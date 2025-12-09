@@ -1,6 +1,6 @@
 # src/fitz_rag/retriever/base.py
 """
-Base Retriever interface for fitz-rag.
+Base Retriever interface for fitz_rag.
 
 This defines the minimal contract for all retrievers:
 - Input: query string
@@ -22,7 +22,7 @@ class BaseRetriever(Protocol):
     """
     Basic retrieval protocol.
 
-    Any retriever used by fitz-rag must implement `retrieve(query: str)`.
+    Any retriever used by fitz_rag must implement `retrieve(query: str)`.
     """
 
     def retrieve(self, query: str) -> List[RetrievedChunk]:

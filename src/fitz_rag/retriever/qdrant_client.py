@@ -1,6 +1,6 @@
 # src/fitz_rag/retriever/qdrant_client.py
 """
-Qdrant client wrapper for fitz-rag.
+Qdrant client wrapper for fitz_rag.
 
 This module provides a thin abstraction over the qdrant-client
 constructor and convenience helpers used across the framework.

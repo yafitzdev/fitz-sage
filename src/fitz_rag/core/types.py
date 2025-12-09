@@ -1,6 +1,6 @@
 # src/fitz_rag/core/types.py
 """
-Core types and dataclasses shared across the fitz-rag library.
+Core types and dataclasses shared across the fitz_rag library.
 """
 
 from __future__ import annotations
