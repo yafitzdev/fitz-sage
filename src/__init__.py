@@ -14,7 +14,7 @@ __all__ = [
     "core",
     "retriever",
     "llm",
-    "chunker",
+    "chunkers",
     "sourcer",
     "pipeline",
     "config",

@@ -22,7 +22,7 @@ class RetrievedChunk:
 
 
 # ---------------------------------------------------------
-# Chunk: generic chunk produced by a chunker
+# Chunk: generic chunk produced by a chunkers
 # ---------------------------------------------------------
 @dataclass
 class Chunk:

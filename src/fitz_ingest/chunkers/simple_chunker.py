@@ -1,6 +1,10 @@
 """
-Simple fixed-size chunker for fitz-rag.
-Splits text into chunks of 500 characters with no overlap.
+Simple fixed-size chunkers for fitz_ingest.
+
+This chunkers:
+- Splits text into 500-character chunks
+- No overlap
+- Metadata includes source file
 """
 
 from __future__ import annotations
@@ -17,9 +21,7 @@ class Chunk:
 
 class SimpleChunker:
     """
-    Very simple chunker that:
-    - Reads a file as text
-    - Splits it into 500-character chunks
+    Minimal file chunkers for ingestion.
     """
 
     def __init__(self, chunk_size: int = 500) -> None:
@@ -42,7 +44,7 @@ class SimpleChunker:
         return self._chunk_text(text, {"source_file": str(path)})
 
     # ---------------------------------------------------------
-    # Chunk pure text
+    # Internal text chunking
     # ---------------------------------------------------------
     def _chunk_text(self, text: str, base_meta: dict) -> List[Chunk]:
         chunks = []
@@ -50,13 +52,13 @@ class SimpleChunker:
         length = len(text)
 
         for i in range(0, length, size):
-            chunk_text = text[i:i + size].strip()
-            if not chunk_text:
+            piece = text[i:i + size].strip()
+            if not piece:
                 continue
 
             chunks.append(
                 Chunk(
-                    text=chunk_text,
+                    text=piece,
                     metadata=dict(base_meta),
                 )
             )

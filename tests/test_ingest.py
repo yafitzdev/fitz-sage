@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import List
 
-from fitz_ingest.chunker.simple_chunker import SimpleChunker
+from fitz_ingest.chunkers.simple_chunker import SimpleChunker
 from fitz_ingest.ingester.engine import IngestionEngine
 from fitz_ingest.vector_db.qdrant_utils import ensure_collection
 
