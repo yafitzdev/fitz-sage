@@ -3,7 +3,7 @@
 High-level RAG pipeline for fitz-rag.
 
 This module glues together:
-- RAGContextBuilder (multi-source retrieval)
+- RAGContextBuilder (multi-source retrieval, optionally with reranking)
 - Prompt builder (TRF + RAG context + task)
 - Chat client (LLM provider)
 
@@ -21,8 +21,8 @@ from fitz_rag.sourcer.rag_base import (
 from fitz_rag.sourcer.prompt_builder import build_user_prompt
 from fitz_rag.llm.chat_client import ChatClient
 
-# NEW – unified config to provide a fallback for max_trf_json_chars
 from fitz_rag.config import get_config
+
 _cfg = get_config()
 
 
@@ -39,7 +39,7 @@ def run_single_rag_analysis(
     """
     Perform a single RAG analysis run:
 
-    - Use `query` for retrieval
+    - Use `query` for retrieval (and optional reranking inside strategies)
     - Use `trf` as the primary JSON context
     - Use `sources` and `context_builder` to build a RetrievalContext
     - Use `task_prompt` as the task description (what the model should do)

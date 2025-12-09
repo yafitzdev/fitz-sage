@@ -1,13 +1,22 @@
+# src/fitz_rag/cli.py
 from __future__ import annotations
 
+import os
 import typer
-from typing import Optional
 import yaml
 
 from fitz_rag.config import get_config
 from fitz_rag.retriever.qdrant_client import create_qdrant_client
 from fitz_rag.retriever.rag_retriever import RAGRetriever
-from fitz_rag.llm.embedding_client import DummyEmbeddingClient  # replace later with real embedder
+
+from fitz_rag.llm.embedding_client import (
+    CohereEmbeddingClient,
+    DummyEmbeddingClient,
+)
+from fitz_rag.llm.rerank_client import (
+    CohereRerankClient,
+    DummyRerankClient,
+)
 
 app = typer.Typer(help="🔥 Fitz-RAG — Retrieval-Augmented Generation Toolkit")
 
@@ -34,8 +43,6 @@ def config_show():
 @app.command("config-path")
 def config_path():
     """Show the active config file path (if any)."""
-    import os
-
     path = os.getenv("FITZ_RAG_CONFIG")
     if path:
         typer.echo(f"Using override config at: {path}")
@@ -70,33 +77,55 @@ def collections_drop(name: str):
 
 
 # ---------------------------------------------------------
-# Query (core RAG retrieval)
+# Query (core RAG retrieval + rerank)
 # ---------------------------------------------------------
 @app.command()
 def query(text: str):
     """
-    Run a basic RAG retrieval using the configured embedding model.
+    Run a basic RAG retrieval using the configured embedding model
+    and optional reranking.
+
+    Requires:
+      - Qdrant running and configured
+      - COHERE_API_KEY set for real embedding/rerank
     """
+
     cfg = get_config()
 
     # 1. Qdrant client
     client = create_qdrant_client()
 
     # 2. Embedding client
-    embedder = DummyEmbeddingClient()  # <-- replace later with real model integration
+    try:
+        embedder = CohereEmbeddingClient()
+        typer.echo("Using Cohere embeddings.")
+    except Exception as exc:
+        typer.echo(f"⚠️  Falling back to DummyEmbeddingClient: {exc}")
+        embedder = DummyEmbeddingClient()
 
-    # 3. Retriever
+    # 3. Rerank client
+    reranker = None
+    try:
+        reranker = CohereRerankClient()
+        typer.echo("Using Cohere reranker.")
+    except Exception as exc:
+        typer.echo(f"⚠️  Falling back to DummyRerankClient: {exc}")
+        reranker = DummyRerankClient()
+
+    # 4. Retriever (with reranking support)
     retr = RAGRetriever(
         client=client,
         embedder=embedder,
-        collection=cfg["qdrant"]["collection"],
-        top_k=cfg["retriever"]["top_k"],
+        collection=cfg.get("qdrant", {}).get("collection", "fitz_default"),
+        top_k=cfg.get("retriever", {}).get("top_k", 10),
+        reranker=reranker,
+        rerank_k=cfg.get("retriever", {}).get("rerank_k", None),
     )
 
-    # 4. Perform retrieval
+    # 5. Perform retrieval
     chunks = retr.retrieve(text)
 
-    typer.echo(f"\n🔍 Retrieved {len(chunks)} chunks:")
+    typer.echo(f"\n🔍 Retrieved {len(chunks)} chunks (after rerank if enabled):")
     typer.echo("--------------------------------------------------")
     for c in chunks:
         path = c.metadata.get("file") or c.metadata.get("source") or "<no-file>"

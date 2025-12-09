@@ -15,12 +15,9 @@ models:
   rerank: "cohere/rerank-3.5"
 
 retriever:
-  # How many items to fetch from the vector DB
   top_k: 20
-  # How many top documents to keep after reranking
-  rerank_k: 5
-  # Optional threshold for rerank relevance scores
-  min_score: 0.0
+  rerank_k: 8
+  max_trf_json_chars: null
 
 ingestion:
   # Chunking settings (tune as needed)
