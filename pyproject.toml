@@ -1,50 +1,54 @@
 [build-system]
-requires = ["setuptools>=61.0.0"]
+requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
+
 
 [project]
 name = "fitz-stack"
 version = "0.1.0"
-description = "A modular, plugin-based RAG framework for multi-source retrieval and LLM context assembly."
-authors = [
-    { name = "Yan Fitzner"}
-]
+description = "The Fitz modular ecosystem: RAG, ingestion, documentation, mapping, grounding and more."
 readme = "README.md"
-requires-python = ">=3.12"
-
-keywords = [
-    "RAG",
-    "retrieval-augmented-generation",
-    "LLM",
-    "AI",
-    "plugins",
-    "modular",
-    "context-building",
-    "qdrant",
+license = { text = "MIT" }
+authors = [
+    { name = "Yan Fitzner" }
 ]
+requires-python = ">=3.10"
 
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3 :: Only",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-]
-
+# Global dependencies shared across all fitz_* packages
 dependencies = [
-    "qdrant-client>=1.9.0",
-    "httpx>=0.24.1",
-    "pydantic>=2.0",
-    "tqdm>=4.0",
-    "python-dotenv>=1.0",
-    "numpy>=1.23",
+    "pyyaml>=6.0",
+    "qdrant-client>=1.7",
+    "httpx>=0.24",
+    "typing-extensions>=4.7",
 ]
 
-[project.urls]
-Homepage = "https://github.com/yafitzdev/fitz-stack"
-Repository = "https://github.com/yafitzdev/fitz-stack"
+
+[project.optional-dependencies]
+docs = ["mkdocs", "mkdocs-material"]
+ingest = ["pdfminer.six", "python-docx"]
+map = ["networkx"]
+ground = ["scikit-learn"]
+
 
 [tool.setuptools]
-package-dir = { "" = "src" }
+package-dir = {"" = "src"}
+
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["fitz_*"]
+exclude = ["tests"]
+
+
+[project.scripts]
+fitz-rag = "fitz_rag.cli:app"
+fitz-ingest = "fitz_ingest.cli:app"
+fitz-docs = "fitz_docs.cli:app"
+fitz-map = "fitz_map.cli:app"
+
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"

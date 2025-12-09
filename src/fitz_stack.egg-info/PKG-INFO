@@ -1,24 +1,26 @@
 Metadata-Version: 2.4
 Name: fitz-stack
 Version: 0.1.0
-Summary: A modular, plugin-based RAG framework for multi-source retrieval and LLM context assembly.
+Summary: The Fitz modular ecosystem: RAG, ingestion, documentation, mapping, grounding and more.
 Author: Yan Fitzner
-Project-URL: Homepage, https://github.com/yafitzdev/fitz-stack
-Project-URL: Repository, https://github.com/yafitzdev/fitz-stack
-Keywords: RAG,retrieval-augmented-generation,LLM,AI,plugins,modular,context-building,qdrant
-Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3 :: Only
-Classifier: License :: OSI Approved :: MIT License
-Classifier: Operating System :: OS Independent
-Requires-Python: >=3.12
+License: MIT
+Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: qdrant-client>=1.9.0
-Requires-Dist: httpx>=0.24.1
-Requires-Dist: pydantic>=2.0
-Requires-Dist: tqdm>=4.0
-Requires-Dist: python-dotenv>=1.0
-Requires-Dist: numpy>=1.23
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: qdrant-client>=1.7
+Requires-Dist: httpx>=0.24
+Requires-Dist: typing-extensions>=4.7
+Provides-Extra: docs
+Requires-Dist: mkdocs; extra == "docs"
+Requires-Dist: mkdocs-material; extra == "docs"
+Provides-Extra: ingest
+Requires-Dist: pdfminer.six; extra == "ingest"
+Requires-Dist: python-docx; extra == "ingest"
+Provides-Extra: map
+Requires-Dist: networkx; extra == "map"
+Provides-Extra: ground
+Requires-Dist: scikit-learn; extra == "ground"
 Dynamic: license-file
 
 # fitz-stack

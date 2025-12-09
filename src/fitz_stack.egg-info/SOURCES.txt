@@ -26,6 +26,7 @@ src/fitz_rag/sourcer/rag_base.py
 src/fitz_stack.egg-info/PKG-INFO
 src/fitz_stack.egg-info/SOURCES.txt
 src/fitz_stack.egg-info/dependency_links.txt
+src/fitz_stack.egg-info/entry_points.txt
 src/fitz_stack.egg-info/requires.txt
 src/fitz_stack.egg-info/top_level.txt
 tests/test_ingest.py
