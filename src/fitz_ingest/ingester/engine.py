@@ -1,6 +1,5 @@
-# src/fitz_rag/ingest/engine.py
 """
-Generic ingestion engine for fitz-rag.
+Generic ingestion engine for fitz-ingest.
 
 This engine:
 - Accepts a Chunker
@@ -18,7 +17,7 @@ from typing import Optional, Any
 
 from qdrant_client import QdrantClient
 
-from src.fitz_rag import ensure_collection
+from fitz_ingest.vector_db.qdrant_utils import ensure_collection
 
 
 class IngestionEngine:
