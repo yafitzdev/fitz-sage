@@ -1,60 +1,97 @@
-from typing import List, Dict
+import pytest
 
-from fitz_rag.core.types import RetrievedChunk
-from fitz_rag.sourcer.rag_base import (
-    ArtefactRetrievalStrategy,
-    SourceConfig,
-    RAGContextBuilder,
-)
-from fitz_rag.llm.chat_client import DummyChatClient
-from fitz_rag.pipeline.engine import run_single_rag_analysis
+from fitz_rag.pipeline.engine import RAGPipeline
+from fitz_rag.generation.rgs import RGS, RGSConfig
+from fitz_rag.models.chunk import Chunk
+from fitz_rag.models.document import Document
 
 
-class DummyStrategy(ArtefactRetrievalStrategy):
-    def retrieve(self, trf: Dict, query: str) -> List[RetrievedChunk]:
-        return [
-            RetrievedChunk(
-                collection="dummy",
-                score=0.99,
-                text=f"chunk for {query}",
-                metadata={"file": "dummy.txt"},
-                chunk_id="1",
-            )
-        ]
+# ---------------------------------------------------------------------
+# Dummy LLM + Retriever for testing
+# ---------------------------------------------------------------------
+
+class DummyLLM:
+    """
+    Fake LLM that records the last messages and returns a predictable answer.
+    """
+
+    def __init__(self):
+        self.last_messages = None
+
+    def chat(self, messages):
+        self.last_messages = messages
+        return "[DUMMY-ANSWER] success"
 
 
-def test_run_single_rag_analysis():
-    # 1) Setup source config + context builder
-    strategy = DummyStrategy()
-    src_cfg = SourceConfig(
-        name="dummy_source",
-        order=1,
-        strategy=strategy,
-        label="DUMMY",
+class DummyRetriever:
+    """
+    Minimal retriever returning a single predictable chunk.
+    """
+
+    def retrieve(self, query, top_k=None):
+        doc = Document(
+            id="doc1",
+            path="dummy.txt",
+            metadata={"source": "unit-test"},
+            content="This is a test document.",
+        )
+        chunk = Chunk(
+            id="chunk1",
+            doc_id="doc1",
+            content=f"retrieved text for: {query}",
+            metadata={"file": "dummy.txt"},
+            chunk_index=0,
+        )
+        return [chunk]
+
+
+# ---------------------------------------------------------------------
+# Pipeline test
+# ---------------------------------------------------------------------
+
+def test_pipeline_end_to_end():
+    """
+    Full pipeline test using:
+    - DummyRetriever
+    - DummyLLM
+    - RGS prompt builder
+    - RAGPipeline coordinator
+    """
+
+    retriever = DummyRetriever()
+    llm = DummyLLM()
+    rgs = RGS(RGSConfig())
+
+    pipeline = RAGPipeline(
+        retriever=retriever,
+        llm=llm,
+        rgs=rgs,
     )
-    sources = [src_cfg]
-    ctx_builder = RAGContextBuilder(sources=sources)
 
-    # 2) Setup dummy chat client
-    chat = DummyChatClient()
+    query = "why did it fail?"
 
-    # 3) Minimal TRF-like dict
-    trf = {"meta": {"id": 123}, "data": "x"}
+    result = pipeline.run(query=query)
 
-    # 4) Run pipeline
-    answer = run_single_rag_analysis(
-        trf=trf,
-        query="why did it fail?",
-        task_prompt="Explain what happened.",
-        system_prompt="You are a test system.",
-        sources=sources,
-        context_builder=ctx_builder,
-        chat_client=chat,
-        max_trf_json_chars=None,
-    )
+    # ------------------------------------------------------------------
+    # Validate pipeline output
+    # ------------------------------------------------------------------
 
-    # 5) Assert we got dummy answer, and prompt was built
-    assert answer.startswith("[DUMMY-ANSWER]")
-    assert "TRF JSON" in chat.last_user_content
-    assert "RAG CONTEXT" in chat.last_user_content
-    assert "Explain what happened." in chat.last_user_content
+    # Check final answer
+    assert result.answer.startswith("[DUMMY-ANSWER]")
+
+    # Check RGS-added source metadata
+    assert len(result.sources) == 1
+    assert result.sources[0].source_id == "chunk1"
+
+    # Check prompt was passed to LLM
+    assert llm.last_messages is not None
+    system_msg = llm.last_messages[0]["content"]
+    user_msg = llm.last_messages[1]["content"]
+
+    assert "retrieval-grounded assistant" in system_msg
+    assert "User question:" in user_msg
+    assert query in user_msg
+    assert "retrieved text for" in user_msg  # chunk content present
+
+    # RGS label check (S1)
+    assert "[S1]" in user_msg

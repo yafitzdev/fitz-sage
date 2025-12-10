@@ -1,121 +1,60 @@
-"""
-RAGPipeline — the core RAG orchestration engine.
-
-This class performs:
-  - dense retrieval
-  - reranking
-  - context building
-  - prompt assembly
-  - LLM chat
-
-EasyRAG (in easy.py) is a thin wrapper that constructs a configured RAGPipeline.
-"""
-
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List, Dict, Any
-
-from fitz_rag.retriever.base import BaseRetriever
-from fitz_rag.llm.rerank_client import RerankClient
-from fitz_rag.llm.chat_client import ChatClient
-from fitz_rag.context.builder import build_context
+from typing import List
+from fitz_rag.models.chunk import Chunk
+from fitz_rag.generation.rgs import RGS, RGSAnswer
 
 
-@dataclass
 class RAGPipeline:
     """
-    The core engine of the fitz-rag retrieval-augmented generation pipeline.
-
-    Users pass in:
-      - retriever (BaseRetriever)
-      - reranker (RerankClient)
-      - chat_client (ChatClient)
-
-    Example:
-        pipeline = RAGPipeline(retriever, reranker, chat_client)
-        answer = pipeline.run("What is this?")
+    Final v0.1.0 RAG pipeline:
+        retriever → chunks
+        RGS → prompt
+        LLM → answer
+        RGS → structured answer
     """
 
-    retriever: BaseRetriever
-    reranker: RerankClient
-    chat_client: ChatClient
+    def __init__(self, retriever, llm, rgs: RGS):
+        self.retriever = retriever
+        self.llm = llm
+        self.rgs = rgs
 
-    system_prompt: str = "You are a helpful assistant."
-    context_chars: int = 4000
-    final_top_k: int = 5
+    def run(self, query: str) -> RGSAnswer:
+        # 1. Retrieve + rerank (retriever handles all of it)
+        chunks: List[Chunk] = self.retriever.retrieve(query)
 
-    # ---------------------------------------------------------
-    # STEP 1 — Dense Retrieval
-    # ---------------------------------------------------------
-    def _retrieve(self, query: str) -> List[Dict[str, Any]]:
-        results = self.retriever.retrieve(query)
-        if not results:
-            return []
+        # 2. Build prompt using RGS
+        prompt = self.rgs.build_prompt(query, chunks)
 
-        chunks = []
-        for r in results:
-            chunks.append(
-                {
-                    "text": r.text,
-                    "file": r.metadata.get("file", "unknown"),
-                }
-            )
-        return chunks
+        messages = [
+            {"role": "system", "content": prompt.system},
+            {"role": "user", "content": prompt.user},
+        ]
 
-    # ---------------------------------------------------------
-    # STEP 2 — Reranking
-    # ---------------------------------------------------------
-    def _rerank(self, query: str, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        if not chunks:
-            return []
+        # 3. LLM call
+        raw = self.llm.chat(messages)
 
-        texts = [c["text"] for c in chunks]
-        indices = self.reranker.rerank(query, texts, top_n=self.final_top_k)
-        return [chunks[i] for i in indices]
+        # 4. Structured answer
+        return self.rgs.build_answer(raw, chunks)
 
-    # ---------------------------------------------------------
-    # STEP 3 — Build Context
-    # ---------------------------------------------------------
-    def _build_context(self, chunks: List[Dict[str, Any]]) -> str:
-        return build_context(chunks, max_chars=self.context_chars)
 
-    # ---------------------------------------------------------
-    # STEP 4 — Build Prompt
-    # ---------------------------------------------------------
-    def _build_prompt(self, context: str, query: str) -> str:
-        return f"""
-CONTEXT:
-{context}
+def create_pipeline(name: str, **kwargs) -> RAGPipeline:
+    name = name.lower()
 
-QUESTION:
-{query}
+    if name in ("easy", "simple"):
+        from fitz_rag.pipeline.easy import EasyRAG
+        return EasyRAG(**kwargs).pipeline
 
-INSTRUCTIONS:
-- Answer ONLY using the context above.
-- If the context does not contain the answer, say: "I don't know."
-""".strip()
+    if name in ("fast",):
+        from fitz_rag.pipeline.fast import FastRAG
+        return FastRAG(**kwargs).pipeline
 
-    # ---------------------------------------------------------
-    # STEP 5 — Chat with LLM
-    # ---------------------------------------------------------
-    def _chat(self, prompt: str) -> str:
-        return self.chat_client.chat(
-            system_prompt=self.system_prompt,
-            user_content=prompt,
-        )
+    if name in ("standard", "default"):
+        from fitz_rag.pipeline.standard import StandardRAG
+        return StandardRAG(**kwargs).pipeline
 
-    # ---------------------------------------------------------
-    # PUBLIC ENTRYPOINT
-    # ---------------------------------------------------------
-    def run(self, query: str) -> str:
-        chunks = self._retrieve(query)
-        if not chunks:
-            return "No relevant information found."
+    if name in ("debug", "verbose"):
+        from fitz_rag.pipeline.debug import DebugRAG
+        return DebugRAG(**kwargs).pipeline
 
-        reranked = self._rerank(query, chunks)
-        context = self._build_context(reranked)
-        prompt = self._build_prompt(context, query)
-
-        answer = self._chat(prompt)
-        return answer
+    raise ValueError(f"Unknown pipeline type: {name}")
