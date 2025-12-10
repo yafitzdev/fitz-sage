@@ -9,7 +9,7 @@ from pathlib import Path
 
 from qdrant_client import QdrantClient
 
-from fitz_ingest.chunkers.simple_chunker import SimpleChunker
+from fitz_ingest.chunker.simple_chunker import SimpleChunker
 from fitz_ingest.ingester.engine import IngestionEngine
 
 

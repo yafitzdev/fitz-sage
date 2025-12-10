@@ -6,8 +6,8 @@ import typer
 import yaml
 
 from fitz_rag.config import get_config
-from fitz_rag.retriever.qdrant_client import create_qdrant_client
-from fitz_rag.retriever.rag_retriever import RAGRetriever
+from fitz_rag.vector_db.qdrant_client import create_qdrant_client
+from fitz_rag.retriever.dense_retriever import RAGRetriever
 
 from fitz_rag.llm.embedding_client import (
     CohereEmbeddingClient,

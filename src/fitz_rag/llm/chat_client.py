@@ -55,9 +55,9 @@ class CohereChatClient:
 
         # New default model (since command-light is gone)
         self.model = (
-                self.model
-                or os.getenv("COHERE_CHAT_MODEL")
-                or "command-r7b-12-2024"
+            self.model
+            or os.getenv("COHERE_CHAT_MODEL")
+            or "command-r7b-12-2024"
         )
 
         self._client = cohere.ClientV2(api_key=key)
@@ -98,6 +98,9 @@ class CohereChatClient:
 @dataclass
 class DummyChatClient:
     prefix: str = "[DUMMY-ANSWER] "
+    last_user_content: Optional[str] = None  # <-- required by tests
 
     def chat(self, system_prompt: str, user_content: str) -> str:
+        # Store the user content so the pipeline tests can inspect the final prompt
+        self.last_user_content = user_content
         return f"{self.prefix}OK"
