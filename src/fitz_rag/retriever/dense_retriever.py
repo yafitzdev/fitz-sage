@@ -1,4 +1,4 @@
-# src/fitz_rag/retriever/rag_retriever.py
+# src/fitz_rag/retriever/dense_retriever.py
 """
 Embedding-based retriever for fitz-rag.
 
@@ -107,7 +107,7 @@ class RAGRetriever(BaseRetriever):
             try:
                 raw = self.client.query_points(
                     collection_name=self.collection,
-                    vector=vector,
+                    query=vector,
                     limit=self.top_k,
                     with_payload=True,
                     with_vectors=False,
