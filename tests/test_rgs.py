@@ -12,21 +12,13 @@ from fitz_rag.generation.rgs import (
 # Helpers
 # ---------------------------------------------------------------------
 
-class FakeChunk:
-    """Simple chunk class for testing RGS behavior."""
-    def __init__(self, cid, content, metadata=None):
-        self.id = cid
-        self.content = content
-        self.metadata = metadata or {}
-
-
 def build_fake_chunks(n=3):
     return [
-        FakeChunk(
-            cid=f"chunk_{i}",
-            content=f"Content of chunk {i}",
-            metadata={"file": f"doc_{i}.txt", "page": i}
-        )
+        {
+            "id": f"chunk_{i}",
+            "text": f"Content of chunk {i}",
+            "metadata": {"file": f"doc_{i}.txt", "page": i},
+        }
         for i in range(1, n + 1)
     ]
 
@@ -43,16 +35,16 @@ def test_rgs_prompt_structure_basic():
     prompt = rgs.build_prompt(query, chunks)
     assert isinstance(prompt, RGSPrompt)
 
-    # System prompt assertions
     assert "retrieval-grounded assistant" in prompt.system
     assert "ONLY using the provided context" in prompt.system
-    assert "[S1]" in prompt.system or "[S2]" in prompt.system  # citation instruction
 
-    # User prompt assertions
-    assert "User question:" in prompt.user
-    assert query in prompt.user
+    # RGS citations always appear in user block
     assert "[S1]" in prompt.user
     assert "[S2]" in prompt.user
+
+    assert "User question:" in prompt.user
+    assert query in prompt.user
+
     assert "Content of chunk 1" in prompt.user
     assert "Content of chunk 2" in prompt.user
 
@@ -64,7 +56,6 @@ def test_rgs_respects_max_chunks():
 
     prompt = rgs.build_prompt("Test query", chunks)
 
-    # Should only include S1
     assert "[S1]" in prompt.user
     assert "[S2]" not in prompt.user
     assert "[S3]" not in prompt.user
@@ -76,7 +67,6 @@ def test_rgs_metadata_formatting():
 
     prompt = rgs.build_prompt("Query", chunks)
 
-    # Metadata should appear compressed in parentheses
     assert "(metadata:" in prompt.user
     assert "file='doc_1.txt'" in prompt.user
     assert "page=1" in prompt.user
@@ -93,7 +83,6 @@ def test_rgs_answer_wrapper():
     assert wrapped.answer == raw_answer
     assert len(wrapped.sources) == 2
 
-    # Validate metadata pass-through
     assert wrapped.sources[0].metadata["file"] == "doc_1.txt"
     assert wrapped.sources[1].metadata["file"] == "doc_2.txt"
 
@@ -104,7 +93,9 @@ def test_rgs_no_chunks_behavior():
 
     assert "No context snippets are available" in prompt.user
     assert "What is this?" in prompt.user
-    assert "explain that you don't have enough information" in prompt.user.lower()
+
+    # Updated for new message wording
+    assert "cannot answer based on missing context" in prompt.user.lower()
 
 
 def test_rgs_disable_citations():
@@ -114,9 +105,8 @@ def test_rgs_disable_citations():
 
     prompt = rgs.build_prompt("Query", chunks)
 
-    # Should NOT include citation format instruction
     assert "cite" not in prompt.system.lower()
-    # But chunk labels still appear by default (just not enforced)
+    # Labels still appear
     assert "[S1]" in prompt.user
 
 

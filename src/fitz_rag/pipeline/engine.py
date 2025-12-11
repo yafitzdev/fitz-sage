@@ -8,8 +8,6 @@ from fitz_rag.config.schema import RAGConfig
 from fitz_rag.config.loader import load_config
 
 from fitz_rag.retriever.plugins.dense import RAGRetriever
-from fitz_rag.llm.embedding.plugins.cohere import CohereEmbeddingClient
-from fitz_rag.llm.rerank.plugins.cohere import CohereRerankClient
 from fitz_rag.llm.chat.engine import ChatEngine
 from fitz_rag.llm.chat.plugins.cohere import CohereChatClient
 
@@ -27,10 +25,10 @@ logger = get_logger(__name__)
 
 class RAGPipeline:
     """
-    Final v0.1.0 RAG pipeline using ONLY the unified config system.
+    Final v0.1.0 RAG pipeline using the unified config system.
 
     Pipeline:
-        1. Retriever retrieves + reranks chunks
+        1. Retriever retrieves (+ optional rerank) chunks
         2. RGS builds prompt
         3. LLM executes
         4. RGS builds answer structure
@@ -95,7 +93,7 @@ class RAGPipeline:
     def from_config(cls, cfg: RAGConfig) -> "RAGPipeline":
         logger.info(f"{PIPELINE} Building RAGPipeline from unified config")
 
-        # Resolve API key (shared for embedding/chat/rerank)
+        # Resolve API key (shared for chat / and indirectly for embedding & rerank)
         key = (
             cfg.llm.api_key
             or cfg.embedding.api_key
@@ -105,37 +103,14 @@ class RAGPipeline:
             raise PipelineError("No API key provided in any config section.")
 
         # ---------------- Qdrant Client ----------------
-        logger.debug(f"{PIPELINE} Connecting to Qdrant at {cfg.retriever.qdrant_host}:{cfg.retriever.qdrant_port}")
+        logger.debug(
+            f"{PIPELINE} Connecting to Qdrant at "
+            f"{cfg.retriever.qdrant_host}:{cfg.retriever.qdrant_port}"
+        )
         qdrant = QdrantClient(
             host=cfg.retriever.qdrant_host,
             port=cfg.retriever.qdrant_port,
         )
-
-        # ---------------- Embedder ---------------------
-        if cfg.embedding.provider.lower() != "cohere":
-            raise PipelineError(f"Unsupported embedding provider: {cfg.embedding.provider}")
-
-        logger.debug(f"{PIPELINE} Initializing embedding model '{cfg.embedding.model}'")
-        embedder = CohereEmbeddingClient(
-            api_key=key,
-            model=cfg.embedding.model,
-        )
-
-        # ---------------- Reranker (optional) ---------
-        if cfg.rerank.enabled:
-            if cfg.rerank.provider.lower() != "cohere":
-                raise PipelineError(f"Unsupported rerank provider: {cfg.rerank.provider}")
-            if not cfg.rerank.model:
-                raise PipelineError("rerank.model must be set if reranking is enabled")
-
-            logger.debug(f"{PIPELINE} Initializing rerank model '{cfg.rerank.model}'")
-            reranker = CohereRerankClient(
-                api_key=key,
-                model=cfg.rerank.model,
-            )
-        else:
-            logger.debug(f"{PIPELINE} Reranker disabled")
-            reranker = None
 
         # ---------------- Chat LLM ---------------------
         if cfg.llm.provider.lower() != "cohere":
@@ -147,21 +122,19 @@ class RAGPipeline:
             model=cfg.llm.model,
             temperature=cfg.llm.temperature,
         )
-
         chat = ChatEngine(chat_plugin)
 
         # ---------------- Retriever --------------------
-        logger.debug(f"{PIPELINE} Constructing retriever")
+        # NOTE: Embedding + rerank are now wired inside the retriever plugin
+        # (DenseRetrievalPlugin / RAGRetriever). It uses cfg.embedding /
+        # cfg.rerank plus the shared Qdrant client.
+        logger.debug(f"{PIPELINE} Constructing retriever (dense)")
         retriever = RAGRetriever(
             client=qdrant,
             embed_cfg=cfg.embedding,
             retriever_cfg=cfg.retriever,
             rerank_cfg=cfg.rerank,
         )
-
-        # override embedder + reranker
-        retriever.embedder = embedder
-        retriever.reranker = reranker
 
         # ---------------- RGS --------------------------
         logger.debug(f"{PIPELINE} Initializing RGS runtime config")

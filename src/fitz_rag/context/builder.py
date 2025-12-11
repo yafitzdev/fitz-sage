@@ -1,159 +1,274 @@
-"""
-Context builder for fitz_rag.
-
-This module handles:
-- merging retrieved chunks
-- grouping by document
-- deduplication
-- packing the final context window for RAG prompts
-
-This is NOT responsible for chunk creation (that belongs to fitz_ingest).
-"""
-
 from __future__ import annotations
 
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Mapping
 
 from fitz_rag.exceptions.pipeline import PipelineError
 
+ChunkDict = Dict[str, Any]
 
-# ---------------------------------------------------------
-# Internal helper
-# ---------------------------------------------------------
+
 def _normalize_text(text: str) -> str:
-    try:
-        return (
-            text.replace("\r", "")
-            .replace("\t", " ")
-            .strip()
+    """
+    Normalize text for deduplication:
+    - strip leading/trailing whitespace
+    - collapse internal whitespace to single spaces
+    """
+    if text is None:
+        return ""
+    # Split on any whitespace and re-join with single spaces
+    return " ".join(str(text).split())
+
+
+def _to_chunk_dict(chunk_like: Any) -> ChunkDict:
+    """
+    Universal normalization layer for 'chunks'.
+
+    Accepts:
+    - dicts with keys like text, metadata, id, score, file
+    - legacy Chunk objects with .text/.content/.metadata/.id/.score
+    - simple test objects with .content and .metadata
+
+    Returns a canonical dict:
+
+        {
+            "id": str | None,
+            "text": str,
+            "metadata": dict,
+            "score": float | None,
+        }
+
+    Also normalizes 'file' from either metadata["file"] or top-level "file".
+    """
+    # If it's already a dict, start from a shallow copy
+    if isinstance(chunk_like, dict):
+        data = dict(chunk_like)
+        text = (
+            data.get("text")
+            if data.get("text") is not None
+            else data.get("content")
         )
-    except Exception as e:
-        raise PipelineError("Failed normalizing text") from e
+        metadata = data.get("metadata") or {}
+        if not isinstance(metadata, Mapping):
+            metadata = {}
+
+        # If there's a top-level 'file', ensure it is reflected in metadata
+        file_val = data.get("file") or metadata.get("file")
+        if file_val is not None:
+            metadata = dict(metadata)
+            metadata.setdefault("file", file_val)
+
+        return {
+            "id": data.get("id"),
+            "text": str(text) if text is not None else "",
+            "metadata": metadata,
+            "score": data.get("score"),
+        }
+
+    # Fallback: treat as an object with attributes
+    text = getattr(chunk_like, "text", None)
+    if text is None:
+        text = getattr(chunk_like, "content", "")
+
+    metadata = getattr(chunk_like, "metadata", {}) or {}
+    if not isinstance(metadata, Mapping):
+        metadata = {}
+
+    cid = getattr(chunk_like, "id", None)
+    score = getattr(chunk_like, "score", None)
+
+    # Optional 'file' attribute
+    file_val = getattr(chunk_like, "file", None) or metadata.get("file")
+    if file_val is not None:
+        metadata = dict(metadata)
+        metadata.setdefault("file", file_val)
+
+    return {
+        "id": cid,
+        "text": str(text),
+        "metadata": metadata,
+        "score": score,
+    }
 
 
-# ---------------------------------------------------------
-# 1) Deduplication
-# ---------------------------------------------------------
-def dedupe_chunks(chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def dedupe_chunks(chunks: List[Any]) -> List[ChunkDict]:
+    """
+    Deduplicate based on normalized text.
+    The first occurrence is kept.
+    Returns canonical dict chunks.
+    """
     try:
         seen = set()
-        output = []
+        output: List[ChunkDict] = []
 
         for ch in chunks:
-            text_norm = _normalize_text(ch.get("text", ""))
+            c = _to_chunk_dict(ch)
+            text_norm = _normalize_text(c["text"])
             if text_norm in seen:
                 continue
+
             seen.add(text_norm)
-            ch["text"] = text_norm
-            output.append(ch)
+
+            # Create a new dict with normalized text
+            c_out = dict(c)
+            c_out["text"] = text_norm
+            output.append(c_out)
 
         return output
+
     except Exception as e:
         raise PipelineError("Failed deduplication of chunks") from e
 
 
-# ---------------------------------------------------------
-# 2) Grouping by file / document
-# ---------------------------------------------------------
-def group_by_document(chunks: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+def group_by_document(chunks: List[Any]) -> Dict[str, List[ChunkDict]]:
+    """
+    Group chunks by their 'file' origin.
+
+    Priority:
+    - metadata["file"]
+    - top-level "file"
+    - "unknown"
+    """
     try:
-        groups = {}
+        groups: Dict[str, List[ChunkDict]] = {}
+
         for ch in chunks:
-            f = ch.get("file", "unknown")
-            groups.setdefault(f, []).append(ch)
+            c = _to_chunk_dict(ch)
+            meta = c.get("metadata", {}) or {}
+            file_val = meta.get("file") or getattr(ch, "file", None)
+
+            if file_val is None and isinstance(ch, dict):
+                file_val = ch.get("file")
+
+            if file_val is None:
+                file_val = "unknown"
+
+            # Ensure metadata["file"] is set for downstream consumers
+            meta = dict(meta)
+            meta.setdefault("file", file_val)
+            c["metadata"] = meta
+
+            groups.setdefault(str(file_val), []).append(c)
+
         return groups
+
     except Exception as e:
         raise PipelineError("Failed grouping chunks by document") from e
 
 
-# ---------------------------------------------------------
-# 3) Merge adjacent chunks
-# ---------------------------------------------------------
-def merge_adjacent_chunks(chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def merge_adjacent_chunks(chunks: List[Any]) -> List[ChunkDict]:
+    """
+    Merge adjacent chunks that belong to the same document (same 'file').
+    """
     try:
         if not chunks:
             return []
 
-        merged = []
-        buffer_text = chunks[0]["text"]
-        buffer_meta = dict(chunks[0])
+        normed = [_to_chunk_dict(ch) for ch in chunks]
 
-        for prev, curr in zip(chunks, chunks[1:]):
-            same_doc = curr.get("file") == prev.get("file")
+        merged: List[ChunkDict] = []
 
-            if same_doc:
-                buffer_text += "\n" + curr["text"]
+        def file_of(c: ChunkDict) -> str:
+            meta = c.get("metadata", {}) or {}
+            return str(meta.get("file", "unknown"))
+
+        buffer = dict(normed[0])
+        buffer_text = buffer.get("text", "")
+        buffer_file = file_of(buffer)
+
+        for curr in normed[1:]:
+            curr_file = file_of(curr)
+
+            if curr_file == buffer_file:
+                # same doc → append text
+                buffer_text += "\n" + curr.get("text", "")
             else:
-                merged.append({
-                    "text": buffer_text,
-                    **{k: v for k, v in buffer_meta.items() if k != "text"},
-                })
-                buffer_text = curr["text"]
-                buffer_meta = curr
+                # flush buffer
+                buffer["text"] = buffer_text
+                merged.append(buffer)
 
-        merged.append({
-            "text": buffer_text,
-            **{k: v for k, v in buffer_meta.items() if k != "text"},
-        })
+                # start new buffer
+                buffer = dict(curr)
+                buffer_text = buffer.get("text", "")
+                buffer_file = curr_file
+
+        # flush last buffer
+        buffer["text"] = buffer_text
+        merged.append(buffer)
 
         return merged
+
     except Exception as e:
         raise PipelineError("Failed merging adjacent chunks") from e
 
 
-# ---------------------------------------------------------
-# 4) Pack context window
-# ---------------------------------------------------------
 def pack_context_window(
-    chunks: List[Dict[str, Any]],
+    chunks: List[Any],
     max_chars: int = 6000,
-) -> List[Dict[str, Any]]:
+) -> List[ChunkDict]:
+    """
+    Return the largest prefix of chunks whose total text does not exceed max_chars.
+    Returns canonical dict chunks.
+    """
     try:
-        packed = []
+        packed: List[ChunkDict] = []
         total = 0
 
         for ch in chunks:
-            txt = ch["text"]
-            if total + len(txt) > max_chars:
+            c = _to_chunk_dict(ch)
+            t = c.get("text", "")
+            if not isinstance(t, str):
+                t = str(t)
+
+            if total + len(t) > max_chars:
                 break
-            packed.append(ch)
-            total += len(txt)
+
+            packed.append(c)
+            total += len(t)
 
         return packed
+
     except Exception as e:
         raise PipelineError("Failed packing context window") from e
 
 
-# ---------------------------------------------------------
-# 5) Main API
-# ---------------------------------------------------------
 def build_context(
-    retrieved_chunks: List[Dict[str, Any]],
+    retrieved_chunks: List[Any],
     max_chars: int = 6000,
 ) -> str:
+    """
+    High-level context builder used by RAG pipeline.
+
+    Steps:
+    - dedupe
+    - group by document
+    - merge adjacent within each doc
+    - pack into max_chars
+    - render as markdown sections
+    """
     try:
         clean_chunks = dedupe_chunks(retrieved_chunks)
         groups = group_by_document(clean_chunks)
 
-        merged_per_doc = []
+        merged_per_doc: List[ChunkDict] = []
         for _, chs in groups.items():
-            merged = merge_adjacent_chunks(chs)
-            merged_per_doc.extend(merged)
+            merged_per_doc.extend(merge_adjacent_chunks(chs))
 
-        merged_list = merged_per_doc
-        packed = pack_context_window(merged_list, max_chars=max_chars)
+        packed = pack_context_window(merged_per_doc, max_chars=max_chars)
 
-        final_sections = []
+        final_sections: List[str] = []
         for ch in packed:
-            file = ch.get("file", "unknown")
-            text = ch["text"]
+            c = _to_chunk_dict(ch)
+            meta = c.get("metadata", {}) or {}
+            file_val = meta.get("file") or "unknown"
+            text = c.get("text", "")
 
             section = (
-                f"### Source: {file}\n"
+                f"### Source: {file_val}\n"
                 f"{text}\n"
             )
             final_sections.append(section)
 
         return "\n".join(final_sections)
+
     except Exception as e:
         raise PipelineError("Failed to build context window") from e

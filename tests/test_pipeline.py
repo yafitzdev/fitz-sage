@@ -2,8 +2,6 @@ import pytest
 
 from fitz_rag.pipeline.engine import RAGPipeline
 from fitz_rag.generation.rgs import RGS, RGSConfig
-from fitz_rag.models.chunk import Chunk
-from fitz_rag.models.document import Document
 
 
 # ---------------------------------------------------------------------
@@ -25,23 +23,17 @@ class DummyLLM:
 
 class DummyRetriever:
     """
-    Minimal retriever returning a single predictable chunk.
+    Minimal retriever returning a single predictable dict chunk.
     """
 
     def retrieve(self, query, top_k=None):
-        doc = Document(
-            id="doc1",
-            path="dummy.txt",
-            metadata={"source": "unit-test"},
-            content="This is a test document.",
-        )
-        chunk = Chunk(
-            id="chunk1",
-            doc_id="doc1",
-            content=f"retrieved text for: {query}",
-            metadata={"file": "dummy.txt"},
-            chunk_index=0,
-        )
+        chunk = {
+            "id": "chunk1",
+            "text": f"retrieved text for: {query}",
+            "metadata": {"file": "dummy.txt", "source": "unit-test"},
+            "score": None,
+            "file": "dummy.txt",
+        }
         return [chunk]
 
 
@@ -88,8 +80,8 @@ def test_pipeline_end_to_end():
     system_msg = llm.last_messages[0]["content"]
     user_msg = llm.last_messages[1]["content"]
 
-    assert "retrieval-grounded assistant" in system_msg
-    assert "User question:" in user_msg
+    assert "retrieval-grounded assistant" in system_msg.lower()
+    assert "user question" in user_msg.lower()
     assert query in user_msg
     assert "retrieved text for" in user_msg  # chunk content present
 

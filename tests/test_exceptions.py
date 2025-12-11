@@ -24,9 +24,6 @@ from fitz_rag.sourcer.rag_base import (
     PluginLoadError,
 )
 
-# core model (only needed to satisfy imports)
-from fitz_rag.models.chunk import Chunk
-
 
 # ---------------------------------------------------------------------
 # HELPERS
@@ -39,15 +36,16 @@ class DummyStrategy(ArtefactRetrievalStrategy):
 
 
 class FakeStrategy(ArtefactRetrievalStrategy):
-    """Strategy that returns chunks normally."""
+    """Strategy that returns dict chunks."""
     def retrieve(self, trf, query):
         return [
-            Chunk(
-                id="1",
-                doc_id="doc",
-                content="hello",
-                metadata={"chunk_index": 0},
-            )
+            {
+                "id": "1",
+                "text": "hello",
+                "file": "doc",
+                "metadata": {"chunk_index": 0},
+                "score": None,
+            }
         ]
 
 
@@ -60,11 +58,9 @@ def test_embedding_error_message():
     from fitz_rag.retriever.plugins.dense import RAGRetriever
     from fitz_rag.config.schema import EmbeddingConfig, RetrieverConfig
 
-    # config objects
     embed_cfg = EmbeddingConfig(provider="cohere", api_key="x", model="y")
     retr_cfg = RetrieverConfig(collection="test", top_k=5)
 
-    # mock embedder to fail
     with patch("fitz_rag.llm.embedding.plugins.cohere.CohereEmbeddingClient.embed") as m:
         m.side_effect = RuntimeError("embedding crash")
 
@@ -90,7 +86,6 @@ def test_vector_search_error_message():
     mock_client = MagicMock()
     mock_client.search.side_effect = RuntimeError("qdrant boom")
 
-    # mock embed returns a valid vector
     with patch("fitz_rag.llm.embedding.plugins.cohere.CohereEmbeddingClient.embed") as embed_mock:
         embed_mock.return_value = [0.1, 0.2, 0.3]
 
@@ -114,11 +109,9 @@ def test_rerank_error_message():
     retr_cfg = RetrieverConfig(collection="test", top_k=5)
     rerank_cfg = RerankConfig(provider="cohere", api_key="x", model="rerank", enabled=True)
 
-    # mock successful embed
     with patch("fitz_rag.llm.embedding.plugins.cohere.CohereEmbeddingClient.embed") as embed_mock:
         embed_mock.return_value = [0.1, 0.2, 0.3]
 
-        # mock qdrant returning one hit
         mock_hit = MagicMock()
         mock_hit.id = "1"
         mock_hit.payload = {"text": "a", "metadata": {}}
@@ -126,7 +119,6 @@ def test_rerank_error_message():
         mock_client = MagicMock()
         mock_client.search.return_value = [mock_hit]
 
-        # mock reranker to fail
         with patch("fitz_rag.llm.rerank.plugins.cohere.CohereRerankClient.rerank") as rerank_mock:
             rerank_mock.side_effect = RuntimeError("rerank boom")
 
@@ -158,10 +150,7 @@ def test_prompt_builder_invalid_json():
 
 def test_prompt_builder_chunk_format_error():
     """Formatting chunks should raise PromptBuilderError if chunk fields fail."""
-    bad_chunk = MagicMock()
-    bad_chunk.metadata = None  # accessing metadata.get will explode
-    bad_chunk.text = "hello"
-    bad_chunk.score = 0.5
+    bad_chunk = {"text": "hello", "metadata": None, "score": 0.5}
 
     ctx = RetrievalContext(query="q", artefacts={"src": [bad_chunk]})
     sources = [SourceConfig(name="src", order=0, strategy=MagicMock())]
@@ -187,7 +176,7 @@ def test_plugin_load_error():
 def test_retrieval_strategy_error_attached():
     """
     RAGContextBuilder should not crash on strategy failure.
-    Instead, it should store an error chunk with message.
+    Instead, it should store an error chunk (dict) with a message.
     """
     ctx_builder = RAGContextBuilder(
         sources=[SourceConfig(name="fail_src", order=0, strategy=DummyStrategy())]
@@ -198,12 +187,7 @@ def test_retrieval_strategy_error_attached():
     # fail_src should be empty list
     assert ctx.artefacts["fail_src"] == []
 
-    # fail_src_error should contain a Chunk with the error message
+    # fail_src_error should contain a dict with a text field
     err_chunks = ctx.artefacts["fail_src_error"]
     assert len(err_chunks) == 1
-    assert "Retrieval error in fail_src" in err_chunks[0].text
-
-
-# ---------------------------------------------------------------------
-# END OF FILE
-# ---------------------------------------------------------------------
+    assert "Retrieval error in fail_src" in err_chunks[0]["text"]

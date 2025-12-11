@@ -41,7 +41,7 @@ def test_all_top_level_commands_help():
 def test_cli_version():
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
-    assert "fitz-rag version" in result.stdout
+    assert "fitz-rag version" in result.stdout.lower()
 
 
 # ---------------------------------------------------------

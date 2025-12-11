@@ -4,9 +4,7 @@ Tests for fitz_ingest ingestion flow.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from typing import List
 
 from fitz_ingest.chunker.plugins.simple import SimpleChunker
 from fitz_ingest.chunker.engine import ChunkingEngine
@@ -52,9 +50,12 @@ def test_simple_chunker(tmp_path: Path):
     chunks = engine.chunk_file(str(file_path))
 
     assert len(chunks) == 3
-    assert chunks[0].text == "A" * 500
-    assert chunks[1].text == "A" * 500
-    assert chunks[2].text == "A" * 200
+
+    assert chunks[0]["text"] == "A" * 500
+    assert chunks[1]["text"] == "A" * 500
+    assert chunks[2]["text"] == "A" * 200
+
+    assert "source_file" in chunks[0]["metadata"]
 
 
 def test_ensure_collection():
@@ -75,11 +76,10 @@ def test_ingestion_engine(tmp_path: Path):
     test_file = tmp_path / "doc.txt"
     test_file.write_text("hello world " * 100)  # ~1200 chars
 
-    # Build plugin + chunking engine
     plugin = SimpleChunker(chunk_size=500)
     chunker_engine = ChunkingEngine(plugin)
 
-    # Build ingestion engine
+    # Ingestion engine now uses dict chunks
     engine = IngestionEngine(
         client=client,
         collection="my_col",
@@ -88,7 +88,6 @@ def test_ingestion_engine(tmp_path: Path):
         embedder=None,
     )
 
-    # Run ingestion
     engine.ingest_file(test_file)
 
     assert len(client.upsert_calls) == 1
@@ -97,6 +96,6 @@ def test_ingestion_engine(tmp_path: Path):
     assert collection_name == "my_col"
     assert len(points) == 3  # 1200 chars => 500 + 500 + 200
 
-    # Validate structure
+    # Validate dict chunk structure
     assert "text" in points[0]["payload"]
     assert "file" in points[0]["payload"]

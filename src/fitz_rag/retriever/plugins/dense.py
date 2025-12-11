@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Any
 
-from fitz_rag.core import Chunk
+from fitz_rag.core import Chunk  # universal chunk
 
 # Embedding
 from fitz_rag.llm.embedding.engine import EmbeddingEngine
@@ -41,13 +41,11 @@ class DenseRetrievalPlugin(RetrievalPlugin):
       1) Embed query via EmbeddingEngine
       2) Dense vector search via Qdrant
       3) Optional rerank via RerankEngine
-      4) Returns Chunk objects
+      4) Returns Chunk objects (universal model)
 
-    This class is auto-registered in the retrieval registry via the
-    `plugin_name` attribute and module auto-discovery.
+    This class is auto-registered in the retrieval registry.
     """
 
-    # Required for auto-discovery registry
     plugin_name: str = "dense"
 
     # Core dependencies
@@ -72,11 +70,9 @@ class DenseRetrievalPlugin(RetrievalPlugin):
             embed_plugin = CohereEmbeddingClient(
                 api_key=self.embed_cfg.api_key,
                 model=self.embed_cfg.model,
-                # Safe default; config no longer carries input_type
                 input_type="search_query",
                 output_dimension=self.embed_cfg.output_dimension,
             )
-            # EmbeddingEngine wraps the raw plugin
             self.embedder = EmbeddingEngine(embed_plugin)
 
         # 2. RERANK ENGINE (if enabled)
@@ -109,7 +105,7 @@ class DenseRetrievalPlugin(RetrievalPlugin):
             raise EmbeddingError(f"Failed to embed query: {query}") from e
 
         # -----------------------------
-        # 2) VECTOR SEARCH (Qdrant)
+        # 2) VECTOR SEARCH
         # -----------------------------
         try:
             logger.debug(
@@ -126,7 +122,7 @@ class DenseRetrievalPlugin(RetrievalPlugin):
                     with_payload=True,
                 )
             except TypeError:
-                # MockQdrantSearchClient in tests (positional args)
+                # MockQdrantSearchClient in tests (positional)
                 hits = self.client.search(
                     self.retriever_cfg.collection,
                     query_vector,
@@ -139,20 +135,20 @@ class DenseRetrievalPlugin(RetrievalPlugin):
                 f"Vector search failed for collection '{self.retriever_cfg.collection}'"
             ) from e
 
-        # Convert hits → Chunk objects
+        # -----------------------------
+        # Convert hits → universal Chunk
+        # -----------------------------
         chunks: List[Chunk] = []
 
         for hit in hits:
             payload = getattr(hit, "payload", {}) or {}
-            text = payload.get("text", "")
-            metadata = payload
-            score = getattr(hit, "score", 0.0)
 
             chunks.append(
                 Chunk(
-                    text=text,
-                    metadata=metadata,
-                    score=score,
+                    id=getattr(hit, "id", None),              # universal Chunk.id
+                    text=payload.get("text", ""),             # universal Chunk.text
+                    metadata=payload,                         # universal Chunk.metadata
+                    score=getattr(hit, "score", None),        # universal Chunk.score
                 )
             )
 
@@ -161,9 +157,8 @@ class DenseRetrievalPlugin(RetrievalPlugin):
         # -----------------------------
         if self.rerank_engine:
             logger.debug(f"{RERANK} Running rerank engine on {len(chunks)} chunks")
+
             try:
-                # Tests patch the underlying Cohere plugin directly:
-                #   fitz_rag.llm.rerank.plugins.cohere.CohereRerankClient.rerank
                 chunks = self.rerank_engine.plugin.rerank(query, chunks)
             except Exception as e:
                 logger.error(f"{RERANK} Rerank failed: {e}")
@@ -183,8 +178,5 @@ class RAGRetriever(DenseRetrievalPlugin):
     Existing code can continue to import:
 
         from fitz_rag.retriever.plugins.dense import RAGRetriever
-
-    while new code can instead work with the generic RetrievalPlugin
-    interface (e.g. via RetrieverEngine + registry).
     """
     pass

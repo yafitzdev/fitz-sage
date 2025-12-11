@@ -66,6 +66,7 @@ def test_rerank():
         "Cars use engines to generate torque.",
     ]
 
+    # Use the signature expected by the actual client implementation
     order = reranker.rerank(query, docs, top_n=2)
 
     print(f"Rerank order: {order}")

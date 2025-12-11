@@ -1,15 +1,24 @@
 """
 Core types and dataclasses shared across the fitz_rag library.
+
+This module now uses the universal Chunk model defined in fitz_stack.core.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Any, Protocol, List
+from typing import Dict, Any
+
+# ---------------------------------------------------------
+# Import the universal Chunk
+# ---------------------------------------------------------
+from fitz_stack.core import Chunk
 
 
 # ---------------------------------------------------------
-# RetrievedChunk: common object returned by all strategies
+# RetrievedChunk:
+# A wrapper describing *how* a chunk was retrieved from the vector DB.
+# NOTE: This is NOT the actual chunk object used in pipelines.
 # ---------------------------------------------------------
 @dataclass
 class RetrievedChunk:
@@ -18,18 +27,3 @@ class RetrievedChunk:
     text: str
     metadata: Dict[str, Any]
     chunk_id: Any
-
-
-# ---------------------------------------------------------
-# Chunk: generic chunk produced by chunkers and retrievers
-# ---------------------------------------------------------
-@dataclass
-class Chunk:
-    id: str = "unknown"               # retriever doesn't provide an ID
-    text: str = ""
-    metadata: Dict[str, Any] | None = None
-    score: float | None = None        # added for retriever tests
-
-    def __post_init__(self):
-        if self.metadata is None:
-            self.metadata = {}

@@ -6,11 +6,12 @@ from fitz_ingest.ingester.validation import (
 )
 
 
-# Helper: minimal mock chunk
-class MockChunk:
-    def __init__(self, text, metadata):
-        self.text = text
-        self.metadata = metadata
+# ---------------------------------------------------------
+# Helper: minimal mock chunk (dict-based)
+# ---------------------------------------------------------
+
+def make_chunk(text, metadata):
+    return {"text": text, "metadata": metadata}
 
 
 # ---------------------------------------------------------
@@ -21,8 +22,8 @@ def test_validation_passes_on_valid_chunks():
     validator = IngestionValidator()
 
     chunks = [
-        MockChunk("hello world", {"doc_id": "1", "chunk_index": 0}),
-        MockChunk("another chunk", {"doc_id": "1", "chunk_index": 1}),
+        make_chunk("hello world", {"doc_id": "1", "chunk_index": 0}),
+        make_chunk("another chunk", {"doc_id": "1", "chunk_index": 1}),
     ]
 
     # Should not raise
@@ -36,8 +37,7 @@ def test_validation_passes_on_valid_chunks():
 def test_validation_fails_non_string_text():
     validator = IngestionValidator()
 
-    # text is not a string
-    chunks = [MockChunk(12345, {})]
+    chunks = [make_chunk(12345, {})]  # invalid, text must be str
 
     with pytest.raises(
         IngestionValidationError,
@@ -55,7 +55,7 @@ def test_validation_fails_on_invalid_length():
     validator = IngestionValidator(cfg)
 
     # too short
-    chunks = [MockChunk("hi", {})]
+    chunks = [make_chunk("hi", {})]
 
     with pytest.raises(
         IngestionValidationError,
@@ -64,7 +64,7 @@ def test_validation_fails_on_invalid_length():
         validator.validate_chunks(chunks, "file.txt")
 
     # too long
-    chunks = [MockChunk("this is way too long", {})]
+    chunks = [make_chunk("this is way too long", {})]
 
     with pytest.raises(
         IngestionValidationError,
@@ -80,8 +80,7 @@ def test_validation_fails_on_invalid_length():
 def test_validation_fails_invalid_metadata():
     validator = IngestionValidator()
 
-    # metadata is not a dict/mapping
-    chunks = [MockChunk("hello", metadata="not-a-dict")]
+    chunks = [make_chunk("hello", "not-a-dict")]
 
     with pytest.raises(
         IngestionValidationError,
@@ -101,7 +100,7 @@ def test_validation_required_metadata_keys():
     validator = IngestionValidator(cfg)
 
     # Missing 'chunk_index'
-    chunks = [MockChunk("hello", {"doc_id": "abc"})]
+    chunks = [make_chunk("hello", {"doc_id": "abc"})]
 
     with pytest.raises(
         IngestionValidationError,
@@ -118,9 +117,9 @@ def test_validation_identifies_correct_chunk_index():
     validator = IngestionValidator()
 
     chunks = [
-        MockChunk("valid text", {"a": 1}),
-        MockChunk(123, {"a": 2}),  # invalid text here
-        MockChunk("valid again", {"a": 3}),
+        make_chunk("valid text", {"a": 1}),
+        make_chunk(123, {"a": 2}),  # invalid text here
+        make_chunk("valid again", {"a": 3}),
     ]
 
     with pytest.raises(
