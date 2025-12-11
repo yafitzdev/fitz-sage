@@ -65,7 +65,7 @@ def test_embedding_error_message():
     retr_cfg = RetrieverConfig(collection="test", top_k=5)
 
     # mock embedder to fail
-    with patch("fitz_rag.llm.embedding_client.CohereEmbeddingClient.embed") as m:
+    with patch("fitz_rag.llm.embedding.plugins.cohere.CohereEmbeddingClient.embed") as m:
         m.side_effect = RuntimeError("embedding crash")
 
         retr = RAGRetriever(
@@ -91,7 +91,7 @@ def test_vector_search_error_message():
     mock_client.search.side_effect = RuntimeError("qdrant boom")
 
     # mock embed returns a valid vector
-    with patch("fitz_rag.llm.embedding_client.CohereEmbeddingClient.embed") as embed_mock:
+    with patch("fitz_rag.llm.embedding.plugins.cohere.CohereEmbeddingClient.embed") as embed_mock:
         embed_mock.return_value = [0.1, 0.2, 0.3]
 
         retr = RAGRetriever(
@@ -115,7 +115,7 @@ def test_rerank_error_message():
     rerank_cfg = RerankConfig(provider="cohere", api_key="x", model="rerank", enabled=True)
 
     # mock successful embed
-    with patch("fitz_rag.llm.embedding_client.CohereEmbeddingClient.embed") as embed_mock:
+    with patch("fitz_rag.llm.embedding.plugins.cohere.CohereEmbeddingClient.embed") as embed_mock:
         embed_mock.return_value = [0.1, 0.2, 0.3]
 
         # mock qdrant returning one hit
@@ -127,7 +127,7 @@ def test_rerank_error_message():
         mock_client.search.return_value = [mock_hit]
 
         # mock reranker to fail
-        with patch("fitz_rag.llm.rerank_client.CohereRerankClient.rerank") as rerank_mock:
+        with patch("fitz_rag.llm.rerank.plugins.cohere.CohereRerankClient.rerank") as rerank_mock:
             rerank_mock.side_effect = RuntimeError("rerank boom")
 
             retr = RAGRetriever(

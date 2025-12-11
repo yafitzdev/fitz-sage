@@ -23,6 +23,8 @@ class EmbeddingConfig(BaseModel):
     provider: str = Field(..., description="Embedding provider name.")
     model: str = Field(..., description="Embedding model ID.")
     api_key: Optional[str] = None
+    input_type: Optional[str] = None
+    output_dimension: Optional[int] = None
 
 
 # -------------------------------------------------------------------

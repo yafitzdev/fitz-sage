@@ -1,5 +1,4 @@
 from fitz_rag.retriever.plugins.dense import RAGRetriever
-from fitz_rag.llm.embedding_client import DummyEmbeddingClient
 
 from fitz_rag.config.schema import (
     RetrieverConfig,
@@ -16,15 +15,17 @@ class MockQdrantSearchClient:
     Emulates the minimal QdrantClient interface needed for retriever tests.
     Returns empty search results (no external DB needed).
     """
-
-    # IMPORTANT:
-    # The real retriever calls:
-    #   search(collection_name=..., vector=..., limit=..., with_payload=True)
-    #
-    # So the mock MUST accept `vector`, not `query_vector`.
-    #
     def search(self, collection_name, vector, limit, with_payload=True):
         return []
+
+
+# ---------------------------------------------------------
+# Dummy embedder for tests (avoids calling Cohere API)
+# ---------------------------------------------------------
+class DummyEmbedder:
+    def embed(self, text: str):
+        # deterministic test embedding
+        return [0.0] * 10
 
 
 def test_rag_retriever_import():
@@ -33,7 +34,7 @@ def test_rag_retriever_import():
 
 
 def test_rag_retriever_dummy(monkeypatch):
-    # Use real provider name; later we'll patch embedder
+    # Use real provider name; later we patch the embedder
     embed_cfg = EmbeddingConfig(
         provider="cohere",
         model="embed-english-v3.0",
@@ -54,7 +55,7 @@ def test_rag_retriever_dummy(monkeypatch):
         enabled=False,
     )
 
-    # Mock Qdrant client (no actual search backend)
+    # Mock Qdrant client
     client = MockQdrantSearchClient()
 
     retriever = RAGRetriever(
@@ -64,8 +65,8 @@ def test_rag_retriever_dummy(monkeypatch):
         rerank_cfg=rerank_cfg,
     )
 
-    # Patch dummy embedder after construction (avoids Cohere API call)
-    retriever.embedder = DummyEmbeddingClient(dim=10)
+    # Patch embedder with dummy class — avoids real API calls
+    retriever.embedder = DummyEmbedder()
 
     # Should run without error and return empty list
     result = retriever.retrieve("hello world")

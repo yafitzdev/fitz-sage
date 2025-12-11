@@ -16,11 +16,6 @@ except ImportError:
 class CohereEmbeddingClient:
     """
     Cohere embedding API plugin for fitz-rag.
-
-    Responsibilities:
-    - Embed raw text
-    - Return a list of floats
-    - Leave embedding orchestration to EmbeddingEngine
     """
 
     api_key: Optional[str] = None
@@ -36,8 +31,17 @@ class CohereEmbeddingClient:
         if not key:
             raise RuntimeError("COHERE_API_KEY is not set")
 
-        self.model = self.model or os.getenv("COHERE_EMBED_MODEL") or "embed-english-v3.0"
-        self.input_type = self.input_type or os.getenv("COHERE_EMBED_INPUT_TYPE") or "search_query"
+        self.model = (
+            self.model or
+            os.getenv("COHERE_EMBED_MODEL") or
+            "embed-english-v3.0"
+        )
+
+        self.input_type = (
+            self.input_type or
+            os.getenv("COHERE_EMBED_INPUT_TYPE") or
+            "search_query"
+        )
 
         try:
             self._client = cohere.ClientV2(api_key=key)

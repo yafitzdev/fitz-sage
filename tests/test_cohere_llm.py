@@ -1,4 +1,3 @@
-# tests/test_cohere_llm.py
 """
 Integration tests for Cohere LLM components:
 - Embedding
@@ -11,14 +10,11 @@ If it's missing, the tests will skip automatically.
 """
 
 from __future__ import annotations
-
 import os
-import sys
 
-# Import your clients
-from fitz_rag.llm.embedding_client import CohereEmbeddingClient
-from fitz_rag.llm.rerank_client import CohereRerankClient
-from fitz_rag.llm.chat_client import CohereChatClient
+from fitz_rag.llm.embedding.plugins.cohere import CohereEmbeddingClient
+from fitz_rag.llm.rerank.plugins.cohere import CohereRerankClient
+from fitz_rag.llm.chat.plugins.cohere import CohereChatClient
 
 
 def require_api_key():
@@ -44,10 +40,10 @@ def test_embedding():
     vec = embedder.embed(text)
 
     print(f"Embedding length: {len(vec)}")
-    print(f"First 5 values:   {vec[:5]}")
+    print(f"First 5 values: {vec[:5]}")
 
     assert isinstance(vec, list)
-    assert len(vec) > 10  # Cohere embeddings are large vectors
+    assert len(vec) > 10
 
     print("✅ Embedding test passed.")
 
@@ -73,13 +69,13 @@ def test_rerank():
     order = reranker.rerank(query, docs, top_n=2)
 
     print(f"Rerank order: {order}")
-    print("Top 2 texts:")
-    for idx in order:
-        print(f"- {docs[idx]}")
 
     assert isinstance(order, list)
     assert len(order) == 2
-    assert order[0] in range(len(docs))
+
+    print("Top 2 texts:")
+    for idx in order:
+        print(f"- {docs[idx]}")
 
     print("✅ Rerank test passed.")
 
@@ -95,10 +91,10 @@ def test_chat():
 
     chat = CohereChatClient()
 
-    response = chat.chat(
-        system_prompt="You are a helpful test assistant.",
-        user_content="Tell me something about RAG systems."
-    )
+    response = chat.chat([
+        {"role": "system", "content": "You are a helpful test assistant."},
+        {"role": "user", "content": "Tell me something about RAG systems."},
+    ])
 
     print(f"Response: {response}")
 
@@ -106,14 +102,3 @@ def test_chat():
     assert len(response) > 5
 
     print("✅ Chat test passed.")
-
-
-# ---------------------------------------------------------
-# Runner
-# ---------------------------------------------------------
-if __name__ == "__main__":
-    print("\n🔧 Running Cohere LLM live tests...")
-    test_embedding()
-    test_rerank()
-    test_chat()
-    print("\n🎉 All tests finished.")
