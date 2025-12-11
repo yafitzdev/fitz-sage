@@ -1,4 +1,3 @@
-# fitz_ingest/ingester/validation.py
 """
 Validation utilities for fitz-ingest.
 
@@ -17,9 +16,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Any, Sequence, Optional
 
+# NEW: use ingestion-local exceptions
+from fitz_ingest.exceptions.chunking import IngestionChunkingError
+from fitz_ingest.exceptions.config import IngestionConfigError
 
-class IngestionValidationError(Exception):
-    """Raised when ingestion validation fails for a document or its chunks."""
+
+class IngestionValidationError(IngestionChunkingError):
+    """
+    Raised when ingestion validation fails for a document or its chunks.
+
+    Inherits from IngestionChunkingError so that all chunking-related problems
+    fall under the same error category.
+    """
+    pass
 
 
 @dataclass
