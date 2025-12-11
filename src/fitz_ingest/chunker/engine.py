@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Dict, Any
 
-from fitz_ingest.chunker.base import BaseChunker, Chunk
+from fitz_stack.core import Chunk
+from fitz_ingest.chunker.base import BaseChunker
 
 from fitz_ingest.exceptions.base import IngestionError
 from fitz_ingest.exceptions.config import IngestionConfigError
@@ -24,7 +25,16 @@ class ChunkingEngine:
     - File reading
     - Error handling
     - Metadata injection
-    - Delegation to chunking plugins (BaseChunker subclasses)
+    - Delegation to chunking plugins (BaseChunker / ChunkerPlugin)
+
+    The plugin only needs to implement:
+
+        chunk_text(text: str, base_meta: Dict[str, Any]) -> List[Chunk]
+
+    It does NOT need to handle:
+    - file I/O
+    - error handling
+    - logging
     """
 
     def __init__(self, plugin: BaseChunker):
@@ -56,9 +66,11 @@ class ChunkingEngine:
             ) from e
 
         # -----------------------------
-        # Build metadata
+        # Build base metadata
         # -----------------------------
-        base_meta = {"source_file": str(path)}
+        base_meta: Dict[str, Any] = {
+            "source_file": str(path),
+        }
 
         # -----------------------------
         # Delegate to plugin
@@ -66,6 +78,7 @@ class ChunkingEngine:
         try:
             chunks = self.plugin.chunk_text(text, base_meta)
         except IngestionChunkingError:
+            # Already a domain-specific error, just bubble it up.
             raise
         except Exception as e:
             logger.error(f"{CHUNKING} Chunking plugin failed for '{path}': {e}")
