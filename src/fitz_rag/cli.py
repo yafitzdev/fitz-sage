@@ -208,9 +208,23 @@ def query(text: str):
     # -----------------------------------------------------
     typer.echo(f"\n🔍 Retrieved {len(chunks)} chunks (after rerank if enabled):")
     typer.echo("--------------------------------------------------")
+
     for c in chunks:
-        path = c.metadata.get("file") or c.metadata.get("source") or "<no-file>"
+
+        # Unified: chunk may be dict or old-style object
+        if isinstance(c, dict):
+            meta = c.get("metadata", {})
+        else:
+            meta = getattr(c, "metadata", {}) or {}
+
+        path = (
+            meta.get("file")
+            or meta.get("source")
+            or "<no-file>"
+        )
+
         typer.echo(f"- score=? | {path}")
+
     typer.echo("--------------------------------------------------")
 
 
