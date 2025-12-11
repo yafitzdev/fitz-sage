@@ -22,7 +22,6 @@ from fitz_rag.sourcer.rag_base import (
     SourceConfig,
     ArtefactRetrievalStrategy,
     PluginLoadError,
-    StrategyError,
 )
 
 # core model (only needed to satisfy imports)
@@ -58,7 +57,7 @@ class FakeStrategy(ArtefactRetrievalStrategy):
 
 def test_embedding_error_message():
     """Retriever should wrap embedding failures in EmbeddingError."""
-    from fitz_rag.retriever.dense_retriever import RAGRetriever
+    from fitz_rag.retriever.plugins.dense import RAGRetriever
     from fitz_rag.config.schema import EmbeddingConfig, RetrieverConfig
 
     # config objects
@@ -82,7 +81,7 @@ def test_embedding_error_message():
 
 def test_vector_search_error_message():
     """Retriever should wrap vector-search failures in VectorSearchError."""
-    from fitz_rag.retriever.dense_retriever import RAGRetriever
+    from fitz_rag.retriever.plugins.dense import RAGRetriever
     from fitz_rag.config.schema import EmbeddingConfig, RetrieverConfig
 
     embed_cfg = EmbeddingConfig(provider="cohere", api_key="x", model="y")
@@ -108,7 +107,7 @@ def test_vector_search_error_message():
 
 def test_rerank_error_message():
     """Retriever should wrap rerank failures in RerankError."""
-    from fitz_rag.retriever.dense_retriever import RAGRetriever
+    from fitz_rag.retriever.plugins.dense import RAGRetriever
     from fitz_rag.config.schema import EmbeddingConfig, RetrieverConfig, RerankConfig
 
     embed_cfg = EmbeddingConfig(provider="cohere", api_key="x", model="y")

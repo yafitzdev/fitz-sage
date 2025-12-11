@@ -1,6 +1,4 @@
-import pytest
-
-from fitz_rag.retriever.dense_retriever import RAGRetriever
+from fitz_rag.retriever.plugins.dense import RAGRetriever
 from fitz_rag.llm.embedding_client import DummyEmbeddingClient
 
 from fitz_rag.config.schema import (
@@ -30,7 +28,7 @@ class MockQdrantSearchClient:
 
 
 def test_rag_retriever_import():
-    from fitz_rag.retriever.dense_retriever import RAGRetriever
+    from fitz_rag.retriever.plugins.dense import RAGRetriever
     assert RAGRetriever is not None
 
 

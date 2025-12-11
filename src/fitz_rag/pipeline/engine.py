@@ -7,7 +7,7 @@ from qdrant_client import QdrantClient
 from fitz_rag.config.schema import RAGConfig
 from fitz_rag.config.loader import load_config
 
-from fitz_rag.retriever.dense_retriever import RAGRetriever
+from fitz_rag.retriever.plugins.dense import RAGRetriever
 from fitz_rag.llm.embedding_client import CohereEmbeddingClient
 from fitz_rag.llm.rerank_client import CohereRerankClient
 from fitz_rag.llm.chat_client import CohereChatClient
