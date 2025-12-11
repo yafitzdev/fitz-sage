@@ -1,5 +1,5 @@
 """
-Cohere reranking client for Fitz-RAG.
+Cohere reranking client for Fitz-RAG (ClientV2 version).
 
 This client accepts either:
 - a list of strings
@@ -15,14 +15,17 @@ from __future__ import annotations
 from typing import Any, List
 import os
 
-import cohere
-
 from fitz_rag.exceptions.retriever import RerankError
+
+try:
+    import cohere
+except ImportError:
+    cohere = None  # type: ignore
 
 
 class CohereRerankClient:
     """
-    Minimal Cohere reranking wrapper.
+    Minimal Cohere reranking wrapper using Cohere ClientV2.
 
     Parameters
     ----------
@@ -31,7 +34,7 @@ class CohereRerankClient:
     api_key:
         Optional explicit API key. If not provided, COHERE_API_KEY env is used.
     model:
-        Cohere rerank model name.
+        Cohere rerank model name (e.g., "rerank-english-v3.0").
     """
 
     def __init__(
@@ -40,16 +43,23 @@ class CohereRerankClient:
         api_key: str | None = None,
         model: str = "rerank-english-v3.0",
     ) -> None:
+
+        if cohere is None:
+            raise RuntimeError("Install cohere: `pip install cohere`")
+
         self.plugin_name = plugin_name
         self.model = model
 
+        # Resolve API key (explicit or env)
         self.api_key = api_key or os.getenv("COHERE_API_KEY")
         if not self.api_key:
-            # In normal use, tests call require_api_key() first and skip
-            # if the env var is not set, so this should not trigger there.
             raise ValueError("COHERE_API_KEY is not set for CohereRerankClient")
 
-        self._client = cohere.Client(self.api_key)
+        try:
+            # Modern interface
+            self._client = cohere.ClientV2(api_key=self.api_key)
+        except Exception as e:
+            raise RerankError("Failed to initialize Cohere rerank client") from e
 
     # ------------------------------------------------------------------
     # Public API
@@ -72,7 +82,7 @@ class CohereRerankClient:
             List of indices into the `chunks` list, sorted by descending relevance.
         """
         try:
-            # Normalize all inputs to a list of document strings
+            # Normalize input to list[str]
             documents: List[str] = []
 
             for idx, c in enumerate(chunks):
@@ -88,23 +98,26 @@ class CohereRerankClient:
                         )
                     documents.append(text)
 
-            # Call Cohere rerank
+            # Call Cohere v2 rerank endpoint
             response = self._client.rerank(
+                model=self.model,
                 query=query,
                 documents=documents,
-                model=self.model,
             )
 
-            # response.results elements usually have: index, relevance_score
-            results_sorted = sorted(
+            # Cohere v2 returns:
+            # response.results → list of objects with fields:
+            #   - index (int)
+            #   - relevance_score (float)
+            #
+            # We sort by score (descending) and return the indices.
+            sorted_results = sorted(
                 response.results,
                 key=lambda r: r.relevance_score,
                 reverse=True,
             )
 
-            # Return just the indices into the original list
-            return [r.index for r in results_sorted]
+            return [r.index for r in sorted_results]
 
         except Exception as e:
-            # Wrap *any* underlying problem in a domain-specific error
             raise RerankError("Reranking failed") from e
