@@ -18,37 +18,46 @@ from typing import Dict, List
 
 from fitz_rag.core import RetrievedChunk
 from fitz_rag.sourcer.rag_base import RetrievalContext, SourceConfig
-
-# NEW — unified config fallback for JSON truncation
 from fitz_rag.config import get_config
+
 _cfg = get_config()
 
 
+class PromptBuilderError(Exception):
+    """Raised when prompt construction fails."""
+
+
 def _format_chunks(label: str, chunks: List[RetrievedChunk]) -> str:
-    if not chunks:
-        return f"{label}: <no chunks>"
+    try:
+        if not chunks:
+            return f"{label}: <no chunks>"
 
-    out = [f"{label} (top {len(chunks)}):"]
-    for idx, c in enumerate(chunks, 1):
-        src = c.metadata.get("file") or c.metadata.get("source") or ""
-        out.append(f"[{idx}] score={c.score:.4f} | {src}")
-        out.append(c.text.strip())
-        out.append("")
+        out = [f"{label} (top {len(chunks)}):"]
+        for idx, c in enumerate(chunks, 1):
+            src = c.metadata.get("file") or c.metadata.get("source") or ""
+            out.append(f"[{idx}] score={c.score:.4f} | {src}")
+            out.append(c.text.strip())
+            out.append("")
 
-    return "\n".join(out).strip()
+        return "\n".join(out).strip()
+    except Exception as e:
+        raise PromptBuilderError(f"Failed to format chunks for label '{label}': {e}") from e
 
 
 def build_rag_block(ctx: RetrievalContext, sources: List[SourceConfig]) -> str:
-    parts = [f"Retrieval query: {ctx.query}", ""]
+    try:
+        parts = [f"Retrieval query: {ctx.query}", ""]
 
-    # Known artefacts in declared order
-    for src in sources:
-        label = src.label or src.name.upper()
-        chunks = ctx.artefacts.get(src.name, [])
-        parts.append(_format_chunks(label, chunks))
-        parts.append("")
+        for src in sources:
+            label = src.label or src.name.upper()
+            chunks = ctx.artefacts.get(src.name, [])
+            parts.append(_format_chunks(label, chunks))
+            parts.append("")
 
-    return "\n".join(parts).strip()
+        return "\n".join(parts).strip()
+
+    except Exception as e:
+        raise PromptBuilderError(f"Failed to build RAG block: {e}") from e
 
 
 def build_user_prompt(
@@ -59,19 +68,27 @@ def build_user_prompt(
     max_trf_json_chars: int | None = None,
 ) -> str:
 
-    # CONFIG FALLBACK — if not supplied, pull from YAML
-    if max_trf_json_chars is None:
-        max_trf_json_chars = _cfg.get("retriever", {}).get("max_trf_json_chars", None)
+    try:
+        if max_trf_json_chars is None:
+            max_trf_json_chars = _cfg.get("retriever", {}).get("max_trf_json_chars", None)
 
-    trf_json = json.dumps(trf, indent=2)
+        # TRF JSON formatting
+        try:
+            trf_json = json.dumps(trf, indent=2)
+        except Exception as je:
+            raise PromptBuilderError(f"Invalid TRF JSON structure: {je}") from je
 
-    if max_trf_json_chars and len(trf_json) > max_trf_json_chars:
-        trf_json = trf_json[:max_trf_json_chars] + "\n...[TRF JSON truncated]..."
+        if max_trf_json_chars and len(trf_json) > max_trf_json_chars:
+            trf_json = trf_json[:max_trf_json_chars] + "\n...[TRF JSON truncated]..."
 
-    rag_block = build_rag_block(ctx, sources)
+        # Build retrieval block
+        rag_block = build_rag_block(ctx, sources)
 
-    return (
-        f"=== TRF JSON ===\n{trf_json}\n\n"
-        f"=== RAG CONTEXT ===\n{rag_block}\n\n"
-        f"=== TASK ===\n{prompt_text}\n"
-    )
+        return (
+            f"=== TRF JSON ===\n{trf_json}\n\n"
+            f"=== RAG CONTEXT ===\n{rag_block}\n\n"
+            f"=== TASK ===\n{prompt_text}\n"
+        )
+
+    except Exception as e:
+        raise PromptBuilderError(f"Failed to build user prompt: {e}") from e

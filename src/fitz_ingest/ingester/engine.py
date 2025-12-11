@@ -1,12 +1,11 @@
 """
 Generic ingestion engine for fitz-ingest.
 
-This engine:
-- Accepts a Chunker
-- Iterates a folder or list of files
-- Produces Qdrant points
-- Stores text + metadata into the vector DB
-- Generates embeddings automatically via a provided embedder (optional)
+Handles:
+- Chunking
+- Optional embedding
+- Upsert into Qdrant
+- File iteration
 """
 
 from __future__ import annotations
@@ -19,12 +18,15 @@ from qdrant_client import QdrantClient
 
 from fitz_ingest.vector_db.qdrant_utils import ensure_collection
 
+from fitz_rag.exceptions.retriever import EmbeddingError, VectorSearchError
+from fitz_rag.exceptions.config import ConfigError
+
 
 class IngestionEngine:
     """
-    Ingest files into a Qdrant collection using:
-    - Chunker (extract chunks from files)
-    - Embedding client (optional)
+    Ingest files into Qdrant using:
+      - Chunker
+      - Optional embedding client
     """
 
     def __init__(
@@ -42,7 +44,7 @@ class IngestionEngine:
         self.distance = distance
 
     # ---------------------------------------------------------
-    # Ingest a path or list of paths
+    # Ingest a directory tree
     # ---------------------------------------------------------
     def ingest_path(
         self,
@@ -50,31 +52,39 @@ class IngestionEngine:
         path: str | Path,
         glob_pattern: str = "**/*",
     ) -> None:
-        """
-        Ingests all files that match the glob pattern under the path.
-        """
-        path = Path(path)
-        files = list(path.glob(glob_pattern))
+        try:
+            path = Path(path)
+            files = list(path.glob(glob_pattern))
+        except Exception as e:
+            raise ConfigError(f"Invalid ingestion path: {path}") from e
 
         if not files:
             return
 
-        # Ensure collection exists
-        ensure_collection(
-            client=self.client,
-            name=self.collection,
-            vector_size=self.vector_size,
-        )
+        try:
+            ensure_collection(
+                client=self.client,
+                name=self.collection,
+                vector_size=self.vector_size,
+            )
+        except Exception as e:
+            raise VectorSearchError(f"Failed ensuring collection '{self.collection}'") from e
 
         for file in files:
             if file.is_file():
-                self.ingest_file(chunker, file)
+                try:
+                    self.ingest_file(chunker, file)
+                except Exception as e:
+                    raise VectorSearchError(f"Failed ingesting file: {file}") from e
 
     # ---------------------------------------------------------
     # Ingest a single file
     # ---------------------------------------------------------
     def ingest_file(self, chunker, file_path: str | Path) -> None:
-        chunks = chunker.chunk_file(str(file_path))
+        try:
+            chunks = chunker.chunk_file(str(file_path))
+        except Exception as e:
+            raise ConfigError(f"Chunker failed on file: {file_path}") from e
 
         if not chunks:
             return
@@ -86,11 +96,15 @@ class IngestionEngine:
             meta = dict(chunk.metadata)
             meta["file"] = str(file_path)
 
-            vector = (
-                self.embedder.embed(text)
-                if self.embedder is not None
-                else None
-            )
+            # Embedding step (optional)
+            try:
+                vector = (
+                    self.embedder.embed(text)
+                    if self.embedder is not None
+                    else None
+                )
+            except Exception as e:
+                raise EmbeddingError(f"Failed embedding chunk from: {file_path}") from e
 
             point_id = str(uuid.uuid4())
 
@@ -106,7 +120,10 @@ class IngestionEngine:
             )
 
         # Upsert into Qdrant
-        self.client.upsert(
-            collection_name=self.collection,
-            points=points,
-        )
+        try:
+            self.client.upsert(
+                collection_name=self.collection,
+                points=points,
+            )
+        except Exception as e:
+            raise VectorSearchError(f"Failed upserting points into '{self.collection}'") from e

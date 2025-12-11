@@ -6,6 +6,9 @@ from typing import Dict
 class Chunk(BaseModel):
     """
     A single chunk extracted from a document.
+
+    Validation errors here naturally become Pydantic errors.
+    These are treated as ConfigError by higher-level ingestion logic.
     """
     id: str = Field(..., description="Chunk ID.")
     doc_id: str = Field(..., description="ID of the parent document.")

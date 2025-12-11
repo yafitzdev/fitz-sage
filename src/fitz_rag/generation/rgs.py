@@ -46,6 +46,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Protocol, Union
 
+from fitz_rag.exceptions.pipeline import RGSGenerationError, PipelineError
+
 
 # ---------------------------------------------------------------------------
 # Chunk abstraction
@@ -179,12 +181,13 @@ class RGS:
         RGSPrompt
             The system and user prompt texts.
         """
-        limited_chunks = self._limit_chunks(chunks)
-
-        system_prompt = self._build_system_prompt()
-        user_prompt = self._build_user_prompt(query, limited_chunks)
-
-        return RGSPrompt(system=system_prompt, user=user_prompt)
+        try:
+            limited_chunks = self._limit_chunks(chunks)
+            system_prompt = self._build_system_prompt()
+            user_prompt = self._build_user_prompt(query, limited_chunks)
+            return RGSPrompt(system=system_prompt, user=user_prompt)
+        except Exception as e:
+            raise RGSGenerationError("Failed to build RGS prompt") from e
 
     def build_answer(
         self,
@@ -208,15 +211,18 @@ class RGS:
         -------
         RGSAnswer
         """
-        limited_chunks = self._limit_chunks(chunks)
+        try:
+            limited_chunks = self._limit_chunks(chunks)
 
-        sources: List[RGSSourceRef] = []
-        for idx, chunk in enumerate(limited_chunks, start=1):
-            cid = self._get_chunk_id(chunk, idx)
-            meta = self._get_chunk_metadata(chunk)
-            sources.append(RGSSourceRef(source_id=cid, index=idx, metadata=meta))
+            sources: List[RGSSourceRef] = []
+            for idx, chunk in enumerate(limited_chunks, start=1):
+                cid = self._get_chunk_id(chunk, idx)
+                meta = self._get_chunk_metadata(chunk)
+                sources.append(RGSSourceRef(source_id=cid, index=idx, metadata=meta))
 
-        return RGSAnswer(answer=raw_answer, sources=sources)
+            return RGSAnswer(answer=raw_answer, sources=sources)
+        except Exception as e:
+            raise PipelineError("Failed to build RGS answer") from e
 
     # -------------------------------
     # Internal helpers

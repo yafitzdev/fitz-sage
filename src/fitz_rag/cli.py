@@ -1,4 +1,3 @@
-# src/fitz_rag/cli.py
 from __future__ import annotations
 
 import os
@@ -6,19 +5,27 @@ import typer
 import yaml
 
 from fitz_rag.config import get_config
+
 from fitz_rag.vector_db.qdrant_client import create_qdrant_client
 from fitz_rag.retriever.dense_retriever import RAGRetriever
 
-from fitz_rag.llm.embedding_client import (
-    CohereEmbeddingClient,
-    DummyEmbeddingClient,
+from fitz_rag.config.schema import (
+    EmbeddingConfig,
+    RetrieverConfig,
+    RerankConfig,
 )
-from fitz_rag.llm.rerank_client import (
-    CohereRerankClient,
-    DummyRerankClient,
+
+from fitz_rag.exceptions.retriever import (
+    EmbeddingError,
+    VectorSearchError,
+    RerankError,
 )
 
 app = typer.Typer(help="🔥 Fitz-RAG — Retrieval-Augmented Generation Toolkit")
+
+
+class CLIError(Exception):
+    """Raised for CLI-level operational failures."""
 
 
 # ---------------------------------------------------------
@@ -36,18 +43,24 @@ def version():
 @app.command("config-show")
 def config_show():
     """Display the loaded configuration."""
-    cfg = get_config()
-    typer.echo(yaml.dump(cfg, sort_keys=False))
+    try:
+        cfg = get_config()
+        typer.echo(yaml.dump(cfg, sort_keys=False))
+    except Exception as e:
+        raise CLIError(f"Failed to load configuration: {e}") from e
 
 
 @app.command("config-path")
 def config_path():
     """Show the active config file path (if any)."""
-    path = os.getenv("FITZ_RAG_CONFIG")
-    if path:
-        typer.echo(f"Using override config at: {path}")
-    else:
-        typer.echo("Using default embedded config.")
+    try:
+        path = os.getenv("FITZ_RAG_CONFIG")
+        if path:
+            typer.echo(f"Using override config at: {path}")
+        else:
+            typer.echo("Using default embedded config.")
+    except Exception as e:
+        raise CLIError(f"Failed to resolve config path: {e}") from e
 
 
 # ---------------------------------------------------------
@@ -60,8 +73,12 @@ app.add_typer(collections_app, name="collections")
 @collections_app.command("list")
 def collections_list():
     """List all collections in Qdrant."""
-    client = create_qdrant_client()
-    cols = client.get_collections().collections
+    try:
+        client = create_qdrant_client()
+        cols = client.get_collections().collections
+    except Exception as e:
+        raise CLIError(f"Could not connect to Qdrant: {e}") from e
+
     for c in cols:
         typer.echo(f"- {c.name}")
 
@@ -69,11 +86,17 @@ def collections_list():
 @collections_app.command("drop")
 def collections_drop(name: str):
     """Drop a Qdrant collection."""
-    client = create_qdrant_client()
+    try:
+        client = create_qdrant_client()
+    except Exception as e:
+        raise CLIError(f"Qdrant connection failed: {e}") from e
 
     if typer.confirm(f"Are you sure you want to delete collection '{name}'?"):
-        client.delete_collection(name)
-        typer.echo(f"Deleted collection: {name}")
+        try:
+            client.delete_collection(name)
+            typer.echo(f"Deleted collection: {name}")
+        except Exception as e:
+            raise CLIError(f"Failed to delete collection '{name}': {e}") from e
 
 
 # ---------------------------------------------------------
@@ -82,54 +105,74 @@ def collections_drop(name: str):
 @app.command()
 def query(text: str):
     """
-    Run a basic RAG retrieval using the configured embedding model
-    and optional reranking.
+    Run a full retrieval using the structured RAGRetriever.
 
-    Requires:
-      - Qdrant running and configured
-      - COHERE_API_KEY set for real embedding/rerank
+    Steps:
+      - load config
+      - build embedding/retriever/rerank config objects
+      - connect to Qdrant
+      - run retrieval
     """
 
     cfg = get_config()
 
-    # 1. Qdrant client
-    client = create_qdrant_client()
-
-    # 2. Embedding client
+    # -----------------------------------------------------
+    # 1. Build config objects
+    # -----------------------------------------------------
     try:
-        embedder = CohereEmbeddingClient()
-        typer.echo("Using Cohere embeddings.")
-    except Exception as exc:
-        typer.echo(f"⚠️  Falling back to DummyEmbeddingClient: {exc}")
-        embedder = DummyEmbeddingClient()
+        embed_cfg = EmbeddingConfig.from_dict(cfg.get("embedding", {}))
+        retr_cfg = RetrieverConfig.from_dict(cfg.get("retriever", {}))
+        rerank_cfg = None
 
-    # 3. Rerank client
-    reranker = None
+        if "rerank" in cfg and cfg["rerank"].get("enabled", False):
+            rerank_cfg = RerankConfig.from_dict(cfg["rerank"])
+
+    except Exception as e:
+        raise CLIError(f"Invalid configuration structure: {e}") from e
+
+    # -----------------------------------------------------
+    # 2. Qdrant client
+    # -----------------------------------------------------
     try:
-        reranker = CohereRerankClient()
-        typer.echo("Using Cohere reranker.")
-    except Exception as exc:
-        typer.echo(f"⚠️  Falling back to DummyRerankClient: {exc}")
-        reranker = DummyRerankClient()
+        client = create_qdrant_client()
+    except Exception as e:
+        raise CLIError(f"Failed to connect to Qdrant: {e}") from e
 
-    # 4. Retriever (with reranking support)
-    retr = RAGRetriever(
-        client=client,
-        embedder=embedder,
-        collection=cfg.get("qdrant", {}).get("collection", "fitz_default"),
-        top_k=cfg.get("retriever", {}).get("top_k", 10),
-        reranker=reranker,
-        rerank_k=cfg.get("retriever", {}).get("rerank_k", None),
-    )
+    # -----------------------------------------------------
+    # 3. Construct RAGRetriever correctly (no yellow!)
+    # -----------------------------------------------------
+    try:
+        retr = RAGRetriever(
+            client=client,
+            embed_cfg=embed_cfg,
+            retriever_cfg=retr_cfg,
+            rerank_cfg=rerank_cfg,
+        )
+    except Exception as e:
+        raise CLIError(f"Failed to initialize retriever: {e}") from e
 
-    # 5. Perform retrieval
-    chunks = retr.retrieve(text)
+    # -----------------------------------------------------
+    # 4. Perform retrieval
+    # -----------------------------------------------------
+    try:
+        chunks = retr.retrieve(text)
+    except EmbeddingError as e:
+        raise CLIError(f"Embedding failed: {e}") from e
+    except VectorSearchError as e:
+        raise CLIError(f"Vector search failed: {e}") from e
+    except RerankError as e:
+        raise CLIError(f"Reranking failed: {e}") from e
+    except Exception as e:
+        raise CLIError(f"Unexpected retrieval error: {e}") from e
 
+    # -----------------------------------------------------
+    # 5. Display results
+    # -----------------------------------------------------
     typer.echo(f"\n🔍 Retrieved {len(chunks)} chunks (after rerank if enabled):")
     typer.echo("--------------------------------------------------")
     for c in chunks:
         path = c.metadata.get("file") or c.metadata.get("source") or "<no-file>"
-        typer.echo(f"- score={c.score:.4f} | {path}")
+        typer.echo(f"- score=? | {path}")
     typer.echo("--------------------------------------------------")
 
 

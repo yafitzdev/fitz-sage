@@ -1,22 +1,10 @@
-# src/fitz_rag/llm/chat_client.py
-"""
-Chat client abstractions for fitz-rag.
-
-This module defines:
-- ChatClient protocol
-- CohereChatClient: real chat via Cohere v2 Chat API
-- DummyChatClient: trivial echo-style implementation for tests
-
-Environment variables:
-COHERE_API_KEY         # required for CohereChatClient
-COHERE_CHAT_MODEL      # optional override
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Protocol, Optional, Dict, Any
+from typing import Protocol, Optional, Dict, Any
 import os
+
+from fitz_rag.exceptions.llm import LLMError, LLMResponseError
 
 try:
     import cohere
@@ -34,10 +22,7 @@ class ChatClient(Protocol):
 @dataclass
 class CohereChatClient:
     """
-    Uses Cohere’s v2 Chat API.
-
-    Default model changed to `command-r7b-12-2024`
-    because Cohere removed `command-light` in 2025.
+    Cohere Chat API wrapper.
     """
 
     api_key: Optional[str] = None
@@ -53,14 +38,16 @@ class CohereChatClient:
         if not key:
             raise RuntimeError("COHERE_API_KEY not set")
 
-        # New default model (since command-light is gone)
         self.model = (
             self.model
             or os.getenv("COHERE_CHAT_MODEL")
             or "command-r7b-12-2024"
         )
 
-        self._client = cohere.ClientV2(api_key=key)
+        try:
+            self._client = cohere.ClientV2(api_key=key)
+        except Exception as e:
+            raise LLMError("Failed to initialize Cohere Chat client") from e
 
     def _build_messages(self, system_prompt: str, user_content: str):
         msg = []
@@ -70,6 +57,7 @@ class CohereChatClient:
         return msg
 
     def chat(self, system_prompt: str, user_content: str) -> str:
+        """Executes a chat call with structured exception handling."""
         messages = self._build_messages(system_prompt, user_content)
 
         kwargs: Dict[str, Any] = {
@@ -80,27 +68,32 @@ class CohereChatClient:
         if self.max_tokens is not None:
             kwargs["max_tokens"] = self.max_tokens
 
-        response = self._client.chat(**kwargs)
+        try:
+            response = self._client.chat(**kwargs)
+        except Exception as e:
+            raise LLMError("Chat request failed") from e
 
-        # Return combined text segments
-        parts = []
-        for seg in response.message.content:
-            if getattr(seg, "type", None) == "text":
-                parts.append(seg.text)
-            else:
-                text = getattr(seg, "text", None)
-                if isinstance(text, str):
-                    parts.append(text)
+        # Parse segments
+        try:
+            parts = []
+            for seg in response.message.content:
+                if getattr(seg, "type", None) == "text":
+                    parts.append(seg.text)
+                else:
+                    text = getattr(seg, "text", None)
+                    if isinstance(text, str):
+                        parts.append(text)
 
-        return "".join(parts).strip()
+            return "".join(parts).strip()
+        except Exception as e:
+            raise LLMResponseError("Malformed LLM response") from e
 
 
 @dataclass
 class DummyChatClient:
     prefix: str = "[DUMMY-ANSWER] "
-    last_user_content: Optional[str] = None  # <-- required by tests
+    last_user_content: Optional[str] = None
 
     def chat(self, system_prompt: str, user_content: str) -> str:
-        # Store the user content so the pipeline tests can inspect the final prompt
         self.last_user_content = user_content
         return f"{self.prefix}OK"

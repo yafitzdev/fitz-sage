@@ -1,17 +1,13 @@
-# src/fitz_rag/retriever/qdrant_client.py
 """
 Qdrant client wrapper for fitz_rag.
 
-This module provides a thin abstraction over the qdrant-client
-constructor and convenience helpers used across the framework.
+Provides:
+- create_qdrant_client()
+- ensure_collection()
 
-Users can configure Qdrant via:
-- Unified YAML config (fitz_rag.config)
-- Environment variables
-- Direct initialization
-- Defaults (localhost)
-
-This keeps the rest of the library independent from raw Qdrant config.
+Now includes structured exceptions:
+- ConfigError
+- VectorSearchError
 """
 
 from __future__ import annotations
@@ -22,23 +18,21 @@ from typing import Optional, Dict, Any
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
 
-# NEW — unified config
 from fitz_rag.config import get_config
-_cfg = get_config()
+from fitz_rag.exceptions.config import ConfigError
+from fitz_rag.exceptions.retriever import VectorSearchError
 
+# Load unified config
+try:
+    _cfg = get_config()
+except Exception as e:
+    raise ConfigError("Failed to load unified fitz_rag configuration") from e
 
-# ---------------------------------------------------------
-# Default environment variable names
-# ---------------------------------------------------------
 
 ENV_QDRANT_URL = "FITZ_RAG_QDRANT_URL"
 ENV_QDRANT_API_KEY = "FITZ_RAG_QDRANT_API_KEY"
 ENV_QDRANT_TIMEOUT = "FITZ_RAG_QDRANT_TIMEOUT"
 
-
-# ---------------------------------------------------------
-# Create a Qdrant client (shared entrypoint)
-# ---------------------------------------------------------
 
 def create_qdrant_client(
     url: Optional[str] = None,
@@ -46,48 +40,64 @@ def create_qdrant_client(
     timeout: Optional[int] = None,
 ) -> QdrantClient:
     """
-    Create a QdrantClient using either:
-    - explicit parameters
-    - unified YAML config
+    Build a QdrantClient from:
+    - explicit args
     - environment variables
-    - fallback to http://localhost:6333
+    - unified config (fitz_rag.config)
+    - default localhost fallback
+
+    Raises:
+        ConfigError – invalid config
+        VectorSearchError – Qdrant initialization failure
     """
 
-    qcfg = _cfg.get("qdrant", {})
+    try:
+        qcfg = _cfg.get("qdrant", {})
+    except Exception as e:
+        raise ConfigError("Invalid config structure for qdrant section") from e
 
-    # unified config as fallback
-    cfg_url = f"{'https' if qcfg.get('https', False) else 'http'}://{qcfg.get('host', 'localhost')}:{qcfg.get('port', 6333)}"
+    try:
+        cfg_url = (
+            f"{'https' if qcfg.get('https', False) else 'http'}://"
+            f"{qcfg.get('host', 'localhost')}:{qcfg.get('port', 6333)}"
+        )
+    except Exception as e:
+        raise ConfigError("Failed constructing Qdrant URL from config") from e
 
-    url = (
+    # URL selection: explicit > ENV > CFG > default
+    chosen_url = (
         url
         or os.getenv(ENV_QDRANT_URL)
         or cfg_url
     )
 
-    api_key = (
+    # API key: explicit > ENV > None
+    chosen_api_key = (
         api_key
         or os.getenv(ENV_QDRANT_API_KEY)
         or None
     )
 
-    if timeout is None:
-        # ENV > unified config > default 30
-        env_val = os.getenv(ENV_QDRANT_TIMEOUT)
-        if env_val:
-            timeout = int(env_val)
-        else:
-            timeout = int(qcfg.get("timeout", 30))
+    # Timeout: explicit > ENV > CFG > default
+    try:
+        if timeout is None:
+            env_val = os.getenv(ENV_QDRANT_TIMEOUT)
+            if env_val:
+                timeout = int(env_val)
+            else:
+                timeout = int(qcfg.get("timeout", 30))
+    except Exception as e:
+        raise ConfigError("Invalid Qdrant timeout value") from e
 
-    return QdrantClient(
-        url=url,
-        api_key=api_key,
-        timeout=timeout,
-    )
+    try:
+        return QdrantClient(
+            url=chosen_url,
+            api_key=chosen_api_key,
+            timeout=timeout,
+        )
+    except Exception as e:
+        raise VectorSearchError(f"Failed initializing Qdrant client for URL: {chosen_url}") from e
 
-
-# ---------------------------------------------------------
-# Collection helper
-# ---------------------------------------------------------
 
 def ensure_collection(
     client: QdrantClient,
@@ -97,19 +107,37 @@ def ensure_collection(
     metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
-    Ensure a Qdrant collection exists. If not, it is created.
+    Ensure a Qdrant collection exists.
+
+    Raises:
+        VectorSearchError – Qdrant calls failed
+        ConfigError – bad parameters
     """
-    collections = client.get_collections().collections
-    names = {c.name for c in collections}
+
+    # Fetch existing collections
+    try:
+        collections = client.get_collections().collections
+    except Exception as e:
+        raise VectorSearchError("Failed fetching collections from Qdrant") from e
+
+    # Check existence
+    try:
+        names = {c.name for c in collections}
+    except Exception as e:
+        raise VectorSearchError("Invalid structure in Qdrant collections response") from e
 
     if name in names:
         return
 
-    client.create_collection(
-        collection_name=name,
-        vectors_config=qmodels.VectorParams(
-            size=vector_size,
-            distance=distance,
-        ),
-        metadata=metadata,
-    )
+    # Create new collection
+    try:
+        client.create_collection(
+            collection_name=name,
+            vectors_config=qmodels.VectorParams(
+                size=vector_size,
+                distance=distance,
+            ),
+            metadata=metadata,
+        )
+    except Exception as e:
+        raise VectorSearchError(f"Failed creating Qdrant collection '{name}'") from e
