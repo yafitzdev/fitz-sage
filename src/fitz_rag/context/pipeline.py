@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, List, Dict
 
-from .steps.normalize import NormalizeStep, _to_chunk_dict, ChunkDict
+from .steps.normalize import NormalizeStep, ChunkDict
 from .steps.dedupe import DedupeStep
 from .steps.group import GroupByDocumentStep
 from .steps.merge import MergeAdjacentStep
@@ -17,10 +17,6 @@ from fitz_rag.exceptions.pipeline import PipelineError
 class ContextPipeline:
     """
     Modern step-based context builder.
-
-    This is the ONLY entry point for building context.
-    No legacy backward-compatibility layers remain.
-    No old build_context() helper exists.
 
     Pipeline steps:
         normalize → dedupe → group → merge → pack → render
@@ -37,24 +33,18 @@ class ContextPipeline:
     render_step: RenderMarkdownStep = field(default_factory=RenderMarkdownStep)
 
     # --------------------------------------------------------
-    # Main pipeline entry
+    # Main context-building API
     # --------------------------------------------------------
     def build(self, chunks: List[Any], max_chars: int | None = None) -> str:
         """
-        Execute the full context-building pipeline.
-
-        Parameters
-        ----------
-        chunks : list[Any]
-            Retrieved raw chunks of any supported structure.
-        max_chars : int | None
-            Overrides the pipeline default.
-
-        Returns
-        -------
-        str
-            Markdown-formatted final context.
+        Execute the full context pipeline:
+            normalize → dedupe → group → merge → pack → render
         """
+
+        # 🔥 FIX: ensure pack inherits pipeline.max_chars when user doesn’t override it
+        if max_chars is None:
+            max_chars = self.max_chars
+
         try:
             # 1. Normalize
             norm = self.normalize_step(chunks)
@@ -65,16 +55,17 @@ class ContextPipeline:
             # 3. Group by document
             grouped: Dict[str, List[ChunkDict]] = self.group_step(deduped)
 
-            # 4. Merge adjacent per document
+            # 4. Merge adjacent chunks per document
             merged_per_doc: List[ChunkDict] = []
             for _, file_chunks in grouped.items():
                 merged_per_doc.extend(self.merge_step(file_chunks))
 
-            # 5. Pack into window
+            # 5. Pack into context window
             packed = self.pack_step(merged_per_doc, max_chars=max_chars)
 
             # 6. Render markdown
             out = self.render_step(packed)
+
             return out
 
         except Exception as e:
