@@ -4,33 +4,52 @@ from __future__ import annotations
 fitz_rag
 
 Public package interface for the Fitz-RAG toolkit.
-We expose only the modern, stable entry points here.
+Only stable, user-facing entry points are exported here.
 """
 
-from .config.loader import get_config  # convenience
+# -------------------------
+# Config
+# -------------------------
+from .config.loader import get_config
 from .config.schema import RAGConfig
 
+# -------------------------
+# Core Pipeline Engine
+# -------------------------
 from .pipeline.engine import RAGPipeline
-from .pipeline.easy import EasyRAG
-from .pipeline.fast import FastRAG
-from .pipeline.standard import StandardRAG
-from .pipeline.debug import DebugRAG
 
+# -------------------------
+# Pipeline Plugins (User-selectable pipeline builders)
+# -------------------------
+from .pipeline.plugins.easy import EasyPipelinePlugin
+from .pipeline.plugins.fast import FastPipelinePlugin
+from .pipeline.plugins.standard import StandardPipelinePlugin
+from .pipeline.plugins.debug import DebugPipelinePlugin
+
+# -------------------------
+# Context Builder
+# -------------------------
 from .context.pipeline import ContextPipeline
+
+# -------------------------
+# RGS
+# -------------------------
 from .generation.rgs import RGS, RGSConfig
 
 __all__ = [
     "get_config",
     "RAGConfig",
     "RAGPipeline",
-    "EasyRAG",
-    "FastRAG",
-    "StandardRAG",
-    "DebugRAG",
+
+    # pipeline plugins
+    "EasyPipelinePlugin",
+    "FastPipelinePlugin",
+    "StandardPipelinePlugin",
+    "DebugPipelinePlugin",
+
     "ContextPipeline",
     "RGS",
     "RGSConfig",
 ]
 
-# Optional but nice to have for CLI / introspection
 __version__ = "0.1.0"

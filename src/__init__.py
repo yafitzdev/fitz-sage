@@ -6,15 +6,11 @@ Public API surface for v0.1.0
 # Core pipeline
 from fitz_rag.pipeline.engine import (
     RAGPipeline,
-    create_pipeline,
     create_pipeline_from_yaml,
 )
 
 # Preset pipelines
-from fitz_rag.pipeline.easy import EasyRAG
-from fitz_rag.pipeline.fast import FastRAG
-from fitz_rag.pipeline.standard import StandardRAG
-from fitz_rag.pipeline.debug import DebugRAG
+from fitz_rag.pipeline.plugins.fast import FastRAG
 
 # Retrieval-Guided Synthesis
 from fitz_rag.generation.rgs import RGS, RGSConfig
