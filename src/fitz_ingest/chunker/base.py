@@ -8,6 +8,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import CHUNKING
+
+logger = get_logger(__name__)
+
 
 @dataclass
 class Chunk:
@@ -31,15 +36,22 @@ class SimpleChunker:
     def chunk_file(self, file_path: str) -> List[Chunk]:
         path = Path(file_path)
 
+        logger.debug(f"{CHUNKING} Chunking file: {file_path}")
+
         if not path.exists() or not path.is_file():
+            logger.error(f"{CHUNKING} File does not exist or is not a file: {file_path}")
             return []
 
         try:
             text = path.read_text(encoding="utf-8", errors="ignore")
-        except Exception:
+        except Exception as e:
+            logger.error(f"{CHUNKING} Failed reading file '{file_path}': {e}")
             return []
 
-        return self._chunk_text(text, {"source_file": str(path)})
+        chunks = self._chunk_text(text, {"source_file": str(path)})
+
+        logger.debug(f"{CHUNKING} Extracted {len(chunks)} chunks from '{file_path}'")
+        return chunks
 
     # ---------------------------------------------------------
     # Chunk pure text

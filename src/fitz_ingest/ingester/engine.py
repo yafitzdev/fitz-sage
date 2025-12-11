@@ -4,8 +4,9 @@ Generic ingestion engine for fitz-ingest.
 Handles:
 - Chunking
 - Optional embedding
+- Validation
 - Upsert into Qdrant
-- File iteration
+- Logging
 """
 
 from __future__ import annotations
@@ -22,8 +23,14 @@ from fitz_ingest.ingester.validation import (
     IngestionValidationError,
 )
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import INGEST
+
 from fitz_rag.exceptions.retriever import EmbeddingError, VectorSearchError
 from fitz_rag.exceptions.config import ConfigError
+
+
+logger = get_logger(__name__)
 
 
 class IngestionEngine:
@@ -31,7 +38,8 @@ class IngestionEngine:
     Ingest files into Qdrant using:
       - Chunker
       - Optional embedding client
-      - Central validation (fitz_ingest.ingester.validation)
+      - Central validation
+      - Unified logging
     """
 
     def __init__(
@@ -50,6 +58,8 @@ class IngestionEngine:
         self.distance = distance
         self.validator = validator or IngestionValidator()
 
+        logger.info(f"{INGEST} IngestionEngine initialized (collection='{collection}')")
+
     # ---------------------------------------------------------
     # Ingest a directory tree
     # ---------------------------------------------------------
@@ -59,60 +69,71 @@ class IngestionEngine:
         path: str | Path,
         glob_pattern: str = "**/*",
     ) -> None:
+
+        logger.info(f"{INGEST} Starting ingestion for directory: {path}")
+
         try:
             path = Path(path)
             files = list(path.glob(glob_pattern))
         except Exception as e:
+            logger.error(f"{INGEST} Failed resolving path '{path}': {e}")
             raise ConfigError(f"Invalid ingestion path: {path}") from e
 
         if not files:
+            logger.info(f"{INGEST} No files found — ingestion finished.")
             return
 
-        # Qdrant validation / ensure collection
+        # Qdrant ensure collection
         try:
             ensure_collection(
                 client=self.client,
                 name=self.collection,
                 vector_size=self.vector_size,
             )
+            logger.info(f"{INGEST} Collection '{self.collection}' is ready.")
         except Exception as e:
+            logger.error(f"{INGEST} Failed ensuring Qdrant collection: {e}")
             raise VectorSearchError(
                 f"Failed ensuring collection '{self.collection}'"
             ) from e
 
+        # Process files
         for file in files:
             if file.is_file():
+                logger.info(f"{INGEST} Ingesting file: {file}")
                 try:
                     self.ingest_file(chunker, file)
                 except Exception as e:
-                    raise VectorSearchError(
-                        f"Failed ingesting file: {file}"
-                    ) from e
+                    logger.error(f"{INGEST} Error ingesting file {file}: {e}")
+                    raise
 
     # ---------------------------------------------------------
     # Ingest a single file
     # ---------------------------------------------------------
     def ingest_file(self, chunker, file_path: str | Path) -> None:
+        logger.debug(f"{INGEST} Chunking file: {file_path}")
+
         try:
             chunks = chunker.chunk_file(str(file_path))
         except Exception as e:
+            logger.error(f"{INGEST} Chunker failed for file {file_path}: {e}")
             raise ConfigError(f"Chunker failed on file: {file_path}") from e
 
-        # No chunks -> nothing to write, not an error
         if not chunks:
+            logger.info(f"{INGEST} No chunks extracted from '{file_path}', skipping.")
             return
 
         # Validation BEFORE embedding / Qdrant
         try:
-            if self.validator is not None:
-                self.validator.validate_chunks(chunks, file_path)
+            self.validator.validate_chunks(chunks, file_path)
+            logger.debug(f"{INGEST} Validation passed for '{file_path}' ({len(chunks)} chunks)")
         except IngestionValidationError as e:
+            logger.error(f"{INGEST} Validation failed for '{file_path}': {e}")
             raise ConfigError(
                 f"Ingestion validation failed for file '{file_path}': {e}"
             ) from e
 
         points = []
-
         for chunk in chunks:
             text = chunk.text
             meta = dict(chunk.metadata)
@@ -125,13 +146,15 @@ class IngestionEngine:
                     if self.embedder is not None
                     else None
                 )
+                if self.embedder is not None:
+                    logger.debug(f"{INGEST} Embedded a chunk from '{file_path}'")
             except Exception as e:
+                logger.error(f"{INGEST} Embedding failed for chunk in '{file_path}': {e}")
                 raise EmbeddingError(
                     f"Failed embedding chunk from: {file_path}"
                 ) from e
 
             point_id = str(uuid.uuid4())
-
             points.append(
                 {
                     "id": point_id,
@@ -143,13 +166,17 @@ class IngestionEngine:
                 }
             )
 
-        # Upsert into Qdrant
+        # Upsert into Qdrant — cast to Any to avoid PyCharm warning
+        points_any: Any = points
+
         try:
             self.client.upsert(
-                collection_name=self.collection,
-                points=points,
+                self.collection,
+                points_any,
             )
+            logger.info(f"{INGEST} Upserted {len(points)} chunks from '{file_path}'")
         except Exception as e:
+            logger.error(f"{INGEST} Upsert failed for '{file_path}': {e}")
             raise VectorSearchError(
                 f"Failed upserting points into '{self.collection}'"
             ) from e

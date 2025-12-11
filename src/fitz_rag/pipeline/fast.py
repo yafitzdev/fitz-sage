@@ -7,6 +7,11 @@ from fitz_rag.config.schema import RAGConfig
 from fitz_rag.config.loader import load_config
 from fitz_rag.pipeline.engine import RAGPipeline
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import PIPELINE
+
+logger = get_logger(__name__)
+
 
 @dataclass
 class FastRAG:
@@ -37,12 +42,15 @@ class FastRAG:
         # 1) Unified config path
         # -------------------------------------
         if self.config is not None:
+            logger.info(f"{PIPELINE} Initializing FastRAG from explicit config")
             self.pipeline = RAGPipeline.from_config(self.config)
             return
 
         # -------------------------------------
         # 2) Legacy initialization path
         # -------------------------------------
+        logger.info(f"{PIPELINE} Initializing FastRAG using legacy parameters")
+
         raw = load_config()
 
         # Apply minimal overrides
@@ -50,10 +58,12 @@ class FastRAG:
         raw["retriever"]["top_k"] = self.top_k
 
         # Disable reranking (fast mode)
+        logger.debug(f"{PIPELINE} Disabling reranker for FastRAG mode")
         raw["rerank"]["enabled"] = False
 
         # API key passthrough
         if self.cohere_api_key:
+            logger.debug(f"{PIPELINE} Overriding API keys with provided cohere_api_key")
             raw["llm"]["api_key"] = self.cohere_api_key
             raw["embedding"]["api_key"] = self.cohere_api_key
             raw["rerank"]["api_key"] = self.cohere_api_key
@@ -62,10 +72,12 @@ class FastRAG:
         cfg = RAGConfig.from_dict(raw)
 
         # Build pipeline from config
+        logger.debug(f"{PIPELINE} Constructing FastRAG pipeline (top_k={self.top_k})")
         self.pipeline = RAGPipeline.from_config(cfg)
 
     # -------------------------------------
     # User API
     # -------------------------------------
     def ask(self, query: str):
+        logger.info(f"{PIPELINE} FastRAG.ask called (query='{query[:50]}...')")
         return self.pipeline.run(query)

@@ -20,7 +20,11 @@ from fitz_rag.core import RetrievedChunk
 from fitz_rag.sourcer.rag_base import RetrievalContext, SourceConfig
 from fitz_rag.config import get_config
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import PROMPT
+
 _cfg = get_config()
+logger = get_logger(__name__)
 
 
 class PromptBuilderError(Exception):
@@ -28,6 +32,8 @@ class PromptBuilderError(Exception):
 
 
 def _format_chunks(label: str, chunks: List[RetrievedChunk]) -> str:
+    logger.debug(f"{PROMPT} Formatting {len(chunks)} chunks for label='{label}'")
+
     try:
         if not chunks:
             return f"{label}: <no chunks>"
@@ -40,11 +46,15 @@ def _format_chunks(label: str, chunks: List[RetrievedChunk]) -> str:
             out.append("")
 
         return "\n".join(out).strip()
+
     except Exception as e:
+        logger.error(f"{PROMPT} Failed formatting chunks for '{label}'")
         raise PromptBuilderError(f"Failed to format chunks for label '{label}': {e}") from e
 
 
 def build_rag_block(ctx: RetrievalContext, sources: List[SourceConfig]) -> str:
+    logger.debug(f"{PROMPT} Building RAG block for query='{ctx.query}'")
+
     try:
         parts = [f"Retrieval query: {ctx.query}", ""]
 
@@ -57,6 +67,7 @@ def build_rag_block(ctx: RetrievalContext, sources: List[SourceConfig]) -> str:
         return "\n".join(parts).strip()
 
     except Exception as e:
+        logger.error(f"{PROMPT} Failed building RAG block")
         raise PromptBuilderError(f"Failed to build RAG block: {e}") from e
 
 
@@ -68,6 +79,8 @@ def build_user_prompt(
     max_trf_json_chars: int | None = None,
 ) -> str:
 
+    logger.debug(f"{PROMPT} Building final user prompt")
+
     try:
         if max_trf_json_chars is None:
             max_trf_json_chars = _cfg.get("retriever", {}).get("max_trf_json_chars", None)
@@ -76,6 +89,7 @@ def build_user_prompt(
         try:
             trf_json = json.dumps(trf, indent=2)
         except Exception as je:
+            logger.error(f"{PROMPT} Invalid TRF JSON structure")
             raise PromptBuilderError(f"Invalid TRF JSON structure: {je}") from je
 
         if max_trf_json_chars and len(trf_json) > max_trf_json_chars:
@@ -91,4 +105,5 @@ def build_user_prompt(
         )
 
     except Exception as e:
+        logger.error(f"{PROMPT} Failed building user prompt")
         raise PromptBuilderError(f"Failed to build user prompt: {e}") from e

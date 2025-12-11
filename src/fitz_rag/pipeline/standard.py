@@ -7,6 +7,11 @@ from fitz_rag.config.schema import RAGConfig
 from fitz_rag.config.loader import load_config
 from fitz_rag.pipeline.engine import RAGPipeline
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import PIPELINE
+
+logger = get_logger(__name__)
+
 
 @dataclass
 class StandardRAG:
@@ -39,27 +44,34 @@ class StandardRAG:
         # 1) Unified CONFIG path
         # -------------------------------------
         if self.config is not None:
+            logger.info(f"{PIPELINE} Initializing StandardRAG from explicit config")
             self.pipeline = RAGPipeline.from_config(self.config)
             return
 
         # -------------------------------------
         # 2) Legacy fallback path
         # -------------------------------------
+        logger.info(f"{PIPELINE} Initializing StandardRAG using legacy parameters")
+
         raw = load_config()
 
         raw["retriever"]["collection"] = self.collection
         raw["retriever"]["top_k"] = self.top_k
 
         if self.cohere_api_key:
+            logger.debug(f"{PIPELINE} Overriding API keys with provided cohere_api_key")
             raw["llm"]["api_key"] = self.cohere_api_key
             raw["embedding"]["api_key"] = self.cohere_api_key
             raw["rerank"]["api_key"] = self.cohere_api_key
 
         cfg = RAGConfig.from_dict(raw)
+
+        logger.debug(f"{PIPELINE} Constructing StandardRAG pipeline (top_k={self.top_k})")
         self.pipeline = RAGPipeline.from_config(cfg)
 
     # -------------------------------------
     # User API
     # -------------------------------------
     def ask(self, query: str):
+        logger.info(f"{PIPELINE} StandardRAG.ask called (query='{query[:50]}...')")
         return self.pipeline.run(query)

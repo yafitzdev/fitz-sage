@@ -20,7 +20,11 @@ from typing import Dict, List, Optional
 from fitz_rag.core import RetrievedChunk
 from fitz_rag.config import get_config
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import SOURCER
+
 _cfg = get_config()
+logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------
@@ -97,13 +101,20 @@ class RAGContextBuilder:
         artefacts: Dict[str, List[RetrievedChunk]] = {}
 
         for src in self.sources:
+            logger.debug(f"{SOURCER} Running strategy '{src.name}' for query='{query}'")
+
             try:
                 artefacts[src.name] = src.strategy.retrieve(trf, query)
+                logger.debug(
+                    f"{SOURCER} Strategy '{src.name}' returned {len(artefacts[src.name])} chunks"
+                )
 
             except Exception as e:
+                logger.error(f"{SOURCER} Strategy '{src.name}' failed: {e}")
+
                 # Fail-open but store an error chunk with all required fields
                 artefacts[src.name] = []
-                artefacts[src.name + "_error"] = [
+                artefacts[src.name + '_error'] = [
                     RetrievedChunk(
                         text=f"[Retrieval error in {src.name}: {e}]",
                         score=0.0,
@@ -131,25 +142,27 @@ def load_source_configs() -> List[SourceConfig]:
     configs: List[SourceConfig] = []
 
     for info in pkgutil.iter_modules([str(pkg_dir)]):
-        name = info.name
 
-        # IMPORTANT CHANGE: do NOT skip internal modules.
-        # The test suite expects import_module() to be called and fail when mocked.
+        name = info.name
         full_name = f"{base_pkg}.{name}"
+
+        logger.debug(f"{SOURCER} Loading plugin module '{full_name}'")
 
         try:
             module = importlib.import_module(full_name)
         except Exception as e:
-            raise PluginLoadError(f"Failed to import plugin module '{full_name}': {e}") from e
+            logger.error(f"{SOURCER} Failed to import plugin '{full_name}': {e}")
+            raise PluginLoadError(
+                f"Failed to import plugin module '{full_name}': {e}"
+            ) from e
 
         cfg = getattr(module, "SOURCE_CONFIG", None)
 
         if isinstance(cfg, SourceConfig):
+            logger.debug(f"{SOURCER} Registered plugin '{full_name}'")
             configs.append(cfg)
         else:
-            # Internal modules will trigger this, but that's OK—
-            # tests mock import_module BEFORE reaching here.
-            pass
+            # Silence is intentional — internal modules don't define SOURCE_CONFIG.
+            logger.debug(f"{SOURCER} Module '{full_name}' has no SOURCE_CONFIG")
 
-    # Do NOT raise "No valid plugins found". This conflicts with test expectations.
     return configs

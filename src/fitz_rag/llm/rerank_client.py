@@ -6,10 +6,15 @@ import os
 
 from fitz_rag.exceptions.retriever import RerankError
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import RERANK
+
 try:
     import cohere
 except ImportError:
     cohere = None  # type: ignore
+
+logger = get_logger(__name__)
 
 
 class RerankClient(Protocol):
@@ -35,9 +40,9 @@ class CohereRerankClient:
             raise RuntimeError("COHERE_API_KEY is not set.")
 
         self.model = (
-            self.model
-            or os.getenv("COHERE_RERANK_MODEL")
-            or "rerank-v3.5"
+                self.model
+                or os.getenv("COHERE_RERANK_MODEL")
+                or "rerank-v3.5"
         )
 
         try:
@@ -45,11 +50,16 @@ class CohereRerankClient:
         except Exception as e:
             raise RerankError("Failed to initialize Cohere Rerank client") from e
 
+        logger.info(f"{RERANK} Initialized CohereRerankClient (model={self.model})")
+
     def rerank(self, query: str, documents: List[str], top_n: Optional[int] = None) -> List[int]:
         if not documents:
+            logger.debug(f"{RERANK} Called rerank() with zero documents — returning empty list")
             return []
 
         n = top_n if top_n is not None else len(documents)
+
+        logger.debug(f"{RERANK} Reranking {len(documents)} docs (top_n={n}, query_len={len(query)})")
 
         try:
             res = self._client.rerank(
@@ -59,11 +69,16 @@ class CohereRerankClient:
                 top_n=n,
             )
         except Exception as e:
+            logger.error(f"{RERANK} Rerank request failed")
             raise RerankError("Rerank request failed") from e
 
+        # Extract results
         try:
-            return [r.index for r in res.results]
+            indices = [r.index for r in res.results]
+            logger.debug(f"{RERANK} Rerank succeeded — returning {len(indices)} indices")
+            return indices
         except Exception as e:
+            logger.error(f"{RERANK} Rerank response malformed")
             raise RerankError("Malformed rerank response") from e
 
 
@@ -72,6 +87,8 @@ class DummyRerankClient:
     """Deterministic test reranker."""
 
     def rerank(self, query: str, documents: List[str], top_n: Optional[int] = None) -> List[int]:
+        logger.debug(f"{RERANK} Dummy reranker invoked for {len(documents)} documents")
+
         if not documents:
             return []
 
@@ -80,4 +97,5 @@ class DummyRerankClient:
 
         if top_n is not None:
             indices = indices[:top_n]
+
         return indices

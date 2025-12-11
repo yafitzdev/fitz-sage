@@ -7,6 +7,11 @@ from fitz_rag.config.schema import RAGConfig
 from fitz_rag.config.loader import load_config
 from fitz_rag.pipeline.engine import RAGPipeline
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import PIPELINE
+
+logger = get_logger(__name__)
+
 
 @dataclass
 class DebugRAG:
@@ -36,18 +41,22 @@ class DebugRAG:
         # 1) Unified config path
         # -------------------------------------
         if self.config is not None:
+            logger.info(f"{PIPELINE} Initializing DebugRAG from explicit config")
             self.pipeline = RAGPipeline.from_config(self.config)
             return
 
         # -------------------------------------
-        # 2) Legacy path (kept for backward compat)
+        # 2) Legacy path (for backward compat)
         # -------------------------------------
+        logger.info(f"{PIPELINE} Initializing DebugRAG using legacy parameters")
+
         raw = load_config()
 
         raw["retriever"]["collection"] = self.collection
         raw["retriever"]["top_k"] = self.top_k
 
         if self.cohere_api_key:
+            logger.debug(f"{PIPELINE} Overriding API keys with provided cohere_api_key")
             raw["llm"]["api_key"] = self.cohere_api_key
             raw["embedding"]["api_key"] = self.cohere_api_key
             raw["rerank"]["api_key"] = self.cohere_api_key
@@ -67,10 +76,14 @@ class DebugRAG:
         Useful for debugging how RAG arrives at a conclusion.
         """
 
+        logger.info(f"{PIPELINE} Debug explain() called for query='{query}'")
+
         # Step 1: retrieve chunks
+        logger.debug(f"{PIPELINE} Retrieving chunks")
         chunks = self.pipeline.retriever.retrieve(query)
 
         # Step 2: build prompt
+        logger.debug(f"{PIPELINE} Building RGS prompt")
         prompt = self.pipeline.rgs.build_prompt(query, chunks)
 
         messages = [
@@ -79,7 +92,10 @@ class DebugRAG:
         ]
 
         # Step 3: LLM answer
+        logger.debug(f"{PIPELINE} Querying LLM for answer")
         raw = self.pipeline.llm.chat(messages)
+
+        logger.info(f"{PIPELINE} explain() completed")
 
         return {
             "query": query,

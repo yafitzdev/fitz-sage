@@ -7,6 +7,11 @@ from fitz_rag.config.schema import RAGConfig
 from fitz_rag.config.loader import load_config
 from fitz_rag.pipeline.engine import RAGPipeline
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import PIPELINE
+
+logger = get_logger(__name__)
+
 
 @dataclass
 class EasyRAG:
@@ -39,32 +44,37 @@ class EasyRAG:
         # 1) Unified CONFIG path
         # --------------------------
         if self.config is not None:
-            # Build full pipeline from config
+            logger.info(f"{PIPELINE} Initializing EasyRAG from explicit config")
             self.pipeline = RAGPipeline.from_config(self.config)
             return
 
         # --------------------------
         # 2) Legacy path (backward compatible)
         # --------------------------
-        # Build RAGConfig dynamically from kwargs
+        logger.info(f"{PIPELINE} Initializing EasyRAG using legacy parameters")
+
         raw = load_config()
 
-        # update necessary values
+        # Update necessary retrieval values
         raw["retriever"]["collection"] = self.collection
         raw["retriever"]["top_k"] = self.top_k
 
         if self.cohere_api_key:
+            logger.debug(f"{PIPELINE} Overriding API keys with provided cohere_api_key")
             raw["llm"]["api_key"] = self.cohere_api_key
             raw["embedding"]["api_key"] = self.cohere_api_key
             raw["rerank"]["api_key"] = self.cohere_api_key
 
+        # Build structured config
         cfg = RAGConfig.from_dict(raw)
 
         # Build pipeline
         self.pipeline = RAGPipeline.from_config(cfg)
+        logger.debug(f"{PIPELINE} EasyRAG pipeline initialized (top_k={self.top_k})")
 
     # ------------------------------------------------------------------
     # User API
     # ------------------------------------------------------------------
     def ask(self, query: str):
+        logger.info(f"{PIPELINE} EasyRAG.ask called (query='{query[:50]}...')")
         return self.pipeline.run(query)

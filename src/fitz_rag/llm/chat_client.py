@@ -6,10 +6,15 @@ import os
 
 from fitz_rag.exceptions.llm import LLMError, LLMResponseError
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import CHAT
+
 try:
     import cohere
 except ImportError:
     cohere = None  # type: ignore
+
+logger = get_logger(__name__)
 
 
 class ChatClient(Protocol):
@@ -49,6 +54,8 @@ class CohereChatClient:
         except Exception as e:
             raise LLMError("Failed to initialize Cohere Chat client") from e
 
+        logger.info(f"{CHAT} Initialized CohereChatClient (model={self.model})")
+
     def _build_messages(self, system_prompt: str, user_content: str):
         msg = []
         if system_prompt:
@@ -68,13 +75,20 @@ class CohereChatClient:
         if self.max_tokens is not None:
             kwargs["max_tokens"] = self.max_tokens
 
+        logger.debug(
+            f"{CHAT} Sending chat with {len(messages)} messages "
+            f"(temperature={self.temperature}, max_tokens={self.max_tokens})"
+        )
+
         try:
             response = self._client.chat(**kwargs)
         except Exception as e:
+            logger.error(f"{CHAT} Chat request failed")
             raise LLMError("Chat request failed") from e
 
         # Parse segments
         try:
+            logger.debug(f"{CHAT} Parsing chat response")
             parts = []
             for seg in response.message.content:
                 if getattr(seg, "type", None) == "text":
@@ -86,6 +100,7 @@ class CohereChatClient:
 
             return "".join(parts).strip()
         except Exception as e:
+            logger.error(f"{CHAT} Malformed LLM response")
             raise LLMResponseError("Malformed LLM response") from e
 
 
@@ -96,4 +111,5 @@ class DummyChatClient:
 
     def chat(self, system_prompt: str, user_content: str) -> str:
         self.last_user_content = user_content
+        logger.debug(f"{CHAT} DummyChatClient returning static answer")
         return f"{self.prefix}OK"

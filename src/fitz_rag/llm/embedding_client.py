@@ -6,16 +6,21 @@ import os
 
 from fitz_rag.exceptions.retriever import EmbeddingError
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import EMBEDDING
+
 try:  # Cohere is optional at import time
     import cohere
 except ImportError:  # pragma: no cover - handled lazily at runtime
     cohere = None  # type: ignore[assignment]
 
 
+logger = get_logger(__name__)
+
+
 # ---------------------------------------------------------------------------
 # EmbeddingClient protocol
 # ---------------------------------------------------------------------------
-
 
 class EmbeddingClient(Protocol):
     """
@@ -31,7 +36,6 @@ class EmbeddingClient(Protocol):
 # ---------------------------------------------------------------------------
 # Cohere implementation
 # ---------------------------------------------------------------------------
-
 
 @dataclass
 class CohereEmbeddingClient:
@@ -77,8 +81,12 @@ class CohereEmbeddingClient:
         except Exception as e:
             raise EmbeddingError("Failed to initialize Cohere embedding client") from e
 
+        logger.info(f"{EMBEDDING} Initialized CohereEmbeddingClient (model={self.model}, input_type={self.input_type})")
+
     def embed(self, text: str) -> List[float]:
         """Create a single embedding with structured exception handling."""
+        logger.debug(f"{EMBEDDING} Embedding text (len={len(text)})")
+
         kwargs = {
             "texts": [text],
             "model": self.model,
@@ -90,8 +98,10 @@ class CohereEmbeddingClient:
 
         try:
             res = self._client.embed(**kwargs)
+            logger.debug(f"{EMBEDDING} Embedding succeeded")
             return res.embeddings.float[0]
         except Exception as e:
+            logger.error(f"{EMBEDDING} Embedding failed")
             raise EmbeddingError(f"Failed to embed text: {text!r}") from e
 
 
@@ -99,11 +109,11 @@ class CohereEmbeddingClient:
 # Dummy implementation (for tests)
 # ---------------------------------------------------------------------------
 
-
 @dataclass
 class DummyEmbeddingClient:
     dim: int = 10
 
     def embed(self, text: str) -> List[float]:
+        logger.debug(f"{EMBEDDING} DummyEmbeddingClient embedding text (len={len(text)})")
         base = abs(hash(text)) % 997
         return [(base + i) / 997.0 for i in range(self.dim)]

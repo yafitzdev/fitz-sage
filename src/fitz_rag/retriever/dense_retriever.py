@@ -20,6 +20,11 @@ from fitz_rag.exceptions.retriever import (
     RerankError,
 )
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import RETRIEVER, EMBEDDING, RERANK
+
+logger = get_logger(__name__)
+
 
 class RAGRetriever:
     """
@@ -30,6 +35,7 @@ class RAGRetriever:
       - vector search (Qdrant)
       - optional reranking (via RerankConfig)
       - structured exceptions
+      - minimal logging with subsystem tags
     """
 
     def __init__(
@@ -43,7 +49,7 @@ class RAGRetriever:
         self.retriever_cfg = retriever_cfg
 
         # -------------------------------------------------------
-        # Embedding backend (strict)
+        # Embedding backend
         # -------------------------------------------------------
         provider = embed_cfg.provider.lower()
 
@@ -55,7 +61,7 @@ class RAGRetriever:
             model=embed_cfg.model,
         )
 
-        # Test hack: allow replacing embedder manually after init
+        # Allow patching in unit tests
         self._allow_embedder_patch = True
 
         # -------------------------------------------------------
@@ -71,50 +77,74 @@ class RAGRetriever:
                 api_key=rerank_cfg.api_key,
                 model=rerank_cfg.model,
             )
+            logger.info(
+                f"{RETRIEVER} Reranker enabled: provider={rerank_cfg.provider}, model={rerank_cfg.model}"
+            )
         else:
             self.reranker = None
+            logger.info(f"{RETRIEVER} Reranker disabled.")
+
+        logger.info(
+            f"{RETRIEVER} Initialized retriever: collection={self.retriever_cfg.collection}, "
+            f"embed_provider={embed_cfg.provider}"
+        )
 
     # ---------------------------------------------------------------------
     # Main public API
     # ---------------------------------------------------------------------
     def retrieve(self, query: str) -> List[Chunk]:
         """
-        Full retrieval pipeline with structured exceptions:
+        Full retrieval pipeline:
         1) embed query
         2) vector search
         3) optional rerank
         4) return Chunk objects
         """
+        logger.info(
+            f"{RETRIEVER} Running retrieval for collection='{self.retriever_cfg.collection}'"
+        )
 
         # 1. EMBEDDING
         try:
+            logger.debug(f"{EMBEDDING} Embedding query...")
             query_vector = self.embedder.embed(query)
         except Exception as e:
+            logger.error(f"{EMBEDDING} Embedding failed for query='{query}'")
             raise EmbeddingError(f"Failed to embed query: {query}") from e
 
         # 2. VECTOR SEARCH
         try:
+            logger.debug(
+                f"{RETRIEVER} Vector search: collection='{self.retriever_cfg.collection}', "
+                f"top_k={self.retriever_cfg.top_k}"
+            )
             hits = self.client.search(
                 collection_name=self.retriever_cfg.collection,
-                query_vector=query_vector,
+                vector=query_vector,  # modern Qdrant arg
                 limit=self.retriever_cfg.top_k,
                 with_payload=True,
             )
         except Exception as e:
+            logger.error(
+                f"{RETRIEVER} Vector search failed for collection '{self.retriever_cfg.collection}'"
+            )
             raise VectorSearchError(
                 f"Vector search failed for collection '{self.retriever_cfg.collection}'"
             ) from e
 
-        # Convert to chunks
+        # Convert to Chunk objects
         chunks = self._to_chunks(hits)
 
         # 3. RERANK
         if self.reranker:
             try:
+                logger.debug(f"{RERANK} Applying rerank to {len(chunks)} chunks")
                 chunks = self._apply_rerank(query, chunks)
             except Exception as e:
+                logger.error(f"{RERANK} Reranking failed")
                 raise RerankError("Reranking failed") from e
 
+        logger.info(f"{RETRIEVER} Retrieval complete: {len(chunks)} chunks returned")
         return chunks
 
     # ---------------------------------------------------------------------
