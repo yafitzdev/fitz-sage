@@ -8,7 +8,8 @@ import importlib.metadata
 from fitz_rag.config.loader import load_config
 from fitz_rag.config.schema import RAGConfig
 from fitz_rag.pipeline.engine import create_pipeline_from_yaml
-from fitz_rag.vector_db.qdrant_client import create_qdrant_client
+
+from fitz_rag.vector_db.registry import get_vector_db_plugin
 
 from fitz_rag.exceptions.base import FitzRAGError
 from fitz_rag.exceptions.retriever import VectorSearchError
@@ -51,46 +52,56 @@ def config_show():
 @app.command("config-path")
 def config_path():
     """Show the resolved config path."""
-    # load_config(return_path=True) removed → we do explicit logic
     env = Path(typer.getenv("FITZ_RAG_CONFIG", "")) if typer.getenv("FITZ_RAG_CONFIG") else None
 
     if env and env.exists():
         typer.echo(str(env))
     else:
-        # default.yaml inside package
         from importlib.resources import files
         default_path = files("fitz_rag.config").joinpath("default.yaml")
         typer.echo(str(default_path))
 
 
 # ---------------------------------------------------------
-# Collections (Qdrant)
+# Collections (Vector DB plugins)
 # ---------------------------------------------------------
-collections_app = typer.Typer(help="Manage Qdrant collections")
+collections_app = typer.Typer(help="Manage vector database collections")
 app.add_typer(collections_app, name="collections")
 
 
-def _make_qdrant_client_from_config() -> object:
-    """Internal helper: Build a Qdrant client using unified config."""
+def _make_vector_db_from_config():
+    """Internal helper: Build the configured vector DB plugin."""
+
     raw = load_config()
     cfg = RAGConfig.from_dict(raw)
 
-    return create_qdrant_client(
-        host=cfg.retriever.qdrant_host,
-        port=cfg.retriever.qdrant_port,
-        https=False,
-        api_key=None,
-    )
+    provider = cfg.retriever.vector_db_provider if hasattr(cfg.retriever, "vector_db_provider") else "qdrant"
+
+    db = get_vector_db_plugin(provider)
+
+    # Assign dynamic config onto plugin instance
+    # (future-safe: works for any backend)
+    if provider == "qdrant":
+        db.host = cfg.retriever.qdrant_host
+        db.port = cfg.retriever.qdrant_port
+        db.collection = cfg.retriever.collection if hasattr(cfg.retriever, "collection") else "default"
+
+    return db
 
 
 @collections_app.command("list")
 def collections_list():
-    """List Qdrant collections."""
+    """List collections (if supported by the vector DB)."""
     try:
-        client = _make_qdrant_client_from_config()
+        db = _make_vector_db_from_config()
+        db.connect()
+
+        # Only Qdrant supports `get_collections`
+        client = db.client  # QdrantVectorDB sets .client after connect()
         cols = client.get_collections().collections
+
     except Exception as e:
-        logger.error(f"{CLI} Qdrant connection failed: {e}")
+        logger.error(f"{CLI} Vector DB connection failed: {e}")
         raise typer.Exit(code=1)
 
     if not cols:
@@ -103,11 +114,13 @@ def collections_list():
 
 @collections_app.command("drop")
 def collections_drop(name: str):
-    """Drop a Qdrant collection."""
+    """Drop a collection (Qdrant only)."""
     try:
-        client = _make_qdrant_client_from_config()
+        db = _make_vector_db_from_config()
+        db.connect()
+        client = db.client
     except Exception as e:
-        logger.error(f"{CLI} Qdrant connection failed: {e}")
+        logger.error(f"{CLI} Vector DB connection failed: {e}")
         raise typer.Exit(code=1)
 
     if typer.confirm(f"Delete collection '{name}'?"):
@@ -137,7 +150,7 @@ def query(text: str, config: str | None = typer.Option(None, help="Path to confi
         logger.error(f"{CLI} Pipeline error: {e}")
         raise typer.Exit(code=1)
     except VectorSearchError as e:
-        logger.error(f"{CLI} Qdrant error: {e}")
+        logger.error(f"{CLI} Vector DB error: {e}")
         raise typer.Exit(code=1)
     except Exception as e:
         logger.error(f"{CLI} Unexpected error: {e}")
