@@ -2,7 +2,7 @@
 Generic ingestion engine for fitz-ingest.
 
 Handles:
-- Chunking via ChunkingEngine (plugin-based)
+- Plugin-based chunking (via ChunkingEngine + registry)
 - Optional embedding
 - Validation
 - Upsert into Qdrant
@@ -23,9 +23,10 @@ from fitz_ingest.ingester.validation import (
     IngestionValidationError,
 )
 from fitz_ingest.chunker.engine import ChunkingEngine
-from fitz_ingest.chunker.base import Chunk
+from fitz_ingest.chunker.registry import get_chunker_plugin
+from fitz_stack.core import Chunk
 
-# NEW: ingestion-local exceptions
+# ingestion-local exceptions
 from fitz_ingest.exceptions.base import IngestionError
 from fitz_ingest.exceptions.config import IngestionConfigError
 from fitz_ingest.exceptions.vector import IngestionVectorError
@@ -33,7 +34,6 @@ from fitz_ingest.exceptions.chunking import IngestionChunkingError
 
 from fitz_stack.logging import get_logger
 from fitz_stack.logging_tags import INGEST
-
 
 logger = get_logger(__name__)
 
@@ -45,6 +45,17 @@ class IngestionEngine:
       - Optional embedding client
       - Validation
       - Unified logging
+
+    CHANGES FOR PLUGIN ARCHITECTURE (Option C):
+    -------------------------------------------
+    Instead of requiring the caller to pass a prebuilt ChunkingEngine,
+    users now specify a chunker *by name*, and the engine constructs the
+    plugin automatically via registry lookup:
+
+        plugin_cls = get_chunker_plugin(chunker_name)
+        chunker_engine = ChunkingEngine(plugin_cls())
+
+    This makes ingestion fully config-driven and consistent with RAG.
     """
 
     def __init__(
@@ -52,7 +63,8 @@ class IngestionEngine:
         client: QdrantClient,
         collection: str,
         vector_size: int,
-        chunker_engine: ChunkingEngine,
+        *,
+        chunker: str = "simple",
         embedder: Optional[Any] = None,
         distance: str = "cosine",
         validator: Optional[IngestionValidator] = None,
@@ -60,11 +72,24 @@ class IngestionEngine:
 
         self.client = client
         self.collection = collection
-        self.chunker_engine = chunker_engine
-        self.embedder = embedder
         self.vector_size = vector_size
         self.distance = distance
+        self.embedder = embedder
         self.validator = validator or IngestionValidator()
+
+        # ---------------------------------------------------------
+        # NEW: Build chunker plugin from registry (Option C)
+        # ---------------------------------------------------------
+        try:
+            plugin_cls = get_chunker_plugin(chunker)
+            plugin = plugin_cls()
+            self.chunker_engine = ChunkingEngine(plugin)
+            logger.info(f"{INGEST} Using chunker plugin: '{chunker}'")
+        except Exception as e:
+            logger.error(f"{INGEST} Failed loading chunker plugin '{chunker}': {e}")
+            raise IngestionConfigError(
+                f"Invalid chunker plugin: '{chunker}'"
+            ) from e
 
         logger.info(f"{INGEST} IngestionEngine initialized (collection='{collection}')")
 

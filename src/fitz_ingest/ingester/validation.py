@@ -16,72 +16,30 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Any, Sequence, Optional
 
-# NEW: use ingestion-local exceptions
 from fitz_ingest.exceptions.chunking import IngestionChunkingError
 from fitz_ingest.exceptions.config import IngestionConfigError
 
 
 class IngestionValidationError(IngestionChunkingError):
-    """
-    Raised when ingestion validation fails for a document or its chunks.
-
-    Inherits from IngestionChunkingError so that all chunking-related problems
-    fall under the same error category.
-    """
     pass
 
 
 @dataclass
 class ChunkValidationConfig:
-    """
-    Configuration for validating chunks.
-
-    min_chars / max_chars:
-        Bounds for chunk.text length. Very loose defaults on purpose so
-        we don't break existing pipelines, but still catch extreme cases.
-
-    required_metadata_keys:
-        Metadata keys that must be present in each chunk.metadata.
-        For v0.1.0 this defaults to an empty tuple (no strict requirements),
-        but the structure is ready to be tightened later.
-    """
-
     min_chars: int = 1
     max_chars: int = 50_000
     required_metadata_keys: Sequence[str] = ()
 
 
 class IngestionValidator:
-    """
-    Central ingestion validator for fitz-ingest.
-
-    Typical usage:
-
-        validator = IngestionValidator()
-        validator.validate_chunks(chunks, file_path)
-    """
-
     def __init__(self, config: Optional[ChunkValidationConfig] = None) -> None:
         self.config = config or ChunkValidationConfig()
 
-    # -----------------------------------------------------
-    # Public API
-    # -----------------------------------------------------
     def validate_chunks(self, chunks: Iterable[Any], file_path: str | Path) -> None:
-        """
-        Validate all chunks for a given file.
-
-        This does NOT raise on empty chunk lists — the ingestion engine
-        already short-circuits those and they never reach Qdrant.
-        """
         file_str = str(file_path)
-
         for idx, chunk in enumerate(chunks):
             self._validate_single_chunk(chunk, idx, file_str)
 
-    # -----------------------------------------------------
-    # Internal helpers
-    # -----------------------------------------------------
     def _validate_single_chunk(self, chunk: Any, idx: int, file_str: str) -> None:
         # Text
         text = getattr(chunk, "text", None)
@@ -105,7 +63,7 @@ class IngestionValidator:
                 f"(expected Mapping, got {type(metadata)})"
             )
 
-        # Required keys (configurable, empty by default)
+        # Required keys
         for key in self.config.required_metadata_keys:
             if key not in metadata:
                 raise IngestionValidationError(
