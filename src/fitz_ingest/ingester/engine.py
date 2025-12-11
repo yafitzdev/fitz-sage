@@ -7,16 +7,12 @@ from fitz_ingest.chunker.engine import ChunkingEngine
 from fitz_ingest.ingester.validation import IngestionValidator
 from fitz_ingest.vector_db.qdrant_utils import ensure_collection
 
+from fitz_ingest.exceptions.config import IngestionConfigError
+
 
 class IngestionEngine:
     """
     High-level ingestion coordinator.
-
-    Responsibilities:
-    - Chunk raw files into chunk dicts
-    - Validate them
-    - Ensure the Qdrant collection exists
-    - Embed + upsert into vector DB
     """
 
     def __init__(
@@ -35,50 +31,50 @@ class IngestionEngine:
         self.embedder = embedder
         self.validator = validator or IngestionValidator()
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
+    # -----------------------------------------------------
     def ingest_file(self, path: str | Path) -> None:
-        """
-        Ingest a single file: chunk → validate → ensure collection → upsert.
-        """
         p = Path(path)
 
-        # 1) Chunk
         chunks = self.chunker_engine.chunk_file(p)
         if not chunks:
             return
 
-        # 2) Validate
         self.validator.validate_chunks(chunks, str(p))
 
-        # 3) Ensure Qdrant collection exists
         ensure_collection(self.client, self.collection, self.vector_size)
 
-        # 4) Convert into Qdrant points
         points = list(self._build_points(chunks))
         if not points:
             return
 
-        # 5) Upsert
-        # Support real QdrantClient (kw args) and dummy test clients (positional)
         try:
             self.client.upsert(collection_name=self.collection, points=points)
         except TypeError:
-            # Dummy test clients: upsert(name, points)
             self.client.upsert(self.collection, points)
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+    # -----------------------------------------------------
+    def ingest_path(self, path: str | Path) -> None:
+        """
+        Ingest a file OR recurse through a directory.
+        """
+        p = Path(path)
+
+        if p.is_file():
+            self.ingest_file(p)
+            return
+
+        if not p.exists():
+            raise IngestionConfigError(f"Path does not exist: {p}")
+
+        for file in p.rglob("*"):
+            if file.is_file():
+                self.ingest_file(file)
+
+    # -----------------------------------------------------
     def _build_points(self, chunks: Iterable[Any]) -> Iterable[Dict[str, Any]]:
-        """
-        Convert chunks into Qdrant point dicts.
-        """
         for idx, ch in enumerate(chunks):
             text, metadata = self._extract_text_and_metadata(ch)
 
-            # Derive file reference
             file_val = None
             if isinstance(metadata, dict):
                 file_val = metadata.get("source_file") or metadata.get("file")
@@ -97,9 +93,6 @@ class IngestionEngine:
             }
 
     def _extract_text_and_metadata(self, chunk: Any) -> tuple[str, Dict[str, Any]]:
-        """
-        Normalize chunk-like objects into (text, metadata).
-        """
         if isinstance(chunk, dict):
             text = chunk.get("text", "")
             metadata = chunk.get("metadata", {}) or {}
@@ -107,8 +100,7 @@ class IngestionEngine:
                 metadata = {}
             return str(text), metadata
 
-        # Legacy object fallback
-        text = getattr(chunk, "text", "") or ""
+        text = getattr(chunk, "text", "")
         metadata = getattr(chunk, "metadata", {}) or {}
         if not isinstance(metadata, dict):
             metadata = {}
@@ -116,10 +108,6 @@ class IngestionEngine:
         return str(text), metadata
 
     def _embed_text(self, text: str) -> List[float]:
-        """
-        Embed text or return zero vector when no embedder is configured.
-        """
         if self.embedder is None:
             return [0.0] * self.vector_size
-
         return list(self.embedder.embed(text))
