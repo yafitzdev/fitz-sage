@@ -1,16 +1,15 @@
+# fitz_rag/pipeline/engine.py
 from __future__ import annotations
 
 from typing import Optional
-
-from qdrant_client import QdrantClient
 
 from fitz_rag.config.schema import RAGConfig
 from fitz_rag.config.loader import load_config
 
 from fitz_rag.retriever.plugins.dense import RAGRetriever
 
-from fitz_stack.llm.chat.engine import ChatEngine
-from fitz_stack.llm.registry import get_llm_plugin
+from fitz_stack.llm.chat import ChatEngine
+from fitz_stack.vector_db import get_vector_db_plugin
 
 from fitz_rag.generation.rgs import (
     RGS,
@@ -22,7 +21,7 @@ from fitz_rag.exceptions.pipeline import PipelineError, RGSGenerationError
 from fitz_rag.exceptions.llm import LLMError
 
 from fitz_stack.logging import get_logger
-from fitz_stack.logging_tags import PIPELINE
+from fitz_stack.logging_tags import PIPELINE, VECTOR_DB
 
 logger = get_logger(__name__)
 
@@ -30,9 +29,8 @@ logger = get_logger(__name__)
 class RAGPipeline:
     """
     Final clean RAG pipeline.
-
     Architecture:
-        retriever → rgs → llm → rgs_answer
+        vector_db → retriever → rgs → llm → final answer
     """
 
     def __init__(self, retriever: RAGRetriever, llm: ChatEngine, rgs: RGS):
@@ -42,15 +40,20 @@ class RAGPipeline:
 
         logger.info(f"{PIPELINE} RAGPipeline initialized")
 
+    # ---------------------------------------------------------
+    # Main run
+    # ---------------------------------------------------------
     def run(self, query: str) -> RGSAnswer:
         logger.info(f"{PIPELINE} Running pipeline for query='{query[:50]}...'")
 
+        # 1) Retrieve
         try:
             chunks = self.retriever.retrieve(query)
         except Exception as e:
             logger.error(f"{PIPELINE} Retriever failed: {e}")
             raise PipelineError("Retriever failed") from e
 
+        # 2) Build RGS prompt
         try:
             prompt = self.rgs.build_prompt(query, chunks)
         except Exception as e:
@@ -62,12 +65,14 @@ class RAGPipeline:
             {"role": "user", "content": prompt.user},
         ]
 
+        # 3) LLM call
         try:
             raw = self.llm.chat(messages)
         except Exception as e:
             logger.error(f"{PIPELINE} LLM chat failed: {e}")
             raise LLMError("LLM chat operation failed") from e
 
+        # 4) Build RGS answer
         try:
             answer = self.rgs.build_answer(raw, chunks)
             logger.info(f"{PIPELINE} Pipeline run completed")
@@ -76,33 +81,41 @@ class RAGPipeline:
             logger.error(f"{PIPELINE} Failed to structure RGS answer: {e}")
             raise RGSGenerationError("Failed to build RGS answer") from e
 
+    # ---------------------------------------------------------
+    # Factory from config
+    # ---------------------------------------------------------
     @classmethod
     def from_config(cls, cfg: RAGConfig) -> "RAGPipeline":
         logger.info(f"{PIPELINE} Constructing RAGPipeline from config")
 
-        qdrant = QdrantClient(
+        # ---------------- Vector DB client ----------------
+        VectorDBCls = get_vector_db_plugin("qdrant")
+        vector_client = VectorDBCls(
             host=cfg.retriever.qdrant_host,
             port=cfg.retriever.qdrant_port,
         )
+        logger.info(
+            f"{VECTOR_DB} Using vector DB plugin='qdrant', "
+            f"collection='{cfg.retriever.collection}'"
+        )
 
-        plugin_name = cfg.llm.provider.lower()
-
-        ChatPluginCls = get_llm_plugin(plugin_name, "chat")
-        chat_plugin = ChatPluginCls(
+        # ---------------- Chat Engine ------------------
+        chat_engine = ChatEngine.from_name(
+            cfg.llm.provider.lower(),
             api_key=cfg.llm.api_key,
             model=cfg.llm.model,
             temperature=cfg.llm.temperature,
         )
 
-        chat_engine = ChatEngine(plugin=chat_plugin)
-
+        # ---------------- Retriever --------------------
         retriever = RAGRetriever(
-            client=qdrant,
+            client=vector_client,
             embed_cfg=cfg.embedding,
             retriever_cfg=cfg.retriever,
             rerank_cfg=cfg.rerank,
         )
 
+        # ---------------- RGS Config -------------------
         rgs_cfg = RGSRuntimeConfig(
             enable_citations=cfg.rgs.enable_citations,
             strict_grounding=cfg.rgs.strict_grounding,
@@ -118,6 +131,9 @@ class RAGPipeline:
         return cls(retriever=retriever, llm=chat_engine, rgs=rgs)
 
 
+# ---------------------------------------------------------
+# Factory for YAML-driven construction
+# ---------------------------------------------------------
 def create_pipeline_from_yaml(path: Optional[str] = None) -> RAGPipeline:
     logger.debug(f"{PIPELINE} Loading config from YAML")
     raw = load_config(path)

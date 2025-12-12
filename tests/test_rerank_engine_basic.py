@@ -1,16 +1,12 @@
-# tests/test_rerank_engine_basic.py
-
-from fitz_stack.llm.rerank.engine import RerankEngine
+from fitz_stack.llm.rerank import RerankEngine
 
 class DummyRerankPlugin:
-    # Return new order: reverse
     def rerank(self, query, chunks):
-        return list(reversed(chunks))
+        # return indices
+        return [1, 0, 2]
 
 def test_rerank_engine_basic_flow():
     engine = RerankEngine(DummyRerankPlugin())
-
     chunks = ["A", "B", "C"]
     ranked = engine.rerank("q", chunks)
-
-    assert ranked == ["C", "B", "A"]
+    assert ranked == ["B", "A", "C"]

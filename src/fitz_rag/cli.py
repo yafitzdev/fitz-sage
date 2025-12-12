@@ -9,7 +9,7 @@ from fitz_rag.config.loader import load_config
 from fitz_rag.config.schema import RAGConfig
 from fitz_rag.pipeline.engine import create_pipeline_from_yaml
 
-from fitz_rag.vector_db.registry import get_vector_db_plugin
+from fitz_stack.vector_db import get_vector_db_plugin
 
 from fitz_rag.exceptions.base import FitzRAGError
 from fitz_rag.exceptions.retriever import VectorSearchError
