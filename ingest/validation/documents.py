@@ -1,32 +1,43 @@
+# ingest/validation/documents.py
 from __future__ import annotations
 
-from typing import Iterable, List
 from dataclasses import dataclass
+from typing import Iterable, List
+
 from ingest.ingestion.base import RawDocument
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ValidationConfig:
     min_chars: int = 1
     strip_whitespace: bool = True
 
 
-def validate(documents: Iterable[RawDocument], config: ValidationConfig | None = None) -> List[RawDocument]:
+def validate(
+    documents: Iterable[RawDocument],
+    config: ValidationConfig | None = None,
+) -> List[RawDocument]:
     """
     Validate raw ingested documents before chunking.
-    Removes documents with empty or whitespace-only content.
+
+    Rules:
+    - drop empty/whitespace-only documents
+    - if strip_whitespace=True, validate on stripped content and persist stripped content
     """
     cfg = config or ValidationConfig()
     valid: List[RawDocument] = []
 
     for doc in documents:
-        text = doc.content or ""
+        content = doc.content or ""
 
         if cfg.strip_whitespace:
-            text = text.strip()
+            content = content.strip()
 
-        if len(text) < cfg.min_chars:
+        if len(content) < cfg.min_chars:
             continue
+
+        if content != doc.content:
+            doc = RawDocument(path=doc.path, content=content, metadata=dict(doc.metadata))
 
         valid.append(doc)
 

@@ -1,15 +1,13 @@
 # ingest/pipeline/ingestion_pipeline.py
 from __future__ import annotations
 
-from typing import Iterable
-
 from ingest.config.schema import IngestConfig
-from ingest.ingestion.engine import Ingester
+from ingest.ingestion.engine import IngestionEngine
 from ingest.chunking.engine import ChunkingEngine
 
-from core.vector_db.writer import VectorDBWriter
 from core.logging.logger import get_logger
 from core.logging.tags import PIPELINE
+from core.vector_db.writer import VectorDBWriter
 
 logger = get_logger(__name__)
 
@@ -19,11 +17,15 @@ class IngestionPipeline:
     End-to-end ingestion pipeline:
 
         source
-          -> ingester
-          -> chunker
+          -> ingestion (documents)
+          -> chunking (chunks)
+          -> embedding (vectors)   [must be injected upstream]
           -> vector db writer
 
-    Construction MUST happen via config-driven factories.
+    Architecture:
+    - Construction happens via config-driven factories (for ingest/chunk).
+    - Provider-specific embedding selection is NOT allowed here.
+      Vectors must be provided by an injected embedder.
     """
 
     def __init__(
@@ -31,38 +33,35 @@ class IngestionPipeline:
         *,
         config: IngestConfig,
         writer: VectorDBWriter,
+        embedder: object,
     ) -> None:
         self.config = config
         self.writer = writer
+        self.embedder = embedder
 
-        # -----------------------------------------------------
-        # Build engines STRICTLY via config factories
-        # -----------------------------------------------------
-        self.ingester = Ingester.from_config(config)
+        self.ingester = IngestionEngine.from_config(config)
         self.chunker = ChunkingEngine.from_config(config.chunker)
 
         self.collection = config.collection
 
-    # ---------------------------------------------------------
-    # Public API
-    # ---------------------------------------------------------
     def run(self, source: str) -> int:
         logger.info(f"{PIPELINE} Starting ingestion pipeline")
 
-        raw_docs = self.ingester.run(source)
-
         total_written = 0
 
-        for raw_doc in raw_docs:
+        for raw_doc in self.ingester.run(source):
             chunks = self.chunker.run(raw_doc)
             if not chunks:
                 continue
 
-            written = self.writer.write(
-                chunks=chunks,
+            vectors = [self.embedder.embed(c.content) for c in chunks]
+
+            self.writer.upsert(
                 collection=self.collection,
+                chunks=chunks,
+                vectors=vectors,
             )
-            total_written += written
+            total_written += len(chunks)
 
         logger.info(f"{PIPELINE} Ingestion finished, written={total_written}")
         return total_written
