@@ -1,69 +1,83 @@
+# core/vector_db/writer.py
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Iterable, List, Set
-from uuid import uuid4
 import hashlib
+from dataclasses import dataclass
+from typing import Any, Dict, Iterable, Mapping
 
 from rag.models.chunk import Chunk
 
-from core.vector_db.engine import VectorDBEngine
-from core.vector_db.base import VectorRecord
-from core.llm.embedding.engine import EmbeddingEngine
+from core.logging.logger import get_logger
+from core.logging.tags import VECTOR_DB
+
+logger = get_logger(__name__)
 
 
 def compute_chunk_hash(chunk: Chunk) -> str:
     """
-    Stable hash based on text and identifying metadata.
+    Stable hash for a chunk, used for dedupe/upsert keys.
+
+    Hash includes:
+    - doc_id
+    - chunk_index
+    - content
     """
-    m = hashlib.md5()
-    m.update(chunk.text.encode("utf-8"))
-
-    meta = chunk.metadata or {}
-    m.update(str(meta.get("source", "")).encode("utf-8"))
-    m.update(str(meta.get("path", "")).encode("utf-8"))
-
-    return m.hexdigest()
+    h = hashlib.sha256()
+    h.update(chunk.doc_id.encode("utf-8"))
+    h.update(b"\x00")
+    h.update(str(chunk.chunk_index).encode("utf-8"))
+    h.update(b"\x00")
+    h.update(chunk.content.encode("utf-8"))
+    return h.hexdigest()
 
 
 @dataclass
 class VectorDBWriter:
     """
-    Ingestion component:
-        Chunk → Embedding → VectorRecord → VectorDBEngine.upsert()
+    Writes canonical Chunk objects into a Vector DB client/plugin.
 
-    - Adds UUIDv4 IDs when missing
-    - Computes stable per-chunk hashes for dedup
-    - Writes payload+vector to the vector DB
+    Payload contract (required by retrieval):
+    - doc_id: str
+    - chunk_index: int
+    - content: str
+    - metadata: dict
     """
 
-    embedder: EmbeddingEngine
-    vectordb: VectorDBEngine
-    deduplicate: bool = True
+    client: Any
 
-    seen_hashes: Set[str] = field(default_factory=set, init=False)
+    def upsert(
+        self,
+        collection: str,
+        chunks: Iterable[Chunk],
+        vectors: Iterable[list[float]],
+    ) -> None:
+        logger.info(f"{VECTOR_DB} Upserting chunks into collection='{collection}'")
 
-    def write(self, collection: str, chunks: Iterable[Chunk]) -> int:
-        records: List[VectorRecord] = []
+        points = []
 
-        for chunk in chunks:
-            h = compute_chunk_hash(chunk)
+        for chunk, vector in zip(chunks, vectors):
+            chunk_hash = compute_chunk_hash(chunk)
 
-            if self.deduplicate and h in self.seen_hashes:
-                continue
-            self.seen_hashes.add(h)
+            payload: Dict[str, Any] = {
+                "doc_id": chunk.doc_id,
+                "chunk_index": chunk.chunk_index,
+                "content": chunk.content,
+                "metadata": dict(chunk.metadata or {}),
+                "chunk_hash": chunk_hash,
+            }
 
-            chunk_id = chunk.id or str(uuid4())
-            vector = self.embedder.embed(chunk.text)
+            points.append(
+                {
+                    "id": chunk.id,
+                    "vector": vector,
+                    "payload": payload,
+                }
+            )
 
-            payload = dict(chunk.metadata or {})
-            payload["chunk_id"] = chunk_id
-            payload["chunk_hash"] = h
+        # Delegate to underlying client.
+        # Vector DB plugins should adapt this to their backend.
+        if hasattr(self.client, "upsert"):
+            self.client.upsert(collection, points)
+            return
 
-            rec = VectorRecord(id=chunk_id, vector=vector, payload=payload)
-            records.append(rec)
-
-        if records:
-            self.vectordb.upsert(collection, records)
-
-        return len(records)
+        raise TypeError("VectorDBWriter client must expose an upsert(collection, points) method")
