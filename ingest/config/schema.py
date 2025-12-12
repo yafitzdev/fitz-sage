@@ -1,42 +1,38 @@
 # ingest/config/schema.py
 from __future__ import annotations
 
-from typing import Optional, Dict, Any
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-# ---------------------------------------------------------
-# Sub-configs (internal, structured, explicit)
-# ---------------------------------------------------------
 class IngesterConfig(BaseModel):
-    plugin_name: str
-    options: Dict[str, Any] = Field(default_factory=dict)
+    plugin_name: str = Field(..., description="Ingester plugin name")
+    kwargs: dict[str, Any] = Field(default_factory=dict, description="Ingester init kwargs")
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ChunkerConfig(BaseModel):
-    plugin_name: str
-    chunk_size: int = 1000
-    chunk_overlap: int = 0
-    options: Dict[str, Any] = Field(default_factory=dict)
+    plugin_name: str = Field(..., description="Chunker plugin name")
+    chunk_size: int = Field(default=1000, ge=1)
+    chunk_overlap: int = Field(default=0, ge=0)
+    kwargs: dict[str, Any] = Field(default_factory=dict, description="Chunker init kwargs")
+
+    model_config = ConfigDict(extra="forbid")
 
 
-# ---------------------------------------------------------
-# Top-level ingestion pipeline config
-# ---------------------------------------------------------
 class IngestConfig(BaseModel):
     """
-    Central configuration for the ENTIRE ingestion pipeline.
+    Central configuration for the entire ingestion pipeline.
 
-    This config intentionally spans:
-    - ingester selection
-    - chunker selection
-    - target collection
-
-    Engines MUST NOT own config.
-    Engines are BUILT FROM this config.
+    Rules:
+    - Engines are built FROM config (engines do not own config).
+    - Provider/plugin selection lives only here (plugin_name).
     """
 
     ingester: IngesterConfig
     chunker: ChunkerConfig
-    collection: str
+    collection: str = Field(..., description="Target vector DB collection")
+
+    model_config = ConfigDict(extra="forbid")
