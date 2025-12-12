@@ -5,26 +5,37 @@ Pydantic schema for Fitz configuration.
 Rules:
 - Strict validation
 - No unknown keys
-- Single top-level llm block
+- Provider selection lives in config, never in non-plugin code paths.
 """
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class LLMConfig(BaseModel):
-    provider: str = Field(..., description="LLM provider name (e.g. openai, anthropic)")
-    model: str = Field(..., description="Model identifier")
-    api_key: str | None = Field(
-        default=None,
-        description="Optional explicit API key (env vars preferred)",
-    )
+class PluginConfig(BaseModel):
+    """
+    Generic plugin configuration block.
+
+    All provider-specific configuration must be expressed via:
+    - plugin_name: plugin id in the central registry
+    - kwargs: arbitrary plugin init kwargs
+    """
+
+    plugin_name: str = Field(..., description="Plugin name in the central registry")
+    kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin init kwargs")
 
     model_config = ConfigDict(extra="forbid")
 
 
 class FitzConfig(BaseModel):
-    llm: LLMConfig
+    """
+    Core Fitz config.
+
+    This config is intentionally minimal and provider-agnostic.
+    """
+    llm: PluginConfig
 
     model_config = ConfigDict(extra="forbid")
