@@ -1,175 +1,165 @@
+"""
+Command-line ingestion tool for fitz_ingest.
+
+High-level flow:
+
+    Ingester → (optional) Chunker → Embedding → Vector DB
+
+- Ingester turns your raw source (files, etc.) into RawDocument objects
+- Chunker turns RawDocument → Chunk
+- Embedding + VectorDBWriter turn Chunk → vector records in your collection
+"""
+
 from __future__ import annotations
 
-"""
-fitz_ingest CLI
-
-Pure ingestion + chunking + output.
-
-Steps:
-1. Load ingestion plugin (default: local filesystem)
-2. Read documents (RawDocument)
-3. Chunk them via ChunkingEngine
-4. Print or write chunks as JSONL
-
-NO vector DBs
-NO embeddings
-NO indexing
-"""
-
-import argparse
-import json
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable, List
+
+import typer
 
 from fitz_ingest.ingester.engine import Ingester
-from fitz_ingest.chunker.engine import ChunkingEngine
-from fitz_ingest.chunker.plugins.simple import SimpleChunker
+from fitz_ingest.ingester.plugins.base import RawDocument
 
-from fitz_ingest.exceptions.base import IngestionError
-from fitz_ingest.exceptions.config import IngestionConfigError
-from fitz_ingest.exceptions.chunking import IngestionChunkingError
+from fitz_rag.core import Chunk
 
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import CLI, INGEST, CHUNKING, VECTOR_DB, EMBEDDING
 
-# -------------------------------------------------------------
-# Chunker registry
-# -------------------------------------------------------------
-CHUNKER_REGISTRY = {
-    "simple": SimpleChunker,
-    # future chunkers can be added here
-}
+from fitz_stack.llm.registry import get_llm_plugin
+from fitz_stack.llm.embedding.engine import EmbeddingEngine
 
+from fitz_stack.vector_db.registry import get_vector_db_plugin
+from fitz_stack.vector_db.writer import VectorDBWriter
 
-# -------------------------------------------------------------
-# Argument parser
-# -------------------------------------------------------------
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="fitz_ingest CLI")
-
-    parser.add_argument(
-        "--path",
-        type=str,
-        required=True,
-        help="File or directory to ingest",
-    )
-
-    parser.add_argument(
-        "--chunker",
-        type=str,
-        default="simple",
-        help="Chunker plugin name",
-    )
-
-    parser.add_argument(
-        "--chunk-size",
-        type=int,
-        default=500,
-        help="Chunk size for 'simple' chunker",
-    )
-
-    parser.add_argument(
-        "--output",
-        type=str,
-        default=None,
-        help="Output JSONL file. If omitted, output prints to stdout.",
-    )
-
-    # Ingestion plugin selection (future-proof)
-    parser.add_argument(
-        "--ingest-plugin",
-        type=str,
-        default="local",
-        help="Ingestion plugin to use (default: local filesystem)",
-    )
-
-    return parser
+app = typer.Typer(help="Ingestion CLI for fitz-ingest")
+logger = get_logger(__name__)
 
 
-# -------------------------------------------------------------
-# Directory ingestion helper
-# -------------------------------------------------------------
-def ingest_directory(root: Path, ingester: Ingester):
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _raw_to_chunks(raw_docs: Iterable[RawDocument]) -> List[Chunk]:
     """
-    ingester.run(path) returns an iterable of RawDocuments.
+    Very simple 1:1 RawDocument → Chunk fallback.
+
+    If you want full-blown chunking, you can plug in ChunkingEngine here later.
+    For now we keep this CLI minimal and rely on the ingestion plugins
+    to provide good RawDocuments.
     """
-    for path in root.rglob("*"):
-        if path.is_file():
-            for doc in ingester.run(str(path)):
-                yield doc
+    chunks: List[Chunk] = []
+    for doc in raw_docs:
+        meta = dict(getattr(doc, "metadata", None) or {})
+        # Common provenance fields (if present on RawDocument)
+        source = getattr(doc, "source", None)
+        path = getattr(doc, "path", None)
 
+        if source is not None:
+            meta.setdefault("source", source)
+        if path is not None:
+            meta.setdefault("path", path)
 
-# -------------------------------------------------------------
-# Main CLI
-# -------------------------------------------------------------
-def main():
-    parser = build_parser()
-    args = parser.parse_args()
-
-    target = Path(args.path)
-    if not target.exists():
-        raise IngestionConfigError(f"Path does not exist: {target}")
-
-    # -------------------------
-    # Load ingestion plugin
-    # -------------------------
-    ingester = Ingester(plugin_name=args.ingest_plugin, config={})
-
-    # -------------------------
-    # Load chunker plugin
-    # -------------------------
-    plugin_name = args.chunker.lower()
-    if plugin_name not in CHUNKER_REGISTRY:
-        raise IngestionConfigError(
-            f"Unknown chunker plugin '{plugin_name}'. "
-            f"Available: {', '.join(CHUNKER_REGISTRY.keys())}"
+        chunks.append(
+            Chunk(
+                id=None,
+                text=doc.text,
+                metadata=meta,
+                score=None,
+            )
         )
+    return chunks
 
-    ChunkerClass = CHUNKER_REGISTRY[plugin_name]
 
-    try:
-        if plugin_name == "simple":
-            chunker_plugin = ChunkerClass(chunk_size=args.chunk_size)
-        else:
-            chunker_plugin = ChunkerClass()
-    except Exception as e:
-        raise IngestionConfigError(f"Failed to initialize chunker: {e}") from e
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
 
-    chunker_engine = ChunkingEngine(chunker_plugin)
 
-    # -------------------------
-    # Run ingestion
-    # -------------------------
-    try:
-        if target.is_file():
-            docs = list(ingester.run(str(target)))
-        else:
-            docs = list(ingest_directory(target, ingester))
-    except (IngestionConfigError, IngestionChunkingError) as e:
-        raise
-    except Exception as e:
-        raise IngestionError(f"Unexpected error during ingestion: {e}") from e
+@app.command("run")
+def run(
+    source: Path = typer.Argument(
+        ...,
+        exists=True,
+        readable=True,
+        help="Source to ingest (file or directory, depending on ingest plugin).",
+    ),
+    collection: str = typer.Option(
+        ...,
+        "--collection",
+        "-c",
+        help="Target vector DB collection name.",
+    ),
+    ingest_plugin: str = typer.Option(
+        "local",
+        "--ingest-plugin",
+        "-i",
+        help="Ingest plugin name (as registered in fitz_ingest.ingester.registry).",
+    ),
+    embedding_plugin: str = typer.Option(
+        "cohere",
+        "--embedding-plugin",
+        "-e",
+        help="LLM embedding plugin name (registered in fitz_stack.llm.registry).",
+    ),
+    vector_db_plugin: str = typer.Option(
+        "qdrant",
+        "--vector-db-plugin",
+        "-v",
+        help="Vector DB plugin name (registered in fitz_stack.vector_db.registry).",
+    ),
+) -> None:
+    """
+    Ingest → (simple) chunk → embed → write into a vector DB collection.
 
-    # -------------------------
-    # Chunking step
-    # -------------------------
-    chunks = []
-    for doc in docs:
-        try:
-            chunks.extend(chunker_engine.run(doc))
-        except Exception as e:
-            raise IngestionChunkingError(f"Chunking failed for {doc.path}: {e}") from e
+    All heavy lifting is delegated to:
+    - Ingester
+    - EmbeddingEngine
+    - VectorDBWriter
+    - Vector DB plugin (e.g. Qdrant)
+    """
+    logger.info(
+        f"{CLI}{INGEST} Starting ingestion: source='{source}' → collection='{collection}' "
+        f"(ingest_plugin='{ingest_plugin}', embedding='{embedding_plugin}', vdb='{vector_db_plugin}')"
+    )
 
-    # -------------------------
-    # Output
-    # -------------------------
-    if args.output:
-        out_path = Path(args.output)
-        with out_path.open("w", encoding="utf-8") as f:
-            for c in chunks:
-                f.write(json.dumps(c) + "\n")
-        print(f"✓ Wrote {len(chunks)} chunks → {args.output}")
-    else:
-        for c in chunks:
-            print(json.dumps(c))
+    # ------------------------------------------------------------------
+    # 1) Ingest → RawDocument
+    # ------------------------------------------------------------------
+    ingester = Ingester(plugin_name=ingest_plugin, config={})
+    raw_docs = list(ingester.run(str(source)))
+    logger.info(f"{INGEST} Ingested {len(raw_docs)} raw documents")
+
+    # ------------------------------------------------------------------
+    # 2) Simple RawDocument → Chunk conversion
+    #    (slot where you can plug ChunkingEngine later)
+    # ------------------------------------------------------------------
+    chunks = _raw_to_chunks(raw_docs)
+    logger.info(f"{CHUNKING} Produced {len(chunks)} chunks (1:1 raw→chunk)")
+
+    # ------------------------------------------------------------------
+    # 3) EmbeddingEngine from LLM registry
+    # ------------------------------------------------------------------
+    EmbedPluginCls = get_llm_plugin(embedding_plugin, plugin_type="embedding")
+    # CohereEmbeddingClient (and other plugins) handle API keys / models via env
+    embed_plugin = EmbedPluginCls()
+    embed_engine = EmbeddingEngine(embed_plugin)
+    logger.info(f"{EMBEDDING} Using embedding plugin='{embedding_plugin}'")
+
+    # ------------------------------------------------------------------
+    # 4) Vector DB plugin + writer
+    # ------------------------------------------------------------------
+    VectorDBPluginCls = get_vector_db_plugin(vector_db_plugin)
+    vectordb = VectorDBPluginCls()
+    writer = VectorDBWriter(embedder=embed_engine, vectordb=vectordb)
+
+    written = writer.write(collection=collection, chunks=chunks)
+    logger.info(f"{VECTOR_DB} Wrote {written} chunks into collection='{collection}'")
+
+    typer.echo(
+        f"Ingested {len(raw_docs)} documents → wrote {written} chunks into collection '{collection}'."
+    )
 
 
 if __name__ == "__main__":
-    main()
+    app()

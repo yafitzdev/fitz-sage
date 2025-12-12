@@ -1,167 +1,95 @@
+# src/fitz_rag/cli.py
+"""
+Command-line interface for fitz_rag.
+
+Commands:
+
+- config show   → print effective RAG config
+- query         → run a one-off RAG query
+"""
+
 from __future__ import annotations
 
-import typer
-import yaml
 from pathlib import Path
-import importlib.metadata
+from typing import Optional
+
+import typer
+
+from fitz_stack.logging import get_logger
+from fitz_stack.logging_tags import CLI, PIPELINE
 
 from fitz_rag.config.loader import load_config
 from fitz_rag.config.schema import RAGConfig
 from fitz_rag.pipeline.engine import create_pipeline_from_yaml
 
-from fitz_stack.vector_db import get_vector_db_plugin
-
-from fitz_rag.exceptions.base import FitzRAGError
-from fitz_rag.exceptions.retriever import VectorSearchError
-
-from fitz_stack.logging import get_logger
-from fitz_stack.logging_tags import CLI
-
-
-app = typer.Typer(help="🔥 Fitz-RAG — Retrieval-Augmented Generation Toolkit")
 logger = get_logger(__name__)
 
+app = typer.Typer(help="fitz-rag CLI")
 
-# ---------------------------------------------------------
-# Version
-# ---------------------------------------------------------
-@app.command()
-def version():
-    """Show current Fitz-RAG version."""
-    try:
-        v = importlib.metadata.version("fitz_rag")
-    except importlib.metadata.PackageNotFoundError:
-        v = "0.1.0"
-    typer.echo(f"fitz-rag version {v}")
+config_app = typer.Typer(help="Configuration commands")
+app.add_typer(config_app, name="config")
 
 
-# ---------------------------------------------------------
-# Config: show & path
-# ---------------------------------------------------------
-@app.command("config-show")
-def config_show():
-    """Print the merged configuration (default + user)."""
-    try:
-        cfg = load_config()
-        typer.echo(yaml.dump(cfg, sort_keys=False))
-    except Exception as e:
-        logger.error(f"{CLI} Failed to load configuration: {e}")
-        raise typer.Exit(code=1)
-
-
-@app.command("config-path")
-def config_path():
-    """Show the resolved config path."""
-    env = Path(typer.getenv("FITZ_RAG_CONFIG", "")) if typer.getenv("FITZ_RAG_CONFIG") else None
-
-    if env and env.exists():
-        typer.echo(str(env))
-    else:
-        from importlib.resources import files
-        default_path = files("fitz_rag.config").joinpath("default.yaml")
-        typer.echo(str(default_path))
-
-
-# ---------------------------------------------------------
-# Collections (Vector DB plugins)
-# ---------------------------------------------------------
-collections_app = typer.Typer(help="Manage vector database collections")
-app.add_typer(collections_app, name="collections")
-
-
-def _make_vector_db_from_config():
-    """Internal helper: Build the configured vector DB plugin."""
-
-    raw = load_config()
-    cfg = RAGConfig.from_dict(raw)
-
-    provider = cfg.retriever.vector_db_provider if hasattr(cfg.retriever, "vector_db_provider") else "qdrant"
-
-    db = get_vector_db_plugin(provider)
-
-    # Assign dynamic config onto plugin instance
-    # (future-safe: works for any backend)
-    if provider == "qdrant":
-        db.host = cfg.retriever.qdrant_host
-        db.port = cfg.retriever.qdrant_port
-        db.collection = cfg.retriever.collection if hasattr(cfg.retriever, "collection") else "default"
-
-    return db
-
-
-@collections_app.command("list")
-def collections_list():
-    """List collections (if supported by the vector DB)."""
-    try:
-        db = _make_vector_db_from_config()
-        db.connect()
-
-        # Only Qdrant supports `get_collections`
-        client = db.client  # QdrantVectorDB sets .client after connect()
-        cols = client.get_collections().collections
-
-    except Exception as e:
-        logger.error(f"{CLI} Vector DB connection failed: {e}")
-        raise typer.Exit(code=1)
-
-    if not cols:
-        typer.echo("No collections found.")
-        return
-
-    for c in cols:
-        typer.echo(f"- {c.name}")
-
-
-@collections_app.command("drop")
-def collections_drop(name: str):
-    """Drop a collection (Qdrant only)."""
-    try:
-        db = _make_vector_db_from_config()
-        db.connect()
-        client = db.client
-    except Exception as e:
-        logger.error(f"{CLI} Vector DB connection failed: {e}")
-        raise typer.Exit(code=1)
-
-    if typer.confirm(f"Delete collection '{name}'?"):
-        try:
-            client.delete_collection(name)
-            typer.echo(f"Deleted collection: {name}")
-        except Exception as e:
-            logger.error(f"{CLI} Failed deleting collection: {e}")
-            raise typer.Exit(code=1)
-
-
-# ---------------------------------------------------------
-# Query
-# ---------------------------------------------------------
-@app.command()
-def query(text: str, config: str | None = typer.Option(None, help="Path to config YAML")):
+@config_app.command("show")
+def config_show(
+    config: Optional[Path] = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to RAG YAML config. If omitted, default search locations are used.",
+    )
+) -> None:
     """
-    Run full RAG pipeline:
-      - load config
-      - build pipeline
-      - retrieve + generate
+    Print the resolved RAG configuration.
     """
-    try:
-        pipeline = create_pipeline_from_yaml(config)
-        answer = pipeline.run(text)
-    except FitzRAGError as e:
-        logger.error(f"{CLI} Pipeline error: {e}")
-        raise typer.Exit(code=1)
-    except VectorSearchError as e:
-        logger.error(f"{CLI} Vector DB error: {e}")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        logger.error(f"{CLI} Unexpected error: {e}")
-        raise typer.Exit(code=1)
+    logger.info(
+        f"{CLI}{PIPELINE} Showing RAG config from "
+        f"{config if config is not None else '<default search>'}"
+    )
 
-    typer.echo("\n=== ANSWER ===")
-    typer.echo(answer.answer)
+    raw_cfg = load_config(str(config) if config is not None else None)
+    cfg = RAGConfig.from_dict(raw_cfg)
 
-    typer.echo("\n=== SOURCES ===")
-    for src in answer.sources:
-        typer.echo(f"- {src.source_id} | metadata={src.metadata}")
+    typer.echo(cfg.json(indent=2))
+
+
+@app.command("query")
+def query(
+    question: str = typer.Argument(
+        ...,
+        help="User question to run through the RAG pipeline.",
+    ),
+    config: Optional[Path] = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to RAG YAML config used to construct the pipeline.",
+    ),
+) -> None:
+    """
+    Run a one-off RAG query.
+    """
+    logger.info(
+        f"{CLI}{PIPELINE} Running RAG query with "
+        f"config={config if config is not None else '<default search>'}"
+    )
+
+    pipeline = create_pipeline_from_yaml(str(config) if config is not None else None)
+    rgs_answer = pipeline.run(question)
+
+    typer.echo("# Answer\n")
+    typer.echo(rgs_answer.answer or "")
+
+    if getattr(rgs_answer, "citations", None):
+        typer.echo("\n# Sources\n")
+        for c in rgs_answer.citations:
+            label = getattr(c, "label", None) or getattr(c, "source_id", "")
+            title = getattr(c, "title", "") or ""
+            src = ""
+            meta = getattr(c, "metadata", None) or {}
+            if isinstance(meta, dict):
+                src = meta.get("source") or meta.get("path") or ""
+            typer.echo(f"- {label}: {title} {f'[{src}]' if src else ''}")
 
 
 if __name__ == "__main__":
