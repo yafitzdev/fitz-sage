@@ -5,7 +5,6 @@ from dataclasses import dataclass
 import os
 
 from rag.exceptions.retriever import EmbeddingError
-from core.llm.registry import register_llm_plugin
 
 try:
     import cohere
@@ -16,6 +15,7 @@ except ImportError:
 @dataclass
 class CohereEmbeddingClient:
     plugin_name: str = "cohere"
+    plugin_type: str = "embedding"
 
     api_key: str | None = None
     model: str | None = None
@@ -53,10 +53,3 @@ class CohereEmbeddingClient:
             return res.embeddings.float[0]
         except Exception as exc:
             raise EmbeddingError(f"Failed to embed text: {text!r}") from exc
-
-
-register_llm_plugin(
-    CohereEmbeddingClient,
-    plugin_name="cohere",
-    plugin_type="embedding",
-)

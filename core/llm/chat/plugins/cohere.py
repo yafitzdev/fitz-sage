@@ -1,10 +1,8 @@
-# core/llm/plugins/cohere.py  (chat portion)
+# core/llm/plugins/cohere.py
 from __future__ import annotations
 
 from typing import Any
 import os
-
-from core.llm.registry import register_llm_plugin
 
 try:
     import cohere
@@ -14,6 +12,7 @@ except ImportError:
 
 class CohereChatClient:
     plugin_name = "cohere"
+    plugin_type = "chat"
 
     def __init__(
         self,
@@ -26,11 +25,12 @@ class CohereChatClient:
 
         self.model = model
         self.temperature = temperature
-        self.api_key = api_key or os.getenv("COHERE_API_KEY")
-        if not self.api_key:
+
+        key = api_key or os.getenv("COHERE_API_KEY")
+        if not key:
             raise ValueError("COHERE_API_KEY is not set for CohereChatClient")
 
-        self._client = cohere.ClientV2(api_key=self.api_key)
+        self._client = cohere.ClientV2(api_key=key)
 
     def chat(self, messages: list[dict[str, Any]]) -> str:
         resp = self._client.chat(
@@ -38,7 +38,7 @@ class CohereChatClient:
             messages=messages,
             temperature=self.temperature,
         )
-        # Cohere v2 returns message content segments; normalize to a plain string.
+
         msg = getattr(resp, "message", None)
         if msg is None:
             return str(resp)
@@ -55,10 +55,3 @@ class CohereChatClient:
             return text
 
         return str(resp)
-
-
-register_llm_plugin(
-    CohereChatClient,
-    plugin_name="cohere",
-    plugin_type="chat",
-)

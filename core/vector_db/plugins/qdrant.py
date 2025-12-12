@@ -7,13 +7,13 @@ from typing import Any
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import PointStruct
 
-from core.llm.registry import register_llm_plugin
 from core.vector_db.base import VectorDBPlugin
 
 
 @dataclass
 class QdrantVectorDB(VectorDBPlugin):
     plugin_name: str = "qdrant"
+    plugin_type: str = "vector_db"
 
     host: str = "localhost"
     port: int = 6333
@@ -45,6 +45,3 @@ class QdrantVectorDB(VectorDBPlugin):
             for p in points
         ]
         self._client.upsert(collection_name=collection, points=q_points)
-
-
-register_llm_plugin(QdrantVectorDB, plugin_name="qdrant", plugin_type="vector_db")
