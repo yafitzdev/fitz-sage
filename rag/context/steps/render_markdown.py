@@ -10,12 +10,9 @@ from .normalize import _to_chunk_dict
 @dataclass
 class RenderMarkdownStep:
     """
-    Render chunks into a markdown string.
+    Debug helper: render chunks into a markdown string.
 
-    Format per chunk:
-
-        ### Source: <doc_id>
-        <content>
+    Not used by the main RAG pipeline.
     """
 
     def __call__(self, chunks: list[Any]) -> str:
