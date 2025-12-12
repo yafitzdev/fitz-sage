@@ -5,22 +5,35 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from rag.exceptions.pipeline import PipelineError
+from rag.models.chunk import Chunk
 
 from .steps.normalize import NormalizeStep, ChunkDict
 from .steps.dedupe import DedupeStep
 from .steps.group import GroupByDocumentStep
 from .steps.merge import MergeAdjacentStep
 from .steps.pack import PackWindowStep
-from .steps.render_markdown import RenderMarkdownStep
+
+
+def _chunkdict_to_chunk(d: ChunkDict) -> Chunk:
+    return Chunk(
+        id=str(d["id"]),
+        doc_id=str(d["doc_id"]),
+        chunk_index=int(d["chunk_index"]),
+        content=str(d["content"]),
+        metadata=dict(d.get("metadata") or {}),
+    )
 
 
 @dataclass
 class ContextPipeline:
     """
-    Step-based context builder.
+    Step-based chunk pre-processing pipeline.
 
     Steps:
-        normalize → dedupe → group → merge → pack → render
+        normalize → dedupe → group → merge → pack
+
+    Output:
+        list[Chunk]
     """
 
     max_chars: int = 6000
@@ -30,9 +43,8 @@ class ContextPipeline:
     group_step: GroupByDocumentStep = field(default_factory=GroupByDocumentStep)
     merge_step: MergeAdjacentStep = field(default_factory=MergeAdjacentStep)
     pack_step: PackWindowStep = field(default_factory=PackWindowStep)
-    render_step: RenderMarkdownStep = field(default_factory=RenderMarkdownStep)
 
-    def build(self, chunks: list[Any], max_chars: int | None = None) -> str:
+    def process(self, chunks: list[Any], max_chars: int | None = None) -> list[Chunk]:
         if max_chars is None:
             max_chars = self.max_chars
 
@@ -46,7 +58,7 @@ class ContextPipeline:
                 merged_per_doc.extend(self.merge_step(doc_chunks))
 
             packed = self.pack_step(merged_per_doc, max_chars=max_chars)
-            return self.render_step(packed)
+            return [_chunkdict_to_chunk(d) for d in packed]
 
         except Exception as exc:
             raise PipelineError(f"Failed context pipeline: {exc}") from exc

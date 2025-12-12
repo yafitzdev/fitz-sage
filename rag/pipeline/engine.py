@@ -5,6 +5,7 @@ from typing import Optional
 
 from rag.config.loader import load_config
 from rag.config.schema import RAGConfig
+from rag.context.pipeline import ContextPipeline
 from rag.exceptions.llm import LLMError
 from rag.exceptions.pipeline import PipelineError, RGSGenerationError
 from rag.generation.rgs import RGS, RGSAnswer, RGSConfig as RGSRuntimeConfig
@@ -23,13 +24,20 @@ logger = get_logger(__name__)
 
 class RAGPipeline:
     """
-    vector_db → retrieval → rgs → llm → final answer
+    vector_db → retrieval → context-processing → rgs → llm → final answer
     """
 
-    def __init__(self, retriever: RetrieverEngine, llm: ChatEngine, rgs: RGS):
+    def __init__(
+        self,
+        retriever: RetrieverEngine,
+        llm: ChatEngine,
+        rgs: RGS,
+        context: ContextPipeline | None = None,
+    ):
         self.retriever = retriever
         self.llm = llm
         self.rgs = rgs
+        self.context = context or ContextPipeline()
 
         logger.info(f"{PIPELINE} RAGPipeline initialized")
 
@@ -37,10 +45,16 @@ class RAGPipeline:
         logger.info(f"{PIPELINE} Running pipeline for query='{query[:50]}...'")
 
         try:
-            chunks = self.retriever.retrieve(query)
+            raw_chunks = self.retriever.retrieve(query)
         except Exception as exc:
             logger.error(f"{PIPELINE} Retriever failed: {exc}")
             raise PipelineError("Retriever failed") from exc
+
+        try:
+            chunks = self.context.process(raw_chunks)
+        except Exception as exc:
+            logger.error(f"{PIPELINE} Context processing failed: {exc}")
+            raise PipelineError("Context processing failed") from exc
 
         try:
             prompt = self.rgs.build_prompt(query, chunks)
@@ -71,27 +85,25 @@ class RAGPipeline:
     def from_config(cls, cfg: RAGConfig) -> "RAGPipeline":
         logger.info(f"{PIPELINE} Constructing RAGPipeline from config")
 
-        # ---------------- Vector DB ----------------
         VectorDBCls = get_vector_db_plugin(cfg.vector_db.plugin_name)
         vector_client = VectorDBCls(**cfg.vector_db.kwargs)
         logger.info(f"{VECTOR_DB} Using vector DB plugin='{cfg.vector_db.plugin_name}'")
 
-        # ---------------- Chat LLM ------------------
         chat_engine = ChatEngine.from_name(cfg.llm.plugin_name, **cfg.llm.kwargs)
 
-        # ---------------- Embedder ------------------
         EmbedCls = get_llm_plugin(plugin_name=cfg.embedding.plugin_name, plugin_type="embedding")
         embed_plugin = EmbedCls(**cfg.embedding.kwargs)
         embedder = EmbeddingEngine(embed_plugin)
 
-        # ---------------- Optional rerank ------------
         rerank_engine: RerankEngine | None = None
         if cfg.rerank.enabled:
-            RerankCls = get_llm_plugin(plugin_name=cfg.rerank.plugin_name, plugin_type="rerank")  # type: ignore[arg-type]
+            RerankCls = get_llm_plugin(
+                plugin_name=cfg.rerank.plugin_name,  # type: ignore[arg-type]
+                plugin_type="rerank",
+            )
             rerank_plugin = RerankCls(**cfg.rerank.kwargs)
             rerank_engine = RerankEngine(rerank_plugin)
 
-        # ---------------- Retriever ------------------
         retriever = RetrieverEngine.from_name(
             cfg.retriever.plugin_name,
             client=vector_client,
@@ -100,7 +112,6 @@ class RAGPipeline:
             rerank_engine=rerank_engine,
         )
 
-        # ---------------- RGS ------------------------
         rgs_cfg = RGSRuntimeConfig(
             enable_citations=cfg.rgs.enable_citations,
             strict_grounding=cfg.rgs.strict_grounding,
@@ -113,8 +124,7 @@ class RAGPipeline:
         rgs = RGS(config=rgs_cfg)
 
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
-        return cls(retriever=retriever, llm=chat_engine, rgs=rgs)
-
+        return cls(retriever=retriever, llm=chat_engine, rgs=rgs, context=ContextPipeline())
 
 def create_pipeline_from_yaml(path: Optional[str] = None) -> RAGPipeline:
     logger.debug(f"{PIPELINE} Loading config from YAML")
