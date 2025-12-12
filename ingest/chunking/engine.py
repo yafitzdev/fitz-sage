@@ -1,15 +1,16 @@
 # ingest/chunking/engine.py
-
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-from ingest.chunking.base import BaseChunker
-import ingest.chunking.registry as chunker_registry
+from ingest.chunking.base import ChunkerPlugin
+from ingest.chunking.registry import get_chunker_plugin
 from ingest.config.schema import ChunkerConfig
-from ingest.exceptions.config import IngestionConfigError
 from ingest.exceptions.chunking import IngestionChunkingError
+from ingest.exceptions.config import IngestionConfigError
+
+from rag.models.chunk import Chunk
 
 from core.logging.logger import get_logger
 from core.logging.tags import CHUNKING
@@ -19,78 +20,59 @@ logger = get_logger(__name__)
 
 class ChunkingEngine:
     """
-    Central controller for all chunking operations.
+    Central controller for chunking operations.
 
-    Supports:
-    - plugin-style chunkers (chunk_text)
-    - engine-style chunkers (run)
+    Architecture:
+    - Single contract: ChunkerPlugin.chunk_text(text, base_meta) -> list[Chunk]
     """
 
-    def __init__(self, plugin):
+    def __init__(self, plugin: ChunkerPlugin):
         self.plugin = plugin
 
-    # ---------------------------------------------------------
-    # Factory
-    # ---------------------------------------------------------
     @classmethod
     def from_config(cls, cfg: ChunkerConfig) -> "ChunkingEngine":
-        if not cfg or not cfg.plugin_name:
+        if cfg is None or not getattr(cfg, "plugin_name", None):
             raise IngestionConfigError("ChunkerConfig.plugin_name is required")
 
         try:
-            PluginFactory = chunker_registry.get_chunker_plugin(cfg.plugin_name)
+            PluginCls = get_chunker_plugin(cfg.plugin_name)
         except Exception as e:
-            raise IngestionConfigError(
-                f"Unknown chunker plugin '{cfg.plugin_name}'"
-            ) from e
+            raise IngestionConfigError(f"Unknown chunker plugin {cfg.plugin_name!r}") from e
 
-        kwargs = {
-            "chunk_size": cfg.chunk_size,
-            "chunk_overlap": cfg.chunk_overlap,
-            **(cfg.options or {}),
-        }
+        kwargs: Dict[str, Any] = {}
+        if getattr(cfg, "chunk_size", None) is not None:
+            kwargs["chunk_size"] = cfg.chunk_size
+        if getattr(cfg, "chunk_overlap", None) is not None:
+            kwargs["chunk_overlap"] = cfg.chunk_overlap
+        if getattr(cfg, "options", None):
+            kwargs.update(cfg.options)
 
         try:
-            plugin = PluginFactory(**kwargs)
+            plugin = PluginCls(**kwargs)
         except Exception as e:
             raise IngestionConfigError(
-                f"Failed to initialize chunker plugin '{cfg.plugin_name}'"
+                f"Failed to initialize chunker plugin {cfg.plugin_name!r}"
             ) from e
 
         return cls(plugin)
 
-    # ---------------------------------------------------------
-    # Public API (ENGINE BOUNDARY)
-    # ---------------------------------------------------------
-    def run(self, raw_doc) -> List[Dict[str, Any]]:
-        """
-        Chunk a RawDocument or engine-compatible object.
-        """
-
-        # Engine-style chunker (tests, injected engines)
-        if hasattr(self.plugin, "run"):
-            return self.plugin.run(raw_doc)
-
-        # Plugin-style chunker
+    def run(self, raw_doc: Any) -> List[Chunk]:
         path = Path(raw_doc.path)
 
         logger.debug(f"{CHUNKING} Chunking file: {path}")
 
         if not path.exists() or not path.is_file():
-            logger.error(f"{CHUNKING} File does not exist or is not a file: {path}")
-            return []
+            raise IngestionChunkingError(f"File does not exist or is not a file: {path}")
 
         try:
             text = path.read_text(encoding="utf-8", errors="ignore")
         except Exception as e:
             logger.error(f"{CHUNKING} Failed reading file '{path}': {e}")
-            raise IngestionConfigError(
-                f"Failed reading file for chunking: {path}"
-            ) from e
+            raise IngestionChunkingError(f"Failed reading file for chunking: {path}") from e
 
         base_meta: Dict[str, Any] = {
             "source_file": str(path),
-            **(raw_doc.metadata or {}),
+            **(getattr(raw_doc, "metadata", None) or {}),
         }
 
         try:
@@ -99,9 +81,7 @@ class ChunkingEngine:
             raise
         except Exception as e:
             logger.error(f"{CHUNKING} Chunking plugin failed for '{path}': {e}")
-            raise IngestionChunkingError(
-                f"Chunking plugin failed for file '{path}'"
-            ) from e
+            raise IngestionChunkingError(f"Chunking plugin failed for file '{path}'") from e
 
         logger.debug(f"{CHUNKING} Extracted {len(chunks)} chunks from '{path}'")
         return chunks

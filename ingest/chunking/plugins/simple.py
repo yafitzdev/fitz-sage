@@ -1,42 +1,48 @@
+# ingest/chunking/plugins/simple.py
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
+from rag.models.chunk import Chunk
+
 
 @dataclass
 class SimpleChunker:
     """
-    Very simple text chunker used for tests and default ingestion.
+    Minimal deterministic chunker.
 
     - Splits text into fixed-size character blocks.
-    - Trims *outer* whitespace but keeps internal newlines.
-    - Produces dict-based chunks:
-        {
-            "text": <chunk_text>,
-            "metadata": { ... base_meta ... }
-        }
+    - Trims outer whitespace.
+    - Emits canonical Chunk objects.
     """
 
     plugin_name: str = "simple"
     chunk_size: int = 1000
 
-    def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Dict[str, Any]]:
-        size = int(self.chunk_size)
-        chunks: List[Dict[str, Any]] = []
+    def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Chunk]:
+        size = max(1, int(self.chunk_size))
+
+        doc_id = str(base_meta.get("doc_id") or base_meta.get("source_file") or "unknown")
+
+        chunks: List[Chunk] = []
+        chunk_index = 0
 
         for i in range(0, len(text), size):
-            piece = text[i:i + size]
-
-            # Strip leading/trailing whitespace without touching internal formatting
-            piece = piece.strip()
-
+            piece = text[i : i + size].strip()
             if not piece:
                 continue
 
-            chunks.append({
-                "text": piece,
-                "metadata": dict(base_meta),
-            })
+            chunk_id = f"{doc_id}:{chunk_index}"
+            chunks.append(
+                Chunk(
+                    id=chunk_id,
+                    doc_id=doc_id,
+                    chunk_index=chunk_index,
+                    content=piece,
+                    metadata=dict(base_meta),
+                )
+            )
+            chunk_index += 1
 
         return chunks
