@@ -1,4 +1,4 @@
-from fitz_stack.llm.rerank import RerankEngine
+from core.llm.rerank import RerankEngine
 
 class DummyRerankPlugin:
     def rerank(self, query, chunks):

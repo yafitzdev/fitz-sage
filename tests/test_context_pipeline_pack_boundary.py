@@ -1,4 +1,4 @@
-from fitz_rag.context.pipeline import ContextPipeline
+from rag.context.pipeline import ContextPipeline
 
 
 def test_context_pipeline_pack_boundary():

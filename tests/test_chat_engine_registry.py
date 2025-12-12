@@ -1,6 +1,6 @@
-from fitz_stack.llm.registry import register_llm_plugin
-from fitz_stack.llm.chat import ChatEngine
-from fitz_stack.llm.chat.base import ChatPlugin
+from core.llm.registry import register_llm_plugin
+from core.llm.chat import ChatEngine
+from core.llm.chat.base import ChatPlugin
 
 class DummyChat(ChatPlugin):
     plugin_name = "dummy_chat"

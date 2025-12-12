@@ -1,8 +1,8 @@
 import pytest
 from dataclasses import dataclass
 
-from fitz_stack.vector_db.writer import VectorDBWriter, compute_chunk_hash
-from fitz_stack.vector_db.base import VectorRecord
+from core.vector_db.writer import VectorDBWriter, compute_chunk_hash
+from core.vector_db.base import VectorRecord
 
 
 # Dummy embedding engine

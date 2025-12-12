@@ -1,6 +1,6 @@
 # tests/test_vector_db_registry.py
 
-from fitz_stack.vector_db import (
+from core.vector_db import (
     register_vector_db_plugin,
     get_vector_db_plugin,
     VectorDBRegistryError,

@@ -1,6 +1,6 @@
 import os
-from fitz_ingest.ingester.engine import Ingester
-from fitz_ingest.ingester.plugins.base import RawDocument
+from ingest.ingester.engine import Ingester
+from ingest.ingester.plugins.base import RawDocument
 
 def test_ingester_local_plugin_runs(tmp_path):
     # Create a temporary folder with a test file

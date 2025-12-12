@@ -1,5 +1,5 @@
-from fitz_ingest.ingester.engine import Ingester
-from fitz_ingest.ingester.plugins.base import RawDocument
+from ingest.ingester.engine import Ingester
+from ingest.ingester.plugins.base import RawDocument
 
 def test_ingester_returns_raw_documents(tmp_path):
     file = tmp_path / "sample.txt"

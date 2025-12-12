@@ -1,6 +1,6 @@
 # tests/test_rgs_max_chunks_limit.py
 
-from fitz_rag.generation.rgs import RGS, RGSConfig
+from rag.generation.rgs import RGS, RGSConfig
 
 def test_rgs_max_chunks_limit():
     rgs = RGS(RGSConfig(max_chunks=1))

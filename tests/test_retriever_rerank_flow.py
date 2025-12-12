@@ -1,6 +1,6 @@
 import pytest
-from fitz_rag.retriever.plugins.dense import DenseRetrievalPlugin
-from fitz_rag.core import Chunk
+from rag.retriever.plugins.dense import DenseRetrievalPlugin
+from rag.core import Chunk
 
 
 class MockEmbedder:

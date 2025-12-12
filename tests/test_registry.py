@@ -1,5 +1,5 @@
-from fitz_ingest.ingester.registry import REGISTRY, get_ingest_plugin
-from fitz_ingest.ingester.plugins.local_fs import LocalFSIngestPlugin
+from ingest.ingester.registry import REGISTRY, get_ingest_plugin
+from ingest.ingester.plugins.local_fs import LocalFSIngestPlugin
 
 def test_registry_returns_correct_plugin():
     plugin = get_ingest_plugin("local")

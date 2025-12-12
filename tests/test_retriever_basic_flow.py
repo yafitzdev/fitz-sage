@@ -1,8 +1,8 @@
 import pytest
-from fitz_rag.retriever.plugins.dense import RAGRetriever
-from fitz_rag.config.schema import EmbeddingConfig, RetrieverConfig, RerankConfig
-from fitz_rag.exceptions.retriever import EmbeddingError, VectorSearchError, RerankError
-from fitz_rag.core import Chunk
+from rag.retriever.plugins.dense import RAGRetriever
+from rag.config.schema import EmbeddingConfig, RetrieverConfig, RerankConfig
+from rag.exceptions.retriever import EmbeddingError, VectorSearchError, RerankError
+from rag.core import Chunk
 
 
 class DummyEmbedder:

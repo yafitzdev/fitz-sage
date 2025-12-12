@@ -1,6 +1,6 @@
 # tests/test_llm_auto_discovery.py
 
-from fitz_stack.llm.registry import (
+from core.llm.registry import (
     auto_discover_llm_plugins,
     get_llm_plugin,
 )

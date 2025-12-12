@@ -1,7 +1,7 @@
 # tests/test_context_pipeline_weird_inputs.py
 
 import pytest
-from fitz_rag.context.pipeline import ContextPipeline
+from rag.context.pipeline import ContextPipeline
 
 class Obj:
     def __init__(self, text, file):

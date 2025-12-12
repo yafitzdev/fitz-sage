@@ -1,6 +1,6 @@
 # tests/test_rgs_metadata_format.py
 
-from fitz_rag.generation.rgs import RGS, RGSConfig
+from rag.generation.rgs import RGS, RGSConfig
 
 def test_rgs_metadata_format():
     rgs = RGS(RGSConfig())

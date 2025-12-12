@@ -1,9 +1,9 @@
 # tests/test_llm_engine_from_name.py
 
-from fitz_stack.llm import get_llm_plugin, LLMRegistryError
-from fitz_stack.llm.chat import ChatEngine
-from fitz_stack.llm.embedding import EmbeddingEngine
-from fitz_stack.llm.rerank import RerankEngine
+from core.llm import get_llm_plugin, LLMRegistryError
+from core.llm.chat import ChatEngine
+from core.llm.embedding import EmbeddingEngine
+from core.llm.rerank import RerankEngine
 
 
 def test_chat_engine_from_name():

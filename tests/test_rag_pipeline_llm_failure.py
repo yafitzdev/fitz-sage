@@ -2,9 +2,9 @@
 
 import pytest
 
-from fitz_rag.pipeline.engine import RAGPipeline
-from fitz_rag.exceptions.llm import LLMError
-from fitz_rag.generation.rgs import RGS, RGSConfig
+from rag.pipeline.engine import RAGPipeline
+from rag.exceptions.llm import LLMError
+from rag.generation.rgs import RGS, RGSConfig
 
 class DummyRetriever:
     def retrieve(self, q): return [{"id": "1", "text": "hello", "metadata": {}}]

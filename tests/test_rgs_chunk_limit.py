@@ -1,4 +1,4 @@
-from fitz_rag.generation.rgs import RGS, RGSConfig
+from rag.generation.rgs import RGS, RGSConfig
 
 
 def test_rgs_respects_max_chunks():

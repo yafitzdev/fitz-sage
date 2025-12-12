@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from fitz_ingest.pipeline import IngestionPipeline
+from ingest.pipeline import IngestionPipeline
 
 
 @dataclass

@@ -1,5 +1,5 @@
-from fitz_ingest.ingester.plugins.base import RawDocument
-from fitz_ingest.ingester.validation import validate
+from ingest.ingester.plugins.base import RawDocument
+from ingest.ingester.validation import validate
 
 def test_validation_filters_empty_documents():
     valid = RawDocument(path="a.txt", content="hello", metadata={})

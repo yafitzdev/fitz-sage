@@ -1,7 +1,7 @@
 # tests/test_context_pipeline_ordering.py
 
 import pytest
-from fitz_rag.context.pipeline import ContextPipeline
+from rag.context.pipeline import ContextPipeline
 
 def test_context_pipeline_preserves_document_order():
     chunks = [

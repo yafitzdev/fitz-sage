@@ -1,4 +1,4 @@
-from fitz_stack.llm.chat import ChatEngine
+from core.llm.chat import ChatEngine
 
 class Dummy:
     def chat(self, messages):
