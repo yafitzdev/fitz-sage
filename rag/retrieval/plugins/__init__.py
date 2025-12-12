@@ -1,7 +1,8 @@
+# rag/retrieval/plugins/__init__.py
 """
-Built-in retrieval plugins for fitz-rag.
+Retrieval plugin implementations live in this package.
 
-Each plugin module should define:
-    - a class implementing `retrieve(self, query: str) -> List[Chunk]`
-    - a class attribute `plugin_name: str` (unique)
+Important:
+- Keep this module import-free to avoid circular imports.
+- Plugin discovery/registration is owned by `rag.retrieval.registry`.
 """

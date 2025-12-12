@@ -1,29 +1,47 @@
 # fitz_rag/pipeline/engine.py
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
-from rag.config.schema import RAGConfig
 from rag.config.loader import load_config
-
-from rag.retrieval.plugins.dense import RAGRetriever
+from rag.config.schema import RAGConfig
+from rag.exceptions.llm import LLMError
+from rag.exceptions.pipeline import PipelineError, RGSGenerationError
+from rag.generation.rgs import RGS, RGSAnswer, RGSConfig as RGSRuntimeConfig
+from rag.retrieval.engine import RetrieverEngine
 
 from core.llm.chat import ChatEngine
+from core.llm.embedding.engine import EmbeddingEngine
+from core.llm.registry import get_llm_plugin
+from core.llm.rerank.engine import RerankEngine
 from core.vector_db import get_vector_db_plugin
-
-from rag.generation.rgs import (
-    RGS,
-    RGSConfig as RGSRuntimeConfig,
-    RGSAnswer,
-)
-
-from rag.exceptions.pipeline import PipelineError, RGSGenerationError
-from rag.exceptions.llm import LLMError
 
 from core.logging.logger import get_logger
 from core.logging.tags import PIPELINE, VECTOR_DB
 
 logger = get_logger(__name__)
+
+
+def _cfg_to_kwargs(cfg: Any, *, exclude: set[str] | None = None) -> dict[str, Any]:
+    if cfg is None:
+        return {}
+
+    exclude = exclude or set()
+
+    if hasattr(cfg, "model_dump"):
+        data = cfg.model_dump(exclude_none=True)
+    elif hasattr(cfg, "dict"):
+        data = cfg.dict(exclude_none=True)
+    elif isinstance(cfg, dict):
+        data = {k: v for k, v in cfg.items() if v is not None}
+    else:
+        data = {k: v for k, v in vars(cfg).items() if not k.startswith("_") and v is not None}
+
+    for k in exclude:
+        data.pop(k, None)
+
+    data.pop("plugin_name", None)
+    return data
 
 
 class RAGPipeline:
@@ -33,16 +51,13 @@ class RAGPipeline:
         vector_db → retrieval → rgs → llm → final answer
     """
 
-    def __init__(self, retriever: RAGRetriever, llm: ChatEngine, rgs: RGS):
+    def __init__(self, retriever: RetrieverEngine, llm: ChatEngine, rgs: RGS):
         self.retriever = retriever
         self.llm = llm
         self.rgs = rgs
 
         logger.info(f"{PIPELINE} RAGPipeline initialized")
 
-    # ---------------------------------------------------------
-    # Main run
-    # ---------------------------------------------------------
     def run(self, query: str) -> RGSAnswer:
         logger.info(f"{PIPELINE} Running pipeline for query='{query[:50]}...'")
 
@@ -81,9 +96,6 @@ class RAGPipeline:
             logger.error(f"{PIPELINE} Failed to structure RGS answer: {e}")
             raise RGSGenerationError("Failed to build RGS answer") from e
 
-    # ---------------------------------------------------------
-    # Factory from config
-    # ---------------------------------------------------------
     @classmethod
     def from_config(cls, cfg: RAGConfig) -> "RAGPipeline":
         logger.info(f"{PIPELINE} Constructing RAGPipeline from config")
@@ -107,12 +119,27 @@ class RAGPipeline:
             temperature=cfg.llm.temperature,
         )
 
-        # ---------------- Retriever --------------------
-        retriever = RAGRetriever(
+        # ---------------- Embedder (resolved upstream) ----------------
+        embed_provider = cfg.llm.provider.lower()
+        EmbedCls = get_llm_plugin(plugin_name=embed_provider, plugin_type="embedding")
+        embed_plugin = EmbedCls(**_cfg_to_kwargs(cfg.embedding))
+        embedder = EmbeddingEngine(embed_plugin)
+
+        # ---------------- Optional rerank (resolved upstream) ----------
+        rerank_engine: RerankEngine | None = None
+        if getattr(cfg.rerank, "enabled", False):
+            RerankCls = get_llm_plugin(plugin_name=embed_provider, plugin_type="rerank")
+            rerank_plugin = RerankCls(**_cfg_to_kwargs(cfg.rerank, exclude={"enabled"}))
+            rerank_engine = RerankEngine(rerank_plugin)
+
+        # ---------------- Retriever (via registry) --------------------
+        retriever_name = getattr(cfg.retriever, "plugin_name", None) or "dense"
+        retriever = RetrieverEngine.from_name(
+            retriever_name,
             client=vector_client,
-            embed_cfg=cfg.embedding,
             retriever_cfg=cfg.retriever,
-            rerank_cfg=cfg.rerank,
+            embedder=embedder,
+            rerank_engine=rerank_engine,
         )
 
         # ---------------- RGS Config -------------------
@@ -131,9 +158,6 @@ class RAGPipeline:
         return cls(retriever=retriever, llm=chat_engine, rgs=rgs)
 
 
-# ---------------------------------------------------------
-# Factory for YAML-driven construction
-# ---------------------------------------------------------
 def create_pipeline_from_yaml(path: Optional[str] = None) -> RAGPipeline:
     logger.debug(f"{PIPELINE} Loading config from YAML")
     raw = load_config(path)
