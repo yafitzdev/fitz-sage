@@ -1,7 +1,7 @@
 # rag/pipeline/engine.py
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 from rag.config.loader import load_config
 from rag.config.schema import RAGConfig
@@ -21,41 +21,9 @@ from core.vector_db import get_vector_db_plugin
 logger = get_logger(__name__)
 
 
-def _cfg_to_kwargs(cfg: Any, *, exclude: set[str] | None = None) -> dict[str, Any]:
-    if cfg is None:
-        return {}
-
-    exclude = exclude or set()
-
-    if hasattr(cfg, "model_dump"):
-        data = cfg.model_dump(exclude_none=True)
-    elif hasattr(cfg, "dict"):
-        data = cfg.dict(exclude_none=True)
-    elif isinstance(cfg, dict):
-        data = {k: v for k, v in cfg.items() if v is not None}
-    else:
-        data = {k: v for k, v in vars(cfg).items() if not k.startswith("_") and v is not None}
-
-    for k in exclude:
-        data.pop(k, None)
-
-    data.pop("plugin_name", None)
-    data.pop("provider", None)
-    return data
-
-
-def _select_plugin_name(cfg: Any, *, label: str) -> str:
-    name = getattr(cfg, "plugin_name", None) or getattr(cfg, "provider", None)
-    if not isinstance(name, str) or not name:
-        raise ValueError(f"{label}.plugin_name (or {label}.provider) must be set")
-    return name
-
-
 class RAGPipeline:
     """
-    Final clean RAG pipeline.
-    Architecture:
-        vector_db → retrieval → rgs → llm → final answer
+    vector_db → retrieval → rgs → llm → final answer
     """
 
     def __init__(self, retriever: RetrieverEngine, llm: ChatEngine, rgs: RGS):
@@ -103,44 +71,36 @@ class RAGPipeline:
     def from_config(cls, cfg: RAGConfig) -> "RAGPipeline":
         logger.info(f"{PIPELINE} Constructing RAGPipeline from config")
 
-        # ---------------- Vector DB client ----------------
-        if not hasattr(cfg, "vector_db"):
-            raise ValueError("RAGConfig.vector_db must be provided (provider-specific fields must not live in retriever config)")
+        # ---------------- Vector DB ----------------
+        VectorDBCls = get_vector_db_plugin(cfg.vector_db.plugin_name)
+        vector_client = VectorDBCls(**cfg.vector_db.kwargs)
+        logger.info(f"{VECTOR_DB} Using vector DB plugin='{cfg.vector_db.plugin_name}'")
 
-        vector_db_name = _select_plugin_name(cfg.vector_db, label="vector_db")
-        VectorDBCls = get_vector_db_plugin(vector_db_name)
-        vector_client = VectorDBCls(**_cfg_to_kwargs(cfg.vector_db))
-        logger.info(f"{VECTOR_DB} Using vector DB plugin='{vector_db_name}'")
+        # ---------------- Chat LLM ------------------
+        chat_engine = ChatEngine.from_name(cfg.llm.plugin_name, **cfg.llm.kwargs)
 
-        # ---------------- Chat Engine ------------------
-        chat_name = _select_plugin_name(cfg.llm, label="llm")
-        chat_engine = ChatEngine.from_name(chat_name, **_cfg_to_kwargs(cfg.llm))
-
-        # ---------------- Embedder ----------------
-        embed_name = _select_plugin_name(cfg.embedding, label="embedding")
-        EmbedCls = get_llm_plugin(plugin_name=embed_name, plugin_type="embedding")
-        embed_plugin = EmbedCls(**_cfg_to_kwargs(cfg.embedding))
+        # ---------------- Embedder ------------------
+        EmbedCls = get_llm_plugin(plugin_name=cfg.embedding.plugin_name, plugin_type="embedding")
+        embed_plugin = EmbedCls(**cfg.embedding.kwargs)
         embedder = EmbeddingEngine(embed_plugin)
 
-        # ---------------- Optional rerank ----------------
+        # ---------------- Optional rerank ------------
         rerank_engine: RerankEngine | None = None
-        if getattr(cfg.rerank, "enabled", False):
-            rerank_name = _select_plugin_name(cfg.rerank, label="rerank")
-            RerankCls = get_llm_plugin(plugin_name=rerank_name, plugin_type="rerank")
-            rerank_plugin = RerankCls(**_cfg_to_kwargs(cfg.rerank, exclude={"enabled"}))
+        if cfg.rerank.enabled:
+            RerankCls = get_llm_plugin(plugin_name=cfg.rerank.plugin_name, plugin_type="rerank")  # type: ignore[arg-type]
+            rerank_plugin = RerankCls(**cfg.rerank.kwargs)
             rerank_engine = RerankEngine(rerank_plugin)
 
-        # ---------------- Retriever --------------------
-        retriever_name = _select_plugin_name(cfg.retriever, label="retriever")
+        # ---------------- Retriever ------------------
         retriever = RetrieverEngine.from_name(
-            retriever_name,
+            cfg.retriever.plugin_name,
             client=vector_client,
             retriever_cfg=cfg.retriever,
             embedder=embedder,
             rerank_engine=rerank_engine,
         )
 
-        # ---------------- RGS Config -------------------
+        # ---------------- RGS ------------------------
         rgs_cfg = RGSRuntimeConfig(
             enable_citations=cfg.rgs.enable_citations,
             strict_grounding=cfg.rgs.strict_grounding,
@@ -148,7 +108,7 @@ class RAGPipeline:
             max_chunks=cfg.rgs.max_chunks,
             max_answer_chars=cfg.rgs.max_answer_chars,
             include_query_in_context=cfg.rgs.include_query_in_context,
-            source_label_prefix=getattr(cfg.rgs, "source_label_prefix", "S"),
+            source_label_prefix=cfg.rgs.source_label_prefix,
         )
         rgs = RGS(config=rgs_cfg)
 

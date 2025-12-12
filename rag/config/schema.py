@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class VectorDBConfig(BaseModel):
@@ -26,6 +26,12 @@ class RerankConfig(BaseModel):
     plugin_name: str | None = Field(default=None, description="Rerank plugin name")
     kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin kwargs")
 
+    @model_validator(mode="after")
+    def _validate_enabled_plugin_name(self) -> "RerankConfig":
+        if self.enabled and not self.plugin_name:
+            raise ValueError("rerank.plugin_name must be set when rerank.enabled=True")
+        return self
+
 
 class RetrieverConfig(BaseModel):
     plugin_name: str = Field(..., description="Retriever plugin name (e.g. 'dense')")
@@ -34,10 +40,13 @@ class RetrieverConfig(BaseModel):
 
 
 class RGSSettings(BaseModel):
-    max_chunks: int = 8
-    max_chars: int = 4000
-    include_citations: bool = True
+    enable_citations: bool = True
     strict_grounding: bool = True
+    answer_style: str | None = None
+    max_chunks: int | None = 8
+    max_answer_chars: int | None = None
+    include_query_in_context: bool = True
+    source_label_prefix: str = "S"
 
 
 class LoggingConfig(BaseModel):
