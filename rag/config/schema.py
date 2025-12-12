@@ -1,44 +1,36 @@
 # rag/config/schema.py
-
 from __future__ import annotations
 
-from typing import Optional
-from pydantic import BaseModel, Field, model_validator
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+
+class VectorDBConfig(BaseModel):
+    plugin_name: str = Field(..., description="Vector DB plugin name (e.g. 'qdrant')")
+    kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin kwargs")
+
+
+class LLMConfig(BaseModel):
+    plugin_name: str = Field(..., description="Chat LLM plugin name")
+    kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin kwargs")
 
 
 class EmbeddingConfig(BaseModel):
-    plugin_name: Optional[str] = Field(
-        default=None,
-        description="Embedding plugin name (canonical field)",
-    )
-    provider: Optional[str] = Field(
-        default=None,
-        description="Alias for plugin_name (legacy / test compatibility)",
-    )
-    model: str
-    api_key: Optional[str] = None
-    output_dimension: Optional[int] = None
-
-    @model_validator(mode="after")
-    def _normalize_plugin_name(self) -> "EmbeddingConfig":
-        if self.plugin_name is None and self.provider is not None:
-            self.plugin_name = self.provider
-        if self.plugin_name is None:
-            raise ValueError("Either plugin_name or provider must be set")
-        return self
+    plugin_name: str = Field(..., description="Embedding plugin name")
+    kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin kwargs")
 
 
 class RerankConfig(BaseModel):
     enabled: bool = False
-    plugin_name: Optional[str] = None
-    model: Optional[str] = None
-    api_key: Optional[str] = None
-    top_k: Optional[int] = None
+    plugin_name: str | None = Field(default=None, description="Rerank plugin name")
+    kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin kwargs")
 
 
 class RetrieverConfig(BaseModel):
-    collection: str
-    top_k: int = 5
+    plugin_name: str = Field(..., description="Retriever plugin name (e.g. 'dense')")
+    collection: str = Field(..., description="Vector DB collection name")
+    top_k: int = Field(default=5, description="Number of chunks to retrieve")
 
 
 class RGSSettings(BaseModel):
@@ -53,8 +45,14 @@ class LoggingConfig(BaseModel):
 
 
 class RAGConfig(BaseModel):
+    vector_db: VectorDBConfig
+    llm: LLMConfig
     embedding: EmbeddingConfig
     retriever: RetrieverConfig
     rerank: RerankConfig = Field(default_factory=RerankConfig)
     rgs: RGSSettings = Field(default_factory=RGSSettings)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> "RAGConfig":
+        return cls(**raw)
