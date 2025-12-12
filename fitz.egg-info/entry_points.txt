@@ -1,0 +1,2 @@
+[console_scripts]
+fitz-rag = rag.cli:app

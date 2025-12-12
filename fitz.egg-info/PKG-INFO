@@ -1,9 +1,9 @@
 Metadata-Version: 2.4
-Name: fitz-stack
+Name: fitz
 Version: 0.1.0
 Summary: The Fitz modular ecosystem: RAG, ingestion, documentation, mapping, grounding and more.
 Author: Yan Fitzner
-License: MIT
+License-Expression: MIT
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE

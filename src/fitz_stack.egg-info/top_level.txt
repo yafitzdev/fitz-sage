@@ -1,2 +1,0 @@
-fitz_ingest
-fitz_rag
