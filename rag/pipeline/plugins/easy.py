@@ -1,10 +1,11 @@
+# rag/pipeline/plugins/easy.py
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from rag.config.schema import RAGConfig
+from rag.pipeline.base import PipelinePlugin, Pipeline
 from rag.pipeline.engine import RAGPipeline
-from rag.pipeline.base import PipelinePlugin
 
 from core.logging.logger import get_logger
 from core.logging.tags import PIPELINE
@@ -17,11 +18,9 @@ class EasyPipelinePlugin(PipelinePlugin):
     """
     Minimal convenience pipeline plugin.
 
-    Currently equivalent to the standard pipeline, but exists as a dedicated
-    plugin so future "easy mode" behavior can be added without touching the
-    core engine.
+    Must only delegate to RAGPipeline.from_config().
     """
 
-    def build(self, cfg: RAGConfig) -> RAGPipeline:
+    def build(self, cfg: RAGConfig) -> Pipeline:
         logger.info(f"{PIPELINE} Building Easy pipeline")
         return RAGPipeline.from_config(cfg)

@@ -1,10 +1,11 @@
+# rag/pipeline/plugins/standard.py
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from rag.config.schema import RAGConfig
+from rag.pipeline.base import PipelinePlugin, Pipeline
 from rag.pipeline.engine import RAGPipeline
-from rag.pipeline.base import PipelinePlugin
 
 from core.logging.logger import get_logger
 from core.logging.tags import PIPELINE
@@ -17,10 +18,9 @@ class StandardPipelinePlugin(PipelinePlugin):
     """
     Balanced default pipeline plugin.
 
-    Mirrors the behavior of the standard RAG pipeline using the provided
-    config without additional mutations.
+    Must only delegate to RAGPipeline.from_config().
     """
 
-    def build(self, cfg: RAGConfig) -> RAGPipeline:
+    def build(self, cfg: RAGConfig) -> Pipeline:
         logger.info(f"{PIPELINE} Building Standard pipeline")
         return RAGPipeline.from_config(cfg)

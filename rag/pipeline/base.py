@@ -1,17 +1,24 @@
+# rag/pipeline/base.py
 from __future__ import annotations
 
-from typing import Protocol, Any
+from typing import Protocol
 
 from rag.config.schema import RAGConfig
+
+
+class Pipeline(Protocol):
+    def run(self, query: str): ...
 
 
 class PipelinePlugin(Protocol):
     """
     Minimal interface for pipeline plugins.
 
-    A plugin takes a fully-resolved RAGConfig and returns a pipeline-like
-    object with a .run(query: str) method (e.g. RAGPipeline or a wrapper).
+    Contract:
+    - Plugins MUST NOT implement wiring (LLM/vector_db/retriever construction).
+    - Plugins may only mutate/override config, then delegate to RAGPipeline.from_config().
+    - Return value must expose .run(query).
     """
 
-    def build(self, cfg: RAGConfig) -> Any:
+    def build(self, cfg: RAGConfig) -> Pipeline:
         ...
