@@ -5,8 +5,8 @@ import inspect
 import pkgutil
 from typing import Dict, Type
 
-from fitz_rag.llm.embedding.base import EmbeddingPlugin
-import fitz_rag.llm.embedding.plugins as plugins_pkg
+from fitz_stack.llm.embedding.base import EmbeddingPlugin
+import fitz_stack.llm.embedding.plugins as plugins_pkg
 
 # Global registry populated via auto_discover_plugins().
 EMBEDDING_REGISTRY: Dict[str, Type[EmbeddingPlugin]] = {}

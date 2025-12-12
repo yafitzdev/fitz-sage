@@ -1,12 +1,15 @@
+# ============================
+# File: src/fitz_stack/llm/chat/__init__.py
+# ============================
 """
-Chat / LLM subsystem for fitz-rag.
+Chat subsystem for fitz_stack.
 
 This package exposes:
 - ChatPlugin: protocol for all chat implementations
 - ChatEngine: orchestration layer around chat plugins
 
-Built-in plugins live in:
-    fitz_rag.llm.chat.plugins
+Plugins live in:
+    fitz_stack.llm.chat.plugins
 """
 
 from .base import ChatPlugin

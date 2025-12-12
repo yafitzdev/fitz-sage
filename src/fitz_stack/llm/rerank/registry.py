@@ -5,8 +5,8 @@ import inspect
 import pkgutil
 from typing import Dict, Type
 
-from fitz_rag.llm.rerank.base import RerankPlugin
-import fitz_rag.llm.rerank.plugins as plugins_pkg
+from fitz_stack.llm.rerank.base import RerankPlugin
+import fitz_stack.llm.rerank.plugins as plugins_pkg
 
 RERANK_REGISTRY: Dict[str, Type[RerankPlugin]] = {}
 

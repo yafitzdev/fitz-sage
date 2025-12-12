@@ -5,8 +5,8 @@ import inspect
 import pkgutil
 from typing import Dict, Type
 
-from fitz_rag.llm.chat.base import ChatPlugin
-import fitz_rag.llm.chat.plugins as plugins_pkg
+from fitz_stack.llm.chat.base import ChatPlugin
+import fitz_stack.llm.chat.plugins as plugins_pkg
 
 CHAT_REGISTRY: Dict[str, Type[ChatPlugin]] = {}
 

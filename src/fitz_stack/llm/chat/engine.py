@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-from fitz_rag.llm.chat.base import ChatPlugin
-from fitz_rag.llm.chat.registry import get_chat_plugin
+from fitz_stack.llm.chat.base import ChatPlugin
+from fitz_stack.llm.chat.registry import get_chat_plugin
 
 
 @dataclass

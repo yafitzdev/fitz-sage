@@ -1,13 +1,15 @@
+# ============================
+# File: src/fitz_stack/llm/embedding/__init__.py
+# ============================
 """
-Embedding subsystem for fitz-rag.
+Embedding subsystem for fitz_stack.
 
 This package exposes:
-
 - EmbeddingPlugin: protocol for all embedding implementations
 - EmbeddingEngine: orchestration layer around embedding plugins
 
-Built-in plugins live in:
-    fitz_rag.llm.embedding.plugins
+Plugins live in:
+    fitz_stack.llm.embedding.plugins
 """
 
 from .base import EmbeddingPlugin

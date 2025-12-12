@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from typing import Any, List
 
 from fitz_rag.core import Chunk
-from fitz_rag.llm.rerank.base import RerankPlugin
-from fitz_rag.llm.rerank.registry import get_rerank_plugin
+from fitz_stack.llm.rerank.base import RerankPlugin
+from fitz_stack.llm.rerank.registry import get_rerank_plugin
 
 
 @dataclass

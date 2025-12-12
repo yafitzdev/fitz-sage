@@ -1,6 +1,6 @@
 # tests/test_rerank_engine_basic.py
 
-from fitz_rag.llm.rerank.engine import RerankEngine
+from fitz_stack.llm.rerank.engine import RerankEngine
 
 class DummyRerankPlugin:
     # Return new order: reverse

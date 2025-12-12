@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, List
 
-from fitz_rag.llm.embedding.base import EmbeddingPlugin
-from fitz_rag.llm.embedding.registry import get_embedding_plugin
+from fitz_stack.llm.embedding.base import EmbeddingPlugin
+from fitz_stack.llm.embedding.registry import get_embedding_plugin
 
 
 @dataclass

@@ -1,5 +1,5 @@
-from fitz_rag.llm.chat.engine import ChatEngine
-from fitz_rag.llm.chat.base import ChatPlugin
+from fitz_stack.llm.chat import ChatEngine
+from fitz_stack.llm.chat.base import ChatPlugin
 
 class Dummy(ChatPlugin):
     plugin_name = "dummy"
