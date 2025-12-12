@@ -1,43 +1,19 @@
-# ================================
-# fitz_rag default configuration
-# ================================
-
-qdrant:
-  host: "localhost"
-  port: 6333
-  https: false
-  collection: "fitz_default"
-
-models:
-  # Optional, in case you add chat endpoints later
-  chat: "gpt-4.1-mini"
-  embedding: "text-embedding-3-large"
-  rerank: "cohere/rerank-3.5"
+embedding:
+  plugin_name: cohere
+  model: embed-english-v3.0
 
 retriever:
-  top_k: 20
-  rerank_k: 8
-  max_trf_json_chars: null
+  collection: default
+  top_k: 5
 
-ingestion:
-  # Chunking settings (tune as needed)
-  chunk_size: 800
-  chunk_overlap: 200
-  # Which files to ingest by default
-  glob_patterns:
-    - "**/*.txt"
-    - "**/*.md"
-    - "**/*.pdf"
-  # Which paths/patterns to skip
-  exclude_glob_patterns:
-    - "**/.git/**"
-    - "**/__pycache__/**"
-    - "**/.venv/**"
+rerank:
+  enabled: false
 
-prompt_logging:
-  enabled: true
-  dir: "./fitz_prompts"
+rgs:
+  max_chunks: 8
+  max_chars: 4000
+  include_citations: true
+  strict_grounding: true
 
 logging:
-  level: "INFO"      # DEBUG / INFO / WARNING / ERROR
-  json: false        # if true, log as JSON lines instead of pretty text
+  level: INFO
