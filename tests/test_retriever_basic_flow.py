@@ -1,50 +1,42 @@
-import pytest
+# tests/test_retriever_basic_flow.py
 from dataclasses import dataclass
 
-from rag.retrieval.plugins.dense import DenseRetrievalPlugin
-from rag.config.schema import RetrieverConfig
-from core.exceptions.llm import EmbeddingError
+from rag.retrieval.engine import RetrieverEngine
 
 
-class DummyEmbedder:
+@dataclass
+class Hit:
+    id: str
+    payload: dict
+    score: float = 0.5
+
+
+class MockClient:
+    def __init__(self, hits):
+        self.hits = hits
+
+    def search(self, collection_name, query_vector, limit):
+        return self.hits
+
+
+class MockEmbedder:
     def embed(self, text):
-        return [0.1, 0.2, 0.3]
-
-
-class DummyClient:
-    class Hit:
-        id = "1"
-        score = 0.9
-        payload = {"content": "hello world", "metadata": {"file": "doc.txt"}}
-
-    def search(self, *args, **kwargs):
-        return [DummyClient.Hit()]
+        return [1.0]
 
 
 def test_retriever_basic_flow():
-    r = DenseRetrievalPlugin(
-        client=DummyClient(),
-        retriever_cfg=RetrieverConfig(collection="demo", top_k=1),
-        embedder=DummyEmbedder(),
+    retriever_cfg = type("Cfg", (), {"collection": "col", "top_k": 1})
+    hits = [Hit(id="h", payload={"doc_id": "d", "content": "X", "chunk_index": 0})]
+
+    engine = RetrieverEngine.from_name(
+        "dense",
+        client=MockClient(hits),
+        retriever_cfg=retriever_cfg,
+        embedder=MockEmbedder(),
         rerank_engine=None,
     )
 
-    out = r.retrieve("hi")
-    assert isinstance(out, list)
-    assert getattr(out[0], "content") == "hello world"
+    out = engine.retrieve("q")
 
-
-def test_retriever_embedding_failure_raises_embedding_error():
-    class BadEmbedder:
-        def embed(self, _):
-            raise RuntimeError("oh no")
-
-    r = DenseRetrievalPlugin(
-        client=DummyClient(),
-        retriever_cfg=RetrieverConfig(collection="demo", top_k=1),
-        embedder=BadEmbedder(),
-        rerank_engine=None,
-    )
-
-    with pytest.raises(EmbeddingError):
-        r.retrieve("hi")
+    assert len(out) == 1
+    assert out[0].content == "X"

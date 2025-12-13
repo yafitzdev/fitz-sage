@@ -1,12 +1,22 @@
-from core.llm.rerank import RerankEngine
+# tests/test_rerank_engine_basic.py
+from core.llm.rerank.engine import RerankEngine
+from core.models.chunk import Chunk
+
 
 class DummyRerankPlugin:
     def rerank(self, query, chunks):
-        # return indices
-        return [1, 0, 2]
+        return list(reversed(chunks))
+
 
 def test_rerank_engine_basic_flow():
     engine = RerankEngine(DummyRerankPlugin())
-    chunks = ["A", "B", "C"]
+
+    chunks = [
+        Chunk(id="1", doc_id="d", chunk_index=0, content="A", metadata={}),
+        Chunk(id="2", doc_id="d", chunk_index=1, content="B", metadata={}),
+        Chunk(id="3", doc_id="d", chunk_index=2, content="C", metadata={}),
+    ]
+
     ranked = engine.rerank("q", chunks)
-    assert ranked == ["B", "A", "C"]
+
+    assert [c.content for c in ranked] == ["C", "B", "A"]

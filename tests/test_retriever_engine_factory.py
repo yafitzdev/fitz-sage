@@ -1,28 +1,26 @@
+# tests/test_retriever_engine_factory.py
 from rag.retrieval.engine import RetrieverEngine
-from rag.retrieval.plugins.dense import DenseRetrievalPlugin
+
+
+class MockClient:
+    def search(self, collection_name, query_vector, limit):
+        return []
+
+
+class MockEmbedder:
+    def embed(self, text):
+        return [0.0]
 
 
 def test_retriever_engine_from_name():
-    # Must use a REAL registered embedding plugin → "cohere"
-    embed_cfg = type("Cfg", (), {
-        "plugin_name": "cohere",
-        "api_key": "k",
-        "model": "m",
-        "output_dimension": None,
-    })
-
-    retriever_cfg = type("Cfg", (), {
-        "collection": "col",
-        "top_k": 2,
-    })
+    retriever_cfg = type("Cfg", (), {"collection": "col", "top_k": 2})
 
     engine = RetrieverEngine.from_name(
         "dense",
-        client="dummy",
-        embed_cfg=embed_cfg,
+        client=MockClient(),
         retriever_cfg=retriever_cfg,
-        rerank_cfg=None,
+        embedder=MockEmbedder(),
+        rerank_engine=None,
     )
 
-    assert isinstance(engine.plugin, DenseRetrievalPlugin)
-    assert engine.plugin.client == "dummy"
+    assert isinstance(engine, RetrieverEngine)

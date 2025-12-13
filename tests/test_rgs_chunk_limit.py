@@ -1,3 +1,4 @@
+# tests/test_rgs_chunk_limit.py
 from rag.generation.rgs import RGS, RGSConfig
 
 
@@ -6,14 +7,13 @@ def test_rgs_respects_max_chunks():
     rgs = RGS(cfg)
 
     chunks = [
-        {"id": "1", "text": "A", "metadata": {}},
-        {"id": "2", "text": "B", "metadata": {}},
-        {"id": "3", "text": "C", "metadata": {}},
+        {"id": "1", "content": "A", "metadata": {}},
+        {"id": "2", "content": "B", "metadata": {}},
+        {"id": "3", "content": "C", "metadata": {}},
     ]
 
     prompt = rgs.build_prompt("Q?", chunks)
 
-    # Only two chunks should appear
-    assert "[S1]" in prompt.user
-    assert "[S2]" in prompt.user
-    assert "[S3]" not in prompt.user
+    assert "A" in prompt.user
+    assert "B" in prompt.user
+    assert "C" not in prompt.user

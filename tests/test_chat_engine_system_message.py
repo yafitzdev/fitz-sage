@@ -1,13 +1,26 @@
-from core.llm.chat import ChatEngine
+# tests/test_chat_engine_system_message.py
+from core.llm.chat.engine import ChatEngine
+
 
 class Dummy:
+    def __init__(self) -> None:
+        self.seen = None
+
     def chat(self, messages):
-        return messages
+        self.seen = messages
+        return "ok"
+
 
 def test_chat_engine_system_message():
-    eng = ChatEngine(Dummy())
+    plugin = Dummy()
+    eng = ChatEngine(plugin)
+
     msgs = [
         {"role": "system", "content": "system!"},
         {"role": "user", "content": "hello"},
     ]
-    assert eng.chat(msgs) == msgs
+
+    out = eng.chat(msgs)
+
+    assert out == "ok"
+    assert plugin.seen == msgs

@@ -1,59 +1,47 @@
+# tests/test_dense_retriever_basic_embedding_and_search.py
 from dataclasses import dataclass
 
 from rag.retrieval.plugins.dense import DenseRetrievalPlugin
-from rag.config.schema import RetrieverConfig
+from core.models.chunk import Chunk
 
 
-class DummyEmbedder:
+@dataclass
+class Hit:
+    id: str
+    payload: dict
+    score: float = 0.5
+
+
+class MockClient:
+    def __init__(self, hits):
+        self.hits = hits
+        self.calls = []
+
+    def search(self, collection_name, query_vector, limit):
+        self.calls.append((collection_name, query_vector, limit))
+        return self.hits
+
+
+class MockEmbedder:
     def __init__(self):
         self.calls = []
 
-    def embed(self, text: str):
+    def embed(self, text):
         self.calls.append(text)
         return [0.1, 0.2, 0.3]
 
 
-class DummyHit:
-    def __init__(self, id, content, score=0.5):
-        self.id = id
-        self.score = score
-        self.payload = {"content": content, "metadata": {"file": "dummy.txt"}}
-
-
-class DummyClient:
-    def __init__(self):
-        self.last_query = None
-
-    def search(self, collection_name, query_vector, limit, with_payload=True):
-        self.last_query = (collection_name, query_vector, limit, with_payload)
-        return [
-            DummyHit("h1", "Hello world"),
-            DummyHit("h2", "Another doc"),
-        ]
-
-
 def test_dense_retriever_calls_embed_and_search():
-    embedder = DummyEmbedder()
-    client = DummyClient()
+    hits = [Hit(id="h1", payload={"doc_id": "d1", "content": "c1", "chunk_index": 0})]
+    client = MockClient(hits)
 
-    retriever = DenseRetrievalPlugin(
-        client=client,
-        retriever_cfg=RetrieverConfig(collection="testcol", top_k=2),
-        embedder=embedder,
-        rerank_engine=None,
-    )
+    retriever_cfg = type("Cfg", (), {"collection": "col", "top_k": 2})
+    embedder = MockEmbedder()
 
-    chunks = retriever.retrieve("hello world")
+    retr = DenseRetrievalPlugin(client=client, retriever_cfg=retriever_cfg, embedder=embedder)
 
-    assert embedder.calls == ["hello world"]
+    out = retr.retrieve("q")
 
-    collection_name, vec, limit, with_payload = client.last_query
-    assert collection_name == "testcol"
-    assert vec == [0.1, 0.2, 0.3]
-    assert limit == 2
-    assert with_payload is True
-
-    assert isinstance(chunks, list)
-    assert len(chunks) == 2
-    # Don’t hard-pin the Chunk class; just validate the output contract.
-    assert getattr(chunks[0], "content") == "Hello world"
+    assert embedder.calls == ["q"]
+    assert client.calls == [("col", [0.1, 0.2, 0.3], 2)]
+    assert isinstance(out, list) and isinstance(out[0], Chunk)

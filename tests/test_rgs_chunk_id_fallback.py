@@ -1,16 +1,16 @@
 # tests/test_rgs_chunk_id_fallback.py
-
 from rag.generation.rgs import RGS, RGSConfig
+
 
 def test_rgs_chunk_id_fallback_generates_chunk_ids():
     rgs = RGS(RGSConfig())
 
     chunks = [
-        {"text": "A", "metadata": {}},
-        {"text": "B", "metadata": {}},
+        {"content": "alpha", "metadata": {}},  # missing id
+        {"content": "beta", "metadata": {}},   # missing id
     ]
 
-    answer = rgs.build_answer("ok", chunks)
+    ans = rgs.build_answer("ok", chunks)
 
-    assert answer.sources[0].source_id == "chunk_1"
-    assert answer.sources[1].source_id == "chunk_2"
+    assert ans.sources[0].source_id == "chunk_1"
+    assert ans.sources[1].source_id == "chunk_2"
