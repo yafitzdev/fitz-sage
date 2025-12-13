@@ -12,10 +12,11 @@ _DISCOVERED = False
 
 
 def _iter_plugin_classes(module: object) -> Iterable[type]:
+    mod_name = getattr(module, "__name__", "")
     for obj in vars(module).values():
         if not isinstance(obj, type):
             continue
-        if getattr(obj, "__module__", None) != getattr(module, "__name__", None):
+        if getattr(obj, "__module__", None) != mod_name:
             continue
 
         plugin_name = getattr(obj, "plugin_name", None)

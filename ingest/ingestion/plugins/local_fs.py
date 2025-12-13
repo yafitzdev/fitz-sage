@@ -5,15 +5,12 @@ from pathlib import Path
 from typing import Any, Dict, Iterable
 
 from ingest.ingestion.base import RawDocument
-from ingest.ingestion.registry import register
 
 
-@register
 class LocalFSIngestPlugin:
     plugin_name = "local"
 
     def __init__(self, **_: Any) -> None:
-        # accept kwargs for uniform plugin construction; unused by this plugin
         pass
 
     def ingest(self, source: str, kwargs: Dict[str, Any]) -> Iterable[RawDocument]:

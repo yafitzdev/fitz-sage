@@ -6,11 +6,8 @@ from typing import Any, Protocol, runtime_checkable
 
 @runtime_checkable
 class ChatPlugin(Protocol):
-    """
-    Canonical chat plugin contract.
-
-    Provider-specific logic must live in plugin implementations only.
-    """
+    plugin_name: str
+    plugin_type: str  # must be "chat"
 
     def chat(self, messages: list[dict[str, Any]]) -> str:
         ...

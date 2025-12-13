@@ -3,65 +3,50 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class VectorDBConfig(BaseModel):
-    plugin_name: str = Field(..., description="Vector DB plugin name (e.g. 'qdrant')")
-    kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin kwargs")
-
-
-class LLMConfig(BaseModel):
-    plugin_name: str = Field(..., description="Chat LLM plugin name")
-    kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin kwargs")
-
-
-class EmbeddingConfig(BaseModel):
-    plugin_name: str = Field(..., description="Embedding plugin name")
-    kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin kwargs")
+class PluginConfig(BaseModel):
+    plugin_name: str = Field(..., description="Plugin name in the central registry")
+    kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin init kwargs")
+    model_config = ConfigDict(extra="forbid")
 
 
 class RerankConfig(BaseModel):
     enabled: bool = False
-    plugin_name: str | None = Field(default=None, description="Rerank plugin name")
-    kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin kwargs")
-
-    @model_validator(mode="after")
-    def _validate_enabled_plugin_name(self) -> "RerankConfig":
-        if self.enabled and not self.plugin_name:
-            raise ValueError("rerank.plugin_name must be set when rerank.enabled=True")
-        return self
+    plugin_name: str | None = None
+    kwargs: dict[str, Any] = Field(default_factory=dict)
+    model_config = ConfigDict(extra="forbid")
 
 
 class RetrieverConfig(BaseModel):
-    plugin_name: str = Field(..., description="Retriever plugin name (e.g. 'dense')")
-    collection: str = Field(..., description="Vector DB collection name")
-    top_k: int = Field(default=5, description="Number of chunks to retrieve")
+    plugin_name: str = "dense"
+    collection: str
+    top_k: int = 5
+    model_config = ConfigDict(extra="forbid")
 
 
-class RGSSettings(BaseModel):
+class RGSConfig(BaseModel):
     enable_citations: bool = True
     strict_grounding: bool = True
-    answer_style: str | None = None
-    max_chunks: int | None = 8
-    max_answer_chars: int | None = None
+    max_chunks: int = 8
     include_query_in_context: bool = True
     source_label_prefix: str = "S"
+    model_config = ConfigDict(extra="forbid")
 
 
 class LoggingConfig(BaseModel):
     level: str = "INFO"
+    model_config = ConfigDict(extra="forbid")
 
 
 class RAGConfig(BaseModel):
-    vector_db: VectorDBConfig
-    llm: LLMConfig
-    embedding: EmbeddingConfig
+    vector_db: PluginConfig
+    llm: PluginConfig
+    embedding: PluginConfig
     retriever: RetrieverConfig
     rerank: RerankConfig = Field(default_factory=RerankConfig)
-    rgs: RGSSettings = Field(default_factory=RGSSettings)
+    rgs: RGSConfig = Field(default_factory=RGSConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
-    @classmethod
-    def from_dict(cls, raw: dict[str, Any]) -> "RAGConfig":
-        return cls(**raw)
+    model_config = ConfigDict(extra="forbid")

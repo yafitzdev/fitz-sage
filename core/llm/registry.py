@@ -7,6 +7,11 @@ from typing import Any, Dict, Iterable, Type
 
 LLMPluginType = str  # "chat" | "embedding" | "rerank" | "vector_db"
 
+
+class LLMRegistryError(RuntimeError):
+    pass
+
+
 LLM_REGISTRY: Dict[LLMPluginType, Dict[str, Type[Any]]] = {}
 _DISCOVERED = False
 
@@ -17,20 +22,13 @@ _REQUIRED_METHOD: dict[str, str] = {
     "vector_db": "search",
 }
 
-
-def register_llm_plugin(
-    cls: Type[Any],
-    *,
-    plugin_name: str,
-    plugin_type: LLMPluginType,
-) -> None:
-    """
-    Optional manual registration hook.
-
-    Not required when using Option A (class scanning discovery),
-    but kept to avoid breaking older plugin modules.
-    """
-    _register(plugin_name=plugin_name, plugin_type=plugin_type, cls=cls)
+_SCAN_PACKAGES: tuple[str, ...] = (
+    "core.llm.plugins",
+    "core.llm.chat.plugins",
+    "core.llm.embedding.plugins",
+    "core.llm.rerank.plugins",
+    "core.vector_db.plugins",
+)
 
 
 def get_llm_plugin(*, plugin_name: str, plugin_type: LLMPluginType) -> Type[Any]:
@@ -38,7 +36,7 @@ def get_llm_plugin(*, plugin_name: str, plugin_type: LLMPluginType) -> Type[Any]
     try:
         return LLM_REGISTRY[plugin_type][plugin_name]
     except KeyError as exc:
-        raise ValueError(f"Unknown {plugin_type} plugin: {plugin_name!r}") from exc
+        raise LLMRegistryError(f"Unknown {plugin_type} plugin: {plugin_name!r}") from exc
 
 
 def available_llm_plugins(plugin_type: LLMPluginType) -> list[str]:
@@ -51,29 +49,31 @@ def _auto_discover() -> None:
     if _DISCOVERED:
         return
 
-    # Scan all plugin packages where provider implementations may live.
-    # (kept explicit to avoid accidental import of unrelated modules)
-    for pkg_name in (
-        "core.llm.plugins",
-        "core.llm.chat.plugins",
-        "core.llm.embedding.plugins",
-        "core.llm.rerank.plugins",
-        "core.vector_db.plugins",
-    ):
-        _scan_package(pkg_name)
+    for pkg_name in _SCAN_PACKAGES:
+        _scan_package_best_effort(pkg_name)
 
     _DISCOVERED = True
 
 
-def _scan_package(package_name: str) -> None:
-    pkg = importlib.import_module(package_name)
+def _scan_package_best_effort(package_name: str) -> None:
+    try:
+        pkg = importlib.import_module(package_name)
+    except Exception:
+        return
 
-    for module_info in pkgutil.iter_modules(pkg.__path__):
-        module = importlib.import_module(f"{package_name}.{module_info.name}")
+    pkg_path = getattr(pkg, "__path__", None)
+    if pkg_path is None:
+        return
+
+    for module_info in pkgutil.iter_modules(pkg_path):
+        module_name = f"{package_name}.{module_info.name}"
+        try:
+            module = importlib.import_module(module_name)
+        except Exception:
+            continue
+
         for cls in _iter_plugin_classes(module):
-            name = getattr(cls, "plugin_name")
-            ptype = getattr(cls, "plugin_type")
-            _register(plugin_name=name, plugin_type=ptype, cls=cls)
+            _register(cls)
 
 
 def _iter_plugin_classes(module: object) -> Iterable[type]:
@@ -103,12 +103,15 @@ def _iter_plugin_classes(module: object) -> Iterable[type]:
         yield obj
 
 
-def _register(*, plugin_name: str, plugin_type: str, cls: Type[Any]) -> None:
+def _register(cls: Type[Any]) -> None:
+    plugin_name = getattr(cls, "plugin_name")
+    plugin_type = getattr(cls, "plugin_type")
+
     bucket = LLM_REGISTRY.setdefault(plugin_type, {})
     existing = bucket.get(plugin_name)
 
     if existing is not None and existing is not cls:
-        raise ValueError(
+        raise LLMRegistryError(
             f"Duplicate {plugin_type} plugin_name={plugin_name!r}: "
             f"{existing.__module__}.{existing.__name__} vs {cls.__module__}.{cls.__name__}"
         )
