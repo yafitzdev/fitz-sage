@@ -1,102 +1,67 @@
+# ingest/cli.py
 """
 Command-line ingestion tool for fitz-ingest.
 
 High-level flow:
-
     Ingestion → (optional) Chunking → Embedding → Vector DB
 
-- Ingester turns your raw source (files, etc.) into RawDocument objects
-- Chunking (here: trivial 1:1 fallback) turns RawDocument → Chunk
-- Embedding + VectorDBWriter turn Chunk → vector records in your collection
+This CLI stays strictly on *core* contracts:
+- IngestionEngine produces RawDocument
+- We convert RawDocument -> core.models.chunk.Chunk (canonical)
+- EmbeddingPlugin.embed(text)->list[float]
+- VectorDBWriter.upsert(collection, chunks, vectors) into a VectorDB client that exposes upsert(collection, points)
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Dict, Any
 
 import typer
-
-from ingest.ingestion.engine import Ingester
-from ingest.ingestion.base import RawDocument
 
 from core.logging.logger import get_logger
 from core.logging.tags import CLI, INGEST, CHUNKING, VECTOR_DB, EMBEDDING
 
-from core.llm.registry import get_llm_plugin
 from core.llm.embedding.engine import EmbeddingEngine
+from core.llm.registry import get_llm_plugin
 
+from core.models.chunk import Chunk
 from core.vector_db.registry import get_vector_db_plugin
 from core.vector_db.writer import VectorDBWriter
+
+from ingest.ingestion.engine import IngestionEngine
+from ingest.ingestion.registry import get_ingest_plugin
 
 app = typer.Typer(help="Ingestion CLI for fitz-ingest")
 logger = get_logger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Internal DTOs
-# ---------------------------------------------------------------------------
+def _raw_to_chunks(raw_docs) -> list[Chunk]:
+    chunks: list[Chunk] = []
 
-@dataclass
-class Chunk:
-    """
-    Minimal chunk DTO for ingestion CLI.
-
-    This intentionally does NOT depend on RAG / retrieval modules.
-    """
-    id: Optional[str]
-    text: str
-    metadata: Dict[str, Any]
-    score: Optional[float] = None
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _raw_to_chunks(raw_docs: Iterable[RawDocument]) -> List[Chunk]:
-    """
-    Very simple 1:1 RawDocument → Chunk fallback.
-
-    This keeps the CLI lightweight and avoids pulling in ChunkingEngine
-    or retrieval-layer abstractions.
-    """
-    chunks: List[Chunk] = []
-
-    for doc in raw_docs:
+    for i, doc in enumerate(raw_docs):
         meta = dict(getattr(doc, "metadata", None) or {})
-
-        source = getattr(doc, "source", None)
         path = getattr(doc, "path", None)
-
-        if source is not None:
-            meta.setdefault("source", source)
-        if path is not None:
+        if path:
             meta.setdefault("path", path)
 
+        # Canonical Chunk requires: id, doc_id, chunk_index, content, metadata
         chunks.append(
             Chunk(
-                id=None,
-                text=doc.text,
+                id=f"{meta.get('path', 'doc')}:{i}",
+                doc_id=str(meta.get("path") or meta.get("doc_id") or "unknown"),
+                chunk_index=i,
+                content=getattr(doc, "content", "") or "",
                 metadata=meta,
-                score=None,
             )
         )
 
     return chunks
 
 
-# ---------------------------------------------------------------------------
-# Commands
-# ---------------------------------------------------------------------------
-
 @app.command("run")
 def run(
     source: Path = typer.Argument(
         ...,
-        exists=True,
-        readable=True,
         help="Source to ingest (file or directory, depending on ingest plugin).",
     ),
     collection: str = typer.Option(
@@ -124,51 +89,48 @@ def run(
         help="Vector DB plugin name (registered in core.vector_db.registry).",
     ),
 ) -> None:
-    """
-    Ingest → simple chunk → embed → write into a vector DB collection.
-    """
+    # Manual validation (so pytest CliRunner doesn't depend on Typer Path validation modes)
+    if not source.exists():
+        typer.echo(f"ERROR: source does not exist: {source}")
+        raise typer.Exit(code=1)
+
+    if not (source.is_file() or source.is_dir()):
+        typer.echo(f"ERROR: source is not file or directory: {source}")
+        raise typer.Exit(code=1)
+
     logger.info(
         f"{CLI}{INGEST} Starting ingestion: source='{source}' → collection='{collection}' "
         f"(ingest='{ingest_plugin}', embedding='{embedding_plugin}', vdb='{vector_db_plugin}')"
     )
 
-    # ------------------------------------------------------------------
     # 1) Ingestion → RawDocument
-    # ------------------------------------------------------------------
-    ingester = Ingester(plugin_name=ingest_plugin, config={})
-    raw_docs = list(ingester.run(str(source)))
+    IngestPluginCls = get_ingest_plugin(ingest_plugin)
+    ingest_plugin_obj = IngestPluginCls()
+    ingest_engine = IngestionEngine(plugin=ingest_plugin_obj, kwargs={})
+
+    raw_docs = list(ingest_engine.run(str(source)))
     logger.info(f"{INGEST} Ingested {len(raw_docs)} raw documents")
 
-    # ------------------------------------------------------------------
-    # 2) RawDocument → Chunk (1:1 fallback)
-    # ------------------------------------------------------------------
+    # 2) RawDocument → canonical Chunk (1:1 fallback)
     chunks = _raw_to_chunks(raw_docs)
     logger.info(f"{CHUNKING} Produced {len(chunks)} chunks (1:1 raw→chunk)")
 
-    # ------------------------------------------------------------------
-    # 3) Embedding engine
-    # ------------------------------------------------------------------
-    EmbedPluginCls = get_llm_plugin(embedding_plugin, plugin_type="embedding")
-    embed_plugin = EmbedPluginCls()
-    embed_engine = EmbeddingEngine(embed_plugin)
-    logger.info(f"{EMBEDDING} Using embedding plugin='{embedding_plugin}'")
+    # 3) Embedding
+    EmbedPluginCls = get_llm_plugin(plugin_name=embedding_plugin, plugin_type="embedding")
+    embed_engine = EmbeddingEngine(EmbedPluginCls())
+    vectors = [embed_engine.embed(c.content) for c in chunks]
+    logger.info(f"{EMBEDDING} Embedded {len(vectors)} chunks using '{embedding_plugin}'")
 
-    # ------------------------------------------------------------------
-    # 4) Vector DB writer
-    # ------------------------------------------------------------------
+    # 4) Vector DB upsert
     VectorDBPluginCls = get_vector_db_plugin(vector_db_plugin)
-    vectordb = VectorDBPluginCls()
+    vdb_client = VectorDBPluginCls()
 
-    writer = VectorDBWriter(
-        embedder=embed_engine,
-        vectordb=vectordb,
-    )
+    writer = VectorDBWriter(client=vdb_client)
+    writer.upsert(collection=collection, chunks=chunks, vectors=vectors)
 
-    written = writer.write(collection=collection, chunks=chunks)
-    logger.info(f"{VECTOR_DB} Wrote {written} chunks into collection='{collection}'")
-
+    logger.info(f"{VECTOR_DB} Upserted {len(chunks)} chunks into collection='{collection}'")
     typer.echo(
-        f"Ingested {len(raw_docs)} documents → wrote {written} chunks into collection '{collection}'."
+        f"OK: ingested {len(raw_docs)} documents → upserted {len(chunks)} chunks into '{collection}'."
     )
 
 

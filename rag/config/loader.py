@@ -1,19 +1,36 @@
-# rag/config/loader.py
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Optional
 
 import yaml
 
+from rag.config.schema import RAGConfig
 
-def load_config(path: str | Path) -> Dict[str, Any]:
+
+def _load_yaml(path: Path) -> dict:
+    with path.open("r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
+def _default_config_path() -> Path:
+    # rag/config/default.yaml
+    return Path(__file__).parent / "default.yaml"
+
+
+def load_config(path: Optional[str]) -> dict:
+    """
+    Load RAG config.
+
+    - None → load built-in default.yaml
+    - str  → load provided yaml file
+    """
+    if path is None:
+        return _load_yaml(_default_config_path())
+
     p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"Config file not found: {p}")
 
-    data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
-    if not isinstance(data, dict):
-        raise TypeError("Config root must be a mapping")
+    if p.is_dir():
+        raise ValueError(f"Config path points to a directory: {p}")
 
-    return data
+    return _load_yaml(p)

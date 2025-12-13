@@ -1,4 +1,4 @@
-# src/fitz_rag/cli.py
+# rag/cli.py
 """
 Command-line interface for fitz_rag.
 
@@ -19,7 +19,6 @@ from core.logging.logger import get_logger
 from core.logging.tags import CLI, PIPELINE
 
 from rag.config.loader import load_config
-from rag.config.schema import RAGConfig
 from rag.pipeline.engine import create_pipeline_from_yaml
 
 logger = get_logger(__name__)
@@ -36,7 +35,7 @@ def config_show(
         None,
         "--config",
         "-c",
-        help="Path to RAG YAML config. If omitted, default search locations are used.",
+        help="Path to RAG YAML config. If omitted, built-in default.yaml is used.",
     )
 ) -> None:
     """
@@ -44,13 +43,12 @@ def config_show(
     """
     logger.info(
         f"{CLI}{PIPELINE} Showing RAG config from "
-        f"{config if config is not None else '<default search>'}"
+        f"{config if config is not None else '<built-in default>'}"
     )
 
     raw_cfg = load_config(str(config) if config is not None else None)
-    cfg = RAGConfig.from_dict(raw_cfg)
-
-    typer.echo(cfg.json(indent=2))
+    # Don't rely on schema helper methods (from_dict/json) that may not exist.
+    typer.echo(raw_cfg)
 
 
 @app.command("query")
@@ -71,18 +69,19 @@ def query(
     """
     logger.info(
         f"{CLI}{PIPELINE} Running RAG query with "
-        f"config={config if config is not None else '<default search>'}"
+        f"config={config if config is not None else '<built-in default>'}"
     )
 
     pipeline = create_pipeline_from_yaml(str(config) if config is not None else None)
     rgs_answer = pipeline.run(question)
 
     typer.echo("# Answer\n")
-    typer.echo(rgs_answer.answer or "")
+    typer.echo(getattr(rgs_answer, "answer", "") or "")
 
-    if getattr(rgs_answer, "citations", None):
+    citations = getattr(rgs_answer, "citations", None)
+    if citations:
         typer.echo("\n# Sources\n")
-        for c in rgs_answer.citations:
+        for c in citations:
             label = getattr(c, "label", None) or getattr(c, "source_id", "")
             title = getattr(c, "title", "") or ""
             src = ""
