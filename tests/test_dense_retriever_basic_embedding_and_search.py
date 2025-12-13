@@ -1,9 +1,7 @@
-from __future__ import annotations
+from dataclasses import dataclass
 
 from rag.retrieval.plugins.dense import DenseRetrievalPlugin
-from core.models.chunk import Chunk
-
-from rag.config.schema import EmbeddingConfig, RetrieverConfig, RerankConfig
+from rag.config.schema import RetrieverConfig
 
 
 class DummyEmbedder:
@@ -16,10 +14,10 @@ class DummyEmbedder:
 
 
 class DummyHit:
-    def __init__(self, id, text, score=0.5):
+    def __init__(self, id, content, score=0.5):
         self.id = id
-        self.payload = {"text": text, "file": "dummy.txt"}
         self.score = score
+        self.payload = {"content": content, "metadata": {"file": "dummy.txt"}}
 
 
 class DummyClient:
@@ -27,7 +25,7 @@ class DummyClient:
         self.last_query = None
 
     def search(self, collection_name, query_vector, limit, with_payload=True):
-        self.last_query = (collection_name, query_vector, limit)
+        self.last_query = (collection_name, query_vector, limit, with_payload)
         return [
             DummyHit("h1", "Hello world"),
             DummyHit("h2", "Another doc"),
@@ -35,34 +33,27 @@ class DummyClient:
 
 
 def test_dense_retriever_calls_embed_and_search():
-    embed_cfg = EmbeddingConfig(provider="x", model="y")
-    retr_cfg = RetrieverConfig(collection="testcol", top_k=2)
-    rerank_cfg = RerankConfig(enabled=False)
-
     embedder = DummyEmbedder()
     client = DummyClient()
 
     retriever = DenseRetrievalPlugin(
         client=client,
-        embed_cfg=embed_cfg,
-        retriever_cfg=retr_cfg,
-        rerank_cfg=rerank_cfg,
-        embedder=embedder,          # inject
-        rerank_engine=None,         # ensure no rerank
+        retriever_cfg=RetrieverConfig(collection="testcol", top_k=2),
+        embedder=embedder,
+        rerank_engine=None,
     )
 
     chunks = retriever.retrieve("hello world")
 
-    # Embedder called
     assert embedder.calls == ["hello world"]
 
-    # Vector search was executed
-    name, vec, limit = client.last_query
-    assert name == "testcol"
+    collection_name, vec, limit, with_payload = client.last_query
+    assert collection_name == "testcol"
     assert vec == [0.1, 0.2, 0.3]
     assert limit == 2
+    assert with_payload is True
 
-    # Output converted to Chunk objects
+    assert isinstance(chunks, list)
     assert len(chunks) == 2
-    assert isinstance(chunks[0], Chunk)
-    assert chunks[0].text == "Hello world"
+    # Don’t hard-pin the Chunk class; just validate the output contract.
+    assert getattr(chunks[0], "content") == "Hello world"

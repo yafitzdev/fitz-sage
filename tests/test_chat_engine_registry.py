@@ -1,19 +1,25 @@
-from core.llm.registry import register_llm_plugin
-from core.llm.chat import ChatEngine
-from core.llm.chat.base import ChatPlugin
+import pytest
 
-class DummyChat(ChatPlugin):
-    plugin_name = "dummy_chat"
+from core.llm.chat.engine import ChatEngine
 
+
+class DummyChatOK:
     def chat(self, messages):
         return "ok"
 
-def test_chat_engine_registry_loads_plugin():
-    register_llm_plugin(
-        DummyChat,
-        plugin_name="dummy_chat",
-        plugin_type="chat",
-    )
 
-    engine = ChatEngine.from_name("dummy_chat")
-    assert engine.chat([{"role": "user", "content": "hello"}]) == "ok"
+class DummyChatBad:
+    def chat(self, messages):
+        return messages  # not a str
+
+
+def test_chat_engine_returns_str():
+    eng = ChatEngine(DummyChatOK())
+    out = eng.chat([{"role": "user", "content": "hello"}])
+    assert out == "ok"
+
+
+def test_chat_engine_enforces_return_type():
+    eng = ChatEngine(DummyChatBad())
+    with pytest.raises(TypeError):
+        eng.chat([{"role": "user", "content": "hello"}])

@@ -1,4 +1,3 @@
-# ingest/ingestion/plugins/local_fs.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,7 +15,9 @@ class LocalFSIngestPlugin:
     def ingest(self, source: str, kwargs: Dict[str, Any]) -> Iterable[RawDocument]:
         base = Path(source)
 
-        for path in base.glob("**/*"):
+        paths = [base] if base.is_file() else list(base.glob("**/*"))
+
+        for path in paths:
             if not path.is_file():
                 continue
 

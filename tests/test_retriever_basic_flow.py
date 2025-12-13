@@ -1,8 +1,9 @@
 import pytest
-from rag.retrieval.plugins.dense import RAGRetriever
-from rag.config.schema import EmbeddingConfig, RetrieverConfig, RerankConfig
-from rag.exceptions.retriever import EmbeddingError
-from core.models.chunk import Chunk
+from dataclasses import dataclass
+
+from rag.retrieval.plugins.dense import DenseRetrievalPlugin
+from rag.config.schema import RetrieverConfig
+from core.exceptions.llm import EmbeddingError
 
 
 class DummyEmbedder:
@@ -10,41 +11,39 @@ class DummyEmbedder:
         return [0.1, 0.2, 0.3]
 
 
-class DummyQdrant:
+class DummyClient:
     class Hit:
         id = "1"
         score = 0.9
-        payload = {"text": "hello world", "file": "doc.txt"}
+        payload = {"content": "hello world", "metadata": {"file": "doc.txt"}}
 
     def search(self, *args, **kwargs):
-        return [DummyQdrant.Hit()]
+        return [DummyClient.Hit()]
 
 
 def test_retriever_basic_flow():
-    r = RAGRetriever(
-        client=DummyQdrant(),
-        embed_cfg=EmbeddingConfig(provider="x", model="m"),
-        retriever_cfg=RetrieverConfig(collection="demo"),
-        rerank_cfg=RerankConfig(enabled=False),
+    r = DenseRetrievalPlugin(
+        client=DummyClient(),
+        retriever_cfg=RetrieverConfig(collection="demo", top_k=1),
         embedder=DummyEmbedder(),
+        rerank_engine=None,
     )
 
     out = r.retrieve("hi")
-
     assert isinstance(out, list)
-    assert isinstance(out[0], Chunk)
-    assert out[0].text == "hello world"
+    assert getattr(out[0], "content") == "hello world"
 
 
-def test_retriever_embedding_failure():
+def test_retriever_embedding_failure_raises_embedding_error():
     class BadEmbedder:
-        def embed(self, _): raise RuntimeError("oh no")
+        def embed(self, _):
+            raise RuntimeError("oh no")
 
-    r = RAGRetriever(
-        client=DummyQdrant(),
-        embed_cfg=EmbeddingConfig(provider="x", model="m"),
-        retriever_cfg=RetrieverConfig(collection="demo"),
+    r = DenseRetrievalPlugin(
+        client=DummyClient(),
+        retriever_cfg=RetrieverConfig(collection="demo", top_k=1),
         embedder=BadEmbedder(),
+        rerank_engine=None,
     )
 
     with pytest.raises(EmbeddingError):

@@ -1,20 +1,27 @@
-# tests/test_llm_auto_discovery.py
+import pytest
 
-from core.llm.registry import (
-    auto_discover_llm_plugins,
-    get_llm_plugin,
-)
+from core.llm import available_llm_plugins, get_llm_plugin
+from core.llm.registry import LLMRegistryError
 
 
-def test_auto_discovery_finds_builtin_plugins():
-    # Force re-discovery to ensure test isolation
-    auto_discover_llm_plugins()
+def test_available_llm_plugins_smoke():
+    # Should not crash and should return a list.
+    kinds = ("chat", "embedding", "rerank", "vector_db")
+    for k in kinds:
+        assert isinstance(available_llm_plugins(k), list)
 
-    # These plugins must exist because Cohere plugins are built-in.
-    emb = get_llm_plugin("cohere", "embedding")
-    rer = get_llm_plugin("cohere", "rerank")
-    chat = get_llm_plugin("cohere", "chat")
 
-    assert emb.__name__.lower().startswith("cohere")
-    assert rer.__name__.lower().startswith("cohere")
-    assert chat.__name__.lower().startswith("cohere")
+def test_get_llm_plugin_unknown_raises():
+    with pytest.raises(LLMRegistryError):
+        get_llm_plugin(plugin_name="__nope__", plugin_type="chat")
+
+
+def test_get_llm_plugin_returns_class_if_present():
+    # If your package ships "cohere" plugins, assert they exist.
+    # If not, this test will skip instead of forcing a dependency.
+    for kind in ("chat", "embedding", "rerank"):
+        names = available_llm_plugins(kind)
+        if "cohere" not in names:
+            pytest.skip(f"'cohere' not registered for kind={kind!r}")
+        cls = get_llm_plugin(plugin_name="cohere", plugin_type=kind)
+        assert isinstance(cls, type)

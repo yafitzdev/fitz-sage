@@ -1,28 +1,15 @@
-from ingest.ingestion.engine import Ingester
 from ingest.ingestion.base import RawDocument
-from ingest.config.schema import IngestConfig
+from ingest.ingestion.registry import get_ingest_plugin
 
 
-def test_ingester_returns_raw_documents(tmp_path):
-    file = tmp_path / "sample.txt"
-    file.write_text("sample")
+def test_local_ingest_returns_raw_documents(tmp_path):
+    p = tmp_path / "b.txt"
+    p.write_text("world", encoding="utf-8")
 
-    cfg = IngestConfig(
-        ingester={
-            "plugin_name": "local",
-        },
-        chunker={
-            "plugin_name": "simple",
-            "chunk_size": 1000,
-            "chunk_overlap": 0,
-        },
-        collection="test",
-    )
+    plugin_cls = get_ingest_plugin("local")
+    plugin = plugin_cls()
 
-    ingester = Ingester(config=cfg)
-    docs = list(ingester.run(str(tmp_path)))
-
-    doc = docs[0]
-    assert isinstance(doc, RawDocument)
-    assert doc.path.endswith("sample.txt")
-    assert doc.metadata["source"] == "local_fs"
+    docs = list(plugin.ingest(str(tmp_path), kwargs={}))
+    assert docs and all(isinstance(d, RawDocument) for d in docs)
+    assert docs[0].path.endswith("b.txt")
+    assert docs[0].metadata["source"] == "local_fs"
