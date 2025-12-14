@@ -765,7 +765,7 @@ def _plugin_predicate_for_namespace(namespace: str):
 
         return is_plugin, plugin_id
 
-    if namespace == "core.vector_db.plugins":
+    if namespace == "fitz.core.vector_db.plugins":
 
         def is_plugin(cls: type) -> bool:
             if not isinstance(getattr(cls, "plugin_name", None), str):
@@ -914,7 +914,7 @@ def _compute_hotspots(root: Path, *, excludes: set[str]) -> List[Hotspot]:
         ("fitz.core.llm.chat.plugins", "ChatPlugin"),
         ("fitz.core.llm.embedding.plugins", "EmbeddingPlugin"),
         ("fitz.core.llm.rerank.plugins", "RerankPlugin"),
-        ("core.vector_db.plugins", "VectorDBPlugin"),
+        ("fitz.core.vector_db.plugins", "VectorDBPlugin"),
         ("fitz.rag.retrieval.plugins", "RetrievalPlugin"),
         ("fitz.rag.pipeline.plugins", "PipelinePlugin"),
         ("fitz.ingest.chunking.plugins", "ChunkerPlugin"),
@@ -1083,7 +1083,7 @@ def build_contract_map(*, verbose: bool, layout_depth: int | None) -> ContractMa
         "fitz.core.llm.chat.base",
         "fitz.core.llm.embedding.base",
         "fitz.core.llm.rerank.base",
-        "core.vector_db.base",
+        "fitz.core.vector_db.base",
         "fitz.rag.retrieval.base",
         "fitz.rag.pipeline.base",
         "fitz.ingest.chunking.base",
@@ -1191,7 +1191,7 @@ def build_contract_map(*, verbose: bool, layout_depth: int | None) -> ContractMa
         _scan_discovery("fitz.core.llm.chat.plugins", "LLM chat plugins (Option A discovery)"),
         _scan_discovery("fitz.core.llm.embedding.plugins", "LLM embedding plugins (Option A discovery)"),
         _scan_discovery("fitz.core.llm.rerank.plugins", "LLM rerank plugins (Option A discovery)"),
-        _scan_discovery("core.vector_db.plugins", "Vector DB plugins (Option A discovery)"),
+        _scan_discovery("fitz.core.vector_db.plugins", "Vector DB plugins (Option A discovery)"),
         _scan_discovery("fitz.rag.retrieval.plugins", "RAG retriever plugins (Option A discovery)"),
         _scan_discovery("fitz.rag.pipeline.plugins", "RAG pipeline plugins (Option A discovery)"),
         _scan_discovery("fitz.ingest.chunking.plugins", "Ingest chunking plugins (Option A discovery)"),

@@ -27,7 +27,7 @@ _SCAN_PACKAGES: tuple[str, ...] = (
     "fitz.core.llm.chat.plugins",
     "fitz.core.llm.embedding.plugins",
     "fitz.core.llm.rerank.plugins",
-    "core.vector_db.plugins",
+    "fitz.core.vector_db.plugins",
 )
 
 

@@ -21,6 +21,11 @@ except Exception:
     BaseModel = object  # type: ignore[assignment]
 
 
+# ============================================================================
+# Repo / package discovery
+# ============================================================================
+
+
 def _ensure_repo_root_on_syspath() -> Path:
     repo_root = Path(__file__).resolve().parents[2]
     if str(repo_root) not in sys.path:
@@ -29,6 +34,24 @@ def _ensure_repo_root_on_syspath() -> Path:
 
 
 REPO_ROOT = _ensure_repo_root_on_syspath()
+
+
+def discover_toplevel_packages(repo_root: Path) -> set[str]:
+    """
+    Discover top-level Python packages by scanning for directories
+    containing an __init__.py directly under repo_root.
+    """
+    pkgs: set[str] = set()
+    for p in repo_root.iterdir():
+        if not p.is_dir():
+            continue
+        if (p / "__init__.py").exists():
+            pkgs.add(p.name)
+    return pkgs
+
+
+TOPLEVEL_PACKAGES = discover_toplevel_packages(REPO_ROOT)
+
 
 DEFAULT_LAYOUT_EXCLUDES = {
     ".git",
@@ -43,8 +66,6 @@ DEFAULT_LAYOUT_EXCLUDES = {
     "build",
     "node_modules",
 }
-
-TOPLEVEL_PACKAGES = ("core", "rag", "ingest", "tools")
 
 
 # ============================================================================
