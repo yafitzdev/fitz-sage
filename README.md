@@ -52,7 +52,7 @@ Most RAG frameworks suffer from abstraction overload, opaque chains, and kitchen
 ## Installation
 
 ```bash
-pip install fitz
+️⚠️ PyPI release coming soon
 ```
 
 Or install from source:
