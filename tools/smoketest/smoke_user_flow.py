@@ -78,7 +78,9 @@ class InMemoryVectorDB:
             by_id[p["id"]] = p
         self._points = list(by_id.values())
 
-    def search(self, collection_name: str, query_vector: list[float], limit: int, with_payload: bool = True):
+    def search(
+        self, collection_name: str, query_vector: list[float], limit: int, with_payload: bool = True
+    ):
         scored: list[Hit] = []
         for p in self._points:
             score = cosine(query_vector, p["vector"])

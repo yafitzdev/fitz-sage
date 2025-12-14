@@ -36,6 +36,7 @@ class FitzConfig(BaseModel):
 
     This config is intentionally minimal and provider-agnostic.
     """
+
     llm: PluginConfig
 
     model_config = ConfigDict(extra="forbid")

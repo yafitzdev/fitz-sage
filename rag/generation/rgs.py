@@ -6,10 +6,24 @@ Retrieval-Guided Synthesis (RGS)
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Protocol, Sequence, Union, runtime_checkable
+from typing import (
+    Any,
+    Dict,
+    List,
+    Mapping,
+    Protocol,
+    Sequence,
+    Union,
+    runtime_checkable,
+)
 
 from rag.exceptions.pipeline import PipelineError, RGSGenerationError
-from rag.generation.prompting import PromptAssembler, PromptConfig, PromptProfile, PromptSlots
+from rag.generation.prompting import (
+    PromptAssembler,
+    PromptConfig,
+    PromptProfile,
+    PromptSlots,
+)
 
 
 @runtime_checkable
@@ -126,9 +140,11 @@ class RGS:
             query=query,
             context_items=context_items,
             include_query_in_context=self.config.include_query_in_context,
-            user_instructions=self.config.prompt_config.user_instructions
-            if self.config.prompt_config is not None
-            else None,
+            user_instructions=(
+                self.config.prompt_config.user_instructions
+                if self.config.prompt_config is not None
+                else None
+            ),
         )
 
     @staticmethod

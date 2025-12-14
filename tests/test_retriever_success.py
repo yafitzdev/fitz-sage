@@ -26,8 +26,12 @@ class MockEmbedder:
 
 def test_retriever_success():
     hits = [
-        Hit(id="1", payload={"doc_id": "doc1", "content": "A", "chunk_index": 0, "x": 1}, score=0.9),
-        Hit(id="2", payload={"doc_id": "doc2", "content": "B", "chunk_index": 1, "y": 2}, score=0.8),
+        Hit(
+            id="1", payload={"doc_id": "doc1", "content": "A", "chunk_index": 0, "x": 1}, score=0.9
+        ),
+        Hit(
+            id="2", payload={"doc_id": "doc2", "content": "B", "chunk_index": 1, "y": 2}, score=0.8
+        ),
     ]
 
     retriever_cfg = type("Cfg", (), {"collection": "col", "top_k": 2})

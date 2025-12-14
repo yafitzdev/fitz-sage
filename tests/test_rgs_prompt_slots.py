@@ -1,6 +1,6 @@
 # tests/test_rgs_prompt_slots.py
-from rag.generation.rgs import RGS, RGSConfig
 from rag.generation.prompting import PromptConfig
+from rag.generation.rgs import RGS, RGSConfig
 
 
 def test_rgs_prompt_slots_override_defaults():

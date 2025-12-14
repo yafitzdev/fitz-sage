@@ -7,8 +7,13 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 from .common import (
-    REPO_ROOT, DEFAULT_LAYOUT_EXCLUDES, ImportGraph, ImportEdge,
-    iter_python_files, module_name_from_path, toplevel
+    DEFAULT_LAYOUT_EXCLUDES,
+    REPO_ROOT,
+    ImportEdge,
+    ImportGraph,
+    iter_python_files,
+    module_name_from_path,
+    toplevel,
 )
 
 

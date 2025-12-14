@@ -1,9 +1,10 @@
 # tests/test_anthropic_chat_plugin.py
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock, patch
 from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 # Mock response structures
@@ -101,9 +102,7 @@ class TestAnthropicChatPlugin:
             with patch("core.llm.chat.plugins.anthropic.anthropic") as mock_anthropic:
                 from core.llm.chat.plugins.anthropic import AnthropicChatClient
 
-                mock_response = MockAnthropicResponse(
-                    content=[MockTextBlock(text="Response")]
-                )
+                mock_response = MockAnthropicResponse(content=[MockTextBlock(text="Response")])
                 mock_anthropic.Anthropic.return_value.messages.create.return_value = mock_response
 
                 client = AnthropicChatClient()
@@ -123,9 +122,7 @@ class TestAnthropicChatPlugin:
             with patch("core.llm.chat.plugins.anthropic.anthropic") as mock_anthropic:
                 from core.llm.chat.plugins.anthropic import AnthropicChatClient
 
-                mock_response = MockAnthropicResponse(
-                    content=[MockTextBlock(text="Response")]
-                )
+                mock_response = MockAnthropicResponse(content=[MockTextBlock(text="Response")])
                 mock_anthropic.Anthropic.return_value.messages.create.return_value = mock_response
 
                 client = AnthropicChatClient()
@@ -174,9 +171,7 @@ class TestAnthropicChatPlugin:
             with patch("core.llm.chat.plugins.anthropic.anthropic") as mock_anthropic:
                 from core.llm.chat.plugins.anthropic import AnthropicChatClient
 
-                mock_response = MockAnthropicResponse(
-                    content=[MockTextBlock(text="Response")]
-                )
+                mock_response = MockAnthropicResponse(content=[MockTextBlock(text="Response")])
                 mock_anthropic.Anthropic.return_value.messages.create.return_value = mock_response
 
                 client = AnthropicChatClient()

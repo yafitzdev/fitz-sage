@@ -1,9 +1,10 @@
 # tests/test_openai_embedding_plugin.py
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock, patch
 from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 # Mock response structures
@@ -117,9 +118,7 @@ class TestOpenAIEmbeddingPlugin:
             with patch("core.llm.embedding.plugins.openai.OpenAI") as mock_openai:
                 from core.llm.embedding.plugins.openai import OpenAIEmbeddingClient
 
-                mock_response = MockEmbeddingResponse(
-                    data=[MockEmbeddingData(embedding=[0.1])]
-                )
+                mock_response = MockEmbeddingResponse(data=[MockEmbeddingData(embedding=[0.1])])
                 mock_openai.return_value.embeddings.create.return_value = mock_response
 
                 client = OpenAIEmbeddingClient(model="text-embedding-3-large")
@@ -134,9 +133,7 @@ class TestOpenAIEmbeddingPlugin:
             with patch("core.llm.embedding.plugins.openai.OpenAI") as mock_openai:
                 from core.llm.embedding.plugins.openai import OpenAIEmbeddingClient
 
-                mock_response = MockEmbeddingResponse(
-                    data=[MockEmbeddingData(embedding=[0.1])]
-                )
+                mock_response = MockEmbeddingResponse(data=[MockEmbeddingData(embedding=[0.1])])
                 mock_openai.return_value.embeddings.create.return_value = mock_response
 
                 client = OpenAIEmbeddingClient(dimensions=256)
@@ -149,8 +146,8 @@ class TestOpenAIEmbeddingPlugin:
         """embed() raises EmbeddingError on API failure."""
         with patch.dict("os.environ", {"OPENAI_API_KEY": "key"}):
             with patch("core.llm.embedding.plugins.openai.OpenAI") as mock_openai:
-                from core.llm.embedding.plugins.openai import OpenAIEmbeddingClient
                 from core.exceptions.llm import EmbeddingError
+                from core.llm.embedding.plugins.openai import OpenAIEmbeddingClient
 
                 mock_openai.return_value.embeddings.create.side_effect = Exception("API Error")
 
@@ -163,8 +160,8 @@ class TestOpenAIEmbeddingPlugin:
         """Plugin raises EmbeddingError when client init fails."""
         with patch.dict("os.environ", {"OPENAI_API_KEY": "key"}):
             with patch("core.llm.embedding.plugins.openai.OpenAI") as mock_openai:
-                from core.llm.embedding.plugins.openai import OpenAIEmbeddingClient
                 from core.exceptions.llm import EmbeddingError
+                from core.llm.embedding.plugins.openai import OpenAIEmbeddingClient
 
                 mock_openai.side_effect = Exception("Connection failed")
 

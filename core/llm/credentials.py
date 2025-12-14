@@ -80,9 +80,7 @@ def resolve_api_key(
     for env_name in env_vars:
         value = os.getenv(env_name)
         if value:
-            logger.debug(
-                f"{CHAT} Using API key from env '{env_name}' for provider '{provider}'"
-            )
+            logger.debug(f"{CHAT} Using API key from env '{env_name}' for provider '{provider}'")
             return value
 
     # 3. Generic fallback

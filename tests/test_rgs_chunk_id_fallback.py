@@ -7,7 +7,7 @@ def test_rgs_chunk_id_fallback_generates_chunk_ids():
 
     chunks = [
         {"content": "alpha", "metadata": {}},  # missing id
-        {"content": "beta", "metadata": {}},   # missing id
+        {"content": "beta", "metadata": {}},  # missing id
     ]
 
     ans = rgs.build_answer("ok", chunks)

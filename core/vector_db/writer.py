@@ -5,10 +5,9 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable
 
-from core.models.chunk import Chunk
-
 from core.logging.logger import get_logger
 from core.logging.tags import VECTOR_DB
+from core.models.chunk import Chunk
 
 logger = get_logger(__name__)
 

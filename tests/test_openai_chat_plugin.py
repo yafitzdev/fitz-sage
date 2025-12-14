@@ -1,9 +1,10 @@
 # tests/test_openai_chat_plugin.py
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock, patch
 from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 # Mock response structures
@@ -153,9 +154,7 @@ class TestOpenAIChatPlugin:
             with patch("core.llm.chat.plugins.openai.OpenAI") as mock_openai:
                 from core.llm.chat.plugins.openai import OpenAIChatClient
 
-                mock_response = MockChatCompletion(
-                    choices=[MockChoice(message=None)]
-                )
+                mock_response = MockChatCompletion(choices=[MockChoice(message=None)])
                 mock_openai.return_value.chat.completions.create.return_value = mock_response
 
                 client = OpenAIChatClient()

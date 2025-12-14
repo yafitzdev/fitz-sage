@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from typing import Type
 
-from core.llm.rerank.base import RerankPlugin
 from core.llm.registry import get_llm_plugin
+from core.llm.rerank.base import RerankPlugin
 
 
 def get_rerank_plugin(plugin_name: str) -> Type[RerankPlugin]:

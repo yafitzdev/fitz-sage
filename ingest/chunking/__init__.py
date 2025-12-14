@@ -8,7 +8,7 @@ Provides:
 - Registry + auto-discovery
 """
 
-from .base import BaseChunker, ChunkerPlugin, Chunk
+from .base import BaseChunker, Chunk, ChunkerPlugin
 from .engine import ChunkingEngine
 
 __all__ = ["BaseChunker", "ChunkerPlugin", "ChunkingEngine", "Chunk"]

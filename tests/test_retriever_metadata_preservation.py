@@ -35,7 +35,9 @@ def test_retriever_preserves_metadata():
 
     retriever_cfg = type("Cfg", (), {"collection": "c", "top_k": 1})
 
-    retr = DenseRetrievalPlugin(client=MockClient(hits), retriever_cfg=retriever_cfg, embedder=MockEmbedder())
+    retr = DenseRetrievalPlugin(
+        client=MockClient(hits), retriever_cfg=retriever_cfg, embedder=MockEmbedder()
+    )
     out = retr.retrieve("q")
 
     assert out[0].metadata["keep_me"] == 123

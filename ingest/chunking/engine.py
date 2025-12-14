@@ -4,16 +4,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List
 
+from core.logging.logger import get_logger
+from core.logging.tags import CHUNKING
+from core.models.chunk import Chunk
 from ingest.chunking.base import ChunkerPlugin
 from ingest.chunking.registry import get_chunker_plugin
 from ingest.config.schema import ChunkerConfig
 from ingest.exceptions.chunking import IngestionChunkingError
 from ingest.exceptions.config import IngestionConfigError
-
-from core.models.chunk import Chunk
-
-from core.logging.logger import get_logger
-from core.logging.tags import CHUNKING
 
 logger = get_logger(__name__)
 

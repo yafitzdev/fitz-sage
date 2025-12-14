@@ -1,9 +1,10 @@
 # tests/test_azure_openai_embedding_plugin.py
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock, patch
 from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 # Mock response structures
@@ -24,7 +25,9 @@ class TestAzureOpenAIEmbeddingPlugin:
         """Plugin initializes with explicit parameters."""
         with patch.dict("os.environ", {}, clear=True):
             with patch("core.llm.embedding.plugins.azure_openai.AzureOpenAI") as mock_azure:
-                from core.llm.embedding.plugins.azure_openai import AzureOpenAIEmbeddingClient
+                from core.llm.embedding.plugins.azure_openai import (
+                    AzureOpenAIEmbeddingClient,
+                )
 
                 client = AzureOpenAIEmbeddingClient(
                     api_key="test-key",
@@ -44,7 +47,9 @@ class TestAzureOpenAIEmbeddingPlugin:
         }
         with patch.dict("os.environ", env):
             with patch("core.llm.embedding.plugins.azure_openai.AzureOpenAI") as mock_azure:
-                from core.llm.embedding.plugins.azure_openai import AzureOpenAIEmbeddingClient
+                from core.llm.embedding.plugins.azure_openai import (
+                    AzureOpenAIEmbeddingClient,
+                )
 
                 client = AzureOpenAIEmbeddingClient()
 
@@ -54,7 +59,9 @@ class TestAzureOpenAIEmbeddingPlugin:
         """Plugin raises RuntimeError when no API key."""
         with patch.dict("os.environ", {}, clear=True):
             with patch("core.llm.embedding.plugins.azure_openai.AzureOpenAI"):
-                from core.llm.embedding.plugins.azure_openai import AzureOpenAIEmbeddingClient
+                from core.llm.embedding.plugins.azure_openai import (
+                    AzureOpenAIEmbeddingClient,
+                )
 
                 with pytest.raises(RuntimeError, match="AZURE_OPENAI_API_KEY"):
                     AzureOpenAIEmbeddingClient(
@@ -66,7 +73,9 @@ class TestAzureOpenAIEmbeddingPlugin:
         """Plugin raises RuntimeError when no endpoint."""
         with patch.dict("os.environ", {"AZURE_OPENAI_API_KEY": "key"}, clear=True):
             with patch("core.llm.embedding.plugins.azure_openai.AzureOpenAI"):
-                from core.llm.embedding.plugins.azure_openai import AzureOpenAIEmbeddingClient
+                from core.llm.embedding.plugins.azure_openai import (
+                    AzureOpenAIEmbeddingClient,
+                )
 
                 with pytest.raises(RuntimeError, match="AZURE_OPENAI_ENDPOINT"):
                     AzureOpenAIEmbeddingClient(deployment_name="test")
@@ -79,7 +88,9 @@ class TestAzureOpenAIEmbeddingPlugin:
         }
         with patch.dict("os.environ", env, clear=True):
             with patch("core.llm.embedding.plugins.azure_openai.AzureOpenAI"):
-                from core.llm.embedding.plugins.azure_openai import AzureOpenAIEmbeddingClient
+                from core.llm.embedding.plugins.azure_openai import (
+                    AzureOpenAIEmbeddingClient,
+                )
 
                 with pytest.raises(RuntimeError, match="deployment_name"):
                     AzureOpenAIEmbeddingClient()
@@ -92,7 +103,9 @@ class TestAzureOpenAIEmbeddingPlugin:
         }
         with patch.dict("os.environ", env):
             with patch("core.llm.embedding.plugins.azure_openai.AzureOpenAI", None):
-                from core.llm.embedding.plugins.azure_openai import AzureOpenAIEmbeddingClient
+                from core.llm.embedding.plugins.azure_openai import (
+                    AzureOpenAIEmbeddingClient,
+                )
 
                 with pytest.raises(RuntimeError, match="Install openai"):
                     AzureOpenAIEmbeddingClient(deployment_name="test")
@@ -105,12 +118,12 @@ class TestAzureOpenAIEmbeddingPlugin:
         }
         with patch.dict("os.environ", env):
             with patch("core.llm.embedding.plugins.azure_openai.AzureOpenAI") as mock_azure:
-                from core.llm.embedding.plugins.azure_openai import AzureOpenAIEmbeddingClient
+                from core.llm.embedding.plugins.azure_openai import (
+                    AzureOpenAIEmbeddingClient,
+                )
 
                 expected = [0.1, 0.2, 0.3]
-                mock_response = MockEmbeddingResponse(
-                    data=[MockEmbeddingData(embedding=expected)]
-                )
+                mock_response = MockEmbeddingResponse(data=[MockEmbeddingData(embedding=expected)])
                 mock_azure.return_value.embeddings.create.return_value = mock_response
 
                 client = AzureOpenAIEmbeddingClient(deployment_name="test")
@@ -126,11 +139,11 @@ class TestAzureOpenAIEmbeddingPlugin:
         }
         with patch.dict("os.environ", env):
             with patch("core.llm.embedding.plugins.azure_openai.AzureOpenAI") as mock_azure:
-                from core.llm.embedding.plugins.azure_openai import AzureOpenAIEmbeddingClient
-
-                mock_response = MockEmbeddingResponse(
-                    data=[MockEmbeddingData(embedding=[0.1])]
+                from core.llm.embedding.plugins.azure_openai import (
+                    AzureOpenAIEmbeddingClient,
                 )
+
+                mock_response = MockEmbeddingResponse(data=[MockEmbeddingData(embedding=[0.1])])
                 mock_azure.return_value.embeddings.create.return_value = mock_response
 
                 client = AzureOpenAIEmbeddingClient(deployment_name="my-embedding")
@@ -147,11 +160,11 @@ class TestAzureOpenAIEmbeddingPlugin:
         }
         with patch.dict("os.environ", env):
             with patch("core.llm.embedding.plugins.azure_openai.AzureOpenAI") as mock_azure:
-                from core.llm.embedding.plugins.azure_openai import AzureOpenAIEmbeddingClient
-
-                mock_response = MockEmbeddingResponse(
-                    data=[MockEmbeddingData(embedding=[0.1])]
+                from core.llm.embedding.plugins.azure_openai import (
+                    AzureOpenAIEmbeddingClient,
                 )
+
+                mock_response = MockEmbeddingResponse(data=[MockEmbeddingData(embedding=[0.1])])
                 mock_azure.return_value.embeddings.create.return_value = mock_response
 
                 client = AzureOpenAIEmbeddingClient(
@@ -171,8 +184,10 @@ class TestAzureOpenAIEmbeddingPlugin:
         }
         with patch.dict("os.environ", env):
             with patch("core.llm.embedding.plugins.azure_openai.AzureOpenAI") as mock_azure:
-                from core.llm.embedding.plugins.azure_openai import AzureOpenAIEmbeddingClient
                 from core.exceptions.llm import EmbeddingError
+                from core.llm.embedding.plugins.azure_openai import (
+                    AzureOpenAIEmbeddingClient,
+                )
 
                 mock_azure.return_value.embeddings.create.side_effect = Exception("API Error")
 
@@ -189,7 +204,9 @@ class TestAzureOpenAIEmbeddingPlugin:
         }
         with patch.dict("os.environ", env):
             with patch("core.llm.embedding.plugins.azure_openai.AzureOpenAI"):
-                from core.llm.embedding.plugins.azure_openai import AzureOpenAIEmbeddingClient
+                from core.llm.embedding.plugins.azure_openai import (
+                    AzureOpenAIEmbeddingClient,
+                )
 
                 client = AzureOpenAIEmbeddingClient(deployment_name="test")
 

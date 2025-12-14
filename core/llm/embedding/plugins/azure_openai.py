@@ -51,7 +51,9 @@ class AzureOpenAIEmbeddingClient:
         if not azure_endpoint:
             raise RuntimeError("AZURE_OPENAI_ENDPOINT is not set")
 
-        self.deployment_name = self.deployment_name or os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT")
+        self.deployment_name = self.deployment_name or os.getenv(
+            "AZURE_OPENAI_EMBEDDING_DEPLOYMENT"
+        )
         if not self.deployment_name:
             raise RuntimeError("deployment_name is required for Azure OpenAI embedding")
 

@@ -17,7 +17,6 @@ import typer
 
 from core.logging.logger import get_logger
 from core.logging.tags import CLI, PIPELINE
-
 from rag.config.loader import load_config
 from rag.pipeline.engine import create_pipeline_from_yaml
 

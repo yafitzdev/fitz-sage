@@ -6,8 +6,14 @@ import inspect
 from typing import Any, List, Type, get_type_hints
 
 from .common import (
-    ContractMap, ModelContract, ModelField, ProtocolContract, MethodContract,
-    fmt_type, is_pydantic_model, safe_import
+    ContractMap,
+    MethodContract,
+    ModelContract,
+    ModelField,
+    ProtocolContract,
+    fmt_type,
+    is_pydantic_model,
+    safe_import,
 )
 
 
@@ -51,7 +57,9 @@ def extract_pydantic_fields(model_cls: Type[Any]) -> List[ModelField]:
 
     hints = getattr(model_cls, "__annotations__", {}) or {}
     for name in sorted(hints.keys()):
-        fields.append(ModelField(name=name, type=fmt_type(hints[name]), required=True, default=None))
+        fields.append(
+            ModelField(name=name, type=fmt_type(hints[name]), required=True, default=None)
+        )
     return fields
 
 

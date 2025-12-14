@@ -31,12 +31,12 @@ if not os.getenv("COHERE_API_KEY"):
 
 from core.llm import get_llm_plugin
 from core.vector_db.writer import VectorDBWriter
-from ingest.ingestion.registry import get_ingest_plugin
 from ingest.chunking.plugins.simple import SimpleChunker
-from ingest.validation.documents import validate, ValidationConfig
-from rag.retrieval.plugins.dense import DenseRetrievalPlugin
+from ingest.ingestion.registry import get_ingest_plugin
+from ingest.validation.documents import ValidationConfig, validate
 from rag.context.pipeline import ContextPipeline
 from rag.generation.rgs import RGS, RGSConfig
+from rag.retrieval.plugins.dense import DenseRetrievalPlugin
 
 COLLECTION_NAME = "fitz_demo"
 
@@ -166,12 +166,14 @@ def query_with_rag(query: str) -> None:
 
     # Step 3: Build prompt with RGS
     print("[3/4] Building prompt...")
-    rgs = RGS(RGSConfig(
-        enable_citations=True,
-        strict_grounding=True,
-        max_chunks=5,
-        source_label_prefix="S",
-    ))
+    rgs = RGS(
+        RGSConfig(
+            enable_citations=True,
+            strict_grounding=True,
+            max_chunks=5,
+            source_label_prefix="S",
+        )
+    )
     prompt = rgs.build_prompt(query, processed_chunks)
 
     # Step 4: Generate answer

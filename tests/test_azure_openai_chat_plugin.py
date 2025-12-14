@@ -1,9 +1,10 @@
 # tests/test_azure_openai_chat_plugin.py
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock, patch
 from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 # Mock response structures

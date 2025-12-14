@@ -4,24 +4,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, List, Protocol, runtime_checkable
 
-from core.models.chunk import Chunk
 from core.exceptions.llm import EmbeddingError
-from rag.exceptions.retriever import RerankError, VectorSearchError
-from rag.retrieval.base import RetrievalPlugin
-
-from core.logging.logger import get_logger
-from core.logging.tags import RETRIEVER
-
 from core.llm.embedding.engine import EmbeddingEngine
 from core.llm.rerank.engine import RerankEngine
+from core.logging.logger import get_logger
+from core.logging.tags import RETRIEVER
+from core.models.chunk import Chunk
+from rag.exceptions.retriever import RerankError, VectorSearchError
+from rag.retrieval.base import RetrievalPlugin
 
 logger = get_logger(__name__)
 
 
 @runtime_checkable
 class VectorSearchClient(Protocol):
-    def search(self, *args: Any, **kwargs: Any) -> list[Any]:
-        ...
+    def search(self, *args: Any, **kwargs: Any) -> list[Any]: ...
 
 
 @dataclass(frozen=True, slots=True)

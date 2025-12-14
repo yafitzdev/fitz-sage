@@ -15,7 +15,6 @@ Why this works:
 import logging
 import sys
 
-
 DEFAULT_FORMAT = "[%(levelname)s] %(name)s — %(message)s"
 
 

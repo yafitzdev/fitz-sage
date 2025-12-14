@@ -5,8 +5,8 @@ from rag.context.pipeline import ContextPipeline
 def test_context_pipeline_groups_unknown_file():
     chunks = [
         {"content": "A", "metadata": {}},  # no file
-        {"content": "B", "file": None},    # explicit None
-        {"content": "C"},                  # nothing at all
+        {"content": "B", "file": None},  # explicit None
+        {"content": "C"},  # nothing at all
     ]
 
     out = ContextPipeline(max_chars=200).process(chunks)

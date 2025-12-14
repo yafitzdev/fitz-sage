@@ -4,13 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from rag.exceptions.pipeline import PipelineError
 from core.models.chunk import Chunk
+from rag.exceptions.pipeline import PipelineError
 
-from .steps.normalize import NormalizeStep, ChunkDict
 from .steps.dedupe import DedupeStep
 from .steps.group import GroupByDocumentStep
 from .steps.merge import MergeAdjacentStep
+from .steps.normalize import ChunkDict, NormalizeStep
 from .steps.pack import PackWindowStep
 
 

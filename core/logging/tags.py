@@ -20,5 +20,5 @@ PROMPT = "[PROMPT]"
 SOURCER = "[SOURCER]"
 PIPELINE = "[PIPELINE]"
 CLI = "[CLI]"
-RGS = "[RGS]"     # retrieval-guided synthesis
+RGS = "[RGS]"  # retrieval-guided synthesis
 VECTOR_SEARCH = "[VECTOR_SEARCH]"

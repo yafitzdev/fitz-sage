@@ -31,8 +31,17 @@ def _ensure_repo_root_on_syspath() -> Path:
 REPO_ROOT = _ensure_repo_root_on_syspath()
 
 DEFAULT_LAYOUT_EXCLUDES = {
-    ".git", ".venv", "__pycache__", ".pytest_cache", ".mypy_cache",
-    ".ruff_cache", ".idea", ".vscode", "dist", "build", "node_modules",
+    ".git",
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".idea",
+    ".vscode",
+    "dist",
+    "build",
+    "node_modules",
 }
 
 TOPLEVEL_PACKAGES = ("core", "rag", "ingest", "tools")
@@ -41,6 +50,7 @@ TOPLEVEL_PACKAGES = ("core", "rag", "ingest", "tools")
 # ============================================================================
 # Data Structures
 # ============================================================================
+
 
 @dataclass(slots=True)
 class ImportFailure:
@@ -166,6 +176,7 @@ class ContractMap:
 # ============================================================================
 # Utility Functions
 # ============================================================================
+
 
 def fmt_type(tp: Any) -> str:
     """Format a type annotation as a string."""

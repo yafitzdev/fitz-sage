@@ -11,9 +11,14 @@ except Exception:
     tomllib = None  # type: ignore[assignment]
 
 from .common import (
-    REPO_ROOT, DEFAULT_LAYOUT_EXCLUDES, ContractMap,
-    Entrypoint, Hotspot, ConfigSurface, CodeStats,
-    iter_python_files
+    DEFAULT_LAYOUT_EXCLUDES,
+    REPO_ROOT,
+    CodeStats,
+    ConfigSurface,
+    ContractMap,
+    Entrypoint,
+    Hotspot,
+    iter_python_files,
 )
 from .discovery import scan_discovery
 
@@ -128,10 +133,14 @@ def compute_hotspots(root: Path, *, excludes: set[str]) -> List[Hotspot]:
         impl[iface] = rep.plugins_found
 
     patterns = {
-        "ChatPlugin": ("core.llm.chat", "plugin_type=\"chat\"", "plugin_type='chat'"),
-        "EmbeddingPlugin": ("core.llm.embedding", "plugin_type=\"embedding\"", "plugin_type='embedding'"),
-        "RerankPlugin": ("core.llm.rerank", "plugin_type=\"rerank\"", "plugin_type='rerank'"),
-        "VectorDBPlugin": ("core.vector_db", "plugin_type=\"vector_db\"", "plugin_type='vector_db'"),
+        "ChatPlugin": ("core.llm.chat", 'plugin_type="chat"', "plugin_type='chat'"),
+        "EmbeddingPlugin": (
+            "core.llm.embedding",
+            'plugin_type="embedding"',
+            "plugin_type='embedding'",
+        ),
+        "RerankPlugin": ("core.llm.rerank", 'plugin_type="rerank"', "plugin_type='rerank'"),
+        "VectorDBPlugin": ("core.vector_db", 'plugin_type="vector_db"', "plugin_type='vector_db'"),
         "RetrievalPlugin": ("rag.retrieval", "get_retriever_plugin(", "RetrieverEngine.from_name("),
         "PipelinePlugin": ("rag.pipeline", "get_pipeline_plugin(", "available_pipeline_plugins("),
         "ChunkerPlugin": ("ingest.chunking", "get_chunker_plugin(", "ChunkingEngine"),
@@ -181,8 +190,13 @@ def compute_stats(root: Path, *, excludes: set[str]) -> CodeStats:
         total_lines += n
         module_sizes.append((n, str(p.relative_to(root))))
         todo_fixme += sum(1 for line in lines if "TODO" in line or "FIXME" in line)
-        any_mentions += text.count(" Any") + text.count("Any]") + text.count("Any,") + text.count("Any)") + text.count(
-            "Any:")
+        any_mentions += (
+            text.count(" Any")
+            + text.count("Any]")
+            + text.count("Any,")
+            + text.count("Any)")
+            + text.count("Any:")
+        )
 
     module_sizes.sort(key=lambda t: (-t[0], t[1]))
     largest = [f"{n} lines: {path}" for n, path in module_sizes[:10]]

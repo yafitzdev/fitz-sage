@@ -19,5 +19,4 @@ class PipelinePlugin(Protocol):
 
     plugin_name: str
 
-    def build(self, cfg: RAGConfig) -> Pipeline:
-        ...
+    def build(self, cfg: RAGConfig) -> Pipeline: ...

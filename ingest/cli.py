@@ -15,20 +15,17 @@ This CLI stays strictly on *core* contracts:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Any
+from typing import Any, Iterable
 
 import typer
 
-from core.logging.logger import get_logger
-from core.logging.tags import CLI, INGEST, CHUNKING, VECTOR_DB, EMBEDDING
-
 from core.llm.embedding.engine import EmbeddingEngine
 from core.llm.registry import get_llm_plugin
-
+from core.logging.logger import get_logger
+from core.logging.tags import CHUNKING, CLI, EMBEDDING, INGEST, VECTOR_DB
 from core.models.chunk import Chunk
 from core.vector_db.registry import get_vector_db_plugin
 from core.vector_db.writer import VectorDBWriter
-
 from ingest.ingestion.engine import IngestionEngine
 from ingest.ingestion.registry import get_ingest_plugin
 

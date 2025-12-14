@@ -242,7 +242,9 @@ def _extract_pydantic_fields(model_cls: Type[Any]) -> List[ModelField]:
 
     hints = getattr(model_cls, "__annotations__", {}) or {}
     for name in sorted(hints.keys()):
-        fields.append(ModelField(name=name, type=_fmt_type(hints[name]), required=True, default=None))
+        fields.append(
+            ModelField(name=name, type=_fmt_type(hints[name]), required=True, default=None)
+        )
     return fields
 
 
@@ -287,7 +289,9 @@ def _safe_import(cm: ContractMap, module: str, *, verbose: bool) -> object | Non
         return importlib.import_module(module)
     except Exception as exc:
         tb = traceback.format_exc() if verbose else None
-        cm.import_failures.append(ImportFailure(module=module, error=f"{type(exc).__name__}: {exc}", traceback=tb))
+        cm.import_failures.append(
+            ImportFailure(module=module, error=f"{type(exc).__name__}: {exc}", traceback=tb)
+        )
         return None
 
 
@@ -371,7 +375,9 @@ def _extract_pipeline_registry(
     )
 
 
-def _extract_llm_registry(cm: ContractMap, module_name: str, *, verbose: bool) -> List[RegistryContract]:
+def _extract_llm_registry(
+    cm: ContractMap, module_name: str, *, verbose: bool
+) -> List[RegistryContract]:
     out: List[RegistryContract] = []
     mod = _safe_import(cm, module_name, verbose=verbose)
     if mod is None:
@@ -442,17 +448,15 @@ def _build_layout_tree(root: Path, *, max_depth: int | None, excludes: set[str])
 
     return tree
 
+
 def _classes_for_file(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))
     except Exception:
         return []
 
-    return sorted(
-        node.name
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ClassDef)
-    )
+    return sorted(node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
+
 
 def _get_classes_for_file(path: Path) -> list[str]:
     try:
@@ -460,11 +464,8 @@ def _get_classes_for_file(path: Path) -> list[str]:
     except Exception:
         return []
 
-    return sorted(
-        node.name
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ClassDef)
-    )
+    return sorted(node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
+
 
 def _render_layout_tree(
     tree: Dict[str, Any],
@@ -510,17 +511,14 @@ def _render_layout_tree(
 
     return lines
 
+
 def _extract_classes_from_file(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))
     except Exception:
         return []
 
-    return sorted(
-        node.name
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ClassDef)
-    )
+    return sorted(node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
 
 
 def _build_class_layout_tree(root: Path, *, excludes: set[str]) -> dict[str, Any]:
@@ -858,7 +856,14 @@ def _scan_discovery(namespace: str, note: str) -> DiscoveryReport:
 
     pkg_path = getattr(pkg, "__path__", None)
     if pkg_path is None:
-        return DiscoveryReport(namespace=namespace, note=note, modules_scanned=0, plugins_found=[], failures=[], duplicates=[])
+        return DiscoveryReport(
+            namespace=namespace,
+            note=note,
+            modules_scanned=0,
+            plugins_found=[],
+            failures=[],
+            duplicates=[],
+        )
 
     import pkgutil
 
@@ -920,10 +925,14 @@ def _compute_hotspots(root: Path, *, excludes: set[str]) -> List[Hotspot]:
         impl[iface] = rep.plugins_found
 
     patterns = {
-        "ChatPlugin": ("core.llm.chat", "plugin_type=\"chat\"", "plugin_type='chat'"),
-        "EmbeddingPlugin": ("core.llm.embedding", "plugin_type=\"embedding\"", "plugin_type='embedding'"),
-        "RerankPlugin": ("core.llm.rerank", "plugin_type=\"rerank\"", "plugin_type='rerank'"),
-        "VectorDBPlugin": ("core.vector_db", "plugin_type=\"vector_db\"", "plugin_type='vector_db'"),
+        "ChatPlugin": ("core.llm.chat", 'plugin_type="chat"', "plugin_type='chat'"),
+        "EmbeddingPlugin": (
+            "core.llm.embedding",
+            'plugin_type="embedding"',
+            "plugin_type='embedding'",
+        ),
+        "RerankPlugin": ("core.llm.rerank", 'plugin_type="rerank"', "plugin_type='rerank'"),
+        "VectorDBPlugin": ("core.vector_db", 'plugin_type="vector_db"', "plugin_type='vector_db'"),
         "RetrievalPlugin": ("rag.retrieval", "get_retriever_plugin(", "RetrieverEngine.from_name("),
         "PipelinePlugin": ("rag.pipeline", "get_pipeline_plugin(", "available_pipeline_plugins("),
         "ChunkerPlugin": ("ingest.chunking", "get_chunker_plugin(", "ChunkingEngine"),
@@ -972,7 +981,13 @@ def _compute_stats(root: Path, *, excludes: set[str]) -> CodeStats:
         total_lines += n
         module_sizes.append((n, str(p.relative_to(root))))
         todo_fixme += sum(1 for line in lines if "TODO" in line or "FIXME" in line)
-        any_mentions += text.count(" Any") + text.count("Any]") + text.count("Any,") + text.count("Any)") + text.count("Any:")
+        any_mentions += (
+            text.count(" Any")
+            + text.count("Any]")
+            + text.count("Any,")
+            + text.count("Any)")
+            + text.count("Any:")
+        )
 
     module_sizes.sort(key=lambda t: (-t[0], t[1]))
     largest = [f"{n} lines: {path}" for n, path in module_sizes[:10]]
@@ -1056,7 +1071,10 @@ def build_contract_map(*, verbose: bool, layout_depth: int | None) -> ContractMa
 
             if obj.__name__ in {"RawDocument"} and hasattr(obj, "__annotations__"):
                 hints = obj.__annotations__ or {}
-                fields = [ModelField(name=k, type=_fmt_type(hints[k]), required=True) for k in sorted(hints.keys())]
+                fields = [
+                    ModelField(name=k, type=_fmt_type(hints[k]), required=True)
+                    for k in sorted(hints.keys())
+                ]
                 cm.models.append(ModelContract(module=mod_name, name=obj.__name__, fields=fields))
 
     cm.models.sort(key=lambda m: (m.module, m.name))
@@ -1177,7 +1195,9 @@ def build_contract_map(*, verbose: bool, layout_depth: int | None) -> ContractMa
         _scan_discovery("rag.retrieval.plugins", "RAG retriever plugins (Option A discovery)"),
         _scan_discovery("rag.pipeline.plugins", "RAG pipeline plugins (Option A discovery)"),
         _scan_discovery("ingest.chunking.plugins", "Ingest chunking plugins (Option A discovery)"),
-        _scan_discovery("ingest.ingestion.plugins", "Ingest ingestion plugins (Option A discovery)"),
+        _scan_discovery(
+            "ingest.ingestion.plugins", "Ingest ingestion plugins (Option A discovery)"
+        ),
     ]
 
     cm.hotspots = _compute_hotspots(REPO_ROOT, excludes=_DEFAULT_LAYOUT_EXCLUDES)
@@ -1203,7 +1223,9 @@ def render_markdown(cm: ContractMap, *, verbose: bool, layout_depth: int | None)
     lines.append(f"- excludes: `{sorted(_DEFAULT_LAYOUT_EXCLUDES)}`")
     lines.append(f"- max_depth: `{layout_depth if layout_depth is not None else 'unlimited'}`")
     lines.append("")
-    layout_tree = _build_layout_tree(REPO_ROOT, max_depth=layout_depth, excludes=_DEFAULT_LAYOUT_EXCLUDES)
+    layout_tree = _build_layout_tree(
+        REPO_ROOT, max_depth=layout_depth, excludes=_DEFAULT_LAYOUT_EXCLUDES
+    )
     lines.append("```")
     lines.append(f"{REPO_ROOT.name}/")
     lines.extend(_render_layout_tree(layout_tree, prefix="", root=REPO_ROOT))
@@ -1370,12 +1392,24 @@ def render_json(cm: ContractMap) -> str:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="Generate a contract map from the current codebase.")
+    parser = argparse.ArgumentParser(
+        description="Generate a contract map from the current codebase."
+    )
     parser.add_argument("--format", choices=["md", "json"], default="md", help="Output format")
-    parser.add_argument("--out", type=str, default=None, help="Write output to a file (otherwise prints to stdout)")
-    parser.add_argument("--verbose", action="store_true", help="Include tracebacks for import/discovery failures")
-    parser.add_argument("--fail-on-errors", action="store_true", help="Exit non-zero if any ERROR health issues exist")
-    parser.add_argument("--layout-depth", type=int, default=None, help="Max depth for Project Layout tree")
+    parser.add_argument(
+        "--out", type=str, default=None, help="Write output to a file (otherwise prints to stdout)"
+    )
+    parser.add_argument(
+        "--verbose", action="store_true", help="Include tracebacks for import/discovery failures"
+    )
+    parser.add_argument(
+        "--fail-on-errors",
+        action="store_true",
+        help="Exit non-zero if any ERROR health issues exist",
+    )
+    parser.add_argument(
+        "--layout-depth", type=int, default=None, help="Max depth for Project Layout tree"
+    )
 
     args = parser.parse_args(argv)
 

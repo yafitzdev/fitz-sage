@@ -6,10 +6,9 @@ import importlib
 import pkgutil
 from typing import Dict, Iterable, Type
 
-from rag.retrieval.base import RetrievalPlugin
-
 from core.logging.logger import get_logger
 from core.logging.tags import RETRIEVER
+from rag.retrieval.base import RetrievalPlugin
 
 logger = get_logger(__name__)
 

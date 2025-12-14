@@ -5,7 +5,7 @@ from __future__ import annotations
 import traceback
 from typing import Iterable, List
 
-from .common import ContractMap, RegistryContract, ImportFailure, safe_import
+from .common import ContractMap, ImportFailure, RegistryContract, safe_import
 
 
 def maybe_call(cm: ContractMap, module_obj: object, fn_name: str, *, verbose: bool) -> None:
@@ -26,13 +26,13 @@ def maybe_call(cm: ContractMap, module_obj: object, fn_name: str, *, verbose: bo
 
 
 def extract_registry_plugins(
-        cm: ContractMap,
-        module_name: str,
-        *,
-        dict_attr: str,
-        discover_fns: Iterable[str] = (),
-        note: str | None = None,
-        verbose: bool,
+    cm: ContractMap,
+    module_name: str,
+    *,
+    dict_attr: str,
+    discover_fns: Iterable[str] = (),
+    note: str | None = None,
+    verbose: bool,
 ) -> RegistryContract | None:
     """Extract plugins from a registry dict."""
     mod = safe_import(cm, module_name, verbose=verbose)
@@ -51,12 +51,12 @@ def extract_registry_plugins(
 
 
 def extract_pipeline_registry(
-        cm: ContractMap,
-        module_name: str,
-        *,
-        list_fn: str,
-        note: str | None,
-        verbose: bool,
+    cm: ContractMap,
+    module_name: str,
+    *,
+    list_fn: str,
+    note: str | None,
+    verbose: bool,
 ) -> RegistryContract | None:
     """Extract plugins from a registry that uses a list function."""
     mod = safe_import(cm, module_name, verbose=verbose)
@@ -91,7 +91,9 @@ def extract_pipeline_registry(
     )
 
 
-def extract_llm_registry(cm: ContractMap, module_name: str, *, verbose: bool) -> List[RegistryContract]:
+def extract_llm_registry(
+    cm: ContractMap, module_name: str, *, verbose: bool
+) -> List[RegistryContract]:
     """Extract LLM registry with multiple plugin types."""
     out: List[RegistryContract] = []
     mod = safe_import(cm, module_name, verbose=verbose)

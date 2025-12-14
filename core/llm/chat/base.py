@@ -9,5 +9,4 @@ class ChatPlugin(Protocol):
     plugin_name: str
     plugin_type: str  # must be "chat"
 
-    def chat(self, messages: list[dict[str, Any]]) -> str:
-        ...
+    def chat(self, messages: list[dict[str, Any]]) -> str: ...

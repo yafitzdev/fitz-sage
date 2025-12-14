@@ -3,13 +3,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable
 
+from core.logging.logger import get_logger
+from core.logging.tags import INGEST
 from ingest.config.schema import IngestConfig
 from ingest.exceptions.config import IngestionConfigError
 from ingest.ingestion.base import IngestPlugin, RawDocument
 from ingest.ingestion.registry import get_ingest_plugin
-
-from core.logging.logger import get_logger
-from core.logging.tags import INGEST
 
 logger = get_logger(__name__)
 

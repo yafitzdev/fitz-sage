@@ -1,8 +1,8 @@
 # core/llm/embedding/plugins/cohere.py
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 
 from core.exceptions.llm import EmbeddingError
 

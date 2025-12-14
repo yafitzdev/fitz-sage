@@ -12,21 +12,34 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import List
 
-from tools.contract_map.common import (
-    REPO_ROOT, DEFAULT_LAYOUT_EXCLUDES, ContractMap, HealthIssue
-)
-from tools.contract_map.models import extract_models, extract_protocols, render_models_section, render_protocols_section
-from tools.contract_map.registries import extract_registries, render_registries_section
-from tools.contract_map.layout import render_layout_section
-from tools.contract_map.imports import build_import_graph, render_import_graph_section
-from tools.contract_map.discovery import scan_all_discoveries, render_discovery_section
 from tools.contract_map.analysis import (
-    discover_entrypoints, compute_hotspots, compute_stats,
-    compute_config_surface, compute_invariants,
-    render_entrypoints_section, render_hotspots_section,
-    render_config_surface_section, render_invariants_section,
-    render_stats_section
+    compute_config_surface,
+    compute_hotspots,
+    compute_invariants,
+    compute_stats,
+    discover_entrypoints,
+    render_config_surface_section,
+    render_entrypoints_section,
+    render_hotspots_section,
+    render_invariants_section,
+    render_stats_section,
 )
+from tools.contract_map.common import (
+    DEFAULT_LAYOUT_EXCLUDES,
+    REPO_ROOT,
+    ContractMap,
+    HealthIssue,
+)
+from tools.contract_map.discovery import render_discovery_section, scan_all_discoveries
+from tools.contract_map.imports import build_import_graph, render_import_graph_section
+from tools.contract_map.layout import render_layout_section
+from tools.contract_map.models import (
+    extract_models,
+    extract_protocols,
+    render_models_section,
+    render_protocols_section,
+)
+from tools.contract_map.registries import extract_registries, render_registries_section
 
 
 def check_registry_health(cm: ContractMap) -> None:
@@ -198,33 +211,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Generate a contract map from the current codebase."
     )
+    parser.add_argument("--format", choices=["md", "json"], default="md", help="Output format")
     parser.add_argument(
-        "--format",
-        choices=["md", "json"],
-        default="md",
-        help="Output format"
+        "--out", type=str, default=None, help="Write output to a file (otherwise prints to stdout)"
     )
     parser.add_argument(
-        "--out",
-        type=str,
-        default=None,
-        help="Write output to a file (otherwise prints to stdout)"
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Include tracebacks for import/discovery failures"
+        "--verbose", action="store_true", help="Include tracebacks for import/discovery failures"
     )
     parser.add_argument(
         "--fail-on-errors",
         action="store_true",
-        help="Exit non-zero if any ERROR health issues exist"
+        help="Exit non-zero if any ERROR health issues exist",
     )
     parser.add_argument(
-        "--layout-depth",
-        type=int,
-        default=None,
-        help="Max depth for Project Layout tree"
+        "--layout-depth", type=int, default=None, help="Max depth for Project Layout tree"
     )
 
     args = parser.parse_args(argv)

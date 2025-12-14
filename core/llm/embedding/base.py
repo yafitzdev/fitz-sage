@@ -9,5 +9,4 @@ class EmbeddingPlugin(Protocol):
     plugin_name: str
     plugin_type: str  # must be "embedding"
 
-    def embed(self, text: str) -> list[float]:
-        ...
+    def embed(self, text: str) -> list[float]: ...

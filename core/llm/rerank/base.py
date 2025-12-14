@@ -11,5 +11,4 @@ class RerankPlugin(Protocol):
     plugin_name: str
     plugin_type: str  # must be "rerank"
 
-    def rerank(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
-        ...
+    def rerank(self, query: str, chunks: list[Chunk]) -> list[Chunk]: ...

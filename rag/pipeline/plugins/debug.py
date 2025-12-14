@@ -4,12 +4,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict
 
+from core.logging.logger import get_logger
+from core.logging.tags import PIPELINE
 from rag.config.schema import RAGConfig
 from rag.pipeline.base import Pipeline, PipelinePlugin
 from rag.pipeline.engine import RAGPipeline
-
-from core.logging.logger import get_logger
-from core.logging.tags import PIPELINE
 
 logger = get_logger(__name__)
 

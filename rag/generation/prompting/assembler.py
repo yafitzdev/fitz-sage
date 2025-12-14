@@ -94,7 +94,9 @@ class PromptAssembler:
             "",
         ]
 
-        instructions = user_instructions if user_instructions is not None else self.slot("user_instructions")
+        instructions = (
+            user_instructions if user_instructions is not None else self.slot("user_instructions")
+        )
         if instructions and instructions.strip():
             parts.extend([instructions.strip(), ""])
 

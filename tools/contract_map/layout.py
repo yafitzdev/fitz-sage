@@ -6,7 +6,7 @@ import ast
 from pathlib import Path
 from typing import Any, Dict, List
 
-from .common import REPO_ROOT, DEFAULT_LAYOUT_EXCLUDES, should_exclude_path
+from .common import DEFAULT_LAYOUT_EXCLUDES, REPO_ROOT, should_exclude_path
 
 
 def get_classes_for_file(path: Path) -> list[str]:
@@ -16,11 +16,7 @@ def get_classes_for_file(path: Path) -> list[str]:
     except Exception:
         return []
 
-    return sorted(
-        node.name
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ClassDef)
-    )
+    return sorted(node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
 
 
 def build_layout_tree(root: Path, *, max_depth: int | None, excludes: set[str]) -> Dict[str, Any]:
@@ -52,10 +48,10 @@ def build_layout_tree(root: Path, *, max_depth: int | None, excludes: set[str]) 
 
 
 def render_layout_tree(
-        tree: Dict[str, Any],
-        prefix: str = "",
-        *,
-        root: Path,
+    tree: Dict[str, Any],
+    prefix: str = "",
+    *,
+    root: Path,
 ) -> List[str]:
     """Render a layout tree with Unicode box-drawing characters."""
     lines: List[str] = []
@@ -106,9 +102,7 @@ def render_layout_section(*, layout_depth: int | None) -> str:
     lines.append("")
 
     layout_tree = build_layout_tree(
-        REPO_ROOT,
-        max_depth=layout_depth,
-        excludes=DEFAULT_LAYOUT_EXCLUDES
+        REPO_ROOT, max_depth=layout_depth, excludes=DEFAULT_LAYOUT_EXCLUDES
     )
 
     lines.append("```")

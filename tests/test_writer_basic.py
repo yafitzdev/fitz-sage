@@ -37,8 +37,12 @@ def test_writer_upsert_builds_payload_and_calls_client():
     writer = VectorDBWriter(client=client)
 
     chunks = [
-        DummyChunk(id="c1", doc_id="docA", chunk_index=0, content="alpha", metadata={"file": "a.txt"}),
-        DummyChunk(id="c2", doc_id="docA", chunk_index=1, content="beta",  metadata={"file": "a.txt"}),
+        DummyChunk(
+            id="c1", doc_id="docA", chunk_index=0, content="alpha", metadata={"file": "a.txt"}
+        ),
+        DummyChunk(
+            id="c2", doc_id="docA", chunk_index=1, content="beta", metadata={"file": "a.txt"}
+        ),
     ]
     vectors = [[0.1, 0.2], [0.3, 0.4]]
 

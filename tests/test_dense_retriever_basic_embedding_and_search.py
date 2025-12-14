@@ -1,8 +1,8 @@
 # tests/test_dense_retriever_basic_embedding_and_search.py
 from dataclasses import dataclass
 
-from rag.retrieval.plugins.dense import DenseRetrievalPlugin
 from core.models.chunk import Chunk
+from rag.retrieval.plugins.dense import DenseRetrievalPlugin
 
 
 @dataclass

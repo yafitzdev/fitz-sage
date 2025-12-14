@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .normalize import _normalize_text, _to_chunk_dict, ChunkDict
+from .normalize import ChunkDict, _normalize_text, _to_chunk_dict
 
 
 @dataclass

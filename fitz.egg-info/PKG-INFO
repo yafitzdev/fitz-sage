@@ -7,11 +7,12 @@ License-Expression: MIT
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE
+Requires-Dist: pydantic>=2.0
 Requires-Dist: pyyaml>=6.0
 Requires-Dist: qdrant-client>=1.7
 Requires-Dist: httpx>=0.24
 Requires-Dist: typing-extensions>=4.7
-Requires-Dist: pydantic>=2.0
+Requires-Dist: typer>=0.9
 Provides-Extra: ingest
 Requires-Dist: pdfminer.six; extra == "ingest"
 Requires-Dist: python-docx; extra == "ingest"

@@ -12,15 +12,15 @@ Run with:
     mkdir -p test_docs
     echo "RAG systems combine retrieval with generation." > test_docs/rag.txt
     echo "Vector databases enable semantic search." > test_docs/vectors.txt
-    
+
     python examples/ingestion_example.py
 """
 
 from pathlib import Path
 
-from ingest.ingestion.registry import get_ingest_plugin
 from ingest.chunking.plugins.simple import SimpleChunker
-from ingest.validation.documents import validate, ValidationConfig
+from ingest.ingestion.registry import get_ingest_plugin
+from ingest.validation.documents import ValidationConfig, validate
 
 
 def main():
@@ -49,14 +49,14 @@ def main():
     print("=" * 60)
     print("Step 1: Document Ingestion")
     print("=" * 60)
-    
+
     # Get the local filesystem ingestion plugin
     LocalIngestPlugin = get_ingest_plugin("local")
     ingest_plugin = LocalIngestPlugin()
-    
+
     # Ingest all documents from the directory
     raw_docs = list(ingest_plugin.ingest(str(test_dir), kwargs={}))
-    
+
     print(f"Ingested {len(raw_docs)} documents:")
     for doc in raw_docs:
         content_preview = doc.content[:50] + "..." if len(doc.content) > 50 else doc.content
@@ -67,14 +67,14 @@ def main():
     print("=" * 60)
     print("Step 2: Document Validation")
     print("=" * 60)
-    
+
     validation_config = ValidationConfig(
         min_chars=10,
         strip_whitespace=True,
     )
-    
+
     valid_docs = validate(raw_docs, validation_config)
-    
+
     print(f"Valid documents: {len(valid_docs)} / {len(raw_docs)}")
     filtered_count = len(raw_docs) - len(valid_docs)
     if filtered_count > 0:
@@ -85,9 +85,9 @@ def main():
     print("=" * 60)
     print("Step 3: Text Chunking")
     print("=" * 60)
-    
+
     chunker = SimpleChunker(chunk_size=200)  # Small chunks for demo
-    
+
     all_chunks = []
     for doc in valid_docs:
         base_meta = {
@@ -97,11 +97,11 @@ def main():
         chunks = chunker.chunk_text(doc.content, base_meta)
         all_chunks.extend(chunks)
         print(f"  {doc.path} -> {len(chunks)} chunks")
-    
+
     print()
     print(f"Total chunks: {len(all_chunks)}")
     print()
-    
+
     # Show chunk details
     print("Chunk details:")
     print("-" * 40)

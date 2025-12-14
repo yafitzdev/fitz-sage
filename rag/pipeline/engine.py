@@ -3,14 +3,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from rag.config.loader import load_config
-from rag.config.schema import RAGConfig
-from rag.context.pipeline import ContextPipeline
 from core.exceptions.llm import LLMError
-from rag.exceptions.pipeline import PipelineError, RGSGenerationError
-from rag.generation.rgs import RGS, RGSAnswer, RGSConfig as RGSRuntimeConfig
-from rag.retrieval.engine import RetrieverEngine
-
 from core.llm.chat import ChatEngine
 from core.llm.embedding.engine import EmbeddingEngine
 from core.llm.registry import get_llm_plugin
@@ -18,6 +11,13 @@ from core.llm.rerank.engine import RerankEngine
 from core.logging.logger import get_logger
 from core.logging.tags import PIPELINE, VECTOR_DB
 from core.vector_db.registry import get_vector_db_plugin
+from rag.config.loader import load_config
+from rag.config.schema import RAGConfig
+from rag.context.pipeline import ContextPipeline
+from rag.exceptions.pipeline import PipelineError, RGSGenerationError
+from rag.generation.rgs import RGS, RGSAnswer
+from rag.generation.rgs import RGSConfig as RGSRuntimeConfig
+from rag.retrieval.engine import RetrieverEngine
 
 logger = get_logger(__name__)
 
@@ -125,6 +125,7 @@ class RAGPipeline:
 
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
         return cls(retriever=retriever, llm=chat_engine, rgs=rgs, context=ContextPipeline())
+
 
 def create_pipeline_from_yaml(path: Optional[str] = None) -> RAGPipeline:
     logger.debug(f"{PIPELINE} Loading config from YAML")

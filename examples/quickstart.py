@@ -45,10 +45,10 @@ def main():
     print("=" * 60)
     print("Step 1: Context Processing")
     print("=" * 60)
-    
+
     context_pipeline = ContextPipeline(max_chars=2000)
     processed_chunks = context_pipeline.process(raw_chunks)
-    
+
     print(f"Input chunks: {len(raw_chunks)}")
     print(f"Processed chunks: {len(processed_chunks)}")
     for chunk in processed_chunks:
@@ -59,17 +59,19 @@ def main():
     print("=" * 60)
     print("Step 2: RGS Prompt Building")
     print("=" * 60)
-    
-    rgs = RGS(RGSConfig(
-        enable_citations=True,
-        strict_grounding=True,
-        max_chunks=5,
-        source_label_prefix="S",
-    ))
-    
+
+    rgs = RGS(
+        RGSConfig(
+            enable_citations=True,
+            strict_grounding=True,
+            max_chunks=5,
+            source_label_prefix="S",
+        )
+    )
+
     query = "What is fitz and how does it work?"
     prompt = rgs.build_prompt(query, processed_chunks)
-    
+
     print("System Prompt:")
     print("-" * 40)
     print(prompt.system)
@@ -83,16 +85,16 @@ def main():
     print("=" * 60)
     print("Step 3: Answer Building")
     print("=" * 60)
-    
+
     # In real usage, this would come from your LLM
     simulated_llm_response = (
         "fitz is a modular RAG framework designed for production use [S1]. "
         "It features a plugin-based architecture where all components can be swapped [S2]. "
         "The framework includes an RGS module for prompt construction with citation support [S3]."
     )
-    
+
     answer = rgs.build_answer(simulated_llm_response, processed_chunks)
-    
+
     print("Answer:")
     print(answer.answer)
     print()

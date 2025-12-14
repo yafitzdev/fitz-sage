@@ -15,6 +15,7 @@ class SearchResult:
     - score
     - payload (dict)
     """
+
     id: str
     score: float | None
     payload: dict[str, Any]
@@ -31,5 +32,4 @@ class VectorDBPlugin(Protocol):
         query_vector: list[float],
         limit: int,
         with_payload: bool = True,
-    ) -> list[SearchResult] | list[Any]:
-        ...
+    ) -> list[SearchResult] | list[Any]: ...

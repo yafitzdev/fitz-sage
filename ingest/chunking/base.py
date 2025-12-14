@@ -24,8 +24,7 @@ class ChunkerPlugin(Protocol):
 
     plugin_name: str
 
-    def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Chunk]:
-        ...
+    def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Chunk]: ...
 
 
 @dataclass

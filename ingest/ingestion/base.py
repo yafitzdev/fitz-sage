@@ -24,5 +24,4 @@ class IngestPlugin(Protocol):
 
     plugin_name: str
 
-    def ingest(self, source: str, kwargs: Dict[str, Any]) -> Iterable[RawDocument]:
-        ...
+    def ingest(self, source: str, kwargs: Dict[str, Any]) -> Iterable[RawDocument]: ...

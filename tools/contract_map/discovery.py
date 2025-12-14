@@ -30,6 +30,7 @@ def plugin_predicate_for_namespace(namespace: str):
         return is_plugin, plugin_id
 
     if namespace == "core.vector_db.plugins":
+
         def is_plugin(cls: type) -> bool:
             if not isinstance(getattr(cls, "plugin_name", None), str):
                 return False
@@ -43,6 +44,7 @@ def plugin_predicate_for_namespace(namespace: str):
         return is_plugin, plugin_id
 
     if namespace == "rag.retrieval.plugins":
+
         def is_plugin(cls: type) -> bool:
             if not isinstance(getattr(cls, "plugin_name", None), str):
                 return False
@@ -54,6 +56,7 @@ def plugin_predicate_for_namespace(namespace: str):
         return is_plugin, plugin_id
 
     if namespace == "rag.pipeline.plugins":
+
         def is_plugin(cls: type) -> bool:
             if not isinstance(getattr(cls, "plugin_name", None), str):
                 return False
@@ -65,6 +68,7 @@ def plugin_predicate_for_namespace(namespace: str):
         return is_plugin, plugin_id
 
     if namespace == "ingest.chunking.plugins":
+
         def is_plugin(cls: type) -> bool:
             if not isinstance(getattr(cls, "plugin_name", None), str):
                 return False
@@ -76,6 +80,7 @@ def plugin_predicate_for_namespace(namespace: str):
         return is_plugin, plugin_id
 
     if namespace == "ingest.ingestion.plugins":
+
         def is_plugin(cls: type) -> bool:
             if not isinstance(getattr(cls, "plugin_name", None), str):
                 return False
@@ -122,7 +127,7 @@ def scan_discovery(namespace: str, note: str) -> DiscoveryReport:
             modules_scanned=0,
             plugins_found=[],
             failures=[],
-            duplicates=[]
+            duplicates=[],
         )
 
     is_plugin, plugin_id = plugin_predicate_for_namespace(namespace)

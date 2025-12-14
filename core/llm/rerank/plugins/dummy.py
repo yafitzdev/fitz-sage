@@ -13,12 +13,7 @@ class DummyRerankClient:
     This plugin is intentionally simple and stable for testing RerankEngine.
     """
 
-    def rerank(
-        self,
-        query: str,
-        documents: List[str],
-        top_n: Optional[int] = None
-    ) -> List[int]:
+    def rerank(self, query: str, documents: List[str], top_n: Optional[int] = None) -> List[int]:
 
         if not documents:
             return []
