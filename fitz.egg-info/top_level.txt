@@ -1,3 +1,8 @@
 core
+examples
+generation
 ingest
 rag
+retrieval
+scripts
+tools

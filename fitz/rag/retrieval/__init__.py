@@ -11,20 +11,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from rag.retrieval.base import RetrievalPlugin as RetrievalPlugin
-    from rag.retrieval.engine import RetrieverEngine as RetrieverEngine
+    pass
 
 __all__ = ["RetrievalPlugin", "RetrieverEngine"]
 
 
 def __getattr__(name: str) -> Any:
     if name == "RetrievalPlugin":
-        from rag.retrieval.base import RetrievalPlugin as _RetrievalPlugin
+        from rag.retrieval import RetrievalPlugin as _RetrievalPlugin
 
         return _RetrievalPlugin
 
     if name == "RetrieverEngine":
-        from rag.retrieval.engine import RetrieverEngine as _RetrieverEngine
+        from rag.retrieval import RetrieverEngine as _RetrieverEngine
 
         return _RetrieverEngine
 

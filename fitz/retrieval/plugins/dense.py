@@ -11,7 +11,7 @@ from core.logging.logger import get_logger
 from core.logging.tags import RETRIEVER
 from core.models.chunk import Chunk
 from rag.exceptions.retriever import RerankError, VectorSearchError
-from rag.retrieval.base import RetrievalPlugin
+from rag.retrieval import RetrievalPlugin
 
 logger = get_logger(__name__)
 

@@ -29,7 +29,7 @@ ingest = ["pdfminer.six", "python-docx"]
 
 
 [tool.setuptools.packages.find]
-include = ["core*", "ingest*", "rag*"]
+where = ["."]
 exclude = ["tests*"]
 
 

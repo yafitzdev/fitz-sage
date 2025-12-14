@@ -17,7 +17,7 @@ from rag.context.pipeline import ContextPipeline
 from rag.exceptions.pipeline import PipelineError, RGSGenerationError
 from rag.generation.rgs import RGS, RGSAnswer
 from rag.generation.rgs import RGSConfig as RGSRuntimeConfig
-from rag.retrieval.engine import RetrieverEngine
+from rag.retrieval import RetrieverEngine
 
 logger = get_logger(__name__)
 

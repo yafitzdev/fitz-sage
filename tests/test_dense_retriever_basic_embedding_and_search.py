@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 
 from core.models.chunk import Chunk
-from rag.retrieval.plugins.dense import DenseRetrievalPlugin
+from retrieval.plugins.dense import DenseRetrievalPlugin
 
 
 @dataclass

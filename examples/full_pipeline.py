@@ -36,7 +36,7 @@ from ingest.ingestion.registry import get_ingest_plugin
 from ingest.validation.documents import ValidationConfig, validate
 from rag.context.pipeline import ContextPipeline
 from rag.generation.rgs import RGS, RGSConfig
-from rag.retrieval.plugins.dense import DenseRetrievalPlugin
+from retrieval.plugins.dense import DenseRetrievalPlugin
 
 COLLECTION_NAME = "fitz_demo"
 

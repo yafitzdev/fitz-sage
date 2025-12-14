@@ -1,7 +1,7 @@
 # tests/test_retriever_success.py
 from dataclasses import dataclass
 
-from rag.retrieval.plugins.dense import DenseRetrievalPlugin
+from retrieval.plugins.dense import DenseRetrievalPlugin
 
 
 @dataclass

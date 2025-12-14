@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing import Any, List
 
 from core.models.chunk import Chunk
-from rag.retrieval.base import RetrievalPlugin
-from rag.retrieval.registry import get_retriever_plugin
+from rag.retrieval import RetrievalPlugin
+from retrieval.registry import get_retriever_plugin
 
 
 @dataclass

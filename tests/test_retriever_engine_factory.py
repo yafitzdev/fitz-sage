@@ -1,5 +1,5 @@
 # tests/test_retriever_engine_factory.py
-from rag.retrieval.engine import RetrieverEngine
+from rag.retrieval import RetrieverEngine
 
 
 class MockClient:
