@@ -1,15 +1,15 @@
-# pipeline/retrieval/engine.py
+# fitz/retrieval/engine.py
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, List
 
 from fitz.core.models.chunk import Chunk
-from fitz.pipeline.retrieval import RetrievalPlugin
+from fitz.retrieval.base import RetrievalPlugin
 from fitz.retrieval.registry import get_retriever_plugin
 
 
-@dataclass
+@dataclass(slots=True)
 class RetrieverEngine:
     """
     Thin orchestration layer around a retrieval plugin.

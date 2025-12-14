@@ -1,5 +1,5 @@
 # tests/test_rgs_prompt_core_logic.py
-from fitz.generation.rgs import RGS, RGSConfig
+from fitz.generation.retrieval_guided.synthesis import RGS, RGSConfig
 
 
 def test_rgs_prompt_structure():

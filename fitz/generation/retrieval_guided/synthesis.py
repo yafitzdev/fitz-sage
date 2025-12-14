@@ -1,4 +1,4 @@
-# pipeline/generation/rgs.py
+# pipeline/generation/synthesis.py
 """
 Retrieval-Guided Synthesis (RGS)
 """
@@ -17,7 +17,7 @@ from typing import (
     runtime_checkable,
 )
 
-from fitz.pipeline.exceptions.pipeline import PipelineError, RGSGenerationError
+from fitz.generation.exceptions.base import GenerationError, RGSGenerationError
 from fitz.generation.prompting import (
     PromptAssembler,
     PromptConfig,
@@ -84,7 +84,7 @@ class RGS:
             user_prompt = self._build_user_prompt(query, limited)
             return RGSPrompt(system=system_prompt, user=user_prompt)
         except Exception as e:
-            raise RGSGenerationError("Failed to build RGS prompt") from e
+            raise GenerationError("Failed to build RGS answer") from e
 
     def build_answer(self, raw_answer: str, chunks: Sequence[ChunkInput]) -> RGSAnswer:
         try:

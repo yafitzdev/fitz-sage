@@ -8,7 +8,7 @@ from typing import Any
 from fitz.core.models.chunk import Chunk
 from fitz.core.vector_db.writer import VectorDBWriter
 from fitz.pipeline.context.pipeline import ContextPipeline
-from fitz.generation.rgs import RGS, RGSConfig
+from fitz.generation.retrieval_guided.synthesis import RGS, RGSConfig
 from fitz.retrieval.plugins.dense import DenseRetrievalPlugin, RetrieverCfg
 
 

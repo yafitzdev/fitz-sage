@@ -15,9 +15,9 @@ from fitz.pipeline.config.loader import load_config
 from fitz.pipeline.config.schema import RAGConfig
 from fitz.pipeline.context.pipeline import ContextPipeline
 from fitz.pipeline.exceptions.pipeline import PipelineError, RGSGenerationError
-from fitz.generation.rgs import RGS, RGSAnswer
-from fitz.generation.rgs import RGSConfig as RGSRuntimeConfig
-from fitz.pipeline.retrieval import RetrieverEngine
+from fitz.generation.retrieval_guided.synthesis import RGS, RGSAnswer
+from fitz.generation.retrieval_guided.synthesis import RGSConfig as RGSRuntimeConfig
+from fitz.retrieval.engine import RetrieverEngine
 
 logger = get_logger(__name__)
 

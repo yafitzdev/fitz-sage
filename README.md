@@ -90,7 +90,7 @@ fitz-ingest run ./my-documents --collection my_knowledge --ingest-plugin local
 
 ```python
 from fitz.pipeline.pipeline.engine import RAGPipeline
-from fitz.generation.rgs import RGS, RGSConfig
+from fitz.generation.retrieval_guided.synthesis import RGS, RGSConfig
 
 # Using the default config
 pipeline = create_pipeline_from_yaml()
@@ -179,7 +179,7 @@ rgs:
 The RGS module handles prompt construction and answer synthesis with built-in citation support:
 
 ```python
-from fitz.generation.rgs import RGS, RGSConfig
+from fitz.generation.retrieval_guided.synthesis import RGS, RGSConfig
 
 rgs = RGS(RGSConfig(
     enable_citations=True,

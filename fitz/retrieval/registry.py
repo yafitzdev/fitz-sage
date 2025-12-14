@@ -1,4 +1,4 @@
-# pipeline/retrieval/registry.py
+# fitz/retrieval/registry.py
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Dict, Iterable, Type
 
 from fitz.core.logging.logger import get_logger
 from fitz.core.logging.tags import RETRIEVER
-from fitz.pipeline.retrieval import RetrievalPlugin
+from fitz.retrieval.base import RetrievalPlugin
 
 logger = get_logger(__name__)
 
