@@ -4,7 +4,7 @@ Chunker and chunking-engine failures for fitz_ingest.
 
 from __future__ import annotations
 
-from ingest.exceptions.base import IngestionError
+from fitz.ingest.exceptions.base import IngestionError
 
 
 class IngestionChunkingError(IngestionError):

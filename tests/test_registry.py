@@ -1,8 +1,8 @@
 # ============================
 # File: tests/test_registry.py
 # ============================
-from ingest.ingestion.plugins.local_fs import LocalFSIngestPlugin
-from ingest.ingestion.registry import get_ingest_plugin
+from fitz.ingest.ingestion.plugins.local_fs import LocalFSIngestPlugin
+from fitz.ingest.ingestion.registry import get_ingest_plugin
 
 
 def test_registry_returns_correct_plugin():

@@ -1,4 +1,4 @@
-from ingest.ingestion.registry import get_ingest_plugin
+from fitz.ingest.ingestion.registry import get_ingest_plugin
 
 
 def test_local_ingest_plugin_runs_on_directory(tmp_path):

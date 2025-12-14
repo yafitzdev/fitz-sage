@@ -89,8 +89,8 @@ fitz-ingest run ./my-documents --collection my_knowledge --ingest-plugin local
 ### 3. Query with RAG
 
 ```python
-from rag.pipeline.engine import RAGPipeline
-from rag.generation.rgs import RGS, RGSConfig
+from fitz.rag.pipeline.engine import RAGPipeline
+from fitz.rag.generation.rgs import RGS, RGSConfig
 
 # Using the default config
 pipeline = create_pipeline_from_yaml()
@@ -118,7 +118,7 @@ fitz-rag query "What is the main topic?" --config my_config.yaml
 Everything in fitz is a plugin. Plugins implement protocols (interfaces) and are auto-discovered at runtime.
 
 ```python
-from core.llm.chat.base import ChatPlugin
+from fitz.core.llm.chat.base import ChatPlugin
 
 class MyChatPlugin:
     plugin_name = "my_chat"
@@ -179,7 +179,7 @@ rgs:
 The RGS module handles prompt construction and answer synthesis with built-in citation support:
 
 ```python
-from rag.generation.rgs import RGS, RGSConfig
+from fitz.rag.generation.rgs import RGS, RGSConfig
 
 rgs = RGS(RGSConfig(
     enable_citations=True,

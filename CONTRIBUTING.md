@@ -316,8 +316,8 @@ from typing import Any
 from pydantic import BaseModel
 
 # Local imports (absolute)
-from core.models.chunk import Chunk
-from core.logging.logger import get_logger
+from fitz.core.models.chunk import Chunk
+from fitz.core.logging.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -4,9 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, List
 
-from core.models.chunk import Chunk
-from rag.retrieval import RetrievalPlugin
-from retrieval.registry import get_retriever_plugin
+from fitz.core.models.chunk import Chunk
+from fitz.rag.retrieval import RetrievalPlugin
+from fitz.retrieval.registry import get_retriever_plugin
 
 
 @dataclass

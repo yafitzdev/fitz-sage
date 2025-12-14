@@ -1,5 +1,5 @@
 # tests/test_chat_engine_system_message.py
-from core.llm.chat.engine import ChatEngine
+from fitz.core.llm.chat.engine import ChatEngine
 
 
 class Dummy:

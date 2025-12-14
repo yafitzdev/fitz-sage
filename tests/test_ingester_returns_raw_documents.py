@@ -1,5 +1,5 @@
-from ingest.ingestion.base import RawDocument
-from ingest.ingestion.registry import get_ingest_plugin
+from fitz.ingest.ingestion.base import RawDocument
+from fitz.ingest.ingestion.registry import get_ingest_plugin
 
 
 def test_local_ingest_returns_raw_documents(tmp_path):

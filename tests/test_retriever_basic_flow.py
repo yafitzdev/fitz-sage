@@ -1,7 +1,7 @@
 # tests/test_retriever_basic_flow.py
 from dataclasses import dataclass
 
-from rag.retrieval import RetrieverEngine
+from fitz.rag.retrieval import RetrieverEngine
 
 
 @dataclass

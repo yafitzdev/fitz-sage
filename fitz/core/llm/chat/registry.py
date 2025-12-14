@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from typing import Type
 
-from core.llm.chat.base import ChatPlugin
-from core.llm.registry import get_llm_plugin
+from fitz.core.llm.chat.base import ChatPlugin
+from fitz.core.llm.registry import get_llm_plugin
 
 
 def get_chat_plugin(plugin_name: str) -> Type[ChatPlugin]:

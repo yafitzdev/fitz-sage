@@ -29,14 +29,14 @@ if not os.getenv("COHERE_API_KEY"):
     print("Run: export COHERE_API_KEY='your-key'")
     sys.exit(1)
 
-from core.llm import get_llm_plugin
-from core.vector_db.writer import VectorDBWriter
-from ingest.chunking.plugins.simple import SimpleChunker
-from ingest.ingestion.registry import get_ingest_plugin
-from ingest.validation.documents import ValidationConfig, validate
-from rag.context.pipeline import ContextPipeline
-from rag.generation.rgs import RGS, RGSConfig
-from retrieval.plugins.dense import DenseRetrievalPlugin
+from fitz.core.llm import get_llm_plugin
+from fitz.core.vector_db.writer import VectorDBWriter
+from fitz.ingest.chunking.plugins.simple import SimpleChunker
+from fitz.ingest.ingestion.registry import get_ingest_plugin
+from fitz.ingest.validation.documents import ValidationConfig, validate
+from fitz.rag.context.pipeline import ContextPipeline
+from fitz.rag.generation.rgs import RGS, RGSConfig
+from fitz.retrieval.plugins.dense import DenseRetrievalPlugin
 
 COLLECTION_NAME = "fitz_demo"
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from rag.generation.rgs import RGS, RGSAnswer, RGSConfig
-from rag.pipeline.engine import RAGPipeline
+from fitz.rag.generation.rgs import RGS, RGSAnswer, RGSConfig
+from fitz.rag.pipeline.engine import RAGPipeline
 
 
 class DummyRetriever:

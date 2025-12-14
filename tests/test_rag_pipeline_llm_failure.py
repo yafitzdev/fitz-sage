@@ -2,9 +2,9 @@
 
 import pytest
 
-from core.exceptions.llm import LLMError
-from rag.generation.rgs import RGS, RGSConfig
-from rag.pipeline.engine import RAGPipeline
+from fitz.core.exceptions.llm import LLMError
+from fitz.rag.generation.rgs import RGS, RGSConfig
+from fitz.rag.pipeline.engine import RAGPipeline
 
 
 class DummyRetriever:

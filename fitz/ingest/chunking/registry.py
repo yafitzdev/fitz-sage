@@ -5,9 +5,9 @@ import importlib
 import pkgutil
 from typing import Dict, Iterable, Type
 
-from core.logging.logger import get_logger
-from core.logging.tags import CHUNKING
-from ingest.chunking.base import ChunkerPlugin
+from fitz.core.logging.logger import get_logger
+from fitz.core.logging.tags import CHUNKING
+from fitz.ingest.chunking.base import ChunkerPlugin
 
 logger = get_logger(__name__)
 

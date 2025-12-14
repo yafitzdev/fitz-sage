@@ -17,8 +17,8 @@ from typing import (
     runtime_checkable,
 )
 
-from rag.exceptions.pipeline import PipelineError, RGSGenerationError
-from rag.generation.prompting import (
+from fitz.rag.exceptions.pipeline import PipelineError, RGSGenerationError
+from fitz.rag.generation.prompting import (
     PromptAssembler,
     PromptConfig,
     PromptProfile,

@@ -11,8 +11,8 @@ Run with:
     python examples/quickstart.py
 """
 
-from rag.context.pipeline import ContextPipeline
-from rag.generation.rgs import RGS, RGSConfig
+from fitz.rag.context.pipeline import ContextPipeline
+from fitz.rag.generation.rgs import RGS, RGSConfig
 
 
 def main():

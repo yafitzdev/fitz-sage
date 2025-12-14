@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from core.exceptions.llm import EmbeddingError
+from fitz.core.exceptions.llm import EmbeddingError
 
 try:
     import cohere

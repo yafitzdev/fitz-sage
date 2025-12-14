@@ -17,9 +17,9 @@ from typing import Any
 
 import yaml
 
-from core.config.schema import FitzConfig
-from core.logging.logger import get_logger
-from core.logging.tags import CLI
+from fitz.core.config.schema import FitzConfig
+from fitz.core.logging.logger import get_logger
+from fitz.core.logging.tags import CLI
 
 logger = get_logger(__name__)
 

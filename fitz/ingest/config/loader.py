@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from ingest.config.schema import IngestConfig
+from fitz.ingest.config.schema import IngestConfig
 
 
 class IngestConfigError(RuntimeError):

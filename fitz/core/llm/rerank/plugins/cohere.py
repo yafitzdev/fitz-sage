@@ -8,7 +8,7 @@ try:
 except ImportError:
     cohere = None  # type: ignore
 
-from core.models.chunk import Chunk
+from fitz.core.models.chunk import Chunk
 
 
 class CohereRerankClient:

@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from typing import Type
 
-from core.llm.embedding.base import EmbeddingPlugin
-from core.llm.registry import get_llm_plugin
+from fitz.core.llm.embedding.base import EmbeddingPlugin
+from fitz.core.llm.registry import get_llm_plugin
 
 
 def get_embedding_plugin(plugin_name: str) -> Type[EmbeddingPlugin]:

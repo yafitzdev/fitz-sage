@@ -15,10 +15,10 @@ from typing import Optional
 
 import typer
 
-from core.logging.logger import get_logger
-from core.logging.tags import CLI, PIPELINE
-from rag.config.loader import load_config
-from rag.pipeline.engine import create_pipeline_from_yaml
+from fitz.core.logging.logger import get_logger
+from fitz.core.logging.tags import CLI, PIPELINE
+from fitz.rag.config.loader import load_config
+from fitz.rag.pipeline.engine import create_pipeline_from_yaml
 
 logger = get_logger(__name__)
 

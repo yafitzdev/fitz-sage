@@ -1,6 +1,6 @@
 # tests/test_rerank_engine_basic.py
-from core.llm.rerank.engine import RerankEngine
-from core.models.chunk import Chunk
+from fitz.core.llm.rerank.engine import RerankEngine
+from fitz.core.models.chunk import Chunk
 
 
 class DummyRerankPlugin:

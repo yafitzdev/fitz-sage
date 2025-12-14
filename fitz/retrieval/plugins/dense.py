@@ -4,14 +4,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, List, Protocol, runtime_checkable
 
-from core.exceptions.llm import EmbeddingError
-from core.llm.embedding.engine import EmbeddingEngine
-from core.llm.rerank.engine import RerankEngine
-from core.logging.logger import get_logger
-from core.logging.tags import RETRIEVER
-from core.models.chunk import Chunk
-from rag.exceptions.retriever import RerankError, VectorSearchError
-from rag.retrieval import RetrievalPlugin
+from fitz.core.exceptions.llm import EmbeddingError
+from fitz.core.llm.embedding.engine import EmbeddingEngine
+from fitz.core.llm.rerank.engine import RerankEngine
+from fitz.core.logging.logger import get_logger
+from fitz.core.logging.tags import RETRIEVER
+from fitz.core.models.chunk import Chunk
+from fitz.rag.exceptions.retriever import RerankError, VectorSearchError
+from fitz.rag.retrieval import RetrievalPlugin
 
 logger = get_logger(__name__)
 

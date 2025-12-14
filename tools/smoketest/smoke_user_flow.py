@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from core.models.chunk import Chunk
-from core.vector_db.writer import VectorDBWriter
-from rag.context.pipeline import ContextPipeline
-from rag.generation.rgs import RGS, RGSConfig
-from retrieval.plugins.dense import DenseRetrievalPlugin, RetrieverCfg
+from fitz.core.models.chunk import Chunk
+from fitz.core.vector_db.writer import VectorDBWriter
+from fitz.rag.context.pipeline import ContextPipeline
+from fitz.rag.generation.rgs import RGS, RGSConfig
+from fitz.retrieval.plugins.dense import DenseRetrievalPlugin, RetrieverCfg
 
 
 def read_text_files(root: Path) -> list[tuple[str, str]]:

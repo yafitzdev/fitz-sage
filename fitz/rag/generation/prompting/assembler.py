@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from rag.generation.prompting.profiles import PromptProfile
+from fitz.rag.generation.prompting.profiles import PromptProfile
 
 
 @dataclass(frozen=True, slots=True)

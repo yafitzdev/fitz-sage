@@ -5,7 +5,7 @@ import importlib
 import pkgutil
 from typing import Dict, Iterable, Type
 
-from rag.pipeline.base import PipelinePlugin
+from fitz.rag.pipeline.base import PipelinePlugin
 
 PIPELINE_REGISTRY: Dict[str, Type[PipelinePlugin]] = {}
 _DISCOVERED = False

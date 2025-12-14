@@ -4,8 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from core.models.chunk import Chunk
-from rag.exceptions.pipeline import PipelineError
+from fitz.core.models.chunk import Chunk
+from fitz.rag.exceptions.pipeline import PipelineError
 
 from .steps.dedupe import DedupeStep
 from .steps.group import GroupByDocumentStep

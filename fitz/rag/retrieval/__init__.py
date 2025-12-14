@@ -1,30 +1,13 @@
-# rag/retrieval/__init__.py
 """
-Retrieval subsystem public API.
+RAG-level retrieval orchestration API.
 
-Keep this module import-light to avoid circular imports.
-We provide lazy re-exports for convenience.
+This module wires RAG to the core retrieval system.
 """
 
-from __future__ import annotations
+from fitz.retrieval.base import RetrievalPlugin
+from fitz.retrieval.engine import RetrieverEngine
 
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    pass
-
-__all__ = ["RetrievalPlugin", "RetrieverEngine"]
-
-
-def __getattr__(name: str) -> Any:
-    if name == "RetrievalPlugin":
-        from rag.retrieval import RetrievalPlugin as _RetrievalPlugin
-
-        return _RetrievalPlugin
-
-    if name == "RetrieverEngine":
-        from rag.retrieval import RetrieverEngine as _RetrieverEngine
-
-        return _RetrieverEngine
-
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+__all__ = [
+    "RetrievalPlugin",
+    "RetrieverEngine",
+]

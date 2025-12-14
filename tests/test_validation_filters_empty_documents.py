@@ -1,5 +1,5 @@
-from ingest.ingestion.base import RawDocument
-from ingest.validation.documents import validate
+from fitz.ingest.ingestion.base import RawDocument
+from fitz.ingest.validation.documents import validate
 
 
 def test_validation_filters_empty_documents():

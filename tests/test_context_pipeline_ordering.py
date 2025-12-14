@@ -1,5 +1,5 @@
 # tests/test_context_pipeline_ordering.py
-from rag.context.pipeline import ContextPipeline
+from fitz.rag.context.pipeline import ContextPipeline
 
 
 def test_context_pipeline_preserves_document_order():

@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from core.exceptions.llm import EmbeddingError
+from fitz.core.exceptions.llm import EmbeddingError
 
 try:
     from openai import OpenAI

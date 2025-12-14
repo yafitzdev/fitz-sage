@@ -1,6 +1,6 @@
 # ingest/config/__init__.py
 
-from ingest.config.schema import (
+from fitz.ingest.config.schema import (
     ChunkerConfig,
     IngestConfig,
     IngesterConfig,

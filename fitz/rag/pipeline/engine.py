@@ -3,21 +3,21 @@ from __future__ import annotations
 
 from typing import Optional
 
-from core.exceptions.llm import LLMError
-from core.llm.chat import ChatEngine
-from core.llm.embedding.engine import EmbeddingEngine
-from core.llm.registry import get_llm_plugin
-from core.llm.rerank.engine import RerankEngine
-from core.logging.logger import get_logger
-from core.logging.tags import PIPELINE, VECTOR_DB
-from core.vector_db.registry import get_vector_db_plugin
-from rag.config.loader import load_config
-from rag.config.schema import RAGConfig
-from rag.context.pipeline import ContextPipeline
-from rag.exceptions.pipeline import PipelineError, RGSGenerationError
-from rag.generation.rgs import RGS, RGSAnswer
-from rag.generation.rgs import RGSConfig as RGSRuntimeConfig
-from rag.retrieval import RetrieverEngine
+from fitz.core.exceptions.llm import LLMError
+from fitz.core.llm.chat import ChatEngine
+from fitz.core.llm.embedding.engine import EmbeddingEngine
+from fitz.core.llm.registry import get_llm_plugin
+from fitz.core.llm.rerank.engine import RerankEngine
+from fitz.core.logging.logger import get_logger
+from fitz.core.logging.tags import PIPELINE, VECTOR_DB
+from fitz.core.vector_db.registry import get_vector_db_plugin
+from fitz.rag.config.loader import load_config
+from fitz.rag.config.schema import RAGConfig
+from fitz.rag.context.pipeline import ContextPipeline
+from fitz.rag.exceptions.pipeline import PipelineError, RGSGenerationError
+from fitz.rag.generation.rgs import RGS, RGSAnswer
+from fitz.rag.generation.rgs import RGSConfig as RGSRuntimeConfig
+from fitz.rag.retrieval import RetrieverEngine
 
 logger = get_logger(__name__)
 

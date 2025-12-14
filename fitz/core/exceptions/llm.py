@@ -1,4 +1,4 @@
-from core.exceptions.base import FitzRAGError
+from fitz.core.exceptions.base import FitzRAGError
 
 
 class LLMError(FitzRAGError):

@@ -16,8 +16,8 @@ from __future__ import annotations
 import os
 from typing import Mapping
 
-from core.logging.logger import get_logger
-from core.logging.tags import CHAT
+from fitz.core.logging.logger import get_logger
+from fitz.core.logging.tags import CHAT
 
 logger = get_logger(__name__)
 

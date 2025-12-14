@@ -4,14 +4,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List
 
-from core.logging.logger import get_logger
-from core.logging.tags import CHUNKING
-from core.models.chunk import Chunk
-from ingest.chunking.base import ChunkerPlugin
-from ingest.chunking.registry import get_chunker_plugin
-from ingest.config.schema import ChunkerConfig
-from ingest.exceptions.chunking import IngestionChunkingError
-from ingest.exceptions.config import IngestionConfigError
+from fitz.core.logging.logger import get_logger
+from fitz.core.logging.tags import CHUNKING
+from fitz.core.models.chunk import Chunk
+from fitz.ingest.chunking.base import ChunkerPlugin
+from fitz.ingest.chunking.registry import get_chunker_plugin
+from fitz.ingest.config.schema import ChunkerConfig
+from fitz.ingest.exceptions.chunking import IngestionChunkingError
+from fitz.ingest.exceptions.config import IngestionConfigError
 
 logger = get_logger(__name__)
 

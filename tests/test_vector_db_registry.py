@@ -1,7 +1,7 @@
 import pytest
 
-from core.llm import get_llm_plugin
-from core.llm.registry import LLMRegistryError
+from fitz.core.llm import get_llm_plugin
+from fitz.core.llm.registry import LLMRegistryError
 
 
 def test_vector_db_discovery_in_llm_registry():

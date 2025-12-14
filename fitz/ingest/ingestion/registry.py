@@ -5,7 +5,7 @@ import importlib
 import pkgutil
 from typing import Dict, Iterable, Type
 
-from ingest.ingestion.base import IngestPlugin
+from fitz.ingest.ingestion.base import IngestPlugin
 
 REGISTRY: Dict[str, Type[IngestPlugin]] = {}
 _DISCOVERED = False

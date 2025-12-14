@@ -1,6 +1,6 @@
 import pytest
 
-from core.llm.chat.engine import ChatEngine
+from fitz.core.llm.chat.engine import ChatEngine
 
 
 class DummyChatOK:

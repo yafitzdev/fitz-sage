@@ -1,4 +1,4 @@
 # rag/retrieval/engine.py
-from fitz.retrieval.engine import RetrievalEngine
+from fitz.retrieval.engine import RetrieverEngine
 
-__all__ = ["RetrievalEngine"]
+__all__ = ["RetrieverEngine"]

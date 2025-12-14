@@ -6,9 +6,9 @@ import importlib
 import pkgutil
 from typing import Dict, Iterable, Type
 
-from core.logging.logger import get_logger
-from core.logging.tags import RETRIEVER
-from rag.retrieval import RetrievalPlugin
+from fitz.core.logging.logger import get_logger
+from fitz.core.logging.tags import RETRIEVER
+from fitz.rag.retrieval import RetrievalPlugin
 
 logger = get_logger(__name__)
 

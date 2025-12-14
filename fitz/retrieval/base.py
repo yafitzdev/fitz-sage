@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List, Protocol, runtime_checkable
 
-from core.models.chunk import Chunk
+from fitz.core.models.chunk import Chunk
 
 
 @runtime_checkable

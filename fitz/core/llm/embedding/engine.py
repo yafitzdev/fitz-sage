@@ -1,7 +1,7 @@
 # core/llm/embedding/engine.py
 from __future__ import annotations
 
-from core.llm.embedding.base import EmbeddingPlugin
+from fitz.core.llm.embedding.base import EmbeddingPlugin
 
 
 class EmbeddingEngine:
