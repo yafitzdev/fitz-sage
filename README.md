@@ -16,7 +16,6 @@ Most RAG frameworks suffer from abstraction overload, opaque chains, and kitchen
 - **Explicit wiring** — See exactly what's happening in your pipeline
 - **Layered architecture** — Clean dependency flow, no circular imports
 - **Config-driven** — Engines built from config, no hidden magic
-- **Production-tested** — Born from real AI pipelines, not toy examples
 
 ---
 
@@ -250,4 +249,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-Built with lessons learned from production AI pipelines. Special thanks to the open-source community for the foundational tools that make this possible.
+Special thanks to the open-source community for the foundational tools that make this possible.
