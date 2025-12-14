@@ -8,9 +8,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 from tools.contract_map.analysis import (
     compute_config_surface,
@@ -24,11 +24,13 @@ from tools.contract_map.analysis import (
     render_invariants_section,
     render_stats_section,
 )
+from tools.contract_map.architecture import RoleResolver
 from tools.contract_map.common import (
     DEFAULT_LAYOUT_EXCLUDES,
     REPO_ROOT,
     ContractMap,
     HealthIssue,
+    module_name_from_path,
 )
 from tools.contract_map.discovery import render_discovery_section, scan_all_discoveries
 from tools.contract_map.imports import build_import_graph, render_import_graph_section
@@ -40,6 +42,16 @@ from tools.contract_map.models import (
     render_protocols_section,
 )
 from tools.contract_map.registries import extract_registries, render_registries_section
+
+
+@dataclass(frozen=True)
+class ArchitectureViolation:
+    """Represents a single architecture rule violation."""
+    src_role: str
+    dst_role: str
+    src_module: str
+    dst_module: str
+    count: int
 
 
 def check_registry_health(cm: ContractMap) -> None:
@@ -76,6 +88,89 @@ def check_registry_health(cm: ContractMap) -> None:
         )
 
 
+def detect_architecture_violations(cm: ContractMap) -> List[ArchitectureViolation]:
+    """
+    Detect architecture violations from the import graph.
+
+    Returns:
+        List of ArchitectureViolation objects
+    """
+    violations: List[ArchitectureViolation] = []
+
+    if not cm.import_graph or not cm.import_graph.edges:
+        return violations
+
+    try:
+        resolver = RoleResolver()
+    except Exception:
+        # If we can't load architecture contracts, return empty
+        return violations
+
+    # Check each import edge
+    for edge in cm.import_graph.edges:
+        importer_role = resolver.resolve_role(edge.src)
+        imported_role = resolver.resolve_role(edge.dst)
+
+        # Skip unknown roles (external deps, etc)
+        if importer_role == "unknown" or imported_role == "unknown":
+            continue
+
+        # Skip self-imports (same role)
+        if importer_role == imported_role:
+            continue
+
+        # Check if import is allowed
+        if not resolver.is_allowed(importer_role, imported_role):
+            violations.append(
+                ArchitectureViolation(
+                    src_role=importer_role,
+                    dst_role=imported_role,
+                    src_module=edge.src,
+                    dst_module=edge.dst,
+                    count=edge.count,
+                )
+            )
+
+    return violations
+
+
+def validate_architecture_contracts(cm: ContractMap) -> List[str]:
+    """
+    Validate import graph against architecture contracts.
+
+    Returns:
+        List of violation messages (warnings, not errors)
+    """
+    violations: List[str] = []
+
+    if not cm.import_graph or not cm.import_graph.edges:
+        return violations
+
+    try:
+        resolver = RoleResolver()
+    except Exception as e:
+        violations.append(f"Failed to load architecture contracts: {e}")
+        return violations
+
+    # Check each import edge
+    for edge in cm.import_graph.edges:
+        importer_role = resolver.resolve_role(edge.src)
+        imported_role = resolver.resolve_role(edge.dst)
+
+        # Skip unknown roles (external deps, etc)
+        if importer_role == "unknown" or imported_role == "unknown":
+            continue
+
+        # Check if import is allowed
+        if not resolver.is_allowed(importer_role, imported_role):
+            violations.append(
+                f"`{edge.src}` (role: {importer_role}) imports `{edge.dst}` (role: {imported_role}) — "
+                f"violates architecture contract ({edge.count}x occurrences)"
+            )
+
+    return violations
+
+
 def build_contract_map(*, verbose: bool, layout_depth: int | None) -> ContractMap:
     """Build the complete contract map by running all extraction steps."""
     cm = ContractMap(
@@ -102,6 +197,16 @@ def build_contract_map(*, verbose: bool, layout_depth: int | None) -> ContractMa
     cm.config_surface = compute_config_surface(cm, excludes=DEFAULT_LAYOUT_EXCLUDES)
     cm.invariants = compute_invariants(cm)
     cm.stats = compute_stats(REPO_ROOT, excludes=DEFAULT_LAYOUT_EXCLUDES)
+
+    # Validate architecture contracts
+    arch_violations = validate_architecture_contracts(cm)
+    if arch_violations:
+        cm.health.append(
+            HealthIssue(
+                level="WARN",
+                message=f"{len(arch_violations)} architecture contract violation(s) detected (see Architecture Violations section).",
+            )
+        )
 
     return cm
 
@@ -144,6 +249,96 @@ def render_import_failures_section(cm: ContractMap, *, verbose: bool) -> str:
     return "\n".join(lines)
 
 
+def render_architecture_section() -> str:
+    """
+    Render the Architecture Contracts section.
+
+    Shows:
+    - Role mappings (from architecture.yaml)
+    - Import rules (from roles.py)
+    - Validation results (if violations found)
+    """
+    lines = ["## Architecture Contracts"]
+    lines.append("")
+    lines.append("Architectural boundaries are enforced via role-based import rules.")
+    lines.append("")
+
+    try:
+        from fitz.core.config.architecture import load_architecture_mapping
+        from fitz.core._contracts.roles import ROLES
+
+        # Show role mappings
+        lines.append("### Role Mappings")
+        lines.append("")
+        mapping = load_architecture_mapping()
+        for package in sorted(mapping.keys()):
+            role = mapping[package]
+            lines.append(f"- `{package}` → **{role}**")
+        lines.append("")
+
+        # Show role rules
+        lines.append("### Role Import Rules")
+        lines.append("")
+        for role in sorted(ROLES, key=lambda r: r.name):
+            if role.may_be_imported_by:
+                allowed = ", ".join(f"`{r}`" for r in sorted(role.may_be_imported_by))
+                lines.append(f"- **{role.name}**: may be imported by {allowed}")
+            else:
+                lines.append(f"- **{role.name}**: may not be imported (leaf role)")
+        lines.append("")
+
+        # Validation results
+        lines.append("### Validation")
+        lines.append("")
+        lines.append("Architecture validation runs on the import graph.")
+        lines.append("Violations are reported as warnings (see Health section).")
+        lines.append("")
+
+    except Exception as e:
+        lines.append(f"- **ERROR**: Failed to load architecture contracts: {e}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def render_architecture_violations_section(cm: ContractMap) -> str:
+    """
+    Render the Architecture Violations section.
+
+    Shows concrete violations grouped by role pairs.
+    """
+    lines = ["## Architecture Violations"]
+    lines.append("")
+
+    violations = detect_architecture_violations(cm)
+
+    if not violations:
+        lines.append("No architecture violations detected.")
+        lines.append("")
+        return "\n".join(lines)
+
+    # Group by role pair
+    grouped: Dict[tuple[str, str], List[ArchitectureViolation]] = {}
+    for v in violations:
+        key = (v.src_role, v.dst_role)
+        if key not in grouped:
+            grouped[key] = []
+        grouped[key].append(v)
+
+    # Render each group
+    for (src_role, dst_role) in sorted(grouped.keys()):
+        group = grouped[(src_role, dst_role)]
+        lines.append(f"### `{src_role}` → `{dst_role}` ({len(group)} violation(s))")
+        lines.append("")
+
+        for v in sorted(group, key=lambda x: (x.src_module, x.dst_module)):
+            lines.append(f"- `{v.src_module}` imports `{v.dst_module}` ({v.count}x)")
+
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def fix_unicode_rendering(text: str) -> str:
     """
     Fix Unicode box-drawing characters that may not render properly.
@@ -172,6 +367,8 @@ def render_markdown(cm: ContractMap, *, verbose: bool, layout_depth: int | None)
     # Combine all sections
     sections.append(render_meta_section(cm))
     sections.append(render_layout_section(layout_depth=layout_depth))
+    sections.append(render_architecture_section())
+    sections.append(render_architecture_violations_section(cm))  # NEW: Architecture Violations
     sections.append(render_import_graph_section(cm.import_graph))
     sections.append(render_entrypoints_section(cm.entrypoints))
     sections.append(render_discovery_section(cm.discovery))
