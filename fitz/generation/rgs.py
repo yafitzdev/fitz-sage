@@ -18,7 +18,7 @@ from typing import (
 )
 
 from fitz.pipeline.exceptions.pipeline import PipelineError, RGSGenerationError
-from fitz.pipeline.generation.prompting import (
+from fitz.generation.prompting import (
     PromptAssembler,
     PromptConfig,
     PromptProfile,

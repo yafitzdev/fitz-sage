@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fitz.pipeline.generation.rgs import RGS, RGSAnswer, RGSConfig
+from fitz.generation.rgs import RGS, RGSAnswer, RGSConfig
 from fitz.pipeline.pipeline.engine import RAGPipeline
 
 

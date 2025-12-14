@@ -1,5 +1,5 @@
 # tests/test_rgs_strict_grounding_instruction.py
-from fitz.pipeline.generation.rgs import RGS, RGSConfig
+from fitz.generation.rgs import RGS, RGSConfig
 
 
 def test_rgs_strict_grounding_instruction_present():

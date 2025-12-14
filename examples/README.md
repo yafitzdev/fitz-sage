@@ -63,7 +63,7 @@ from fitz.pipeline.pipeline.engine import create_pipeline_from_yaml
 pipeline = create_pipeline_from_yaml("my_config.yaml")
 
 # Direct component usage
-from fitz.pipeline.generation.rgs import RGS, RGSConfig
+from fitz.generation.rgs import RGS, RGSConfig
 
 rgs = RGS(RGSConfig(enable_citations=True))
 

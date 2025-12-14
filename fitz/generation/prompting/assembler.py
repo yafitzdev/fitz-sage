@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from fitz.pipeline.generation.prompting.profiles import PromptProfile
+from fitz.generation.prompting.profiles import PromptProfile
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,5 +1,5 @@
 # tests/test_rgs_metadata_truncation.py
-from fitz.pipeline.generation.rgs import RGS, RGSConfig
+from fitz.generation.rgs import RGS, RGSConfig
 
 
 def test_rgs_metadata_truncation():

@@ -12,7 +12,7 @@ Run with:
 """
 
 from fitz.pipeline.context.pipeline import ContextPipeline
-from fitz.pipeline.generation.rgs import RGS, RGSConfig
+from fitz.generation.rgs import RGS, RGSConfig
 
 
 def main():

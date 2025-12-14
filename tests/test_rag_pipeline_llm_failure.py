@@ -3,7 +3,7 @@
 import pytest
 
 from fitz.core.exceptions.llm import LLMError
-from fitz.pipeline.generation.rgs import RGS, RGSConfig
+from fitz.generation.rgs import RGS, RGSConfig
 from fitz.pipeline.pipeline.engine import RAGPipeline
 
 
