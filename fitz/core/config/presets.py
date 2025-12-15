@@ -16,19 +16,58 @@ Usage:
 # Available configuration presets
 PRESETS = {
     "local": {
+        "vector_db": {
+            "plugin_name": "qdrant",
+            "kwargs": {"host": "localhost", "port": 6333}
+        },
         "llm": {"plugin_name": "local"},
         "embedding": {"plugin_name": "local"},
-        "rerank": {"plugin_name": "local"},
+        "retriever": {
+            "plugin_name": "dense",
+            "collection": "test_collection",
+            "top_k": 5
+        },
+        "rerank": {
+            "enabled": False,
+            "plugin_name": "local"
+        },
     },
     "dev": {
-        "llm": {"plugin_name": "openai", "kwargs": {"model": "gpt-4o-mini"}},
+        "vector_db": {
+            "plugin_name": "qdrant",
+            "kwargs": {"host": "localhost", "port": 6333}
+        },
+        "llm": {
+            "plugin_name": "openai",
+            "kwargs": {"model": "gpt-4o-mini"}
+        },
         "embedding": {"plugin_name": "openai"},
-        "rerank": {"plugin_name": "cohere"},
+        "retriever": {
+            "plugin_name": "dense",
+            "collection": "dev_collection",
+            "top_k": 5
+        },
+        "rerank": {
+            "enabled": True,
+            "plugin_name": "cohere"
+        },
     },
     "production": {
+        "vector_db": {
+            "plugin_name": "qdrant",
+            "kwargs": {"url": "https://your-cluster.qdrant.io", "api_key": "${QDRANT_API_KEY}"}
+        },
         "llm": {"plugin_name": "anthropic"},
         "embedding": {"plugin_name": "cohere"},
-        "rerank": {"plugin_name": "cohere"},
+        "retriever": {
+            "plugin_name": "dense",
+            "collection": "production_collection",
+            "top_k": 10
+        },
+        "rerank": {
+            "enabled": True,
+            "plugin_name": "cohere"
+        },
     },
 }
 

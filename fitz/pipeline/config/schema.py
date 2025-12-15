@@ -29,7 +29,9 @@ class RetrieverConfig(BaseModel):
 class RGSConfig(BaseModel):
     enable_citations: bool = True
     strict_grounding: bool = True
+    answer_style: str | None = None
     max_chunks: int = 8
+    max_answer_chars: int | None = None
     include_query_in_context: bool = True
     source_label_prefix: str = "S"
     model_config = ConfigDict(extra="forbid")
@@ -49,3 +51,24 @@ class RAGConfig(BaseModel):
     rgs: RGSConfig = Field(default_factory=RGSConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     model_config = ConfigDict(extra="forbid")
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "RAGConfig":
+        """
+        Create RAGConfig from a dictionary.
+
+        Uses Pydantic's validation to create a config instance from a dict.
+        This is useful for creating configs from presets or API payloads.
+
+        Args:
+            data: Configuration dictionary
+
+        Returns:
+            Validated RAGConfig instance
+
+        Example:
+            >>> from fitz.core.config.presets import get_preset
+            >>> config_dict = get_preset("local")
+            >>> config = RAGConfig.from_dict(config_dict)
+        """
+        return cls.model_validate(data)

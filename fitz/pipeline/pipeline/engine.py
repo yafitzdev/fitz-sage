@@ -28,11 +28,11 @@ class RAGPipeline:
     """
 
     def __init__(
-        self,
-        retriever: RetrieverEngine,
-        llm: ChatEngine,
-        rgs: RGS,
-        context: ContextPipeline | None = None,
+            self,
+            retriever: RetrieverEngine,
+            llm: ChatEngine,
+            rgs: RGS,
+            context: ContextPipeline | None = None,
     ):
         self.retriever = retriever
         self.llm = llm
@@ -136,6 +136,29 @@ class RAGPipeline:
 
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
         return cls(retriever=retriever, llm=chat_engine, rgs=rgs, context=ContextPipeline())
+
+    @classmethod
+    def from_dict(cls, config_dict: dict) -> "RAGPipeline":
+        """
+        Create a RAGPipeline from a configuration dictionary.
+
+        This method is useful for creating pipelines from presets or
+        dictionaries without manually constructing RAGConfig objects.
+
+        Args:
+            config_dict: Configuration dictionary matching RAGConfig schema
+
+        Returns:
+            RAGPipeline instance
+
+        Example:
+            >>> from fitz.core.config.presets import get_preset
+            >>> config = get_preset("local")
+            >>> pipeline = RAGPipeline.from_dict(config)
+        """
+        logger.info(f"{PIPELINE} Creating RAGPipeline from dict")
+        cfg = RAGConfig.from_dict(config_dict)
+        return cls.from_config(cfg)
 
 
 def create_pipeline_from_yaml(path: Optional[str] = None) -> RAGPipeline:
