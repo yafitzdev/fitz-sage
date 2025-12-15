@@ -1,27 +1,49 @@
-# fitz/core/llm/rerank/plugins/local.py
 from __future__ import annotations
 
-from typing import Any
+from typing import List
 
-from fitz.backends.local_llm.rerank import LocalReranker, LocalRerankerConfig
 from fitz.core.llm.rerank.base import RerankPlugin
 from fitz.core.models.chunk import Chunk
 
 
 class LocalRerankClient(RerankPlugin):
     """
-    Local fallback rerank plugin.
+    Local fallback reranker.
 
-    Thin adapter around fitz.backends.local_llm.rerank.LocalReranker.
+    Baseline quality:
+    - token overlap
+    - substring presence
+    - deterministic ordering
+
+    Purpose:
+    - make the pipeline runnable without API keys
+    - validate retrieval + RGS wiring
     """
 
     plugin_name = "local"
     plugin_type = "rerank"
     availability = "local"
 
-    def __init__(self, **kwargs: Any):
-        cfg = LocalRerankerConfig(**kwargs)
-        self._reranker = LocalReranker(cfg)
+    def rerank(self, query: str, chunks: List[Chunk]) -> List[Chunk]:
+        if not chunks:
+            return chunks
 
-    def rerank(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
-        return self._reranker.rerank(query, chunks)
+        q = query.lower()
+        q_tokens = set(q.split())
+
+        def score(chunk: Chunk) -> float:
+            text = chunk.content.lower()
+
+            # token overlap
+            tokens = set(text.split())
+            overlap = len(tokens & q_tokens)
+
+            # substring boost
+            substring = 1.0 if q in text else 0.0
+
+            # mild length normalization (avoid giant chunks winning)
+            length_penalty = max(len(tokens), 1)
+
+            return (overlap * 2.0 + substring) / length_penalty
+
+        return sorted(chunks, key=score, reverse=True)
