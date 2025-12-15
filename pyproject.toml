@@ -26,6 +26,7 @@ dependencies = [
 
 [project.optional-dependencies]
 ingest = ["pdfminer.six", "python-docx"]
+local = ["ollama>=0.1.0"]
 
 
 [tool.setuptools.packages.find]
@@ -34,8 +35,9 @@ exclude = ["tests*"]
 
 
 [project.scripts]
-pipeline = "fitz.pipeline.cli:app"
-ingest = "fitz.ingest.cli:app"
+fitz = "fitz.cli:app"
+fitz-ingest = "fitz.ingest.cli:app"
+fitz-pipeline = "fitz.pipeline.cli:app"
 
 
 [tool.black]
