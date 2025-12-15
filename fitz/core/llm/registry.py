@@ -3,10 +3,9 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
-from typing import Any, Dict, Iterable, Type, Literal
+from typing import Any, Dict, Iterable, Type
 
 LLMPluginType = str  # "chat" | "embedding" | "rerank" | "vector_db"
-Availability = Literal["external", "local"]
 
 
 class LLMRegistryError(RuntimeError):
@@ -14,7 +13,6 @@ class LLMRegistryError(RuntimeError):
 
 
 LLM_REGISTRY: Dict[LLMPluginType, Dict[str, Type[Any]]] = {}
-LLM_REGISTRY_LOCAL: Dict[LLMPluginType, Dict[str, Type[Any]]] = {}
 _DISCOVERED = False
 
 _REQUIRED_METHOD: dict[str, str] = {
@@ -41,17 +39,39 @@ def get_llm_plugin(*, plugin_name: str, plugin_type: LLMPluginType) -> Type[Any]
         raise LLMRegistryError(f"Unknown {plugin_type} plugin: {plugin_name!r}") from exc
 
 
-def get_local_llm_plugin(*, plugin_type: LLMPluginType) -> Type[Any]:
-    _auto_discover()
-    try:
-        return next(iter(LLM_REGISTRY_LOCAL.get(plugin_type, {}).values()))
-    except StopIteration as exc:
-        raise LLMRegistryError(f"No local {plugin_type} plugin available") from exc
-
-
 def available_llm_plugins(plugin_type: LLMPluginType) -> list[str]:
     _auto_discover()
     return sorted(LLM_REGISTRY.get(plugin_type, {}).keys())
+
+
+def resolve_llm_plugin(
+    *,
+    plugin_type: LLMPluginType,
+    requested_name: str,
+) -> Type[Any]:
+    """
+    Resolve an LLM plugin with local-first fallback.
+
+    Resolution order:
+    1. Any plugin with availability="local" for this plugin_type
+    2. The explicitly requested plugin_name
+    """
+    _auto_discover()
+
+    bucket = LLM_REGISTRY.get(plugin_type, {})
+
+    # 1. local-first
+    for cls in bucket.values():
+        if getattr(cls, "availability", None) == "local":
+            return cls
+
+    # 2. explicit request
+    try:
+        return bucket[requested_name]
+    except KeyError as exc:
+        raise LLMRegistryError(
+            f"Unknown {plugin_type} plugin: {requested_name!r}"
+        ) from exc
 
 
 def _auto_discover() -> None:
@@ -116,13 +136,8 @@ def _iter_plugin_classes(module: object) -> Iterable[type]:
 def _register(cls: Type[Any]) -> None:
     plugin_name = getattr(cls, "plugin_name")
     plugin_type = getattr(cls, "plugin_type")
-    availability: Availability = getattr(cls, "availability", "external")
 
-    if availability == "local":
-        bucket = LLM_REGISTRY_LOCAL.setdefault(plugin_type, {})
-    else:
-        bucket = LLM_REGISTRY.setdefault(plugin_type, {})
-
+    bucket = LLM_REGISTRY.setdefault(plugin_type, {})
     existing = bucket.get(plugin_name)
 
     if existing is not None and existing is not cls:

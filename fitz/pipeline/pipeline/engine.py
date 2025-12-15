@@ -6,7 +6,7 @@ from typing import Optional
 from fitz.core.exceptions.llm import LLMError
 from fitz.core.llm.chat import ChatEngine
 from fitz.core.llm.embedding.engine import EmbeddingEngine
-from fitz.core.llm.registry import get_llm_plugin
+from fitz.core.llm.registry import resolve_llm_plugin
 from fitz.core.llm.rerank.engine import RerankEngine
 from fitz.core.logging.logger import get_logger
 from fitz.core.logging.tags import PIPELINE, VECTOR_DB
@@ -89,17 +89,28 @@ class RAGPipeline:
         vector_client = VectorDBCls(**cfg.vector_db.kwargs)
         logger.info(f"{VECTOR_DB} Using vector DB plugin='{cfg.vector_db.plugin_name}'")
 
-        chat_engine = ChatEngine.from_name(cfg.llm.plugin_name, **cfg.llm.kwargs)
+        # Chat (local-first fallback)
+        ChatCls = resolve_llm_plugin(
+            plugin_type="chat",
+            requested_name=cfg.llm.plugin_name,
+        )
+        chat_plugin = ChatCls(**cfg.llm.kwargs)
+        chat_engine = ChatEngine(chat_plugin)
 
-        EmbedCls = get_llm_plugin(plugin_name=cfg.embedding.plugin_name, plugin_type="embedding")
+        # Embedding (local-first fallback)
+        EmbedCls = resolve_llm_plugin(
+            plugin_type="embedding",
+            requested_name=cfg.embedding.plugin_name,
+        )
         embed_plugin = EmbedCls(**cfg.embedding.kwargs)
         embedder = EmbeddingEngine(embed_plugin)
 
+        # Rerank (local-first fallback)
         rerank_engine: RerankEngine | None = None
         if cfg.rerank.enabled:
-            RerankCls = get_llm_plugin(
-                plugin_name=cfg.rerank.plugin_name,  # type: ignore[arg-type]
+            RerankCls = resolve_llm_plugin(
                 plugin_type="rerank",
+                requested_name=cfg.rerank.plugin_name,  # type: ignore[arg-type]
             )
             rerank_plugin = RerankCls(**cfg.rerank.kwargs)
             rerank_engine = RerankEngine(rerank_plugin)

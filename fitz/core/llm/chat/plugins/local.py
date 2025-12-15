@@ -3,29 +3,24 @@ from __future__ import annotations
 
 from typing import Any
 
-from fitz.core.llm.chat.base import ChatPlugin
 from fitz.backends.local_llm.chat import LocalChatLLM, LocalChatConfig
-from fitz.backends.local_llm.runtime import LocalLLMRuntime, LocalLLMRuntimeConfig
+from fitz.core.llm.chat.base import ChatPlugin
 
 
 class LocalChatClient(ChatPlugin):
     """
-    Local baseline ChatPlugin.
+    Local fallback chat plugin.
 
-    Purpose:
-    - Zero-key fallback
-    - Pipeline verification
-    - Deterministic, degraded quality
+    Thin adapter around fitz.backends.local_llm.chat.LocalChatLLM.
     """
 
     plugin_name = "local"
+    plugin_type = "chat"
     availability = "local"
 
-    def __init__(self, **kwargs: Any) -> None:
-        runtime_cfg = LocalLLMRuntimeConfig(**kwargs)
-        runtime = LocalLLMRuntime(runtime_cfg)
-        chat_cfg = LocalChatConfig()
-        self._client = LocalChatLLM(runtime=runtime, cfg=chat_cfg)
+    def __init__(self, **kwargs: Any):
+        cfg = LocalChatConfig(**kwargs)
+        self._llm = LocalChatLLM(cfg)
 
     def chat(self, messages: list[dict[str, Any]]) -> str:
-        return self._client.chat(messages)
+        return self._llm.chat(messages)
