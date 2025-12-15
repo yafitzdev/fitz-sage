@@ -46,3 +46,12 @@ class LocalEmbedder:
             raise TypeError("Local embedding must return list[float]")
 
         return vec
+
+    def embed_texts(self, texts: List[str]) -> List[List[float]]:
+        """
+        Embed multiple texts.
+
+        NOTE: This calls embed() for each text sequentially.
+        Ollama doesn't support batch embedding via the Python client.
+        """
+        return [self.embed(text) for text in texts]
