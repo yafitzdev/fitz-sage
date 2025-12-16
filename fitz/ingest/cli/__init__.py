@@ -10,6 +10,7 @@ Available commands:
 - validate: Validate documents before ingestion (dry-run)
 - stats: Show statistics about a collection
 """
+
 import typer
 
 # Create main app first

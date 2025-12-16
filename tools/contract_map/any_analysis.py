@@ -167,9 +167,7 @@ def analyze_any_usage(
                 category = categorize_any_occurrence(str(rel_path), line)
 
                 # Track by category
-                analysis.by_category[category] = (
-                    analysis.by_category.get(category, 0) + any_count
-                )
+                analysis.by_category[category] = analysis.by_category.get(category, 0) + any_count
 
                 # Store occurrence
                 context = extract_context(py_file, line_num - 1)
@@ -255,9 +253,7 @@ def render_any_analysis_section(analysis: AnyAnalysis) -> str:
     lines.append("")
 
     if lazy > 0:
-        lines.append(
-            f"1. **Fix Lazy Typing** ({lazy} mentions): Type erasure and lazy parameters"
-        )
+        lines.append(f"1. **Fix Lazy Typing** ({lazy} mentions): Type erasure and lazy parameters")
         lines.append("   - Replace `Type[Any]` with specific types")
         lines.append("   - Replace `-> Any:` with concrete return types")
         lines.append("   - Replace parameter `Any` with `object` or specific types")
@@ -267,21 +263,23 @@ def render_any_analysis_section(analysis: AnyAnalysis) -> str:
         lines.append("   - Create `@runtime_checkable` Protocols")
         lines.append("   - Replace `chunk_like: Any` with `chunk_like: ChunkLike | dict`")
 
-    lines.append(
-        f"3. **Keep Legitimate** ({legitimate} mentions): Config, metadata, messages"
-    )
+    lines.append(f"3. **Keep Legitimate** ({legitimate} mentions): Config, metadata, messages")
     lines.append("   - These are correctly typed")
     lines.append("")
 
     # Progress tracking
     total_fixable = lazy + converter
-    percentage_fixable = (total_fixable / analysis.total_count * 100) if analysis.total_count > 0 else 0
+    percentage_fixable = (
+        (total_fixable / analysis.total_count * 100) if analysis.total_count > 0 else 0
+    )
 
     lines.append("### Improvement Potential")
     lines.append("")
     lines.append(f"- **Total Any**: {analysis.total_count}")
     lines.append(f"- **Fixable**: {total_fixable} ({percentage_fixable:.1f}%)")
-    lines.append(f"- **Should Keep**: {legitimate + reflection} ({(legitimate + reflection) / analysis.total_count * 100:.1f}%)")
+    lines.append(
+        f"- **Should Keep**: {legitimate + reflection} ({(legitimate + reflection) / analysis.total_count * 100:.1f}%)"
+    )
     lines.append("")
 
     return "\n".join(lines)

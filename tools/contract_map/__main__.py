@@ -49,6 +49,7 @@ from tools.contract_map.registries import extract_registries, render_registries_
 @dataclass(frozen=True)
 class ArchitectureViolation:
     """Represents a single architecture rule violation."""
+
     src_role: str
     dst_role: str
     src_module: str
@@ -328,7 +329,7 @@ def render_architecture_violations_section(cm: ContractMap) -> str:
         grouped[key].append(v)
 
     # Render each group
-    for (src_role, dst_role) in sorted(grouped.keys()):
+    for src_role, dst_role in sorted(grouped.keys()):
         group = grouped[(src_role, dst_role)]
         lines.append(f"### `{src_role}` → `{dst_role}` ({len(group)} violation(s))")
         lines.append("")

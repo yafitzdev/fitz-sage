@@ -27,6 +27,7 @@ class CohereEmbeddingClient:
         - input_type: Type of input (default: search_document for ingestion)
         - output_dimension: Dimension reduction (default: None - full dimensions)
     """
+
     plugin_name: str = "cohere"
     plugin_type: str = "embedding"
 
@@ -39,8 +40,7 @@ class CohereEmbeddingClient:
     def __post_init__(self) -> None:
         if httpx is None:
             raise RuntimeError(
-                "httpx is required for Cohere plugin. "
-                "Install with: pip install httpx"
+                "httpx is required for Cohere plugin. " "Install with: pip install httpx"
             )
 
         # Get API key
@@ -54,7 +54,9 @@ class CohereEmbeddingClient:
 
         # Set defaults
         self.model = self.model or os.getenv("COHERE_EMBED_MODEL") or "embed-english-v3.0"
-        self.input_type = self.input_type or os.getenv("COHERE_EMBED_INPUT_TYPE") or "search_document"
+        self.input_type = (
+            self.input_type or os.getenv("COHERE_EMBED_INPUT_TYPE") or "search_document"
+        )
 
         # Create HTTP client
         self._client = httpx.Client(
@@ -133,7 +135,7 @@ class CohereEmbeddingClient:
 
     def __del__(self):
         """Clean up HTTP client on deletion."""
-        if hasattr(self, '_client'):
+        if hasattr(self, "_client"):
             try:
                 self._client.close()
             except Exception as e:

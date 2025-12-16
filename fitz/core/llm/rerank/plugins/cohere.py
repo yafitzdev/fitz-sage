@@ -23,19 +23,19 @@ class CohereRerankClient:
     Optional:
         - model: Rerank model (default: rerank-english-v3.0)
     """
+
     plugin_name = "cohere"
     plugin_type = "rerank"
 
     def __init__(
-            self,
-            api_key: str | None = None,
-            model: str = "rerank-english-v3.0",
-            base_url: str = "https://api.cohere.ai/v1",
+        self,
+        api_key: str | None = None,
+        model: str = "rerank-english-v3.0",
+        base_url: str = "https://api.cohere.ai/v1",
     ) -> None:
         if httpx is None:
             raise RuntimeError(
-                "httpx is required for Cohere plugin. "
-                "Install with: pip install httpx"
+                "httpx is required for Cohere plugin. " "Install with: pip install httpx"
             )
 
         # Get API key
@@ -125,7 +125,7 @@ class CohereRerankClient:
 
     def __del__(self):
         """Clean up HTTP client on deletion."""
-        if hasattr(self, '_client'):
+        if hasattr(self, "_client"):
             try:
                 self._client.close()
             except Exception as e:

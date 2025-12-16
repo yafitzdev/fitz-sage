@@ -6,6 +6,7 @@ Usage:
     fitz-ingest run ./documents --collection my_docs --ingest-plugin local
     fitz-ingest run ./documents --collection my_docs --embedding-plugin cohere
 """
+
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -54,34 +55,34 @@ def _raw_to_chunks(raw_docs: Iterable[Any]) -> list[Chunk]:
 
 
 def command(
-        source: Path = typer.Argument(
-            ...,
-            help="Source to ingest (file or directory, depending on ingest plugin).",
-        ),
-        collection: str = typer.Option(
-            ...,
-            "--collection",
-            "-c",
-            help="Target vector DB collection name.",
-        ),
-        ingest_plugin: str = typer.Option(
-            "local",
-            "--ingest-plugin",
-            "-i",
-            help="Ingestion plugin name (as registered in ingest.ingestion.registry).",
-        ),
-        embedding_plugin: str = typer.Option(
-            "cohere",
-            "--embedding-plugin",
-            "-e",
-            help="Embedding plugin name (registered in core.llm.registry).",
-        ),
-        vector_db_plugin: str = typer.Option(
-            "qdrant",
-            "--vector-db-plugin",
-            "-v",
-            help="Vector DB plugin name (registered in core.vector_db.registry).",
-        ),
+    source: Path = typer.Argument(
+        ...,
+        help="Source to ingest (file or directory, depending on ingest plugin).",
+    ),
+    collection: str = typer.Option(
+        ...,
+        "--collection",
+        "-c",
+        help="Target vector DB collection name.",
+    ),
+    ingest_plugin: str = typer.Option(
+        "local",
+        "--ingest-plugin",
+        "-i",
+        help="Ingestion plugin name (as registered in ingest.ingestion.registry).",
+    ),
+    embedding_plugin: str = typer.Option(
+        "cohere",
+        "--embedding-plugin",
+        "-e",
+        help="Embedding plugin name (registered in core.llm.registry).",
+    ),
+    vector_db_plugin: str = typer.Option(
+        "qdrant",
+        "--vector-db-plugin",
+        "-v",
+        help="Vector DB plugin name (registered in core.vector_db.registry).",
+    ),
 ) -> None:
     """
     Ingest documents into a vector database.
@@ -155,6 +156,7 @@ def command(
 
         # Import config
         from fitz.backends.local_vector_db.config import LocalVectorDBConfig
+
         config = LocalVectorDBConfig()
 
         vdb_client = VectorDBPluginCls(dim=dim, config=config)

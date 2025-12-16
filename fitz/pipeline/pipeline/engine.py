@@ -28,11 +28,11 @@ class RAGPipeline:
     """
 
     def __init__(
-            self,
-            retriever: RetrieverEngine,
-            llm: ChatEngine,
-            rgs: RGS,
-            context: ContextPipeline | None = None,
+        self,
+        retriever: RetrieverEngine,
+        llm: ChatEngine,
+        rgs: RGS,
+        context: ContextPipeline | None = None,
     ):
         self.retriever = retriever
         self.llm = llm

@@ -3,6 +3,7 @@ class FitzRAGError(Exception):
 
     pass
 
+
 class RetrieverError(FitzRAGError):
     """General retrieval failure."""
 

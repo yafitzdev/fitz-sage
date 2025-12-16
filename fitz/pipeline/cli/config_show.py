@@ -5,6 +5,7 @@ Usage:
     fitz-pipeline config show
     fitz-pipeline config show --config my_config.yaml
 """
+
 from pathlib import Path
 from typing import Optional
 
@@ -71,10 +72,12 @@ def command(
     # Display based on format
     if format == "json":
         import json
+
         typer.echo(json.dumps(raw_cfg, indent=2))
     else:
         # Default to YAML-like display
         import yaml
+
         typer.echo(yaml.dump(raw_cfg, default_flow_style=False, sort_keys=False))
 
     typer.echo()

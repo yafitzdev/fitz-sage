@@ -15,9 +15,7 @@ class LocalEmbeddingClient(EmbeddingPlugin):
     def __init__(self, **kwargs: Any):
         embed_cfg = LocalEmbedderConfig(**kwargs)
 
-        runtime_cfg = LocalLLMRuntimeConfig(
-            model="llama3.2:1b"
-        )
+        runtime_cfg = LocalLLMRuntimeConfig(model="llama3.2:1b")
         runtime = LocalLLMRuntime(runtime_cfg)
 
         self._embedder = LocalEmbedder(runtime=runtime, cfg=embed_cfg)

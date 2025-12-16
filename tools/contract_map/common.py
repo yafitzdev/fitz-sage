@@ -233,11 +233,7 @@ def fmt_type(tp: Any) -> str:
 def is_pydantic_model(obj: Any) -> bool:
     """Check if an object is a Pydantic model class."""
     try:
-        return (
-            isinstance(obj, type)
-            and issubclass(obj, BaseModel)
-            and obj is not BaseModel
-        )
+        return isinstance(obj, type) and issubclass(obj, BaseModel) and obj is not BaseModel
     except Exception:
         return False
 

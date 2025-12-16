@@ -6,6 +6,7 @@ Usage:
     fitz-ingest validate ./documents --ingest-plugin local
     fitz-ingest validate ./documents --show-errors
 """
+
 from pathlib import Path
 
 import typer
@@ -20,26 +21,26 @@ logger = get_logger(__name__)
 
 
 def command(
-        source: Path = typer.Argument(
-            ...,
-            help="Source to validate (file or directory).",
-        ),
-        ingest_plugin: str = typer.Option(
-            "local",
-            "--ingest-plugin",
-            "-i",
-            help="Ingestion plugin to use for reading documents.",
-        ),
-        show_errors: bool = typer.Option(
-            False,
-            "--show-errors",
-            help="Show detailed error messages for invalid documents.",
-        ),
-        min_chars: int = typer.Option(
-            10,
-            "--min-chars",
-            help="Minimum character count for valid documents.",
-        ),
+    source: Path = typer.Argument(
+        ...,
+        help="Source to validate (file or directory).",
+    ),
+    ingest_plugin: str = typer.Option(
+        "local",
+        "--ingest-plugin",
+        "-i",
+        help="Ingestion plugin to use for reading documents.",
+    ),
+    show_errors: bool = typer.Option(
+        False,
+        "--show-errors",
+        help="Show detailed error messages for invalid documents.",
+    ),
+    min_chars: int = typer.Option(
+        10,
+        "--min-chars",
+        help="Minimum character count for valid documents.",
+    ),
 ) -> None:
     """
     Validate documents before full ingestion (dry-run).
@@ -133,8 +134,9 @@ def command(
         typer.echo(f"Estimated chunks:  ~{len(valid_docs)}")
 
         # Estimate content size
-        total_chars = sum(len(getattr(d, "content", "") or getattr(d, "text", ""))
-                          for d in valid_docs)
+        total_chars = sum(
+            len(getattr(d, "content", "") or getattr(d, "text", "")) for d in valid_docs
+        )
         typer.echo(f"Total content:     ~{total_chars:,} characters")
 
     typer.echo()

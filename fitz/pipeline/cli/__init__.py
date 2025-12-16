@@ -9,6 +9,7 @@ Available commands:
 - config show: Display resolved configuration
 - test: Test pipeline setup and connections
 """
+
 import typer
 
 # Create main app first

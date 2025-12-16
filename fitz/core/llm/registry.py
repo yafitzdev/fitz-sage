@@ -69,9 +69,7 @@ def resolve_llm_plugin(
     try:
         return bucket[requested_name]
     except KeyError as exc:
-        raise LLMRegistryError(
-            f"Unknown {plugin_type} plugin: {requested_name!r}"
-        ) from exc
+        raise LLMRegistryError(f"Unknown {plugin_type} plugin: {requested_name!r}") from exc
 
 
 def _auto_discover() -> None:

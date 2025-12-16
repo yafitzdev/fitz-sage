@@ -47,9 +47,7 @@ class FaissLocalVectorDB:
         if self._config.persist and self._index_path.exists():
             self._load()
 
-        logger.info(
-            f"{VECTOR_DB} Local FAISS initialized (dim={dim}, path={self._base_path})"
-        )
+        logger.info(f"{VECTOR_DB} Local FAISS initialized (dim={dim}, path={self._base_path})")
 
     # ------------------------------------------------------------------ public
 
@@ -124,11 +122,11 @@ class FaissLocalVectorDB:
         self._index.add(matrix)
 
     def search(
-            self,
-            collection_name: str,
-            query_vector: list[float],
-            limit: int,
-            with_payload: bool = True,
+        self,
+        collection_name: str,
+        query_vector: list[float],
+        limit: int,
+        with_payload: bool = True,
     ) -> list[SearchResult]:
         """Search for similar vectors."""
         if self._index.ntotal == 0:

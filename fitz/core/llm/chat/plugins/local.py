@@ -21,9 +21,7 @@ class LocalChatClient(ChatPlugin):
     def __init__(self, **kwargs: Any):
         chat_cfg = LocalChatConfig(**kwargs)
 
-        runtime_cfg = LocalLLMRuntimeConfig(
-            model="llama3.2:1b"
-        )
+        runtime_cfg = LocalLLMRuntimeConfig(model="llama3.2:1b")
 
         runtime = LocalLLMRuntime(runtime_cfg)
 

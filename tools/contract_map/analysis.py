@@ -141,8 +141,16 @@ def compute_hotspots(root: Path, *, excludes: set[str]) -> List[Hotspot]:
         ),
         "RerankPlugin": ("fitz.core.llm.rerank", 'plugin_type="rerank"', "plugin_type='rerank'"),
         "VectorDBPlugin": ("core.vector_db", 'plugin_type="vector_db"', "plugin_type='vector_db'"),
-        "RetrievalPlugin": ("fitz.retrieval.registry", "get_retriever_plugin(", "RetrieverEngine.from_name("),
-        "PipelinePlugin": ("fitz.pipeline.pipeline", "get_pipeline_plugin(", "available_pipeline_plugins("),
+        "RetrievalPlugin": (
+            "fitz.retrieval.registry",
+            "get_retriever_plugin(",
+            "RetrieverEngine.from_name(",
+        ),
+        "PipelinePlugin": (
+            "fitz.pipeline.pipeline",
+            "get_pipeline_plugin(",
+            "available_pipeline_plugins(",
+        ),
         "ChunkerPlugin": ("fitz.ingest.chunking", "get_chunker_plugin(", "ChunkingEngine"),
         "IngestPlugin": ("fitz.ingest.ingestion", "get_ingest_plugin(", "IngestionEngine"),
     }
@@ -338,13 +346,13 @@ def analyze_any_breakdown(root, excludes):
     from pathlib import Path
 
     categories = {
-        'legitimate_kwargs': 0,
-        'legitimate_metadata': 0,
-        'legitimate_messages': 0,
-        'lazy_type': 0,
-        'lazy_return': 0,
-        'lazy_param': 0,
-        'other': 0
+        "legitimate_kwargs": 0,
+        "legitimate_metadata": 0,
+        "legitimate_messages": 0,
+        "lazy_type": 0,
+        "lazy_return": 0,
+        "lazy_param": 0,
+        "other": 0,
     }
 
     for py_file in root.rglob("*.py"):
@@ -354,24 +362,24 @@ def analyze_any_breakdown(root, excludes):
 
         try:
             for line in py_file.read_text().splitlines():
-                if 'import ' in line:
+                if "import " in line:
                     continue
 
                 # Categorize
-                if 'kwargs: dict[str, Any]' in line or 'kwargs: Dict[str, Any]' in line:
-                    categories['legitimate_kwargs'] += 1
-                elif 'metadata: dict[str, Any]' in line or 'metadata: Dict[str, Any]' in line:
-                    categories['legitimate_metadata'] += 1
-                elif 'messages: list[dict[str, Any]]' in line:
-                    categories['legitimate_messages'] += 1
-                elif 'Type[Any]' in line:
-                    categories['lazy_type'] += 1
-                elif '-> Any:' in line:
-                    categories['lazy_return'] += 1
-                elif ': Any' in line and 'def ' in line:
-                    categories['lazy_param'] += 1
-                elif ' Any' in line or 'Any]' in line or 'Any,' in line:
-                    categories['other'] += 1
+                if "kwargs: dict[str, Any]" in line or "kwargs: Dict[str, Any]" in line:
+                    categories["legitimate_kwargs"] += 1
+                elif "metadata: dict[str, Any]" in line or "metadata: Dict[str, Any]" in line:
+                    categories["legitimate_metadata"] += 1
+                elif "messages: list[dict[str, Any]]" in line:
+                    categories["legitimate_messages"] += 1
+                elif "Type[Any]" in line:
+                    categories["lazy_type"] += 1
+                elif "-> Any:" in line:
+                    categories["lazy_return"] += 1
+                elif ": Any" in line and "def " in line:
+                    categories["lazy_param"] += 1
+                elif " Any" in line or "Any]" in line or "Any," in line:
+                    categories["other"] += 1
         except:
             pass
 
@@ -392,8 +400,8 @@ def render_any_breakdown_section(stats):
     lines.append("### By Category")
     lines.append("")
 
-    legit = cats['legitimate_kwargs'] + cats['legitimate_metadata'] + cats['legitimate_messages']
-    lazy = cats['lazy_type'] + cats['lazy_return'] + cats['lazy_param']
+    legit = cats["legitimate_kwargs"] + cats["legitimate_metadata"] + cats["legitimate_messages"]
+    lazy = cats["lazy_type"] + cats["lazy_return"] + cats["lazy_param"]
 
     lines.append(f"- **Legitimate (Keep)**: ~{legit}")
     lines.append(f"  - kwargs: {cats['legitimate_kwargs']}")
@@ -420,10 +428,10 @@ def analyze_exception_patterns(root, excludes):
     from pathlib import Path
 
     patterns = {
-        'bare_except_continue': 0,
-        'bare_except_pass': 0,
-        'logged_exceptions': 0,
-        'reraise_exceptions': 0,
+        "bare_except_continue": 0,
+        "bare_except_pass": 0,
+        "logged_exceptions": 0,
+        "reraise_exceptions": 0,
     }
 
     problem_files = []
@@ -439,28 +447,28 @@ def analyze_exception_patterns(root, excludes):
 
             for i, line in enumerate(lines):
                 # Check for bare except patterns
-                if 'except Exception:' in line or 'except:' in line:
+                if "except Exception:" in line or "except:" in line:
                     # Look at next line
                     if i + 1 < len(lines):
                         next_line = lines[i + 1].strip()
 
-                        if next_line == 'continue':
-                            patterns['bare_except_continue'] += 1
-                            problem_files.append((str(rel), i + 1, 'silent continue'))
-                        elif next_line == 'pass':
-                            patterns['bare_except_pass'] += 1
+                        if next_line == "continue":
+                            patterns["bare_except_continue"] += 1
+                            problem_files.append((str(rel), i + 1, "silent continue"))
+                        elif next_line == "pass":
+                            patterns["bare_except_pass"] += 1
                             # Don't flag if in __del__ (cleanup is OK)
-                            if i > 5 and 'def __del__' not in ''.join(lines[i - 5:i]):
-                                problem_files.append((str(rel), i + 1, 'silent pass'))
+                            if i > 5 and "def __del__" not in "".join(lines[i - 5 : i]):
+                                problem_files.append((str(rel), i + 1, "silent pass"))
 
                 # Check for good patterns
-                if 'except' in line and 'as e:' in line:
+                if "except" in line and "as e:" in line:
                     if i + 1 < len(lines):
                         next_line = lines[i + 1]
-                        if 'log' in next_line.lower():
-                            patterns['logged_exceptions'] += 1
-                        elif 'raise' in next_line:
-                            patterns['reraise_exceptions'] += 1
+                        if "log" in next_line.lower():
+                            patterns["logged_exceptions"] += 1
+                        elif "raise" in next_line:
+                            patterns["reraise_exceptions"] += 1
 
         except:
             pass
@@ -478,8 +486,8 @@ def render_exception_analysis_section(stats):
     lines = ["## Exception Handling Analysis"]
     lines.append("")
 
-    total_bare = patterns['bare_except_continue'] + patterns['bare_except_pass']
-    good = patterns['logged_exceptions'] + patterns['reraise_exceptions']
+    total_bare = patterns["bare_except_continue"] + patterns["bare_except_pass"]
+    good = patterns["logged_exceptions"] + patterns["reraise_exceptions"]
 
     lines.append(f"**Total bare exceptions**: `{total_bare}`")
     lines.append(f"**Good exception handling**: `{good}`")

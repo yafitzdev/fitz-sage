@@ -96,6 +96,7 @@ PLUGIN_PREDICATES: Dict[str, PluginPredicate] = {
 # Discovery
 # ---------------------------------------------------------------------------
 
+
 def scan_discovery(namespace: str, note: str) -> DiscoveryReport:
     """Scan a namespace for plugins using declared discovery predicates."""
     failures: List[str] = []
@@ -173,13 +174,23 @@ def scan_all_discoveries() -> List[DiscoveryReport]:
     """Scan all declared plugin namespaces."""
     return [
         scan_discovery("fitz.core.llm.chat.plugins", "LLM chat plugins (Option A discovery)"),
-        scan_discovery("fitz.core.llm.embedding.plugins", "LLM embedding plugins (Option A discovery)"),
+        scan_discovery(
+            "fitz.core.llm.embedding.plugins", "LLM embedding plugins (Option A discovery)"
+        ),
         scan_discovery("fitz.core.llm.rerank.plugins", "LLM rerank plugins (Option A discovery)"),
         scan_discovery("fitz.core.vector_db.plugins", "Vector DB plugins (Option A discovery)"),
-        scan_discovery("fitz.retrieval.runtime.plugins", "RAG retriever plugins (Option A discovery)"),
-        scan_discovery("fitz.pipeline.pipeline.plugins", "RAG pipeline plugins (Option A discovery)"),
-        scan_discovery("fitz.ingest.chunking.plugins", "Ingest chunking plugins (Option A discovery)"),
-        scan_discovery("fitz.ingest.ingestion.plugins", "Ingest ingestion plugins (Option A discovery)"),
+        scan_discovery(
+            "fitz.retrieval.runtime.plugins", "RAG retriever plugins (Option A discovery)"
+        ),
+        scan_discovery(
+            "fitz.pipeline.pipeline.plugins", "RAG pipeline plugins (Option A discovery)"
+        ),
+        scan_discovery(
+            "fitz.ingest.chunking.plugins", "Ingest chunking plugins (Option A discovery)"
+        ),
+        scan_discovery(
+            "fitz.ingest.ingestion.plugins", "Ingest ingestion plugins (Option A discovery)"
+        ),
     ]
 
 

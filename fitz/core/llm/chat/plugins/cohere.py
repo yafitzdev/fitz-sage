@@ -23,20 +23,20 @@ class CohereChatClient:
         - model: Chat model (default: command-r-plus)
         - temperature: Sampling temperature (default: 0.2)
     """
+
     plugin_name = "cohere"
     plugin_type = "chat"
 
     def __init__(
-            self,
-            api_key: str | None = None,
-            model: str = "command-r-plus",
-            temperature: float = 0.2,
-            base_url: str = "https://api.cohere.ai/v1",
+        self,
+        api_key: str | None = None,
+        model: str = "command-r-plus",
+        temperature: float = 0.2,
+        base_url: str = "https://api.cohere.ai/v1",
     ) -> None:
         if httpx is None:
             raise RuntimeError(
-                "httpx is required for Cohere plugin. "
-                "Install with: pip install httpx"
+                "httpx is required for Cohere plugin. " "Install with: pip install httpx"
             )
 
         # Get API key
@@ -129,7 +129,7 @@ class CohereChatClient:
 
     def __del__(self):
         """Clean up HTTP client on deletion."""
-        if hasattr(self, '_client'):
+        if hasattr(self, "_client"):
             try:
                 self._client.close()
             except Exception as e:

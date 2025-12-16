@@ -5,6 +5,7 @@ Usage:
     fitz-ingest stats --collection my_docs
     fitz-ingest stats --collection my_docs --vector-db-plugin qdrant
 """
+
 import typer
 
 from fitz.core.logging.logger import get_logger
@@ -15,18 +16,18 @@ logger = get_logger(__name__)
 
 
 def command(
-        collection: str = typer.Option(
-            ...,
-            "--collection",
-            "-c",
-            help="Collection name to show statistics for.",
-        ),
-        vector_db_plugin: str = typer.Option(
-            "qdrant",
-            "--vector-db-plugin",
-            "-v",
-            help="Vector DB plugin name.",
-        ),
+    collection: str = typer.Option(
+        ...,
+        "--collection",
+        "-c",
+        help="Collection name to show statistics for.",
+    ),
+    vector_db_plugin: str = typer.Option(
+        "qdrant",
+        "--vector-db-plugin",
+        "-v",
+        help="Vector DB plugin name.",
+    ),
 ) -> None:
     """
     Show statistics about an ingested collection.

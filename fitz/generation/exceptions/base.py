@@ -1,5 +1,6 @@
 # fitz/generation/exceptions.py
 
+
 class GenerationError(Exception):
     """Base error for generation failures."""
 

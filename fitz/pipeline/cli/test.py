@@ -5,6 +5,7 @@ Usage:
     fitz-pipeline test
     fitz-pipeline test --config my_config.yaml
 """
+
 from pathlib import Path
 from typing import Optional
 
@@ -18,17 +19,17 @@ logger = get_logger(__name__)
 
 
 def command(
-        config: Optional[Path] = typer.Option(
-            None,
-            "--config",
-            "-c",
-            help="Path to pipeline YAML config.",
-        ),
-        skip_query: bool = typer.Option(
-            False,
-            "--skip-query",
-            help="Skip running test query (only check connections)",
-        ),
+    config: Optional[Path] = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to pipeline YAML config.",
+    ),
+    skip_query: bool = typer.Option(
+        False,
+        "--skip-query",
+        help="Skip running test query (only check connections)",
+    ),
 ) -> None:
     """
     Test pipeline setup and verify all connections work.
@@ -79,9 +80,9 @@ def command(
     typer.echo("[2/3] Checking pipeline components...")
     try:
         # Check if pipeline has required components
-        has_retriever = hasattr(pipeline, '_retriever') or hasattr(pipeline, 'retriever')
-        has_llm = hasattr(pipeline, '_llm') or hasattr(pipeline, 'llm')
-        has_rgs = hasattr(pipeline, '_rgs') or hasattr(pipeline, 'rgs')
+        has_retriever = hasattr(pipeline, "_retriever") or hasattr(pipeline, "retriever")
+        has_llm = hasattr(pipeline, "_llm") or hasattr(pipeline, "llm")
+        has_rgs = hasattr(pipeline, "_rgs") or hasattr(pipeline, "rgs")
 
         if has_retriever:
             typer.echo("  ✓ Retriever configured")
@@ -110,7 +111,7 @@ def command(
             test_question = "Hello, this is a test query."
             result = pipeline.run(test_question)
 
-            if result and getattr(result, 'answer', None):
+            if result and getattr(result, "answer", None):
                 typer.echo("  ✓ Test query completed successfully")
                 typer.echo(f"  Answer preview: {getattr(result, 'answer', '')[:100]}...")
             else:
@@ -136,6 +137,6 @@ def command(
     typer.echo("Your pipeline is configured correctly and ready to use!")
     typer.echo()
     typer.echo("Next steps:")
-    typer.echo("  • Run queries: fitz-pipeline query \"Your question\"")
+    typer.echo('  • Run queries: fitz-pipeline query "Your question"')
     typer.echo("  • Check config: fitz-pipeline config show")
     typer.echo()

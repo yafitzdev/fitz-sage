@@ -15,6 +15,7 @@ This smoketest can be run in two ways:
    pytest tools/smoketest/smoke_local_llm.py
 
 """
+
 import sys
 from dataclasses import dataclass
 from typing import NoReturn
@@ -31,6 +32,7 @@ from fitz.core.models.chunk import Chunk
 @dataclass
 class TestResult:
     """Result of a single test."""
+
     name: str
     passed: bool
     error_message: str | None = None
@@ -119,7 +121,9 @@ def run_single_test(test_func, test_name: str) -> TestResult:
     except Exception as e:
         # Unexpected error
         print(f"✗ {test_name} failed with unexpected error: {type(e).__name__}: {e}")
-        return TestResult(name=test_name, passed=False, error_message=f"Unexpected error: {type(e).__name__}: {e}")
+        return TestResult(
+            name=test_name, passed=False, error_message=f"Unexpected error: {type(e).__name__}: {e}"
+        )
 
 
 def clean_exit_with_message(message: str) -> NoReturn:
@@ -159,7 +163,10 @@ def print_summary(results: list[TestResult]) -> None:
         # Show the error message from the first failure
         first_failure = next((r for r in results if not r.passed), None)
         if first_failure and first_failure.error_message:
-            if isinstance(first_failure.error_message, str) and "Local LLM fallback" in first_failure.error_message:
+            if (
+                isinstance(first_failure.error_message, str)
+                and "Local LLM fallback" in first_failure.error_message
+            ):
                 # This is the Ollama setup message - show it
                 print(f"\n{first_failure.error_message}")
             else:

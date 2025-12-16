@@ -6,6 +6,7 @@ Usage:
     fitz-ingest list-plugins --type ingest
     fitz-ingest list-plugins --type embedding
 """
+
 from typing import Optional
 
 import typer

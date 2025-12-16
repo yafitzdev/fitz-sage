@@ -18,6 +18,7 @@ class LocalEmbedderConfig:
 
     Diagnostic quality only.
     """
+
     pass
 
 

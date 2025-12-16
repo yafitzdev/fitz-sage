@@ -6,6 +6,7 @@ Usage:
     fitz-pipeline query "Explain X" --config my_config.yaml
     fitz-pipeline query "Explain X" --preset local
 """
+
 from pathlib import Path
 from typing import Optional
 
@@ -82,7 +83,7 @@ def command(
         import tempfile
         import yaml
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(preset_config, f)
             temp_config_path = f.name
 
@@ -90,6 +91,7 @@ def command(
             pipeline = create_pipeline_from_yaml(temp_config_path)
         finally:
             import os
+
             os.unlink(temp_config_path)
     else:
         config_source = config if config is not None else "<default>"
