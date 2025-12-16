@@ -1,6 +1,49 @@
-# core/config/default.yaml
+# fitz/core/config/default.yaml
 
-llm:
-  provider: openai
-  model: gpt-4.1-mini
-  # api_key intentionally omitted
+default_preset: local-dev
+
+presets:
+  local-dev:
+    llm:
+      chat:
+        plugin: local
+      embedding:
+        plugin: local
+      rerank:
+        plugin: local
+
+    vector_db:
+      plugin: local-faiss
+
+    pipeline:
+      plugin: standard
+
+  local-fast:
+    llm:
+      chat:
+        plugin: local
+      embedding:
+        plugin: local
+      rerank:
+        plugin: dummy
+
+    vector_db:
+      plugin: local-faiss
+
+    pipeline:
+      plugin: fast
+
+  local-debug:
+    llm:
+      chat:
+        plugin: dummy
+      embedding:
+        plugin: local
+      rerank:
+        plugin: dummy
+
+    vector_db:
+      plugin: local-faiss
+
+    pipeline:
+      plugin: debug
