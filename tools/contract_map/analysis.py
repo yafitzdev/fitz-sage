@@ -333,6 +333,88 @@ def render_stats_section(stats: CodeStats | None) -> str:
     return "\n".join(lines)
 
 
+def analyze_any_breakdown(root, excludes):
+    """Quick Any breakdown - categorize by pattern."""
+    from pathlib import Path
+
+    categories = {
+        'legitimate_kwargs': 0,
+        'legitimate_metadata': 0,
+        'legitimate_messages': 0,
+        'lazy_type': 0,
+        'lazy_return': 0,
+        'lazy_param': 0,
+        'other': 0
+    }
+
+    for py_file in root.rglob("*.py"):
+        rel = py_file.relative_to(root)
+        if any(part in excludes for part in rel.parts):
+            continue
+
+        try:
+            for line in py_file.read_text().splitlines():
+                if 'import ' in line:
+                    continue
+
+                # Categorize
+                if 'kwargs: dict[str, Any]' in line or 'kwargs: Dict[str, Any]' in line:
+                    categories['legitimate_kwargs'] += 1
+                elif 'metadata: dict[str, Any]' in line or 'metadata: Dict[str, Any]' in line:
+                    categories['legitimate_metadata'] += 1
+                elif 'messages: list[dict[str, Any]]' in line:
+                    categories['legitimate_messages'] += 1
+                elif 'Type[Any]' in line:
+                    categories['lazy_type'] += 1
+                elif '-> Any:' in line:
+                    categories['lazy_return'] += 1
+                elif ': Any' in line and 'def ' in line:
+                    categories['lazy_param'] += 1
+                elif ' Any' in line or 'Any]' in line or 'Any,' in line:
+                    categories['other'] += 1
+        except:
+            pass
+
+    return categories
+
+
+def render_any_breakdown_section(stats):
+    """Render Any breakdown section."""
+    if not stats:
+        return ""
+
+    cats = analyze_any_breakdown(REPO_ROOT, DEFAULT_LAYOUT_EXCLUDES)
+
+    lines = ["## Any Usage Breakdown"]
+    lines.append("")
+    lines.append(f"**Total: `{stats.any_mentions}`**")
+    lines.append("")
+    lines.append("### By Category")
+    lines.append("")
+
+    legit = cats['legitimate_kwargs'] + cats['legitimate_metadata'] + cats['legitimate_messages']
+    lazy = cats['lazy_type'] + cats['lazy_return'] + cats['lazy_param']
+
+    lines.append(f"- **Legitimate (Keep)**: ~{legit}")
+    lines.append(f"  - kwargs: {cats['legitimate_kwargs']}")
+    lines.append(f"  - metadata: {cats['legitimate_metadata']}")
+    lines.append(f"  - messages: {cats['legitimate_messages']}")
+    lines.append("")
+    lines.append(f"- **Lazy (Fix)**: ~{lazy}")
+    lines.append(f"  - Type[Any]: {cats['lazy_type']}")
+    lines.append(f"  - return Any: {cats['lazy_return']}")
+    lines.append(f"  - param Any: {cats['lazy_param']}")
+    lines.append("")
+    lines.append(f"- **Other**: ~{cats['other']}")
+    lines.append("")
+
+    fixable_pct = (lazy / stats.any_mentions * 100) if stats.any_mentions > 0 else 0
+    lines.append(f"**Fixable**: ~{lazy}/{stats.any_mentions} ({fixable_pct:.1f}%)")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
 if __name__ == "__main__":
     from .common import ContractMap
 
