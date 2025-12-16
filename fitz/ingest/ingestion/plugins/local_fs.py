@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, Dict, Iterable
 
 from fitz.ingest.ingestion.base import RawDocument
+
+
+logger = logging.getLogger(__name__)
 
 
 class LocalFSIngestPlugin:
@@ -23,7 +27,9 @@ class LocalFSIngestPlugin:
 
             try:
                 content = path.read_text(encoding="utf-8", errors="ignore")
-            except Exception:
+            except Exception as e:
+                # Log file read failures but continue processing
+                logger.warning(f"Skipping {path}: {type(e).__name__}: {e}")
                 continue
 
             yield RawDocument(

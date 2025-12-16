@@ -116,8 +116,9 @@ class CohereChatClient:
             try:
                 error_data = exc.response.json()
                 error_detail = f": {error_data.get('message', '')}"
-            except Exception:
-                pass
+            except Exception as e:
+                # Failed to parse error response
+                error_detail = f" (response parse failed: {e})"
 
             raise RuntimeError(
                 f"Cohere API request failed with status {exc.response.status_code}{error_detail}"
@@ -131,5 +132,6 @@ class CohereChatClient:
         if hasattr(self, '_client'):
             try:
                 self._client.close()
-            except Exception:
-                pass
+            except Exception as e:
+                # Failed to parse error response
+                error_detail = f" (response parse failed: {e})"
