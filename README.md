@@ -1,60 +1,101 @@
 # fitz
 
-> A modular, production-oriented RAG framework with explicit architecture and plugin-based design. 
+> A modular RAG framework with clean architecture and straightforward configuration.
 
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](https://github.com/yourusername/fitz/releases)
+[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](https://github.com/yafitzdev/fitz/releases)
 
 ---
 
 ## Why fitz?
 
-Most RAG frameworks suffer from abstraction overload, opaque chains, and kitchen-sink design. **fitz** takes a different approach:
+Most RAG frameworks hide what's happening behind layers of abstraction. **fitz** gives you direct control:
 
-- **Protocol-based contracts** — Clear interfaces, swap implementations freely
-- **Explicit wiring** — See exactly what's happening in your pipeline
-- **Layered architecture** — Clean dependency flow, no circular imports
-- **Config-driven** — Engines built from config, no hidden magic
+- **See what's happening** — No magic chains, explicit pipeline steps
+- **Swap components freely** — Protocol-based plugins, not vendor lock-in  
+- **Run locally** — Zero API costs with Ollama + FAISS
+- **Configure, don't code** — YAML-driven, sensible defaults
 
 ---
 
-## Architecture
+## Quick Start
 
+### Local Development (No API Keys)
+
+```bash
+# Install
+pip install fitz[local]
+
+# Start Ollama (get it from ollama.ai)
+ollama pull llama3.2
+ollama pull nomic-embed-text
+
+# Ingest documents
+fitz-ingest run ./docs --collection my_docs
+
+# Query
+fitz-pipeline query "What are the main concepts?" --collection my_docs
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        CLI Layer                            │
-│            (pipeline/cli.py, ingest/cli.py)                 │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                    Pipeline Layer                           │
-│  RAGPipeline → Retriever → Context → RGS → LLM → Answer     │
-│  IngestionPipeline → Ingest → Chunk → Embed → VectorDB      │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                    Plugin Layer                             │
-│   chat/embedding/rerank     │   retrieval plugins           │
-│   vector_db plugins         │   chunking plugins            │
-│   ingestion plugins         │   pipeline plugins            │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                     Core Layer                              │
-│  Registry • Config • Models • Logging • Credentials         │
-└─────────────────────────────────────────────────────────────┘
+
+### With Cloud APIs
+
+```bash
+# Install
+pip install fitz
+
+# Set your API key
+export OPENAI_API_KEY="sk-..."
+
+# Ingest documents
+fitz-ingest run ./docs --collection my_docs
+
+# Query
+fitz-pipeline query "What are the main concepts?" --collection my_docs
+```
+
+---
+
+## Features
+
+### Local-First
+Run everything on your machine. No API keys, no rate limits, no costs.
+
+```bash
+pip install fitz[local]
+# Uses Ollama for LLMs, FAISS for vector search
+```
+
+### Flexible Plugins
+Swap any component via config:
+
+**LLMs**: OpenAI, Anthropic, Cohere, Azure, Ollama  
+**Vector DBs**: Qdrant, FAISS  
+**Everything else**: Drop in your own plugins
+
+### Straightforward Config
+
+```yaml
+llm:
+  plugin_name: openai
+  kwargs:
+    model: gpt-4
+    temperature: 0
+
+retriever:
+  collection: my_docs
+  top_k: 5
+
+rgs:
+  enable_citations: true
+  strict_grounding: true
 ```
 
 ---
 
 ## Installation
 
-```bash
-️⚠️ PyPI release coming soon
-```
-
-Or install from source:
+### From Source
 
 ```bash
 git clone https://github.com/yafitzdev/fitz.git
@@ -62,106 +103,90 @@ cd fitz
 pip install -e .
 ```
 
-### Optional dependencies
+### Optional Dependencies
 
 ```bash
-pip install fitz[ingest]   # PDF, DOCX parsing
+pip install fitz[ingest]  # PDF, DOCX support
+pip install fitz[local]   # Ollama + FAISS
 ```
 
 ---
 
-## Quick Start
+## Usage
 
-### 1. Configure your environment
-
-```bash
-export COHERE_API_KEY="your-api-key"
-# or
-export OPENAI_API_KEY="your-api-key"
-```
-
-### 2. Ingest documents
-
-```bash
-fitz-ingest run ./my-documents --collection my_knowledge --ingest-plugin local
-```
-
-### 3. Query with RAG
+### Python API
 
 ```python
 from fitz.pipeline.pipeline.engine import RAGPipeline
-from fitz.generation.retrieval_guided.synthesis import RGS, RGSConfig
+from fitz.pipeline.config.loader import load_rag_config
 
-# Using the default config
-pipeline = create_pipeline_from_yaml()
+# Load config
+config = load_rag_config()
 
-# Ask a question
-answer = pipeline.run("What are the key concepts in my documents?")
+# Create pipeline
+pipeline = RAGPipeline.from_config(config)
 
-print(answer.answer)
-for source in answer.sources:
-    print(f"  - {source.source_id}: {source.metadata}")
+# Query
+result = pipeline.run("What is retrieval-guided synthesis?")
+
+print(result.answer)
+for source in result.sources:
+    print(f"  - {source.doc_id}: {source.content[:100]}")
 ```
 
-### 4. CLI query
+### CLI
 
 ```bash
-fitz-pipeline query "What is the main topic?" --config my_config.yaml
+# Ingest documents
+fitz-ingest run ./my-documents \
+  --collection docs \
+  --chunk-size 1000 \
+  --chunk-overlap 200
+
+# Query
+fitz-pipeline query "Your question here" \
+  --collection docs \
+  --preset standard
+
+# Show config
+fitz-pipeline config show
 ```
 
 ---
 
-## Core Concepts
+## Configuration
 
-### Plugins
+### Environment Variables
 
-Everything in fitz is a plugin. Plugins implement protocols (interfaces) and are auto-discovered at runtime.
+```bash
+# LLM APIs
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+export COHERE_API_KEY="..."
 
-```python
-from fitz.core.llm.chat.base import ChatPlugin
-
-class MyChatPlugin:
-    plugin_name = "my_chat"
-    plugin_type = "chat"
-    
-    def chat(self, messages: list[dict]) -> str:
-        # Your implementation
-        return "response"
+# Vector DB (optional)
+export QDRANT_URL="http://localhost:6333"
 ```
 
-### Available Plugin Types
+### YAML Config
 
-| Type | Protocol | Method | Description |
-|------|----------|--------|-------------|
-| `chat` | `ChatPlugin` | `chat()` | LLM chat completions |
-| `embedding` | `EmbeddingPlugin` | `embed()` | Text embeddings |
-| `rerank` | `RerankPlugin` | `rerank()` | Result reranking |
-| `vector_db` | `VectorDBPlugin` | `search()` | Vector storage/search |
-| `retrieval` | `RetrievalPlugin` | `retrieve()` | Retrieval strategies |
-| `chunking` | `ChunkerPlugin` | `chunk_text()` | Text chunking |
-| `ingestion` | `IngestPlugin` | `ingest()` | Document ingestion |
-
-### Configuration
-
-fitz uses YAML configuration:
+Place a `config.yaml` in your project:
 
 ```yaml
-# rag_config.yaml
+llm:
+  plugin_name: openai
+  kwargs:
+    model: gpt-4
+
+embedding:
+  plugin_name: openai
+  kwargs:
+    model: text-embedding-3-small
+
 vector_db:
   plugin_name: qdrant
   kwargs:
-    host: localhost
-    port: 6333
-
-llm:
-  plugin_name: cohere
-  kwargs:
-    model: command-r-plus
-
-embedding:
-  plugin_name: cohere
-  kwargs:
-    model: embed-english-v3.0
+    url: http://localhost:6333
 
 retriever:
   plugin_name: dense
@@ -169,75 +194,165 @@ retriever:
   top_k: 5
 
 rgs:
+  max_chunks: 10
   enable_citations: true
   strict_grounding: true
-  max_chunks: 8
-```
-
-### RGS (Retrieval-Guided Synthesis)
-
-The RGS module handles prompt construction and answer synthesis with built-in citation support:
-
-```python
-from fitz.generation.retrieval_guided.synthesis import RGS, RGSConfig
-
-rgs = RGS(RGSConfig(
-    enable_citations=True,
-    strict_grounding=True,
-    max_chunks=8,
-    source_label_prefix="S"
-))
-
-prompt = rgs.build_prompt(query, chunks)
-# prompt.system → system message with grounding instructions
-# prompt.user   → user message with context and query
 ```
 
 ---
 
-## Project Structure
+## Architecture
 
 ```
-fitz/
-├── core/                 # Foundation layer
-│   ├── llm/              # LLM abstractions (chat, embedding, rerank)
-│   ├── vector_db/        # Vector DB abstractions
-│   ├── models/           # Canonical data models (Chunk, Document)
-│   ├── config/           # Configuration loading
-│   └── logging/          # Unified logging
-├── rag/                  # RAG pipeline
-│   ├── pipeline/         # Pipeline orchestration
-│   ├── retrieval/        # Retrieval strategies
-│   ├── context/          # Context processing steps
-│   ├── generation/       # RGS prompt building
-│   └── config/           # RAG configuration
-├── ingest/               # Ingestion pipeline
-│   ├── ingestion/        # Document ingestion
-│   ├── chunking/         # Text chunking
-│   ├── validation/       # Document validation
-│   └── pipeline/         # Ingestion orchestration
-└── tools/                # Development tools
-    └── contract_map/     # Codebase analysis
+CLI (fitz, fitz-ingest, fitz-pipeline)
+    ↓
+Pipeline (orchestration)
+    ↓
+Plugins (chat, embed, rerank, vector_db)
+    ↓
+Core (registry, config, models)
+    ↓
+Backends (ollama, faiss, cloud APIs)
+```
+
+Clean boundaries. No circular dependencies.
+
+---
+
+## Examples
+
+### Local RAG Pipeline
+
+```python
+from fitz.pipeline.pipeline.engine import RAGPipeline
+from fitz.pipeline.config.schema import RAGConfig, PipelinePluginConfig
+
+# Local config
+config = RAGConfig(
+    llm=PipelinePluginConfig(
+        plugin_name="local",
+        kwargs={"model": "llama3.2"}
+    ),
+    embedding=PipelinePluginConfig(
+        plugin_name="local",
+        kwargs={"model": "nomic-embed-text"}
+    ),
+    vector_db=PipelinePluginConfig(
+        plugin_name="local-faiss",
+        kwargs={}
+    ),
+    retriever=RetrieverConfig(
+        plugin_name="dense",
+        collection="docs",
+        top_k=5
+    )
+)
+
+pipeline = RAGPipeline.from_config(config)
+result = pipeline.run("What is X?")
+```
+
+### Custom Ingestion
+
+```python
+from fitz.ingest.pipeline.ingestion_pipeline import IngestionPipeline
+from fitz.ingest.config.schema import IngestConfig
+
+config = IngestConfig(
+    ingester=IngesterConfig(
+        plugin_name="local",
+        kwargs={}
+    ),
+    chunker=ChunkerConfig(
+        plugin_name="simple",
+        chunk_size=1000,
+        chunk_overlap=200,
+        kwargs={}
+    ),
+    collection="my_docs"
+)
+
+pipeline = IngestionPipeline(config)
+pipeline.run(source="./documents")
+```
+
+---
+
+## Plugin Development
+
+### Create a Chat Plugin
+
+```python
+from fitz.core.llm.chat.base import ChatPlugin
+
+class MyChatClient(ChatPlugin):
+    plugin_name = "my_llm"
+    
+    def __init__(self, model: str = "default", **kwargs):
+        self.model = model
+    
+    def chat(self, messages: list[dict[str, Any]]) -> str:
+        # Your implementation
+        return response_text
+```
+
+Place it in `fitz/core/llm/chat/plugins/` and it's automatically discovered.
+
+### Use It
+
+```yaml
+llm:
+  plugin_name: my_llm
+  kwargs:
+    model: custom-model
+```
+
+---
+
+## Testing
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=fitz
+
+# Run specific test
+pytest tests/test_rag_pipeline_end_to_end.py
+```
+
+---
+
+## Development
+
+```bash
+# Clone
+git clone https://github.com/yafitzdev/fitz.git
+cd fitz
+
+# Install for development
+pip install -e ".[local,ingest]"
+
+# Run tests
+pytest
+
+# Format code
+black .
+isort .
 ```
 
 ---
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```bash
-# Setup development environment
-git clone https://github.com/yafitzdev/fitz.git
-cd fitz
-pip install -e ".[dev]"
-
-# Run tests
-pytest
-
-# Run contract map analysis
-python -m tools.contract_map
-```
+Areas we'd love help with:
+- Additional LLM/vector DB plugins
+- Advanced chunking strategies
+- Performance improvements
+- Documentation
 
 ---
 
@@ -247,6 +362,12 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## Acknowledgments
+## Links
 
-Special thanks to the open-source community for the foundational tools that make this possible.
+- **Repository**: https://github.com/yafitzdev/fitz
+- **Issues**: https://github.com/yafitzdev/fitz/issues
+- **Changelog**: [CHANGELOG.md](CHANGELOG.md)
+
+---
+
+**Build RAG pipelines that make sense.**
