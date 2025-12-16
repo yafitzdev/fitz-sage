@@ -31,11 +31,11 @@ if not os.getenv("COHERE_API_KEY"):
 
 from fitz.core.llm import get_llm_plugin
 from fitz.core.vector_db.writer import VectorDBWriter
+from fitz.generation.retrieval_guided.synthesis import RGS, RGSConfig
 from fitz.ingest.chunking.plugins.simple import SimpleChunker
 from fitz.ingest.ingestion.registry import get_ingest_plugin
 from fitz.ingest.validation.documents import ValidationConfig, validate
 from fitz.pipeline.context.pipeline import ContextPipeline
-from fitz.generation.retrieval_guided.synthesis import RGS, RGSConfig
 from fitz.retrieval.runtime.plugins.dense import DenseRetrievalPlugin
 
 COLLECTION_NAME = "fitz_demo"

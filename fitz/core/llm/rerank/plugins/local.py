@@ -1,7 +1,7 @@
 # fitz/core/llm/rerank/plugins/local.py
 from __future__ import annotations
 
-from typing import List, Any
+from typing import Any, List
 
 from fitz.backends.local_llm.embedding import LocalEmbedder, LocalEmbedderConfig
 from fitz.backends.local_llm.rerank import LocalReranker, LocalRerankerConfig

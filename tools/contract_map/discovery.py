@@ -8,7 +8,6 @@ from typing import Callable, Dict, List, Tuple
 
 from .common import DiscoveryReport
 
-
 # ---------------------------------------------------------------------------
 # Plugin predicates (declared, not inferred)
 # ---------------------------------------------------------------------------

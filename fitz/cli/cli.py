@@ -41,8 +41,9 @@ def _register_sub_apps():
 
 def _register_commands():
     """Register commands after module initialization to avoid circular imports."""
-    from fitz.cli import doctor, init, plugins
+    from fitz.cli import doctor
     from fitz.cli import help as help_module
+    from fitz.cli import init, plugins
 
     app.command("help")(help_module.command)
     app.command("init")(init.command)

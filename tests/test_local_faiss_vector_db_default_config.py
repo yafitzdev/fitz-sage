@@ -3,6 +3,9 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
+
+pytest.importorskip("faiss")
 
 from fitz.backends.local_vector_db.config import LocalVectorDBConfig
 from fitz.backends.local_vector_db.faiss import FaissLocalVectorDB

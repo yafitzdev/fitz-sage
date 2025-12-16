@@ -6,7 +6,6 @@ from typing import Any, Dict, Iterable
 
 from fitz.ingest.ingestion.base import RawDocument
 
-
 logger = logging.getLogger(__name__)
 
 

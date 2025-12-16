@@ -18,13 +18,13 @@ from tools.contract_map.analysis import (
     compute_invariants,
     compute_stats,
     discover_entrypoints,
+    render_any_breakdown_section,
     render_config_surface_section,
     render_entrypoints_section,
+    render_exception_analysis_section,
     render_hotspots_section,
     render_invariants_section,
     render_stats_section,
-    render_any_breakdown_section,
-    render_exception_analysis_section,
 )
 from tools.contract_map.architecture import RoleResolver
 from tools.contract_map.common import (
@@ -267,8 +267,8 @@ def render_architecture_section() -> str:
     lines.append("")
 
     try:
-        from fitz.core.config.architecture import load_architecture_mapping
         from fitz.core._contracts.roles import ROLES
+        from fitz.core.config.architecture import load_architecture_mapping
 
         # Show role mappings
         lines.append("### Role Mappings")

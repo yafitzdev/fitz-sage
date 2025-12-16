@@ -11,8 +11,8 @@ Run with:
     python examples/quickstart.py
 """
 
-from fitz.pipeline.context.pipeline import ContextPipeline
 from fitz.generation.retrieval_guided.synthesis import RGS, RGSConfig
+from fitz.pipeline.context.pipeline import ContextPipeline
 
 
 def main():

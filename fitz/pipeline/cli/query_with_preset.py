@@ -81,6 +81,7 @@ def command(
         # For now, we need to save preset to a temp file
         # TODO: Enhance create_pipeline_from_yaml to accept dict directly
         import tempfile
+
         import yaml
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
