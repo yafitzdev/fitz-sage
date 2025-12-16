@@ -143,7 +143,23 @@ def command(
     # 4) Vector DB upsert
     typer.echo(f"[4/4] Writing to vector database '{vector_db_plugin}'...")
     VectorDBPluginCls = get_vector_db_plugin(vector_db_plugin)
-    vdb_client = VectorDBPluginCls()
+
+    # Special handling for local-faiss which needs dimension
+    if vector_db_plugin == "local-faiss":
+        if not vectors:
+            typer.echo("ERROR: No vectors generated, cannot initialize FAISS")
+            raise typer.Exit(code=1)
+
+        # Get dimension from first vector
+        dim = len(vectors[0])
+
+        # Import config
+        from fitz.backends.local_vector_db.config import LocalVectorDBConfig
+        config = LocalVectorDBConfig()
+
+        vdb_client = VectorDBPluginCls(dim=dim, config=config)
+    else:
+        vdb_client = VectorDBPluginCls()
 
     writer = VectorDBWriter(client=vdb_client)
     writer.upsert(collection=collection, chunks=chunks, vectors=vectors)

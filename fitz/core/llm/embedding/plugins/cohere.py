@@ -99,12 +99,21 @@ class CohereEmbeddingClient:
             data = response.json()
 
             # Extract embedding from response
-            # Response structure: {"embeddings": [[0.1, 0.2, ...]]}
-            embeddings = data.get("embeddings", [])
-            if not embeddings or not embeddings[0]:
-                raise EmbeddingError(f"No embedding returned from Cohere API")
+            # Response structure: {"embeddings": {"float": [[0.1, 0.2, ...]]}}
+            embeddings_data = data.get("embeddings", {})
 
-            return embeddings[0]
+            # Handle both v1 and v2 API response formats
+            if isinstance(embeddings_data, dict):
+                # v1 API format: {"embeddings": {"float": [[...]]}}
+                float_embeddings = embeddings_data.get("float", [])
+                if float_embeddings and isinstance(float_embeddings, list) and float_embeddings[0]:
+                    return float_embeddings[0]
+            elif isinstance(embeddings_data, list):
+                # v2 API format: {"embeddings": [[...]]}
+                if embeddings_data and embeddings_data[0]:
+                    return embeddings_data[0]
+
+            raise EmbeddingError(f"No embedding returned from Cohere API")
 
         except httpx.HTTPStatusError as exc:
             error_detail = ""
