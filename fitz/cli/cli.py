@@ -29,6 +29,24 @@ app = typer.Typer(
 
 
 # ---------------------------------------------------------------------------
+# Register sub-apps with lazy imports to avoid circular dependency issues
+# ---------------------------------------------------------------------------
+
+def _register_sub_apps():
+    """Register ingest and pipeline sub-apps after module initialization."""
+    # Import here to avoid circular imports at module load time
+    from fitz.ingest.cli import app as ingest_app
+    from fitz.pipeline.cli import app as pipeline_app
+
+    app.add_typer(ingest_app, name="ingest")
+    app.add_typer(pipeline_app, name="pipeline")
+
+
+# Call immediately during module initialization
+_register_sub_apps()
+
+
+# ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
 
@@ -55,16 +73,17 @@ def help_cmd() -> None:
     typer.echo("Fitz — local-first RAG framework")
     typer.echo()
     typer.echo("Common commands:")
-    typer.echo("  fitz init               Initialize a local Fitz workspace")
-    typer.echo("  fitz plugins            List available plugins")
-    typer.echo("  fitz ingest             Ingest documents")
-    typer.echo("  fitz pipeline run       Query your knowledge base")
-    typer.echo("  fitz config show        Show resolved configuration")
+    typer.echo("  fitz init                    Initialize a local Fitz workspace")
+    typer.echo("  fitz plugins                 List available plugins")
+    typer.echo("  fitz ingest run              Ingest documents into vector DB")
+    typer.echo("  fitz ingest validate         Validate documents before ingestion")
+    typer.echo("  fitz pipeline query          Query your knowledge base")
+    typer.echo("  fitz pipeline config show    Show resolved configuration")
     typer.echo()
     typer.echo("Quick start:")
     typer.echo("  1. fitz init")
-    typer.echo("  2. fitz ingest ./docs")
-    typer.echo('  3. fitz pipeline run "What is this project about?"')
+    typer.echo("  2. fitz ingest run ./docs --collection my_docs")
+    typer.echo('  3. fitz pipeline query "What is this project about?"')
     typer.echo()
 
 
@@ -97,8 +116,8 @@ def init() -> None:
     typer.echo("  Vector DB: local-faiss (disk)")
     typer.echo()
     typer.echo("Next steps:")
-    typer.echo("  fitz ingest ./docs")
-    typer.echo('  fitz pipeline run "Your question"')
+    typer.echo("  fitz ingest run ./docs --collection my_docs")
+    typer.echo('  fitz pipeline query "Your question"')
     typer.echo()
 
 
@@ -112,6 +131,7 @@ def plugins() -> None:
     List all discovered plugins.
     """
     from fitz.core.llm.registry import available_llm_plugins
+    from fitz.core.vector_db.registry import available_vector_db_plugins
 
     typer.echo()
 
@@ -121,14 +141,28 @@ def plugins() -> None:
         if not names:
             typer.echo("  (none)")
         else:
-            for name in names:
+            for name in sorted(names):
                 typer.echo(f"  - {name}")
         typer.echo()
 
     show("LLM chat", "chat")
     show("LLM embedding", "embedding")
     show("LLM rerank", "rerank")
-    show("Vector DB", "vector_db")
+
+    # Vector DB plugins
+    typer.echo("Vector DB:")
+    try:
+        vdb_plugins = available_vector_db_plugins()
+        if not vdb_plugins:
+            typer.echo("  (none)")
+        else:
+            for name in sorted(vdb_plugins):
+                typer.echo(f"  - {name}")
+    except Exception:
+        # Fallback if the function doesn't exist
+        typer.echo("  - local-faiss")
+        typer.echo("  - qdrant")
+    typer.echo()
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +198,7 @@ def doctor() -> None:
 
 
 # ---------------------------------------------------------------------------
-# legacy local-llm helpers (kept for compatibility)
+# legacy helpers (kept for compatibility)
 # ---------------------------------------------------------------------------
 
 @app.command("setup-local")

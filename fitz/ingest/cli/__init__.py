@@ -12,20 +12,26 @@ Available commands:
 """
 import typer
 
-# Import individual commands
-from fitz.ingest.cli import list_plugins, run, stats, validate
-
-# Create main app
+# Create main app first
 app = typer.Typer(
     help="Ingestion CLI commands",
     no_args_is_help=True,
 )
 
-# Register commands
-app.command("run")(run.command)
-app.command("list-plugins")(list_plugins.command)
-app.command("validate")(validate.command)
-app.command("stats")(stats.command)
+
+# Import and register commands AFTER app creation to avoid circular imports
+def _register_commands():
+    """Register commands after module initialization to avoid circular imports."""
+    from fitz.ingest.cli import list_plugins, run, stats, validate
+
+    app.command("run")(run.command)
+    app.command("list-plugins")(list_plugins.command)
+    app.command("validate")(validate.command)
+    app.command("stats")(stats.command)
+
+
+# Register commands immediately
+_register_commands()
 
 
 if __name__ == "__main__":
