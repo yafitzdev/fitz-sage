@@ -2,10 +2,9 @@
 """
 Pydantic schema for Fitz configuration.
 
-Rules:
-- Strict validation
-- No unknown keys
-- Provider selection lives in config, never in non-plugin code paths.
+Architecture:
+- FitzMetaConfig: YAML-facing meta config (presets, defaults)
+- FitzConfig: runtime config consumed by engines
 """
 
 from __future__ import annotations
@@ -32,11 +31,26 @@ class PluginConfig(BaseModel):
 
 class FitzConfig(BaseModel):
     """
-    Core Fitz config.
+    Fully resolved runtime configuration.
 
-    This config is intentionally minimal and provider-agnostic.
+    This is the ONLY config that engines are allowed to see.
     """
 
     llm: PluginConfig
+    vector_db: PluginConfig
+    pipeline: PluginConfig
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class FitzMetaConfig(BaseModel):
+    """
+    YAML-facing meta configuration.
+
+    This layer is NEVER passed to engines.
+    """
+
+    default_preset: str
+    presets: dict[str, dict[str, Any]]
 
     model_config = ConfigDict(extra="forbid")

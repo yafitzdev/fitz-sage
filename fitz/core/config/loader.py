@@ -3,10 +3,11 @@
 Configuration loader for Fitz.
 
 Responsibilities:
-- Load default config
-- Load user config (optional)
+- Load default config (meta)
+- Load user config (meta)
 - Expand ${ENV_VAR} placeholders
-- Validate via schema
+- Resolve preset
+- Validate resolved config via FitzConfig
 """
 
 from __future__ import annotations
@@ -17,9 +18,10 @@ from typing import Any
 
 import yaml
 
-from fitz.core.config.schema import FitzConfig
+from fitz.core.config.schema import FitzConfig, FitzMetaConfig
 from fitz.core.logging.logger import get_logger
 from fitz.core.logging.tags import CLI
+from fitz.core.config.normalize import normalize_preset
 
 logger = get_logger(__name__)
 
@@ -61,18 +63,29 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 
 def load_config(user_config_path: Path | None = None) -> FitzConfig:
     """
-    Load and validate Fitz configuration.
+    Load and validate Fitz runtime configuration.
 
-    Precedence:
-    - defaults
-    - user config (deep-merged over defaults)
+    Flow:
+    1. Load meta config
+    2. Merge user meta config
+    3. Resolve preset
+    4. Validate resolved runtime config
     """
     logger.debug(f"{CLI} Loading default config from {DEFAULT_CONFIG_PATH}")
-    base_cfg = _load_yaml(DEFAULT_CONFIG_PATH)
+    meta_raw = _load_yaml(DEFAULT_CONFIG_PATH)
 
     if user_config_path:
         logger.debug(f"{CLI} Loading user config from {user_config_path}")
-        user_cfg = _load_yaml(user_config_path)
-        base_cfg = _deep_merge(base_cfg, user_cfg)
+        user_raw = _load_yaml(user_config_path)
+        meta_raw = _deep_merge(meta_raw, user_raw)
 
-    return FitzConfig.model_validate(base_cfg)
+    meta = FitzMetaConfig.model_validate(meta_raw)
+
+    preset_name = meta.default_preset
+    if preset_name not in meta.presets:
+        raise ValueError(f"Unknown preset: {preset_name}")
+
+    resolved = meta.presets[preset_name]
+    normalized = normalize_preset(resolved)
+
+    return FitzConfig.model_validate(normalized)
