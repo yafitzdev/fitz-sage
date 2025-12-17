@@ -12,28 +12,23 @@ Usage:
     >>> config = load_config("config.yaml")
 """
 
-from .schema import (
-    # Main config
-    ClassicRagConfig,
-    # Sub-configs
-    PluginConfig,
-    RetrieverConfig,
-    RerankConfig,
-    RGSConfig,
-    LoggingConfig,
-    # Backwards compatibility aliases
-    RAGConfig,
-    PipelinePluginConfig,
-    EnginePluginConfig,
-    FitzConfig,
-)
-
-from .loader import (
-    load_config,
-    load_config_dict,
-    # Backwards compatibility exports
+from .loader import (  # Backwards compatibility exports
     DEFAULT_CONFIG_PATH,
     _load_yaml,
+    load_config,
+    load_config_dict,
+)
+from .schema import (  # Main config; Sub-configs; Backwards compatibility aliases
+    ClassicRagConfig,
+    EnginePluginConfig,
+    FitzConfig,
+    LoggingConfig,
+    PipelinePluginConfig,
+    PluginConfig,
+    RAGConfig,
+    RerankConfig,
+    RetrieverConfig,
+    RGSConfig,
 )
 
 __all__ = [

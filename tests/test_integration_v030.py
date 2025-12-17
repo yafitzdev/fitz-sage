@@ -9,29 +9,30 @@ These tests verify that the complete refactored system works end-to-end:
 - Universal runner works
 """
 
+from unittest.mock import MagicMock, Mock
+
 import pytest
-from unittest.mock import Mock, MagicMock
 
 # Core imports
 from fitz.core import (
-    Query,
     Answer,
-    Provenance,
     Constraints,
-    KnowledgeEngine,
-    QueryError,
-    KnowledgeError,
     GenerationError,
+    KnowledgeEngine,
+    KnowledgeError,
+    Provenance,
+    Query,
+    QueryError,
 )
 
 # Runtime imports
 from fitz.runtime import (
     EngineRegistry,
-    get_engine_registry,
-    run,
     create_engine,
+    get_engine_registry,
     list_engines,
     list_engines_with_info,
+    run,
 )
 
 
@@ -79,11 +80,7 @@ class TestCoreContracts:
 
     def test_provenance_creation(self):
         """Test Provenance object creation."""
-        prov = Provenance(
-            source_id="doc_123",
-            excerpt="Some text",
-            metadata={"title": "Paper"}
-        )
+        prov = Provenance(source_id="doc_123", excerpt="Some text", metadata={"title": "Paper"})
         assert prov.source_id == "doc_123"
         assert prov.excerpt == "Some text"
         assert prov.metadata["title"] == "Paper"
@@ -91,9 +88,7 @@ class TestCoreContracts:
     def test_constraints_creation(self):
         """Test Constraints object creation."""
         constraints = Constraints(
-            max_sources=10,
-            filters={"topic": "physics"},
-            metadata={"timeout": 30}
+            max_sources=10, filters={"topic": "physics"}, metadata={"timeout": 30}
         )
         assert constraints.max_sources == 10
         assert constraints.filters["topic"] == "physics"
@@ -128,11 +123,7 @@ class TestEngineRegistry:
         def mock_factory(config):
             return Mock()
 
-        registry.register(
-            name="test_engine",
-            factory=mock_factory,
-            description="Test engine"
-        )
+        registry.register(name="test_engine", factory=mock_factory, description="Test engine")
 
         assert "test_engine" in registry.list()
 
@@ -202,10 +193,7 @@ class TestEngineRegistry:
         """Test decorator-based registration."""
         registry = get_engine_registry()
 
-        @EngineRegistry.register_engine(
-            name="decorated",
-            description="Decorated engine"
-        )
+        @EngineRegistry.register_engine(name="decorated", description="Decorated engine")
         def create_engine(config):
             return Mock(spec=KnowledgeEngine)
 
@@ -229,14 +217,12 @@ class TestUniversalRunner:
             mock_engine.answer.return_value = Answer(
                 text="Mock answer",
                 provenance=[Provenance(source_id="mock_1")],
-                metadata={"engine": "mock"}
+                metadata={"engine": "mock"},
             )
             return mock_engine
 
         registry.register(
-            name="mock_engine",
-            factory=mock_factory,
-            description="Mock engine for testing"
+            name="mock_engine", factory=mock_factory, description="Mock engine for testing"
         )
 
     def test_list_engines_function(self):
@@ -257,11 +243,7 @@ class TestUniversalRunner:
 
     def test_run_with_string_query(self):
         """Test universal run() with string query."""
-        answer = run(
-            query="What is X?",
-            engine="mock_engine",
-            config=None
-        )
+        answer = run(query="What is X?", engine="mock_engine", config=None)
 
         assert answer.text == "Mock answer"
         assert len(answer.provenance) == 1
@@ -270,34 +252,21 @@ class TestUniversalRunner:
     def test_run_with_query_object(self):
         """Test universal run() with Query object."""
         query = Query(text="What is Y?")
-        answer = run(
-            query=query,
-            engine="mock_engine",
-            config=None
-        )
+        answer = run(query=query, engine="mock_engine", config=None)
 
         assert answer.text == "Mock answer"
 
     def test_run_with_constraints(self):
         """Test run() with constraints."""
         constraints = Constraints(max_sources=5)
-        answer = run(
-            query="What is Z?",
-            engine="mock_engine",
-            config=None,
-            constraints=constraints
-        )
+        answer = run(query="What is Z?", engine="mock_engine", config=None, constraints=constraints)
 
         assert answer.text == "Mock answer"
 
     def test_run_unknown_engine_raises(self):
         """Test that unknown engine raises error."""
         with pytest.raises(Exception, match="Unknown engine"):
-            run(
-                query="What is X?",
-                engine="nonexistent",
-                config=None
-            )
+            run(query="What is X?", engine="nonexistent", config=None)
 
 
 class TestProtocolCompliance:
@@ -343,6 +312,7 @@ class TestErrorHandling:
 
         # Test catching as EngineError
         from fitz.core import EngineError
+
         with pytest.raises(EngineError):
             raise QueryError("Test error")
 

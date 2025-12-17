@@ -20,8 +20,8 @@ import typer
 try:
     from rich.console import Console
     from rich.panel import Panel
+    from rich.prompt import Confirm, Prompt
     from rich.table import Table
-    from rich.prompt import Prompt, Confirm
 
     RICH_AVAILABLE = True
     console = Console()
@@ -34,9 +34,11 @@ except ImportError:
 # Detection Functions
 # =============================================================================
 
+
 @dataclass
 class ProviderStatus:
     """Status of a provider/service."""
+
     name: str
     available: bool
     details: str = ""
@@ -53,7 +55,7 @@ def detect_api_keys() -> dict[str, ProviderStatus]:
         name="Cohere",
         available=bool(cohere_key),
         details=f"Key: {cohere_key[:8]}..." if cohere_key else "Not set",
-        env_var="COHERE_API_KEY"
+        env_var="COHERE_API_KEY",
     )
 
     # OpenAI
@@ -62,7 +64,7 @@ def detect_api_keys() -> dict[str, ProviderStatus]:
         name="OpenAI",
         available=bool(openai_key),
         details=f"Key: {openai_key[:8]}..." if openai_key else "Not set",
-        env_var="OPENAI_API_KEY"
+        env_var="OPENAI_API_KEY",
     )
 
     # Anthropic
@@ -71,7 +73,7 @@ def detect_api_keys() -> dict[str, ProviderStatus]:
         name="Anthropic",
         available=bool(anthropic_key),
         details=f"Key: {anthropic_key[:8]}..." if anthropic_key else "Not set",
-        env_var="ANTHROPIC_API_KEY"
+        env_var="ANTHROPIC_API_KEY",
     )
 
     return providers
@@ -89,7 +91,7 @@ def detect_ollama() -> ProviderStatus:
         )
         if result.returncode == 0:
             # Parse models
-            lines = result.stdout.strip().split('\n')[1:]  # Skip header
+            lines = result.stdout.strip().split("\n")[1:]  # Skip header
             models = [line.split()[0] for line in lines if line.strip()]
             model_str = ", ".join(models[:3])
             if len(models) > 3:
@@ -97,24 +99,20 @@ def detect_ollama() -> ProviderStatus:
             return ProviderStatus(
                 name="Ollama",
                 available=True,
-                details=f"Models: {model_str}" if models else "No models installed"
+                details=f"Models: {model_str}" if models else "No models installed",
             )
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
     except Exception:
         pass
 
-    return ProviderStatus(
-        name="Ollama",
-        available=False,
-        details="Not installed or not running"
-    )
+    return ProviderStatus(name="Ollama", available=False, details="Not installed or not running")
 
 
 def detect_qdrant() -> ProviderStatus:
     """Detect if Qdrant is accessible."""
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     # Check common locations - prioritize env var
     env_host = os.getenv("QDRANT_HOST")
@@ -128,10 +126,11 @@ def detect_qdrant() -> ProviderStatus:
     for host in hosts_to_try:
         try:
             url = f"http://{host}:{port}/collections"
-            req = urllib.request.Request(url, method='GET')
+            req = urllib.request.Request(url, method="GET")
             with urllib.request.urlopen(req, timeout=3) as response:
                 if response.status == 200:
                     import json
+
                     data = json.loads(response.read())
                     collections = data.get("result", {}).get("collections", [])
                     col_names = [c.get("name", "?") for c in collections]
@@ -141,15 +140,13 @@ def detect_qdrant() -> ProviderStatus:
                     return ProviderStatus(
                         name="Qdrant",
                         available=True,
-                        details=f"At {host}:{port} (collections: {col_str})"
+                        details=f"At {host}:{port} (collections: {col_str})",
                     )
         except Exception:
             continue
 
     return ProviderStatus(
-        name="Qdrant",
-        available=False,
-        details="Not found (tried localhost:6333)"
+        name="Qdrant", available=False, details="Not found (tried localhost:6333)"
     )
 
 
@@ -157,16 +154,11 @@ def check_faiss_available() -> ProviderStatus:
     """Check if FAISS is installed."""
     try:
         import faiss
-        return ProviderStatus(
-            name="FAISS",
-            available=True,
-            details="Installed (local vector DB)"
-        )
+
+        return ProviderStatus(name="FAISS", available=True, details="Installed (local vector DB)")
     except ImportError:
         return ProviderStatus(
-            name="FAISS",
-            available=False,
-            details="Not installed (pip install faiss-cpu)"
+            name="FAISS", available=False, details="Not installed (pip install faiss-cpu)"
         )
 
 
@@ -174,14 +166,15 @@ def check_faiss_available() -> ProviderStatus:
 # Config Generation
 # =============================================================================
 
+
 def generate_config(
-        llm_provider: str,
-        embedding_provider: str,
-        vector_db: str,
-        qdrant_host: str = "localhost",
-        qdrant_port: int = 6333,
-        collection: str = "default",
-        enable_rerank: bool = False,
+    llm_provider: str,
+    embedding_provider: str,
+    vector_db: str,
+    qdrant_host: str = "localhost",
+    qdrant_port: int = 6333,
+    collection: str = "default",
+    enable_rerank: bool = False,
 ) -> str:
     """Generate YAML config based on user choices."""
 
@@ -299,6 +292,7 @@ logging:
 # Display Helpers
 # =============================================================================
 
+
 def print_header(text: str) -> None:
     """Print a header."""
     if RICH_AVAILABLE:
@@ -306,7 +300,7 @@ def print_header(text: str) -> None:
     else:
         print(f"\n{'=' * 60}")
         print(text)
-        print('=' * 60)
+        print("=" * 60)
 
 
 def print_status(name: str, available: bool, details: str = "") -> None:
@@ -356,18 +350,19 @@ def prompt_confirm(prompt: str, default: bool = True) -> bool:
 # Main Command
 # =============================================================================
 
+
 def command(
-        non_interactive: bool = typer.Option(
-            False,
-            "--non-interactive",
-            "-y",
-            help="Use detected defaults without prompting",
-        ),
-        show_config: bool = typer.Option(
-            False,
-            "--show-config",
-            help="Only show what config would be generated",
-        ),
+    non_interactive: bool = typer.Option(
+        False,
+        "--non-interactive",
+        "-y",
+        help="Use detected defaults without prompting",
+    ),
+    show_config: bool = typer.Option(
+        False,
+        "--show-config",
+        help="Only show what config would be generated",
+    ),
 ) -> None:
     """
     Initialize Fitz with an interactive setup wizard.
@@ -383,11 +378,12 @@ def command(
 
     # Header
     if RICH_AVAILABLE:
-        console.print(Panel.fit(
-            "[bold]🔧 Fitz Setup Wizard[/bold]\n"
-            "Let's configure your RAG pipeline!",
-            border_style="blue"
-        ))
+        console.print(
+            Panel.fit(
+                "[bold]🔧 Fitz Setup Wizard[/bold]\n" "Let's configure your RAG pipeline!",
+                border_style="blue",
+            )
+        )
     else:
         print("\n" + "=" * 60)
         print("🔧 Fitz Setup Wizard")
@@ -504,7 +500,9 @@ def command(
             print(f"✓ Using {embedding_choice} for embeddings (only available provider)")
         else:
             print(f"\nAvailable embedding providers: {', '.join(available_embeddings)}")
-            embedding_choice = prompt_choice("Select embedding provider", available_embeddings, embedding_default)
+            embedding_choice = prompt_choice(
+                "Select embedding provider", available_embeddings, embedding_default
+            )
 
         # Vector DB choice
         available_vdbs = []
@@ -532,7 +530,9 @@ def command(
             print(f"✓ Using {vector_db_choice} for vector database (only available option)")
         else:
             print(f"\nAvailable vector databases: {', '.join(available_vdbs)}")
-            vector_db_choice = prompt_choice("Select vector database", available_vdbs, vector_db_default)
+            vector_db_choice = prompt_choice(
+                "Select vector database", available_vdbs, vector_db_default
+            )
 
         # Collection name
         if RICH_AVAILABLE:
@@ -544,7 +544,9 @@ def command(
         enable_rerank = False
         if api_keys["cohere"].available:
             print()
-            enable_rerank = prompt_confirm("Enable reranking? (improves quality, uses Cohere API)", default=False)
+            enable_rerank = prompt_confirm(
+                "Enable reranking? (improves quality, uses Cohere API)", default=False
+            )
 
     # ==========================================================================
     # Generate Config
@@ -581,6 +583,7 @@ def command(
 
     if RICH_AVAILABLE:
         from rich.syntax import Syntax
+
         console.print(Syntax(config, "yaml", theme="monokai", line_numbers=False))
     else:
         print(config)

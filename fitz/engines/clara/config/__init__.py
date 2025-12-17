@@ -4,11 +4,11 @@ CLaRa configuration package.
 """
 
 from .schema import (
-    ClaraConfig,
-    ClaraModelConfig,
     ClaraCompressionConfig,
-    ClaraRetrievalConfig,
+    ClaraConfig,
     ClaraGenerationConfig,
+    ClaraModelConfig,
+    ClaraRetrievalConfig,
     load_clara_config,
 )
 

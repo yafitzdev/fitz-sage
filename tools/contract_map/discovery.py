@@ -184,8 +184,12 @@ def scan_all_discoveries() -> List[DiscoveryReport]:
             "fitz.engines.classic_rag.pipeline.pipeline.plugins",
             "RAG pipeline plugins (Option A discovery)",
         ),
-        scan_discovery("fitz.ingest.chunking.plugins", "Ingest chunking plugins (Option A discovery)"),
-        scan_discovery("fitz.ingest.ingestion.plugins", "Ingest ingestion plugins (Option A discovery)"),
+        scan_discovery(
+            "fitz.ingest.chunking.plugins", "Ingest chunking plugins (Option A discovery)"
+        ),
+        scan_discovery(
+            "fitz.ingest.ingestion.plugins", "Ingest ingestion plugins (Option A discovery)"
+        ),
     ]
 
 

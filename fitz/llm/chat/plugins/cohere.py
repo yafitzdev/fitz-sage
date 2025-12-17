@@ -35,16 +35,15 @@ class CohereChatClient:
     plugin_type = "chat"
 
     def __init__(
-            self,
-            api_key: str | None = None,
-            model: str = "command-r-plus",
-            temperature: float = 0.2,
-            base_url: str = "https://api.cohere.ai/v1",
+        self,
+        api_key: str | None = None,
+        model: str = "command-r-plus",
+        temperature: float = 0.2,
+        base_url: str = "https://api.cohere.ai/v1",
     ) -> None:
         if httpx is None:
             raise RuntimeError(
-                "httpx is required for Cohere plugin. "
-                "Install with: pip install httpx"
+                "httpx is required for Cohere plugin. " "Install with: pip install httpx"
             )
 
         # Get API key
@@ -104,16 +103,10 @@ class CohereChatClient:
                 # Last user message becomes the "message" parameter
                 # Previous user messages go to chat_history
                 if current_message:
-                    chat_history.append({
-                        "role": "USER",
-                        "message": current_message
-                    })
+                    chat_history.append({"role": "USER", "message": current_message})
                 current_message = content
             elif role == "assistant":
-                chat_history.append({
-                    "role": "CHATBOT",
-                    "message": content
-                })
+                chat_history.append({"role": "CHATBOT", "message": content})
 
         # Build request payload
         payload: dict[str, Any] = {

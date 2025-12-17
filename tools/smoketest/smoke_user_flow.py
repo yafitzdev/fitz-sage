@@ -5,11 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from fitz.engines.classic_rag.models.chunk import Chunk
-from fitz.vector_db.writer import VectorDBWriter
 from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
+from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.engines.classic_rag.pipeline.context.pipeline import ContextPipeline
-from fitz.engines.classic_rag.retrieval.runtime.plugins.dense import DenseRetrievalPlugin, RetrieverCfg
+from fitz.engines.classic_rag.retrieval.runtime.plugins.dense import (
+    DenseRetrievalPlugin,
+    RetrieverCfg,
+)
+from fitz.vector_db.writer import VectorDBWriter
 
 
 def read_text_files(root: Path) -> list[tuple[str, str]]:

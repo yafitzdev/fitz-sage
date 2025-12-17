@@ -12,17 +12,17 @@ CLaRa differs from Classic RAG:
 - Single language modeling loss trains both retrieval and generation
 """
 
-from typing import Optional, Dict, Any, List
 import logging
+from typing import Any, Dict, List, Optional
 
 from fitz.core import (
-    Query,
     Answer,
-    Provenance,
-    QueryError,
-    KnowledgeError,
-    GenerationError,
     ConfigurationError,
+    GenerationError,
+    KnowledgeError,
+    Provenance,
+    Query,
+    QueryError,
 )
 from fitz.engines.clara.config.schema import ClaraConfig
 
@@ -120,10 +120,7 @@ class ClaraEngine:
         elif model_config.load_in_4bit:
             load_kwargs["load_in_4bit"] = True
 
-        self._model = AutoModel.from_pretrained(
-            model_config.model_name_or_path,
-            **load_kwargs
-        )
+        self._model = AutoModel.from_pretrained(model_config.model_name_or_path, **load_kwargs)
 
         # Move to device if not using quantization
         if not (model_config.load_in_8bit or model_config.load_in_4bit):
@@ -132,11 +129,7 @@ class ClaraEngine:
         self._model.eval()
         logger.info(f"CLaRa model loaded on {model_config.device}")
 
-    def add_documents(
-            self,
-            documents: List[str],
-            doc_ids: Optional[List[str]] = None
-    ) -> List[str]:
+    def add_documents(self, documents: List[str], doc_ids: Optional[List[str]] = None) -> List[str]:
         """
         Add documents to the knowledge base.
 
@@ -155,6 +148,7 @@ class ClaraEngine:
         """
         if doc_ids is None:
             import uuid
+
             doc_ids = [f"doc_{uuid.uuid4().hex[:8]}" for _ in documents]
 
         if len(doc_ids) != len(documents):
@@ -195,7 +189,7 @@ class ClaraEngine:
             # - E2E: full retrieval + generation
 
             # For compression, we use the compressor adapter
-            if hasattr(self._model, 'compress_documents'):
+            if hasattr(self._model, "compress_documents"):
                 compressed = self._model.compress_documents(
                     documents=formatted_docs,
                     max_length=self._config.compression.doc_max_length,
@@ -221,18 +215,18 @@ class ClaraEngine:
         # This captures the compressed representation
         with torch.no_grad():
             # Different variants have different methods
-            if hasattr(self._model, 'encode_documents'):
+            if hasattr(self._model, "encode_documents"):
                 embeddings = self._model.encode_documents(flat_docs)
             else:
                 # Use tokenizer + model hidden states
-                tokenizer = self._model.tokenizer if hasattr(self._model, 'tokenizer') else None
+                tokenizer = self._model.tokenizer if hasattr(self._model, "tokenizer") else None
                 if tokenizer:
                     inputs = tokenizer(
                         flat_docs,
                         return_tensors="pt",
                         padding=True,
                         truncation=True,
-                        max_length=self._config.compression.doc_max_length
+                        max_length=self._config.compression.doc_max_length,
                     ).to(self._model.device)
 
                     outputs = self._model(**inputs, output_hidden_states=True)
@@ -290,16 +284,21 @@ class ClaraEngine:
             # Note: Provenance takes source_id, excerpt, and metadata (no direct score field)
             provenance = []
             for i, (doc_id, score) in enumerate(zip(retrieved_doc_ids, scores)):
-                provenance.append(Provenance(
-                    source_id=doc_id,
-                    excerpt=self._doc_texts[doc_id][:200] + "..." if len(self._doc_texts[doc_id]) > 200 else
-                    self._doc_texts[doc_id],
-                    metadata={
-                        "rank": i + 1,
-                        "relevance_score": float(score),
-                        "compression_rate": self._config.compression.compression_rate,
-                    }
-                ))
+                provenance.append(
+                    Provenance(
+                        source_id=doc_id,
+                        excerpt=(
+                            self._doc_texts[doc_id][:200] + "..."
+                            if len(self._doc_texts[doc_id]) > 200
+                            else self._doc_texts[doc_id]
+                        ),
+                        metadata={
+                            "rank": i + 1,
+                            "relevance_score": float(score),
+                            "compression_rate": self._config.compression.compression_rate,
+                        },
+                    )
+                )
 
             return Answer(
                 text=answer_text,
@@ -309,7 +308,7 @@ class ClaraEngine:
                     "variant": self._config.model.variant,
                     "compression_rate": self._config.compression.compression_rate,
                     "num_docs_retrieved": len(retrieved_doc_ids),
-                }
+                },
             )
 
         except QueryError:
@@ -337,18 +336,11 @@ class ClaraEngine:
 
             # Compute similarities with all documents
             doc_ids = list(self._compressed_docs.keys())
-            doc_embeddings = torch.stack([
-                self._compressed_docs[doc_id]
-                for doc_id in doc_ids
-            ])
+            doc_embeddings = torch.stack([self._compressed_docs[doc_id] for doc_id in doc_ids])
 
             # Cosine similarity
             query_embedding = query_embedding.to(doc_embeddings.device)
-            similarities = F.cosine_similarity(
-                query_embedding.unsqueeze(0),
-                doc_embeddings,
-                dim=-1
-            )
+            similarities = F.cosine_similarity(query_embedding.unsqueeze(0), doc_embeddings, dim=-1)
 
             # Get top-k
             top_k = min(top_k, len(doc_ids))
@@ -369,18 +361,18 @@ class ClaraEngine:
         import torch
 
         with torch.no_grad():
-            if hasattr(self._model, 'encode_query'):
+            if hasattr(self._model, "encode_query"):
                 return self._model.encode_query(query_text)
             else:
                 # Fallback to tokenize + forward
-                tokenizer = getattr(self._model, 'tokenizer', None)
+                tokenizer = getattr(self._model, "tokenizer", None)
                 if tokenizer:
                     inputs = tokenizer(
                         query_text,
                         return_tensors="pt",
                         padding=True,
                         truncation=True,
-                        max_length=512
+                        max_length=512,
                     ).to(self._model.device)
 
                     outputs = self._model(**inputs, output_hidden_states=True)
@@ -388,11 +380,7 @@ class ClaraEngine:
                 else:
                     raise KnowledgeError("Cannot encode query without tokenizer")
 
-    def _generate(
-            self,
-            query_text: str,
-            documents: List[str]
-    ) -> tuple[str, List[int]]:
+    def _generate(self, query_text: str, documents: List[str]) -> tuple[str, List[int]]:
         """
         Generate answer from query and retrieved documents.
 
@@ -411,16 +399,18 @@ class ClaraEngine:
             # Use appropriate generation method based on variant
             variant = self._config.model.variant
 
-            if variant == "e2e" and hasattr(self._model, 'generate_from_questions'):
+            if variant == "e2e" and hasattr(self._model, "generate_from_questions"):
                 # E2E variant: full retrieval + generation
                 outputs, topk_indices = self._model.generate_from_questions(
                     questions=questions,
                     documents=docs_batch,
                     max_new_tokens=gen_config.max_new_tokens,
                 )
-                return outputs[0], topk_indices.tolist() if hasattr(topk_indices, 'tolist') else topk_indices
+                return outputs[0], (
+                    topk_indices.tolist() if hasattr(topk_indices, "tolist") else topk_indices
+                )
 
-            elif variant == "instruct" and hasattr(self._model, 'generate_from_text'):
+            elif variant == "instruct" and hasattr(self._model, "generate_from_text"):
                 # Instruct variant: instruction-following generation
                 outputs = self._model.generate_from_text(
                     questions=questions,
@@ -429,7 +419,7 @@ class ClaraEngine:
                 )
                 return outputs[0], list(range(len(documents)))
 
-            elif hasattr(self._model, 'generate_from_paraphrase'):
+            elif hasattr(self._model, "generate_from_paraphrase"):
                 # Base variant: paraphrase-based generation
                 outputs = self._model.generate_from_paraphrase(
                     questions=questions,

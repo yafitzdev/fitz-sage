@@ -5,7 +5,7 @@ Constraints allow users to control query execution without changing engine confi
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 
 @dataclass

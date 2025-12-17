@@ -11,10 +11,10 @@ from typing import Optional
 
 import typer
 
-from fitz.llm.registry import available_llm_plugins
-from fitz.vector_db.registry import get_vector_db_plugin
 from fitz.ingest.ingestion.registry import REGISTRY as ingest_registry
 from fitz.ingest.ingestion.registry import _auto_discover as discover_ingest
+from fitz.llm.registry import available_llm_plugins
+from fitz.vector_db.registry import get_vector_db_plugin
 
 
 def command(

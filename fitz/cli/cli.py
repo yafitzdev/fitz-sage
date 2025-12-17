@@ -15,14 +15,17 @@ import typer
 
 # Try to import error handler, but don't fail if not present
 try:
-    from fitz.cli.errors import install_global_handler, friendly_errors
+    from fitz.cli.errors import friendly_errors, install_global_handler
+
     install_global_handler()
     HAS_ERROR_HANDLER = True
 except ImportError:
     HAS_ERROR_HANDLER = False
+
     # Dummy decorator if errors.py not installed
     def friendly_errors(func):
         return func
+
 
 app = typer.Typer(
     help="Fitz — local-first RAG framework",

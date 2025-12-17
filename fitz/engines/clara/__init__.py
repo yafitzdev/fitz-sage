@@ -61,11 +61,11 @@ References:
 # CONFIGURATION (import first, no dependencies on engine)
 # =============================================================================
 from fitz.engines.clara.config.schema import (
-    ClaraConfig,
-    ClaraModelConfig,
     ClaraCompressionConfig,
-    ClaraRetrievalConfig,
+    ClaraConfig,
     ClaraGenerationConfig,
+    ClaraModelConfig,
+    ClaraRetrievalConfig,
     load_clara_config,
 )
 
@@ -78,9 +78,9 @@ from fitz.engines.clara.engine import ClaraEngine
 # RUNTIME (import after engine)
 # =============================================================================
 from fitz.engines.clara.runtime import (
-    run_clara,
-    create_clara_engine,
     clear_engine_cache,
+    create_clara_engine,
+    run_clara,
 )
 
 __all__ = [
@@ -107,6 +107,7 @@ __all__ = [
 # the universal run() function.
 #
 # This is done at the END of __init__.py to ensure all imports are complete.
+
 
 def _register_clara_engine():
     """Register CLaRa with the engine registry."""

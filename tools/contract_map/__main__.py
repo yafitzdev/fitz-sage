@@ -266,8 +266,8 @@ def render_architecture_section() -> str:
     lines.append("")
 
     try:
-        from fitz.engines.classic_rag.contracts.roles import ROLES
         from fitz.engines.classic_rag.config.architecture import load_architecture_mapping
+        from fitz.engines.classic_rag.contracts.roles import ROLES
 
         # Show role mappings
         lines.append("### Role Mappings")

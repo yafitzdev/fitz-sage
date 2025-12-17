@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fitz.logging.logger import get_logger
-from fitz.logging.tags import PIPELINE
 from fitz.engines.classic_rag.config.schema import RAGConfig
 from fitz.engines.classic_rag.pipeline.pipeline.base import Pipeline, PipelinePlugin
 from fitz.engines.classic_rag.pipeline.pipeline.engine import RAGPipeline
+from fitz.logging.logger import get_logger
+from fitz.logging.tags import PIPELINE
 
 logger = get_logger(__name__)
 

@@ -30,7 +30,7 @@ Examples:
 """
 
 from .engine import ClassicRagEngine
-from .runtime import run_classic_rag, create_classic_rag_engine, run
+from .runtime import create_classic_rag_engine, run, run_classic_rag
 
 __all__ = [
     "ClassicRagEngine",

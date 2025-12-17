@@ -5,7 +5,7 @@ Provenance provides transparency about where information came from.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 
 @dataclass

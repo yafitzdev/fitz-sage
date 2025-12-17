@@ -5,13 +5,13 @@ from dataclasses import dataclass
 from typing import Any, List, Protocol, runtime_checkable
 
 from fitz.engines.classic_rag.errors.llm import EmbeddingError
+from fitz.engines.classic_rag.models.chunk import Chunk
+from fitz.engines.classic_rag.retrieval.exceptions.base import RerankError, VectorSearchError
+from fitz.engines.classic_rag.retrieval.runtime.base import RetrievalPlugin
 from fitz.llm.embedding.engine import EmbeddingEngine
 from fitz.llm.rerank.engine import RerankEngine
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import RETRIEVER
-from fitz.engines.classic_rag.models.chunk import Chunk
-from fitz.engines.classic_rag.retrieval.exceptions.base import RerankError, VectorSearchError
-from fitz.engines.classic_rag.retrieval.runtime.base import RetrievalPlugin
 
 logger = get_logger(__name__)
 

@@ -18,6 +18,7 @@ class EngineError(Exception):
         ... except EngineError as e:
         ...     print(f"Engine failed: {e}")
     """
+
     pass
 
 
@@ -36,6 +37,7 @@ class QueryError(EngineError):
         ... except QueryError as e:
         ...     print(f"Invalid query: {e}")
     """
+
     pass
 
 
@@ -58,6 +60,7 @@ class KnowledgeError(EngineError):
         ... except KnowledgeError as e:
         ...     print(f"Knowledge system unavailable: {e}")
     """
+
     pass
 
 
@@ -81,6 +84,7 @@ class GenerationError(EngineError):
         ... except GenerationError as e:
         ...     print(f"Failed to generate answer: {e}")
     """
+
     pass
 
 
@@ -102,6 +106,7 @@ class ConfigurationError(EngineError):
         ... except ConfigurationError as e:
         ...     print(f"Engine misconfigured: {e}")
     """
+
     pass
 
 
@@ -120,6 +125,7 @@ class TimeoutError(EngineError):
         ... except TimeoutError as e:
         ...     print(f"Query timed out: {e}")
     """
+
     pass
 
 
@@ -139,4 +145,5 @@ class UnsupportedOperationError(EngineError):
         ... except UnsupportedOperationError as e:
         ...     print(f"This engine doesn't support uncertainty: {e}")
     """
+
     pass

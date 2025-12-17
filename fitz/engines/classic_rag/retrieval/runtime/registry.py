@@ -4,9 +4,9 @@ import importlib
 import pkgutil
 from typing import Dict, Iterable, Type
 
+from fitz.engines.classic_rag.retrieval.runtime.base import RetrievalPlugin
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import RETRIEVER
-from fitz.engines.classic_rag.retrieval.runtime.base import RetrievalPlugin
 
 logger = get_logger(__name__)
 

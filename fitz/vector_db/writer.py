@@ -5,9 +5,9 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable
 
+from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import VECTOR_DB
-from fitz.engines.classic_rag.models.chunk import Chunk
 
 logger = get_logger(__name__)
 

@@ -9,6 +9,18 @@ from __future__ import annotations
 
 from typing import Optional
 
+from fitz.engines.classic_rag.config import ClassicRagConfig, load_config
+from fitz.engines.classic_rag.errors.llm import LLMError
+from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import (
+    RGS,
+    RGSAnswer,
+)
+from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import (
+    RGSConfig as RGSRuntimeConfig,
+)
+from fitz.engines.classic_rag.pipeline.context.pipeline import ContextPipeline
+from fitz.engines.classic_rag.pipeline.exceptions.pipeline import PipelineError, RGSGenerationError
+from fitz.engines.classic_rag.retrieval.runtime.engine import RetrieverEngine
 from fitz.llm.chat import ChatEngine
 from fitz.llm.embedding.engine import EmbeddingEngine
 from fitz.llm.registry import resolve_llm_plugin
@@ -17,23 +29,15 @@ from fitz.logging.logger import get_logger
 from fitz.logging.tags import PIPELINE, VECTOR_DB
 from fitz.vector_db.registry import get_vector_db_plugin
 
-from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSAnswer
-from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGSConfig as RGSRuntimeConfig
-from fitz.engines.classic_rag.config import ClassicRagConfig, load_config
-from fitz.engines.classic_rag.pipeline.context.pipeline import ContextPipeline
-from fitz.engines.classic_rag.pipeline.exceptions.pipeline import PipelineError, RGSGenerationError
-from fitz.engines.classic_rag.retrieval.runtime.engine import RetrieverEngine
-from fitz.engines.classic_rag.errors.llm import LLMError
-
 logger = get_logger(__name__)
 
 
 class RAGPipeline:
     """
     RAG Pipeline orchestrator.
-    
+
     Flow: vector_db → retrieval → context-processing → rgs → llm → final answer
-    
+
     Usage:
         >>> from fitz.engines.classic_rag.config import load_config
         >>> config = load_config()
@@ -58,10 +62,10 @@ class RAGPipeline:
     def run(self, query: str) -> RGSAnswer:
         """
         Execute the RAG pipeline for a query.
-        
+
         Args:
             query: The user's question
-            
+
         Returns:
             RGSAnswer with answer text and source references
         """
@@ -113,12 +117,12 @@ class RAGPipeline:
     def from_config(cls, cfg: ClassicRagConfig) -> "RAGPipeline":
         """
         Create a RAGPipeline from configuration.
-        
+
         This is the primary factory method for creating pipelines.
-        
+
         Args:
             cfg: ClassicRagConfig with all pipeline settings
-            
+
         Returns:
             Configured RAGPipeline instance
         """
@@ -183,10 +187,10 @@ class RAGPipeline:
     def from_dict(cls, config_dict: dict) -> "RAGPipeline":
         """
         Create a RAGPipeline from a configuration dictionary.
-        
+
         Args:
             config_dict: Configuration dictionary matching ClassicRagConfig schema
-            
+
         Returns:
             RAGPipeline instance
         """
@@ -198,10 +202,10 @@ class RAGPipeline:
 def create_pipeline_from_yaml(path: Optional[str] = None) -> RAGPipeline:
     """
     Create a RAGPipeline from a YAML config file.
-    
+
     Args:
         path: Path to YAML config file. If None, uses default config.
-        
+
     Returns:
         Configured RAGPipeline instance
     """

@@ -5,13 +5,13 @@ This example demonstrates the new paradigm-agnostic engine interface.
 The code is cleaner and more forward-compatible with future engines (CLaRa, etc.).
 """
 
-from fitz.core import Query, Constraints
-from fitz.engines.classic_rag import run_classic_rag, create_classic_rag_engine
-
+from fitz.core import Constraints, Query
+from fitz.engines.classic_rag import create_classic_rag_engine, run_classic_rag
 
 # ============================================================================
 # OPTION 1: Simple one-off query (easiest)
 # ============================================================================
+
 
 def simple_query():
     """Simple query with default configuration."""
@@ -31,6 +31,7 @@ def simple_query():
 # OPTION 2: Query with constraints
 # ============================================================================
 
+
 def query_with_constraints():
     """Query with constraints (filters, source limits)."""
     print("\n" + "=" * 60)
@@ -40,13 +41,10 @@ def query_with_constraints():
     # Build constraints
     constraints = Constraints(
         max_sources=5,  # Limit to top 5 sources
-        filters={"topic": "quantum_physics"}  # Filter by topic
+        filters={"topic": "quantum_physics"},  # Filter by topic
     )
 
-    answer = run_classic_rag(
-        query="Explain quantum entanglement",
-        constraints=constraints
-    )
+    answer = run_classic_rag(query="Explain quantum entanglement", constraints=constraints)
 
     print(f"\nAnswer: {answer.text}\n")
     print(f"Sources (max {constraints.max_sources}): {len(answer.provenance)}")
@@ -55,6 +53,7 @@ def query_with_constraints():
 # ============================================================================
 # OPTION 3: Reusable engine (most efficient for multiple queries)
 # ============================================================================
+
 
 def reusable_engine():
     """Create engine once, use for multiple queries."""
@@ -66,11 +65,7 @@ def reusable_engine():
     engine = create_classic_rag_engine("config.yaml")
 
     # Use for multiple queries (more efficient)
-    questions = [
-        "What is a qubit?",
-        "How does superposition work?",
-        "What is quantum decoherence?"
-    ]
+    questions = ["What is a qubit?", "How does superposition work?", "What is quantum decoherence?"]
 
     for question in questions:
         query = Query(text=question)
@@ -82,6 +77,7 @@ def reusable_engine():
 # ============================================================================
 # OPTION 4: Advanced - with engine-specific hints
 # ============================================================================
+
 
 def advanced_query():
     """Advanced usage with engine-specific metadata."""
@@ -95,8 +91,8 @@ def advanced_query():
         metadata={
             "temperature": 0.3,  # Lower temperature for more focused answers
             "rerank": True,  # Enable reranking
-            "model": "claude-3-opus"  # Specific model
-        }
+            "model": "claude-3-opus",  # Specific model
+        },
     )
 
     print(f"\nAnswer: {answer.text}\n")
@@ -109,13 +105,14 @@ def advanced_query():
 # OPTION 5: Error handling
 # ============================================================================
 
+
 def error_handling():
     """Demonstrate proper error handling."""
     print("\n" + "=" * 60)
     print("ERROR HANDLING")
     print("=" * 60)
 
-    from fitz.core import QueryError, KnowledgeError, GenerationError
+    from fitz.core import GenerationError, KnowledgeError, QueryError
 
     try:
         # Empty query will raise QueryError
@@ -125,13 +122,8 @@ def error_handling():
 
     try:
         # Simulate knowledge error (this might not actually fail in practice)
-        constraints = Constraints(
-            filters={"nonexistent_field": "value"}
-        )
-        answer = run_classic_rag(
-            "Some question",
-            constraints=constraints
-        )
+        constraints = Constraints(filters={"nonexistent_field": "value"})
+        answer = run_classic_rag("Some question", constraints=constraints)
     except KnowledgeError as e:
         print(f"Knowledge error: {e}")
     except Exception as e:
@@ -141,6 +133,7 @@ def error_handling():
 # ============================================================================
 # OPTION 6: Working with the Answer object
 # ============================================================================
+
 
 def working_with_answers():
     """Demonstrate working with Answer objects."""

@@ -20,7 +20,6 @@ import yaml
 
 from fitz.engines.classic_rag.config.schema import ClassicRagConfig
 
-
 # Export for backwards compatibility
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "default.yaml"
 
@@ -39,23 +38,23 @@ def _default_config_path() -> Path:
 def load_config(path: Optional[str] = None) -> ClassicRagConfig:
     """
     Load Classic RAG configuration.
-    
+
     Args:
         path: Optional path to YAML config file.
               If None, loads the built-in default.yaml.
-    
+
     Returns:
         Validated ClassicRagConfig instance
-    
+
     Raises:
         FileNotFoundError: If config file doesn't exist
         ValueError: If config path points to a directory
         ValidationError: If config doesn't match schema
-    
+
     Examples:
         Load default config:
         >>> config = load_config()
-        
+
         Load custom config:
         >>> config = load_config("my_config.yaml")
     """
@@ -65,10 +64,10 @@ def load_config(path: Optional[str] = None) -> ClassicRagConfig:
         config_path = Path(path)
         if config_path.is_dir():
             raise ValueError(f"Config path points to a directory: {config_path}")
-    
+
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
-    
+
     raw = _load_yaml(config_path)
     return ClassicRagConfig.from_dict(raw)
 
@@ -76,12 +75,12 @@ def load_config(path: Optional[str] = None) -> ClassicRagConfig:
 def load_config_dict(path: Optional[str] = None) -> dict:
     """
     Load configuration as raw dictionary (for advanced use cases).
-    
+
     Most users should use load_config() instead.
-    
+
     Args:
         path: Optional path to YAML config file.
-    
+
     Returns:
         Raw configuration dictionary
     """
@@ -89,5 +88,5 @@ def load_config_dict(path: Optional[str] = None) -> dict:
         config_path = _default_config_path()
     else:
         config_path = Path(path)
-    
+
     return _load_yaml(config_path)

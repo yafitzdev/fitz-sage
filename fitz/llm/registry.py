@@ -52,8 +52,7 @@ def get_llm_plugin(*, plugin_name: str, plugin_type: LLMPluginType) -> Type[Any]
     except KeyError as exc:
         available = sorted(LLM_REGISTRY.get(plugin_type, {}).keys())
         raise LLMRegistryError(
-            f"Unknown {plugin_type} plugin: {plugin_name!r}. "
-            f"Available: {available}"
+            f"Unknown {plugin_type} plugin: {plugin_name!r}. " f"Available: {available}"
         ) from exc
 
 
@@ -90,8 +89,7 @@ def resolve_llm_plugin(
     except KeyError as exc:
         available = sorted(bucket.keys())
         raise LLMRegistryError(
-            f"Unknown {plugin_type} plugin: {requested_name!r}. "
-            f"Available: {available}"
+            f"Unknown {plugin_type} plugin: {requested_name!r}. " f"Available: {available}"
         ) from exc
 
 
@@ -104,7 +102,9 @@ def _auto_discover() -> None:
     for pkg_name in _SCAN_PACKAGES:
         _scan_package_best_effort(pkg_name)
 
-    logger.debug(f"{CHAT} Discovered LLM plugins: { {k: list(v.keys()) for k, v in LLM_REGISTRY.items()} }")
+    logger.debug(
+        f"{CHAT} Discovered LLM plugins: { {k: list(v.keys()) for k, v in LLM_REGISTRY.items()} }"
+    )
     _DISCOVERED = True
 
 

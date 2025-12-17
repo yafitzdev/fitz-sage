@@ -11,6 +11,7 @@ To run with Qdrant:
 """
 
 import os
+
 import pytest
 
 
@@ -18,6 +19,7 @@ def qdrant_available() -> bool:
     """Check if Qdrant is available."""
     try:
         from fitz.vector_db.plugins.qdrant import QdrantVectorDB
+
         db = QdrantVectorDB()
         db.list_collections()
         return True
@@ -28,7 +30,7 @@ def qdrant_available() -> bool:
 # Skip all tests in this module if Qdrant not available
 pytestmark = pytest.mark.skipif(
     not qdrant_available(),
-    reason="Qdrant not available (set QDRANT_HOST or start Qdrant on localhost:6333)"
+    reason="Qdrant not available (set QDRANT_HOST or start Qdrant on localhost:6333)",
 )
 
 
@@ -36,6 +38,7 @@ pytestmark = pytest.mark.skipif(
 def qdrant_db():
     """Create a Qdrant client for testing."""
     from fitz.vector_db.plugins.qdrant import QdrantVectorDB
+
     return QdrantVectorDB()
 
 
@@ -75,7 +78,7 @@ class TestAutoCreateCollection:
             {
                 "id": "test-doc-1",
                 "vector": [0.1] * 1024,
-                "payload": {"content": "Test document", "doc_id": "doc1"}
+                "payload": {"content": "Test document", "doc_id": "doc1"},
             },
         ]
 
@@ -102,12 +105,12 @@ class TestAutoCreateCollection:
             {
                 "id": "test-doc-1",
                 "vector": [0.1] * 1024,
-                "payload": {"content": "Test document about AI", "doc_id": "doc1"}
+                "payload": {"content": "Test document about AI", "doc_id": "doc1"},
             },
             {
                 "id": "test-doc-2",
                 "vector": [0.2] * 1024,
-                "payload": {"content": "Test document about ML", "doc_id": "doc2"}
+                "payload": {"content": "Test document about ML", "doc_id": "doc2"},
             },
         ]
 
@@ -159,7 +162,7 @@ class TestStringIdConversion:
             {
                 "id": "test_docs\\quantum.txt:0",  # This format caused issues before
                 "vector": [0.1] * 1024,
-                "payload": {"content": "Test", "doc_id": "doc1"}
+                "payload": {"content": "Test", "doc_id": "doc1"},
             },
         ]
 

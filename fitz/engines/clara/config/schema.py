@@ -6,8 +6,8 @@ This module defines the configuration structure for the CLaRa engine,
 which uses continuous latent reasoning for retrieval-augmented generation.
 """
 
-from typing import Optional, Literal
 from dataclasses import dataclass, field
+from typing import Literal, Optional
 
 
 @dataclass
@@ -152,8 +152,9 @@ def load_clara_config(config_path: Optional[str] = None) -> ClaraConfig:
     if config_path is None:
         return ClaraConfig()
 
-    import yaml
     from pathlib import Path
+
+    import yaml
 
     path = Path(config_path)
     if not path.exists():

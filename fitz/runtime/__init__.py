@@ -14,15 +14,15 @@ Examples:
     Simple query:
     >>> from fitz.runtime import run
     >>> answer = run("What is quantum computing?")
-    
+
     Specific engine:
     >>> answer = run("Explain X", engine="clara")
-    
+
     List engines:
     >>> from fitz.runtime import list_engines
     >>> print(list_engines())
     ['classic_rag', 'clara']
-    
+
     Create reusable engine:
     >>> from fitz.runtime import create_engine
     >>> engine = create_engine("classic_rag")
@@ -30,16 +30,15 @@ Examples:
 """
 
 from .registry import (
-    EngineRegistry,
     EngineRegistration,
+    EngineRegistry,
     get_engine_registry,
 )
-
 from .runner import (
-    run,
     create_engine,
     list_engines,
     list_engines_with_info,
+    run,
 )
 
 __all__ = [

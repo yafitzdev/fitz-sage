@@ -15,12 +15,12 @@ Public API:
         - Answer: Output from engines
         - Provenance: Source attribution
         - Constraints: Query-time constraints
-    
+
     Runtime:
         - run: Universal entry point (any engine)
         - create_engine: Factory for creating engines
         - list_engines: List available engines
-    
+
     Classic RAG:
         - run_classic_rag: RAG-specific entry point
         - create_classic_rag_engine: RAG engine factory
@@ -37,7 +37,7 @@ Architecture:
 
 Philosophy:
     Knowledge → Engine → Answer
-    
+
     Engines are black boxes that transform queries into answers.
     The platform only cares about the interface, not the implementation.
 
@@ -45,15 +45,15 @@ Examples:
     Simple query:
     >>> from fitz import run
     >>> answer = run("What is quantum computing?")
-    
+
     With constraints:
     >>> from fitz import run, Constraints
     >>> constraints = Constraints(max_sources=5)
     >>> answer = run("Explain entanglement", constraints=constraints)
-    
+
     Specific engine:
     >>> answer = run("What is X?", engine="classic_rag")
-    
+
     Reusable engine:
     >>> from fitz import create_engine, Query
     >>> engine = create_engine("classic_rag")
@@ -67,45 +67,42 @@ __version__ = "0.3.0"
 # CORE TYPES
 # =============================================================================
 
-from fitz.core import (
-    # Protocol
-    KnowledgeEngine,
-    # Types
-    Query,
+from fitz.core import (  # Protocol; Types; Exceptions
     Answer,
-    Provenance,
-    Constraints,
-    # Exceptions
-    EngineError,
-    QueryError,
-    KnowledgeError,
-    GenerationError,
     ConfigurationError,
+    Constraints,
+    EngineError,
+    GenerationError,
+    KnowledgeEngine,
+    KnowledgeError,
+    Provenance,
+    Query,
+    QueryError,
     TimeoutError,
     UnsupportedOperationError,
+)
+from fitz.engines.classic_rag import (
+    ClassicRagEngine,
+    create_classic_rag_engine,
+    run_classic_rag,
+)
+from fitz.runtime import (
+    create_engine,
+    get_engine_registry,
+    list_engines,
+    list_engines_with_info,
+    run,
 )
 
 # =============================================================================
 # RUNTIME (UNIVERSAL)
 # =============================================================================
 
-from fitz.runtime import (
-    run,
-    create_engine,
-    list_engines,
-    list_engines_with_info,
-    get_engine_registry,
-)
 
 # =============================================================================
 # CLASSIC RAG (CONVENIENCE)
 # =============================================================================
 
-from fitz.engines.classic_rag import (
-    run_classic_rag,
-    create_classic_rag_engine,
-    ClassicRagEngine,
-)
 
 # =============================================================================
 # PUBLIC API
@@ -114,16 +111,13 @@ from fitz.engines.classic_rag import (
 __all__ = [
     # Version
     "__version__",
-    
     # Core Protocol
     "KnowledgeEngine",
-    
     # Core Types
     "Query",
     "Answer",
     "Provenance",
     "Constraints",
-    
     # Core Exceptions
     "EngineError",
     "QueryError",
@@ -132,14 +126,12 @@ __all__ = [
     "ConfigurationError",
     "TimeoutError",
     "UnsupportedOperationError",
-    
     # Universal Runtime
     "run",
     "create_engine",
     "list_engines",
     "list_engines_with_info",
     "get_engine_registry",
-    
     # Classic RAG
     "run_classic_rag",
     "create_classic_rag_engine",

@@ -11,9 +11,9 @@ from typing import Optional
 
 import typer
 
+from fitz.engines.classic_rag.config.loader import load_config
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import CLI, PIPELINE
-from fitz.engines.classic_rag.config.loader import load_config
 
 logger = get_logger(__name__)
 

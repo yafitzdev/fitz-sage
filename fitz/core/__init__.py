@@ -33,25 +33,26 @@ Examples:
     ...     print(f"Source: {source.source_id}")
 """
 
+from .answer import Answer
+from .constraints import Constraints
+
 # Core protocol
 from .engine import KnowledgeEngine
 
-# Core types
-from .query import Query
-from .answer import Answer
-from .provenance import Provenance
-from .constraints import Constraints
-
 # Core exceptions
 from .exceptions import (
-    EngineError,
-    QueryError,
-    KnowledgeError,
-    GenerationError,
     ConfigurationError,
+    EngineError,
+    GenerationError,
+    KnowledgeError,
+    QueryError,
     TimeoutError,
     UnsupportedOperationError,
 )
+from .provenance import Provenance
+
+# Core types
+from .query import Query
 
 __all__ = [
     # Protocol

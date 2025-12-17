@@ -13,17 +13,17 @@ Features:
 
 from __future__ import annotations
 
+import logging
 import os
 import uuid
-import logging
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
 # Support both import paths (fitz.vector_db and fitz.core.vector_db)
 try:
-    from fitz.vector_db.base import VectorDBPlugin, SearchResult
+    from fitz.vector_db.base import SearchResult, VectorDBPlugin
 except ImportError:
-    from fitz.vector_db.base import VectorDBPlugin, SearchResult
+    from fitz.vector_db.base import SearchResult, VectorDBPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Errors with helpful messages
 # =============================================================================
+
 
 class QdrantConnectionError(Exception):
     """Raised when unable to connect to Qdrant."""
@@ -57,12 +58,14 @@ Original error: {original_error}
 
 class QdrantCollectionError(Exception):
     """Raised for collection-related errors with helpful messages."""
+
     pass
 
 
 # =============================================================================
 # Helper functions
 # =============================================================================
+
 
 def _string_to_uuid(s: str) -> str:
     """Convert any string to a deterministic UUID."""
@@ -79,13 +82,14 @@ def _get_env_or_default(env_var: str, default: Any) -> Any:
     if isinstance(default, int):
         return int(value)
     if isinstance(default, bool):
-        return value.lower() in ('true', '1', 'yes')
+        return value.lower() in ("true", "1", "yes")
     return value
 
 
 # =============================================================================
 # Smart Qdrant Plugin
 # =============================================================================
+
 
 @dataclass
 class QdrantVectorDB(VectorDBPlugin):
@@ -127,9 +131,7 @@ class QdrantVectorDB(VectorDBPlugin):
         try:
             from qdrant_client import QdrantClient
         except ImportError:
-            raise RuntimeError(
-                "qdrant-client is required. Install with: pip install qdrant-client"
-            )
+            raise RuntimeError("qdrant-client is required. Install with: pip install qdrant-client")
 
         try:
             self._client = QdrantClient(host=self.host, port=self.port, timeout=10)
@@ -155,46 +157,48 @@ class QdrantVectorDB(VectorDBPlugin):
             vectors_config = info.config.params.vectors
 
             # Detect if named or unnamed vectors
-            if hasattr(vectors_config, 'size'):
+            if hasattr(vectors_config, "size"):
                 # Unnamed vectors (simple config)
                 config = {
-                    'exists': True,
-                    'named_vectors': False,
-                    'vector_name': None,
-                    'size': vectors_config.size,
-                    'distance': str(vectors_config.distance),
+                    "exists": True,
+                    "named_vectors": False,
+                    "vector_name": None,
+                    "size": vectors_config.size,
+                    "distance": str(vectors_config.distance),
                 }
             else:
                 # Named vectors (dict-like config)
                 # Get the first (or only) vector name
-                vector_names = list(vectors_config.keys()) if hasattr(vectors_config, 'keys') else []
+                vector_names = (
+                    list(vectors_config.keys()) if hasattr(vectors_config, "keys") else []
+                )
                 if vector_names:
                     first_name = vector_names[0]
                     first_config = vectors_config[first_name]
                     config = {
-                        'exists': True,
-                        'named_vectors': True,
-                        'vector_name': first_name,
-                        'vector_names': vector_names,
-                        'size': first_config.size,
-                        'distance': str(first_config.distance),
+                        "exists": True,
+                        "named_vectors": True,
+                        "vector_name": first_name,
+                        "vector_names": vector_names,
+                        "size": first_config.size,
+                        "distance": str(first_config.distance),
                     }
                 else:
-                    config = {'exists': True, 'named_vectors': False, 'vector_name': None}
+                    config = {"exists": True, "named_vectors": False, "vector_name": None}
 
             self._collection_cache[collection_name] = config
             return config
 
         except Exception as e:
             error_msg = str(e).lower()
-            if 'not found' in error_msg or 'doesn\'t exist' in error_msg:
+            if "not found" in error_msg or "doesn't exist" in error_msg:
                 return None
             raise
 
     def _collection_exists(self, collection_name: str) -> bool:
         """Check if collection exists."""
         info = self._get_collection_info(collection_name)
-        return info is not None and info.get('exists', False)
+        return info is not None and info.get("exists", False)
 
     def _create_collection(self, collection_name: str, vector_size: int) -> None:
         """Create a collection with the given vector size."""
@@ -225,8 +229,9 @@ class QdrantVectorDB(VectorDBPlugin):
             info = self._get_collection_info(collection_name)
 
         # Validate vector dimensions match
-        if info and info.get('size') and info['size'] != vector_size:
-            raise QdrantCollectionError(f"""
+        if info and info.get("size") and info["size"] != vector_size:
+            raise QdrantCollectionError(
+                f"""
 ❌ Vector dimension mismatch for collection '{collection_name}'
 
 Collection expects: {info['size']} dimensions
@@ -237,7 +242,8 @@ Possible fixes:
   2. Delete and recreate the collection:
        curl -X DELETE "http://{self.host}:{self.port}/collections/{collection_name}"
   3. Use an embedding model with {info['size']} dimensions
-""")
+"""
+            )
 
         return info or {}
 
@@ -246,11 +252,11 @@ Possible fixes:
     # =========================================================================
 
     def search(
-            self,
-            collection_name: str,
-            query_vector: list[float],
-            limit: int,
-            with_payload: bool = True,
+        self,
+        collection_name: str,
+        query_vector: list[float],
+        limit: int,
+        with_payload: bool = True,
     ) -> list[SearchResult]:
         """
         Search for similar vectors in a collection.
@@ -262,7 +268,8 @@ Possible fixes:
         info = self._get_collection_info(collection_name)
 
         if info is None:
-            raise QdrantCollectionError(f"""
+            raise QdrantCollectionError(
+                f"""
 ❌ Collection '{collection_name}' not found
 
 To fix:
@@ -273,16 +280,17 @@ To fix:
        curl http://{self.host}:{self.port}/collections
 
 Available at: http://{self.host}:{self.port}
-""")
+"""
+            )
 
         try:
             # Use query_points (qdrant-client >= 1.7)
-            if info.get('named_vectors') and info.get('vector_name'):
+            if info.get("named_vectors") and info.get("vector_name"):
                 # Named vectors - use 'using' parameter
                 result = self._client.query_points(
                     collection_name=collection_name,
                     query=query_vector,
-                    using=info['vector_name'],
+                    using=info["vector_name"],
                     limit=limit,
                     with_payload=with_payload,
                 )
@@ -307,9 +315,10 @@ Available at: http://{self.host}:{self.port}
         except Exception as e:
             error_msg = str(e).lower()
 
-            if 'vector name' in error_msg:
+            if "vector name" in error_msg:
                 # Named vector issue
-                raise QdrantCollectionError(f"""
+                raise QdrantCollectionError(
+                    f"""
 ❌ Vector name mismatch for collection '{collection_name}'
 
 The collection uses named vectors but the search didn't specify the correct name.
@@ -319,7 +328,8 @@ This usually means the collection was created with a different configuration.
 Try recreating the collection:
   curl -X DELETE "http://{self.host}:{self.port}/collections/{collection_name}"
   fitz-ingest run ./your_docs --collection {collection_name}
-""")
+"""
+                )
             raise
 
     def upsert(self, collection: str, points: list[dict[str, Any]]) -> None:
@@ -361,8 +371,8 @@ Try recreating the collection:
 
             # Handle vector format (named vs unnamed)
             vector = p["vector"]
-            if info.get('named_vectors') and info.get('vector_name'):
-                vector = {info['vector_name']: vector}
+            if info.get("named_vectors") and info.get("vector_name"):
+                vector = {info["vector_name"]: vector}
 
             q_points.append(
                 PointStruct(
@@ -393,7 +403,7 @@ Try recreating the collection:
             logger.info(f"Deleted collection '{collection_name}'")
             return True
         except Exception as e:
-            if 'not found' in str(e).lower():
+            if "not found" in str(e).lower():
                 return False
             raise
 
@@ -402,13 +412,13 @@ Try recreating the collection:
         try:
             info = self._client.get_collection(collection_name)
             return {
-                'name': collection_name,
-                'points_count': info.points_count,
-                'vectors_count': info.vectors_count,
-                'indexed_vectors_count': info.indexed_vectors_count,
-                'status': str(info.status),
+                "name": collection_name,
+                "points_count": info.points_count,
+                "vectors_count": info.vectors_count,
+                "indexed_vectors_count": info.indexed_vectors_count,
+                "status": str(info.status),
             }
         except Exception as e:
-            if 'not found' in str(e).lower():
-                return {'name': collection_name, 'exists': False}
+            if "not found" in str(e).lower():
+                return {"name": collection_name, "exists": False}
             raise

@@ -11,11 +11,10 @@ Philosophy:
     - CLI, API, and examples route through here
 """
 
-from typing import Optional, Union, Dict, Any
 from pathlib import Path
+from typing import Any, Dict, Optional, Union
 
-from fitz.core import Query, Answer, Constraints, ConfigurationError
-
+from fitz.core import Answer, ConfigurationError, Constraints, Query
 from fitz.runtime.registry import get_engine_registry
 
 
@@ -29,14 +28,14 @@ def run(
 ) -> Answer:
     """
     Universal entry point for executing queries on any engine.
-    
+
     This function:
     1. Resolves which engine to use
     2. Loads configuration (if needed)
     3. Creates the engine instance
     4. Executes the query
     5. Returns the answer
-    
+
     Args:
         query: Question text or Query object
         engine: Engine name to use (default: "classic_rag")
@@ -44,29 +43,29 @@ def run(
         config_path: Path to config file (ignored if config provided)
         constraints: Optional query-time constraints
         metadata: Optional engine-specific hints
-    
+
     Returns:
         Answer object with text, provenance, and metadata
-    
+
     Raises:
         ConfigurationError: If engine doesn't exist or config is invalid
         QueryError: If query is invalid
         KnowledgeError: If knowledge retrieval fails
         GenerationError: If answer generation fails
-    
+
     Examples:
         Simple query:
         >>> answer = run("What is quantum computing?")
         >>> print(answer.text)
-        
+
         Specific engine:
         >>> answer = run("Explain X", engine="clara")
-        
+
         With constraints:
         >>> from fitz.core import Constraints
         >>> constraints = Constraints(max_sources=5)
         >>> answer = run("What is Y?", constraints=constraints)
-        
+
         With config:
         >>> from fitz.engines.classic_rag.config.loader import load_config
         >>> config = load_config("my_config.yaml")
@@ -74,7 +73,7 @@ def run(
     """
     # Get the registry
     registry = get_engine_registry()
-    
+
     # Get the factory for the requested engine
     try:
         factory = registry.get(engine)
@@ -86,7 +85,7 @@ def run(
             f"Available engines: {', '.join(available)}. "
             f"Original error: {e}"
         ) from e
-    
+
     # Load config if not provided
     if config is None:
         config = _load_engine_config(engine, config_path)
@@ -96,11 +95,7 @@ def run(
 
     # Build Query object if string was provided
     if isinstance(query, str):
-        query_obj = Query(
-            text=query,
-            constraints=constraints,
-            metadata=metadata or {}
-        )
+        query_obj = Query(text=query, constraints=constraints, metadata=metadata or {})
     else:
         query_obj = query
 
@@ -215,15 +210,14 @@ def _load_engine_config(engine_name: str, config_path: Optional[Union[str, Path]
     # Import here to avoid circular dependencies
     if engine_name == "classic_rag":
         from fitz.engines.classic_rag.config.loader import load_config as load_rag_config
+
         return load_rag_config(str(config_path) if config_path else None)
 
     elif engine_name == "clara":
         # Future: CLaRa config loader
         # from fitz.engines.clara.config.loader import load_config as load_clara_config
         # return load_clara_config(str(config_path) if config_path else None)
-        raise ConfigurationError(
-            f"Config loading not yet implemented for engine: {engine_name}"
-        )
+        raise ConfigurationError(f"Config loading not yet implemented for engine: {engine_name}")
 
     else:
         # For custom engines, return None - they should provide config explicitly

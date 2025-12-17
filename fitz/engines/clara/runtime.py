@@ -6,10 +6,10 @@ This module provides simple entry points for using CLaRa, following
 the same pattern as classic_rag/runtime.py.
 """
 
-from typing import Optional, Union, Dict, Any, List, TYPE_CHECKING
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from fitz.core import Query, Answer, Constraints
+from fitz.core import Answer, Constraints, Query
 
 # Import directly from schema to avoid circular imports through __init__
 from fitz.engines.clara.config.schema import ClaraConfig, load_clara_config
@@ -23,11 +23,11 @@ _cached_config_path: Optional[str] = None
 
 
 def run_clara(
-        query: Union[str, Query],
-        documents: Optional[List[str]] = None,
-        config: Optional[ClaraConfig] = None,
-        config_path: Optional[Union[str, Path]] = None,
-        constraints: Optional[Constraints] = None,
+    query: Union[str, Query],
+    documents: Optional[List[str]] = None,
+    config: Optional[ClaraConfig] = None,
+    config_path: Optional[Union[str, Path]] = None,
+    constraints: Optional[Constraints] = None,
 ) -> Answer:
     """
     Run a query through the CLaRa engine.
@@ -69,11 +69,7 @@ def run_clara(
     current_config_path = str(config_path) if config_path else None
 
     # Reuse cached engine if config hasn't changed
-    if (
-            _cached_engine is not None
-            and _cached_config_path == current_config_path
-            and config is None
-    ):
+    if _cached_engine is not None and _cached_config_path == current_config_path and config is None:
         engine = _cached_engine
     else:
         # Create new engine
@@ -104,8 +100,8 @@ def run_clara(
 
 
 def create_clara_engine(
-        config: Optional[ClaraConfig] = None,
-        config_path: Optional[Union[str, Path]] = None,
+    config: Optional[ClaraConfig] = None,
+    config_path: Optional[Union[str, Path]] = None,
 ) -> "ClaraEngine":
     """
     Create a CLaRa engine instance.

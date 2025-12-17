@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from typing import List
 
-from fitz.llm.rerank.base import RerankPlugin
 from fitz.engines.classic_rag.models.chunk import Chunk
+from fitz.llm.rerank.base import RerankPlugin
 
 
 class RerankEngine:

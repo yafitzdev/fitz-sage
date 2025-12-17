@@ -3,7 +3,7 @@
 Test that default configuration loads and validates correctly.
 """
 
-from fitz.engines.classic_rag.config import load_config, ClassicRagConfig
+from fitz.engines.classic_rag.config import ClassicRagConfig, load_config
 
 
 def test_default_config_loads_and_validates_base_schema():

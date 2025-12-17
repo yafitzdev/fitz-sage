@@ -5,24 +5,31 @@ This engine wraps the existing RAG pipeline (retrieval + generation) behind
 the paradigm-agnostic KnowledgeEngine interface.
 """
 
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 from fitz.core import (
-    KnowledgeEngine,
-    Query,
     Answer,
-    Provenance,
-    QueryError,
-    KnowledgeError,
-    GenerationError,
     ConfigurationError,
+    GenerationError,
+    KnowledgeEngine,
+    KnowledgeError,
+    Provenance,
+    Query,
+    QueryError,
 )
+from fitz.engines.classic_rag.config.schema import (
+    FitzConfig,
+    LoggingConfig,
+    PipelinePluginConfig,
+    RAGConfig,
+    RerankConfig,
+    RetrieverConfig,
+    RGSConfig,
+)
+from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGSAnswer
 
 # RAG-specific imports (from the moved modules)
 from fitz.engines.classic_rag.pipeline.pipeline.engine import RAGPipeline
-from fitz.engines.classic_rag.config.schema import RAGConfig, PipelinePluginConfig, RerankConfig, RetrieverConfig, RGSConfig, LoggingConfig
-from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGSAnswer
-from fitz.engines.classic_rag.config.schema import FitzConfig
 
 
 class ClassicRagEngine:
@@ -90,31 +97,28 @@ class ClassicRagEngine:
         # Map FitzConfig fields to RAGConfig fields
         rag_config = RAGConfig(
             llm=PipelinePluginConfig(
-                plugin_name=fitz_config.chat.plugin_name,
-                kwargs=fitz_config.chat.kwargs
+                plugin_name=fitz_config.chat.plugin_name, kwargs=fitz_config.chat.kwargs
             ),
             embedding=PipelinePluginConfig(
-                plugin_name=fitz_config.embedding.plugin_name,
-                kwargs=fitz_config.embedding.kwargs
+                plugin_name=fitz_config.embedding.plugin_name, kwargs=fitz_config.embedding.kwargs
             ),
             vector_db=PipelinePluginConfig(
-                plugin_name=fitz_config.vector_db.plugin_name,
-                kwargs=fitz_config.vector_db.kwargs
+                plugin_name=fitz_config.vector_db.plugin_name, kwargs=fitz_config.vector_db.kwargs
             ),
             rerank=RerankConfig(
                 enabled=fitz_config.rerank is not None,
                 plugin_name=fitz_config.rerank.plugin_name if fitz_config.rerank else None,
-                kwargs=fitz_config.rerank.kwargs if fitz_config.rerank else {}
+                kwargs=fitz_config.rerank.kwargs if fitz_config.rerank else {},
             ),
             # Pipeline plugin config - this determines which pipeline plugin to use
             # For now, we'll use the standard pipeline
             retriever=RetrieverConfig(
                 plugin_name="dense",  # Default to dense retrieval
                 collection="default",  # This should come from config or be parameterized
-                top_k=5  # Default
+                top_k=5,  # Default
             ),
             rgs=RGSConfig(),  # Use defaults
-            logging=LoggingConfig()  # Use defaults
+            logging=LoggingConfig(),  # Use defaults
         )
 
         return rag_config
@@ -188,7 +192,7 @@ class ClassicRagEngine:
                 prov = Provenance(
                     source_id=getattr(source_ref, "source_id", str(source_ref)),
                     excerpt=getattr(source_ref, "text", None),
-                    metadata=getattr(source_ref, "metadata", {})
+                    metadata=getattr(source_ref, "metadata", {}),
                 )
                 provenance.append(prov)
 
@@ -206,7 +210,7 @@ class ClassicRagEngine:
         return Answer(
             text=rag_answer.answer if hasattr(rag_answer, "answer") else str(rag_answer),
             provenance=provenance,
-            metadata=answer_metadata
+            metadata=answer_metadata,
         )
 
     @property

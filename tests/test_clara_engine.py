@@ -7,21 +7,22 @@ and integrates properly with the Fitz platform.
 """
 
 import sys
-import pytest
-from unittest.mock import Mock, MagicMock, patch
 from dataclasses import asdict
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Core imports
 from fitz.core import (
-    Query,
     Answer,
-    Provenance,
-    Constraints,
-    KnowledgeEngine,
-    QueryError,
-    KnowledgeError,
-    GenerationError,
     ConfigurationError,
+    Constraints,
+    GenerationError,
+    KnowledgeEngine,
+    KnowledgeError,
+    Provenance,
+    Query,
+    QueryError,
 )
 
 
@@ -31,9 +32,9 @@ class TestClaraConfig:
     def test_default_config(self):
         """Test default configuration values."""
         from fitz.engines.clara.config.schema import (
+            ClaraCompressionConfig,
             ClaraConfig,
             ClaraModelConfig,
-            ClaraCompressionConfig,
         )
 
         config = ClaraConfig()
@@ -47,9 +48,9 @@ class TestClaraConfig:
     def test_custom_config(self):
         """Test custom configuration."""
         from fitz.engines.clara.config.schema import (
+            ClaraCompressionConfig,
             ClaraConfig,
             ClaraModelConfig,
-            ClaraCompressionConfig,
         )
 
         config = ClaraConfig(
@@ -129,12 +130,15 @@ class TestClaraEngine:
     def mock_engine(self, mock_torch, mock_transformers):
         """Create a CLaRa engine with mocked dependencies."""
         # Insert mock modules into sys.modules BEFORE importing engine
-        with patch.dict(sys.modules, {
-            'torch': mock_torch,
-            'torch.nn': MagicMock(),
-            'torch.nn.functional': MagicMock(),
-            'transformers': mock_transformers,
-        }):
+        with patch.dict(
+            sys.modules,
+            {
+                "torch": mock_torch,
+                "torch.nn": MagicMock(),
+                "torch.nn.functional": MagicMock(),
+                "transformers": mock_transformers,
+            },
+        ):
             from fitz.engines.clara.config.schema import ClaraConfig
             from fitz.engines.clara.engine import ClaraEngine
 
@@ -149,22 +153,22 @@ class TestClaraEngine:
 
     def test_engine_implements_protocol(self, mock_engine):
         """Test that ClaraEngine implements KnowledgeEngine protocol."""
-        assert hasattr(mock_engine, 'answer')
+        assert hasattr(mock_engine, "answer")
         assert callable(mock_engine.answer)
 
     def test_add_documents(self, mock_engine, mock_torch):
         """Test adding documents to knowledge base."""
         # Mock the compression to return mock tensors
         mock_tensor = MagicMock()
-        mock_engine._compress_documents = MagicMock(return_value=[
-            mock_tensor for _ in range(3)
-        ])
+        mock_engine._compress_documents = MagicMock(return_value=[mock_tensor for _ in range(3)])
 
-        doc_ids = mock_engine.add_documents([
-            "Document 1",
-            "Document 2",
-            "Document 3",
-        ])
+        doc_ids = mock_engine.add_documents(
+            [
+                "Document 1",
+                "Document 2",
+                "Document 3",
+            ]
+        )
 
         assert len(doc_ids) == 3
         assert len(mock_engine._compressed_docs) == 3
@@ -173,14 +177,9 @@ class TestClaraEngine:
     def test_add_documents_with_ids(self, mock_engine):
         """Test adding documents with custom IDs."""
         mock_tensor = MagicMock()
-        mock_engine._compress_documents = MagicMock(return_value=[
-            mock_tensor for _ in range(2)
-        ])
+        mock_engine._compress_documents = MagicMock(return_value=[mock_tensor for _ in range(2)])
 
-        doc_ids = mock_engine.add_documents(
-            ["Doc 1", "Doc 2"],
-            doc_ids=["custom_1", "custom_2"]
-        )
+        doc_ids = mock_engine.add_documents(["Doc 1", "Doc 2"], doc_ids=["custom_1", "custom_2"])
 
         assert doc_ids == ["custom_1", "custom_2"]
         assert "custom_1" in mock_engine._compressed_docs
@@ -214,16 +213,10 @@ class TestClaraEngine:
         }
 
         # Mock retrieval
-        mock_engine._retrieve = MagicMock(return_value=(
-            ["doc_1", "doc_2"],
-            [0.9, 0.8]
-        ))
+        mock_engine._retrieve = MagicMock(return_value=(["doc_1", "doc_2"], [0.9, 0.8]))
 
         # Mock generation
-        mock_engine._generate = MagicMock(return_value=(
-            "Quantum computing uses qubits.",
-            [0, 1]
-        ))
+        mock_engine._generate = MagicMock(return_value=("Quantum computing uses qubits.", [0, 1]))
 
         query = Query(text="What is quantum computing?")
         answer = mock_engine.answer(query)
@@ -239,23 +232,15 @@ class TestClaraEngine:
         """Test that answer respects query constraints."""
         mock_tensor = MagicMock()
 
-        mock_engine._compressed_docs = {
-            f"doc_{i}": mock_tensor for i in range(10)
-        }
-        mock_engine._doc_texts = {
-            f"doc_{i}": f"Content {i}" for i in range(10)
-        }
+        mock_engine._compressed_docs = {f"doc_{i}": mock_tensor for i in range(10)}
+        mock_engine._doc_texts = {f"doc_{i}": f"Content {i}" for i in range(10)}
 
-        mock_engine._retrieve = MagicMock(return_value=(
-            ["doc_0", "doc_1", "doc_2"],
-            [0.9, 0.8, 0.7]
-        ))
+        mock_engine._retrieve = MagicMock(
+            return_value=(["doc_0", "doc_1", "doc_2"], [0.9, 0.8, 0.7])
+        )
         mock_engine._generate = MagicMock(return_value=("Answer", [0, 1, 2]))
 
-        query = Query(
-            text="Question?",
-            constraints=Constraints(max_sources=3)
-        )
+        query = Query(text="Question?", constraints=Constraints(max_sources=3))
         answer = mock_engine.answer(query)
 
         # Verify retrieve was called with constrained top_k
@@ -298,6 +283,7 @@ class TestClaraRuntime:
     def clear_cache(self):
         """Clear engine cache before each test."""
         from fitz.engines.clara.runtime import clear_engine_cache
+
         clear_engine_cache()
         yield
         clear_engine_cache()
@@ -315,12 +301,15 @@ class TestClaraRuntime:
         mock_model.eval.return_value = None
         mock_transformers.AutoModel.from_pretrained.return_value = mock_model
 
-        with patch.dict(sys.modules, {
-            'torch': mock_torch,
-            'torch.nn': MagicMock(),
-            'torch.nn.functional': MagicMock(),
-            'transformers': mock_transformers,
-        }):
+        with patch.dict(
+            sys.modules,
+            {
+                "torch": mock_torch,
+                "torch.nn": MagicMock(),
+                "torch.nn.functional": MagicMock(),
+                "transformers": mock_transformers,
+            },
+        ):
             from fitz.engines.clara.runtime import create_clara_engine
 
             engine = create_clara_engine()
@@ -336,7 +325,6 @@ class TestClaraRegistration:
         """Test that CLaRa is registered in the engine registry."""
         # Import clara module to trigger registration
         import fitz.engines.clara  # noqa
-
         from fitz.runtime import get_engine_registry
 
         registry = get_engine_registry()
@@ -362,12 +350,12 @@ class TestClaraIntegration:
         answer = Answer(
             text="Test answer",
             provenance=[Provenance(source_id="doc_1")],
-            metadata={"engine": "clara"}
+            metadata={"engine": "clara"},
         )
 
-        assert hasattr(answer, 'text')
-        assert hasattr(answer, 'provenance')
-        assert hasattr(answer, 'metadata')
+        assert hasattr(answer, "text")
+        assert hasattr(answer, "provenance")
+        assert hasattr(answer, "metadata")
 
 
 if __name__ == "__main__":

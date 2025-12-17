@@ -16,13 +16,13 @@ from typing import Optional
 
 import typer
 
-from fitz.logging.logger import get_logger
-from fitz.logging.tags import CLI, PIPELINE
+from fitz.core import Constraints, GenerationError, KnowledgeError, QueryError
+from fitz.engines.classic_rag.config.loader import load_config as load_rag_config
 
 # NEW: Import from runtime instead of pipeline
 from fitz.engines.classic_rag.runtime import run_classic_rag
-from fitz.engines.classic_rag.config.loader import load_config as load_rag_config
-from fitz.core import Constraints, QueryError, KnowledgeError, GenerationError
+from fitz.logging.logger import get_logger
+from fitz.logging.tags import CLI, PIPELINE
 
 logger = get_logger(__name__)
 
@@ -52,7 +52,7 @@ def command(
     filters: Optional[str] = typer.Option(
         None,
         "--filters",
-        help="Metadata filters as JSON string, e.g. '{\"topic\": \"physics\"}'",
+        help='Metadata filters as JSON string, e.g. \'{"topic": "physics"}\'',
     ),
 ) -> None:
     """
@@ -96,6 +96,7 @@ def command(
 
         # Load config from preset dict
         from fitz.engines.classic_rag.config.schema import FitzConfig
+
         config_obj = FitzConfig.from_dict(preset_dict)
     else:
         config_path = str(config) if config else None
@@ -109,25 +110,19 @@ def command(
         filter_dict = {}
         if filters:
             import json
+
             try:
                 filter_dict = json.loads(filters)
             except json.JSONDecodeError as e:
                 typer.echo(f"Error: Invalid JSON in --filters: {e}", err=True)
                 raise typer.Exit(code=1)
 
-        constraints = Constraints(
-            max_sources=max_sources,
-            filters=filter_dict
-        )
+        constraints = Constraints(max_sources=max_sources, filters=filter_dict)
 
     # Run query using new runtime
     typer.echo("Processing query...")
     try:
-        answer = run_classic_rag(
-            query=question,
-            config=config_obj,
-            constraints=constraints
-        )
+        answer = run_classic_rag(query=question, config=config_obj, constraints=constraints)
     except QueryError as e:
         typer.echo(f"Query error: {e}", err=True)
         raise typer.Exit(code=1)
@@ -177,4 +172,5 @@ def command(
         typer.echo("=" * 60)
         typer.echo()
         import json
+
         typer.echo(json.dumps(answer.metadata, indent=2))

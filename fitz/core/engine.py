@@ -7,8 +7,8 @@ The platform architecture is: Knowledge → Engine → Answer.
 
 from typing import Protocol, runtime_checkable
 
-from .query import Query
 from .answer import Answer
+from .query import Query
 
 
 @runtime_checkable

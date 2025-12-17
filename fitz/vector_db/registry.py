@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
-from typing import Any, Dict, Iterable, Type, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Type
 
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import VECTOR_DB
@@ -27,9 +27,7 @@ class VectorDBRegistryError(RuntimeError):
 VECTOR_DB_REGISTRY: Dict[str, Type[Any]] = {}
 _DISCOVERED = False
 
-_SCAN_PACKAGES: tuple[str, ...] = (
-    "fitz.vector_db.plugins",
-)
+_SCAN_PACKAGES: tuple[str, ...] = ("fitz.vector_db.plugins",)
 
 
 def get_vector_db_plugin(plugin_name: str) -> Type["VectorDBPlugin"]:
@@ -40,8 +38,7 @@ def get_vector_db_plugin(plugin_name: str) -> Type["VectorDBPlugin"]:
     except KeyError as exc:
         available = sorted(VECTOR_DB_REGISTRY.keys())
         raise VectorDBRegistryError(
-            f"Unknown vector_db plugin: {plugin_name!r}. "
-            f"Available: {available}"
+            f"Unknown vector_db plugin: {plugin_name!r}. " f"Available: {available}"
         ) from exc
 
 
@@ -72,8 +69,7 @@ def resolve_vector_db_plugin(requested_name: str) -> Type["VectorDBPlugin"]:
     except KeyError as exc:
         available = sorted(VECTOR_DB_REGISTRY.keys())
         raise VectorDBRegistryError(
-            f"Unknown vector_db plugin: {requested_name!r}. "
-            f"Available: {available}"
+            f"Unknown vector_db plugin: {requested_name!r}. " f"Available: {available}"
         ) from exc
 
 
