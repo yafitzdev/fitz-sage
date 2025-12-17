@@ -105,8 +105,8 @@ def extract_models(cm: ContractMap, *, verbose: bool) -> None:
     """Extract all models from the codebase."""
     model_modules = [
         "fitz.engines.classic_rag.config.schema",
-        "fitz.core.models.chunk",
-        "fitz.core.models.document",
+        "fitz.engines.classic_rag.models.chunk",
+        "fitz.engines.classic_rag.models.document",
         "fitz.engines.classic_rag.pipeline.config.schema",
         "fitz.ingest.config.schema",
         "fitz.ingest.ingestion.base",
