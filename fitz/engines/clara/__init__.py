@@ -57,17 +57,9 @@ References:
     - Models: https://huggingface.co/apple/CLaRa-7B-E2E
 """
 
-# Engine
-from .engine import ClaraEngine
-
-# Runtime convenience functions
-from .runtime import (
-    run_clara,
-    create_clara_engine,
-    clear_engine_cache,
-)
-
-# Configuration
+# =============================================================================
+# CONFIGURATION (import first, no dependencies on engine)
+# =============================================================================
 from .config.schema import (
     ClaraConfig,
     ClaraModelConfig,
@@ -75,6 +67,20 @@ from .config.schema import (
     ClaraRetrievalConfig,
     ClaraGenerationConfig,
     load_clara_config,
+)
+
+# =============================================================================
+# ENGINE (import after config to avoid circular imports)
+# =============================================================================
+from .engine import ClaraEngine
+
+# =============================================================================
+# RUNTIME (import after engine)
+# =============================================================================
+from .runtime import (
+    run_clara,
+    create_clara_engine,
+    clear_engine_cache,
 )
 
 __all__ = [
@@ -93,35 +99,50 @@ __all__ = [
     "load_clara_config",
 ]
 
+
 # =============================================================================
 # ENGINE REGISTRATION
 # =============================================================================
 # Register CLaRa engine with the global registry so it can be accessed via
 # the universal run() function.
+#
+# This is done at the END of __init__.py to ensure all imports are complete.
 
-from fitz.runtime import EngineRegistry
+def _register_clara_engine():
+    """Register CLaRa with the engine registry."""
+    from fitz.runtime import EngineRegistry
 
+    def _create_clara_engine_factory(config) -> ClaraEngine:
+        """
+        Factory function for creating CLaRa engine instances.
 
-@EngineRegistry.register_engine(
-    name="clara",
-    description="CLaRa: Continuous Latent Reasoning - Compression-native RAG with 16x-128x document compression",
-)
-def _create_clara_engine(config) -> ClaraEngine:
-    """
-    Factory function for creating CLaRa engine instances.
+        This is registered with the global engine registry and called
+        by the universal run() function when engine="clara".
+        """
+        if config is None:
+            config = ClaraConfig()
+        elif isinstance(config, dict):
+            # Convert dict to ClaraConfig
+            config = ClaraConfig(
+                model=ClaraModelConfig(**config.get("model", {})),
+                compression=ClaraCompressionConfig(**config.get("compression", {})),
+                retrieval=ClaraRetrievalConfig(**config.get("retrieval", {})),
+                generation=ClaraGenerationConfig(**config.get("generation", {})),
+            )
 
-    This is registered with the global engine registry and called
-    by the universal run() function when engine="clara".
-    """
-    if config is None:
-        config = ClaraConfig()
-    elif isinstance(config, dict):
-        # Convert dict to ClaraConfig
-        config = ClaraConfig(
-            model=ClaraModelConfig(**config.get("model", {})),
-            compression=ClaraCompressionConfig(**config.get("compression", {})),
-            retrieval=ClaraRetrievalConfig(**config.get("retrieval", {})),
-            generation=ClaraGenerationConfig(**config.get("generation", {})),
+        return ClaraEngine(config)
+
+    # Register with global registry
+    registry = EngineRegistry.get_global()
+
+    # Only register if not already registered
+    if "clara" not in registry.list():
+        registry.register(
+            name="clara",
+            factory=_create_clara_engine_factory,
+            description="CLaRa: Continuous Latent Reasoning - Compression-native RAG with 16x-128x document compression",
         )
 
-    return ClaraEngine(config)
+
+# Perform registration when module is imported
+_register_clara_engine()
