@@ -1,56 +1,43 @@
 # fitz/engines/classic_rag/config/default.yaml
 #
 # Default configuration for Classic RAG engine.
-# Configured for your Qdrant setup at 192.168.178.2:6333
 #
 
-# =============================================================================
 # LLM (Chat) Configuration - Cohere
-# =============================================================================
+# command-r-plus was retired Sept 2025, use command-r-08-2024
 llm:
   plugin_name: cohere
   kwargs:
-    model: command-r-plus
+    model: command-r-08-2024
     temperature: 0.2
 
-# =============================================================================
-# Embedding Configuration - Cohere
-# =============================================================================
+# Embedding Configuration - Cohere (1024 dimensions)
 embedding:
   plugin_name: cohere
   kwargs:
     model: embed-english-v3.0
 
-# =============================================================================
-# Vector Database Configuration - Qdrant
-# =============================================================================
+# Vector Database - Qdrant (simple vectors, no named vectors)
 vector_db:
   plugin_name: qdrant
   kwargs:
-    host: "192.168.178.2"
+    host: "localhost"
     port: 6333
-    vector_name: "Default"  # Named vector in your Qdrant collection
 
-# =============================================================================
 # Retriever Configuration
-# =============================================================================
 retriever:
   plugin_name: dense
-  collection: fitz_stack_test  # Your collection with data
+  collection: fitz_stack_test
   top_k: 5
 
-# =============================================================================
-# Reranker Configuration (Optional)
-# =============================================================================
+# Reranker (disabled)
 rerank:
   enabled: false
   plugin_name: cohere
   kwargs:
     model: rerank-english-v3.0
 
-# =============================================================================
-# RGS (Retrieval-Guided Synthesis) Configuration
-# =============================================================================
+# RGS Configuration
 rgs:
   enable_citations: true
   strict_grounding: true
@@ -58,8 +45,6 @@ rgs:
   include_query_in_context: true
   source_label_prefix: S
 
-# =============================================================================
-# Logging Configuration
-# =============================================================================
+# Logging
 logging:
   level: INFO

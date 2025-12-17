@@ -2,7 +2,8 @@
 """
 Qdrant vector database plugin.
 
-Supports qdrant-client >= 1.7 API with named vectors.
+Supports qdrant-client >= 1.7 API.
+Uses simple (unnamed) vectors for compatibility.
 """
 
 from __future__ import annotations
@@ -28,13 +29,10 @@ class QdrantVectorDB(VectorDBPlugin):
     """
     Qdrant vector database plugin.
 
-    Config example:
-        vector_db:
-          plugin_name: qdrant
-          kwargs:
-            host: 192.168.178.2
-            port: 6333
-            vector_name: Default  # Named vector in your collection
+    Uses simple (unnamed) vectors. Create your collection like:
+        curl -X PUT "http://host:6333/collections/myname" \\
+             -H "Content-Type: application/json" \\
+             -d '{"vectors": {"size": 1024, "distance": "Cosine"}}'
     """
 
     plugin_name: str = "qdrant"
@@ -42,9 +40,6 @@ class QdrantVectorDB(VectorDBPlugin):
 
     host: str = field(default_factory=lambda: os.getenv("QDRANT_HOST", "192.168.178.2"))
     port: int = field(default_factory=lambda: int(os.getenv("QDRANT_PORT", "6333")))
-
-    # Vector name for named vectors. Your collection uses "Default"
-    vector_name: str = "Default"
 
     _client: QdrantClient = field(init=False, repr=False)
 
@@ -59,11 +54,10 @@ class QdrantVectorDB(VectorDBPlugin):
             with_payload: bool = True,
     ) -> list[SearchResult]:
         """Search for similar vectors in a collection."""
-        # Always use the named vector
+        # Simple query - no named vectors
         result = self._client.query_points(
             collection_name=collection_name,
             query=query_vector,
-            using=self.vector_name,  # Specify which named vector to use
             limit=limit,
             with_payload=with_payload,
         )
@@ -93,13 +87,11 @@ class QdrantVectorDB(VectorDBPlugin):
             payload = p.get("payload", {}) or {}
             payload["original_id"] = original_id
 
-            # Use named vector
-            vector = {self.vector_name: p["vector"]}
-
+            # Simple vector (not named)
             q_points.append(
                 PointStruct(
                     id=qdrant_id,
-                    vector=vector,
+                    vector=p["vector"],
                     payload=payload,
                 )
             )

@@ -1,4 +1,13 @@
-# core/llm/chat/plugins/cohere.py
+# fitz/llm/chat/plugins/cohere.py
+"""
+Cohere chat plugin using direct HTTP requests.
+
+Uses Cohere v1 Chat API which expects:
+- preamble: system message
+- message: user message
+- chat_history: conversation history
+"""
+
 from __future__ import annotations
 
 import os
@@ -14,8 +23,6 @@ class CohereChatClient:
     """
     Cohere chat plugin using direct HTTP requests.
 
-    Zero dependencies beyond httpx (which is already required by fitz core).
-
     Required:
         - COHERE_API_KEY environment variable OR api_key parameter
 
@@ -28,15 +35,16 @@ class CohereChatClient:
     plugin_type = "chat"
 
     def __init__(
-        self,
-        api_key: str | None = None,
-        model: str = "command-r-plus",
-        temperature: float = 0.2,
-        base_url: str = "https://api.cohere.ai/v1",
+            self,
+            api_key: str | None = None,
+            model: str = "command-r-plus",
+            temperature: float = 0.2,
+            base_url: str = "https://api.cohere.ai/v1",
     ) -> None:
         if httpx is None:
             raise RuntimeError(
-                "httpx is required for Cohere plugin. " "Install with: pip install httpx"
+                "httpx is required for Cohere plugin. "
+                "Install with: pip install httpx"
             )
 
         # Get API key
@@ -59,7 +67,7 @@ class CohereChatClient:
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
             },
-            timeout=60.0,
+            timeout=120.0,  # Longer timeout for LLM generation
         )
 
     def chat(self, messages: list[dict[str, Any]]) -> str:
@@ -68,6 +76,7 @@ class CohereChatClient:
 
         Args:
             messages: List of message dicts with 'role' and 'content'
+                     Supports: system, user, assistant roles
 
         Returns:
             The assistant's response text
@@ -75,12 +84,49 @@ class CohereChatClient:
         Raises:
             RuntimeError: If the API request fails
         """
+        # Convert standard messages format to Cohere format
+        # Cohere v1 uses:
+        #   - preamble: system prompt
+        #   - message: current user message
+        #   - chat_history: previous messages
+
+        preamble = ""
+        chat_history = []
+        current_message = ""
+
+        for msg in messages:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+
+            if role == "system":
+                preamble = content
+            elif role == "user":
+                # Last user message becomes the "message" parameter
+                # Previous user messages go to chat_history
+                if current_message:
+                    chat_history.append({
+                        "role": "USER",
+                        "message": current_message
+                    })
+                current_message = content
+            elif role == "assistant":
+                chat_history.append({
+                    "role": "CHATBOT",
+                    "message": content
+                })
+
         # Build request payload
-        payload = {
+        payload: dict[str, Any] = {
             "model": self.model,
-            "messages": messages,
+            "message": current_message,
             "temperature": self.temperature,
         }
+
+        if preamble:
+            payload["preamble"] = preamble
+
+        if chat_history:
+            payload["chat_history"] = chat_history
 
         try:
             response = self._client.post("/chat", json=payload)
@@ -88,27 +134,11 @@ class CohereChatClient:
 
             data = response.json()
 
-            # Extract text from response
-            # Response structure varies, try common patterns
+            # Cohere response has "text" field
             if "text" in data:
                 return data["text"]
 
-            if "message" in data:
-                msg = data["message"]
-                if isinstance(msg, dict) and "content" in msg:
-                    content = msg["content"]
-                    if isinstance(content, str):
-                        return content
-                    if isinstance(content, list) and content:
-                        # Handle structured content
-                        text_parts = [
-                            item.get("text", "")
-                            for item in content
-                            if isinstance(item, dict) and item.get("type") == "text"
-                        ]
-                        return " ".join(text_parts)
-
-            # Fallback
+            # Fallback for unexpected format
             return str(data)
 
         except httpx.HTTPStatusError as exc:
@@ -116,9 +146,8 @@ class CohereChatClient:
             try:
                 error_data = exc.response.json()
                 error_detail = f": {error_data.get('message', '')}"
-            except Exception as e:
-                # Failed to parse error response
-                error_detail = f" (response parse failed: {e})"
+            except Exception:
+                pass
 
             raise RuntimeError(
                 f"Cohere API request failed with status {exc.response.status_code}{error_detail}"
@@ -132,6 +161,5 @@ class CohereChatClient:
         if hasattr(self, "_client"):
             try:
                 self._client.close()
-            except Exception as e:
-                # Failed to parse error response
-                error_detail = f" (response parse failed: {e})"
+            except Exception:
+                pass
