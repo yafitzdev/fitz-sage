@@ -1,6 +1,6 @@
 # tests/test_rgs_prompt_slots.py
-fitz.engines.classic_rag.generation.prompting import PromptConfig
-fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
+from fitz.engines.classic_rag.generation.prompting import PromptConfig
+from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
 
 
 def test_rgs_prompt_slots_override_defaults():

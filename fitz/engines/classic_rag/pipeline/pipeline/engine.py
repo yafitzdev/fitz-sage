@@ -11,8 +11,8 @@ from fitz.llm.rerank.engine import RerankEngine
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import PIPELINE, VECTOR_DB
 from fitz.vector_db.registry import get_vector_db_plugin
-fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSAnswer
-fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGSConfig as RGSRuntimeConfig
+from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSAnswer
+from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGSConfig as RGSRuntimeConfig
 from fitz.engines.classic_rag.pipeline.config.loader import load_config
 from fitz.engines.classic_rag.pipeline.config.schema import RAGConfig
 from fitz.engines.classic_rag.pipeline.context.pipeline import ContextPipeline

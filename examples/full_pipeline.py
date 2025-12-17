@@ -31,7 +31,7 @@ if not os.getenv("COHERE_API_KEY"):
 
 from fitz.llm import get_llm_plugin
 from fitz.vector_db.writer import VectorDBWriter
-fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
+from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
 from fitz.ingest.chunking.plugins.simple import SimpleChunker
 from fitz.ingest.ingestion.registry import get_ingest_plugin
 from fitz.ingest.validation.documents import ValidationConfig, validate
