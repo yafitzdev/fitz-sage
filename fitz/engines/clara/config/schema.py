@@ -1,13 +1,13 @@
 # fitz/engines/clara/config/schema.py
 """
-CLaRa Engine Configuration Schema.
+CLaRa Configuration Schema.
 
-This module defines the configuration structure for the CLaRa engine,
-which uses continuous latent reasoning for retrieval-augmented generation.
+Configuration dataclasses for the CLaRa engine.
 """
 
 from dataclasses import dataclass, field
-from typing import Literal, Optional
+from typing import Optional, Literal
+from pathlib import Path
 
 
 @dataclass
@@ -15,97 +15,79 @@ class ClaraModelConfig:
     """
     Configuration for CLaRa model loading.
 
-    CLaRa has three model variants:
-    - Base: Compression pretraining (CLaRa-7B-Base)
-    - Instruct: Instruction tuning (CLaRa-7B-Instruct)
-    - E2E: End-to-end retrieval + generation (CLaRa-7B-E2E)
+    Note: CLaRa models on HuggingFace have subdirectories for compression rates.
+    Use the full path like "apple/CLaRa-7B-E2E/compression-16".
     """
 
-    model_name_or_path: str = "apple/CLaRa-7B-E2E"
-    """HuggingFace model path or local path."""
+    # Model path - NOTE: includes compression subfolder!
+    model_name_or_path: str = "apple/CLaRa-7B-Instruct/compression-16"
 
-    variant: Literal["base", "instruct", "e2e"] = "e2e"
-    """Which CLaRa variant to use. E2E recommended for full RAG."""
+    # Model variant: base, instruct, or e2e
+    variant: Literal["base", "instruct", "e2e"] = "instruct"
 
+    # Device to load model on
     device: str = "cuda"
-    """Device to load model on ('cuda', 'cpu', 'mps')."""
 
+    # Torch dtype for model weights
     torch_dtype: str = "bfloat16"
-    """Torch dtype for model weights ('float32', 'float16', 'bfloat16')."""
 
+    # Whether to trust remote code (required for CLaRa)
     trust_remote_code: bool = True
-    """Whether to trust remote code from HuggingFace."""
 
+    # Quantization options
     load_in_8bit: bool = False
-    """Whether to use 8-bit quantization for memory efficiency."""
-
     load_in_4bit: bool = False
-    """Whether to use 4-bit quantization for memory efficiency."""
 
 
 @dataclass
 class ClaraCompressionConfig:
-    """
-    Configuration for document compression.
+    """Configuration for document compression."""
 
-    CLaRa compresses documents into continuous memory tokens,
-    achieving 16x-128x compression while preserving semantics.
-    """
-
+    # Compression rate: 16 or 128
     compression_rate: int = 16
-    """Compression rate (4, 16, 32, 64, 128). Higher = more compression."""
 
-    doc_max_length: int = 256
-    """Maximum document length before compression."""
+    # Maximum document length before compression
+    doc_max_length: int = 2048
 
-    num_memory_tokens: Optional[int] = None
-    """Number of memory tokens per document. Auto-calculated if None."""
+    # Batch size for compression
+    compression_batch_size: int = 4
 
 
 @dataclass
 class ClaraRetrievalConfig:
-    """
-    Configuration for latent space retrieval.
+    """Configuration for latent space retrieval."""
 
-    CLaRa performs retrieval by computing cosine similarity between
-    query embeddings and compressed document embeddings in latent space.
-    """
-
+    # Number of documents to retrieve
     top_k: int = 5
-    """Number of documents to retrieve for generation."""
 
+    # Size of candidate pool for retrieval
     candidate_pool_size: int = 20
-    """Number of candidate documents to consider for reranking."""
 
-    use_differentiable_topk: bool = True
-    """Whether to use differentiable top-k (for training). Disable for inference."""
+    # Whether to use differentiable top-k (for E2E model)
+    differentiable_topk: bool = True
 
 
 @dataclass
 class ClaraGenerationConfig:
-    """
-    Configuration for answer generation.
-    """
+    """Configuration for answer generation."""
 
+    # Maximum new tokens to generate
     max_new_tokens: int = 256
-    """Maximum tokens to generate in answer."""
 
+    # Temperature for sampling
     temperature: float = 0.7
-    """Sampling temperature."""
 
+    # Top-p (nucleus) sampling
     top_p: float = 0.9
-    """Nucleus sampling probability."""
 
+    # Whether to use sampling or greedy decoding
     do_sample: bool = True
-    """Whether to use sampling (vs greedy decoding)."""
 
 
 @dataclass
 class ClaraConfig:
     """
-    Complete configuration for the CLaRa engine.
-
-    This is the main config object that ClaraEngine expects.
+    Main configuration for CLaRa engine.
 
     Examples:
         Default config:
@@ -113,64 +95,65 @@ class ClaraConfig:
 
         Custom config:
         >>> config = ClaraConfig(
-        ...     model=ClaraModelConfig(model_name_or_path="apple/CLaRa-7B-Instruct"),
-        ...     compression=ClaraCompressionConfig(compression_rate=32),
-        ...     retrieval=ClaraRetrievalConfig(top_k=10),
+        ...     model=ClaraModelConfig(
+        ...         model_name_or_path="apple/CLaRa-7B-E2E/compression-16",
+        ...         variant="e2e",
+        ...         device="cuda",
+        ...     ),
+        ...     compression=ClaraCompressionConfig(compression_rate=16),
         ... )
+
+        Load from YAML:
+        >>> config = load_clara_config("clara_config.yaml")
     """
 
     model: ClaraModelConfig = field(default_factory=ClaraModelConfig)
-    """Model loading configuration."""
-
     compression: ClaraCompressionConfig = field(default_factory=ClaraCompressionConfig)
-    """Document compression configuration."""
-
     retrieval: ClaraRetrievalConfig = field(default_factory=ClaraRetrievalConfig)
-    """Retrieval configuration."""
-
     generation: ClaraGenerationConfig = field(default_factory=ClaraGenerationConfig)
-    """Generation configuration."""
 
-    # Knowledge base settings
-    knowledge_base_path: Optional[str] = None
-    """Path to pre-compressed knowledge base (optional)."""
-
+    # Whether to cache compressed documents
     cache_compressed_docs: bool = True
-    """Whether to cache compressed document embeddings."""
 
 
 def load_clara_config(config_path: Optional[str] = None) -> ClaraConfig:
     """
-    Load CLaRa configuration from file or return defaults.
+    Load CLaRa configuration from a YAML file.
 
     Args:
-        config_path: Optional path to YAML config file
+        config_path: Path to YAML config file. If None, returns defaults.
 
     Returns:
         ClaraConfig object
+
+    Raises:
+        FileNotFoundError: If config file doesn't exist
     """
     if config_path is None:
         return ClaraConfig()
-
-    from pathlib import Path
-
-    import yaml
 
     path = Path(config_path)
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
+    import yaml
+
     with open(path) as f:
         data = yaml.safe_load(f)
 
-    # Parse nested configs
+    # Extract clara section if present
     clara_data = data.get("clara", data)
 
+    # Build config from nested dicts
+    model_data = clara_data.get("model", {})
+    compression_data = clara_data.get("compression", {})
+    retrieval_data = clara_data.get("retrieval", {})
+    generation_data = clara_data.get("generation", {})
+
     return ClaraConfig(
-        model=ClaraModelConfig(**clara_data.get("model", {})),
-        compression=ClaraCompressionConfig(**clara_data.get("compression", {})),
-        retrieval=ClaraRetrievalConfig(**clara_data.get("retrieval", {})),
-        generation=ClaraGenerationConfig(**clara_data.get("generation", {})),
-        knowledge_base_path=clara_data.get("knowledge_base_path"),
+        model=ClaraModelConfig(**model_data),
+        compression=ClaraCompressionConfig(**compression_data),
+        retrieval=ClaraRetrievalConfig(**retrieval_data),
+        generation=ClaraGenerationConfig(**generation_data),
         cache_compressed_docs=clara_data.get("cache_compressed_docs", True),
     )

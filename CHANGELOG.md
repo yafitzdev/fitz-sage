@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🎉 Overview
 
-Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine knowledge platform**. This release introduces a pluggable engine architecture, the CLaRa engine for compression-native RAG, and a universal runtime that makes switching between paradigms seamless.
+Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine knowledge platform**. This release introduces a pluggable engine architecture, the CLaRa engine for compression-native RAG, and a universal runtime for seamless engine switching.
 
 ---
 
@@ -24,17 +24,15 @@ Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine kn
 - **Protocol-Based Design**: Implement `answer(Query) -> Answer` to create custom engines
 - **Shared Infrastructure**: LLM, vector DB, and ingestion services shared across engines
 
-#### CLaRa Engine (NEW)
+#### CLaRa Engine (NEW - Experimental)
 - **Apple's CLaRa Integration**: Continuous Latent Reasoning for RAG
 - **16x-128x Document Compression**: Preserve semantics while drastically reducing context
 - **Unified Retrieval-Generation**: Single model for both retrieval and generation
 - **Multi-Hop Reasoning**: Superior performance on complex queries
 - **HuggingFace Models**: Support for CLaRa-7B-Base, CLaRa-7B-Instruct, CLaRa-7B-E2E
 
-#### Forward Compatibility
-- **Stable Contracts**: `Query`, `Answer`, `Provenance` won't change
-- **Paradigm Agnostic**: Add new engines without modifying core code
-- **Your Code Won't Break**: Upgrade to new engines with minimal changes
+> ⚠️ **Note**: CLaRa requires significant hardware (16GB+ VRAM GPU recommended). 
+> The engine is fully implemented and tested, but live inference requires the 7B model.
 
 ---
 
@@ -54,7 +52,6 @@ Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine kn
 - `create_engine(engine="...")` - factory for engine instances
 - `list_engines()` - discover available engines
 - `list_engines_with_info()` - engines with descriptions
-- `@EngineRegistry.register_engine` - decorator for registration
 
 #### CLaRa Engine (`fitz/engines/clara/`)
 - `ClaraEngine` - full implementation of CLaRa paradigm
@@ -66,6 +63,7 @@ Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine kn
 - `ClaraRetrievalConfig` - latent space retrieval settings
 - `ClaraGenerationConfig` - generation parameters
 - Auto-registration with global engine registry
+- 17 passing tests covering all functionality
 
 #### Classic RAG Engine (`fitz/engines/classic_rag/`)
 - `ClassicRagEngine` - wrapper implementing `KnowledgeEngine`
@@ -86,9 +84,6 @@ from fitz.pipeline.pipeline.engine import RAGPipeline
 result = RAGPipeline.from_config(config).run("query")
 
 # NEW
-from fitz import run
-answer = run("query", engine="classic_rag")
-# or
 from fitz.engines.classic_rag import run_classic_rag
 answer = run_classic_rag("query")
 ```
@@ -98,20 +93,11 @@ answer = run_classic_rag("query")
 - `RGSAnswer.sources` → `Answer.provenance`
 - `source.chunk_id` → `provenance.source_id`
 - `source.text` → `provenance.excerpt`
-- `source.metadata` → `provenance.metadata`
-
-**Import Paths**:
-| Old Path | New Path |
-|----------|----------|
-| `fitz.pipeline.*` | `fitz.engines.classic_rag.*` |
-| `fitz.core.llm.*` | `fitz.llm.*` |
-| `fitz.core.embedding.*` | `fitz.llm.embedding.*` |
-| `fitz.core.vector_db.*` | `fitz.vector_db.*` |
 
 #### CLI Commands
 - `fitz-pipeline query` - now uses universal runtime internally
-- Added `--engine` flag to select engine
-- Added `fitz engines` command to list available engines
+- Added `--engine` flag to select engine (future)
+- Enhanced error messages with exception hierarchy
 
 ---
 
@@ -138,13 +124,6 @@ fitz/
 └── ingest/            # Shared ingestion
 ```
 
-#### Module Organization
-- **Moved**: All RAG-specific code → `engines/classic_rag/`
-- **Added**: CLaRa engine in `engines/clara/`
-- **Promoted**: Shared services to root level
-- **Created**: `runtime/` for multi-engine orchestration
-- **Cleaned**: `core/` now contains only paradigm-agnostic contracts
-
 ---
 
 ### 🐛 Fixed
@@ -157,29 +136,25 @@ fitz/
 ---
 
 ### 📚 Documentation
-- **New**: Complete README rewrite with multi-engine focus
-- **New**: MIGRATION.md with detailed upgrade instructions
-- **New**: ENGINES.md explaining engine architecture
-- **New**: CUSTOM_ENGINES.md tutorial for creating engines
-- **Updated**: All code examples to use new API
-- **Added**: CLaRa-specific documentation and examples
+- Updated README with multi-engine architecture
+- Added CLaRa hardware requirements
+- Migration guide for v0.2.x → v0.3.0
+- Updated all code examples
 
 ---
 
 ### 🧪 Testing
 - ✅ All existing tests updated and passing
-- ✅ New tests for CLaRa engine (config, engine, runtime, registration)
-- ✅ New tests for universal runtime
-- ✅ New tests for engine registry
-- ✅ Integration tests for multi-engine scenarios
-- ✅ 155 tests total, all passing
+- ✅ 17 new tests for CLaRa engine (config, engine, runtime, registration)
+- ✅ Tests use mocked dependencies (no GPU required for testing)
+- ✅ Integration tests for engine protocol compliance
 
 ---
 
 ### ⚠️ Breaking Changes Summary
 
 1. **Import paths changed** - Update all imports (see Migration Guide)
-2. **Public API changed** - Use `run()` or engine-specific functions
+2. **Public API changed** - Use `run_classic_rag()` or engine-specific functions
 3. **Answer format changed** - `Answer.text` and `Answer.provenance`
 4. **No backwards compatibility layer** - Clean break for cleaner codebase
 
@@ -193,40 +168,15 @@ fitz/
 clara = ["transformers>=4.35.0", "torch>=2.0.0"]
 ```
 
-#### Installation
-```bash
-# Base installation
-pip install fitz
-
-# With CLaRa support
-pip install fitz[clara]
-
-# Full installation
-pip install fitz[all]
-```
-
 ---
 
 ### 🔮 Future Compatibility
 
 This architecture enables:
-- **GraphRAG engine** - Knowledge graph-based retrieval (planned v0.3.1)
-- **Engine composition** - Combine engines for ensemble (planned v0.4.0)
-- **Streaming responses** - Real-time generation (planned v0.5.0)
+- **GraphRAG engine** - Knowledge graph-based retrieval (planned)
+- **CLaRa MLX** - Smaller models for Apple Silicon (when available)
+- **Engine composition** - Combine engines for ensemble approaches
 - **Custom engines** - Users can implement and register their own
-
----
-
-### 📖 Migration Path
-
-See [MIGRATION.md](docs/MIGRATION.md) for detailed upgrade instructions.
-
-**Quick migration**:
-1. Update imports: `fitz.pipeline` → `fitz.engines.classic_rag`
-2. Replace `RAGPipeline.run()` with `run_classic_rag()`
-3. Update answer access: `result.answer` → `answer.text`
-4. Update sources: `result.sources` → `answer.provenance`
-5. Run tests to verify
 
 ---
 

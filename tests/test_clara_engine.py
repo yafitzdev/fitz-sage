@@ -32,15 +32,15 @@ class TestClaraConfig:
     def test_default_config(self):
         """Test default configuration values."""
         from fitz.engines.clara.config.schema import (
-            ClaraCompressionConfig,
             ClaraConfig,
             ClaraModelConfig,
+            ClaraCompressionConfig,
         )
 
         config = ClaraConfig()
 
-        assert config.model.model_name_or_path == "apple/CLaRa-7B-E2E"
-        assert config.model.variant == "e2e"
+        assert config.model.model_name_or_path == "apple/CLaRa-7B-Instruct/compression-16"
+        assert config.model.variant == "instruct"
         assert config.compression.compression_rate == 16
         assert config.retrieval.top_k == 5
         assert config.generation.max_new_tokens == 256
