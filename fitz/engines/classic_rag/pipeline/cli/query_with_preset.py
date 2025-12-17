@@ -1,26 +1,26 @@
+# fitz/engines/classic_rag/pipeline/cli/query_with_preset.py
 """
-Query command: Run a RAG query through the pipeline.
+Query command with preset support.
 
-Usage:
-    fitz-pipeline query "What is this about?"
-    fitz-pipeline query "Explain X" --config my_config.yaml
-    fitz-pipeline query "Explain X" --preset local
-
-UPDATED: Now uses the new runtime entry point (run_classic_rag) instead of
-calling RAGPipeline directly. This provides better abstraction and forwards
-compatibility with future engines.
+This module provides the main query command for the RAG pipeline,
+with support for configuration presets and constraints.
 """
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional
 
 import typer
 
-from fitz.core import Constraints, GenerationError, KnowledgeError, QueryError
+from fitz.core import (
+    Constraints,
+    QueryError,
+    KnowledgeError,
+    GenerationError,
+)
 from fitz.engines.classic_rag.config.loader import load_config as load_rag_config
-
-# NEW: Import from runtime instead of pipeline
 from fitz.engines.classic_rag.runtime import run_classic_rag
+from fitz.engines.classic_rag.errors.llm import LLMError
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import CLI, PIPELINE
 
@@ -28,38 +28,41 @@ logger = get_logger(__name__)
 
 
 def command(
-    question: str = typer.Argument(
-        ...,
-        help="User question to run through the RAG pipeline.",
-    ),
+    question: str = typer.Argument(..., help="The question to answer"),
     config: Optional[Path] = typer.Option(
         None,
         "--config",
         "-c",
-        help="Path to pipeline YAML config.",
+        help="Path to config YAML file. Overrides preset if both specified.",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
     ),
     preset: Optional[str] = typer.Option(
         None,
         "--preset",
         "-p",
-        help="Use a configuration preset (local, dev, production). Overrides --config.",
+        help="Use a named preset (e.g., 'local' for offline mode). "
+             "Available: local, openai, azure, cohere",
     ),
     max_sources: Optional[int] = typer.Option(
         None,
         "--max-sources",
-        help="Maximum number of sources to use for answer generation.",
+        "-n",
+        help="Maximum number of sources to retrieve.",
     ),
     filters: Optional[str] = typer.Option(
         None,
         "--filters",
-        help='Metadata filters as JSON string, e.g. \'{"topic": "physics"}\'',
+        "-f",
+        help="JSON string of metadata filters (e.g., '{\"topic\": \"physics\"}')",
     ),
 ) -> None:
     """
     Run a RAG query through the pipeline.
 
     This command:
-    1. Loads the pipeline configuration (from preset or file)
+    1. Loads configuration (from file, preset, or defaults)
     2. Retrieves relevant chunks from vector database
     3. Builds context and prompt
     4. Calls LLM for answer generation
@@ -96,7 +99,6 @@ def command(
 
         # Load config from preset dict
         from fitz.engines.classic_rag.config.schema import FitzConfig
-
         config_obj = FitzConfig.from_dict(preset_dict)
     else:
         config_path = str(config) if config else None
@@ -110,19 +112,29 @@ def command(
         filter_dict = {}
         if filters:
             import json
-
             try:
                 filter_dict = json.loads(filters)
             except json.JSONDecodeError as e:
                 typer.echo(f"Error: Invalid JSON in --filters: {e}", err=True)
                 raise typer.Exit(code=1)
 
-        constraints = Constraints(max_sources=max_sources, filters=filter_dict)
+        constraints = Constraints(
+            max_sources=max_sources,
+            filters=filter_dict
+        )
 
     # Run query using new runtime
     typer.echo("Processing query...")
     try:
-        answer = run_classic_rag(query=question, config=config_obj, constraints=constraints)
+        answer = run_classic_rag(
+            query=question,
+            config=config_obj,
+            constraints=constraints
+        )
+    except LLMError as e:
+        # LLMError contains user-friendly setup instructions - display them directly
+        typer.echo(str(e), err=True)
+        raise typer.Exit(code=1)
     except QueryError as e:
         typer.echo(f"Query error: {e}", err=True)
         raise typer.Exit(code=1)
@@ -133,6 +145,14 @@ def command(
         typer.echo(f"Answer generation error: {e}", err=True)
         raise typer.Exit(code=1)
     except Exception as e:
+        # Check if the root cause is an LLMError
+        root_cause = e.__cause__
+        while root_cause:
+            if isinstance(root_cause, LLMError):
+                typer.echo(str(root_cause), err=True)
+                raise typer.Exit(code=1)
+            root_cause = getattr(root_cause, '__cause__', None)
+        
         typer.echo(f"Unexpected error: {e}", err=True)
         logger.exception("Unexpected error during query execution")
         raise typer.Exit(code=1)
@@ -172,5 +192,4 @@ def command(
         typer.echo("=" * 60)
         typer.echo()
         import json
-
         typer.echo(json.dumps(answer.metadata, indent=2))

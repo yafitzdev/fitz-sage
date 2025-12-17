@@ -1,3 +1,4 @@
+# fitz/llm/embedding/plugins/local.py
 from __future__ import annotations
 
 from typing import Any
@@ -13,12 +14,23 @@ class LocalEmbeddingClient(EmbeddingPlugin):
     availability = "local"
 
     def __init__(self, **kwargs: Any):
-        embed_cfg = LocalEmbedderConfig(**kwargs)
+        # Extract model name if provided (for Ollama model selection)
+        model_name = kwargs.pop("model", "nomic-embed-text")
 
-        runtime_cfg = LocalLLMRuntimeConfig(model="llama3.2:1b")
+        # LocalEmbedderConfig doesn't take any arguments currently
+        embed_cfg = LocalEmbedderConfig()
+
+        # Use the model name for the runtime
+        runtime_cfg = LocalLLMRuntimeConfig(model=model_name)
         runtime = LocalLLMRuntime(runtime_cfg)
 
         self._embedder = LocalEmbedder(runtime=runtime, cfg=embed_cfg)
+        self._model = model_name
 
     def embed(self, text: str) -> list[float]:
         return self._embedder.embed(text)
+
+    @property
+    def model(self) -> str:
+        """Return the model name being used."""
+        return self._model
