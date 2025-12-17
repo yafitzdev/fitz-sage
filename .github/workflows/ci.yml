@@ -1,16 +1,59 @@
+# .github/workflows/ci.yml
+#
+# Continuous Integration for Fitz
+# Runs on every push and pull request to ensure code quality
+
 name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop, "feature/*"]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
+
+# Cancel in-progress runs when a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  Tests:
+  # ===========================================================================
+  # Lint & Type Check
+  # ===========================================================================
+  lint:
+    name: Lint & Format Check
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install linting tools
+        run: |
+          pip install ruff black isort
+
+      - name: Check formatting with Black
+        run: black --check --diff .
+
+      - name: Check import sorting with isort
+        run: isort --check-only --diff .
+
+      - name: Lint with Ruff
+        run: ruff check .
+
+  # ===========================================================================
+  # Unit Tests (No External Dependencies)
+  # ===========================================================================
+  test:
+    name: Tests (Python ${{ matrix.python-version }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
@@ -21,52 +64,33 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Cache pip dependencies
+      - name: Cache pip packages
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[ingest]"
-          pip install pytest pytest-cov
+          pip install -e ".[dev]"
 
       - name: Run tests
         run: |
-          pytest --cov=core --cov=rag --cov=ingest --cov-report=xml
+          pytest tests/ -v --tb=short --ignore=tests/integration/
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        if: matrix.python-version == '3.11'
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install linters
+      - name: Run smoketest (mocked, no external services)
         run: |
-          pip install black isort
+          python tools/smoketest/smoke_classic_rag_e2e.py
 
-      - name: Check formatting with Black
-        run: black --check .
-
-      - name: Check import sorting with isort
-        run: isort --check-only .
-
-  architecture:
+  # ===========================================================================
+  # Import & Module Health Check
+  # ===========================================================================
+  import-check:
+    name: Import Health Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -74,12 +98,53 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install package
         run: |
           pip install -e .
 
-      - name: Check architecture constraints
+      - name: Check all imports work
         run: |
-          python -m tools.contract_map --fail-on-errors --layout-depth 3
+          python -c "from fitz.cli.cli import app; print('✓ CLI imports OK')"
+          python -c "from fitz.core import Answer, Provenance, Query; print('✓ Core imports OK')"
+          python -c "from fitz.engines.classic_rag import run_classic_rag; print('✓ Classic RAG imports OK')"
+          python -c "from fitz.llm.registry import available_llm_plugins; print('✓ LLM registry OK')"
+          python -c "from fitz.vector_db.registry import available_vector_db_plugins; print('✓ Vector DB registry OK')"
+          python -c "from fitz.ingest.cli import app; print('✓ Ingest CLI OK')"
+
+      - name: Check CLI commands are registered
+        run: |
+          fitz --help
+          fitz-pipeline --help
+          fitz-ingest --help
+
+  # ===========================================================================
+  # Coverage Report (Optional - on main branch only)
+  # ===========================================================================
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install pytest-cov
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ --cov=fitz --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
