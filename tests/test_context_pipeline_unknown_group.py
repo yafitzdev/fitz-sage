@@ -1,5 +1,5 @@
 # tests/test_context_pipeline_unknown_group.py
-from fitz.pipeline.context.pipeline import ContextPipeline
+from fitz.engines.classic_rag.pipeline.context.pipeline import ContextPipeline
 
 
 def test_context_pipeline_groups_unknown_file():

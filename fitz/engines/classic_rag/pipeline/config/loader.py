@@ -5,7 +5,7 @@ from typing import Optional
 
 import yaml
 
-from fitz.pipeline.config.schema import RAGConfig
+from fitz.engines.classic_rag.pipeline.config.schema import RAGConfig
 
 
 def _load_yaml(path: Path) -> dict:

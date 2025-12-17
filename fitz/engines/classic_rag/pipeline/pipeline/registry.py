@@ -5,7 +5,7 @@ import importlib
 import pkgutil
 from typing import Dict, Iterable, Type
 
-from fitz.pipeline.pipeline.base import PipelinePlugin
+from fitz.engines.classic_rag.pipeline.pipeline.base import PipelinePlugin
 
 PIPELINE_REGISTRY: Dict[str, Type[PipelinePlugin]] = {}
 _DISCOVERED = False
@@ -35,7 +35,7 @@ def _auto_discover() -> None:
     if _DISCOVERED:
         return
 
-    plugins_pkg = importlib.import_module("fitz.pipeline.pipeline.plugins")
+    plugins_pkg = importlib.import_module("fitz.engines.classic_rag.pipeline.pipeline.plugins")
 
     for module_info in pkgutil.iter_modules(plugins_pkg.__path__):
         module = importlib.import_module(f"{plugins_pkg.__name__}.{module_info.name}")

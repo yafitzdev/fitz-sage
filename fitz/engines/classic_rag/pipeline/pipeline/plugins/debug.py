@@ -6,9 +6,9 @@ from typing import Any, Dict
 
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import PIPELINE
-from fitz.pipeline.config.schema import RAGConfig
-from fitz.pipeline.pipeline.base import Pipeline, PipelinePlugin
-from fitz.pipeline.pipeline.engine import RAGPipeline
+from fitz.engines.classic_rag.pipeline.config.schema import RAGConfig
+from fitz.engines.classic_rag.pipeline.pipeline.base import Pipeline, PipelinePlugin
+from fitz.engines.classic_rag.pipeline.pipeline.engine import RAGPipeline
 
 logger = get_logger(__name__)
 

@@ -58,12 +58,12 @@ Use the examples as templates. Key patterns:
 
 ```python
 # Config-driven pipeline creation
-from fitz.pipeline.pipeline.engine import create_pipeline_from_yaml
+from fitz.engines.classic_rag.pipeline.pipeline.engine import create_pipeline_from_yaml
 
 pipeline = create_pipeline_from_yaml("my_config.yaml")
 
 # Direct component usage
-from fitz.generation.retrieval_guided.synthesis import RGS, RGSConfig
+fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
 
 rgs = RGS(RGSConfig(enable_citations=True))
 

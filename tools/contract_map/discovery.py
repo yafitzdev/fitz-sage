@@ -58,7 +58,7 @@ PLUGIN_PREDICATES: Dict[str, PluginPredicate] = {
         _simple_plugin_id,
     ),
     # --- retrieval (runtime only by design) ---
-    "fitz.retrieval.runtime.plugins": (
+    "fitz.engines.classic_rag.retrieval.runtime.plugins": (
         lambda cls: (
             isinstance(getattr(cls, "plugin_name", None), str)
             and callable(getattr(cls, "retrieve", None))
@@ -66,7 +66,7 @@ PLUGIN_PREDICATES: Dict[str, PluginPredicate] = {
         _simple_plugin_id,
     ),
     # --- pipeline ---
-    "fitz.pipeline.pipeline.plugins": (
+    "fitz.engines.classic_rag.pipeline.pipeline.plugins": (
         lambda cls: (
             isinstance(getattr(cls, "plugin_name", None), str)
             and callable(getattr(cls, "build", None))
@@ -179,10 +179,10 @@ def scan_all_discoveries() -> List[DiscoveryReport]:
         scan_discovery("fitz.core.llm.rerank.plugins", "LLM rerank plugins (Option A discovery)"),
         scan_discovery("fitz.core.vector_db.plugins", "Vector DB plugins (Option A discovery)"),
         scan_discovery(
-            "fitz.retrieval.runtime.plugins", "RAG retriever plugins (Option A discovery)"
+            "fitz.engines.classic_rag.retrieval.runtime.plugins", "RAG retriever plugins (Option A discovery)"
         ),
         scan_discovery(
-            "fitz.pipeline.pipeline.plugins", "RAG pipeline plugins (Option A discovery)"
+            "fitz.engines.classic_rag.pipeline.pipeline.plugins", "RAG pipeline plugins (Option A discovery)"
         ),
         scan_discovery(
             "fitz.ingest.chunking.plugins", "Ingest chunking plugins (Option A discovery)"

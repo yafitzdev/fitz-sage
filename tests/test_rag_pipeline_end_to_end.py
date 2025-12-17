@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from fitz.generation.retrieval_guided.synthesis import RGS, RGSAnswer, RGSConfig
-from fitz.pipeline.pipeline.engine import RAGPipeline
+fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSAnswer, RGSConfig
+from fitz.engines.classic_rag.pipeline.pipeline.engine import RAGPipeline
 
 
 class DummyRetriever:

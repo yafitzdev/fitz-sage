@@ -10,8 +10,8 @@ from fitz.llm.rerank.engine import RerankEngine
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import RETRIEVER
 from fitz.engines.classic_rag.models.chunk import Chunk
-from fitz.retrieval.exceptions.base import RerankError, VectorSearchError
-from fitz.retrieval.runtime.base import RetrievalPlugin
+from fitz.engines.classic_rag.retrieval.exceptions.base import RerankError, VectorSearchError
+from fitz.engines.classic_rag.retrieval.runtime.base import RetrievalPlugin
 
 logger = get_logger(__name__)
 

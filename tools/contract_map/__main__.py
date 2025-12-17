@@ -77,7 +77,7 @@ def check_registry_health(cm: ContractMap) -> None:
         cm.health.append(
             HealthIssue(
                 level="ERROR",
-                message="Retriever registry appears empty. Likely cause: fitz.retrieval.plugins package missing/empty or import failures.",
+                message="Retriever registry appears empty. Likely cause: fitz.engines.classic_rag.retrieval.plugins package missing/empty or import failures.",
             )
         )
 

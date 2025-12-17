@@ -26,7 +26,7 @@ app.add_typer(config_app, name="config")
 # Import and register commands AFTER app creation to avoid circular imports
 def _register_commands():
     """Register commands after module initialization to avoid circular imports."""
-    from fitz.pipeline.cli import config_show, query_with_preset, test
+    from fitz.engines.classic_rag.pipeline.cli import config_show, query_with_preset, test
 
     app.command("query")(query_with_preset.command)
     config_app.command("show")(config_show.command)

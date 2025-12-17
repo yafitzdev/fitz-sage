@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from fitz.pipeline.config.schema import RAGConfig
+from fitz.engines.classic_rag.pipeline.config.schema import RAGConfig
 
 
 class Pipeline(Protocol):

@@ -11,13 +11,13 @@ from fitz.llm.rerank.engine import RerankEngine
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import PIPELINE, VECTOR_DB
 from fitz.vector_db.registry import get_vector_db_plugin
-from fitz.generation.retrieval_guided.synthesis import RGS, RGSAnswer
-from fitz.generation.retrieval_guided.synthesis import RGSConfig as RGSRuntimeConfig
-from fitz.pipeline.config.loader import load_config
-from fitz.pipeline.config.schema import RAGConfig
-from fitz.pipeline.context.pipeline import ContextPipeline
-from fitz.pipeline.exceptions.pipeline import PipelineError, RGSGenerationError
-from fitz.retrieval.runtime.engine import RetrieverEngine
+fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSAnswer
+fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGSConfig as RGSRuntimeConfig
+from fitz.engines.classic_rag.pipeline.config.loader import load_config
+from fitz.engines.classic_rag.pipeline.config.schema import RAGConfig
+from fitz.engines.classic_rag.pipeline.context.pipeline import ContextPipeline
+from fitz.engines.classic_rag.pipeline.exceptions.pipeline import PipelineError, RGSGenerationError
+from fitz.engines.classic_rag.retrieval.runtime.engine import RetrieverEngine
 
 logger = get_logger(__name__)
 

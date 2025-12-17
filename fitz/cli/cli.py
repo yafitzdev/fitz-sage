@@ -28,7 +28,7 @@ def _register_sub_apps():
     """Register ingest and pipeline sub-apps after module initialization."""
     # Import here to avoid circular imports at module load time
     from fitz.ingest.cli import app as ingest_app
-    from fitz.pipeline.cli import app as pipeline_app
+    from fitz.engines.classic_rag.pipeline.cli import app as pipeline_app
 
     app.add_typer(ingest_app, name="ingest")
     app.add_typer(pipeline_app, name="pipeline")

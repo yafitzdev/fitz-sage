@@ -107,7 +107,7 @@ def extract_models(cm: ContractMap, *, verbose: bool) -> None:
         "fitz.core.config.schema",
         "fitz.core.models.chunk",
         "fitz.core.models.document",
-        "fitz.pipeline.config.schema",
+        "fitz.engines.classic_rag.pipeline.config.schema",
         "fitz.ingest.config.schema",
         "fitz.ingest.ingestion.base",
     ]
@@ -149,8 +149,8 @@ def extract_protocols(cm: ContractMap, *, verbose: bool) -> None:
         "fitz.core.llm.embedding.base",
         "fitz.core.llm.rerank.base",
         "fitz.core.vector_db.base",
-        "fitz.retrieval.runtime.base",
-        "fitz.pipeline.pipeline.base",
+        "fitz.engines.classic_rag.retrieval.runtime.base",
+        "fitz.engines.classic_rag.pipeline.pipeline.base",
         "fitz.ingest.chunking.base",
         "fitz.ingest.ingestion.base",
     ]

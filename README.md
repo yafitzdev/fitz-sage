@@ -117,8 +117,8 @@ pip install fitz[local]   # Ollama + FAISS
 ### Python API
 
 ```python
-from fitz.pipeline.pipeline.engine import RAGPipeline
-from fitz.pipeline.config.loader import load_rag_config
+from fitz.engines.classic_rag.pipeline.pipeline.engine import RAGPipeline
+from fitz.engines.classic_rag.pipeline.config.loader import load_rag_config
 
 # Load config
 config = load_rag_config()
@@ -224,8 +224,8 @@ Clean boundaries. No circular dependencies.
 ### Local RAG Pipeline
 
 ```python
-from fitz.pipeline.pipeline.engine import RAGPipeline
-from fitz.pipeline.config.schema import RAGConfig, PipelinePluginConfig
+from fitz.engines.classic_rag.pipeline.pipeline.engine import RAGPipeline
+from fitz.engines.classic_rag.pipeline.config.schema import RAGConfig, PipelinePluginConfig
 
 # Local config
 config = RAGConfig(

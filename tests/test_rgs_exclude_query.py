@@ -1,5 +1,5 @@
 # tests/test_rgs_exclude_query.py
-from fitz.generation.retrieval_guided.synthesis import RGS, RGSConfig
+fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
 
 
 def test_rgs_excludes_query_from_context():

@@ -17,8 +17,8 @@ from typing import (
     runtime_checkable,
 )
 
-from fitz.generation.exceptions.base import GenerationError, RGSGenerationError
-from fitz.generation.prompting import (
+fitz.engines.classic_rag.generation.exceptions.base import GenerationError, RGSGenerationError
+fitz.engines.classic_rag.generation.prompting import (
     PromptAssembler,
     PromptConfig,
     PromptProfile,

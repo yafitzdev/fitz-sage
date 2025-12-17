@@ -51,7 +51,7 @@ exclude = ["tests*", "tools*", "examples*"]
 [project.scripts]
 fitz = "fitz.cli.cli:app"
 fitz-ingest = "fitz.ingest.cli:app"
-fitz-pipeline = "fitz.pipeline.cli:app"
+fitz-pipeline = "fitz.engines.classic_rag.pipeline.cli:app"
 
 
 [tool.black]

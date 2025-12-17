@@ -12,10 +12,10 @@ mapping:
   fitz.core: foundation
 
   fitz.ingest: domain
-  fitz.retrieval: domain
+  fitz.engines.classic_rag.retrieval: domain
   fitz.generation: domain
 
-  fitz.pipeline: orchestration
+  fitz.engines.classic_rag.pipeline: orchestration
 
   tools: tooling
   tests: tests
