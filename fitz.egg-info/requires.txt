@@ -5,9 +5,17 @@ httpx>=0.24
 typing-extensions>=4.7
 typer>=0.9
 
+[dev]
+pytest>=7.0
+pytest-cov>=4.0
+black>=23.0
+isort>=5.0
+mypy>=1.0
+
 [ingest]
 pdfminer.six
 python-docx
 
 [local]
 ollama>=0.1.0
+faiss-cpu>=1.7.0
