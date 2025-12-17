@@ -14,7 +14,7 @@ import re
 import sys
 import traceback
 from dataclasses import dataclass
-from typing import Any, Callable, TypeVar
+from typing import Callable, TypeVar, Any
 
 import typer
 
@@ -34,11 +34,9 @@ except ImportError:
 # Error Patterns and Fixes
 # =============================================================================
 
-
 @dataclass
 class ErrorFix:
     """A suggested fix for an error."""
-
     title: str
     description: str
     commands: list[str] | None = None
@@ -47,7 +45,6 @@ class ErrorFix:
 @dataclass
 class ErrorPattern:
     """Pattern matching for known errors."""
-
     pattern: str  # Regex pattern to match error message
     title: str
     description: str
@@ -69,22 +66,20 @@ ERROR_PATTERNS: list[ErrorPattern] = [
             ErrorFix(
                 "Start Qdrant with Docker",
                 "Run Qdrant locally using Docker:",
-                ["docker run -p 6333:6333 qdrant/qdrant"],
+                ["docker run -p 6333:6333 qdrant/qdrant"]
             ),
             ErrorFix(
                 "Check Qdrant host",
                 "If Qdrant is running elsewhere, set the environment variable:",
-                [
-                    "$env:QDRANT_HOST = 'your-host-ip'  # PowerShell",
-                    "export QDRANT_HOST=your-host-ip    # Bash",
-                ],
+                ["$env:QDRANT_HOST = 'your-host-ip'  # PowerShell",
+                 "export QDRANT_HOST=your-host-ip    # Bash"]
             ),
             ErrorFix(
                 "Use local FAISS instead",
                 "Run 'fitz init' and select FAISS as vector database",
-                ["fitz init"],
+                ["fitz init"]
             ),
-        ],
+        ]
     ),
     ErrorPattern(
         pattern=r"(Connection refused|Cannot connect).*(:11434|ollama)",
@@ -95,20 +90,23 @@ ERROR_PATTERNS: list[ErrorPattern] = [
             ErrorFix(
                 "Install and start Ollama",
                 "Download from https://ollama.com and run:",
-                ["ollama serve"],
+                ["ollama serve"]
             ),
             ErrorFix(
                 "Pull a model",
                 "After starting Ollama, pull a model:",
-                ["ollama pull llama3.2", "ollama pull nomic-embed-text"],
+                ["ollama pull llama3.2",
+                 "ollama pull nomic-embed-text"]
             ),
             ErrorFix(
                 "Use cloud API instead",
                 "Set an API key and run 'fitz init':",
-                ["$env:COHERE_API_KEY = 'your-key'", "fitz init"],
+                ["$env:COHERE_API_KEY = 'your-key'",
+                 "fitz init"]
             ),
-        ],
+        ]
     ),
+
     # =========================================================================
     # API Key Errors
     # =========================================================================
@@ -121,21 +119,17 @@ ERROR_PATTERNS: list[ErrorPattern] = [
             ErrorFix(
                 "Set the API key",
                 "Get your key from https://dashboard.cohere.com/api-keys",
-                [
-                    "$env:COHERE_API_KEY = 'your-key'  # PowerShell",
-                    "export COHERE_API_KEY=your-key    # Bash",
-                ],
+                ["$env:COHERE_API_KEY = 'your-key'  # PowerShell",
+                 "export COHERE_API_KEY=your-key    # Bash"]
             ),
             ErrorFix(
                 "Use local LLM instead",
                 "Install Ollama for offline usage:",
-                [
-                    "# Visit https://ollama.com to install",
-                    "ollama pull llama3.2",
-                    "fitz init  # Select 'ollama' as provider",
-                ],
+                ["# Visit https://ollama.com to install",
+                 "ollama pull llama3.2",
+                 "fitz init  # Select 'ollama' as provider"]
             ),
-        ],
+        ]
     ),
     ErrorPattern(
         pattern=r"(OPENAI_API_KEY|OpenAI).*(not set|missing|invalid)",
@@ -146,12 +140,10 @@ ERROR_PATTERNS: list[ErrorPattern] = [
             ErrorFix(
                 "Set the API key",
                 "Get your key from https://platform.openai.com/api-keys",
-                [
-                    "$env:OPENAI_API_KEY = 'sk-...'  # PowerShell",
-                    "export OPENAI_API_KEY=sk-...    # Bash",
-                ],
+                ["$env:OPENAI_API_KEY = 'sk-...'  # PowerShell",
+                 "export OPENAI_API_KEY=sk-...    # Bash"]
             ),
-        ],
+        ]
     ),
     ErrorPattern(
         pattern=r"(ANTHROPIC_API_KEY|Anthropic).*(not set|missing|invalid)",
@@ -162,13 +154,12 @@ ERROR_PATTERNS: list[ErrorPattern] = [
             ErrorFix(
                 "Set the API key",
                 "Get your key from https://console.anthropic.com/",
-                [
-                    "$env:ANTHROPIC_API_KEY = 'sk-ant-...'  # PowerShell",
-                    "export ANTHROPIC_API_KEY=sk-ant-...    # Bash",
-                ],
+                ["$env:ANTHROPIC_API_KEY = 'sk-ant-...'  # PowerShell",
+                 "export ANTHROPIC_API_KEY=sk-ant-...    # Bash"]
             ),
-        ],
+        ]
     ),
+
     # =========================================================================
     # Collection Errors
     # =========================================================================
@@ -181,14 +172,14 @@ ERROR_PATTERNS: list[ErrorPattern] = [
             ErrorFix(
                 "Ingest documents first",
                 "Create the collection by ingesting documents:",
-                ["fitz-ingest run ./your_docs --collection your_collection"],
+                ["fitz-ingest run ./your_docs --collection your_collection"]
             ),
             ErrorFix(
                 "Check collection name",
                 "List available collections:",
-                ["fitz-ingest stats --collection default"],
+                ["fitz-ingest stats --collection default"]
             ),
-        ],
+        ]
     ),
     ErrorPattern(
         pattern=r"(No (documents|chunks)|empty).*(collection|result)",
@@ -199,15 +190,16 @@ ERROR_PATTERNS: list[ErrorPattern] = [
             ErrorFix(
                 "Ingest documents",
                 "Add documents to your collection:",
-                ["fitz-ingest run ./your_docs --collection your_collection"],
+                ["fitz-ingest run ./your_docs --collection your_collection"]
             ),
             ErrorFix(
                 "Check ingestion logs",
                 "Verify documents were ingested successfully:",
-                ["fitz-ingest validate ./your_docs"],
+                ["fitz-ingest validate ./your_docs"]
             ),
-        ],
+        ]
     ),
+
     # =========================================================================
     # Model Errors
     # =========================================================================
@@ -220,13 +212,11 @@ ERROR_PATTERNS: list[ErrorPattern] = [
             ErrorFix(
                 "Update your config",
                 "Edit your config file and update the model name:",
-                [
-                    "# For Cohere, try: command-r-08-2024",
-                    "# For OpenAI, try: gpt-4o-mini",
-                    "fitz init  # Or re-run setup wizard",
-                ],
+                ["# For Cohere, try: command-r-08-2024",
+                 "# For OpenAI, try: gpt-4o-mini",
+                 "fitz init  # Or re-run setup wizard"]
             ),
-        ],
+        ]
     ),
     ErrorPattern(
         pattern=r"(rate limit|too many requests|429)",
@@ -234,14 +224,20 @@ ERROR_PATTERNS: list[ErrorPattern] = [
         description="You've exceeded the API rate limit.",
         category="api",
         fixes=[
-            ErrorFix("Wait and retry", "Wait a few minutes before retrying.", []),
+            ErrorFix(
+                "Wait and retry",
+                "Wait a few minutes before retrying.",
+                []
+            ),
             ErrorFix(
                 "Use local LLM",
                 "Switch to Ollama for unlimited local usage:",
-                ["ollama pull llama3.2", "fitz init"],
+                ["ollama pull llama3.2",
+                 "fitz init"]
             ),
-        ],
+        ]
     ),
+
     # =========================================================================
     # Config Errors
     # =========================================================================
@@ -251,30 +247,19 @@ ERROR_PATTERNS: list[ErrorPattern] = [
         description="The configuration file is missing or invalid.",
         category="config",
         fixes=[
-            ErrorFix("Run setup wizard", "Create a new configuration:", ["fitz init"]),
             ErrorFix(
-                "Check config syntax", "View your current config:", ["fitz-pipeline config show"]
+                "Run setup wizard",
+                "Create a new configuration:",
+                ["fitz init"]
             ),
-        ],
+            ErrorFix(
+                "Check config syntax",
+                "View your current config:",
+                ["fitz-pipeline config show"]
+            ),
+        ]
     ),
-    ErrorPattern(
-        pattern=r"(No module named|ModuleNotFoundError|ImportError).*'([^']+)'",
-        title="Missing Dependency",
-        description="A required Python package is not installed.",
-        category="dependency",
-        fixes=[
-            ErrorFix(
-                "Install the package",
-                "Install the missing dependency:",
-                ["pip install <package-name>"],
-            ),
-            ErrorFix(
-                "Install all dependencies",
-                "Reinstall fitz with all dependencies:",
-                ["pip install -e .[all]"],
-            ),
-        ],
-    ),
+
     # =========================================================================
     # Vector/Embedding Errors
     # =========================================================================
@@ -287,17 +272,15 @@ ERROR_PATTERNS: list[ErrorPattern] = [
             ErrorFix(
                 "Recreate collection",
                 "Delete and recreate the collection with new embeddings:",
-                [
-                    "# Delete collection first (via Qdrant dashboard or API)",
-                    "fitz-ingest run ./your_docs --collection new_collection",
-                ],
+                ["# Delete collection first (via Qdrant dashboard or API)",
+                 "fitz-ingest run ./your_docs --collection new_collection"]
             ),
             ErrorFix(
                 "Use matching embedding model",
                 "Ensure you're using the same embedding model for ingest and query.",
-                [],
+                []
             ),
-        ],
+        ]
     ),
     ErrorPattern(
         pattern=r"vector name.*(error|mismatch|not found)",
@@ -308,10 +291,11 @@ ERROR_PATTERNS: list[ErrorPattern] = [
             ErrorFix(
                 "Recreate collection",
                 "Delete and recreate with simple vector configuration:",
-                ["fitz-ingest run ./docs --collection new_collection"],
+                ["fitz-ingest run ./docs --collection new_collection"]
             ),
-        ],
+        ]
     ),
+
     # =========================================================================
     # File Errors
     # =========================================================================
@@ -324,9 +308,9 @@ ERROR_PATTERNS: list[ErrorPattern] = [
             ErrorFix(
                 "Check the path",
                 "Verify the file/directory exists:",
-                ["ls ./your_path  # or 'dir' on Windows"],
+                ["ls ./your_path  # or 'dir' on Windows"]
             ),
-        ],
+        ]
     ),
     ErrorPattern(
         pattern=r"(Permission denied|Access denied)",
@@ -337,9 +321,9 @@ ERROR_PATTERNS: list[ErrorPattern] = [
             ErrorFix(
                 "Check permissions",
                 "Run with appropriate permissions or change file ownership.",
-                [],
+                []
             ),
-        ],
+        ]
     ),
 ]
 
@@ -348,88 +332,134 @@ ERROR_PATTERNS: list[ErrorPattern] = [
 # Error Display Functions
 # =============================================================================
 
-
 def format_error_message(
-    title: str,
-    description: str,
-    fixes: list[ErrorFix],
-    original_error: str | None = None,
-    show_traceback: bool = False,
+        title: str,
+        description: str,
+        fixes: list[ErrorFix],
+        original_error: str | None = None,
+        show_traceback: bool = False,
 ) -> str:
     """Format a user-friendly error message."""
     lines = []
-
-    lines.append(f"\n❌ {title}")
-    lines.append("")
-    lines.append(description)
+    lines.append(f"\n❌ {title}\n")
+    lines.append(f"{description}\n")
 
     if fixes:
-        lines.append("")
-        lines.append("How to fix:")
+        lines.append("\nHow to fix:\n")
         for i, fix in enumerate(fixes, 1):
-            lines.append(f"\n  {i}. {fix.title}")
-            lines.append(f"     {fix.description}")
+            lines.append(f"{i}. {fix.title}")
+            lines.append(f"   {fix.description}")
             if fix.commands:
                 for cmd in fix.commands:
-                    lines.append(f"       $ {cmd}")
+                    lines.append(f"   $ {cmd}")
+            lines.append("")
 
     if original_error and (show_traceback or os.getenv("FITZ_DEBUG")):
-        lines.append("")
-        lines.append("─" * 60)
-        lines.append("Original error:")
-        lines.append(original_error)
+        lines.append(f"\nOriginal error: {original_error}")
 
     return "\n".join(lines)
 
 
 def display_error(
-    title: str,
-    description: str,
-    fixes: list[ErrorFix],
-    original_error: str | None = None,
+        title: str,
+        description: str,
+        fixes: list[ErrorFix],
+        original_error: str | None = None,
 ) -> None:
-    """Display a formatted error message."""
+    """Display an error message to the user."""
     show_traceback = bool(os.getenv("FITZ_DEBUG"))
 
-    if RICH_AVAILABLE:
+    if RICH_AVAILABLE and console:
         # Build rich panel content
         content_lines = [description, ""]
 
         if fixes:
             content_lines.append("[bold]How to fix:[/bold]")
+            content_lines.append("")
             for i, fix in enumerate(fixes, 1):
-                content_lines.append(f"\n[cyan]{i}. {fix.title}[/cyan]")
+                content_lines.append(f"[bold]{i}. {fix.title}[/bold]")
                 content_lines.append(f"   {fix.description}")
                 if fix.commands:
                     for cmd in fix.commands:
-                        content_lines.append(f"   [dim]$ {cmd}[/dim]")
+                        content_lines.append(f"   [dim]$[/dim] [cyan]{cmd}[/cyan]")
 
-        console.print(
-            Panel(
-                "\n".join(content_lines),
-                title=f"[red]❌ {title}[/red]",
-                border_style="red",
-            )
-        )
+        content = "\n".join(content_lines)
+
+        console.print(Panel(
+            content,
+            title=f"❌ {title}",
+            border_style="red",
+            expand=False,
+        ))
 
         if original_error and show_traceback:
-            console.print("\n[dim]Original error:[/dim]")
-            console.print(f"[dim]{original_error}[/dim]")
+            console.print(f"\n[dim]Original error: {original_error}[/dim]")
     else:
-        message = format_error_message(title, description, fixes, original_error, show_traceback)
-        print(message, file=sys.stderr)
+        # Plain text fallback
+        print(format_error_message(title, description, fixes, original_error, show_traceback))
 
+
+# =============================================================================
+# Error Matching
+# =============================================================================
 
 def match_error(error_message: str) -> ErrorPattern | None:
-    """Find a matching error pattern for the given error message."""
+    """Match an error message against known patterns."""
     for pattern in ERROR_PATTERNS:
         if re.search(pattern.pattern, error_message, re.IGNORECASE):
             return pattern
     return None
 
 
+def handle_import_error(exc: ImportError | ModuleNotFoundError) -> None:
+    """Handle import errors with helpful messages showing the missing package."""
+    # Extract the module name from the exception
+    module_name = getattr(exc, 'name', None) or str(exc)
+
+    # Try to extract from the message if name attr is not set
+    if not module_name or module_name == str(exc):
+        match = re.search(r"No module named ['\"]?([^'\"]+)['\"]?", str(exc))
+        if match:
+            module_name = match.group(1)
+
+    # Map common module names to pip package names
+    pip_name_map = {
+        'yaml': 'pyyaml',
+        'cv2': 'opencv-python',
+        'PIL': 'pillow',
+        'sklearn': 'scikit-learn',
+    }
+
+    # Get the root module name (e.g., 'fitz.foo.bar' -> 'fitz')
+    root_module = module_name.split('.')[0] if module_name else 'unknown'
+    pip_name = pip_name_map.get(root_module, root_module)
+
+    display_error(
+        title=f"Missing Dependency: {module_name}",
+        description=f"The Python package '{module_name}' is not installed.",
+        fixes=[
+            ErrorFix(
+                "Install the package",
+                f"Install the missing dependency:",
+                [f"pip install {pip_name}"]
+            ),
+            ErrorFix(
+                "Install all fitz dependencies",
+                "Reinstall fitz with all dependencies:",
+                ["pip install -e .", "# or: pip install -e .[all]"]
+            ),
+        ],
+        original_error=str(exc),
+    )
+
+
 def handle_exception(exc: Exception) -> None:
     """Handle an exception with a user-friendly message."""
+    # Special handling for import errors
+    if isinstance(exc, (ImportError, ModuleNotFoundError)):
+        handle_import_error(exc)
+        return
+
     error_str = str(exc)
     error_type = type(exc).__name__
 
@@ -455,13 +485,18 @@ def handle_exception(exc: Exception) -> None:
                 ErrorFix(
                     "Check the logs",
                     "Run with FITZ_DEBUG=1 for more details:",
-                    ["$env:FITZ_DEBUG = '1'  # PowerShell", "export FITZ_DEBUG=1    # Bash"],
+                    ["$env:FITZ_DEBUG = '1'  # PowerShell",
+                     "export FITZ_DEBUG=1    # Bash"]
                 ),
-                ErrorFix("Run diagnostics", "Check your setup:", ["fitz doctor"]),
+                ErrorFix(
+                    "Run diagnostics",
+                    "Check your setup:",
+                    ["fitz doctor"]
+                ),
                 ErrorFix(
                     "Report a bug",
                     "If this seems like a bug, please report it at:",
-                    ["https://github.com/yafitzdev/fitz/issues"],
+                    ["https://github.com/yafitzdev/fitz/issues"]
                 ),
             ],
             original_error=tb if os.getenv("FITZ_DEBUG") else f"{error_type}: {error_str}",
@@ -472,7 +507,7 @@ def handle_exception(exc: Exception) -> None:
 # Decorator for CLI Commands
 # =============================================================================
 
-F = TypeVar("F", bound=Callable[..., Any])
+F = TypeVar('F', bound=Callable[..., Any])
 
 
 def friendly_errors(func: F) -> F:
@@ -495,6 +530,9 @@ def friendly_errors(func: F) -> F:
         except KeyboardInterrupt:
             print("\n\nOperation cancelled by user.")
             raise typer.Exit(code=130)
+        except (ImportError, ModuleNotFoundError) as exc:
+            handle_import_error(exc)
+            raise typer.Exit(code=1)
         except Exception as exc:
             handle_exception(exc)
             raise typer.Exit(code=1)
@@ -514,6 +552,9 @@ def install_global_handler() -> None:
         if exc_type is KeyboardInterrupt:
             print("\n\nOperation cancelled by user.")
             sys.exit(130)
+        elif issubclass(exc_type, (ImportError, ModuleNotFoundError)):
+            handle_import_error(exc_value)  # type: ignore
+            sys.exit(1)
         elif issubclass(exc_type, Exception):
             handle_exception(exc_value)  # type: ignore
             sys.exit(1)
@@ -527,7 +568,6 @@ def install_global_handler() -> None:
 # =============================================================================
 # Convenience function for testing
 # =============================================================================
-
 
 def test_error_matching():
     """Test error pattern matching with sample errors."""
