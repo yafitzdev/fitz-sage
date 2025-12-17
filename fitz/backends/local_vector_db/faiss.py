@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 
 import faiss
 import numpy as np
 
-from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import VECTOR_DB
+from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.vector_db.base import SearchResult
 
 from .config import LocalVectorDBConfig
@@ -23,13 +23,48 @@ class FaissLocalVectorDB:
     Local FAISS-backed VectorDB plugin.
 
     Implements the canonical VectorDBPlugin contract with upsert support.
+
+    Can be initialized in two ways:
+
+    1. Direct initialization (for programmatic use):
+        db = FaissLocalVectorDB(dim=768, config=LocalVectorDBConfig())
+
+    2. From config kwargs (for YAML-based config):
+        db = FaissLocalVectorDB(dim=768, path=".fitz/vector_db", persist=True)
     """
 
     plugin_name = "local-faiss"
     plugin_type = "vector_db"
 
-    def __init__(self, *, dim: int, config: LocalVectorDBConfig):
+    def __init__(
+            self,
+            *,
+            dim: int,
+            config: Optional[LocalVectorDBConfig] = None,
+            # These kwargs allow config-based initialization from YAML
+            path: Optional[str] = None,
+            persist: Optional[bool] = None,
+    ):
+        """
+        Initialize the FAISS vector database.
+
+        Args:
+            dim: Vector dimension (required)
+            config: LocalVectorDBConfig object (optional)
+            path: Storage path (alternative to config)
+            persist: Whether to persist to disk (alternative to config)
+        """
         self._dim = dim
+
+        # Build config from kwargs if not provided directly
+        if config is None:
+            config_kwargs = {}
+            if path is not None:
+                config_kwargs["path"] = Path(path)
+            if persist is not None:
+                config_kwargs["persist"] = persist
+            config = LocalVectorDBConfig(**config_kwargs)
+
         self._config = config
 
         self._base_path = Path(config.path)
@@ -56,80 +91,72 @@ class FaissLocalVectorDB:
         """
         Upsert points into the vector database.
 
-        Expected points format:
-        [
-            {
-                "id": "chunk_id",
-                "vector": [0.1, 0.2, ...],
-                "payload": {"doc_id": "...", "content": "...", ...}
-            },
-            ...
-        ]
+        Args:
+            collection: Collection name (ignored for FAISS, single collection)
+            points: List of points with 'id', 'vector', and 'payload' keys
         """
-        # Build a mapping of existing IDs to their indices
-        id_to_idx = {id_: idx for idx, id_ in enumerate(self._ids)}
-
-        # Separate updates from inserts
-        updates = []
-        inserts = []
-
         for point in points:
-            point_id = point["id"]
-            if point_id in id_to_idx:
-                updates.append((id_to_idx[point_id], point))
+            point_id = str(point["id"])
+            vector = np.asarray([point["vector"]], dtype="float32")
+            payload = point.get("payload", {})
+
+            # Check if ID exists (for update)
+            if point_id in self._ids:
+                idx = self._ids.index(point_id)
+                # FAISS doesn't support in-place updates, so we just update payload
+                self._payloads[idx] = payload
+                # Note: vector update would require index rebuild
             else:
-                inserts.append(point)
+                # Add new point
+                self._index.add(vector)
+                self._ids.append(point_id)
+                self._payloads.append(payload)
 
-        # Handle updates (replace existing vectors)
-        for idx, point in updates:
-            vector = np.asarray(point["vector"], dtype="float32")
-            # FAISS doesn't support in-place updates, so we'll just track metadata updates
-            self._payloads[idx] = point.get("payload", {})
-            # Note: Vector is not updated in FAISS index (would require rebuild)
-            # For true upsert with vector updates, we'd need to rebuild the entire index
-
-        # Handle inserts (add new vectors)
-        if inserts:
-            vectors = []
-            for point in inserts:
-                vectors.append(point["vector"])
-                self._ids.append(point["id"])
-                self._payloads.append(point.get("payload", {}))
-
-            matrix = np.asarray(vectors, dtype="float32")
-            self._index.add(matrix)
-
-        # Persist if configured
+        # Auto-persist if enabled
         if self._config.persist:
             self.persist()
 
     def add(self, chunks: Iterable[Chunk]) -> None:
-        """Legacy add method for chunks with embedded vectors."""
-        vectors = []
+        """
+        Add chunks with pre-computed embeddings to the index.
 
+        This is the legacy interface that expects chunks to have
+        an 'embedding' attribute attached at runtime.
+        """
         for chunk in chunks:
             embedding = getattr(chunk, "embedding", None)
             if embedding is None:
-                continue
+                raise ValueError(f"Chunk {chunk.id} has no embedding attached")
 
-            vectors.append(embedding)
+            vec = np.asarray([embedding], dtype="float32")
+            self._index.add(vec)
             self._ids.append(chunk.id)
-            self._payloads.append(chunk.metadata or {})
-
-        if not vectors:
-            return
-
-        matrix = np.asarray(vectors, dtype="float32")
-        self._index.add(matrix)
+            self._payloads.append({
+                "doc_id": chunk.doc_id,
+                "chunk_index": chunk.chunk_index,
+                "content": chunk.content,
+                **(chunk.metadata or {}),
+            })
 
     def search(
-        self,
-        collection_name: str,
-        query_vector: list[float],
-        limit: int,
-        with_payload: bool = True,
+            self,
+            collection_name: str,
+            query_vector: list[float],
+            limit: int,
+            with_payload: bool = True,
     ) -> list[SearchResult]:
-        """Search for similar vectors."""
+        """
+        Search for similar vectors.
+
+        Args:
+            collection_name: Collection name (ignored for FAISS)
+            query_vector: Query vector
+            limit: Maximum number of results
+            with_payload: Whether to include payload in results
+
+        Returns:
+            List of SearchResult objects
+        """
         if self._index.ntotal == 0:
             return []
 

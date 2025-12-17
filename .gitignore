@@ -115,3 +115,4 @@ temp/
 *.tmp
 
 RELEASE_CHECKLIST.md
+.fitz

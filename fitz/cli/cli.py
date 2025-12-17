@@ -55,13 +55,14 @@ def _register_commands():
     """Register commands after module initialization to avoid circular imports."""
     from fitz.cli import doctor
     from fitz.cli import help as help_module
-    from fitz.cli import init, plugins
+    from fitz.cli import init, plugins, quickstart
 
     # Wrap commands with friendly error handling
     app.command("help")(friendly_errors(help_module.command))
     app.command("init")(friendly_errors(init.command))
     app.command("plugins")(friendly_errors(plugins.command))
     app.command("doctor")(friendly_errors(doctor.command))
+    app.command("quickstart")(friendly_errors(quickstart.command))
 
 
 # Call immediately during module initialization
