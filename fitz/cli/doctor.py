@@ -1,48 +1,433 @@
-"""Doctor command for Fitz CLI."""
+# fitz/cli/doctor.py
+"""
+Doctor command for Fitz CLI.
 
+Runs comprehensive diagnostics on your Fitz setup.
+"""
+
+from __future__ import annotations
+
+import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 import typer
 
+# Rich for pretty output (optional)
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich.panel import Panel
+    RICH_AVAILABLE = True
+    console = Console()
+except ImportError:
+    RICH_AVAILABLE = False
+    console = None
 
-def check_ollama_installed() -> bool:
-    """Check if Ollama is installed on the system."""
+
+def print_status(name: str, status: str, details: str = "", ok: bool = True) -> None:
+    """Print a status line."""
+    if RICH_AVAILABLE:
+        icon = "✓" if ok else "✗" if status == "ERROR" else "⚠"
+        color = "green" if ok else "red" if status == "ERROR" else "yellow"
+        console.print(f"  [{color}]{icon}[/{color}] {name}: {details}")
+    else:
+        icon = "✓" if ok else "✗" if status == "ERROR" else "⚠"
+        print(f"  {icon} {name}: {details}")
+
+
+def check_python() -> tuple[bool, str]:
+    """Check Python version."""
+    version = sys.version.split()[0]
+    major, minor = sys.version_info[:2]
+    ok = major >= 3 and minor >= 10
+    return ok, f"Python {version}" + ("" if ok else " (3.10+ required)")
+
+
+def check_fitz_dir() -> tuple[bool, str]:
+    """Check for .fitz directory."""
+    fitz_dir = Path.cwd() / ".fitz"
+    if fitz_dir.exists():
+        config = fitz_dir / "config.yaml"
+        if config.exists():
+            return True, ".fitz/config.yaml exists"
+        return True, ".fitz/ exists (no config.yaml)"
+    return False, ".fitz/ not found (run: fitz init)"
+
+
+def check_config() -> tuple[bool, str, Optional[dict]]:
+    """Check if config is valid."""
+    config_paths = [
+        Path.cwd() / ".fitz" / "config.yaml",
+        Path.cwd() / "fitz" / "engines" / "classic_rag" / "config" / "default.yaml",
+    ]
+    
+    for path in config_paths:
+        if path.exists():
+            try:
+                import yaml
+                with open(path) as f:
+                    config = yaml.safe_load(f)
+                return True, f"Config loaded from {path.name}", config
+            except Exception as e:
+                return False, f"Config error: {e}", None
+    
+    return False, "No config found", None
+
+
+def check_ollama() -> tuple[bool, str]:
+    """Check if Ollama is installed and running."""
     try:
         result = subprocess.run(
-            ["ollama", "--version"],
+            ["ollama", "list"],
             capture_output=True,
             text=True,
-            check=False,
+            timeout=5,
         )
-        return result.returncode == 0
+        if result.returncode == 0:
+            lines = result.stdout.strip().split('\n')[1:]
+            models = [line.split()[0] for line in lines if line.strip()]
+            if models:
+                return True, f"Running ({len(models)} models)"
+            return True, "Running (no models installed)"
+        return False, "Installed but not responding"
     except FileNotFoundError:
-        return False
+        return False, "Not installed (https://ollama.com)"
+    except subprocess.TimeoutExpired:
+        return False, "Timeout (is Ollama running?)"
+    except Exception as e:
+        return False, f"Error: {e}"
 
 
-def command() -> None:
+def check_api_key(name: str, env_var: str) -> tuple[bool, str]:
+    """Check if an API key is set."""
+    key = os.getenv(env_var)
+    if key:
+        return True, f"Set ({key[:8]}...)"
+    return False, f"Not set (export {env_var}=...)"
+
+
+def check_qdrant() -> tuple[bool, str]:
+    """Check if Qdrant is accessible."""
+    import urllib.request
+    import urllib.error
+    
+    host = os.getenv("QDRANT_HOST", "localhost")
+    port = int(os.getenv("QDRANT_PORT", "6333"))
+    
+    try:
+        url = f"http://{host}:{port}/collections"
+        req = urllib.request.Request(url, method='GET')
+        with urllib.request.urlopen(req, timeout=3) as response:
+            if response.status == 200:
+                import json
+                data = json.loads(response.read())
+                collections = data.get("result", {}).get("collections", [])
+                return True, f"Connected at {host}:{port} ({len(collections)} collections)"
+    except urllib.error.URLError:
+        pass
+    except Exception as e:
+        return False, f"Error: {e}"
+    
+    return False, f"Not reachable at {host}:{port}"
+
+
+def check_faiss() -> tuple[bool, str]:
+    """Check if FAISS is installed."""
+    try:
+        import faiss
+        return True, "Installed"
+    except ImportError:
+        return False, "Not installed (pip install faiss-cpu)"
+
+
+def check_dependencies() -> list[tuple[str, bool, str]]:
+    """Check required Python dependencies."""
+    deps = []
+    
+    packages = [
+        ("typer", "CLI framework"),
+        ("httpx", "HTTP client"),
+        ("pydantic", "Config validation"),
+        ("yaml", "YAML parsing", "pyyaml"),
+    ]
+    
+    for item in packages:
+        name = item[0]
+        desc = item[1]
+        import_name = item[2] if len(item) > 2 else item[0]
+        
+        try:
+            __import__(import_name.replace("-", "_"))
+            deps.append((f"{name}", True, "Installed"))
+        except ImportError:
+            deps.append((f"{name}", False, f"Missing (pip install {import_name})"))
+    
+    return deps
+
+
+def test_embedding(config: dict) -> tuple[bool, str]:
+    """Test embedding generation."""
+    if not config:
+        return False, "No config"
+    
+    try:
+        embedding_cfg = config.get("embedding", {})
+        plugin_name = embedding_cfg.get("plugin_name", "cohere")
+        
+        # Quick import test
+        if plugin_name == "cohere":
+            if not os.getenv("COHERE_API_KEY"):
+                return False, "COHERE_API_KEY not set"
+        elif plugin_name == "openai":
+            if not os.getenv("OPENAI_API_KEY"):
+                return False, "OPENAI_API_KEY not set"
+        
+        return True, f"Plugin '{plugin_name}' configured"
+    except Exception as e:
+        return False, f"Error: {e}"
+
+
+def test_llm(config: dict) -> tuple[bool, str]:
+    """Test LLM configuration."""
+    if not config:
+        return False, "No config"
+    
+    try:
+        llm_cfg = config.get("llm", {})
+        plugin_name = llm_cfg.get("plugin_name", "cohere")
+        model = llm_cfg.get("kwargs", {}).get("model", "unknown")
+        
+        # Quick validation
+        if plugin_name == "cohere":
+            if not os.getenv("COHERE_API_KEY"):
+                return False, "COHERE_API_KEY not set"
+        elif plugin_name == "openai":
+            if not os.getenv("OPENAI_API_KEY"):
+                return False, "OPENAI_API_KEY not set"
+        elif plugin_name == "anthropic":
+            if not os.getenv("ANTHROPIC_API_KEY"):
+                return False, "ANTHROPIC_API_KEY not set"
+        
+        return True, f"Plugin '{plugin_name}' model '{model}'"
+    except Exception as e:
+        return False, f"Error: {e}"
+
+
+def command(
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show detailed output",
+    ),
+    test_connections: bool = typer.Option(
+        False,
+        "--test",
+        "-t",
+        help="Test actual connections (slower)",
+    ),
+) -> None:
     """
-    Run basic diagnostics for local setup.
+    Run diagnostics on your Fitz setup.
+    
+    Checks:
+    - Python version and dependencies
+    - Configuration files
+    - API keys and credentials
+    - External services (Ollama, Qdrant)
+    
+    Examples:
+        fitz doctor           # Quick check
+        fitz doctor -v        # Verbose output
+        fitz doctor --test    # Test actual connections
     """
-    typer.echo()
-    typer.echo("Fitz doctor")
-    typer.echo()
-
-    # Python
-    typer.echo(f"✓ Python {sys.version.split()[0]}")
-
-    # .fitz
-    if Path(".fitz").exists():
-        typer.echo("✓ .fitz directory present")
+    
+    if RICH_AVAILABLE:
+        console.print(Panel.fit(
+            "[bold]🩺 Fitz Doctor[/bold]\n"
+            "Running diagnostics...",
+            border_style="blue"
+        ))
     else:
-        typer.echo("⚠ .fitz directory missing (run: fitz init)")
+        print("\n" + "=" * 60)
+        print("🩺 Fitz Doctor")
+        print("Running diagnostics...")
+        print("=" * 60)
+    
+    issues = []
+    warnings = []
+    
+    # =========================================================================
+    # Core Checks
+    # =========================================================================
+    
+    print("\n📦 Core:")
+    
+    ok, msg = check_python()
+    print_status("Python", "OK" if ok else "ERROR", msg, ok)
+    if not ok:
+        issues.append("Python 3.10+ required")
+    
+    ok, msg = check_fitz_dir()
+    print_status("Workspace", "OK" if ok else "WARN", msg, ok)
+    if not ok:
+        warnings.append("Run 'fitz init' to create workspace")
+    
+    ok, msg, config = check_config()
+    print_status("Config", "OK" if ok else "WARN", msg, ok)
+    if not ok:
+        warnings.append("Run 'fitz init' to create config")
+    
+    # =========================================================================
+    # Dependencies
+    # =========================================================================
+    
+    if verbose:
+        print("\n📚 Dependencies:")
+        for name, ok, msg in check_dependencies():
+            print_status(name, "OK" if ok else "ERROR", msg, ok)
+            if not ok:
+                issues.append(f"Missing dependency: {name}")
+    
+    # =========================================================================
+    # LLM Providers
+    # =========================================================================
+    
+    print("\n🤖 LLM Providers:")
+    
+    ok, msg = check_ollama()
+    print_status("Ollama", "OK" if ok else "INFO", msg, ok)
+    
+    ok, msg = check_api_key("Cohere", "COHERE_API_KEY")
+    print_status("Cohere", "OK" if ok else "INFO", msg, ok)
+    
+    ok, msg = check_api_key("OpenAI", "OPENAI_API_KEY")
+    print_status("OpenAI", "OK" if ok else "INFO", msg, ok)
+    
+    ok, msg = check_api_key("Anthropic", "ANTHROPIC_API_KEY")
+    print_status("Anthropic", "OK" if ok else "INFO", msg, ok)
+    
+    # =========================================================================
+    # Vector Databases
+    # =========================================================================
+    
+    print("\n🗄️  Vector Databases:")
+    
+    ok, msg = check_qdrant()
+    print_status("Qdrant", "OK" if ok else "INFO", msg, ok)
+    
+    ok, msg = check_faiss()
+    print_status("FAISS", "OK" if ok else "INFO", msg, ok)
+    
+    # =========================================================================
+    # Config Validation
+    # =========================================================================
+    
+    if config:
+        print("\n⚙️  Configuration:")
+        
+        ok, msg = test_llm(config)
+        print_status("LLM", "OK" if ok else "WARN", msg, ok)
+        if not ok:
+            warnings.append(f"LLM: {msg}")
+        
+        ok, msg = test_embedding(config)
+        print_status("Embedding", "OK" if ok else "WARN", msg, ok)
+        if not ok:
+            warnings.append(f"Embedding: {msg}")
+        
+        # Show configured values
+        if verbose:
+            print("\n  Configured values:")
+            print(f"    LLM: {config.get('llm', {}).get('plugin_name', '?')}")
+            print(f"    Embedding: {config.get('embedding', {}).get('plugin_name', '?')}")
+            print(f"    Vector DB: {config.get('vector_db', {}).get('plugin_name', '?')}")
+            print(f"    Collection: {config.get('retriever', {}).get('collection', '?')}")
+    
+    # =========================================================================
+    # Connection Tests
+    # =========================================================================
+    
+    if test_connections and config:
+        print("\n🔌 Connection Tests:")
+        
+        # Test Qdrant connection with actual client
+        try:
+            from qdrant_client import QdrantClient
+            vdb_cfg = config.get("vector_db", {}).get("kwargs", {})
+            host = vdb_cfg.get("host", "localhost")
+            port = vdb_cfg.get("port", 6333)
+            client = QdrantClient(host=host, port=port, timeout=5)
+            collections = client.get_collections()
+            print_status("Qdrant connection", "OK", f"Connected, {len(collections.collections)} collections", True)
+        except Exception as e:
+            print_status("Qdrant connection", "ERROR", str(e), False)
+            issues.append(f"Qdrant connection failed: {e}")
+        
+        # Test embedding
+        try:
+            emb_cfg = config.get("embedding", {})
+            if emb_cfg.get("plugin_name") == "cohere" and os.getenv("COHERE_API_KEY"):
+                import httpx
+                client = httpx.Client(
+                    base_url="https://api.cohere.ai/v1",
+                    headers={"Authorization": f"Bearer {os.getenv('COHERE_API_KEY')}"},
+                    timeout=10,
+                )
+                response = client.post("/embed", json={
+                    "texts": ["test"],
+                    "model": "embed-english-v3.0",
+                    "input_type": "search_query",
+                    "embedding_types": ["float"],
+                })
+                if response.status_code == 200:
+                    print_status("Embedding API", "OK", "Cohere embed working", True)
+                else:
+                    print_status("Embedding API", "ERROR", f"Status {response.status_code}", False)
+        except Exception as e:
+            print_status("Embedding API", "ERROR", str(e), False)
+    
+    # =========================================================================
+    # Summary
+    # =========================================================================
+    
+    print("\n" + "=" * 60)
+    
+    if issues:
+        if RICH_AVAILABLE:
+            console.print(f"[red]❌ {len(issues)} issue(s) found:[/red]")
+            for issue in issues:
+                console.print(f"  • {issue}")
+        else:
+            print(f"❌ {len(issues)} issue(s) found:")
+            for issue in issues:
+                print(f"  • {issue}")
+    
+    if warnings:
+        if RICH_AVAILABLE:
+            console.print(f"[yellow]⚠️  {len(warnings)} warning(s):[/yellow]")
+            for warning in warnings:
+                console.print(f"  • {warning}")
+        else:
+            print(f"⚠️  {len(warnings)} warning(s):")
+            for warning in warnings:
+                print(f"  • {warning}")
+    
+    if not issues and not warnings:
+        if RICH_AVAILABLE:
+            console.print("[green]✅ All checks passed![/green]")
+        else:
+            print("✅ All checks passed!")
+    
+    print()
+    
+    # Exit with error code if there are issues
+    if issues:
+        raise typer.Exit(code=1)
 
-    # Ollama
-    if check_ollama_installed():
-        typer.echo("✓ Ollama detected")
-    else:
-        typer.echo("⚠ Ollama not detected (local LLM unavailable)")
-        typer.echo("→ To enable local LLMs: https://ollama.com")
 
-    typer.echo()
+if __name__ == "__main__":
+    typer.run(command)
