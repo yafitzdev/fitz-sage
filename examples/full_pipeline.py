@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# examples/full_pipeline.py
 """
 fitz Full Pipeline Example
 
@@ -29,14 +30,15 @@ if not os.getenv("COHERE_API_KEY"):
     print("Run: export COHERE_API_KEY='your-key'")
     sys.exit(1)
 
+from fitz.llm.registry import get_llm_plugin
+from fitz.vector_db.registry import get_vector_db_plugin  # Correct registry!
+from fitz.vector_db.writer import VectorDBWriter
 from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
-from fitz.engines.classic_rag.pipeline.context.pipeline import ContextPipeline
-from fitz.engines.classic_rag.retrieval.runtime.plugins.dense import DenseRetrievalPlugin
 from fitz.ingest.chunking.plugins.simple import SimpleChunker
 from fitz.ingest.ingestion.registry import get_ingest_plugin
 from fitz.ingest.validation.documents import ValidationConfig, validate
-from fitz.llm import get_llm_plugin
-from fitz.vector_db.writer import VectorDBWriter
+from fitz.engines.classic_rag.pipeline.context.pipeline import ContextPipeline
+from fitz.engines.classic_rag.retrieval.runtime.plugins.dense import DenseRetrievalPlugin
 
 COLLECTION_NAME = "fitz_demo"
 
@@ -110,12 +112,12 @@ def ingest_documents(test_dir: Path) -> None:
     # Step 4: Embed and store
     print("[4/4] Embedding and storing...")
 
-    # Get embedding plugin
+    # Get embedding plugin (from LLM registry)
     EmbeddingPlugin = get_llm_plugin(plugin_name="cohere", plugin_type="embedding")
     embedder = EmbeddingPlugin()
 
-    # Get vector DB plugin
-    VectorDBPlugin = get_llm_plugin(plugin_name="qdrant", plugin_type="vector_db")
+    # Get vector DB plugin (from vector_db registry - NOT llm registry!)
+    VectorDBPlugin = get_vector_db_plugin("qdrant")
     vector_client = VectorDBPlugin(host="localhost", port=6333)
 
     # Embed all chunks
@@ -145,7 +147,8 @@ def query_with_rag(query: str) -> None:
     EmbeddingPlugin = get_llm_plugin(plugin_name="cohere", plugin_type="embedding")
     embedder = EmbeddingPlugin()
 
-    VectorDBPlugin = get_llm_plugin(plugin_name="qdrant", plugin_type="vector_db")
+    # Use correct registry for vector DB
+    VectorDBPlugin = get_vector_db_plugin("qdrant")
     vector_client = VectorDBPlugin(host="localhost", port=6333)
 
     retriever = DenseRetrievalPlugin(

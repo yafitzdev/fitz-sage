@@ -1,13 +1,17 @@
-# fitz/core/vector_db/plugins/local.py
+# fitz/vector_db/plugins/local.py
+"""
+Local FAISS vector database plugin.
+
+This module re-exports FaissLocalVectorDB for plugin discovery.
+The actual implementation is in fitz.backends.local_vector_db.faiss.
+"""
 
 from fitz.backends.local_vector_db.faiss import FaissLocalVectorDB
 
+# Re-export for plugin discovery
+# The FaissLocalVectorDB class has:
+#   plugin_name = "local-faiss"
+#   plugin_type = "vector_db"
+# So it will be discovered automatically by the registry
 
-class LocalVectorDB(FaissLocalVectorDB):
-    """
-    Local FAISS-backed VectorDB plugin.
-
-    Registered under the name: `local-faiss`
-    """
-
-    name = "local-faiss"
+__all__ = ["FaissLocalVectorDB"]

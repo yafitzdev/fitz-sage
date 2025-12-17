@@ -1,25 +1,54 @@
-# core/vector_db/writer.py
+# fitz/vector_db/writer.py
+"""
+Vector database writer utilities.
+
+Converts Chunk objects + vectors into the standard points format
+that all vector database plugins accept.
+"""
+
 from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, List, Protocol, runtime_checkable
 
-from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import VECTOR_DB
 
 logger = get_logger(__name__)
 
 
-def compute_chunk_hash(chunk: Chunk) -> str:
-    """
-    Stable hash for a chunk, used for dedupe/upsert keys.
+# =============================================================================
+# Protocols
+# =============================================================================
 
-    Hash includes:
-    - doc_id
-    - chunk_index
-    - content
+@runtime_checkable
+class ChunkLike(Protocol):
+    """Protocol for chunk-like objects."""
+    id: str
+    doc_id: str
+    chunk_index: int
+    content: str
+    metadata: Dict[str, Any] | None
+
+
+@runtime_checkable
+class VectorDBClient(Protocol):
+    """Protocol for vector database clients."""
+
+    def upsert(self, collection: str, points: List[Dict[str, Any]]) -> None: ...
+
+
+# =============================================================================
+# Utility Functions
+# =============================================================================
+
+def compute_chunk_hash(chunk: ChunkLike) -> str:
+    """
+    Compute a stable hash for a chunk.
+
+    Hash includes doc_id, chunk_index, and content.
+    Useful for deduplication and change detection.
     """
     h = hashlib.sha256()
     h.update(chunk.doc_id.encode("utf-8"))
@@ -30,53 +59,95 @@ def compute_chunk_hash(chunk: Chunk) -> str:
     return h.hexdigest()
 
 
+def chunks_to_points(
+        chunks: Iterable[ChunkLike],
+        vectors: Iterable[List[float]],
+) -> List[Dict[str, Any]]:
+    """
+    Convert chunks and vectors to the standard points format.
+
+    This is the canonical transformation from (Chunk, vector) pairs
+    to the format all vector databases accept.
+
+    Args:
+        chunks: Iterable of chunk-like objects
+        vectors: Iterable of embedding vectors (same length as chunks)
+
+    Returns:
+        List of point dicts with 'id', 'vector', and 'payload' keys
+
+    Example:
+        >>> points = chunks_to_points(chunks, vectors)
+        >>> vdb.upsert("collection", points)
+    """
+    points = []
+
+    for chunk, vector in zip(chunks, vectors):
+        chunk_hash = compute_chunk_hash(chunk)
+
+        payload: Dict[str, Any] = {
+            "doc_id": chunk.doc_id,
+            "chunk_index": chunk.chunk_index,
+            "content": chunk.content,
+            "metadata": dict(chunk.metadata or {}),
+            "chunk_hash": chunk_hash,
+        }
+
+        points.append({
+            "id": chunk.id,
+            "vector": vector,
+            "payload": payload,
+        })
+
+    return points
+
+
+# =============================================================================
+# VectorDBWriter Class (for compatibility)
+# =============================================================================
+
 @dataclass
 class VectorDBWriter:
     """
-    Writes canonical Chunk objects into a Vector DB client/plugin.
+    Writes Chunk objects into a Vector DB client.
 
-    Payload contract (required by retrieval):
-    - doc_id: str
-    - chunk_index: int
-    - content: str
-    - metadata: dict
+    This is a thin wrapper that:
+    1. Converts chunks + vectors to points format
+    2. Delegates to the underlying client
+
+    The class exists for backwards compatibility and convenience.
+    For simple cases, you can use chunks_to_points() directly:
+
+        points = chunks_to_points(chunks, vectors)
+        vdb_client.upsert(collection, points)
+
+    Payload contract (what retrieval expects):
+        - doc_id: str
+        - chunk_index: int
+        - content: str
+        - metadata: dict
+        - chunk_hash: str (for deduplication)
     """
 
-    client: Any
+    client: VectorDBClient
 
     def upsert(
-        self,
-        collection: str,
-        chunks: Iterable[Chunk],
-        vectors: Iterable[list[float]],
+            self,
+            collection: str,
+            chunks: Iterable[ChunkLike],
+            vectors: Iterable[List[float]],
     ) -> None:
+        """
+        Upsert chunks with their vectors into the vector database.
+
+        Args:
+            collection: Target collection name
+            chunks: Chunk objects to store
+            vectors: Embedding vectors (must match chunks order/length)
+        """
         logger.info(f"{VECTOR_DB} Upserting chunks into collection='{collection}'")
 
-        points = []
+        points = chunks_to_points(chunks, vectors)
+        self.client.upsert(collection, points)
 
-        for chunk, vector in zip(chunks, vectors):
-            chunk_hash = compute_chunk_hash(chunk)
-
-            payload: Dict[str, Any] = {
-                "doc_id": chunk.doc_id,
-                "chunk_index": chunk.chunk_index,
-                "content": chunk.content,
-                "metadata": dict(chunk.metadata or {}),
-                "chunk_hash": chunk_hash,
-            }
-
-            points.append(
-                {
-                    "id": chunk.id,
-                    "vector": vector,
-                    "payload": payload,
-                }
-            )
-
-        # Delegate to underlying client.
-        # Vector DB plugins should adapt this to their backend.
-        if hasattr(self.client, "upsert"):
-            self.client.upsert(collection, points)
-            return
-
-        raise TypeError("VectorDBWriter client must expose an upsert(collection, points) method")
+        logger.debug(f"{VECTOR_DB} Upserted {len(points)} points")

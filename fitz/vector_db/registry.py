@@ -116,12 +116,15 @@ def _scan_package_best_effort(package_name: str) -> None:
 
 
 def _iter_plugin_classes(module: object) -> Iterable[type]:
-    """Iterate over plugin classes in a module."""
-    mod_name = getattr(module, "__name__", "")
+    """
+    Iterate over plugin classes in a module.
+
+    Note: We intentionally do NOT check __module__ because plugins
+    can be re-exported from other modules (e.g., FaissLocalVectorDB
+    is defined in backends but re-exported in vector_db.plugins.local).
+    """
     for obj in vars(module).values():
         if not isinstance(obj, type):
-            continue
-        if getattr(obj, "__module__", None) != mod_name:
             continue
 
         plugin_name = getattr(obj, "plugin_name", None)
