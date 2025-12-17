@@ -430,18 +430,3 @@ def available_chunking_plugins() -> List[str]:
     """List available chunking plugins."""
     return CHUNKING_REGISTRY.list_available()
 
-
-# =============================================================================
-# Backwards Compatibility Aliases
-# =============================================================================
-# These match the old function signatures so existing code doesn't break.
-
-
-def resolve_llm_plugin(*, plugin_type: str, requested_name: str) -> Type[Any]:
-    """Alias for get_llm_plugin (backwards compatibility)."""
-    return get_llm_plugin(plugin_name=requested_name, plugin_type=plugin_type)
-
-
-def resolve_vector_db_plugin(requested_name: str) -> Type[Any]:
-    """Alias for get_vector_db_plugin (backwards compatibility)."""
-    return get_vector_db_plugin(requested_name)

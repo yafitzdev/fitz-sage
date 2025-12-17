@@ -12,10 +12,15 @@ from typing import Optional
 
 import typer
 
-from fitz.llm.registry import available_llm_plugins
+from fitz.core.registry import (
+    get_ingest_plugin,
+    available_ingest_plugins,
+    available_embedding_plugins,
+    available_rerank_plugins,
+    get_embedding_plugin,
+    get_rerank_plugin,
+)
 from fitz.vector_db.registry import available_vector_db_plugins
-from fitz.ingest.ingestion.registry import REGISTRY as ingest_registry
-from fitz.ingest.ingestion.registry import _auto_discover as discover_ingest
 
 
 def command(
@@ -54,15 +59,15 @@ def command(
 
     # Ingestion plugins
     if show_all or type == "ingest":
-        discover_ingest()
         typer.echo()
         typer.echo("📄 Ingestion Plugins (document readers)")
         typer.echo("-" * 60)
-        if ingest_registry:
-            for name, cls in sorted(ingest_registry.items()):
+        ingest_plugins = available_ingest_plugins()
+        if ingest_plugins:
+            for name in ingest_plugins:
+                cls = get_ingest_plugin(name)
                 plugin_type = getattr(cls, "plugin_type", "N/A")
                 doc = cls.__doc__ or "No description"
-                # Get first line of docstring
                 desc = doc.strip().split("\n")[0]
                 typer.echo(f"  • {name:15} [{plugin_type}]")
                 typer.echo(f"    {desc}")
@@ -74,7 +79,7 @@ def command(
         typer.echo()
         typer.echo("🔢 Embedding Plugins (text → vectors)")
         typer.echo("-" * 60)
-        embedding_plugins = available_llm_plugins(plugin_type="embedding")
+        embedding_plugins = available_embedding_plugins()
         if embedding_plugins:
             for name in embedding_plugins:
                 typer.echo(f"  • {name}")
@@ -86,27 +91,23 @@ def command(
         typer.echo()
         typer.echo("🎯 Rerank Plugins (result scoring)")
         typer.echo("-" * 60)
-        rerank_plugins = available_llm_plugins(plugin_type="rerank")
+        rerank_plugins = available_rerank_plugins()
         if rerank_plugins:
             for name in rerank_plugins:
                 typer.echo(f"  • {name}")
         else:
             typer.echo("  (No rerank plugins found)")
 
-    # Vector DB plugins - use the correct registry!
+    # Vector DB plugins
     if show_all or type == "vector-db":
         typer.echo()
-        typer.echo("💾 Vector Database Plugins (storage)")
+        typer.echo("🗄️  Vector DB Plugins (storage)")
         typer.echo("-" * 60)
         vdb_plugins = available_vector_db_plugins()
         if vdb_plugins:
             for name in vdb_plugins:
                 typer.echo(f"  • {name}")
         else:
-            typer.echo("  (No vector database plugins found)")
+            typer.echo("  (No vector DB plugins found)")
 
-    typer.echo()
-    typer.echo("=" * 60)
-    typer.echo()
-    typer.echo("💡 Tip: Use these plugin names with --ingest-plugin, --embedding-plugin, etc.")
     typer.echo()
