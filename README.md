@@ -1,5 +1,5 @@
 # README.md
-# Fitz v0.3.0 - Multi-Engine Knowledge Platform
+# Fitz v0.3.1 - Multi-Engine Knowledge Platform
 
 **Fitz** is a modular knowledge engine platform that supports multiple retrieval-generation paradigms. Build RAG applications today, switch to CLaRa tomorrow, or create your own custom engine.
 
@@ -11,7 +11,7 @@
 
 ---
 
-## What's New in v0.3.0
+## What's New in v0.3.1
 
 - ✅ **Multi-Engine Architecture**: Pluggable engine system with standardized interfaces
 - ✅ **CLaRa Engine**: Apple's Continuous Latent Reasoning with 16x-128x document compression
