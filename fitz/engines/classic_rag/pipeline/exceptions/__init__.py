@@ -1,4 +1,4 @@
-from fitz.core.exceptions.llm import LLMError, LLMResponseError
+from fitz.engines.classic_rag.errors.llm import LLMError, LLMResponseError
 
 from .base import FitzRAGError
 from .config import ConfigError

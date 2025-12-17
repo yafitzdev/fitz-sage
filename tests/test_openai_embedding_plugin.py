@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -146,7 +146,7 @@ class TestOpenAIEmbeddingPlugin:
         """embed() raises EmbeddingError on API failure."""
         with patch.dict("os.environ", {"OPENAI_API_KEY": "key"}):
             with patch("fitz.core.llm.embedding.plugins.openai.OpenAI") as mock_openai:
-                from fitz.core.exceptions.llm import EmbeddingError
+                from fitz.engines.classic_rag.errors.llm import EmbeddingError
                 from fitz.core.llm.embedding.plugins.openai import OpenAIEmbeddingClient
 
                 mock_openai.return_value.embeddings.create.side_effect = Exception("API Error")
@@ -160,7 +160,7 @@ class TestOpenAIEmbeddingPlugin:
         """Plugin raises EmbeddingError when client init fails."""
         with patch.dict("os.environ", {"OPENAI_API_KEY": "key"}):
             with patch("fitz.core.llm.embedding.plugins.openai.OpenAI") as mock_openai:
-                from fitz.core.exceptions.llm import EmbeddingError
+                from fitz.engines.classic_rag.errors.llm import EmbeddingError
                 from fitz.core.llm.embedding.plugins.openai import OpenAIEmbeddingClient
 
                 mock_openai.side_effect = Exception("Connection failed")

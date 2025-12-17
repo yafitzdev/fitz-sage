@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, List, Protocol, runtime_checkable
 
-from fitz.core.exceptions.llm import EmbeddingError
+from fitz.engines.classic_rag.errors.llm import EmbeddingError
 from fitz.core.llm.embedding.engine import EmbeddingEngine
 from fitz.core.llm.rerank.engine import RerankEngine
 from fitz.core.logging.logger import get_logger

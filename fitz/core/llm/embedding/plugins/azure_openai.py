@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from fitz.core.exceptions.llm import EmbeddingError
+from fitz.engines.classic_rag.errors.llm import EmbeddingError
 
 try:
     from openai import AzureOpenAI

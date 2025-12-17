@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -184,7 +184,7 @@ class TestAzureOpenAIEmbeddingPlugin:
         }
         with patch.dict("os.environ", env):
             with patch("fitz.core.llm.embedding.plugins.azure_openai.AzureOpenAI") as mock_azure:
-                from fitz.core.exceptions.llm import EmbeddingError
+                from fitz.engines.classic_rag.errors.llm import EmbeddingError
                 from fitz.core.llm.embedding.plugins.azure_openai import (
                     AzureOpenAIEmbeddingClient,
                 )
