@@ -25,8 +25,10 @@ embedding:
 # Vector Database Configuration
 # =============================================================================
 vector_db:
-  plugin_name: local-faiss
-  kwargs: {}
+  plugin_name: qdrant
+  kwargs:
+    host: "192.168.178.2"
+    port: 6333
 
 # =============================================================================
 # Retriever Configuration
@@ -37,10 +39,10 @@ retriever:
   top_k: 5
 
 # =============================================================================
-# Reranker (disabled by default)
+# Reranker (improves retrieval quality)
 # =============================================================================
 rerank:
-  enabled: false
+  enabled: true
   plugin_name: cohere
   kwargs:
     model: rerank-english-v3.0
