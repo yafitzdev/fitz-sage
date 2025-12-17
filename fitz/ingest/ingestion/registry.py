@@ -1,61 +1,36 @@
-# ingest/ingestion/registry.py
-from __future__ import annotations
+# fitz/ingest/ingestion/registry.py
+"""
+Ingestion plugin registry.
 
-import importlib
-import pkgutil
-from typing import Dict, Iterable, Type
+This is a thin wrapper around fitz.core.registry.
+All the actual logic lives there - this file just provides
+backwards-compatible imports.
 
-from fitz.ingest.ingestion.base import IngestPlugin
+For new code, prefer importing directly from fitz.core.registry:
+    from fitz.core.registry import get_ingest_plugin, available_ingest_plugins
+"""
 
-REGISTRY: Dict[str, Type[IngestPlugin]] = {}
-_DISCOVERED = False
+from fitz.core.registry import (
+    # Main functions
+    get_ingest_plugin,
+    available_ingest_plugins,
+    # Registry (if needed for advanced use)
+    INGEST_REGISTRY,
+    # Errors
+    PluginRegistryError,
+    PluginNotFoundError,
+    DuplicatePluginError,
+)
 
+# Backwards compatibility - old name was REGISTRY
+REGISTRY = INGEST_REGISTRY._registry  # Direct access for legacy code
 
-def _iter_plugin_classes(module: object) -> Iterable[type]:
-    mod_name = getattr(module, "__name__", "")
-    for obj in vars(module).values():
-        if not isinstance(obj, type):
-            continue
-        if getattr(obj, "__module__", None) != mod_name:
-            continue
-
-        plugin_name = getattr(obj, "plugin_name", None)
-        if not isinstance(plugin_name, str) or not plugin_name:
-            continue
-
-        ingest_fn = getattr(obj, "ingest", None)
-        if not callable(ingest_fn):
-            continue
-
-        yield obj
-
-
-def _auto_discover() -> None:
-    global _DISCOVERED
-    if _DISCOVERED:
-        return
-
-    plugins_pkg = importlib.import_module("fitz.ingest.ingestion.plugins")
-
-    for module_info in pkgutil.iter_modules(plugins_pkg.__path__):
-        module = importlib.import_module(f"{plugins_pkg.__name__}.{module_info.name}")
-
-        for cls in _iter_plugin_classes(module):
-            name = getattr(cls, "plugin_name")
-            existing = REGISTRY.get(name)
-            if existing is not None and existing is not cls:
-                raise ValueError(
-                    f"Duplicate ingester plugin_name={name!r}: "
-                    f"{existing.__module__}.{existing.__name__} vs {cls.__module__}.{cls.__name__}"
-                )
-            REGISTRY[name] = cls  # type: ignore[assignment]
-
-    _DISCOVERED = True
-
-
-def get_ingest_plugin(name: str) -> Type[IngestPlugin]:
-    _auto_discover()
-    try:
-        return REGISTRY[name]
-    except KeyError as exc:
-        raise ValueError(f"Unknown ingester plugin: {name!r}") from exc
+__all__ = [
+    "get_ingest_plugin",
+    "available_ingest_plugins",
+    "INGEST_REGISTRY",
+    "REGISTRY",
+    "PluginRegistryError",
+    "PluginNotFoundError",
+    "DuplicatePluginError",
+]

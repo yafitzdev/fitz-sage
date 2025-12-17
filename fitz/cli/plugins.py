@@ -1,4 +1,9 @@
-"""Plugins command for Fitz CLI."""
+# fitz/cli/plugins.py
+"""
+Plugins command for Fitz CLI.
+
+Lists all discovered plugins across all registries.
+"""
 
 import typer
 
@@ -7,11 +12,15 @@ def command() -> None:
     """
     List all discovered plugins.
     """
-    from fitz.llm.registry import available_llm_plugins
+    from fitz.core.registry import (
+        available_llm_plugins,
+        available_vector_db_plugins,
+    )
 
     typer.echo()
 
-    def show(title: str, plugin_type: str):
+    def show_llm(title: str, plugin_type: str):
+        """Show LLM plugins (chat, embedding, rerank)."""
         typer.echo(f"{title}:")
         names = available_llm_plugins(plugin_type)
         if not names:
@@ -21,9 +30,21 @@ def command() -> None:
                 typer.echo(f"  - {name}")
         typer.echo()
 
-    show("LLM chat", "chat")
-    show("LLM embedding", "embedding")
-    show("LLM rerank", "rerank")
+    def show_vector_db(title: str):
+        """Show Vector DB plugins (separate registry)."""
+        typer.echo(f"{title}:")
+        names = available_vector_db_plugins()
+        if not names:
+            typer.echo("  (none)")
+        else:
+            for name in sorted(names):
+                typer.echo(f"  - {name}")
+        typer.echo()
 
-    # Vector DB plugins
-    show("Vector DB", "vector_db")
+    # LLM plugins
+    show_llm("LLM Chat", "chat")
+    show_llm("LLM Embedding", "embedding")
+    show_llm("LLM Rerank", "rerank")
+
+    # Vector DB plugins (separate registry!)
+    show_vector_db("Vector DB")

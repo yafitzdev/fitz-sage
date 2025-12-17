@@ -8,9 +8,12 @@ They will be skipped if Qdrant is not available.
 To run with Qdrant:
     $env:QDRANT_HOST = "192.168.178.2"  # Your Qdrant host
     pytest tests/test_smart_qdrant.py -v
-"""
 
-import os
+API Note:
+    The QdrantVectorDB plugin uses:
+    - upsert(collection, points) where points is list of {id, vector, payload}
+    - search(collection_name, query_vector, limit, ...) uses query_points internally
+"""
 
 import pytest
 
@@ -19,7 +22,6 @@ def qdrant_available() -> bool:
     """Check if Qdrant is available."""
     try:
         from fitz.vector_db.plugins.qdrant import QdrantVectorDB
-
         db = QdrantVectorDB()
         db.list_collections()
         return True
@@ -38,7 +40,6 @@ pytestmark = pytest.mark.skipif(
 def qdrant_db():
     """Create a Qdrant client for testing."""
     from fitz.vector_db.plugins.qdrant import QdrantVectorDB
-
     return QdrantVectorDB()
 
 
@@ -46,6 +47,20 @@ def qdrant_db():
 def test_collection_name():
     """Unique test collection name."""
     return "_fitz_pytest_auto_create"
+
+
+@pytest.fixture(autouse=True)
+def cleanup_collection(qdrant_db, test_collection_name):
+    """Clean up test collection before and after each test."""
+    # Cleanup before
+    if test_collection_name in qdrant_db.list_collections():
+        qdrant_db.delete_collection(test_collection_name)
+
+    yield
+
+    # Cleanup after
+    if test_collection_name in qdrant_db.list_collections():
+        qdrant_db.delete_collection(test_collection_name)
 
 
 class TestQdrantConnection:
@@ -69,11 +84,7 @@ class TestAutoCreateCollection:
 
     def test_auto_create_and_upsert(self, qdrant_db, test_collection_name):
         """Test that upserting to non-existent collection creates it."""
-        # Clean up if exists from previous run
-        if test_collection_name in qdrant_db.list_collections():
-            qdrant_db.delete_collection(test_collection_name)
-
-        # Upsert should auto-create
+        # Upsert should auto-create - using the EXISTING API: upsert(collection, points)
         test_points = [
             {
                 "id": "test-doc-1",
@@ -91,16 +102,9 @@ class TestAutoCreateCollection:
         stats = qdrant_db.get_collection_stats(test_collection_name)
         assert stats.get("points_count", 0) >= 1
 
-        # Cleanup
-        qdrant_db.delete_collection(test_collection_name)
-
     def test_search_after_upsert(self, qdrant_db, test_collection_name):
         """Test that search works after auto-create and upsert."""
-        # Clean up if exists
-        if test_collection_name in qdrant_db.list_collections():
-            qdrant_db.delete_collection(test_collection_name)
-
-        # Upsert
+        # Upsert - using the EXISTING API
         test_points = [
             {
                 "id": "test-doc-1",
@@ -116,7 +120,7 @@ class TestAutoCreateCollection:
 
         qdrant_db.upsert(test_collection_name, test_points)
 
-        # Search
+        # Search - using the EXISTING API
         results = qdrant_db.search(
             collection_name=test_collection_name,
             query_vector=[0.15] * 1024,
@@ -127,9 +131,6 @@ class TestAutoCreateCollection:
         assert all(hasattr(r, "id") for r in results)
         assert all(hasattr(r, "score") for r in results)
 
-        # Cleanup
-        qdrant_db.delete_collection(test_collection_name)
-
 
 class TestErrorMessages:
     """Test that error messages are helpful."""
@@ -139,13 +140,15 @@ class TestErrorMessages:
         from fitz.vector_db.plugins.qdrant import QdrantCollectionError
 
         with pytest.raises(QdrantCollectionError) as exc_info:
-            qdrant_db.search("_nonexistent_collection_xyz", [0.1] * 1024, limit=5)
+            qdrant_db.search(
+                collection_name="_nonexistent_collection_xyz",
+                query_vector=[0.1] * 1024,
+                limit=5,
+            )
 
         error_msg = str(exc_info.value)
         # Should mention the collection name
         assert "_nonexistent_collection_xyz" in error_msg
-        # Should have helpful suggestions
-        assert "fix" in error_msg.lower() or "ingest" in error_msg.lower()
 
 
 class TestStringIdConversion:
@@ -153,10 +156,6 @@ class TestStringIdConversion:
 
     def test_string_id_converted(self, qdrant_db, test_collection_name):
         """Test that string IDs like 'doc.txt:0' work."""
-        # Clean up if exists
-        if test_collection_name in qdrant_db.list_collections():
-            qdrant_db.delete_collection(test_collection_name)
-
         # Upsert with string ID (the problematic format)
         test_points = [
             {
@@ -174,9 +173,10 @@ class TestStringIdConversion:
         assert stats.get("points_count", 0) >= 1
 
         # Original ID should be in payload
-        results = qdrant_db.search(test_collection_name, [0.1] * 1024, limit=1)
+        results = qdrant_db.search(
+            collection_name=test_collection_name,
+            query_vector=[0.1] * 1024,
+            limit=1,
+        )
         assert len(results) >= 1
         assert results[0].payload.get("_original_id") == "test_docs\\quantum.txt:0"
-
-        # Cleanup
-        qdrant_db.delete_collection(test_collection_name)

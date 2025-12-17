@@ -3,7 +3,7 @@
 Smart Qdrant vector database plugin.
 
 Features:
-- AUTO-DETECTION: Automatically finds Qdrant on common addresses
+- Auto-detection of Qdrant server (uses fitz.core.detect)
 - Auto-creates collections when they don't exist
 - Auto-detects vector dimensions from first upsert
 - Auto-detects named vs unnamed vectors
@@ -22,9 +22,6 @@ from typing import Any, List, Optional
 
 from fitz.vector_db.base import SearchResult, VectorDBPlugin
 
-# Import centralized detection
-from fitz.core.detect import get_qdrant_connection, detect_qdrant
-
 logger = logging.getLogger(__name__)
 
 
@@ -41,31 +38,7 @@ class QdrantConnectionError(Exception):
         self.port = port
         self.original_error = original_error
 
-        # Get detection status for helpful message
-        status = detect_qdrant()
-
-        if status.available:
-            # Qdrant IS available somewhere else
-            message = f"""
-❌ Cannot connect to Qdrant at {host}:{port}
-
-However, Qdrant was detected at {status.host}:{status.port}!
-
-Quick fix - update your config or set environment variables:
-  export QDRANT_HOST={status.host}
-  export QDRANT_PORT={status.port}
-
-Or update your config.yaml:
-  vector_db:
-    plugin_name: qdrant
-    kwargs:
-      host: "{status.host}"
-      port: {status.port}
-
-Original error: {original_error}
-"""
-        else:
-            message = f"""
+        message = f"""
 ❌ Cannot connect to Qdrant at {host}:{port}
 
 Possible fixes:
@@ -95,6 +68,20 @@ def _string_to_uuid(s: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, s))
 
 
+def _get_env_or_default(env_var: str, default: Any) -> Any:
+    """Get environment variable with type coercion."""
+    value = os.getenv(env_var)
+    if value is None:
+        return default
+
+    # Coerce to same type as default
+    if isinstance(default, int):
+        return int(value)
+    if isinstance(default, bool):
+        return value.lower() in ("true", "1", "yes")
+    return value
+
+
 # =============================================================================
 # Smart Qdrant Plugin
 # =============================================================================
@@ -105,13 +92,8 @@ class QdrantVectorDB(VectorDBPlugin):
     """
     Smart Qdrant vector database plugin with auto-configuration.
 
-    Connection Resolution (in order):
-    1. Explicit host/port kwargs passed to constructor
-    2. QDRANT_HOST / QDRANT_PORT environment variables
-    3. Auto-detection of common addresses (localhost, Docker IPs, etc.)
-
     Environment variables:
-        QDRANT_HOST: Qdrant server hostname
+        QDRANT_HOST: Qdrant server hostname (default: localhost)
         QDRANT_PORT: Qdrant server port (default: 6333)
 
     Features:
@@ -122,21 +104,17 @@ class QdrantVectorDB(VectorDBPlugin):
         - Provides helpful error messages
 
     Usage:
-        # Auto-detect (recommended)
+        # Basic usage (uses env vars or defaults)
         db = QdrantVectorDB()
 
-        # Explicit configuration
+        # Custom configuration
         db = QdrantVectorDB(host="192.168.1.100", port=6333)
-
-        # From environment
-        # export QDRANT_HOST=192.168.178.2
-        db = QdrantVectorDB()
     """
 
     plugin_name: str = "qdrant"
     plugin_type: str = "vector_db"
 
-    # Connection settings - None means "auto-detect"
+    # Connection settings - None means "use env var or default"
     host: Optional[str] = None
     port: Optional[int] = None
 
@@ -147,7 +125,7 @@ class QdrantVectorDB(VectorDBPlugin):
     _resolved_port: int = field(init=False, repr=False, default=6333)
 
     def __post_init__(self) -> None:
-        """Initialize Qdrant client with auto-detection."""
+        """Initialize Qdrant client with connection validation."""
         try:
             from qdrant_client import QdrantClient
         except ImportError:
@@ -169,35 +147,27 @@ class QdrantVectorDB(VectorDBPlugin):
             raise QdrantConnectionError(self._resolved_host, self._resolved_port, e)
 
     def _resolve_connection(self) -> None:
-        """
-        Resolve connection parameters with priority:
-        1. Explicit kwargs (self.host, self.port)
-        2. Environment variables
-        3. Auto-detection
-        """
-        if self.host is not None and self.port is not None:
-            # Explicit configuration - use as-is
+        """Resolve connection parameters."""
+        # Use explicit params if provided
+        if self.host is not None:
             self._resolved_host = self.host
+        else:
+            self._resolved_host = _get_env_or_default("QDRANT_HOST", "localhost")
+
+        if self.port is not None:
             self._resolved_port = self.port
-            logger.debug(f"Using explicit Qdrant config: {self.host}:{self.port}")
-            return
+        else:
+            self._resolved_port = _get_env_or_default("QDRANT_PORT", 6333)
 
-        # Check environment variables
-        env_host = os.getenv("QDRANT_HOST")
-        env_port = os.getenv("QDRANT_PORT")
-
-        if env_host:
-            self._resolved_host = env_host
-            self._resolved_port = int(env_port) if env_port else 6333
-            logger.debug(f"Using Qdrant from env: {self._resolved_host}:{self._resolved_port}")
-            return
-
-        # Auto-detect
-        logger.debug("Auto-detecting Qdrant...")
-        detected_host, detected_port = get_qdrant_connection()
-        self._resolved_host = detected_host
-        self._resolved_port = detected_port
-        logger.debug(f"Auto-detected Qdrant: {self._resolved_host}:{self._resolved_port}")
+        # Try auto-detection if localhost doesn't work
+        if self._resolved_host == "localhost":
+            try:
+                from fitz.core.detect import get_qdrant_connection
+                detected_host, detected_port = get_qdrant_connection()
+                self._resolved_host = detected_host
+                self._resolved_port = detected_port
+            except ImportError:
+                pass  # fitz.core.detect not available yet
 
     # =========================================================================
     # Collection Management
@@ -210,137 +180,276 @@ class QdrantVectorDB(VectorDBPlugin):
 
         try:
             info = self._client.get_collection(collection_name)
-            self._collection_cache[collection_name] = {
-                "exists": True,
-                "vectors_config": info.config.params.vectors,
-            }
-            return self._collection_cache[collection_name]
-        except Exception:
-            return None
 
-    def _ensure_collection(self, collection_name: str, vector_dim: int) -> None:
-        """Create collection if it doesn't exist."""
-        from qdrant_client.models import Distance, VectorParams
+            # Parse vector config
+            vectors_config = info.config.params.vectors
 
-        info = self._get_collection_info(collection_name)
-        if info is not None:
-            return  # Already exists
+            # Detect if named or unnamed vectors
+            if hasattr(vectors_config, "size"):
+                # Unnamed vectors (simple config)
+                config = {
+                    "exists": True,
+                    "named_vectors": False,
+                    "vector_name": None,
+                    "size": vectors_config.size,
+                    "distance": str(vectors_config.distance),
+                }
+            else:
+                # Named vectors (dict-like config)
+                vector_names = (
+                    list(vectors_config.keys()) if hasattr(vectors_config, "keys") else []
+                )
+                if vector_names:
+                    first_name = vector_names[0]
+                    first_config = vectors_config[first_name]
+                    config = {
+                        "exists": True,
+                        "named_vectors": True,
+                        "vector_name": first_name,
+                        "vector_names": vector_names,
+                        "size": first_config.size,
+                        "distance": str(first_config.distance),
+                    }
+                else:
+                    config = {"exists": True, "named_vectors": False, "vector_name": None}
 
-        logger.info(f"Creating Qdrant collection '{collection_name}' with dim={vector_dim}")
+            self._collection_cache[collection_name] = config
+            return config
+
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "not found" in error_msg or "doesn't exist" in error_msg:
+                return None
+            raise
+
+    def _create_collection(self, collection_name: str, vector_size: int) -> None:
+        """Create a collection with the given vector size."""
+        from qdrant_client.http.models import Distance, VectorParams
+
+        logger.info(f"Auto-creating collection '{collection_name}' with dimension {vector_size}")
 
         self._client.create_collection(
             collection_name=collection_name,
             vectors_config=VectorParams(
-                size=vector_dim,
+                size=vector_size,
                 distance=Distance.COSINE,
             ),
         )
 
-        self._collection_cache[collection_name] = {
-            "exists": True,
-            "vectors_config": {"size": vector_dim},
-        }
+        # Invalidate cache
+        self._collection_cache.pop(collection_name, None)
+
+        logger.info(f"✓ Created collection '{collection_name}'")
+
+    def _ensure_collection(self, collection_name: str, vector_size: int) -> dict:
+        """Ensure collection exists, create if needed. Returns collection info."""
+        info = self._get_collection_info(collection_name)
+
+        if info is None:
+            # Collection doesn't exist - create it
+            self._create_collection(collection_name, vector_size)
+            # Clear cache to force refresh
+            self._collection_cache.pop(collection_name, None)
+            info = self._get_collection_info(collection_name)
+
+        # Validate vector dimensions match
+        if info and info.get("size") and info["size"] != vector_size:
+            raise QdrantCollectionError(
+                f"""
+❌ Vector dimension mismatch for collection '{collection_name}'
+
+Collection expects: {info['size']} dimensions
+You're sending:     {vector_size} dimensions
+
+Possible fixes:
+  1. Use a different collection name
+  2. Delete and recreate the collection:
+       curl -X DELETE "http://{self._resolved_host}:{self._resolved_port}/collections/{collection_name}"
+  3. Use an embedding model with {info['size']} dimensions
+"""
+            )
+
+        return info or {}
 
     # =========================================================================
-    # VectorDBPlugin Interface
+    # Core Operations
     # =========================================================================
-
-    def upsert(
-            self,
-            collection_name: str,
-            ids: List[str],
-            vectors: List[List[float]],
-            payloads: Optional[List[dict]] = None,
-    ) -> None:
-        """
-        Upsert vectors into collection.
-
-        Auto-creates collection if it doesn't exist.
-        Auto-converts string IDs to UUIDs.
-        """
-        from qdrant_client.models import PointStruct
-
-        if not vectors:
-            return
-
-        # Auto-create collection with detected dimension
-        vector_dim = len(vectors[0])
-        self._ensure_collection(collection_name, vector_dim)
-
-        # Build points
-        points = []
-        for i, (id_, vector) in enumerate(zip(ids, vectors)):
-            point_id = _string_to_uuid(id_)
-            payload = payloads[i] if payloads else {}
-            payload["_original_id"] = id_  # Preserve original ID
-
-            points.append(PointStruct(
-                id=point_id,
-                vector=vector,
-                payload=payload,
-            ))
-
-        self._client.upsert(
-            collection_name=collection_name,
-            points=points,
-        )
-
-        logger.debug(f"Upserted {len(points)} vectors to '{collection_name}'")
 
     def search(
             self,
             collection_name: str,
             query_vector: List[float],
             limit: int = 10,
+            with_payload: bool = True,
             **kwargs: Any,
     ) -> List[SearchResult]:
-        """Search for similar vectors."""
-        try:
-            results = self._client.search(
-                collection_name=collection_name,
-                query_vector=query_vector,
-                limit=limit,
-                **kwargs,
+        """
+        Search for similar vectors in a collection.
+
+        Uses query_points API (qdrant-client >= 1.7).
+        Automatically handles named vs unnamed vectors.
+        """
+        info = self._get_collection_info(collection_name)
+
+        if info is None:
+            raise QdrantCollectionError(
+                f"""
+❌ Collection '{collection_name}' not found
+
+To fix:
+  1. Ingest documents first:
+       fitz-ingest run ./your_docs --collection {collection_name}
+
+  2. Or check available collections:
+       curl http://{self._resolved_host}:{self._resolved_port}/collections
+"""
             )
+
+        try:
+            # Use query_points (qdrant-client >= 1.7) - NOT the deprecated search()
+            if info.get("named_vectors") and info.get("vector_name"):
+                # Named vectors - use 'using' parameter
+                result = self._client.query_points(
+                    collection_name=collection_name,
+                    query=query_vector,
+                    using=info["vector_name"],
+                    limit=limit,
+                    with_payload=with_payload,
+                )
+            else:
+                # Unnamed vectors
+                result = self._client.query_points(
+                    collection_name=collection_name,
+                    query=query_vector,
+                    limit=limit,
+                    with_payload=with_payload,
+                )
+
+            return [
+                SearchResult(
+                    id=str(point.id),
+                    score=point.score,
+                    payload=point.payload or {},
+                )
+                for point in result.points
+            ]
+
         except Exception as e:
-            if "not found" in str(e).lower():
-                logger.warning(f"Collection '{collection_name}' not found")
-                return []
+            error_msg = str(e).lower()
+
+            if "vector name" in error_msg:
+                raise QdrantCollectionError(
+                    f"""
+❌ Vector name mismatch for collection '{collection_name}'
+
+Collection vector names: {info.get('vector_names', ['unknown'])}
+
+Try recreating the collection:
+  curl -X DELETE "http://{self._resolved_host}:{self._resolved_port}/collections/{collection_name}"
+  fitz-ingest run ./your_docs --collection {collection_name}
+"""
+                )
             raise
 
-        return [
-            SearchResult(
-                id=str(hit.id),
-                score=hit.score,
-                payload=hit.payload or {},
+    def upsert(self, collection: str, points: List[dict[str, Any]]) -> None:
+        """
+        Upsert points into a collection.
+
+        Args:
+            collection: Collection name
+            points: List of {id, vector, payload} dicts
+
+        Automatically handles:
+        - Collection creation if missing
+        - String ID to UUID conversion
+        - Named vs unnamed vectors
+        """
+        if not points:
+            logger.warning("upsert called with empty points list")
+            return
+
+        from qdrant_client.http.models import PointStruct
+
+        # Get vector dimension from first point
+        first_vector = points[0].get("vector", [])
+        vector_size = len(first_vector)
+
+        # Ensure collection exists (auto-create if needed)
+        info = self._ensure_collection(collection, vector_size)
+
+        # Build Qdrant points
+        q_points = []
+        for p in points:
+            original_id = p["id"]
+
+            # Convert string ID to UUID (Qdrant requires UUID or int)
+            if isinstance(original_id, str):
+                qdrant_id = _string_to_uuid(original_id)
+            else:
+                qdrant_id = original_id
+
+            # Store original ID in payload for reference
+            payload = p.get("payload", {}) or {}
+            payload["_original_id"] = original_id
+
+            # Handle vector format (named vs unnamed)
+            vector = p["vector"]
+            if info.get("named_vectors") and info.get("vector_name"):
+                vector = {info["vector_name"]: vector}
+
+            q_points.append(
+                PointStruct(
+                    id=qdrant_id,
+                    vector=vector,
+                    payload=payload,
+                )
             )
-            for hit in results
-        ]
 
-    def delete(self, collection_name: str, ids: List[str]) -> None:
-        """Delete vectors by ID."""
-        from qdrant_client.models import PointIdsList
+        # Perform upsert
+        self._client.upsert(collection_name=collection, points=q_points)
+        logger.info(f"Upserted {len(q_points)} points to collection '{collection}'")
 
-        point_ids = [_string_to_uuid(id_) for id_ in ids]
-
-        self._client.delete(
-            collection_name=collection_name,
-            points_selector=PointIdsList(points=point_ids),
-        )
-
-    def get_collection_info(self, collection_name: str) -> dict:
-        """Get collection information."""
-        try:
-            info = self._client.get_collection(collection_name)
-            return {
-                "name": collection_name,
-                "vectors_count": info.vectors_count,
-                "points_count": info.points_count,
-            }
-        except Exception:
-            return {"name": collection_name, "exists": False}
+    # =========================================================================
+    # Utility Methods
+    # =========================================================================
 
     def list_collections(self) -> List[str]:
         """List all collections."""
-        collections = self._client.get_collections()
-        return [c.name for c in collections.collections]
+        result = self._client.get_collections()
+        return [c.name for c in result.collections]
+
+    def delete_collection(self, collection_name: str) -> bool:
+        """Delete a collection. Returns True if deleted, False if didn't exist."""
+        try:
+            self._client.delete_collection(collection_name)
+            self._collection_cache.pop(collection_name, None)
+            logger.info(f"Deleted collection '{collection_name}'")
+            return True
+        except Exception as e:
+            if "not found" in str(e).lower():
+                return False
+            raise
+
+    def get_collection_stats(self, collection_name: str) -> dict:
+        """Get statistics about a collection."""
+        try:
+            info = self._client.get_collection(collection_name)
+
+            # Handle different qdrant-client versions
+            # Newer versions use info.points_count, older had vectors_count
+            points_count = getattr(info, 'points_count', 0)
+            vectors_count = getattr(info, 'vectors_count', points_count)
+            indexed_count = getattr(info, 'indexed_vectors_count', 0)
+
+            return {
+                "name": collection_name,
+                "points_count": points_count,
+                "vectors_count": vectors_count,
+                "indexed_vectors_count": indexed_count,
+                "status": str(info.status),
+                "exists": True,
+            }
+        except Exception as e:
+            if "not found" in str(e).lower():
+                return {"name": collection_name, "exists": False}
+            raise
