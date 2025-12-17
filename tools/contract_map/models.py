@@ -103,11 +103,13 @@ def extract_protocol_methods(proto_cls: Type[Any]) -> List[MethodContract]:
 
 def extract_models(cm: ContractMap, *, verbose: bool) -> None:
     """Extract all models from the codebase."""
+    # Updated paths to match actual project structure
     model_modules = [
+        # Engine models (classic_rag)
         "fitz.engines.classic_rag.config.schema",
         "fitz.engines.classic_rag.models.chunk",
         "fitz.engines.classic_rag.models.document",
-        "fitz.engines.classic_rag.pipeline.config.schema",
+        # Ingest models
         "fitz.ingest.config.schema",
         "fitz.ingest.ingestion.base",
     ]
@@ -144,13 +146,18 @@ def extract_models(cm: ContractMap, *, verbose: bool) -> None:
 
 def extract_protocols(cm: ContractMap, *, verbose: bool) -> None:
     """Extract all protocols from the codebase."""
+    # Updated paths to match actual project structure
     protocol_modules = [
+        # LLM protocols
         "fitz.llm.chat.base",
         "fitz.llm.embedding.base",
         "fitz.llm.rerank.base",
+        # Vector DB protocols
         "fitz.vector_db.base",
+        # Engine protocols (classic_rag)
         "fitz.engines.classic_rag.retrieval.runtime.base",
         "fitz.engines.classic_rag.pipeline.pipeline.base",
+        # Ingest protocols
         "fitz.ingest.chunking.base",
         "fitz.ingest.ingestion.base",
     ]

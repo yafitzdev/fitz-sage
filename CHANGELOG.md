@@ -15,6 +15,37 @@ Fitz has been fundamentally restructured from a RAG framework into an engine pla
 
 ### ✨ Added
 
+#### Developer Experience
+- **`fitz init` Setup Wizard**: Interactive configuration with auto-detection
+  - Detects available LLM providers (API keys, Ollama)
+  - Detects vector databases (Qdrant, FAISS)
+  - Generates working config automatically
+  - Auto-selects when only one option available
+  
+- **`fitz doctor` Diagnostics**: Comprehensive health checks
+  - Python version and dependencies
+  - API key validation
+  - Service connectivity (Qdrant, Ollama)
+  - Configuration validation
+
+- **Smart Qdrant Plugin**: Production-ready vector DB integration
+  - Auto-creates collections on first upsert
+  - Auto-detects vector dimensions
+  - Handles named vs unnamed vectors automatically
+  - Converts string IDs to UUIDs
+  - Environment variable configuration (QDRANT_HOST, QDRANT_PORT)
+
+- **Friendly Error Handler**: User-friendly error messages
+  - Pattern matching for common errors
+  - Actionable fix suggestions
+  - Debug mode (FITZ_DEBUG=1) for full tracebacks
+
+- **Progress Bars**: Rich progress display for ingestion
+  - Real-time embedding progress
+  - Batch writing progress
+  - Time estimates
+  - Quiet mode (-q) for scripts
+
 #### Core Abstractions
 - **New `fitz.core` package** with paradigm-agnostic contracts:
   - `KnowledgeEngine` protocol - The single stable abstraction all engines implement
@@ -49,6 +80,10 @@ Fitz has been fundamentally restructured from a RAG framework into an engine pla
   - `fitz.ingest/` - Document ingestion
 
 ### 🔄 Changed
+
+- Cohere chat plugin now uses correct v1 API format
+- Updated default model to `command-r-08-2024` (command-r-plus deprecated)
+- Config now saves to correct locations automatically
 
 #### Import Paths (BREAKING)
 All import paths have changed to reflect the new architecture:
@@ -131,6 +166,9 @@ fitz/
 - Resolved circular dependency issues
 - Fixed double-nesting of modules
 - Corrected model location inconsistencies
+- Qdrant point ID format (string → UUID conversion)
+- UTF-16 file encoding detection in local filesystem plugin
+- Named vector configuration handling
 
 ### 📚 Documentation
 - **New**: Architecture overview in README

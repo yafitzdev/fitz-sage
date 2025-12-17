@@ -137,8 +137,10 @@ def extract_llm_registry(
 
 def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     """Extract all registries from the codebase."""
+    # LLM registry (central)
     cm.registries.extend(extract_llm_registry(cm, "fitz.llm.registry", verbose=verbose))
 
+    # Retriever registry - updated path for engines structure
     rr = extract_registry_plugins(
         cm,
         "fitz.engines.classic_rag.retrieval.runtime.registry",
@@ -150,6 +152,7 @@ def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     if rr:
         cm.registries.append(rr)
 
+    # Chunker registry
     cr = extract_registry_plugins(
         cm,
         "fitz.ingest.chunking.registry",
@@ -161,6 +164,7 @@ def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     if cr:
         cm.registries.append(cr)
 
+    # Ingestion registry
     ir = extract_registry_plugins(
         cm,
         "fitz.ingest.ingestion.registry",
@@ -172,6 +176,7 @@ def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     if ir:
         cm.registries.append(ir)
 
+    # Pipeline registry - updated path for engines structure
     pr = extract_pipeline_registry(
         cm,
         "fitz.engines.classic_rag.pipeline.pipeline.registry",
@@ -193,25 +198,11 @@ def render_registries_section(cm: ContractMap) -> str:
         lines.append(f"### `{r.module}.{r.name}`")
         if r.note:
             lines.append(f"- {r.note}")
-        if not r.plugins:
-            lines.append("- (no plugins found)")
-            lines.append("")
-            continue
-        for name in r.plugins:
-            lines.append(f"- `{name}`")
+        if r.plugins:
+            for p in r.plugins:
+                lines.append(f"- `{p}`")
+        else:
+            lines.append("- (empty)")
         lines.append("")
 
     return "\n".join(lines)
-
-
-if __name__ == "__main__":
-    from .common import ContractMap
-
-    cm = ContractMap(meta={"test": "registries_extraction"})
-
-    print("Extracting registries...")
-    extract_registries(cm, verbose=True)
-    print(f"Found {len(cm.registries)} registries")
-
-    print("\n" + "=" * 80)
-    print(render_registries_section(cm))

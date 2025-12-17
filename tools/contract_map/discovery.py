@@ -20,7 +20,7 @@ def _simple_plugin_id(cls: type) -> str:
 
 
 PLUGIN_PREDICATES: Dict[str, PluginPredicate] = {
-    # --- core LLM ---
+    # --- LLM plugins (new fitz.llm.* paths) ---
     "fitz.llm.chat.plugins": (
         lambda cls: (
             isinstance(cls, type)
@@ -48,7 +48,7 @@ PLUGIN_PREDICATES: Dict[str, PluginPredicate] = {
         ),
         _simple_plugin_id,
     ),
-    # --- vector DB ---
+    # --- vector DB (new fitz.vector_db.* path) ---
     "fitz.vector_db.plugins": (
         lambda cls: (
             isinstance(getattr(cls, "plugin_name", None), str)
@@ -57,7 +57,7 @@ PLUGIN_PREDICATES: Dict[str, PluginPredicate] = {
         ),
         _simple_plugin_id,
     ),
-    # --- retrieval (runtime only by design) ---
+    # --- retrieval (under engines/classic_rag) ---
     "fitz.engines.classic_rag.retrieval.runtime.plugins": (
         lambda cls: (
             isinstance(getattr(cls, "plugin_name", None), str)
@@ -65,7 +65,7 @@ PLUGIN_PREDICATES: Dict[str, PluginPredicate] = {
         ),
         _simple_plugin_id,
     ),
-    # --- pipeline ---
+    # --- pipeline (under engines/classic_rag) ---
     "fitz.engines.classic_rag.pipeline.pipeline.plugins": (
         lambda cls: (
             isinstance(getattr(cls, "plugin_name", None), str)
@@ -173,60 +173,47 @@ def scan_all_discoveries() -> List[DiscoveryReport]:
     """Scan all declared plugin namespaces."""
     return [
         scan_discovery("fitz.llm.chat.plugins", "LLM chat plugins (Option A discovery)"),
-        scan_discovery(
-            "fitz.llm.embedding.plugins", "LLM embedding plugins (Option A discovery)"
-        ),
+        scan_discovery("fitz.llm.embedding.plugins", "LLM embedding plugins (Option A discovery)"),
         scan_discovery("fitz.llm.rerank.plugins", "LLM rerank plugins (Option A discovery)"),
         scan_discovery("fitz.vector_db.plugins", "Vector DB plugins (Option A discovery)"),
         scan_discovery(
-            "fitz.engines.classic_rag.retrieval.runtime.plugins", "RAG retriever plugins (Option A discovery)"
+            "fitz.engines.classic_rag.retrieval.runtime.plugins",
+            "RAG retriever plugins (Option A discovery)",
         ),
         scan_discovery(
-            "fitz.engines.classic_rag.pipeline.pipeline.plugins", "RAG pipeline plugins (Option A discovery)"
+            "fitz.engines.classic_rag.pipeline.pipeline.plugins",
+            "RAG pipeline plugins (Option A discovery)",
         ),
-        scan_discovery(
-            "fitz.ingest.chunking.plugins", "Ingest chunking plugins (Option A discovery)"
-        ),
-        scan_discovery(
-            "fitz.ingest.ingestion.plugins", "Ingest ingestion plugins (Option A discovery)"
-        ),
+        scan_discovery("fitz.ingest.chunking.plugins", "Ingest chunking plugins (Option A discovery)"),
+        scan_discovery("fitz.ingest.ingestion.plugins", "Ingest ingestion plugins (Option A discovery)"),
     ]
 
 
-def render_discovery_section(discovery: List[DiscoveryReport]) -> str:
+def render_discovery_section(reports: List[DiscoveryReport]) -> str:
     """Render the Discovery Report section."""
     lines = ["## Discovery Report"]
 
-    for rep in discovery:
-        lines.append(f"### `{rep.namespace}`")
-        lines.append(f"- {rep.note}")
-        lines.append(f"- modules_scanned: `{rep.modules_scanned}`")
+    for r in reports:
+        lines.append(f"### `{r.namespace}`")
+        if r.note:
+            lines.append(f"- {r.note}")
+        lines.append(f"- modules_scanned: `{r.modules_scanned}`")
 
-        for d in rep.duplicates:
-            lines.append(f"- **ERROR** duplicate: {d}")
-
-        for f in rep.failures[:10]:
-            lines.append(f"- **WARN** import failure: {f}")
-        if len(rep.failures) > 10:
-            lines.append(f"- **WARN** ... {len(rep.failures) - 10} more failures omitted")
-
-        if rep.plugins_found:
+        if r.plugins_found:
             lines.append("- plugins:")
-            for p in rep.plugins_found:
+            for p in r.plugins_found:
                 lines.append(f"  - `{p}`")
-        else:
-            lines.append("- plugins: (none)")
+
+        if r.failures:
+            lines.append("- failures:")
+            for f in r.failures:
+                lines.append(f"  - `{f}`")
+
+        if r.duplicates:
+            lines.append("- duplicates:")
+            for d in r.duplicates:
+                lines.append(f"  - `{d}`")
+
         lines.append("")
 
     return "\n".join(lines)
-
-
-if __name__ == "__main__":
-    print("Running plugin discovery...")
-    reports = scan_all_discoveries()
-
-    total_plugins = sum(len(r.plugins_found) for r in reports)
-    print(f"Found {total_plugins} plugins across {len(reports)} namespaces")
-
-    print("\n" + "=" * 80)
-    print(render_discovery_section(reports))
