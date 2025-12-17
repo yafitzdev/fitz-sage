@@ -10,7 +10,7 @@ import numpy as np
 
 from fitz.core.logging.logger import get_logger
 from fitz.core.logging.tags import VECTOR_DB
-from fitz.core.models.chunk import Chunk
+from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.core.vector_db.base import SearchResult
 
 from .config import LocalVectorDBConfig

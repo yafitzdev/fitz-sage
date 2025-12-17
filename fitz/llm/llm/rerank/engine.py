@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import List
 
 from fitz.core.llm.rerank.base import RerankPlugin
-from fitz.core.models.chunk import Chunk
+from fitz.engines.classic_rag.models.chunk import Chunk
 
 
 class RerankEngine:

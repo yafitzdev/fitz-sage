@@ -316,13 +316,14 @@ from typing import Any
 from pydantic import BaseModel
 
 # Local imports (absolute)
-from fitz.core.models.chunk import Chunk
+from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.core.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
 # Constants
 DEFAULT_VALUE = 10
+
 
 # Classes/Functions
 class MyClass:

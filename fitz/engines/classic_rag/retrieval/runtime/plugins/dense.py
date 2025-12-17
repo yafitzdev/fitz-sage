@@ -9,7 +9,7 @@ from fitz.core.llm.embedding.engine import EmbeddingEngine
 from fitz.core.llm.rerank.engine import RerankEngine
 from fitz.core.logging.logger import get_logger
 from fitz.core.logging.tags import RETRIEVER
-from fitz.core.models.chunk import Chunk
+from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.retrieval.exceptions.base import RerankError, VectorSearchError
 from fitz.retrieval.runtime.base import RetrievalPlugin
 

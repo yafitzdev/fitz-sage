@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from fitz.core.models.chunk import Chunk
+from fitz.engines.classic_rag.models.chunk import Chunk
 
 
 @runtime_checkable

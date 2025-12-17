@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from fitz.core.models.chunk import Chunk
+from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.core.vector_db.writer import VectorDBWriter
 from fitz.generation.retrieval_guided.synthesis import RGS, RGSConfig
 from fitz.pipeline.context.pipeline import ContextPipeline

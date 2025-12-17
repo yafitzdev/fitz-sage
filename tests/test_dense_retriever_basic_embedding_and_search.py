@@ -1,7 +1,7 @@
 # tests/test_dense_retriever_basic_embedding_and_search.py
 from dataclasses import dataclass
 
-from fitz.core.models.chunk import Chunk
+from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.retrieval.runtime.plugins.dense import DenseRetrievalPlugin
 
 

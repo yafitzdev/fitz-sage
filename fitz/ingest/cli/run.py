@@ -16,7 +16,7 @@ from fitz.core.llm.embedding.engine import EmbeddingEngine
 from fitz.core.llm.registry import get_llm_plugin
 from fitz.core.logging.logger import get_logger
 from fitz.core.logging.tags import CHUNKING, CLI, EMBEDDING, INGEST, VECTOR_DB
-from fitz.core.models.chunk import Chunk
+from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.core.vector_db.registry import get_vector_db_plugin
 from fitz.core.vector_db.writer import VectorDBWriter
 from fitz.ingest.ingestion.engine import IngestionEngine

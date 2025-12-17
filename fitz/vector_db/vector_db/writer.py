@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable
 
 from fitz.core.logging.logger import get_logger
 from fitz.core.logging.tags import VECTOR_DB
-from fitz.core.models.chunk import Chunk
+from fitz.engines.classic_rag.models.chunk import Chunk
 
 logger = get_logger(__name__)
 

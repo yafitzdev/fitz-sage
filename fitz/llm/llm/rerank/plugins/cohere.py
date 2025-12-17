@@ -8,7 +8,7 @@ try:
 except ImportError:
     httpx = None  # type: ignore
 
-from fitz.core.models.chunk import Chunk
+from fitz.engines.classic_rag.models.chunk import Chunk
 
 
 class CohereRerankClient:

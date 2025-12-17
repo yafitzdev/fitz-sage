@@ -9,7 +9,7 @@ pytest.importorskip("faiss")
 
 from fitz.backends.local_vector_db.config import LocalVectorDBConfig
 from fitz.backends.local_vector_db.faiss import FaissLocalVectorDB
-from fitz.core.models.chunk import Chunk
+from fitz.engines.classic_rag.models.chunk import Chunk
 
 
 def _make_chunk(i: int, dim: int) -> Chunk:
