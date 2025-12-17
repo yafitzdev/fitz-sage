@@ -2,37 +2,43 @@
 """
 Vector DB plugin registry.
 
-This is a thin wrapper around fitz.core.registry.
-All the actual logic lives there - this file just provides
-backwards-compatible imports.
+Handles discovery and registration of vector database plugins.
+Separate from LLM registry for cleaner architecture.
 
-For new code, prefer importing directly from fitz.core.registry:
-    from fitz.core.registry import get_vector_db_plugin, available_vector_db_plugins
+Design principle: NO SILENT FALLBACK
+- If user configures "qdrant", they get qdrant or an error
+- If user wants local-faiss, they explicitly configure "local-faiss"
+- No magic substitution that could cause confusion
 """
+from __future__ import annotations
+
+from typing import Any, Type, TYPE_CHECKING
 
 from fitz.core.registry import (
-    # Main functions
+    # Functions
     get_vector_db_plugin,
     available_vector_db_plugins,
     resolve_vector_db_plugin,
-    # Registry (if needed for advanced use)
+    # Registry
     VECTOR_DB_REGISTRY,
     # Errors
+    VectorDBRegistryError,
     PluginRegistryError,
     PluginNotFoundError,
-    DuplicatePluginError,
 )
 
-# Backwards compatibility alias
-VectorDBRegistryError = PluginRegistryError
+if TYPE_CHECKING:
+    from fitz.vector_db.base import VectorDBPlugin
 
 __all__ = [
+    # Functions
     "get_vector_db_plugin",
     "available_vector_db_plugins",
     "resolve_vector_db_plugin",
+    # Registry
     "VECTOR_DB_REGISTRY",
+    # Errors
+    "VectorDBRegistryError",
     "PluginRegistryError",
     "PluginNotFoundError",
-    "DuplicatePluginError",
-    "VectorDBRegistryError",
 ]

@@ -1,42 +1,56 @@
 # fitz/llm/registry.py
 """
-LLM plugin registry.
+Central LLM plugin registry.
 
-This is a thin wrapper around fitz.core.registry.
-All the actual logic lives there - this file just provides
-backwards-compatible imports.
+Handles discovery and registration of:
+- chat plugins
+- embedding plugins
+- rerank plugins
 
-For new code, prefer importing directly from fitz.core.registry:
-    from fitz.core.registry import get_llm_plugin, available_llm_plugins
+Note: vector_db plugins have their own separate registry at fitz.vector_db.registry
+
+Design principle: NO SILENT FALLBACK
+- If user configures "cohere", they get cohere or an error
+- If user wants local, they explicitly configure "local"
+- No magic substitution that could cause confusion
 """
+from __future__ import annotations
+
+from typing import Any, Type
 
 from fitz.core.registry import (
-    # Main functions
+    # Functions
     get_llm_plugin,
     available_llm_plugins,
     resolve_llm_plugin,
-    # Registries (if needed for advanced use)
+    # Registries
+    LLM_REGISTRY,
     CHAT_REGISTRY,
     EMBEDDING_REGISTRY,
     RERANK_REGISTRY,
     # Errors
+    LLMRegistryError,
     PluginRegistryError,
     PluginNotFoundError,
-    DuplicatePluginError,
 )
 
-# Backwards compatibility alias
-LLMRegistryError = PluginRegistryError
+# Type alias for backwards compat
+LLMPluginType = str  # "chat" | "embedding" | "rerank"
 
 __all__ = [
+    # Functions
     "get_llm_plugin",
     "available_llm_plugins",
     "resolve_llm_plugin",
+    # Registries
+    "LLM_REGISTRY",
     "CHAT_REGISTRY",
     "EMBEDDING_REGISTRY",
     "RERANK_REGISTRY",
+    # Errors
+    "LLMRegistryError",
     "PluginRegistryError",
     "PluginNotFoundError",
-    "DuplicatePluginError",
-    "LLMRegistryError",
+    # Types
+    "LLMPluginType",
 ]

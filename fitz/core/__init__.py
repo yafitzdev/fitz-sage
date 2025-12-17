@@ -33,7 +33,7 @@ Examples:
     >>> print(answer.text)
     >>> for source in answer.provenance:
     ...     print(f"Source: {source.source_id}")
-    
+
     Using FitzPaths:
     >>> from fitz.core import FitzPaths
     >>> config_path = FitzPaths.config()

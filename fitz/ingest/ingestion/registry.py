@@ -1,9 +1,6 @@
 # fitz/ingest/ingestion/registry.py
-"""
-Ingestion plugin registry.
-
-Thin wrapper around fitz.core.registry.
-"""
+"""Ingestion plugin registry."""
+from __future__ import annotations
 
 from fitz.core.registry import (
     get_ingest_plugin,
@@ -11,7 +8,6 @@ from fitz.core.registry import (
     INGEST_REGISTRY,
     PluginRegistryError,
     PluginNotFoundError,
-    DuplicatePluginError,
 )
 
 __all__ = [
@@ -20,5 +16,4 @@ __all__ = [
     "INGEST_REGISTRY",
     "PluginRegistryError",
     "PluginNotFoundError",
-    "DuplicatePluginError",
 ]

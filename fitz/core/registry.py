@@ -2,40 +2,17 @@
 """
 Centralized Plugin Registry System.
 
-This module provides a generic, reusable plugin registry that eliminates
-code duplication across the codebase. Previously, we had 5+ nearly identical
-registry implementations:
-- fitz/llm/registry.py
-- fitz/vector_db/registry.py
-- fitz/ingest/ingestion/registry.py
-- fitz/ingest/chunking/registry.py
-- fitz/engines/classic_rag/retrieval/runtime/registry.py
-- fitz/engines/classic_rag/pipeline/pipeline/registry.py
+Single implementation of plugin registry logic used by all plugin types:
+- LLM (chat, embedding, rerank)
+- Vector DB
+- Ingest
+- Chunking
+- Retriever
+- Pipeline
 
-Now there's ONE registry implementation that all can use.
-
-Usage:
-    # Create a registry for your plugin type
-    from fitz.core.registry import PluginRegistry
-
-    chat_registry = PluginRegistry(
-        name="chat",
-        required_attrs=["plugin_name", "plugin_type"],
-        required_method="chat",
-        scan_packages=["fitz.llm.chat.plugins"],
-    )
-
-    # Get a plugin
-    plugin_cls = chat_registry.get("cohere")
-
-    # List available plugins
-    available = chat_registry.list_available()
-
-Design Principles:
-    - NO SILENT FALLBACK: If you ask for "cohere", you get cohere or an error
-    - Lazy discovery: Plugins are discovered on first access
-    - Duplicate detection: Raises error if same plugin_name registered twice
-    - Clear error messages: Tells you what's available when lookup fails
+Design principle: NO SILENT FALLBACK
+- If you ask for "cohere", you get cohere or an error
+- No magic substitution
 """
 
 from __future__ import annotations
@@ -44,15 +21,27 @@ import importlib
 import logging
 import pkgutil
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Generic, Iterable, List, Optional, Type, TypeVar
+from typing import Any, Dict, Iterable, List, Type, TypeVar
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
 
+# =============================================================================
+# Exceptions
+# =============================================================================
+
 class PluginRegistryError(Exception):
-    """Raised when plugin lookup or registration fails."""
+    """Base error for plugin registry operations."""
+    pass
+
+
+class PluginNotFoundError(PluginRegistryError, ValueError):
+    """Raised when requested plugin doesn't exist.
+
+    Inherits from ValueError for backwards compatibility.
+    """
     pass
 
 
@@ -61,329 +50,270 @@ class DuplicatePluginError(PluginRegistryError):
     pass
 
 
-class PluginNotFoundError(PluginRegistryError):
-    """Raised when requested plugin doesn't exist."""
+# Specific error classes for backwards compat
+class LLMRegistryError(PluginRegistryError):
+    """Error from LLM registry."""
     pass
 
 
+class VectorDBRegistryError(PluginRegistryError):
+    """Error from Vector DB registry."""
+    pass
+
+
+# =============================================================================
+# Generic Plugin Registry
+# =============================================================================
+
 @dataclass
-class PluginRegistry(Generic[T]):
+class PluginRegistry:
     """
-    Generic plugin registry with auto-discovery.
+    Generic plugin registry with lazy auto-discovery.
 
-    This is the SINGLE implementation of plugin registry logic.
-    All plugin types (chat, embedding, vector_db, etc.) use this.
-
-    Attributes:
-        name: Human-readable name for this registry (for error messages)
-        required_attrs: Class attributes that must exist (e.g., ["plugin_name"])
-        required_method: Method that must be callable (e.g., "chat", "embed")
-        scan_packages: List of package paths to scan for plugins
-        attr_filter: Optional dict of {attr: value} that must match
-
-    Example:
-        # For chat plugins
-        registry = PluginRegistry(
-            name="chat",
-            required_attrs=["plugin_name", "plugin_type"],
-            required_method="chat",
-            scan_packages=["fitz.llm.chat.plugins"],
-            attr_filter={"plugin_type": "chat"},
-        )
-
-        # For vector_db plugins
-        registry = PluginRegistry(
-            name="vector_db",
-            required_attrs=["plugin_name"],
-            required_method="search",
-            scan_packages=["fitz.vector_db.plugins"],
-        )
+    Args:
+        name: Registry name (for error messages and logging)
+        scan_packages: List of package names to scan for plugins
+        required_method: Method name that plugins must have
+        plugin_name_attr: Attribute containing the plugin name (default: "plugin_name")
+        plugin_type_filter: If set, only register plugins with this plugin_type
+        check_module_match: If True, only register classes defined in the scanned module
     """
-
     name: str
-    required_attrs: List[str] = field(default_factory=lambda: ["plugin_name"])
-    required_method: Optional[str] = None
-    scan_packages: List[str] = field(default_factory=list)
-    attr_filter: Dict[str, Any] = field(default_factory=dict)
+    scan_packages: List[str]
+    required_method: str
     plugin_name_attr: str = "plugin_name"
+    plugin_type_filter: str | None = None
+    check_module_match: bool = True
+    _plugins: Dict[str, Type[Any]] = field(default_factory=dict, repr=False)
+    _discovered: bool = field(default=False, repr=False)
 
-    # Internal state
-    _registry: Dict[str, Type[T]] = field(default_factory=dict, init=False, repr=False)
-    _discovered: bool = field(default=False, init=False, repr=False)
-
-    def get(self, name: str) -> Type[T]:
-        """
-        Get a plugin by exact name.
-
-        No fallback, no magic - returns exactly what you ask for or raises.
-
-        Args:
-            name: Exact plugin name (e.g., "cohere", "qdrant", "local")
-
-        Returns:
-            Plugin class
-
-        Raises:
-            PluginNotFoundError: If plugin doesn't exist
-        """
+    def get(self, plugin_name: str) -> Type[Any]:
+        """Get a plugin by name. Raises PluginNotFoundError if not found."""
         self._ensure_discovered()
 
-        if name not in self._registry:
-            available = sorted(self._registry.keys())
+        if plugin_name not in self._plugins:
+            available = sorted(self._plugins.keys())
             raise PluginNotFoundError(
-                f"Unknown {self.name} plugin: {name!r}. "
+                f"Unknown {self.name} plugin: {plugin_name!r}. "
                 f"Available: {available}"
             )
 
-        return self._registry[name]
+        return self._plugins[plugin_name]
 
     def list_available(self) -> List[str]:
         """List all available plugin names."""
         self._ensure_discovered()
-        return sorted(self._registry.keys())
-
-    def register(self, cls: Type[T]) -> None:
-        """
-        Manually register a plugin class.
-
-        Useful for testing or dynamic registration.
-
-        Args:
-            cls: Plugin class to register
-
-        Raises:
-            DuplicatePluginError: If plugin name already registered
-        """
-        name = getattr(cls, self.plugin_name_attr, None)
-        if not name:
-            raise PluginRegistryError(
-                f"Cannot register {cls}: missing {self.plugin_name_attr} attribute"
-            )
-
-        existing = self._registry.get(name)
-        if existing is not None and existing is not cls:
-            raise DuplicatePluginError(
-                f"Duplicate {self.name} plugin_name={name!r}: "
-                f"{existing.__module__}.{existing.__name__} vs "
-                f"{cls.__module__}.{cls.__name__}"
-            )
-
-        self._registry[name] = cls
-        logger.debug(f"Registered {self.name} plugin: {name}")
-
-    def is_discovered(self) -> bool:
-        """Check if discovery has run."""
-        return self._discovered
-
-    def reset(self) -> None:
-        """Reset registry (mainly for testing)."""
-        self._registry.clear()
-        self._discovered = False
+        return sorted(self._plugins.keys())
 
     def _ensure_discovered(self) -> None:
         """Run discovery if not already done."""
         if self._discovered:
             return
 
-        for pkg_name in self.scan_packages:
-            self._scan_package(pkg_name)
+        for package_name in self.scan_packages:
+            self._scan_package(package_name)
 
-        logger.debug(
-            f"Discovered {self.name} plugins: {list(self._registry.keys())}"
-        )
         self._discovered = True
+        logger.debug(f"[{self.name}] Discovered plugins: {list(self._plugins.keys())}")
 
     def _scan_package(self, package_name: str) -> None:
         """Scan a package for plugin classes."""
         try:
             pkg = importlib.import_module(package_name)
-        except ImportError as e:
-            logger.debug(f"Could not import {package_name}: {e}")
+        except ImportError:
+            logger.debug(f"[{self.name}] Package not found: {package_name}")
             return
 
         pkg_path = getattr(pkg, "__path__", None)
         if pkg_path is None:
-            # Single module, not a package - scan it directly
-            self._scan_module(pkg)
             return
 
-        # Iterate over submodules
         for module_info in pkgutil.iter_modules(pkg_path):
             module_name = f"{package_name}.{module_info.name}"
             try:
                 module = importlib.import_module(module_name)
-                self._scan_module(module)
             except Exception as e:
-                logger.debug(f"Could not import {module_name}: {e}")
+                logger.debug(f"[{self.name}] Failed to import {module_name}: {e}")
                 continue
 
-    def _scan_module(self, module: object) -> None:
-        """Scan a module for plugin classes."""
+            for cls in self._iter_plugin_classes(module):
+                self._register(cls)
+
+    def _iter_plugin_classes(self, module: object) -> Iterable[type]:
+        """Find plugin classes in a module."""
         mod_name = getattr(module, "__name__", "")
 
         for obj in vars(module).values():
             if not isinstance(obj, type):
                 continue
 
-            # Must be defined in this module (not imported)
-            if getattr(obj, "__module__", None) != mod_name:
+            # Optionally check that class is defined in this module
+            if self.check_module_match and getattr(obj, "__module__", None) != mod_name:
                 continue
 
-            # Check if it's a valid plugin
-            if self._is_valid_plugin(obj):
-                self.register(obj)
+            # Must have plugin_name attribute
+            plugin_name = getattr(obj, self.plugin_name_attr, None)
+            if not isinstance(plugin_name, str) or not plugin_name:
+                continue
 
-    def _is_valid_plugin(self, cls: type) -> bool:
-        """Check if a class is a valid plugin for this registry."""
-        # Check required attributes
-        for attr in self.required_attrs:
-            val = getattr(cls, attr, None)
-            if not isinstance(val, str) or not val:
-                return False
+            # If filtering by plugin_type, check it
+            if self.plugin_type_filter:
+                obj_type = getattr(obj, "plugin_type", None)
+                if obj_type != self.plugin_type_filter:
+                    continue
 
-        # Check attribute filters (e.g., plugin_type == "chat")
-        for attr, expected in self.attr_filter.items():
-            actual = getattr(cls, attr, None)
-            if actual != expected:
-                return False
-
-        # Check required method
-        if self.required_method:
-            method = getattr(cls, self.required_method, None)
+            # Must have required method
+            method = getattr(obj, self.required_method, None)
             if not callable(method):
-                return False
+                continue
 
-        return True
+            yield obj
+
+    def _register(self, cls: Type[Any]) -> None:
+        """Register a plugin class."""
+        name = getattr(cls, self.plugin_name_attr)
+
+        if name in self._plugins:
+            existing = self._plugins[name]
+            if existing is not cls:
+                raise DuplicatePluginError(
+                    f"Duplicate {self.name} plugin: {name!r}. "
+                    f"Found in {existing.__module__} and {cls.__module__}"
+                )
+            return  # Same class, already registered
+
+        self._plugins[name] = cls
 
 
 # =============================================================================
 # Pre-configured Registries
 # =============================================================================
-# These are singleton instances for each plugin type.
-# Import and use these directly instead of creating new registries.
 
-
-# LLM Chat plugins
-CHAT_REGISTRY = PluginRegistry[Any](
+CHAT_REGISTRY = PluginRegistry(
     name="chat",
-    required_attrs=["plugin_name", "plugin_type"],
-    required_method="chat",
     scan_packages=["fitz.llm.chat.plugins"],
-    attr_filter={"plugin_type": "chat"},
+    required_method="chat",
+    plugin_type_filter="chat",
 )
 
-# LLM Embedding plugins
-EMBEDDING_REGISTRY = PluginRegistry[Any](
+EMBEDDING_REGISTRY = PluginRegistry(
     name="embedding",
-    required_attrs=["plugin_name", "plugin_type"],
-    required_method="embed",
     scan_packages=["fitz.llm.embedding.plugins"],
-    attr_filter={"plugin_type": "embedding"},
+    required_method="embed",
+    plugin_type_filter="embedding",
 )
 
-# LLM Rerank plugins
-RERANK_REGISTRY = PluginRegistry[Any](
+RERANK_REGISTRY = PluginRegistry(
     name="rerank",
-    required_attrs=["plugin_name", "plugin_type"],
-    required_method="rerank",
     scan_packages=["fitz.llm.rerank.plugins"],
-    attr_filter={"plugin_type": "rerank"},
+    required_method="rerank",
+    plugin_type_filter="rerank",
 )
 
-# Vector DB plugins
-VECTOR_DB_REGISTRY = PluginRegistry[Any](
+VECTOR_DB_REGISTRY = PluginRegistry(
     name="vector_db",
-    required_attrs=["plugin_name"],
-    required_method="search",
     scan_packages=["fitz.vector_db.plugins"],
+    required_method="search",
+    plugin_type_filter="vector_db",
+    check_module_match=False,  # Plugins can be re-exported from other modules
 )
 
-# Retrieval plugins
-RETRIEVAL_REGISTRY = PluginRegistry[Any](
-    name="retrieval",
-    required_attrs=["plugin_name"],
-    required_method="retrieve",
-    scan_packages=["fitz.engines.classic_rag.retrieval.runtime.plugins"],
-)
-
-# Pipeline plugins
-PIPELINE_REGISTRY = PluginRegistry[Any](
-    name="pipeline",
-    required_attrs=["plugin_name"],
-    required_method="build",
-    scan_packages=["fitz.engines.classic_rag.pipeline.pipeline.plugins"],
-)
-
-# Ingestion plugins
-INGEST_REGISTRY = PluginRegistry[Any](
+INGEST_REGISTRY = PluginRegistry(
     name="ingest",
-    required_attrs=["plugin_name"],
-    required_method="ingest",
     scan_packages=["fitz.ingest.ingestion.plugins"],
+    required_method="ingest",
 )
 
-# Chunking plugins
-CHUNKING_REGISTRY = PluginRegistry[Any](
+CHUNKING_REGISTRY = PluginRegistry(
     name="chunking",
-    required_attrs=["plugin_name"],
-    required_method="chunk_text",
     scan_packages=["fitz.ingest.chunking.plugins"],
+    required_method="chunk_text",
 )
 
+RETRIEVER_REGISTRY = PluginRegistry(
+    name="retriever",
+    scan_packages=["fitz.engines.classic_rag.retrieval.runtime.plugins"],
+    required_method="retrieve",
+)
+
+PIPELINE_REGISTRY = PluginRegistry(
+    name="pipeline",
+    scan_packages=["fitz.engines.classic_rag.pipeline.pipeline.plugins"],
+    required_method="build",
+)
 
 # =============================================================================
-# Convenience Functions
+# LLM Registry (special case: multi-type registry)
 # =============================================================================
-# These provide a familiar API and handle the LLM registry multiplexing.
+
+# Combined view of all LLM plugin types
+LLM_REGISTRY: Dict[str, Dict[str, Type[Any]]] = {}
+_LLM_DISCOVERED = False
+
+
+def _discover_llm_plugins() -> None:
+    """Populate LLM_REGISTRY from individual registries."""
+    global _LLM_DISCOVERED
+    if _LLM_DISCOVERED:
+        return
+
+    for type_name, registry in [
+        ("chat", CHAT_REGISTRY),
+        ("embedding", EMBEDDING_REGISTRY),
+        ("rerank", RERANK_REGISTRY),
+    ]:
+        registry._ensure_discovered()
+        LLM_REGISTRY[type_name] = dict(registry._plugins)
+
+    _LLM_DISCOVERED = True
 
 
 def get_llm_plugin(*, plugin_name: str, plugin_type: str) -> Type[Any]:
     """
     Get an LLM plugin by name and type.
 
-    This is the main entry point for LLM plugins (chat, embedding, rerank).
-
     Args:
-        plugin_name: Plugin name (e.g., "cohere", "openai", "local")
-        plugin_type: Plugin type ("chat", "embedding", "rerank")
+        plugin_name: Name of the plugin (e.g., "cohere", "openai")
+        plugin_type: Type of plugin ("chat", "embedding", "rerank")
 
     Returns:
         Plugin class
 
     Raises:
-        PluginNotFoundError: If plugin doesn't exist
-        ValueError: If plugin_type is invalid
+        LLMRegistryError: If plugin not found
     """
-    registry = _get_llm_registry(plugin_type)
-    return registry.get(plugin_name)
+    _discover_llm_plugins()
+    try:
+        return LLM_REGISTRY[plugin_type][plugin_name]
+    except KeyError:
+        available = sorted(LLM_REGISTRY.get(plugin_type, {}).keys())
+        raise LLMRegistryError(
+            f"Unknown {plugin_type} plugin: {plugin_name!r}. "
+            f"Available: {available}"
+        )
 
 
 def available_llm_plugins(plugin_type: str) -> List[str]:
-    """List available plugins for an LLM type."""
-    registry = _get_llm_registry(plugin_type)
-    return registry.list_available()
+    """List available LLM plugins for a type."""
+    _discover_llm_plugins()
+    return sorted(LLM_REGISTRY.get(plugin_type, {}).keys())
 
 
-def _get_llm_registry(plugin_type: str) -> PluginRegistry:
-    """Get the appropriate registry for an LLM plugin type."""
-    registries = {
-        "chat": CHAT_REGISTRY,
-        "embedding": EMBEDDING_REGISTRY,
-        "rerank": RERANK_REGISTRY,
-    }
+def resolve_llm_plugin(*, plugin_type: str, requested_name: str) -> Type[Any]:
+    """Alias for get_llm_plugin (backwards compatibility)."""
+    return get_llm_plugin(plugin_name=requested_name, plugin_type=plugin_type)
 
-    if plugin_type not in registries:
-        raise ValueError(
-            f"Invalid LLM plugin_type: {plugin_type!r}. "
-            f"Must be one of: {list(registries.keys())}"
-        )
 
-    return registries[plugin_type]
-
+# =============================================================================
+# Vector DB Functions
+# =============================================================================
 
 def get_vector_db_plugin(plugin_name: str) -> Type[Any]:
     """Get a vector DB plugin by name."""
-    return VECTOR_DB_REGISTRY.get(plugin_name)
+    try:
+        return VECTOR_DB_REGISTRY.get(plugin_name)
+    except PluginNotFoundError as e:
+        raise VectorDBRegistryError(str(e)) from e
 
 
 def available_vector_db_plugins() -> List[str]:
@@ -391,25 +321,14 @@ def available_vector_db_plugins() -> List[str]:
     return VECTOR_DB_REGISTRY.list_available()
 
 
-def get_retriever_plugin(plugin_name: str) -> Type[Any]:
-    """Get a retrieval plugin by name."""
-    return RETRIEVAL_REGISTRY.get(plugin_name)
+def resolve_vector_db_plugin(requested_name: str) -> Type[Any]:
+    """Alias for get_vector_db_plugin (backwards compatibility)."""
+    return get_vector_db_plugin(requested_name)
 
 
-def available_retriever_plugins() -> List[str]:
-    """List available retrieval plugins."""
-    return RETRIEVAL_REGISTRY.list_available()
-
-
-def get_pipeline_plugin(plugin_name: str) -> Type[Any]:
-    """Get a pipeline plugin by name."""
-    return PIPELINE_REGISTRY.get(plugin_name)
-
-
-def available_pipeline_plugins() -> List[str]:
-    """List available pipeline plugins."""
-    return PIPELINE_REGISTRY.list_available()
-
+# =============================================================================
+# Ingest Functions
+# =============================================================================
 
 def get_ingest_plugin(plugin_name: str) -> Type[Any]:
     """Get an ingestion plugin by name."""
@@ -421,8 +340,17 @@ def available_ingest_plugins() -> List[str]:
     return INGEST_REGISTRY.list_available()
 
 
+# =============================================================================
+# Chunking Functions
+# =============================================================================
+
+def get_chunker_plugin(plugin_name: str) -> Type[Any]:
+    """Get a chunker plugin by name."""
+    return CHUNKING_REGISTRY.get(plugin_name)
+
+
 def get_chunking_plugin(plugin_name: str) -> Type[Any]:
-    """Get a chunking plugin by name."""
+    """Alias for get_chunker_plugin."""
     return CHUNKING_REGISTRY.get(plugin_name)
 
 
@@ -430,3 +358,30 @@ def available_chunking_plugins() -> List[str]:
     """List available chunking plugins."""
     return CHUNKING_REGISTRY.list_available()
 
+
+# =============================================================================
+# Retriever Functions
+# =============================================================================
+
+def get_retriever_plugin(plugin_name: str) -> Type[Any]:
+    """Get a retriever plugin by name."""
+    return RETRIEVER_REGISTRY.get(plugin_name)
+
+
+def available_retriever_plugins() -> List[str]:
+    """List available retriever plugins."""
+    return RETRIEVER_REGISTRY.list_available()
+
+
+# =============================================================================
+# Pipeline Functions
+# =============================================================================
+
+def get_pipeline_plugin(plugin_name: str) -> Type[Any]:
+    """Get a pipeline plugin by name."""
+    return PIPELINE_REGISTRY.get(plugin_name)
+
+
+def available_pipeline_plugins() -> List[str]:
+    """List available pipeline plugins."""
+    return PIPELINE_REGISTRY.list_available()
