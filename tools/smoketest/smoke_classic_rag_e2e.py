@@ -333,7 +333,6 @@ def chunking(documents: list[dict], config: TestConfig) -> tuple[list[dict], boo
     print("TEST 2: DOCUMENT CHUNKING")
     print("=" * 60)
 
-
     chunks = []
     for doc in documents:
         # Split by paragraphs (simple chunking)

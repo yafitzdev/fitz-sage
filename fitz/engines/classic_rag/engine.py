@@ -5,7 +5,6 @@ This engine wraps the existing RAG pipeline (retrieval + generation) behind
 the paradigm-agnostic KnowledgeEngine interface.
 """
 
-
 from fitz.core import (
     Answer,
     ConfigurationError,
