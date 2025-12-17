@@ -1,8 +1,13 @@
-# core/llm/chat/plugins/anthropic.py
+# fitz/llm/chat/plugins/anthropic.py
+"""
+Anthropic Claude chat plugin using centralized credentials.
+"""
+
 from __future__ import annotations
 
-import os
 from typing import Any
+
+from fitz.llm.credentials import resolve_api_key, CredentialError
 
 try:
     import anthropic
@@ -12,10 +17,10 @@ except ImportError:
 
 class AnthropicChatClient:
     """
-    Chat plugin for Anthropic Claude API.
+    Chat plugin for Anthropic Claude API using centralized credentials.
 
-    Required environment variables:
-        ANTHROPIC_API_KEY: API key for authentication
+    Required:
+        - ANTHROPIC_API_KEY environment variable OR api_key parameter
 
     Config example:
         llm:
@@ -39,9 +44,14 @@ class AnthropicChatClient:
         if anthropic is None:
             raise RuntimeError("Install anthropic: `pip install anthropic`")
 
-        key = api_key or os.getenv("ANTHROPIC_API_KEY")
-        if not key:
-            raise ValueError("ANTHROPIC_API_KEY is not set for AnthropicChatClient")
+        # Use centralized credential resolution
+        try:
+            key = resolve_api_key(
+                provider="anthropic",
+                config={"api_key": api_key} if api_key else None,
+            )
+        except CredentialError as e:
+            raise ValueError(str(e)) from e
 
         self.model = model
         self.max_tokens = max_tokens
@@ -49,6 +59,15 @@ class AnthropicChatClient:
         self._client = anthropic.Anthropic(api_key=key)
 
     def chat(self, messages: list[dict[str, Any]]) -> str:
+        """
+        Send chat completion request.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+
+        Returns:
+            The assistant's response text
+        """
         # Anthropic uses a separate system parameter, not a system message
         system_content = ""
         chat_messages = []
@@ -60,7 +79,6 @@ class AnthropicChatClient:
             if role == "system":
                 system_content = content
             else:
-                # Map 'assistant' stays 'assistant', 'user' stays 'user'
                 chat_messages.append({"role": role, "content": content})
 
         kwargs: dict[str, Any] = {

@@ -1,8 +1,13 @@
-# core/llm/chat/plugins/openai.py
+# fitz/llm/chat/plugins/openai.py
+"""
+OpenAI chat plugin using centralized credentials.
+"""
+
 from __future__ import annotations
 
-import os
 from typing import Any
+
+from fitz.llm.credentials import resolve_api_key, CredentialError
 
 try:
     from openai import OpenAI
@@ -12,10 +17,10 @@ except ImportError:
 
 class OpenAIChatClient:
     """
-    Chat plugin for OpenAI API.
+    Chat plugin for OpenAI API using centralized credentials.
 
-    Required environment variables:
-        OPENAI_API_KEY: API key for authentication
+    Required:
+        - OPENAI_API_KEY environment variable OR api_key parameter
 
     Config example:
         llm:
@@ -39,9 +44,14 @@ class OpenAIChatClient:
         if OpenAI is None:
             raise RuntimeError("Install openai: `pip install openai`")
 
-        key = api_key or os.getenv("OPENAI_API_KEY")
-        if not key:
-            raise ValueError("OPENAI_API_KEY is not set for OpenAIChatClient")
+        # Use centralized credential resolution
+        try:
+            key = resolve_api_key(
+                provider="openai",
+                config={"api_key": api_key} if api_key else None,
+            )
+        except CredentialError as e:
+            raise ValueError(str(e)) from e
 
         self.model = model
         self.temperature = temperature
@@ -54,6 +64,15 @@ class OpenAIChatClient:
         self._client = OpenAI(**client_kwargs)
 
     def chat(self, messages: list[dict[str, Any]]) -> str:
+        """
+        Send chat completion request.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+
+        Returns:
+            The assistant's response text
+        """
         kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": messages,

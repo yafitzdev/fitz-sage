@@ -1,6 +1,6 @@
 # fitz/llm/chat/plugins/cohere.py
 """
-Cohere chat plugin using centralized HTTP client.
+Cohere chat plugin using centralized HTTP client and credentials.
 
 Uses Cohere v1 Chat API which expects:
 - preamble: system message
@@ -10,7 +10,6 @@ Uses Cohere v1 Chat API which expects:
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from fitz.core.http import (
@@ -20,11 +19,12 @@ from fitz.core.http import (
     APIError,
     HTTPClientNotAvailable,
 )
+from fitz.llm.credentials import resolve_api_key, CredentialError
 
 
 class CohereChatClient:
     """
-    Cohere chat plugin using centralized HTTP client.
+    Cohere chat plugin using centralized HTTP client and credentials.
 
     Required:
         - COHERE_API_KEY environment variable OR api_key parameter
@@ -44,13 +44,14 @@ class CohereChatClient:
         temperature: float = 0.2,
         base_url: str = "https://api.cohere.ai/v1",
     ) -> None:
-        # Get API key
-        key = api_key or os.getenv("COHERE_API_KEY")
-        if not key:
-            raise RuntimeError(
-                "COHERE_API_KEY is not set. "
-                "Set it as an environment variable or pass api_key parameter."
+        # Use centralized credential resolution
+        try:
+            key = resolve_api_key(
+                provider="cohere",
+                config={"api_key": api_key} if api_key else None,
             )
+        except CredentialError as e:
+            raise RuntimeError(str(e)) from e
 
         self.model = model
         self.temperature = temperature

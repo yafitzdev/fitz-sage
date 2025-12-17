@@ -1,6 +1,6 @@
 # fitz/llm/embedding/plugins/cohere.py
 """
-Cohere embedding plugin using centralized HTTP client.
+Cohere embedding plugin using centralized HTTP client and credentials.
 """
 
 from __future__ import annotations
@@ -16,13 +16,14 @@ from fitz.core.http import (
     APIError,
     HTTPClientNotAvailable,
 )
+from fitz.llm.credentials import resolve_api_key, CredentialError
 from fitz.engines.classic_rag.errors.llm import EmbeddingError
 
 
 @dataclass
 class CohereEmbeddingClient:
     """
-    Cohere embedding plugin using centralized HTTP client.
+    Cohere embedding plugin using centralized HTTP client and credentials.
 
     Required:
         - COHERE_API_KEY environment variable OR api_key parameter
@@ -46,16 +47,18 @@ class CohereEmbeddingClient:
     _client: Any = field(init=False, repr=False, default=None)
 
     def __post_init__(self) -> None:
-        # Get API key
-        key = self.api_key or os.getenv("COHERE_API_KEY")
-        if not key:
-            raise RuntimeError(
-                "COHERE_API_KEY is not set. "
-                "Set it as an environment variable or pass api_key parameter."
+        # Use centralized credential resolution
+        try:
+            key = resolve_api_key(
+                provider="cohere",
+                config={"api_key": self.api_key} if self.api_key else None,
             )
+        except CredentialError as e:
+            raise RuntimeError(str(e)) from e
+
         self._api_key = key
 
-        # Set defaults
+        # Set defaults (still allow env var override for model-specific settings)
         self.model = self.model or os.getenv("COHERE_EMBED_MODEL") or "embed-english-v3.0"
         self.input_type = (
             self.input_type or os.getenv("COHERE_EMBED_INPUT_TYPE") or "search_document"

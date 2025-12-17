@@ -1,8 +1,14 @@
-# core/llm/chat/plugins/azure_openai.py
+# fitz/llm/chat/plugins/azure_openai.py
+"""
+Azure OpenAI chat plugin using centralized credentials.
+"""
+
 from __future__ import annotations
 
 import os
 from typing import Any
+
+from fitz.llm.credentials import resolve_api_key, CredentialError
 
 try:
     from openai import AzureOpenAI
@@ -12,7 +18,7 @@ except ImportError:
 
 class AzureOpenAIChatClient:
     """
-    Chat plugin for Azure OpenAI Service.
+    Chat plugin for Azure OpenAI Service using centralized credentials.
 
     Required environment variables:
         AZURE_OPENAI_API_KEY: API key for authentication
@@ -42,17 +48,30 @@ class AzureOpenAIChatClient:
         if AzureOpenAI is None:
             raise RuntimeError("Install openai: `pip install openai`")
 
-        key = api_key or os.getenv("AZURE_OPENAI_API_KEY")
-        if not key:
-            raise ValueError("AZURE_OPENAI_API_KEY is not set")
+        # Use centralized credential resolution
+        try:
+            key = resolve_api_key(
+                provider="azure_openai",
+                config={"api_key": api_key} if api_key else None,
+            )
+        except CredentialError as e:
+            raise ValueError(str(e)) from e
 
+        # Azure endpoint (not handled by credentials module - separate concern)
         azure_endpoint = endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")
         if not azure_endpoint:
-            raise ValueError("AZURE_OPENAI_ENDPOINT is not set")
+            raise ValueError(
+                "AZURE_OPENAI_ENDPOINT is not set. "
+                "Set it as an environment variable or pass endpoint parameter."
+            )
 
+        # Deployment name
         self.deployment_name = deployment_name or os.getenv("AZURE_OPENAI_DEPLOYMENT")
         if not self.deployment_name:
-            raise ValueError("deployment_name is required for Azure OpenAI")
+            raise ValueError(
+                "deployment_name is required for Azure OpenAI. "
+                "Set AZURE_OPENAI_DEPLOYMENT or pass deployment_name parameter."
+            )
 
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -64,6 +83,15 @@ class AzureOpenAIChatClient:
         )
 
     def chat(self, messages: list[dict[str, Any]]) -> str:
+        """
+        Send chat completion request.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+
+        Returns:
+            The assistant's response text
+        """
         kwargs: dict[str, Any] = {
             "model": self.deployment_name,
             "messages": messages,

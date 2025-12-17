@@ -1,11 +1,9 @@
 # fitz/llm/rerank/plugins/cohere.py
 """
-Cohere rerank plugin using centralized HTTP client.
+Cohere rerank plugin using centralized HTTP client and credentials.
 """
 
 from __future__ import annotations
-
-import os
 
 from fitz.core.http import (
     create_api_client,
@@ -14,12 +12,13 @@ from fitz.core.http import (
     APIError,
     HTTPClientNotAvailable,
 )
+from fitz.llm.credentials import resolve_api_key, CredentialError
 from fitz.engines.classic_rag.models.chunk import Chunk
 
 
 class CohereRerankClient:
     """
-    Cohere rerank plugin using centralized HTTP client.
+    Cohere rerank plugin using centralized HTTP client and credentials.
 
     Required:
         - COHERE_API_KEY environment variable OR api_key parameter
@@ -37,13 +36,14 @@ class CohereRerankClient:
         model: str = "rerank-english-v3.0",
         base_url: str = "https://api.cohere.ai/v1",
     ) -> None:
-        # Get API key
-        key = api_key or os.getenv("COHERE_API_KEY")
-        if not key:
-            raise RuntimeError(
-                "COHERE_API_KEY is not set. "
-                "Set it as an environment variable or pass api_key parameter."
+        # Use centralized credential resolution
+        try:
+            key = resolve_api_key(
+                provider="cohere",
+                config={"api_key": api_key} if api_key else None,
             )
+        except CredentialError as e:
+            raise RuntimeError(str(e)) from e
 
         self.model = model
         self.base_url = base_url
