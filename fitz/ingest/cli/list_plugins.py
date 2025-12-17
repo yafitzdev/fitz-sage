@@ -1,3 +1,4 @@
+# fitz/ingest/cli/list_plugins.py
 """
 List-plugins command: Show available plugins for ingestion.
 
@@ -11,10 +12,10 @@ from typing import Optional
 
 import typer
 
+from fitz.llm.registry import available_llm_plugins
+from fitz.vector_db.registry import available_vector_db_plugins
 from fitz.ingest.ingestion.registry import REGISTRY as ingest_registry
 from fitz.ingest.ingestion.registry import _auto_discover as discover_ingest
-from fitz.llm.registry import available_llm_plugins
-from fitz.vector_db.registry import get_vector_db_plugin
 
 
 def command(
@@ -92,12 +93,12 @@ def command(
         else:
             typer.echo("  (No rerank plugins found)")
 
-    # Vector DB plugins
+    # Vector DB plugins - use the correct registry!
     if show_all or type == "vector-db":
         typer.echo()
         typer.echo("💾 Vector Database Plugins (storage)")
         typer.echo("-" * 60)
-        vdb_plugins = available_llm_plugins(plugin_type="vector_db")
+        vdb_plugins = available_vector_db_plugins()
         if vdb_plugins:
             for name in vdb_plugins:
                 typer.echo(f"  • {name}")
