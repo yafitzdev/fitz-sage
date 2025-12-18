@@ -24,14 +24,10 @@ def _string_to_uuid(s: str) -> str:
     """
     Convert an arbitrary string ID to a deterministic UUID.
 
-    Qdrant requires IDs to be UUIDs or unsigned 64-bit integers.
-    This converts string IDs like 'doc.txt:0' to valid UUIDs.
-
     Uses UUID5 with a fixed namespace for determinism - same input
     always produces the same UUID.
     """
-    # Use UUID5 for deterministic conversion (same string -> same UUID)
-    namespace = uuid.UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')  # UUID namespace for URLs
+    namespace = uuid.UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')
     return str(uuid.uuid5(namespace, s))
 
 
@@ -47,6 +43,7 @@ class VectorDBSpec:
         self.description = self.spec.get('description', '')
         self.connection = self.spec['connection']
         self.operations = self.spec['operations']
+        self.features = self.spec.get('features', {})
 
     def is_local(self) -> bool:
         """Check if this is a local (non-HTTP) plugin."""
@@ -55,6 +52,14 @@ class VectorDBSpec:
     def get_local_class_path(self) -> Optional[str]:
         """Get Python class path for local implementations."""
         return self.operations.get('python_class')
+
+    def requires_uuid_ids(self) -> bool:
+        """Check if this vector DB requires UUID IDs (from YAML spec)."""
+        return self.features.get('requires_uuid_ids', False)
+
+    def get_auto_detect_service(self) -> Optional[str]:
+        """Get the service name for auto-detection (from YAML spec)."""
+        return self.features.get('auto_detect')
 
     def build_base_url(self, **kwargs) -> str:
         """Build base URL from template and kwargs."""
@@ -103,23 +108,14 @@ class VectorDBSpec:
         return {}
 
     def render_template(self, template: Any, context: Dict[str, Any]) -> Any:
-        """Render Jinja2 templates in values recursively.
-
-        Special handling: If the template is exactly "{{var}}", return the actual
-        object from context instead of a string representation. This allows
-        passing lists, dicts, etc. through templates without stringification.
-        """
+        """Render Jinja2 templates in values recursively."""
         if isinstance(template, str):
             if '{{' in template:
-                # Check if it's a simple variable substitution like "{{points}}"
-                # In that case, return the actual object, not a string
                 stripped = template.strip()
                 if stripped.startswith('{{') and stripped.endswith('}}'):
                     var_name = stripped[2:-2].strip()
                     if var_name in context:
-                        # Return the actual object, not stringified
                         return context[var_name]
-                # Otherwise do normal Jinja2 rendering
                 return Template(template).render(context)
             return template
         elif isinstance(template, dict):
@@ -134,11 +130,9 @@ class VectorDBSpec:
         op_spec = self.operations.get(operation, {})
         transform = op_spec.get('point_transform', {})
 
-        # No transformation needed
         if transform.get('identity'):
             return points
 
-        # Field mapping transformation
         transformed = []
         for point in points:
             new_point = {}
@@ -148,11 +142,6 @@ class VectorDBSpec:
             transformed.append(new_point)
 
         return transformed
-
-    def requires_uuid_ids(self) -> bool:
-        """Check if this vector DB requires UUID IDs (e.g., Qdrant)."""
-        # Qdrant requires UUIDs or integers for point IDs
-        return self.name in ('qdrant',)
 
 
 class GenericVectorDBPlugin:
@@ -165,7 +154,6 @@ class GenericVectorDBPlugin:
         self.plugin_name = spec.name
         self.kwargs = kwargs
 
-        # Setup HTTP client
         base_url = spec.build_base_url(**kwargs)
         headers = spec.get_auth_headers()
 
@@ -175,17 +163,10 @@ class GenericVectorDBPlugin:
             timeout=30.0,
         )
 
-        # Track vector dimension for auto-create
         self._vector_dim: Optional[int] = None
 
     def _convert_point_ids(self, points: List[Dict]) -> List[Dict]:
-        """
-        Convert string IDs to UUIDs if required by the vector DB.
-
-        For Qdrant and similar DBs that require UUID/integer IDs,
-        this converts arbitrary string IDs to deterministic UUIDs
-        and stores the original ID in the payload.
-        """
+        """Convert string IDs to UUIDs if required by the vector DB (from YAML spec)."""
         if not self.spec.requires_uuid_ids():
             return points
 
@@ -195,14 +176,10 @@ class GenericVectorDBPlugin:
             original_id = point.get('id')
 
             if original_id is not None and isinstance(original_id, str):
-                # Check if already a valid UUID
                 try:
                     uuid.UUID(original_id)
-                    # Already a valid UUID, keep it
                 except ValueError:
-                    # Not a UUID, convert it
                     new_point['id'] = _string_to_uuid(original_id)
-                    # Store original ID in payload for retrieval
                     if 'payload' not in new_point:
                         new_point['payload'] = {}
                     new_point['payload']['_original_id'] = original_id
@@ -220,13 +197,10 @@ class GenericVectorDBPlugin:
     ) -> List[SearchResult]:
         """Search for similar vectors in collection."""
         if 'search' not in self.spec.operations:
-            raise NotImplementedError(
-                f"{self.plugin_name} does not support search"
-            )
+            raise NotImplementedError(f"{self.plugin_name} does not support search")
 
         op = self.spec.operations['search']
 
-        # Build context for template rendering
         context = {
             'collection': collection_name,
             'query_vector': query_vector,
@@ -235,11 +209,9 @@ class GenericVectorDBPlugin:
             **self.kwargs,
         }
 
-        # Build request
         endpoint = Template(op['endpoint']).render(context)
         body = self.spec.render_template(op.get('body', {}), context)
 
-        # Send request
         response = self.client.request(
             method=op['method'],
             url=endpoint,
@@ -247,7 +219,6 @@ class GenericVectorDBPlugin:
         )
         response.raise_for_status()
 
-        # Extract results from response
         data = response.json()
         results_path = op['response']['results_path']
         results = extract_path(data, results_path, default=[], strict=False)
@@ -255,7 +226,6 @@ class GenericVectorDBPlugin:
         if not results:
             return []
 
-        # Map provider format to SearchResult
         mapping = op['response']['mapping']
         search_results = []
 
@@ -264,7 +234,6 @@ class GenericVectorDBPlugin:
             result_score = extract_path(item, mapping.get('score', ''), strict=False)
             result_payload = extract_path(item, mapping.get('payload', ''), default={}, strict=False)
 
-            # Restore original ID if it was converted
             if result_payload and '_original_id' in result_payload:
                 result_id = result_payload['_original_id']
 
@@ -280,26 +249,20 @@ class GenericVectorDBPlugin:
     def upsert(self, collection: str, points: List[Dict]) -> None:
         """Insert or update points in collection."""
         if 'upsert' not in self.spec.operations:
-            raise NotImplementedError(
-                f"{self.plugin_name} does not support upsert"
-            )
+            raise NotImplementedError(f"{self.plugin_name} does not support upsert")
 
-        # Track dimension from first upsert
         if points and 'vector' in points[0]:
             self._vector_dim = len(points[0]['vector'])
 
         op = self.spec.operations['upsert']
 
-        # Convert string IDs to UUIDs if required
         converted_points = self._convert_point_ids(points)
-
-        # Transform points to provider format
         transformed_points = self.spec.transform_points(converted_points, 'upsert')
 
         context = {
             'collection': collection,
             'points': transformed_points,
-            'vector_dim': self._vector_dim,  # For auto-create collection
+            'vector_dim': self._vector_dim,
             **self.kwargs,
         }
 
@@ -312,10 +275,8 @@ class GenericVectorDBPlugin:
             json=body,
         )
 
-        # Handle auto-create collection on 404 (collection doesn't exist)
         if response.status_code == 404 and op.get('auto_create_collection'):
             self._auto_create_collection(collection, op, context)
-            # Retry the upsert after creating collection
             response = self.client.request(
                 method=op['method'],
                 url=endpoint,
@@ -330,10 +291,7 @@ class GenericVectorDBPlugin:
         op: Dict[str, Any],
         context: Dict[str, Any],
     ) -> None:
-        """Auto-create a collection before upsert.
-
-        Uses the create_collection_* fields from the upsert operation spec.
-        """
+        """Auto-create a collection before upsert."""
         create_endpoint = op.get('create_collection_endpoint')
         create_method = op.get('create_collection_method', 'PUT')
         create_body_template = op.get('create_collection_body', {})
@@ -344,7 +302,6 @@ class GenericVectorDBPlugin:
                 f"is not specified in {self.plugin_name} YAML"
             )
 
-        # Render the endpoint and body with current context
         endpoint = Template(create_endpoint).render(context)
         body = self.spec.render_template(create_body_template, context)
 
@@ -354,16 +311,13 @@ class GenericVectorDBPlugin:
             json=body,
         )
 
-        # Accept 200, 201, and 409 (already exists) as success
         if response.status_code not in (200, 201, 409):
             response.raise_for_status()
 
     def create_collection(self, name: str, vector_size: int) -> None:
         """Create a new collection."""
         if 'create_collection' not in self.spec.operations:
-            raise NotImplementedError(
-                f"{self.plugin_name} does not support create_collection"
-            )
+            raise NotImplementedError(f"{self.plugin_name} does not support create_collection")
 
         op = self.spec.operations['create_collection']
         context = {
@@ -385,9 +339,7 @@ class GenericVectorDBPlugin:
     def delete_collection(self, name: str) -> None:
         """Delete a collection."""
         if 'delete_collection' not in self.spec.operations:
-            raise NotImplementedError(
-                f"{self.plugin_name} does not support delete_collection"
-            )
+            raise NotImplementedError(f"{self.plugin_name} does not support delete_collection")
 
         op = self.spec.operations['delete_collection']
         context = {'collection': name, **self.kwargs}
@@ -403,9 +355,7 @@ class GenericVectorDBPlugin:
     def list_collections(self) -> List[str]:
         """List all collections."""
         if 'list_collections' not in self.spec.operations:
-            raise NotImplementedError(
-                f"{self.plugin_name} does not support list_collections"
-            )
+            raise NotImplementedError(f"{self.plugin_name} does not support list_collections")
 
         op = self.spec.operations['list_collections']
         context = {**self.kwargs}
@@ -421,16 +371,13 @@ class GenericVectorDBPlugin:
         if not collections:
             return []
 
-        # Extract collection names
         name_field = op['response'].get('name_field', 'name')
         return [c[name_field] if isinstance(c, dict) else c for c in collections]
 
     def get_collection_stats(self, collection: str) -> Dict[str, Any]:
         """Get statistics for a collection."""
         if 'get_stats' not in self.spec.operations:
-            raise NotImplementedError(
-                f"{self.plugin_name} does not support get_collection_stats"
-            )
+            raise NotImplementedError(f"{self.plugin_name} does not support get_collection_stats")
 
         op = self.spec.operations['get_stats']
         context = {'collection': collection, **self.kwargs}
@@ -453,11 +400,7 @@ class GenericVectorDBPlugin:
 
 
 def load_vector_db_spec(plugin_name: str) -> VectorDBSpec:
-    """Load vector DB specification from YAML file.
-
-    Looks for YAML files in fitz/vector_db/plugins/ directory.
-    """
-    # Look for YAML file in plugins subdirectory
+    """Load vector DB specification from YAML file."""
     plugins_dir = Path(__file__).parent / "plugins"
     yaml_path = plugins_dir / f"{plugin_name}.yaml"
 
@@ -470,36 +413,46 @@ def load_vector_db_spec(plugin_name: str) -> VectorDBSpec:
     return VectorDBSpec(yaml_path)
 
 
-def _get_auto_detected_kwargs(plugin_name: str, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+def _get_auto_detected_kwargs(spec: VectorDBSpec, kwargs: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Auto-detect connection parameters from fitz.core.detect if not provided.
+    Auto-detect connection parameters based on YAML spec.
 
-    This is the SINGLE SOURCE OF TRUTH for connection detection.
+    Uses the 'features.auto_detect' field to determine which service
+    detection function to call from fitz.core.detect.
 
-    Args:
-        plugin_name: Name of the plugin (e.g., 'qdrant')
-        kwargs: User-provided kwargs (may override auto-detection)
-
-    Returns:
-        kwargs with auto-detected values filled in where not provided
+    This is PROVIDER-AGNOSTIC - the detection logic is driven by YAML.
     """
     result = dict(kwargs)
 
-    # Only auto-detect for known plugins that need it
-    if plugin_name == "qdrant":
-        # Only auto-detect if host/port not explicitly provided
-        if 'host' not in result or 'port' not in result:
-            try:
-                from fitz.core.detect import get_qdrant_connection
-                detected_host, detected_port = get_qdrant_connection()
+    auto_detect_service = spec.get_auto_detect_service()
+    if not auto_detect_service:
+        return result
 
-                if 'host' not in result:
-                    result['host'] = detected_host
-                if 'port' not in result:
-                    result['port'] = detected_port
-            except ImportError:
-                # fitz.core.detect not available, fall back to YAML defaults
-                pass
+    # Only auto-detect if host/port not explicitly provided
+    if 'host' in result and 'port' in result:
+        return result
+
+    try:
+        from fitz.core import detect
+
+        # Map service name to detection function
+        detection_functions = {
+            'qdrant': detect.get_qdrant_connection,
+            'ollama': detect.get_ollama_connection,
+        }
+
+        detect_func = detection_functions.get(auto_detect_service)
+        if detect_func:
+            detected_host, detected_port = detect_func()
+
+            if 'host' not in result:
+                result['host'] = detected_host
+            if 'port' not in result:
+                result['port'] = detected_port
+
+    except ImportError:
+        # fitz.core.detect not available, fall back to YAML defaults
+        pass
 
     return result
 
@@ -508,33 +461,15 @@ def create_vector_db_plugin(plugin_name: str, **kwargs):
     """
     Create a vector DB plugin from YAML specification.
 
-    Connection details are AUTO-DETECTED from fitz.core.detect if not provided.
-    This ensures a single source of truth for service discovery.
+    Connection details are AUTO-DETECTED based on the YAML spec's
+    'features.auto_detect' field. This is provider-agnostic.
 
     For HTTP-based plugins: Returns GenericVectorDBPlugin
     For local plugins: Returns the specific Python implementation
-
-    Args:
-        plugin_name: Name of the plugin (e.g., 'qdrant', 'pinecone', 'local-faiss')
-        **kwargs: Plugin-specific configuration (host, port, api_key, etc.)
-                  If not provided, auto-detected from fitz.core.detect
-
-    Returns:
-        Vector DB plugin instance
-
-    Examples:
-        # Auto-detect Qdrant connection (recommended)
-        >>> db = create_vector_db_plugin('qdrant')
-
-        # Explicit override
-        >>> db = create_vector_db_plugin('qdrant', host='localhost', port=6333)
-
-        # Local FAISS (no network needed)
-        >>> db = create_vector_db_plugin('local-faiss', path='/tmp/vectors')
     """
     spec = load_vector_db_spec(plugin_name)
 
-    # Handle local implementations (e.g., FAISS) - no auto-detection needed
+    # Handle local implementations (e.g., FAISS)
     if spec.is_local():
         class_path = spec.get_local_class_path()
         if not class_path:
@@ -542,15 +477,13 @@ def create_vector_db_plugin(plugin_name: str, **kwargs):
                 f"Local plugin '{plugin_name}' missing python_class specification"
             )
 
-        # Import and instantiate the Python class
         module_path, class_name = class_path.rsplit('.', 1)
         module = importlib.import_module(module_path)
         PluginClass = getattr(module, class_name)
 
         return PluginClass(**kwargs)
 
-    # For HTTP-based plugins, auto-detect connection if not provided
-    resolved_kwargs = _get_auto_detected_kwargs(plugin_name, kwargs)
+    # For HTTP-based plugins, auto-detect connection based on YAML spec
+    resolved_kwargs = _get_auto_detected_kwargs(spec, kwargs)
 
-    # HTTP-based plugins use generic implementation
     return GenericVectorDBPlugin(spec, **resolved_kwargs)

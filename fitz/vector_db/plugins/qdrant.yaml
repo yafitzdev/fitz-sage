@@ -1,9 +1,29 @@
 # fitz/vector_db/plugins/qdrant.yaml
+#
+# Qdrant Vector Database Plugin
+#
+# Documentation: https://qdrant.tech/documentation/
+# Supports both local and cloud deployments.
 
 name: qdrant
 type: vector_db
 description: Qdrant vector database - supports local and cloud deployments
 
+# =============================================================================
+# Provider-specific features (drives loader behavior)
+# =============================================================================
+features:
+  # Qdrant requires point IDs to be UUIDs or unsigned 64-bit integers.
+  # String IDs like "doc.txt:0" will be converted to deterministic UUIDs.
+  requires_uuid_ids: true
+
+  # Enable auto-detection of Qdrant host/port via fitz.core.detect
+  # Uses get_qdrant_connection() which scans localhost and LAN.
+  auto_detect: qdrant
+
+# =============================================================================
+# Connection Configuration
+# =============================================================================
 connection:
   type: http
   base_url: "http://{{host}}:{{port}}"
@@ -15,8 +35,13 @@ connection:
     header: api-key
     optional: true  # API key is optional for local deployments
 
+# =============================================================================
+# Operations
+# =============================================================================
 operations:
+  # ---------------------------------------------------------------------------
   # Search for similar vectors
+  # ---------------------------------------------------------------------------
   search:
     endpoint: /collections/{{collection}}/points/search
     method: POST
@@ -32,12 +57,14 @@ operations:
         score: score
         payload: payload
 
+  # ---------------------------------------------------------------------------
   # Insert or update points
+  # ---------------------------------------------------------------------------
   upsert:
     endpoint: /collections/{{collection}}/points
     method: PUT
 
-    # Auto-create collection if it doesn't exist
+    # Auto-create collection if it doesn't exist (on 404)
     auto_create_collection: true
     create_collection_endpoint: /collections/{{collection}}
     create_collection_method: PUT
@@ -53,14 +80,18 @@ operations:
     point_transform:
       identity: true
 
+  # ---------------------------------------------------------------------------
   # Delete entire collection
+  # ---------------------------------------------------------------------------
   delete_collection:
     endpoint: /collections/{{collection}}
     method: DELETE
     response:
       success_codes: [200, 404]  # 404 = already deleted, that's fine
 
+  # ---------------------------------------------------------------------------
   # List all collections
+  # ---------------------------------------------------------------------------
   list_collections:
     endpoint: /collections
     method: GET
@@ -68,7 +99,9 @@ operations:
       collections_path: result.collections
       name_field: name
 
+  # ---------------------------------------------------------------------------
   # Get collection statistics
+  # ---------------------------------------------------------------------------
   get_stats:
     endpoint: /collections/{{collection}}
     method: GET

@@ -4,6 +4,10 @@ name: pinecone
 type: vector_db
 description: Pinecone vector database - managed cloud service
 
+features:
+  requires_uuid_ids: false
+  auto_detect: null
+
 connection:
   type: http
   # Pinecone URL format: https://{index}-{project}.svc.{environment}.pinecone.io

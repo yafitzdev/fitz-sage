@@ -1,18 +1,37 @@
-# File: fitz/vector_db/plugins/local_faiss.py
-# Wrapper for local FAISS implementation
+# fitz/vector_db/plugins/local_faiss.yaml
+#
+# Local FAISS Vector Database Plugin
+#
+# FAISS (Facebook AI Similarity Search) is a library for efficient
+# similarity search. This plugin wraps it for local, file-based storage.
+#
+# No external service required - runs entirely in-process.
+# Install with: pip install faiss-cpu
 
-"""
-Local FAISS vector database plugin.
+name: local_faiss
+type: vector_db
+description: Local FAISS vector database - file-based, no server required
 
-This is a thin wrapper that re-exports the actual FaissLocalVectorDB
-implementation from fitz.backends.local_vector_db.faiss.
+# =============================================================================
+# Provider-specific features
+# =============================================================================
+features:
+  # FAISS accepts any string ID - no conversion needed
+  requires_uuid_ids: false
 
-The actual implementation has:
-  - plugin_name = "local-faiss"
-  - plugin_type = "vector_db"
-  - Full VectorDBPlugin protocol implementation
-"""
+  # No auto-detection needed - it's a local library, not a network service
+  auto_detect: null
 
-from fitz.backends.local_vector_db.faiss import FaissLocalVectorDB
+# =============================================================================
+# Connection Configuration
+# =============================================================================
+connection:
+  # Local plugin - delegates to Python implementation
+  type: local
 
-__all__ = ["FaissLocalVectorDB"]
+# =============================================================================
+# Operations
+# =============================================================================
+operations:
+  # Python class that implements the VectorDBPlugin protocol
+  python_class: fitz.backends.local_vector_db.faiss.FaissLocalVectorDB
