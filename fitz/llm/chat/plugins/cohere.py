@@ -1,13 +1,12 @@
 # fitz/llm/chat/plugins/cohere.py
+
 """
 Cohere chat plugin using centralized HTTP client and credentials.
 
-Required:
-    - model: Chat model name (must be specified in config)
-    - COHERE_API_KEY environment variable OR api_key parameter
-
-Optional:
-    - temperature: Sampling temperature (default: 0.2)
+Uses Cohere v1 Chat API which expects:
+- preamble: system message
+- message: user message
+- chat_history: conversation history
 """
 
 from __future__ import annotations
@@ -29,10 +28,10 @@ class CohereChatClient:
     Cohere chat plugin using centralized HTTP client and credentials.
 
     Required:
+        - model: Chat model name (MUST be specified in config)
         - COHERE_API_KEY environment variable OR api_key parameter
 
     Optional:
-        - model: Chat model (default: command-r-plus)
         - temperature: Sampling temperature (default: 0.2)
     """
 
@@ -40,11 +39,11 @@ class CohereChatClient:
     plugin_type = "chat"
 
     def __init__(
-            self,
-            model: str,
-            api_key: str | None = None,
-            temperature: float = 0.2,
-            base_url: str = "https://api.cohere.ai/v1",
+        self,
+        model: str,  # ✅ REQUIRED - no default!
+        api_key: str | None = None,
+        temperature: float = 0.2,
+        base_url: str = "https://api.cohere.ai/v1",
     ) -> None:
         # Use centralized credential resolution
         try:
