@@ -20,6 +20,21 @@ from fitz.core.utils import extract_path
 from fitz.vector_db.base import SearchResult
 
 
+def _string_to_uuid(s: str) -> str:
+    """
+    Convert an arbitrary string ID to a deterministic UUID.
+
+    Qdrant requires IDs to be UUIDs or unsigned 64-bit integers.
+    This converts string IDs like 'doc.txt:0' to valid UUIDs.
+
+    Uses UUID5 with a fixed namespace for determinism - same input
+    always produces the same UUID.
+    """
+    # Use UUID5 for deterministic conversion (same string -> same UUID)
+    namespace = uuid.UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')  # UUID namespace for URLs
+    return str(uuid.uuid5(namespace, s))
+
+
 class VectorDBSpec:
     """Parsed vector DB specification from YAML file."""
 
@@ -134,6 +149,11 @@ class VectorDBSpec:
 
         return transformed
 
+    def requires_uuid_ids(self) -> bool:
+        """Check if this vector DB requires UUID IDs (e.g., Qdrant)."""
+        # Qdrant requires UUIDs or integers for point IDs
+        return self.name in ('qdrant',)
+
 
 class GenericVectorDBPlugin:
     """Generic vector DB plugin that executes YAML specifications."""
@@ -158,6 +178,39 @@ class GenericVectorDBPlugin:
         # Track vector dimension for auto-create
         self._vector_dim: Optional[int] = None
 
+    def _convert_point_ids(self, points: List[Dict]) -> List[Dict]:
+        """
+        Convert string IDs to UUIDs if required by the vector DB.
+
+        For Qdrant and similar DBs that require UUID/integer IDs,
+        this converts arbitrary string IDs to deterministic UUIDs
+        and stores the original ID in the payload.
+        """
+        if not self.spec.requires_uuid_ids():
+            return points
+
+        converted = []
+        for point in points:
+            new_point = dict(point)
+            original_id = point.get('id')
+
+            if original_id is not None and isinstance(original_id, str):
+                # Check if already a valid UUID
+                try:
+                    uuid.UUID(original_id)
+                    # Already a valid UUID, keep it
+                except ValueError:
+                    # Not a UUID, convert it
+                    new_point['id'] = _string_to_uuid(original_id)
+                    # Store original ID in payload for retrieval
+                    if 'payload' not in new_point:
+                        new_point['payload'] = {}
+                    new_point['payload']['_original_id'] = original_id
+
+            converted.append(new_point)
+
+        return converted
+
     def search(
             self,
             collection_name: str,
@@ -166,6 +219,11 @@ class GenericVectorDBPlugin:
             with_payload: bool = True,
     ) -> List[SearchResult]:
         """Search for similar vectors in collection."""
+        if 'search' not in self.spec.operations:
+            raise NotImplementedError(
+                f"{self.plugin_name} does not support search"
+            )
+
         op = self.spec.operations['search']
 
         # Build context for template rendering
@@ -206,6 +264,10 @@ class GenericVectorDBPlugin:
             result_score = extract_path(item, mapping.get('score', ''), strict=False)
             result_payload = extract_path(item, mapping.get('payload', ''), default={}, strict=False)
 
+            # Restore original ID if it was converted
+            if result_payload and '_original_id' in result_payload:
+                result_id = result_payload['_original_id']
+
             search_result = SearchResult(
                 id=str(result_id),
                 score=float(result_score) if result_score is not None else None,
@@ -228,12 +290,16 @@ class GenericVectorDBPlugin:
 
         op = self.spec.operations['upsert']
 
+        # Convert string IDs to UUIDs if required
+        converted_points = self._convert_point_ids(points)
+
         # Transform points to provider format
-        transformed_points = self.spec.transform_points(points, 'upsert')
+        transformed_points = self.spec.transform_points(converted_points, 'upsert')
 
         context = {
             'collection': collection,
             'points': transformed_points,
+            'vector_dim': self._vector_dim,  # For auto-create collection
             **self.kwargs,
         }
 
@@ -245,7 +311,52 @@ class GenericVectorDBPlugin:
             url=endpoint,
             json=body,
         )
+
+        # Handle auto-create collection on 404 (collection doesn't exist)
+        if response.status_code == 404 and op.get('auto_create_collection'):
+            self._auto_create_collection(collection, op, context)
+            # Retry the upsert after creating collection
+            response = self.client.request(
+                method=op['method'],
+                url=endpoint,
+                json=body,
+            )
+
         response.raise_for_status()
+
+    def _auto_create_collection(
+        self,
+        collection: str,
+        op: Dict[str, Any],
+        context: Dict[str, Any],
+    ) -> None:
+        """Auto-create a collection before upsert.
+
+        Uses the create_collection_* fields from the upsert operation spec.
+        """
+        create_endpoint = op.get('create_collection_endpoint')
+        create_method = op.get('create_collection_method', 'PUT')
+        create_body_template = op.get('create_collection_body', {})
+
+        if not create_endpoint:
+            raise ValueError(
+                f"auto_create_collection is true but create_collection_endpoint "
+                f"is not specified in {self.plugin_name} YAML"
+            )
+
+        # Render the endpoint and body with current context
+        endpoint = Template(create_endpoint).render(context)
+        body = self.spec.render_template(create_body_template, context)
+
+        response = self.client.request(
+            method=create_method,
+            url=endpoint,
+            json=body,
+        )
+
+        # Accept 200, 201, and 409 (already exists) as success
+        if response.status_code not in (200, 201, 409):
+            response.raise_for_status()
 
     def create_collection(self, name: str, vector_size: int) -> None:
         """Create a new collection."""
