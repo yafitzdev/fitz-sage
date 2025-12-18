@@ -45,12 +45,12 @@ class RAGPipeline:
     def __init__(
         self,
         retriever: RetrieverEngine,
-        llm,  # Chat plugin directly
+        chat,  # Chat plugin directly
         rgs: RGS,
         context: ContextPipeline | None = None,
     ):
         self.retriever = retriever
-        self.llm = llm
+        self.chat = chat
         self.rgs = rgs
         self.context = context or ContextPipeline()
 
@@ -96,7 +96,7 @@ class RAGPipeline:
         ]
 
         try:
-            raw = self.llm.chat(messages)
+            raw = self.chat.chat(messages)
         except Exception as exc:
             logger.error(f"{PIPELINE} LLM chat failed: {exc}")
             raise LLMError("LLM chat operation failed") from exc
@@ -177,7 +177,7 @@ class RAGPipeline:
         rgs = RGS(config=rgs_cfg)
 
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
-        return cls(retriever=retriever, llm=chat_plugin, rgs=rgs, context=ContextPipeline())
+        return cls(retriever=retriever, chat=chat_plugin, rgs=rgs, context=ContextPipeline())
 
     @classmethod
     def from_dict(cls, config_dict: dict) -> "RAGPipeline":

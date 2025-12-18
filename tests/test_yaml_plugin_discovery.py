@@ -1,86 +1,69 @@
-# tests/test_yaml_plugin_discovery.py
-"""
-Tests for YAML plugin discovery.
-"""
+# File: tests/test_yaml_plugin_discovery.py
+"""Tests for YAML plugin discovery system."""
 import pytest
+
+from fitz.llm import available_llm_plugins, get_llm_plugin, list_yaml_plugins
+from fitz.llm.registry import LLMRegistryError
 
 
 class TestYAMLPluginDiscovery:
-    """Test YAML plugin discovery."""
+    """Tests for YAML-based plugin discovery."""
 
     def test_list_yaml_plugins(self):
-        """list_yaml_plugins returns list for each type."""
-        from fitz.llm.loader import list_yaml_plugins
-
-        for plugin_type in ("chat", "embedding", "rerank"):
-            result = list_yaml_plugins(plugin_type)
-            assert isinstance(result, list)
+        """list_yaml_plugins returns available plugins."""
+        chat_plugins = list_yaml_plugins("chat")
+        assert isinstance(chat_plugins, list)
+        assert len(chat_plugins) > 0
 
     def test_available_llm_plugins(self):
-        """available_llm_plugins includes YAML plugins."""
-        from fitz.llm import available_llm_plugins, list_yaml_plugins
-        from fitz.core import registry
+        """available_llm_plugins works with YAML system."""
+        chat_plugins = available_llm_plugins("chat")
+        assert isinstance(chat_plugins, list)
+        assert len(chat_plugins) > 0
 
-        # Reset discovery
-        registry._LLM_DISCOVERED = False
-        registry.LLM_REGISTRY.clear()
-
-        yaml_plugins = list_yaml_plugins("chat")
-        all_plugins = available_llm_plugins("chat")
-
-        for name in yaml_plugins:
-            assert name in all_plugins
-
-    def test_get_llm_plugin_returns_wrapper(self):
-        """get_llm_plugin returns wrapper class for YAML plugins."""
-        from fitz.llm import get_llm_plugin, list_yaml_plugins
-        from fitz.core import registry
-
-        registry._LLM_DISCOVERED = False
-        registry.LLM_REGISTRY.clear()
-
+    def test_get_llm_plugin_returns_instance(self):
+        """get_llm_plugin returns instance for YAML plugins."""
         yaml_plugins = list_yaml_plugins("chat")
         if not yaml_plugins:
             pytest.skip("No YAML chat plugins")
 
-        plugin_cls = get_llm_plugin(plugin_name=yaml_plugins[0], plugin_type="chat")
-
-        assert hasattr(plugin_cls, "plugin_name")
-        assert hasattr(plugin_cls, "plugin_type")
-        assert plugin_cls.plugin_name == yaml_plugins[0]
-        assert plugin_cls.plugin_type == "chat"
-
-    def test_resolve_llm_plugin(self):
-        """resolve_llm_plugin works with YAML plugins."""
-        from fitz.core.registry import resolve_llm_plugin
-        from fitz.llm.loader import list_yaml_plugins
-        from fitz.core import registry
-
-        registry._LLM_DISCOVERED = False
-        registry.LLM_REGISTRY.clear()
-
-        yaml_plugins = list_yaml_plugins("chat")
-        if not yaml_plugins:
-            pytest.skip("No YAML chat plugins")
-
-        plugin_cls = resolve_llm_plugin(
+        # YAML plugins return instances, pass api_key to avoid credential errors
+        instance = get_llm_plugin(
+            plugin_name=yaml_plugins[0],
             plugin_type="chat",
-            requested_name=yaml_plugins[0],
+            api_key="test_key_for_testing"
         )
 
-        assert isinstance(plugin_cls, type)
+        # Should have plugin attributes
+        assert hasattr(instance, "plugin_name")
+        assert hasattr(instance, "plugin_type")
+        assert instance.plugin_name == yaml_plugins[0]
+        assert instance.plugin_type == "chat"
+
+    def test_resolve_llm_plugin(self):
+        """resolve_llm_plugin is an alias for get_llm_plugin."""
+        from fitz.llm.registry import resolve_llm_plugin
+
+        yaml_plugins = list_yaml_plugins("chat")
+        if not yaml_plugins:
+            pytest.skip("No YAML chat plugins")
+
+        # Pass api_key to avoid credential errors
+        instance = resolve_llm_plugin(
+            plugin_type="chat",
+            requested_name=yaml_plugins[0],
+            api_key="test_key_for_testing"
+        )
+
+        assert hasattr(instance, "plugin_name")
+        assert instance.plugin_name == yaml_plugins[0]
 
     def test_invalid_plugin_type_raises(self):
         """Invalid plugin type raises ValueError."""
-        from fitz.llm import get_llm_plugin
-
-        with pytest.raises(ValueError):
-            get_llm_plugin(plugin_name="test", plugin_type="invalid")
+        with pytest.raises(ValueError, match="Invalid LLM plugin type"):
+            get_llm_plugin(plugin_name="cohere", plugin_type="invalid_type")
 
     def test_unknown_plugin_raises(self):
         """Unknown plugin raises LLMRegistryError."""
-        from fitz.llm import get_llm_plugin
-        from fitz.core.registry import LLMRegistryError
-
-        with pytest.raises(LLMRegistryError):
+        with pytest.raises(LLMRegistryError, match="Unknown chat plugin"):
             get_llm_plugin(plugin_name="__nonexistent__", plugin_type="chat")

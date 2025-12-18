@@ -1,43 +1,41 @@
-# fitz/llm/embedding/ollama.yaml
-# Ollama Embedding Plugin - Local embeddings
+# fitz/llm/rerank/cohere.yaml
+# Cohere Rerank Plugin - v2 Rerank API
 #
-# Documentation: https://github.com/ollama/ollama/blob/main/docs/api.md#generate-embeddings
-# Required: Ollama running locally (no API key needed)
+# Documentation: https://docs.cohere.com/reference/rerank
+# Required: COHERE_API_KEY environment variable
 
-plugin_name: "ollama"
-plugin_type: "embedding"
+plugin_name: "cohere"
+plugin_type: "rerank"
 version: "1.0"
 
 provider:
-  name: "ollama"
-  base_url: "http://localhost:11434"
+  name: "cohere"
+  base_url: "https://api.cohere.ai/v1"
 
 auth:
-  type: "none"
-  header_name: ""
-  header_format: ""
-  env_vars: []
-
-health_check:
-  path: "/api/tags"
-  method: "GET"
-  timeout: 2
+  type: "bearer"
+  header_name: "Authorization"
+  header_format: "Bearer {key}"
+  env_vars:
+    - "COHERE_API_KEY"
 
 endpoint:
-  path: "/api/embeddings"
+  path: "/rerank"
   method: "POST"
   timeout: 30
 
 defaults:
-  model: "nomic-embed-text"
+  model: "rerank-english-v3.0"
 
 request:
-  input_field: "prompt"
-  input_wrap: "string"
+  query_field: "query"
+  documents_field: "documents"
   static_fields: {}
   param_map:
     model: "model"
+    top_n: "top_n"
 
 response:
-  embeddings_path: "embedding"
-  is_array: false
+  results_path: "results"
+  result_index_path: "index"
+  result_score_path: "relevance_score"

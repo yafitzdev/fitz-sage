@@ -1,4 +1,4 @@
-# tests/test_llm_auto_discovery.py
+# File: tests/test_llm_auto_discovery.py
 """
 Tests for LLM plugin auto-discovery.
 
@@ -46,12 +46,23 @@ def test_get_llm_plugin_invalid_type_raises():
         get_llm_plugin(plugin_name="cohere", plugin_type="vector_db")
 
 
-def test_get_llm_plugin_returns_class_if_present():
-    """Registered plugins should return a class."""
+def test_get_llm_plugin_returns_instance_if_present():
+    """Registered plugins should return an instance (YAML-based system)."""
     for kind in ("chat", "embedding", "rerank"):
         names = available_llm_plugins(kind)
         if "cohere" not in names:
             pytest.skip(f"'cohere' not registered for kind={kind!r}")
 
-        cls = get_llm_plugin(plugin_name="cohere", plugin_type=kind)
-        assert isinstance(cls, type)
+        # YAML plugins return instances, not classes
+        # Pass api_key to avoid credential errors in tests
+        instance = get_llm_plugin(
+            plugin_name="cohere",
+            plugin_type=kind,
+            api_key="test_key_for_testing"
+        )
+
+        # Should be an instance with plugin_name and plugin_type attributes
+        assert hasattr(instance, "plugin_name")
+        assert hasattr(instance, "plugin_type")
+        assert instance.plugin_name == "cohere"
+        assert instance.plugin_type == kind
