@@ -1,4 +1,3 @@
-# MIGRATION.md
 # Migration Guide: v0.2.x → v0.3.0
 
 This guide helps you upgrade your Fitz application from v0.2.x to v0.3.0.
