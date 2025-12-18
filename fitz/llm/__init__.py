@@ -28,8 +28,6 @@ from fitz.llm.runtime import (
     create_yaml_rerank_client,
 )
 
-from fitz.llm.yaml_wrappers import create_yaml_plugin_wrapper
-
 __all__ = [
     # Registry
     "available_llm_plugins",
@@ -52,6 +50,4 @@ __all__ = [
     "create_yaml_chat_client",
     "create_yaml_embedding_client",
     "create_yaml_rerank_client",
-    # Wrapper factory
-    "create_yaml_plugin_wrapper",
 ]
