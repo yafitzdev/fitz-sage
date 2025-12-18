@@ -308,10 +308,23 @@ def command(
 
     system = detect_all()
 
-    # Display API key status for chat
-    for provider in system.api_keys.values():
-        print_provider_status(provider)
-    print_provider_status(system.ollama)
+    # Display chat providers with consistent model info
+    if system.api_keys["cohere"].available:
+        print_status("Cohere", True, "command-r-08-2024")
+    else:
+        print_status("Cohere", False, "Requires COHERE_API_KEY")
+    if system.api_keys["openai"].available:
+        print_status("OpenAI", True, "gpt-4o-mini")
+    else:
+        print_status("OpenAI", False, "Requires OPENAI_API_KEY")
+    if system.api_keys["anthropic"].available:
+        print_status("Anthropic", True, "claude-sonnet-4-20250514")
+    else:
+        print_status("Anthropic", False, "Requires ANTHROPIC_API_KEY")
+    if system.ollama.available:
+        print_status("Ollama", True, "llama3.2")
+    else:
+        print_status("Ollama", False, "Not running")
 
     print_header("Checking Embedding Providers...")
     # Show embedding-capable providers (Anthropic doesn't have embeddings)
@@ -331,7 +344,7 @@ def command(
     print_header("Checking Rerank Providers...")
     # Currently only Cohere supports reranking
     if system.api_keys["cohere"].available:
-        print_status("Cohere", True, "Available (rerank-english-v3.0)")
+        print_status("Cohere", True, "rerank-english-v3.0")
     else:
         print_status("Cohere", False, "Requires COHERE_API_KEY")
 
@@ -568,7 +581,7 @@ def command(
 Your configuration is ready! Next steps:
 
 1. Ingest some documents:
-   fitz-ingest run ./your_docs --collection {collection_name}
+   fitz ingest ./your_docs {collection_name}
 
 2. Query your documents:
    fitz query "What is in my documents?"
