@@ -143,15 +143,16 @@ Architecture enforces separation: engines can be added or removed without destab
 ---
 
 ## 💻 CLI
-
 ```bash
-# Ingest documents
-fitz-ingest run ./docs --collection my_kb
+# First-time setup
+fitz init                # Interactive config wizard
+fitz quickstart          # End-to-end test with sample docs
 
-# Query
+# Daily usage
+fitz-ingest run ./docs --collection my_kb
 fitz-pipeline query "What is X?" --collection my_kb
 
-# Check system health
+# Diagnostics
 fitz doctor
 ```
 
