@@ -4,12 +4,13 @@ Tests for the centralized plugin registry system.
 
 Architecture:
 - All registries use fitz.core.registry.PluginRegistry
-- PluginNotFoundError is raised for unknown plugins
+- PluginNotFoundError is raised for unknown plugins (most registries)
+- PluginRegistryError wraps PluginNotFoundError for get_ingest_plugin
 - Each plugin type has its own registry instance
 """
 import pytest
 
-from fitz.core.registry import PluginNotFoundError
+from fitz.core.registry import PluginNotFoundError, PluginRegistryError
 from fitz.ingest.ingestion.plugins.local_fs import LocalFSIngestPlugin
 from fitz.ingest.ingestion.registry import get_ingest_plugin
 
@@ -21,14 +22,16 @@ def test_registry_returns_correct_plugin():
 
 
 def test_registry_rejects_unknown_plugin():
-    """Registry should raise PluginNotFoundError for unknown plugins."""
-    with pytest.raises(PluginNotFoundError):
+    """Registry should raise PluginRegistryError for unknown plugins."""
+    # get_ingest_plugin wraps PluginNotFoundError in PluginRegistryError
+    with pytest.raises(PluginRegistryError):
         get_ingest_plugin("does_not_exist")
 
 
 def test_registry_error_message_is_helpful():
     """Error message should list available plugins."""
-    with pytest.raises(PluginNotFoundError) as exc_info:
+    # get_ingest_plugin wraps PluginNotFoundError in PluginRegistryError
+    with pytest.raises(PluginRegistryError) as exc_info:
         get_ingest_plugin("nonexistent_plugin")
 
     error_msg = str(exc_info.value)
@@ -45,17 +48,19 @@ def test_all_registries_use_same_pattern():
     """All plugin registries should follow the same pattern."""
     from fitz.core.registry import (
         PluginNotFoundError,
+        PluginRegistryError,
         get_ingest_plugin,
         get_llm_plugin,
         get_vector_db_plugin,
     )
 
-    # All should raise PluginNotFoundError for unknown plugins
+    # LLM and Vector DB raise PluginNotFoundError
     with pytest.raises(PluginNotFoundError):
         get_llm_plugin(plugin_name="__fake__", plugin_type="chat")
 
     with pytest.raises(PluginNotFoundError):
         get_vector_db_plugin("__fake__")
 
-    with pytest.raises(PluginNotFoundError):
+    # get_ingest_plugin wraps in PluginRegistryError
+    with pytest.raises(PluginRegistryError):
         get_ingest_plugin("__fake__")

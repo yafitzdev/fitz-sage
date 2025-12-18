@@ -18,7 +18,7 @@ class FailingLLM:
 
 
 def test_rag_pipeline_llm_failure():
-    pipe = RAGPipeline(retriever=DummyRetriever(), llm=FailingLLM(), rgs=RGS(RGSConfig()))
+    pipe = RAGPipeline(retriever=DummyRetriever(), chat=FailingLLM(), rgs=RGS(RGSConfig()))
 
     with pytest.raises(LLMError):
         pipe.run("hello?")

@@ -1,3 +1,4 @@
+# tests/test_rag_pipeline_end_to_end.py
 from __future__ import annotations
 
 from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSAnswer, RGSConfig
@@ -54,7 +55,7 @@ def test_pipeline_end_to_end():
 
     pipe = RAGPipeline(
         retriever=DummyRetriever(),
-        llm=DummyLLM(),
+        chat=DummyLLM(),
         rgs=rgs,
     )
 
