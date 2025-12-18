@@ -16,7 +16,6 @@ import typer
 from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.ingest.ingestion.engine import IngestionEngine
 from fitz.ingest.ingestion.registry import get_ingest_plugin
-from fitz.llm.embedding.engine import EmbeddingEngine
 from fitz.llm.registry import get_llm_plugin
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import CHUNKING, CLI, EMBEDDING, INGEST, VECTOR_DB
@@ -77,33 +76,42 @@ def _raw_to_chunks(raw_docs: Iterable[Any]) -> list[Chunk]:
 
 
 def _embed_with_progress(
-    embed_engine: EmbeddingEngine,
-    chunks: List[Chunk],
-    show_progress: bool = True,
+        embed_plugin: Any,
+        chunks: List[Chunk],
+        show_progress: bool = True,
 ) -> List[List[float]]:
-    """Embed chunks with progress bar."""
+    """Embed chunks with progress bar.
+
+    Args:
+        embed_plugin: YAML embedding plugin instance with embed() method
+        chunks: List of chunks to embed
+        show_progress: Whether to show progress bar
+
+    Returns:
+        List of embedding vectors
+    """
     vectors = []
 
     if RICH_AVAILABLE and show_progress and len(chunks) > 1:
         with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-            console=console,
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+                console=console,
         ) as progress:
             task = progress.add_task("Embedding...", total=len(chunks))
 
             for chunk in chunks:
-                vector = embed_engine.embed(chunk.content)
+                vector = embed_plugin.embed(chunk.content)
                 vectors.append(vector)
                 progress.update(task, advance=1)
     else:
         # Fallback without rich
         for i, chunk in enumerate(chunks):
-            vector = embed_engine.embed(chunk.content)
+            vector = embed_plugin.embed(chunk.content)
             vectors.append(vector)
             if not RICH_AVAILABLE and (i + 1) % 10 == 0:
                 typer.echo(f"  Embedded {i + 1}/{len(chunks)} chunks...")
@@ -112,44 +120,44 @@ def _embed_with_progress(
 
 
 def command(
-    source: Path = typer.Argument(
-        ...,
-        help="Source to ingest (file or directory).",
-    ),
-    collection: str = typer.Argument(
-        "default",
-        help="Target collection name.",
-    ),
-    ingest_plugin: str = typer.Option(
-        "local",
-        "--ingest",
-        "-i",
-        help="Ingestion plugin name.",
-    ),
-    embedding_plugin: str = typer.Option(
-        "cohere",
-        "--embedding",
-        "-e",
-        help="Embedding plugin name.",
-    ),
-    vector_db_plugin: str = typer.Option(
-        "qdrant",
-        "--vector-db",
-        "-v",
-        help="Vector DB plugin name.",
-    ),
-    batch_size: int = typer.Option(
-        50,
-        "--batch-size",
-        "-b",
-        help="Batch size for vector DB writes.",
-    ),
-    quiet: bool = typer.Option(
-        False,
-        "--quiet",
-        "-q",
-        help="Suppress progress output.",
-    ),
+        source: Path = typer.Argument(
+            ...,
+            help="Source to ingest (file or directory).",
+        ),
+        collection: str = typer.Argument(
+            "default",
+            help="Target collection name.",
+        ),
+        ingest_plugin: str = typer.Option(
+            "local",
+            "--ingest",
+            "-i",
+            help="Ingestion plugin name.",
+        ),
+        embedding_plugin: str = typer.Option(
+            "cohere",
+            "--embedding",
+            "-e",
+            help="Embedding plugin name.",
+        ),
+        vector_db_plugin: str = typer.Option(
+            "qdrant",
+            "--vector-db",
+            "-v",
+            help="Vector DB plugin name.",
+        ),
+        batch_size: int = typer.Option(
+            50,
+            "--batch-size",
+            "-b",
+            help="Batch size for vector DB writes.",
+        ),
+        quiet: bool = typer.Option(
+            False,
+            "--quiet",
+            "-q",
+            help="Suppress progress output.",
+        ),
 ) -> None:
     """
     Ingest documents into a vector database.
@@ -202,28 +210,29 @@ def command(
                 IngestPluginCls = get_ingest_plugin(ingest_plugin)
                 ingest_plugin_obj = IngestPluginCls()
                 ingest_engine = IngestionEngine(plugin=ingest_plugin_obj, kwargs={})
-                raw_docs = list(ingest_engine.run(str(source)))
-            console.print(f"[green]✓[/green] Found [bold]{len(raw_docs)}[/bold] documents")
+                raw_docs = list(ingest_engine.ingest(str(source)))
         else:
-            typer.echo(f"[1/4] Ingesting documents from {source}...")
+            typer.echo("[1/4] Reading documents...")
             IngestPluginCls = get_ingest_plugin(ingest_plugin)
             ingest_plugin_obj = IngestPluginCls()
             ingest_engine = IngestionEngine(plugin=ingest_plugin_obj, kwargs={})
-            raw_docs = list(ingest_engine.run(str(source)))
-            typer.echo(f"  ✓ Ingested {len(raw_docs)} documents")
+            raw_docs = list(ingest_engine.ingest(str(source)))
     else:
         IngestPluginCls = get_ingest_plugin(ingest_plugin)
         ingest_plugin_obj = IngestPluginCls()
         ingest_engine = IngestionEngine(plugin=ingest_plugin_obj, kwargs={})
-        raw_docs = list(ingest_engine.run(str(source)))
+        raw_docs = list(ingest_engine.ingest(str(source)))
 
-    logger.info(f"{INGEST} Ingested {len(raw_docs)} raw documents")
+    logger.info(f"{INGEST} Ingested {len(raw_docs)} raw documents from {source}")
+
+    if show_progress:
+        if RICH_AVAILABLE:
+            console.print(f"[green]✓[/green] Found [bold]{len(raw_docs)}[/bold] documents")
+        else:
+            typer.echo(f"  ✓ Found {len(raw_docs)} documents")
 
     if not raw_docs:
-        if RICH_AVAILABLE:
-            console.print("[yellow]⚠[/yellow] No documents found to ingest")
-        else:
-            typer.echo("⚠ No documents found to ingest")
+        typer.echo("No documents found to ingest.")
         raise typer.Exit(code=0)
 
     # =========================================================================
@@ -231,15 +240,17 @@ def command(
     # =========================================================================
     if show_progress:
         if RICH_AVAILABLE:
-            with console.status("[bold blue]Converting to chunks...", spinner="dots"):
-                chunks = _raw_to_chunks(raw_docs)
+            console.print("[bold blue]⏳[/bold blue] Creating chunks...")
+        else:
+            typer.echo("[2/4] Creating chunks...")
+
+    chunks = _raw_to_chunks(raw_docs)
+
+    if show_progress:
+        if RICH_AVAILABLE:
             console.print(f"[green]✓[/green] Created [bold]{len(chunks)}[/bold] chunks")
         else:
-            typer.echo("[2/4] Converting to chunks...")
-            chunks = _raw_to_chunks(raw_docs)
             typer.echo(f"  ✓ Created {len(chunks)} chunks")
-    else:
-        chunks = _raw_to_chunks(raw_docs)
 
     logger.info(f"{CHUNKING} Created {len(chunks)} chunks from raw documents")
 
@@ -254,11 +265,10 @@ def command(
         else:
             typer.echo(f"[3/4] Generating embeddings with {embedding_plugin}...")
 
-    EmbedPluginCls = get_llm_plugin(plugin_type="embedding", plugin_name=embedding_plugin)
-    embed_plugin = EmbedPluginCls()
-    embed_engine = EmbeddingEngine(embed_plugin)
+    # Use YAML plugin directly - no EmbeddingEngine wrapper needed
+    embed_plugin = get_llm_plugin(plugin_type="embedding", plugin_name=embedding_plugin)
 
-    vectors = _embed_with_progress(embed_engine, chunks, show_progress=show_progress)
+    vectors = _embed_with_progress(embed_plugin, chunks, show_progress=show_progress)
 
     logger.info(f"{EMBEDDING} Generated {len(vectors)} embeddings")
 
@@ -284,8 +294,8 @@ def command(
 
     # Batch write
     for i in range(0, len(chunks), batch_size):
-        batch_chunks = chunks[i : i + batch_size]
-        batch_vectors = vectors[i : i + batch_size]
+        batch_chunks = chunks[i: i + batch_size]
+        batch_vectors = vectors[i: i + batch_size]
         writer.upsert(collection=collection, chunks=batch_chunks, vectors=batch_vectors)
         logger.debug(f"{VECTOR_DB} Wrote batch {i // batch_size + 1}")
 

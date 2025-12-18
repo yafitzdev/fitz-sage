@@ -12,10 +12,11 @@ def command() -> None:
     """
     List all discovered plugins.
     """
-    from fitz.core.registry import (
-        available_llm_plugins,
-        available_vector_db_plugins,
-    )
+    # Import from correct locations:
+    # - LLM plugins (chat, embedding, rerank) are in fitz.llm.registry
+    # - Vector DB plugins are in fitz.core.registry
+    from fitz.llm.registry import available_llm_plugins
+    from fitz.core.registry import available_vector_db_plugins
 
     typer.echo()
 
