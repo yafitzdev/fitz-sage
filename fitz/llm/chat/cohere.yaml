@@ -3,6 +3,13 @@
 #
 # Documentation: https://docs.cohere.com/reference/chat
 # Required: COHERE_API_KEY environment variable
+#
+# Available models (as of 2025):
+#   - command-a-03-2025       (newest, best performance)
+#   - command-r-plus-08-2024  (powerful, complex tasks)
+#   - command-r-08-2024       (efficient, general purpose)
+#
+# Note: command-r-plus was retired September 15, 2025
 
 plugin_name: "cohere"
 plugin_type: "chat"
@@ -25,7 +32,7 @@ endpoint:
   timeout: 120
 
 defaults:
-  model: "command-r-plus"
+  model: "command-r-plus-08-2024"
   temperature: 0.2
 
 request:
