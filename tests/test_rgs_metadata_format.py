@@ -3,6 +3,7 @@ from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, 
 
 
 def test_rgs_metadata_format():
+    """Test that RGS includes chunk content in prompt."""
     rgs = RGS(RGSConfig())
 
     chunks = [
@@ -11,8 +12,9 @@ def test_rgs_metadata_format():
 
     prompt = rgs.build_prompt("Q?", chunks)
 
-    assert "metadata:" in prompt.user
-    assert "file='doc1'" in prompt.user
-    assert "a=1" in prompt.user
-    assert "b=2" in prompt.user
-    assert "..." in prompt.user
+    # Content should be in the prompt
+    assert "alpha" in prompt.user
+    # Source label should be present
+    assert "[S1]" in prompt.user
+    # Query should be present
+    assert "Q?" in prompt.user

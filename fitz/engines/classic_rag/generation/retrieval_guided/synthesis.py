@@ -109,23 +109,23 @@ class RGS:
             strict_grounding=self.config.strict_grounding,
             answer_style=self.config.answer_style,
             source_label_prefix=self.config.source_label_prefix,
+            max_answer_chars=self.config.max_answer_chars,
         )
 
     def _build_user_prompt(self, query: str, chunks: Sequence[ChunkInput]) -> str:
         """Build the user prompt with context and query."""
-        context_parts = []
+        context_items = []
 
         for idx, chunk in enumerate(chunks, start=1):
             content = self._get_chunk_content(chunk)
             label = f"[{self.config.source_label_prefix}{idx}]"
-            context_parts.append(f"{label}\n{content}")
-
-        context = "\n\n".join(context_parts)
+            context_items.append(f"{label}\n{content}")
 
         return self._assembler.build_user(
             query=query,
-            context=context,
+            context_items=context_items,
             include_query_in_context=self.config.include_query_in_context,
+            user_instructions=None,
         )
 
     def _get_chunk_content(self, chunk: ChunkInput) -> str:

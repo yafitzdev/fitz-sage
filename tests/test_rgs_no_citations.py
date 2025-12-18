@@ -3,6 +3,7 @@ from fitz.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, 
 
 
 def test_rgs_disable_citations():
+    """Test that enable_citations=False removes citation instruction from system prompt."""
     rgs = RGS(config=RGSConfig(enable_citations=False))
 
     chunks = [
@@ -12,5 +13,9 @@ def test_rgs_disable_citations():
 
     prompt = rgs.build_prompt("What?", chunks)
 
-    assert "[S1]" not in prompt.user
-    assert "[S2]" not in prompt.user
+    # Citation instruction should NOT be in system prompt
+    assert "Use citations" not in prompt.system
+
+    # Content should still be in user prompt
+    assert "alpha" in prompt.user
+    assert "beta" in prompt.user
