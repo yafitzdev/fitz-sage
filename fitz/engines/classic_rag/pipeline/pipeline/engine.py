@@ -1,4 +1,4 @@
-# fitz/engines/classic_rag/pipeline/pipeline/engine.py
+# File: fitz/engines/classic_rag/pipeline/pipeline/engine.py
 """
 RAGPipeline - Core orchestration for retrieval-augmented generation.
 
@@ -7,7 +7,7 @@ Flow: vector_db → retrieval → context-processing → rgs → llm → final a
 
 from __future__ import annotations
 
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Optional
 
 from fitz.engines.classic_rag.config import ClassicRagConfig, load_config
 from fitz.engines.classic_rag.errors.llm import LLMError
@@ -29,34 +29,6 @@ from fitz.vector_db.registry import get_vector_db_plugin
 logger = get_logger(__name__)
 
 
-# =============================================================================
-# Protocols for type hints
-# =============================================================================
-
-
-@runtime_checkable
-class ChatPlugin(Protocol):
-    """Protocol for chat plugins."""
-    def chat(self, messages: list[dict[str, Any]]) -> str: ...
-
-
-@runtime_checkable
-class EmbeddingPlugin(Protocol):
-    """Protocol for embedding plugins."""
-    def embed(self, text: str) -> list[float]: ...
-
-
-@runtime_checkable
-class RerankPlugin(Protocol):
-    """Protocol for rerank plugins."""
-    def rerank(self, query: str, documents: list[str], top_n: int | None = None) -> list[tuple[int, float]]: ...
-
-
-# =============================================================================
-# RAGPipeline
-# =============================================================================
-
-
 class RAGPipeline:
     """
     RAG Pipeline orchestrator.
@@ -73,21 +45,16 @@ class RAGPipeline:
     def __init__(
         self,
         retriever: RetrieverEngine,
-        chat: ChatPlugin,
+        llm,  # Chat plugin directly
         rgs: RGS,
         context: ContextPipeline | None = None,
     ):
         self.retriever = retriever
-        self.chat = chat
+        self.llm = llm
         self.rgs = rgs
         self.context = context or ContextPipeline()
 
         logger.info(f"{PIPELINE} RAGPipeline initialized")
-
-    # Backwards compat: expose chat as llm
-    @property
-    def llm(self) -> ChatPlugin:
-        return self.chat
 
     def run(self, query: str) -> RGSAnswer:
         """
@@ -129,7 +96,7 @@ class RAGPipeline:
         ]
 
         try:
-            raw = self.chat.chat(messages)
+            raw = self.llm.chat(messages)
         except Exception as exc:
             logger.error(f"{PIPELINE} LLM chat failed: {exc}")
             raise LLMError("LLM chat operation failed") from exc
@@ -158,26 +125,28 @@ class RAGPipeline:
         """
         logger.info(f"{PIPELINE} Constructing RAGPipeline from config")
 
-        # Vector DB
-        VectorDBCls = get_vector_db_plugin(cfg.vector_db.plugin_name)
-        vector_client = VectorDBCls(**cfg.vector_db.kwargs)
+        # Vector DB - YAML plugin system
+        vector_client = get_vector_db_plugin(
+            cfg.vector_db.plugin_name,
+            **cfg.vector_db.kwargs
+        )
         logger.info(f"{VECTOR_DB} Using vector DB plugin='{cfg.vector_db.plugin_name}'")
 
-        # Chat plugin
+        # Chat LLM - use plugin directly
         ChatCls = resolve_llm_plugin(
             plugin_type="chat",
             requested_name=cfg.chat.plugin_name,
         )
         chat_plugin = ChatCls(**cfg.chat.kwargs)
 
-        # Embedding plugin
+        # Embedding - use plugin directly
         EmbedCls = resolve_llm_plugin(
             plugin_type="embedding",
             requested_name=cfg.embedding.plugin_name,
         )
-        embed_plugin = EmbedCls(**cfg.embedding.kwargs)
+        embedder = EmbedCls(**cfg.embedding.kwargs)
 
-        # Rerank plugin (optional)
+        # Rerank (optional) - use plugin directly
         rerank_plugin = None
         if cfg.rerank.enabled:
             RerankCls = resolve_llm_plugin(
@@ -191,7 +160,7 @@ class RAGPipeline:
             cfg.retriever.plugin_name,
             client=vector_client,
             retriever_cfg=cfg.retriever,
-            embedder=embed_plugin,
+            embedder=embedder,
             rerank_engine=rerank_plugin,
         )
 
@@ -208,7 +177,7 @@ class RAGPipeline:
         rgs = RGS(config=rgs_cfg)
 
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
-        return cls(retriever=retriever, chat=chat_plugin, rgs=rgs, context=ContextPipeline())
+        return cls(retriever=retriever, llm=chat_plugin, rgs=rgs, context=ContextPipeline())
 
     @classmethod
     def from_dict(cls, config_dict: dict) -> "RAGPipeline":
@@ -231,10 +200,10 @@ def create_pipeline_from_yaml(path: Optional[str] = None) -> RAGPipeline:
     Create a RAGPipeline from a YAML config file.
 
     Args:
-        path: Path to YAML config file. Uses default if None.
+        path: Path to YAML config file. If None, uses default config.
 
     Returns:
-        RAGPipeline instance
+        Configured RAGPipeline instance
     """
     cfg = load_config(path)
     return RAGPipeline.from_config(cfg)

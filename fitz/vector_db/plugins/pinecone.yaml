@@ -1,0 +1,55 @@
+# fitz/vector_db/plugins/pinecone.yaml
+
+name: pinecone
+type: vector_db
+description: Pinecone vector database - managed cloud service
+
+connection:
+  type: http
+  # Pinecone URL format: https://{index}-{project}.svc.{environment}.pinecone.io
+  base_url: "https://{{index_name}}-{{project_id}}.svc.{{environment}}.pinecone.io"
+  default_environment: us-east-1-aws
+  auth:
+    type: custom
+    env_var: PINECONE_API_KEY
+    header: Api-Key
+
+operations:
+  search:
+    endpoint: /query
+    method: POST
+    body:
+      namespace: "{{collection}}"
+      vector: "{{query_vector}}"
+      topK: "{{limit}}"
+      includeMetadata: "{{with_payload}}"
+
+    response:
+      results_path: matches
+      mapping:
+        id: id
+        score: score
+        payload: metadata
+
+  upsert:
+    endpoint: /vectors/upsert
+    method: POST
+    body:
+      namespace: "{{collection}}"
+      vectors: "{{points}}"
+
+    # Transform standard format to Pinecone format
+    point_transform:
+      id: id
+      values: vector
+      metadata: payload
+
+  delete_collection:
+    # Pinecone uses namespace deletion (deletes all vectors in namespace)
+    endpoint: /vectors/delete
+    method: POST
+    body:
+      namespace: "{{collection}}"
+      deleteAll: true
+    response:
+      success_codes: [200, 404]

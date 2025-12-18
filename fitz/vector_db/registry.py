@@ -1,41 +1,60 @@
 # fitz/vector_db/registry.py
-"""
-Vector DB plugin registry.
 
-Handles discovery and registration of vector database plugins.
-Separate from LLM registry for cleaner architecture.
-
-Design principle: NO SILENT FALLBACK
-- If user configures "qdrant", they get qdrant or an error
-- If user wants local-faiss, they explicitly configure "local-faiss"
-- No magic substitution that could cause confusion
-"""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any, List
 
-from fitz.core.registry import (  # Functions; Registry; Errors
-    VECTOR_DB_REGISTRY,
-    PluginNotFoundError,
-    PluginRegistryError,
-    VectorDBRegistryError,
-    available_vector_db_plugins,
-    get_vector_db_plugin,
-    resolve_vector_db_plugin,
-)
+from fitz.vector_db.loader import create_vector_db_plugin, load_vector_db_spec
+from pathlib import Path
 
-if TYPE_CHECKING:
-    pass
+
+def get_vector_db_plugin(plugin_name: str, **kwargs) -> Any:
+    """
+    Get a vector DB plugin by name.
+
+    Args:
+        plugin_name: Name of the plugin (e.g., 'qdrant', 'pinecone', 'local-faiss')
+        **kwargs: Plugin configuration (host, port, etc.)
+
+    Returns:
+        Vector DB plugin instance
+
+    Raises:
+        ValueError: If plugin not found
+
+    Examples:
+        >>> db = get_vector_db_plugin('qdrant', host='localhost', port=6333)
+        >>> db = get_vector_db_plugin('pinecone', index_name='my-index', project_id='abc')
+    """
+    return create_vector_db_plugin(plugin_name, **kwargs)
+
+
+def available_vector_db_plugins() -> List[str]:
+    """
+    List available vector DB plugins.
+
+    Returns:
+        List of plugin names
+
+    Examples:
+        >>> available_vector_db_plugins()
+        ['qdrant', 'pinecone', 'local-faiss']
+    """
+    # Scan for YAML files in plugins directory
+    plugins_dir = Path(__file__).parent / "plugins"
+
+    if not plugins_dir.exists():
+        return []
+
+    yaml_files = list(plugins_dir.glob("*.yaml"))
+    return sorted([f.stem for f in yaml_files])
+
+
+# Backwards compatibility aliases
+resolve_vector_db_plugin = get_vector_db_plugin
 
 __all__ = [
-    # Functions
     "get_vector_db_plugin",
     "available_vector_db_plugins",
     "resolve_vector_db_plugin",
-    # Registry
-    "VECTOR_DB_REGISTRY",
-    # Errors
-    "VectorDBRegistryError",
-    "PluginRegistryError",
-    "PluginNotFoundError",
 ]

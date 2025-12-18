@@ -1,0 +1,18 @@
+# File: fitz/vector_db/plugins/local_faiss.py
+# Wrapper for local FAISS implementation
+
+"""
+Local FAISS vector database plugin.
+
+This is a thin wrapper that re-exports the actual FaissLocalVectorDB
+implementation from fitz.backends.local_vector_db.faiss.
+
+The actual implementation has:
+  - plugin_name = "local-faiss"
+  - plugin_type = "vector_db"
+  - Full VectorDBPlugin protocol implementation
+"""
+
+from fitz.backends.local_vector_db.faiss import FaissLocalVectorDB
+
+__all__ = ["FaissLocalVectorDB"]
