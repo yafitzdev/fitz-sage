@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from typing import Any
 
 from fitz.core.http import (
@@ -20,6 +19,7 @@ from fitz.core.http import (
     handle_api_error,
     raise_for_status,
 )
+from fitz.core.utils import extract_path, set_nested_path
 from fitz.llm.credentials import CredentialError, resolve_api_key
 from fitz.llm.loader import (
     load_chat_plugin,
@@ -39,56 +39,14 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Response Extraction Utilities
-# =============================================================================
-
-
-def extract_path(data: Any, path: str) -> Any:
-    """Extract a value from nested data using dot/bracket notation.
-
-    Examples:
-        extract_path({"a": {"b": 1}}, "a.b") -> 1
-        extract_path({"items": [{"x": 1}]}, "items[0].x") -> 1
-        extract_path({"data": [1, 2, 3]}, "data[0]") -> 1
-
-    Args:
-        data: The data structure to extract from
-        path: Dot-notation path with optional array indices
-
-    Returns:
-        Extracted value
-
-    Raises:
-        KeyError: If path doesn't exist
-        IndexError: If array index is out of bounds
-    """
-    if not path:
-        return data
-
-    # Split path into parts, handling both dots and brackets
-    # "items[0].text" -> ["items", "0", "text"]
-    parts = re.split(r'\.|\[|\]', path)
-    parts = [p for p in parts if p]  # Remove empty strings
-
-    current = data
-    for part in parts:
-        if isinstance(current, dict):
-            current = current[part]
-        elif isinstance(current, (list, tuple)):
-            current = current[int(part)]
-        else:
-            raise KeyError(f"Cannot traverse {type(current).__name__} with key {part!r}")
-
-    return current
-
-
-# =============================================================================
 # Base YAML Plugin Client
 # =============================================================================
 
 
 class YAMLPluginBase:
     """Base class for YAML-driven plugin clients."""
+
+    plugin_type: str = ""
 
     def __init__(
             self,
@@ -256,7 +214,7 @@ class YAMLChatClient(YAMLPluginBase):
         for fitz_name, provider_name in self.spec.request.param_map.items():
             if fitz_name in self.params:
                 # Handle nested param paths like "options.temperature"
-                self._set_nested_param(payload, provider_name, self.params[fitz_name])
+                set_nested_path(payload, provider_name, self.params[fitz_name])
 
         # Make request
         response = self._make_request(payload)
@@ -268,16 +226,6 @@ class YAMLChatClient(YAMLPluginBase):
         except (KeyError, IndexError) as e:
             logger.warning(f"Failed to extract response: {e}. Full response: {response}")
             return ""
-
-    def _set_nested_param(self, payload: dict, path: str, value: Any) -> None:
-        """Set a parameter at a potentially nested path (e.g., 'options.temperature')."""
-        parts = path.split(".")
-        current = payload
-        for part in parts[:-1]:
-            if part not in current:
-                current[part] = {}
-            current = current[part]
-        current[parts[-1]] = value
 
 
 # =============================================================================

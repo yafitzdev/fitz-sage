@@ -13,6 +13,7 @@ Public API:
     - Constraints: Query-time constraints
     - FitzPaths: Central path management
     - Exceptions: Standard error hierarchy
+    - Utils: extract_path, set_nested_path
 
 Examples:
     Using the core abstractions:
@@ -38,6 +39,12 @@ Examples:
     >>> from fitz.core import FitzPaths
     >>> config_path = FitzPaths.config()
     >>> vector_db_path = FitzPaths.vector_db()
+
+    Using extract_path:
+    >>> from fitz.core import extract_path
+    >>> data = {"response": {"choices": [{"text": "Hello"}]}}
+    >>> extract_path(data, "response.choices[0].text")
+    'Hello'
 """
 
 from .answer import Answer
@@ -64,6 +71,9 @@ from .provenance import Provenance
 # Core types
 from .query import Query
 
+# Core utilities
+from .utils import extract_path, set_nested_path
+
 __all__ = [
     # Protocol
     "KnowledgeEngine",
@@ -85,4 +95,7 @@ __all__ = [
     "ConfigurationError",
     "TimeoutError",
     "UnsupportedOperationError",
+    # Utilities
+    "extract_path",
+    "set_nested_path",
 ]

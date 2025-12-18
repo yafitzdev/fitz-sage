@@ -16,6 +16,7 @@ import yaml
 import httpx
 from jinja2 import Template
 
+from fitz.core.utils import extract_path
 from fitz.vector_db.base import SearchResult
 
 
@@ -113,27 +114,6 @@ class VectorDBSpec:
         else:
             return template
 
-    def extract_value(self, data: Any, path: str) -> Any:
-        """Extract value using dot notation path (e.g., 'result.collections')."""
-        if not path:
-            return data
-
-        parts = path.split('.')
-        current = data
-
-        for part in parts:
-            if part.isdigit():
-                current = current[int(part)]
-            elif isinstance(current, dict):
-                current = current.get(part)
-            else:
-                current = getattr(current, part, None)
-
-            if current is None:
-                return None
-
-        return current
-
     def transform_points(self, points: List[Dict], operation: str) -> List[Dict]:
         """Transform standard points format to provider-specific format."""
         op_spec = self.operations.get(operation, {})
@@ -212,7 +192,7 @@ class GenericVectorDBPlugin:
         # Extract results from response
         data = response.json()
         results_path = op['response']['results_path']
-        results = self.spec.extract_value(data, results_path)
+        results = extract_path(data, results_path, default=[], strict=False)
 
         if not results:
             return []
@@ -222,9 +202,9 @@ class GenericVectorDBPlugin:
         search_results = []
 
         for item in results:
-            result_id = self.spec.extract_value(item, mapping['id'])
-            result_score = self.spec.extract_value(item, mapping.get('score'))
-            result_payload = self.spec.extract_value(item, mapping.get('payload', {}))
+            result_id = extract_path(item, mapping['id'], strict=False)
+            result_score = extract_path(item, mapping.get('score', ''), strict=False)
+            result_payload = extract_path(item, mapping.get('payload', ''), default={}, strict=False)
 
             search_result = SearchResult(
                 id=str(result_id),
@@ -237,39 +217,29 @@ class GenericVectorDBPlugin:
 
     def upsert(self, collection: str, points: List[Dict]) -> None:
         """Insert or update points in collection."""
-        if not points:
-            return
+        if 'upsert' not in self.spec.operations:
+            raise NotImplementedError(
+                f"{self.plugin_name} does not support upsert"
+            )
 
-        # Detect vector dimension from first point
-        if self._vector_dim is None:
+        # Track dimension from first upsert
+        if points and 'vector' in points[0]:
             self._vector_dim = len(points[0]['vector'])
 
         op = self.spec.operations['upsert']
 
-        # Auto-create collection if configured
-        if op.get('auto_create_collection'):
-            self._ensure_collection(collection, op)
-
         # Transform points to provider format
         transformed_points = self.spec.transform_points(points, 'upsert')
 
-        # For Qdrant: Convert string IDs to UUIDs (Qdrant requires int or UUID)
-        if self.plugin_name == "qdrant":
-            transformed_points = self._convert_ids_for_qdrant(transformed_points)
-
-        # Build context
         context = {
             'collection': collection,
             'points': transformed_points,
-            'vector_dim': self._vector_dim,
             **self.kwargs,
         }
 
-        # Build request
         endpoint = Template(op['endpoint']).render(context)
         body = self.spec.render_template(op.get('body', {}), context)
 
-        # Send request
         response = self.client.request(
             method=op['method'],
             url=endpoint,
@@ -277,77 +247,31 @@ class GenericVectorDBPlugin:
         )
         response.raise_for_status()
 
-    def _ensure_collection(self, collection: str, upsert_op: Dict):
-        """Create collection if it doesn't exist (best-effort)."""
-        try:
-            endpoint = Template(upsert_op['create_collection_endpoint']).render(
-                {'collection': collection, **self.kwargs}
+    def create_collection(self, name: str, vector_size: int) -> None:
+        """Create a new collection."""
+        if 'create_collection' not in self.spec.operations:
+            raise NotImplementedError(
+                f"{self.plugin_name} does not support create_collection"
             )
 
-            body = self.spec.render_template(
-                upsert_op.get('create_collection_body', {}),
-                {'collection': collection, 'vector_dim': self._vector_dim, **self.kwargs}
-            )
+        op = self.spec.operations['create_collection']
+        context = {
+            'collection': name,
+            'vector_size': vector_size,
+            **self.kwargs,
+        }
 
-            response = self.client.request(
-                method=upsert_op['create_collection_method'],
-                url=endpoint,
-                json=body if body else None,
-            )
+        endpoint = Template(op['endpoint']).render(context)
+        body = self.spec.render_template(op.get('body', {}), context)
 
-            # Ignore "already exists" errors (usually 409)
-            if response.status_code not in [200, 201, 409]:
-                response.raise_for_status()
+        response = self.client.request(
+            method=op['method'],
+            url=endpoint,
+            json=body,
+        )
+        response.raise_for_status()
 
-        except Exception:
-            # Best-effort - collection might already exist
-            pass
-
-    def _convert_ids_for_qdrant(self, points: List[Dict]) -> List[Dict]:
-        """
-        Convert string IDs to UUIDs for Qdrant compatibility.
-
-        Qdrant REST API requires point IDs to be integers or UUIDs.
-        String IDs like "doc.txt:0" are converted to deterministic UUIDs
-        using uuid5 (based on the string content).
-
-        The original string ID is preserved in the payload as '_original_id'
-        so it can be retrieved later.
-        """
-        converted = []
-        for point in points:
-            new_point = dict(point)
-            original_id = point.get('id')
-
-            # If ID is already an int or valid UUID string, keep it
-            if isinstance(original_id, int):
-                converted.append(new_point)
-                continue
-
-            # Try to parse as UUID
-            try:
-                uuid.UUID(str(original_id))
-                # It's already a valid UUID string
-                converted.append(new_point)
-                continue
-            except (ValueError, TypeError):
-                pass
-
-            # Convert string ID to deterministic UUID
-            string_id = str(original_id)
-            new_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, string_id))
-            new_point['id'] = new_uuid
-
-            # Preserve original ID in payload
-            if 'payload' not in new_point:
-                new_point['payload'] = {}
-            new_point['payload']['_original_id'] = string_id
-
-            converted.append(new_point)
-
-        return converted
-
-    def delete_collection(self, collection: str) -> None:
+    def delete_collection(self, name: str) -> None:
         """Delete a collection."""
         if 'delete_collection' not in self.spec.operations:
             raise NotImplementedError(
@@ -355,7 +279,7 @@ class GenericVectorDBPlugin:
             )
 
         op = self.spec.operations['delete_collection']
-        context = {'collection': collection, **self.kwargs}
+        context = {'collection': name, **self.kwargs}
 
         endpoint = Template(op['endpoint']).render(context)
 
@@ -363,11 +287,7 @@ class GenericVectorDBPlugin:
             method=op['method'],
             url=endpoint,
         )
-
-        # Handle acceptable status codes
-        success_codes = op.get('response', {}).get('success_codes', [200, 204])
-        if response.status_code not in success_codes:
-            response.raise_for_status()
+        response.raise_for_status()
 
     def list_collections(self) -> List[str]:
         """List all collections."""
@@ -385,7 +305,7 @@ class GenericVectorDBPlugin:
         response.raise_for_status()
 
         data = response.json()
-        collections = self.spec.extract_value(data, op['response']['collections_path'])
+        collections = extract_path(data, op['response']['collections_path'], default=[], strict=False)
 
         if not collections:
             return []
@@ -410,7 +330,7 @@ class GenericVectorDBPlugin:
         response.raise_for_status()
 
         data = response.json()
-        return self.spec.extract_value(data, op['response']['stats_path'])
+        return extract_path(data, op['response']['stats_path'], default={}, strict=False)
 
     def __del__(self):
         """Cleanup HTTP client."""
