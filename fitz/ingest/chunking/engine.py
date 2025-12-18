@@ -1,4 +1,5 @@
-# ingest/chunking/engine.py
+# fitz/ingest/chunking/engine.py
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -37,13 +38,9 @@ class ChunkingEngine:
         except Exception as e:
             raise IngestionConfigError(f"Unknown chunker plugin {cfg.plugin_name!r}") from e
 
-        kwargs: Dict[str, Any] = {}
-        if getattr(cfg, "chunk_size", None) is not None:
-            kwargs["chunk_size"] = cfg.chunk_size
-        if getattr(cfg, "chunk_overlap", None) is not None:
-            kwargs["chunk_overlap"] = cfg.chunk_overlap
-        if getattr(cfg, "options", None):
-            kwargs.update(cfg.options)
+        # Simple: just pass all kwargs to the plugin
+        # The plugin defines what parameters it accepts
+        kwargs: Dict[str, Any] = dict(cfg.kwargs or {})
 
         try:
             plugin = PluginCls(**kwargs)

@@ -1,5 +1,4 @@
-# File: fitz/cli/quickstart.py
-# PLUGIN-AGNOSTIC VERSION - Uses registries for discovery
+# fitz/cli/quickstart.py
 
 """
 Quickstart command: Run end-to-end test.
@@ -332,25 +331,43 @@ def run_ingestion(
     """
     try:
         from fitz.ingest.pipeline.ingestion_pipeline import IngestionPipeline
+        from fitz.ingest.config.schema import IngestConfig, IngesterConfig, ChunkerConfig
+        from fitz.llm.registry import get_llm_plugin
+        from fitz.vector_db.registry import get_vector_db_plugin
+        from fitz.vector_db.writer import VectorDBWriter
+
+        # Create config
+        config = IngestConfig(
+            ingester=IngesterConfig(plugin_name="local", kwargs={}),
+            chunker=ChunkerConfig(plugin_name="simple", kwargs={"chunk_size": 1000}),
+            collection=collection,
+        )
+
+        # Create embedder
+        EmbedderClass = get_llm_plugin(plugin_name=embedding_plugin, plugin_type="embedding")
+        embedder = EmbedderClass()
+
+        # Create vector DB writer
+        VectorDBClass = get_vector_db_plugin(vector_db_plugin)
+        vector_db = VectorDBClass()
+        writer = VectorDBWriter(client=vector_db)
 
         # Create pipeline
         pipeline = IngestionPipeline(
-            ingester_plugin="local",
-            chunker_plugin="simple",
-            embedding_plugin=embedding_plugin,
-            vector_db_plugin=vector_db_plugin,
+            config=config,
+            writer=writer,
+            embedder=embedder,
         )
 
         # Run ingestion
-        num_chunks = pipeline.ingest(
-            source=str(docs_path),
-            collection=collection,
-        )
+        num_chunks = pipeline.run(source=str(docs_path))
 
         return True, num_chunks
 
     except Exception as e:
         print_error(f"Ingestion failed: {e}")
+        import traceback
+        traceback.print_exc()
         return False, 0
 
 

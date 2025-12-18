@@ -1,4 +1,5 @@
-# ingest/config/schema.py
+# fitz/ingest/config/schema.py
+
 from __future__ import annotations
 
 from typing import Any
@@ -14,10 +15,27 @@ class IngesterConfig(BaseModel):
 
 
 class ChunkerConfig(BaseModel):
+    """
+    Plugin-agnostic chunker configuration.
+
+    All chunker-specific parameters go in kwargs.
+    No hardcoded chunk_size or chunk_overlap - plugins define their own params.
+
+    Examples:
+        Simple chunker:
+        >>> ChunkerConfig(
+        ...     plugin_name="simple",
+        ...     kwargs={"chunk_size": 1000}
+        ... )
+
+        Overlap chunker:
+        >>> ChunkerConfig(
+        ...     plugin_name="overlap",
+        ...     kwargs={"chunk_size": 1000, "chunk_overlap": 200}
+        ... )
+    """
     plugin_name: str = Field(..., description="Chunker plugin name")
-    chunk_size: int = Field(default=1000, ge=1)
-    chunk_overlap: int = Field(default=0, ge=0)
-    kwargs: dict[str, Any] = Field(default_factory=dict, description="Chunker init kwargs")
+    kwargs: dict[str, Any] = Field(default_factory=dict, description="All chunker parameters")
 
     model_config = ConfigDict(extra="forbid")
 
