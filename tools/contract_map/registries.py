@@ -1,4 +1,4 @@
-# tools/contract_map/registries.py
+# File: tools/contract_map/registries.py
 """Extract plugin registries from the codebase."""
 from __future__ import annotations
 
@@ -26,13 +26,13 @@ def maybe_call(cm: ContractMap, module_obj: object, fn_name: str, *, verbose: bo
 
 
 def extract_registry_plugins(
-    cm: ContractMap,
-    module_name: str,
-    *,
-    dict_attr: str,
-    discover_fns: Iterable[str] = (),
-    note: str | None = None,
-    verbose: bool,
+        cm: ContractMap,
+        module_name: str,
+        *,
+        dict_attr: str,
+        discover_fns: Iterable[str] = (),
+        note: str | None = None,
+        verbose: bool,
 ) -> RegistryContract | None:
     """Extract plugins from a registry dict."""
     mod = safe_import(cm, module_name, verbose=verbose)
@@ -51,12 +51,12 @@ def extract_registry_plugins(
 
 
 def extract_pipeline_registry(
-    cm: ContractMap,
-    module_name: str,
-    *,
-    list_fn: str,
-    note: str | None,
-    verbose: bool,
+        cm: ContractMap,
+        module_name: str,
+        *,
+        list_fn: str,
+        note: str | None,
+        verbose: bool,
 ) -> RegistryContract | None:
     """Extract plugins from a registry that uses a list function."""
     mod = safe_import(cm, module_name, verbose=verbose)
@@ -92,67 +92,116 @@ def extract_pipeline_registry(
 
 
 def extract_llm_registry(
-    cm: ContractMap, module_name: str, *, verbose: bool
+        cm: ContractMap, module_name: str, *, verbose: bool
 ) -> List[RegistryContract]:
-    """Extract LLM registry with multiple plugin types."""
+    """
+    Extract LLM registry with multiple plugin types.
+
+    NOTE: LLM registry now uses YAML-based discovery.
+    We call available_llm_plugins() to get the real plugin list.
+    """
     out: List[RegistryContract] = []
     mod = safe_import(cm, module_name, verbose=verbose)
     if mod is None:
         return out
 
-    maybe_call(cm, mod, "_auto_discover", verbose=verbose)
-
-    reg = getattr(mod, "LLM_REGISTRY", None)
-    if not isinstance(reg, dict):
+    # Try to get available_llm_plugins function
+    available_fn = getattr(mod, "available_llm_plugins", None)
+    if not callable(available_fn):
         return out
 
-    for plugin_type in sorted(reg.keys()):
-        bucket = reg.get(plugin_type)
-        if not isinstance(bucket, dict):
-            continue
-        plugins = sorted(str(k) for k in bucket.keys())
+    # Query each plugin type
+    for plugin_type in ["chat", "embedding", "rerank"]:
+        try:
+            plugins = available_fn(plugin_type)
+            if isinstance(plugins, list):
+                out.append(
+                    RegistryContract(
+                        module=module_name,
+                        name=f"LLM_REGISTRY[{plugin_type!r}]",
+                        plugins=sorted(str(p) for p in plugins),
+                        note=f"YAML-based discovery (fitz/llm/{plugin_type}/*.yaml)",
+                    )
+                )
+        except Exception as exc:
+            tb = traceback.format_exc() if verbose else None
+            cm.import_failures.append(
+                ImportFailure(
+                    module=module_name,
+                    error=f"available_llm_plugins('{plugin_type}') failed: {type(exc).__name__}: {exc}",
+                    traceback=tb,
+                )
+            )
+
+    # Flatten all plugins for summary view
+    flat: list[str] = []
+    for contract in out:
+        flat.extend(contract.plugins)
+
+    if flat:
         out.append(
             RegistryContract(
                 module=module_name,
-                name=f"LLM_REGISTRY[{plugin_type!r}]",
-                plugins=plugins,
-                note="Lazy discovery over fitz.llm.*/plugins (chat, embedding, rerank)",
+                name="LLM_REGISTRY",
+                plugins=sorted(set(flat)),
+                note="Central LLM plugin registry (flattened view, YAML-based)",
             )
         )
 
-    flat: list[str] = []
-    for bucket in reg.values():
-        if isinstance(bucket, dict):
-            flat.extend(str(k) for k in bucket.keys())
-    out.append(
-        RegistryContract(
-            module=module_name,
-            name="LLM_REGISTRY",
-            plugins=sorted(set(flat)),
-            note="Central plugin registry (flattened view)",
-        )
-    )
     return out
+
+
+def extract_vector_db_registry(
+        cm: ContractMap, module_name: str, *, verbose: bool
+) -> RegistryContract | None:
+    """
+    Extract Vector DB registry.
+
+    NOTE: Vector DB registry now uses YAML-based discovery.
+    We call available_vector_db_plugins() to get the real plugin list.
+    """
+    mod = safe_import(cm, module_name, verbose=verbose)
+    if mod is None:
+        return None
+
+    # Try to get available_vector_db_plugins function
+    available_fn = getattr(mod, "available_vector_db_plugins", None)
+    if not callable(available_fn):
+        return None
+
+    try:
+        plugins = available_fn()
+        if isinstance(plugins, list):
+            return RegistryContract(
+                module=module_name,
+                name="VECTOR_DB_REGISTRY",
+                plugins=sorted(str(p) for p in plugins),
+                note="YAML-based discovery (fitz/vector_db/plugins/*.yaml)",
+            )
+    except Exception as exc:
+        tb = traceback.format_exc() if verbose else None
+        cm.import_failures.append(
+            ImportFailure(
+                module=module_name,
+                error=f"available_vector_db_plugins() failed: {type(exc).__name__}: {exc}",
+                traceback=tb,
+            )
+        )
+
+    return None
 
 
 def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     """Extract all registries from the codebase."""
-    # LLM registry (chat, embedding, rerank only)
+    # LLM registry (chat, embedding, rerank) - YAML-based
     cm.registries.extend(extract_llm_registry(cm, "fitz.llm.registry", verbose=verbose))
 
-    # Vector DB registry (separate from LLM)
-    vdb = extract_registry_plugins(
-        cm,
-        "fitz.vector_db.registry",
-        dict_attr="VECTOR_DB_REGISTRY",
-        discover_fns=("_auto_discover",),
-        note="Lazy discovery over fitz.vector_db.plugins.*",
-        verbose=verbose,
-    )
+    # Vector DB registry (separate from LLM) - YAML-based
+    vdb = extract_vector_db_registry(cm, "fitz.vector_db.registry", verbose=verbose)
     if vdb:
         cm.registries.append(vdb)
 
-    # Retriever registry - updated path for engines structure
+    # Retriever registry - Python-based
     rr = extract_registry_plugins(
         cm,
         "fitz.engines.classic_rag.retrieval.runtime.registry",
@@ -164,7 +213,7 @@ def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     if rr:
         cm.registries.append(rr)
 
-    # Chunker registry
+    # Chunker registry - Python-based
     cr = extract_registry_plugins(
         cm,
         "fitz.ingest.chunking.registry",
@@ -176,7 +225,7 @@ def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     if cr:
         cm.registries.append(cr)
 
-    # Ingestion registry
+    # Ingestion registry - Python-based
     ir = extract_registry_plugins(
         cm,
         "fitz.ingest.ingestion.registry",
@@ -188,7 +237,7 @@ def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     if ir:
         cm.registries.append(ir)
 
-    # Pipeline registry - updated path for engines structure
+    # Pipeline registry - Python-based
     pr = extract_pipeline_registry(
         cm,
         "fitz.engines.classic_rag.pipeline.pipeline.registry",

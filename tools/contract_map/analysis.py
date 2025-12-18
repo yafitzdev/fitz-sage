@@ -118,20 +118,42 @@ def compute_hotspots(root: Path, *, excludes: set[str]) -> List[Hotspot]:
     impl: Dict[str, List[str]] = {}
     consumers: Dict[str, List[str]] = {}
 
+    # UPDATED: Remove LLM plugins from Python discovery
+    # LLM plugins (chat, embedding, rerank) are now YAML-based
+    # Vector DB plugins are also YAML-based
     expected = [
-        ("fitz.llm.chat.plugins", "ChatPlugin"),
-        ("fitz.llm.embedding.plugins", "EmbeddingPlugin"),
-        ("fitz.llm.rerank.plugins", "RerankPlugin"),
-        ("fitz.vector_db.plugins", "VectorDBPlugin"),
-        ("fitz.engines.classic_rag.retrieval.plugins", "RetrievalPlugin"),
+        # Python-based plugins only
+        ("fitz.engines.classic_rag.retrieval.runtime.plugins", "RetrievalPlugin"),
         ("fitz.engines.classic_rag.pipeline.pipeline.plugins", "PipelinePlugin"),
         ("fitz.ingest.chunking.plugins", "ChunkerPlugin"),
         ("fitz.ingest.ingestion.plugins", "IngestPlugin"),
     ]
+
+    # For YAML-based plugins, we'll use the registry directly
+    # Add YAML plugin implementations
+    try:
+        from fitz.llm.registry import available_llm_plugins
+        impl["ChatPlugin"] = [f"{p} (YAML)" for p in available_llm_plugins("chat")]
+        impl["EmbeddingPlugin"] = [f"{p} (YAML)" for p in available_llm_plugins("embedding")]
+        impl["RerankPlugin"] = [f"{p} (YAML)" for p in available_llm_plugins("rerank")]
+    except Exception:
+        impl["ChatPlugin"] = []
+        impl["EmbeddingPlugin"] = []
+        impl["RerankPlugin"] = []
+
+    try:
+        from fitz.vector_db.registry import available_vector_db_plugins
+        impl["VectorDBPlugin"] = [f"{p} (YAML)" for p in available_vector_db_plugins()]
+    except Exception:
+        impl["VectorDBPlugin"] = []
+
+    # Scan Python plugins
     for ns, iface in expected:
+        from tools.contract_map.discovery import scan_discovery
         rep = scan_discovery(ns, note="hotspot scan")
         impl[iface] = rep.plugins_found
 
+    # Consumer patterns remain the same
     patterns = {
         "ChatPlugin": ("fitz.llm.chat", 'plugin_type="chat"', "plugin_type='chat'"),
         "EmbeddingPlugin": (
@@ -140,7 +162,7 @@ def compute_hotspots(root: Path, *, excludes: set[str]) -> List[Hotspot]:
             "plugin_type='embedding'",
         ),
         "RerankPlugin": ("fitz.llm.rerank", 'plugin_type="rerank"', "plugin_type='rerank'"),
-        "VectorDBPlugin": ("core.vector_db", 'plugin_type="vector_db"', "plugin_type='vector_db'"),
+        "VectorDBPlugin": ("fitz.vector_db", 'plugin_type="vector_db"', "plugin_type='vector_db'"),
         "RetrievalPlugin": (
             "fitz.engines.classic_rag.retrieval.registry",
             "get_retriever_plugin(",
@@ -151,7 +173,7 @@ def compute_hotspots(root: Path, *, excludes: set[str]) -> List[Hotspot]:
             "get_pipeline_plugin(",
             "available_pipeline_plugins(",
         ),
-        "ChunkerPlugin": ("fitz.ingest.chunking", "get_chunking_plugin(", "ChunkingEngine"),
+        "ChunkerPlugin": ("fitz.ingest.chunking", "get_chunker_plugin(", "ChunkingEngine"),
         "IngestPlugin": ("fitz.ingest.ingestion", "get_ingest_plugin(", "IngestionEngine"),
     }
 
