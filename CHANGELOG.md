@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.2] - 2024-12-18
+
+### 🔄 Changed
+
+- Renamed config field `llm` → `chat` for clarity (breaking change - regenerate config with `fitz init`)
+
+### 🚀 Added
+
+- `fitz db` command to inspect vector database collections
+- `fitz chunk` command to preview chunking strategies
+- `fitz query` as top-level command (was `fitz pipeline query`)
+- `fitz config` as top-level command (was `fitz pipeline config show`)
+- LAN scanning for Qdrant detection in `fitz init`
+- Auto-select single provider options in `fitz init`
+
+### 🐛 Fixed
+
+- Contract map now discovers re-exported plugins (local-faiss)
+- Contract map health check false positives removed
+- Test fixes for `llm` → `chat` rename
+
+---
+
 ## [0.3.1] - 2025-01-17
 
 ### 🐛 Fixed

@@ -12,12 +12,11 @@ Usage:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import typer
 
 from fitz.logging.logger import get_logger
-from fitz.logging.tags import CHUNKING
 
 logger = get_logger(__name__)
 
@@ -25,8 +24,8 @@ logger = get_logger(__name__)
 try:
     from rich.console import Console
     from rich.panel import Panel
-    from rich.table import Table
     from rich.syntax import Syntax
+    from rich.table import Table
 
     RICH_AVAILABLE = True
     console = Console()
@@ -67,51 +66,51 @@ def _get_content_from_source(source: Path) -> List[tuple[Path, str]]:
 
 
 def command(
-        source: Path = typer.Argument(
-            ...,
-            help="File or directory to chunk.",
-        ),
-        chunker: str = typer.Option(
-            "simple",
-            "--chunker",
-            "-c",
-            help="Chunking plugin to use.",
-        ),
-        size: int = typer.Option(
-            1000,
-            "--size",
-            "-s",
-            help="Target chunk size in characters.",
-        ),
-        overlap: int = typer.Option(
-            0,
-            "--overlap",
-            "-o",
-            help="Overlap between chunks in characters.",
-        ),
-        stats_only: bool = typer.Option(
-            False,
-            "--stats",
-            help="Only show statistics, no chunk content.",
-        ),
-        show_all: bool = typer.Option(
-            False,
-            "--all",
-            "-a",
-            help="Show all chunks (default: first 5).",
-        ),
-        limit: int = typer.Option(
-            5,
-            "--limit",
-            "-n",
-            help="Number of chunks to preview.",
-        ),
-        list_chunkers: bool = typer.Option(
-            False,
-            "--list",
-            "-l",
-            help="List available chunking plugins.",
-        ),
+    source: Path = typer.Argument(
+        ...,
+        help="File or directory to chunk.",
+    ),
+    chunker: str = typer.Option(
+        "simple",
+        "--chunker",
+        "-c",
+        help="Chunking plugin to use.",
+    ),
+    size: int = typer.Option(
+        1000,
+        "--size",
+        "-s",
+        help="Target chunk size in characters.",
+    ),
+    overlap: int = typer.Option(
+        0,
+        "--overlap",
+        "-o",
+        help="Overlap between chunks in characters.",
+    ),
+    stats_only: bool = typer.Option(
+        False,
+        "--stats",
+        help="Only show statistics, no chunk content.",
+    ),
+    show_all: bool = typer.Option(
+        False,
+        "--all",
+        "-a",
+        help="Show all chunks (default: first 5).",
+    ),
+    limit: int = typer.Option(
+        5,
+        "--limit",
+        "-n",
+        help="Number of chunks to preview.",
+    ),
+    list_chunkers: bool = typer.Option(
+        False,
+        "--list",
+        "-l",
+        help="List available chunking plugins.",
+    ),
 ) -> None:
     """
     Preview how documents will be chunked.
@@ -145,7 +144,7 @@ def command(
     # Get chunker
     try:
         ChunkerCls = get_chunker_plugin(chunker)
-    except Exception as e:
+    except Exception:
         typer.echo(f"Error: Unknown chunker '{chunker}'")
         typer.echo()
         typer.echo("Available chunkers:")
@@ -185,14 +184,16 @@ def command(
 
         # Calculate stats for this file
         chunk_sizes = [len(c.content) for c in chunks]
-        file_stats.append({
-            "file": file_path,
-            "content_chars": len(content),
-            "num_chunks": len(chunks),
-            "avg_chunk_size": sum(chunk_sizes) // len(chunk_sizes) if chunk_sizes else 0,
-            "min_chunk_size": min(chunk_sizes) if chunk_sizes else 0,
-            "max_chunk_size": max(chunk_sizes) if chunk_sizes else 0,
-        })
+        file_stats.append(
+            {
+                "file": file_path,
+                "content_chars": len(content),
+                "num_chunks": len(chunks),
+                "avg_chunk_size": sum(chunk_sizes) // len(chunk_sizes) if chunk_sizes else 0,
+                "min_chunk_size": min(chunk_sizes) if chunk_sizes else 0,
+                "max_chunk_size": max(chunk_sizes) if chunk_sizes else 0,
+            }
+        )
 
     # Calculate totals
     total_chars = sum(s["content_chars"] for s in file_stats)
@@ -213,7 +214,7 @@ def command(
     else:
         typer.echo()
         typer.echo("=" * 60)
-        typer.echo(f"Chunking Preview")
+        typer.echo("Chunking Preview")
         typer.echo(f"Chunker: {chunker} | Size: {size} | Overlap: {overlap}")
         typer.echo("=" * 60)
 
@@ -301,7 +302,9 @@ def command(
     typer.echo()
     if total_chunks > num_to_show:
         if RICH_AVAILABLE:
-            console.print(f"[dim]Use --all to see all {total_chunks} chunks, or --limit N to see more[/dim]")
+            console.print(
+                f"[dim]Use --all to see all {total_chunks} chunks, or --limit N to see more[/dim]"
+            )
         else:
             typer.echo(f"Use --all to see all {total_chunks} chunks, or --limit N to see more")
 

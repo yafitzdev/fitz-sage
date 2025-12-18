@@ -27,27 +27,27 @@ PLUGIN_PREDICATES: Dict[str, Tuple[Callable, Callable, bool]] = {
     # --- llm (chat, embedding, rerank) ---
     "fitz.llm.chat.plugins": (
         lambda cls: (
-                isinstance(getattr(cls, "plugin_name", None), str)
-                and getattr(cls, "plugin_type", None) == "chat"
-                and callable(getattr(cls, "chat", None))
+            isinstance(getattr(cls, "plugin_name", None), str)
+            and getattr(cls, "plugin_type", None) == "chat"
+            and callable(getattr(cls, "chat", None))
         ),
         _simple_plugin_id,
         False,  # Must be defined in module
     ),
     "fitz.llm.embedding.plugins": (
         lambda cls: (
-                isinstance(getattr(cls, "plugin_name", None), str)
-                and getattr(cls, "plugin_type", None) == "embedding"
-                and callable(getattr(cls, "embed", None))
+            isinstance(getattr(cls, "plugin_name", None), str)
+            and getattr(cls, "plugin_type", None) == "embedding"
+            and callable(getattr(cls, "embed", None))
         ),
         _simple_plugin_id,
         False,
     ),
     "fitz.llm.rerank.plugins": (
         lambda cls: (
-                isinstance(getattr(cls, "plugin_name", None), str)
-                and getattr(cls, "plugin_type", None) == "rerank"
-                and callable(getattr(cls, "rerank", None))
+            isinstance(getattr(cls, "plugin_name", None), str)
+            and getattr(cls, "plugin_type", None) == "rerank"
+            and callable(getattr(cls, "rerank", None))
         ),
         _simple_plugin_id,
         False,
@@ -55,9 +55,9 @@ PLUGIN_PREDICATES: Dict[str, Tuple[Callable, Callable, bool]] = {
     # --- vector_db (NEW: allow_reexport=True for re-exported plugins like local-faiss) ---
     "fitz.vector_db.plugins": (
         lambda cls: (
-                isinstance(getattr(cls, "plugin_name", None), str)
-                and getattr(cls, "plugin_type", None) == "vector_db"
-                and callable(getattr(cls, "search", None))
+            isinstance(getattr(cls, "plugin_name", None), str)
+            and getattr(cls, "plugin_type", None) == "vector_db"
+            and callable(getattr(cls, "search", None))
         ),
         _simple_plugin_id,
         True,  # Allow re-exports (e.g., FaissLocalVectorDB from backends)
@@ -65,8 +65,8 @@ PLUGIN_PREDICATES: Dict[str, Tuple[Callable, Callable, bool]] = {
     # --- retrieval (under engines/classic_rag) ---
     "fitz.engines.classic_rag.retrieval.runtime.plugins": (
         lambda cls: (
-                isinstance(getattr(cls, "plugin_name", None), str)
-                and callable(getattr(cls, "retrieve", None))
+            isinstance(getattr(cls, "plugin_name", None), str)
+            and callable(getattr(cls, "retrieve", None))
         ),
         _simple_plugin_id,
         False,
@@ -74,8 +74,8 @@ PLUGIN_PREDICATES: Dict[str, Tuple[Callable, Callable, bool]] = {
     # --- pipeline (under engines/classic_rag) ---
     "fitz.engines.classic_rag.pipeline.pipeline.plugins": (
         lambda cls: (
-                isinstance(getattr(cls, "plugin_name", None), str)
-                and callable(getattr(cls, "build", None))
+            isinstance(getattr(cls, "plugin_name", None), str)
+            and callable(getattr(cls, "build", None))
         ),
         _simple_plugin_id,
         False,
@@ -83,16 +83,16 @@ PLUGIN_PREDICATES: Dict[str, Tuple[Callable, Callable, bool]] = {
     # --- ingest ---
     "fitz.ingest.chunking.plugins": (
         lambda cls: (
-                isinstance(getattr(cls, "plugin_name", None), str)
-                and callable(getattr(cls, "chunk_text", None))
+            isinstance(getattr(cls, "plugin_name", None), str)
+            and callable(getattr(cls, "chunk_text", None))
         ),
         _simple_plugin_id,
         False,
     ),
     "fitz.ingest.ingestion.plugins": (
         lambda cls: (
-                isinstance(getattr(cls, "plugin_name", None), str)
-                and callable(getattr(cls, "ingest", None))
+            isinstance(getattr(cls, "plugin_name", None), str)
+            and callable(getattr(cls, "ingest", None))
         ),
         _simple_plugin_id,
         False,

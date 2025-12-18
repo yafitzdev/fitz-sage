@@ -42,9 +42,7 @@ def _register_commands():
         ctx: typer.Context,
         source: str = typer.Argument(None, help="Source to ingest (file or directory)."),
         collection: str = typer.Argument(None, help="Target collection name."),
-        ingest_plugin: str = typer.Option(
-            "local", "--ingest", "-i", help="Ingestion plugin name."
-        ),
+        ingest_plugin: str = typer.Option("local", "--ingest", "-i", help="Ingestion plugin name."),
         embedding_plugin: str = typer.Option(
             "cohere", "--embedding", "-e", help="Embedding plugin name."
         ),
@@ -54,9 +52,7 @@ def _register_commands():
         batch_size: int = typer.Option(
             50, "--batch-size", "-b", help="Batch size for vector DB writes."
         ),
-        quiet: bool = typer.Option(
-            False, "--quiet", "-q", help="Suppress progress output."
-        ),
+        quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output."),
     ):
         """
         Ingest documents into a vector database.

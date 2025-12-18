@@ -248,7 +248,9 @@ def command(
     # =========================================================================
     if show_progress:
         if RICH_AVAILABLE:
-            console.print(f"[bold blue]⏳[/bold blue] Generating embeddings with {embedding_plugin}...")
+            console.print(
+                f"[bold blue]⏳[/bold blue] Generating embeddings with {embedding_plugin}..."
+            )
         else:
             typer.echo(f"[3/4] Generating embeddings with {embedding_plugin}...")
 
@@ -313,7 +315,7 @@ def command(
             table.add_row("Embedding", embedding_plugin)
             console.print(table)
 
-            console.print(f'\n[dim]Next:[/dim] fitz query "Your question"')
+            console.print('\n[dim]Next:[/dim] fitz query "Your question"')
         else:
             typer.echo()
             typer.echo("✅ Ingestion Complete")

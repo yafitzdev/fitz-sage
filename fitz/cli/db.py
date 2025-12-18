@@ -15,7 +15,6 @@ from typing import Optional
 import typer
 
 from fitz.logging.logger import get_logger
-from fitz.logging.tags import CLI, VECTOR_DB
 
 logger = get_logger(__name__)
 
@@ -130,8 +129,22 @@ def command(
         table.add_column("Property", style="dim")
         table.add_column("Value", style="bold")
 
-        table.add_row("Chunks", f"{stats.get('points_count', 'N/A'):,}" if isinstance(stats.get('points_count'), int) else str(stats.get('points_count', 'N/A')))
-        table.add_row("Vectors", f"{stats.get('vectors_count', 'N/A'):,}" if isinstance(stats.get('vectors_count'), int) else str(stats.get('vectors_count', 'N/A')))
+        table.add_row(
+            "Chunks",
+            (
+                f"{stats.get('points_count', 'N/A'):,}"
+                if isinstance(stats.get("points_count"), int)
+                else str(stats.get("points_count", "N/A"))
+            ),
+        )
+        table.add_row(
+            "Vectors",
+            (
+                f"{stats.get('vectors_count', 'N/A'):,}"
+                if isinstance(stats.get("vectors_count"), int)
+                else str(stats.get("vectors_count", "N/A"))
+            ),
+        )
         table.add_row("Status", stats.get("status", "N/A"))
         table.add_row("Vector DB", vector_db)
 
@@ -225,7 +238,9 @@ def _show_sample_chunks(vdb, collection: str, num_samples: int) -> None:
 
             if RICH_AVAILABLE:
                 console.print()
-                console.print(f"[dim]#{i}[/dim] [cyan]{doc_id}[/cyan] [dim](chunk {chunk_index})[/dim]")
+                console.print(
+                    f"[dim]#{i}[/dim] [cyan]{doc_id}[/cyan] [dim](chunk {chunk_index})[/dim]"
+                )
                 console.print(f"  [dim]{content}[/dim]")
             else:
                 typer.echo()

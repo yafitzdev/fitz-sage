@@ -155,7 +155,9 @@ def command(
     # Display answer
     typer.echo()
     if RICH_AVAILABLE:
-        console.print(Panel(answer.text or "(No answer generated)", title="Answer", border_style="green"))
+        console.print(
+            Panel(answer.text or "(No answer generated)", title="Answer", border_style="green")
+        )
     else:
         typer.echo("=" * 60)
         typer.echo("ANSWER")

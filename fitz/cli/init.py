@@ -36,14 +36,14 @@ except ImportError:
 
 
 def generate_config(
-        chat_provider: str,
-        embedding_provider: str,
-        vector_db: str,
-        qdrant_host: str = "localhost",
-        qdrant_port: int = 6333,
-        collection: str = "default",
-        enable_rerank: bool = False,
-        rerank_provider: str = "cohere",
+    chat_provider: str,
+    embedding_provider: str,
+    vector_db: str,
+    qdrant_host: str = "localhost",
+    qdrant_port: int = 6333,
+    collection: str = "default",
+    enable_rerank: bool = False,
+    rerank_provider: str = "cohere",
 ) -> str:
     """Generate YAML config based on user choices."""
 
@@ -100,12 +100,16 @@ def generate_config(
     }
 
     # Rerank config
-    rerank_config = f"""rerank:
+    rerank_config = (
+        f"""rerank:
   enabled: {str(enable_rerank).lower()}
   plugin_name: {rerank_provider}
   kwargs:
-    model: rerank-english-v3.0""" if enable_rerank else """rerank:
+    model: rerank-english-v3.0"""
+        if enable_rerank
+        else """rerank:
   enabled: false"""
+    )
 
     # Build full config
     config = f"""# Fitz RAG Configuration
@@ -222,10 +226,10 @@ def prompt_confirm(prompt: str, default: bool = True) -> bool:
 
 
 def auto_select_or_prompt(
-        category: str,
-        available: list[str],
-        default: str,
-        prompt_text: str,
+    category: str,
+    available: list[str],
+    default: str,
+    prompt_text: str,
 ) -> str:
     """
     Auto-select if only one option, otherwise prompt user.
@@ -242,7 +246,9 @@ def auto_select_or_prompt(
     if len(available) == 1:
         choice = available[0]
         if RICH_AVAILABLE:
-            console.print(f"  [dim]{category}:[/dim] [green]{choice}[/green] [dim](auto-selected)[/dim]")
+            console.print(
+                f"  [dim]{category}:[/dim] [green]{choice}[/green] [dim](auto-selected)[/dim]"
+            )
         else:
             print(f"  {category}: {choice} (auto-selected)")
         return choice
@@ -256,17 +262,17 @@ def auto_select_or_prompt(
 
 
 def command(
-        non_interactive: bool = typer.Option(
-            False,
-            "--non-interactive",
-            "-y",
-            help="Use detected defaults without prompting",
-        ),
-        show_config: bool = typer.Option(
-            False,
-            "--show-config",
-            help="Only show what config would be generated",
-        ),
+    non_interactive: bool = typer.Option(
+        False,
+        "--non-interactive",
+        "-y",
+        help="Use detected defaults without prompting",
+    ),
+    show_config: bool = typer.Option(
+        False,
+        "--show-config",
+        help="Only show what config would be generated",
+    ),
 ) -> None:
     """
     Initialize Fitz with an interactive setup wizard.
@@ -455,7 +461,9 @@ def command(
             enable_rerank = False
             rerank_choice = "cohere"
             if RICH_AVAILABLE:
-                console.print("  [dim]Rerank:[/dim] [yellow]Unavailable[/yellow] [dim](requires COHERE_API_KEY)[/dim]")
+                console.print(
+                    "  [dim]Rerank:[/dim] [yellow]Unavailable[/yellow] [dim](requires COHERE_API_KEY)[/dim]"
+                )
             else:
                 print("  Rerank: Unavailable (requires COHERE_API_KEY)")
 

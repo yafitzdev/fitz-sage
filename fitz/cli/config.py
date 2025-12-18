@@ -46,8 +46,7 @@ def command(
     from fitz.engines.classic_rag.config.loader import load_config
 
     logger.info(
-        f"{CLI}{PIPELINE} Showing config from "
-        f"{config if config is not None else '<default>'}"
+        f"{CLI}{PIPELINE} Showing config from " f"{config if config is not None else '<default>'}"
     )
 
     # Load configuration

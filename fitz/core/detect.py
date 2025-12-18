@@ -310,7 +310,9 @@ def detect_qdrant() -> ServiceStatus:
     if len(tried_hosts) <= 2:
         tried_str = f"tried {', '.join(tried_hosts)}"
     else:
-        tried_str = f"tried {tried_hosts[0]}, {tried_hosts[1]}, and {len(tried_hosts) - 2} LAN addresses"
+        tried_str = (
+            f"tried {tried_hosts[0]}, {tried_hosts[1]}, and {len(tried_hosts) - 2} LAN addresses"
+        )
 
     return ServiceStatus(
         name="Qdrant",

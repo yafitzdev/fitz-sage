@@ -6,7 +6,7 @@ Doctor command: Run diagnostics on Fitz setup.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import typer
 
@@ -37,12 +37,15 @@ def print_status(name: str, status: str, details: str, ok: bool) -> None:
 
 def print_provider_status(provider) -> None:
     """Print status for a provider."""
-    print_status(provider.name, "OK" if provider.available else "WARN", provider.details, provider.available)
+    print_status(
+        provider.name, "OK" if provider.available else "WARN", provider.details, provider.available
+    )
 
 
 def check_python() -> tuple[bool, str]:
     """Check Python version."""
     import sys
+
     version = f"Python {sys.version.split()[0]}"
     ok = sys.version_info >= (3, 10)
     return ok, version
@@ -65,6 +68,7 @@ def check_config() -> tuple[bool, str, Optional[dict]]:
     """Check if config can be loaded."""
     try:
         from fitz.engines.classic_rag.config.loader import load_config_dict
+
         config = load_config_dict()
         return True, "Config loaded from config.yaml", config
     except Exception as e:
@@ -117,7 +121,9 @@ def test_embedding(config: dict) -> tuple[bool, str]:
     if plugin == "?":
         return False, "Not configured"
 
-    return True, f"Plugin '{plugin}'" + (f" model '{model}'" if model != "default" else " configured")
+    return True, f"Plugin '{plugin}'" + (
+        f" model '{model}'" if model != "default" else " configured"
+    )
 
 
 def test_rerank(config: dict) -> tuple[bool, str]:
@@ -145,8 +151,8 @@ def test_rerank(config: dict) -> tuple[bool, str]:
 
 
 def command(
-        verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed output"),
-        test_connections: bool = typer.Option(False, "--test", "-t", help="Test actual connections"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed output"),
+    test_connections: bool = typer.Option(False, "--test", "-t", help="Test actual connections"),
 ) -> None:
     """
     Run diagnostics on your Fitz setup.
