@@ -229,7 +229,7 @@ def render_health_section(cm: ContractMap) -> str:
 
     lines = ["## Health"]
     for h in cm.health:
-        lines.append(f"- **{h.level}**: {h.message}")
+        lines.append(f"- **{h.lel}**: {h.message}")
     lines.append("")
     return "\n".join(lines)
 
