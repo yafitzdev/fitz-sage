@@ -2,25 +2,17 @@
 """
 Central LLM plugin registry.
 
-Handles discovery and registration of:
-- chat plugins
-- embedding plugins
-- rerank plugins
-
-Note: vector_db plugins have their own separate registry at fitz.vector_db.registry
+All LLM plugins (chat, embedding, rerank) are YAML-based.
+This module re-exports registry functions from fitz.core.registry.
 
 Design principle: NO SILENT FALLBACK
 - If user configures "cohere", they get cohere or an error
-- If user wants local, they explicitly configure "local"
-- No magic substitution that could cause confusion
+- No magic substitution
 """
 from __future__ import annotations
 
-from fitz.core.registry import (  # Functions; Registries; Errors
-    CHAT_REGISTRY,
-    EMBEDDING_REGISTRY,
+from fitz.core.registry import (
     LLM_REGISTRY,
-    RERANK_REGISTRY,
     LLMRegistryError,
     PluginNotFoundError,
     PluginRegistryError,
@@ -29,7 +21,7 @@ from fitz.core.registry import (  # Functions; Registries; Errors
     resolve_llm_plugin,
 )
 
-# Type alias for backwards compat
+# Type alias
 LLMPluginType = str  # "chat" | "embedding" | "rerank"
 
 __all__ = [
@@ -37,11 +29,8 @@ __all__ = [
     "get_llm_plugin",
     "available_llm_plugins",
     "resolve_llm_plugin",
-    # Registries
+    # Registry
     "LLM_REGISTRY",
-    "CHAT_REGISTRY",
-    "EMBEDDING_REGISTRY",
-    "RERANK_REGISTRY",
     # Errors
     "LLMRegistryError",
     "PluginRegistryError",

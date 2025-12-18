@@ -1,4 +1,7 @@
-# fitz/retrieval/plugins/dense.py
+# fitz/engines/classic_rag/retrieval/runtime/plugins/dense.py
+"""
+Dense retrieval plugin using vector search.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,12 +11,15 @@ from fitz.engines.classic_rag.errors.llm import EmbeddingError
 from fitz.engines.classic_rag.models.chunk import Chunk
 from fitz.engines.classic_rag.retrieval.exceptions.base import RerankError, VectorSearchError
 from fitz.engines.classic_rag.retrieval.runtime.base import RetrievalPlugin
-from fitz.llm.embedding.engine import EmbeddingEngine
-from fitz.llm.rerank.engine import RerankEngine
 from fitz.logging.logger import get_logger
 from fitz.logging.tags import RETRIEVER
 
 logger = get_logger(__name__)
+
+
+# =============================================================================
+# Protocols
+# =============================================================================
 
 
 @runtime_checkable
@@ -21,10 +27,32 @@ class VectorSearchClient(Protocol):
     def search(self, *args: Any, **kwargs: Any) -> list[Any]: ...
 
 
+@runtime_checkable
+class Embedder(Protocol):
+    """Protocol for embedding plugins."""
+    def embed(self, text: str) -> list[float]: ...
+
+
+@runtime_checkable
+class Reranker(Protocol):
+    """Protocol for rerank plugins."""
+    def rerank(self, query: str, documents: list[Any], top_n: int | None = None) -> list[Any]: ...
+
+
+# =============================================================================
+# Config
+# =============================================================================
+
+
 @dataclass(frozen=True, slots=True)
 class RetrieverCfg:
     collection: str
     top_k: int = 5
+
+
+# =============================================================================
+# Plugin
+# =============================================================================
 
 
 @dataclass
@@ -34,8 +62,8 @@ class DenseRetrievalPlugin(RetrievalPlugin):
     client: VectorSearchClient | None = None
     retriever_cfg: RetrieverCfg | None = None
 
-    embedder: EmbeddingEngine | None = None
-    rerank_engine: RerankEngine | None = None
+    embedder: Embedder | None = None
+    rerank_engine: Reranker | None = None
 
     def __post_init__(self) -> None:
         if self.client is None:
@@ -43,7 +71,7 @@ class DenseRetrievalPlugin(RetrievalPlugin):
         if self.retriever_cfg is None:
             raise ValueError("retriever_cfg must be provided")
         if self.embedder is None:
-            raise ValueError("embedder must be injected (EmbeddingEngine)")
+            raise ValueError("embedder must be injected")
 
     def retrieve(self, query: str) -> List[Chunk]:
         logger.info(
