@@ -148,10 +148,6 @@ def extract_protocols(cm: ContractMap, *, verbose: bool) -> None:
     """Extract all protocols from the codebase."""
     # Updated paths to match actual project structure
     protocol_modules = [
-        # LLM protocols
-        "fitz.llm.chat.base",
-        "fitz.llm.embedding.base",
-        "fitz.llm.rerank.base",
         # Vector DB protocols
         "fitz.vector_db.base",
         # Engine protocols (classic_rag)
