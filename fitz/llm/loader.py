@@ -24,20 +24,13 @@ from fitz.llm.schema import (
 
 logger = logging.getLogger(__name__)
 
-# Directory containing YAML plugin definitions (fitz/llm/)
 YAML_PLUGINS_DIR = Path(__file__).parent
 
-# Mapping of plugin types to their spec classes
 _SPEC_CLASSES: dict[str, type[PluginSpec]] = {
     "chat": ChatPluginSpec,
     "embedding": EmbeddingPluginSpec,
     "rerank": RerankPluginSpec,
 }
-
-
-# =============================================================================
-# Exceptions
-# =============================================================================
 
 
 class YAMLPluginError(Exception):
@@ -57,7 +50,6 @@ class YAMLPluginValidationError(YAMLPluginError, ValueError):
         self.plugin_path = plugin_path
         self.errors = errors
 
-        # Format errors nicely
         error_lines = [f"Invalid YAML plugin: {plugin_path}"]
         for err in errors:
             loc = " -> ".join(str(x) for x in err.get("loc", []))
@@ -67,17 +59,8 @@ class YAMLPluginValidationError(YAMLPluginError, ValueError):
         super().__init__("\n".join(error_lines))
 
 
-# =============================================================================
-# Internal Helpers
-# =============================================================================
-
-
 def _get_yaml_path(plugin_type: str, plugin_name: str) -> Path:
-    """Get the path to a YAML plugin file.
-
-    Structure: fitz/llm/{plugin_type}/{plugin_name}.yaml
-    Example: fitz/llm/chat/openai.yaml
-    """
+    """Get the path to a YAML plugin file."""
     return YAML_PLUGINS_DIR / plugin_type / f"{plugin_name}.yaml"
 
 
@@ -98,31 +81,9 @@ def _load_yaml_file(path: Path) -> dict:
     return data
 
 
-# =============================================================================
-# Core Generic Loader (Single Implementation)
-# =============================================================================
-
-
 @lru_cache(maxsize=256)
 def _load_plugin_cached(plugin_type: str, plugin_name: str) -> PluginSpec:
-    """
-    Load and validate a plugin specification (cached).
-
-    This is the single implementation for all plugin types.
-    The cache key is (plugin_type, plugin_name).
-
-    Args:
-        plugin_type: Type of plugin ("chat", "embedding", "rerank")
-        plugin_name: Name of the plugin (e.g., "cohere", "openai")
-
-    Returns:
-        Validated PluginSpec
-
-    Raises:
-        ValueError: If plugin_type is invalid
-        YAMLPluginNotFoundError: If plugin file doesn't exist
-        YAMLPluginValidationError: If plugin fails validation
-    """
+    """Load and validate a plugin specification (cached)."""
     if plugin_type not in _SPEC_CLASSES:
         raise ValueError(
             f"Invalid plugin type: {plugin_type!r}. "
@@ -139,11 +100,6 @@ def _load_plugin_cached(plugin_type: str, plugin_name: str) -> PluginSpec:
         raise YAMLPluginValidationError(path, e.errors()) from e
 
 
-# =============================================================================
-# Type-Safe Public API
-# =============================================================================
-
-
 @overload
 def load_plugin(plugin_type: Literal["chat"], plugin_name: str) -> ChatPluginSpec: ...
 
@@ -158,90 +114,28 @@ def load_plugin(plugin_type: str, plugin_name: str) -> PluginSpec: ...
 
 
 def load_plugin(plugin_type: str, plugin_name: str) -> PluginSpec:
-    """Load and validate any plugin specification.
-
-    This is the primary entry point for loading plugins. It returns
-    the appropriate spec type based on the plugin_type.
+    """
+    Load and validate a plugin specification.
 
     Args:
         plugin_type: Type of plugin ("chat", "embedding", "rerank")
         plugin_name: Name of the plugin (e.g., "cohere", "openai")
 
     Returns:
-        Validated PluginSpec (ChatPluginSpec, EmbeddingPluginSpec, or RerankPluginSpec)
-
-    Raises:
-        ValueError: If plugin_type is invalid
-        YAMLPluginNotFoundError: If plugin file doesn't exist
-        YAMLPluginValidationError: If plugin fails validation
-
-    Examples:
-        >>> spec = load_plugin("chat", "openai")
-        >>> spec.plugin_name
-        'openai'
+        Validated PluginSpec
     """
     return _load_plugin_cached(plugin_type, plugin_name)
 
 
-def load_chat_plugin(plugin_name: str) -> ChatPluginSpec:
-    """Load and validate a chat plugin specification.
-
-    Type-safe wrapper around load_plugin() for chat plugins.
-
-    Args:
-        plugin_name: Name of the plugin (e.g., "cohere", "openai")
-
-    Returns:
-        Validated ChatPluginSpec
-    """
-    return _load_plugin_cached("chat", plugin_name)  # type: ignore[return-value]
-
-
-def load_embedding_plugin(plugin_name: str) -> EmbeddingPluginSpec:
-    """Load and validate an embedding plugin specification.
-
-    Type-safe wrapper around load_plugin() for embedding plugins.
-
-    Args:
-        plugin_name: Name of the plugin (e.g., "cohere", "openai")
-
-    Returns:
-        Validated EmbeddingPluginSpec
-    """
-    return _load_plugin_cached("embedding", plugin_name)  # type: ignore[return-value]
-
-
-def load_rerank_plugin(plugin_name: str) -> RerankPluginSpec:
-    """Load and validate a rerank plugin specification.
-
-    Type-safe wrapper around load_plugin() for rerank plugins.
-
-    Args:
-        plugin_name: Name of the plugin (e.g., "cohere")
-
-    Returns:
-        Validated RerankPluginSpec
-    """
-    return _load_plugin_cached("rerank", plugin_name)  # type: ignore[return-value]
-
-
-# =============================================================================
-# Utility Functions
-# =============================================================================
-
-
 def list_yaml_plugins(plugin_type: str) -> list[str]:
-    """List available YAML plugins for a type.
+    """
+    List available YAML plugins for a type.
 
     Args:
         plugin_type: Type of plugin ("chat", "embedding", "rerank")
 
     Returns:
         Sorted list of plugin names
-
-    Examples:
-        >>> list_yaml_plugins("chat")
-        ['anthropic', 'cohere', 'openai', ...]
     """
     if plugin_type not in _SPEC_CLASSES:
         raise ValueError(
@@ -250,35 +144,24 @@ def list_yaml_plugins(plugin_type: str) -> list[str]:
         )
 
     plugin_dir = YAML_PLUGINS_DIR / plugin_type
-
     if not plugin_dir.exists():
         return []
 
     return sorted(
         p.stem for p in plugin_dir.glob("*.yaml")
-        if not p.stem.startswith("_")  # Ignore files like _template.yaml
+        if not p.stem.startswith("_")
     )
 
 
 def clear_cache() -> None:
-    """Clear the plugin loading cache.
-
-    Useful for testing or when YAML files are modified.
-    """
+    """Clear the plugin loading cache."""
     _load_plugin_cached.cache_clear()
 
 
 __all__ = [
-    # Primary API
     "load_plugin",
-    # Type-safe wrappers
-    "load_chat_plugin",
-    "load_embedding_plugin",
-    "load_rerank_plugin",
-    # Utilities
     "list_yaml_plugins",
     "clear_cache",
-    # Exceptions
     "YAMLPluginError",
     "YAMLPluginNotFoundError",
     "YAMLPluginValidationError",

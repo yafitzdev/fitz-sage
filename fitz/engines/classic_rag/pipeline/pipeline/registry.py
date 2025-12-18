@@ -2,18 +2,23 @@
 """Pipeline plugin registry."""
 from __future__ import annotations
 
-from fitz.core.registry import (
-    PIPELINE_REGISTRY,
-    PluginNotFoundError,
-    PluginRegistryError,
-    available_pipeline_plugins,
-    get_pipeline_plugin,
-)
+from typing import List, Type, Any
+
+from fitz.core.registry import PIPELINE_REGISTRY, PluginNotFoundError
+
+
+def get_pipeline_plugin(plugin_name: str) -> Type[Any]:
+    """Get a pipeline plugin by name."""
+    return PIPELINE_REGISTRY.get(plugin_name)
+
+
+def available_pipeline_plugins() -> List[str]:
+    """List available pipeline plugins."""
+    return PIPELINE_REGISTRY.list_available()
+
 
 __all__ = [
     "get_pipeline_plugin",
     "available_pipeline_plugins",
-    "PIPELINE_REGISTRY",
-    "PluginRegistryError",
     "PluginNotFoundError",
 ]

@@ -3,14 +3,13 @@
 Generic plugin runtime that executes YAML-defined plugins.
 
 This is the "engine" that reads YAML plugin specs and performs the actual
-HTTP calls, credential resolution, and response parsing. Users never write
-code - they just define YAML, and this runtime does the work.
+HTTP calls, credential resolution, and response parsing.
 """
 from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+from typing import Any, ClassVar, Literal, overload
 
 from fitz.core.http import (
     APIError,
@@ -21,16 +20,13 @@ from fitz.core.http import (
 )
 from fitz.core.utils import extract_path, set_nested_path
 from fitz.llm.credentials import CredentialError, resolve_api_key
-from fitz.llm.loader import (
-    load_chat_plugin,
-    load_embedding_plugin,
-    load_rerank_plugin,
-)
+from fitz.llm.loader import load_plugin
 from fitz.llm.schema import (
     AuthType,
     ChatPluginSpec,
     EmbeddingPluginSpec,
     InputWrap,
+    PluginSpec,
     RerankPluginSpec,
 )
 from fitz.llm.transforms import get_transformer
@@ -38,27 +34,21 @@ from fitz.llm.transforms import get_transformer
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# Base YAML Plugin Client
-# =============================================================================
-
-
 class YAMLPluginBase:
-    """Base class for YAML-driven plugin clients."""
+    """
+    Base class for YAML-driven plugin clients.
 
-    plugin_type: str = ""
+    Handles: spec storage, parameter merging, env var resolution,
+    API key resolution, HTTP client creation, request execution.
+    """
 
-    def __init__(
-            self,
-            spec: ChatPluginSpec | EmbeddingPluginSpec | RerankPluginSpec,
-            **kwargs: Any,
-    ) -> None:
+    plugin_type: ClassVar[str] = ""
+
+    def __init__(self, spec: PluginSpec, **kwargs: Any) -> None:
         self.spec = spec
-
-        # Merge defaults with user kwargs
         self.params = {**spec.defaults, **kwargs}
 
-        # Resolve any required env vars (e.g., Azure endpoint)
+        # Resolve required env vars
         self._env_values: dict[str, str] = {}
         for req_env in spec.required_env:
             value = kwargs.get(req_env.inject_as) or os.getenv(req_env.name) or req_env.default
@@ -69,10 +59,9 @@ class YAMLPluginBase:
                 )
             self._env_values[req_env.inject_as] = value
 
-        # Resolve base URL (may have placeholders)
         self._base_url = self._resolve_placeholders(spec.provider.base_url)
 
-        # Resolve API key if auth is needed
+        # Resolve API key
         self._api_key: str | None = None
         if spec.auth.type != AuthType.NONE:
             try:
@@ -83,28 +72,23 @@ class YAMLPluginBase:
             except CredentialError as e:
                 raise RuntimeError(str(e)) from e
 
-        # Create HTTP client
         self._client = self._create_client()
 
-    def _resolve_placeholders(self, template: str) -> str:
-        """Replace {placeholder} with env values or params."""
-        result = template
+    @property
+    def plugin_name(self) -> str:
+        return self.spec.plugin_name
 
-        # Replace from env values first
+    def _resolve_placeholders(self, template: str) -> str:
+        result = template
         for key, value in self._env_values.items():
             result = result.replace(f"{{{key}}}", value)
-
-        # Replace from params
         for key, value in self.params.items():
             if isinstance(value, str):
                 result = result.replace(f"{{{key}}}", value)
-
         return result
 
     def _create_client(self) -> Any:
-        """Create the HTTP client with appropriate auth headers."""
         extra_headers: dict[str, str] = {}
-
         if self._api_key and self.spec.auth.type != AuthType.NONE:
             header_value = self.spec.auth.header_format.format(key=self._api_key)
             extra_headers[self.spec.auth.header_name] = header_value
@@ -112,18 +96,16 @@ class YAMLPluginBase:
         try:
             return create_api_client(
                 base_url=self._base_url,
-                api_key=None,  # We handle auth via headers ourselves
+                api_key=None,
                 timeout_type=self.spec.plugin_type,
                 headers=extra_headers if extra_headers else None,
             )
         except HTTPClientNotAvailable:
             raise RuntimeError(
-                "httpx is required for YAML plugins. "
-                "Install with: pip install httpx"
+                "httpx is required for YAML plugins. Install with: pip install httpx"
             )
 
     def _make_request(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Make HTTP request to the provider."""
         try:
             response = self._client.request(
                 method=self.spec.endpoint.method,
@@ -136,10 +118,8 @@ class YAMLPluginBase:
                 endpoint=self.spec.endpoint.path,
             )
             return response.json()
-
         except APIError as exc:
             raise RuntimeError(str(exc)) from exc
-
         except Exception as exc:
             error = handle_api_error(
                 exc,
@@ -149,7 +129,6 @@ class YAMLPluginBase:
             raise RuntimeError(str(error)) from exc
 
     def __del__(self):
-        """Clean up HTTP client."""
         if hasattr(self, "_client"):
             try:
                 self._client.close()
@@ -157,69 +136,26 @@ class YAMLPluginBase:
                 pass
 
 
-# =============================================================================
-# YAML Chat Plugin
-# =============================================================================
-
-
 class YAMLChatClient(YAMLPluginBase):
-    """
-    Generic chat plugin driven by YAML specification.
+    """Chat plugin client."""
 
-    Usage:
-        client = YAMLChatClient.from_name("cohere", temperature=0.5)
-        response = client.chat([{"role": "user", "content": "Hello!"}])
-    """
-
-    plugin_type = "chat"
+    plugin_type: ClassVar[str] = "chat"
+    spec: ChatPluginSpec
 
     def __init__(self, spec: ChatPluginSpec, **kwargs: Any) -> None:
         super().__init__(spec, **kwargs)
         self._transformer = get_transformer(spec.request.messages_transform.value)
 
-    @classmethod
-    def from_name(cls, plugin_name: str, **kwargs: Any) -> "YAMLChatClient":
-        """Create a chat client from plugin name.
-
-        Args:
-            plugin_name: Name of the YAML plugin (e.g., "cohere", "openai")
-            **kwargs: Override default parameters
-
-        Returns:
-            Configured YAMLChatClient
-        """
-        spec = load_chat_plugin(plugin_name)
-        return cls(spec, **kwargs)
-
-    @property
-    def plugin_name(self) -> str:
-        return self.spec.plugin_name
-
     def chat(self, messages: list[dict[str, Any]]) -> str:
-        """Send chat completion request.
-
-        Args:
-            messages: List of message dicts with 'role' and 'content'
-
-        Returns:
-            The assistant's response text
-        """
-        # Transform messages to provider format
         payload = self._transformer.transform(messages)
-
-        # Add static fields
         payload.update(self.spec.request.static_fields)
 
-        # Add mapped parameters
         for fitz_name, provider_name in self.spec.request.param_map.items():
             if fitz_name in self.params:
-                # Handle nested param paths like "options.temperature"
                 set_nested_path(payload, provider_name, self.params[fitz_name])
 
-        # Make request
         response = self._make_request(payload)
 
-        # Extract response content
         try:
             content = extract_path(response, self.spec.response.content_path)
             return str(content) if content else ""
@@ -228,68 +164,31 @@ class YAMLChatClient(YAMLPluginBase):
             return ""
 
 
-# =============================================================================
-# YAML Embedding Plugin
-# =============================================================================
-
-
 class YAMLEmbeddingClient(YAMLPluginBase):
-    """
-    Generic embedding plugin driven by YAML specification.
+    """Embedding plugin client."""
 
-    Usage:
-        client = YAMLEmbeddingClient.from_name("cohere")
-        embedding = client.embed("Hello, world!")
-    """
-
-    plugin_type = "embedding"
-
-    def __init__(self, spec: EmbeddingPluginSpec, **kwargs: Any) -> None:
-        super().__init__(spec, **kwargs)
-
-    @classmethod
-    def from_name(cls, plugin_name: str, **kwargs: Any) -> "YAMLEmbeddingClient":
-        """Create an embedding client from plugin name."""
-        spec = load_embedding_plugin(plugin_name)
-        return cls(spec, **kwargs)
-
-    @property
-    def plugin_name(self) -> str:
-        return self.spec.plugin_name
+    plugin_type: ClassVar[str] = "embedding"
+    spec: EmbeddingPluginSpec
 
     def embed(self, text: str) -> list[float]:
-        """Generate embedding for text.
-
-        Args:
-            text: Text to embed
-
-        Returns:
-            Embedding vector as list of floats
-        """
-        # Build payload based on input_wrap config
         input_config = self.spec.request
 
         if input_config.input_wrap == InputWrap.LIST:
             input_value = [text]
         elif input_config.input_wrap == InputWrap.STRING:
             input_value = text
-        else:  # OBJECT
+        else:
             input_value = {"text": text}
 
         payload = {input_config.input_field: input_value}
-
-        # Add static fields
         payload.update(input_config.static_fields)
 
-        # Add mapped parameters
         for fitz_name, provider_name in input_config.param_map.items():
             if fitz_name in self.params:
                 payload[provider_name] = self.params[fitz_name]
 
-        # Make request
         response = self._make_request(payload)
 
-        # Extract embedding
         try:
             embedding = extract_path(response, self.spec.response.embeddings_path)
             return list(embedding)
@@ -297,34 +196,11 @@ class YAMLEmbeddingClient(YAMLPluginBase):
             raise RuntimeError(f"Failed to extract embedding: {e}. Response: {response}") from e
 
 
-# =============================================================================
-# YAML Rerank Plugin
-# =============================================================================
-
-
 class YAMLRerankClient(YAMLPluginBase):
-    """
-    Generic rerank plugin driven by YAML specification.
+    """Rerank plugin client."""
 
-    Usage:
-        client = YAMLRerankClient.from_name("cohere")
-        results = client.rerank("query", ["doc1", "doc2", "doc3"])
-    """
-
-    plugin_type = "rerank"
-
-    def __init__(self, spec: RerankPluginSpec, **kwargs: Any) -> None:
-        super().__init__(spec, **kwargs)
-
-    @classmethod
-    def from_name(cls, plugin_name: str, **kwargs: Any) -> "YAMLRerankClient":
-        """Create a rerank client from plugin name."""
-        spec = load_rerank_plugin(plugin_name)
-        return cls(spec, **kwargs)
-
-    @property
-    def plugin_name(self) -> str:
-        return self.spec.plugin_name
+    plugin_type: ClassVar[str] = "rerank"
+    spec: RerankPluginSpec
 
     def rerank(
             self,
@@ -332,30 +208,16 @@ class YAMLRerankClient(YAMLPluginBase):
             documents: list[str],
             top_n: int | None = None,
     ) -> list[tuple[int, float]]:
-        """Rerank documents by relevance to query.
-
-        Args:
-            query: The search query
-            documents: List of document texts to rerank
-            top_n: Optional limit on results
-
-        Returns:
-            List of (index, score) tuples in ranked order
-        """
         if not documents:
             return []
 
         req_config = self.spec.request
-
         payload = {
             req_config.query_field: query,
             req_config.documents_field: documents,
         }
-
-        # Add static fields
         payload.update(req_config.static_fields)
 
-        # Add mapped parameters
         params_with_top_n = {**self.params}
         if top_n is not None:
             params_with_top_n["top_n"] = top_n
@@ -364,40 +226,67 @@ class YAMLRerankClient(YAMLPluginBase):
             if fitz_name in params_with_top_n:
                 payload[provider_name] = params_with_top_n[fitz_name]
 
-        # Make request
         response = self._make_request(payload)
 
-        # Extract results
         try:
             results = extract_path(response, self.spec.response.results_path)
-
             ranked: list[tuple[int, float]] = []
             for result in results:
                 idx = extract_path(result, self.spec.response.result_index_path)
                 score = extract_path(result, self.spec.response.result_score_path)
                 ranked.append((int(idx), float(score)))
-
             return ranked
-
         except (KeyError, IndexError) as e:
             raise RuntimeError(f"Failed to extract rerank results: {e}. Response: {response}") from e
 
 
-# =============================================================================
-# Factory Functions
-# =============================================================================
+_CLIENT_CLASSES: dict[str, type[YAMLPluginBase]] = {
+    "chat": YAMLChatClient,
+    "embedding": YAMLEmbeddingClient,
+    "rerank": YAMLRerankClient,
+}
 
 
-def create_yaml_chat_client(plugin_name: str, **kwargs: Any) -> YAMLChatClient:
-    """Factory function to create a YAML chat client."""
-    return YAMLChatClient.from_name(plugin_name, **kwargs)
+@overload
+def create_yaml_client(plugin_type: Literal["chat"], plugin_name: str, **kwargs: Any) -> YAMLChatClient: ...
+
+@overload
+def create_yaml_client(plugin_type: Literal["embedding"], plugin_name: str, **kwargs: Any) -> YAMLEmbeddingClient: ...
+
+@overload
+def create_yaml_client(plugin_type: Literal["rerank"], plugin_name: str, **kwargs: Any) -> YAMLRerankClient: ...
+
+@overload
+def create_yaml_client(plugin_type: str, plugin_name: str, **kwargs: Any) -> YAMLPluginBase: ...
 
 
-def create_yaml_embedding_client(plugin_name: str, **kwargs: Any) -> YAMLEmbeddingClient:
-    """Factory function to create a YAML embedding client."""
-    return YAMLEmbeddingClient.from_name(plugin_name, **kwargs)
+def create_yaml_client(plugin_type: str, plugin_name: str, **kwargs: Any) -> YAMLPluginBase:
+    """
+    Create a YAML plugin client.
+
+    Args:
+        plugin_type: "chat", "embedding", or "rerank"
+        plugin_name: Plugin name (e.g., "cohere", "openai")
+        **kwargs: Plugin configuration
+
+    Returns:
+        Configured client instance
+    """
+    if plugin_type not in _CLIENT_CLASSES:
+        raise ValueError(
+            f"Invalid plugin type: {plugin_type!r}. "
+            f"Must be one of: {sorted(_CLIENT_CLASSES.keys())}"
+        )
+
+    spec = load_plugin(plugin_type, plugin_name)
+    client_class = _CLIENT_CLASSES[plugin_type]
+    return client_class(spec, **kwargs)  # type: ignore[arg-type]
 
 
-def create_yaml_rerank_client(plugin_name: str, **kwargs: Any) -> YAMLRerankClient:
-    """Factory function to create a YAML rerank client."""
-    return YAMLRerankClient.from_name(plugin_name, **kwargs)
+__all__ = [
+    "YAMLPluginBase",
+    "YAMLChatClient",
+    "YAMLEmbeddingClient",
+    "YAMLRerankClient",
+    "create_yaml_client",
+]

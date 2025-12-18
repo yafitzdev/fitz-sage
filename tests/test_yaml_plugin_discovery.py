@@ -1,4 +1,4 @@
-# File: tests/test_yaml_plugin_discovery.py
+# tests/test_yaml_plugin_discovery.py
 """Tests for YAML plugin discovery system."""
 import pytest
 
@@ -27,36 +27,16 @@ class TestYAMLPluginDiscovery:
         if not yaml_plugins:
             pytest.skip("No YAML chat plugins")
 
-        # YAML plugins return instances, pass api_key to avoid credential errors
         instance = get_llm_plugin(
             plugin_name=yaml_plugins[0],
             plugin_type="chat",
             api_key="test_key_for_testing"
         )
 
-        # Should have plugin attributes
         assert hasattr(instance, "plugin_name")
         assert hasattr(instance, "plugin_type")
         assert instance.plugin_name == yaml_plugins[0]
         assert instance.plugin_type == "chat"
-
-    def test_resolve_llm_plugin(self):
-        """resolve_llm_plugin is an alias for get_llm_plugin."""
-        from fitz.llm.registry import resolve_llm_plugin
-
-        yaml_plugins = list_yaml_plugins("chat")
-        if not yaml_plugins:
-            pytest.skip("No YAML chat plugins")
-
-        # Pass api_key to avoid credential errors
-        instance = resolve_llm_plugin(
-            plugin_type="chat",
-            requested_name=yaml_plugins[0],
-            api_key="test_key_for_testing"
-        )
-
-        assert hasattr(instance, "plugin_name")
-        assert instance.plugin_name == yaml_plugins[0]
 
     def test_invalid_plugin_type_raises(self):
         """Invalid plugin type raises ValueError."""
