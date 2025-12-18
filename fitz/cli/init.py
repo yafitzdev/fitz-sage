@@ -1,8 +1,6 @@
 # File: fitz/cli/init.py
-# Complete fixed version with:
-# 1. Consistent provider display (shows models)
-# 2. Engine auto-discovery and selection
-# 3. Correct config keys (chat not llm)
+# PLUGIN-AGNOSTIC VERSION
+# Uses plugin registries for auto-discovery - NO hardcoded plugin names!
 
 """
 Interactive setup wizard for Fitz.
@@ -13,14 +11,16 @@ Detects available providers and creates a working configuration.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Dict, List, Any
 
 import typer
 
-# Import centralized detection (THE SINGLE SOURCE OF TRUTH)
-from fitz.core.detect import (
-    ProviderStatus,
-    detect_all,
-)
+# Import centralized detection
+from fitz.core.detect import detect_all
+
+# Import plugin registries
+from fitz.llm.registry import available_llm_plugins
+from fitz.vector_db.registry import available_vector_db_plugins
 
 # Rich for pretty output (optional, falls back gracefully)
 try:
@@ -68,15 +68,7 @@ def detect_engines() -> dict[str, str]:
 
 
 def prompt_engine_choice(engines: dict[str, str]) -> str:
-    """
-    Prompt user to select an engine.
-
-    Args:
-        engines: Dict of engine_name -> description
-
-    Returns:
-        Selected engine name
-    """
+    """Prompt user to select an engine."""
     if not engines:
         raise ValueError("No engines available")
 
@@ -105,7 +97,7 @@ def prompt_engine_choice(engines: dict[str, str]) -> str:
 
     # Get user choice
     choices = list(engines.keys())
-    default_idx = 0  # Default to first (classic_rag if present)
+    default_idx = 0
     if "classic_rag" in choices:
         default_idx = choices.index("classic_rag")
 
@@ -124,7 +116,71 @@ def prompt_engine_choice(engines: dict[str, str]) -> str:
 
 
 # =============================================================================
-# Config Generation
+# Plugin Discovery (AGNOSTIC!)
+# =============================================================================
+
+
+def get_plugin_defaults(plugin_name: str, plugin_type: str) -> Dict[str, Any]:
+    """
+    Get default configuration for a plugin.
+
+    This could be extended to query plugin classes for their own defaults.
+    For now, we use sensible defaults based on common conventions.
+    """
+    defaults = {
+        # Temperature for chat/LLM
+        "temperature": 0.2,
+        # Common host/port defaults
+        "host": "localhost",
+        "port": 6333,
+    }
+
+    # Plugin-specific model defaults (can be queried from plugin class later)
+    if plugin_type == "chat":
+        # Try to get default model from plugin class
+        try:
+            from fitz.llm.registry import get_llm_plugin
+            plugin_cls = get_llm_plugin(plugin_name=plugin_name, plugin_type="chat")
+            # Look for default model in class attributes
+            if hasattr(plugin_cls, "default_model"):
+                defaults["model"] = plugin_cls.default_model
+        except:
+            pass
+
+    return defaults
+
+
+def generate_plugin_config(plugin_name: str, plugin_type: str, **kwargs) -> str:
+    """
+    Generate YAML config for any plugin dynamically.
+
+    This is PLUGIN-AGNOSTIC - no hardcoded plugin names!
+    """
+    # Get defaults
+    defaults = get_plugin_defaults(plugin_name, plugin_type)
+
+    # Merge with provided kwargs
+    config_kwargs = {**defaults, **kwargs}
+
+    # Build kwargs section
+    if config_kwargs:
+        kwargs_lines = []
+        for key, value in config_kwargs.items():
+            if isinstance(value, str):
+                kwargs_lines.append(f'    {key}: "{value}"')
+            else:
+                kwargs_lines.append(f'    {key}: {value}')
+        kwargs_str = "\n".join(kwargs_lines)
+    else:
+        kwargs_str = "    {}"
+
+    return f"""  plugin_name: {plugin_name}
+  kwargs:
+{kwargs_str}"""
+
+
+# =============================================================================
+# Config Generation (AGNOSTIC!)
 # =============================================================================
 
 
@@ -136,73 +192,28 @@ def generate_config(
         qdrant_port: int = 6333,
         collection: str = "default",
         enable_rerank: bool = False,
-        rerank_provider: str = "cohere",
+        rerank_provider: str | None = None,
 ) -> str:
-    """Generate YAML config based on user choices."""
+    """Generate YAML config dynamically based on selected plugins."""
 
-    # Chat configs - 'chat' is the canonical config key
-    chat_configs = {
-        "cohere": """chat:
-  plugin_name: cohere
-  kwargs:
-    model: command-r-08-2024
-    temperature: 0.2""",
-        "openai": """chat:
-  plugin_name: openai
-  kwargs:
-    model: gpt-4o-mini
-    temperature: 0.2""",
-        "anthropic": """chat:
-  plugin_name: anthropic
-  kwargs:
-    model: claude-sonnet-4-20250514
-    temperature: 0.2""",
-        "ollama": """chat:
-  plugin_name: ollama
-  kwargs:
-    model: llama3.2
-    temperature: 0.2""",
-    }
+    # Generate each section dynamically
+    chat_config = generate_plugin_config(chat_provider, "chat")
+    embedding_config = generate_plugin_config(embedding_provider, "embedding")
 
-    # Embedding configs
-    embedding_configs = {
-        "cohere": """embedding:
-  plugin_name: cohere
-  kwargs:
-    model: embed-english-v3.0""",
-        "openai": """embedding:
-  plugin_name: openai
-  kwargs:
-    model: text-embedding-3-small""",
-        "ollama": """embedding:
-  plugin_name: ollama
-  kwargs:
-    model: nomic-embed-text""",
-    }
-
-    # Vector DB configs
-    vector_db_configs = {
-        "qdrant": f"""vector_db:
-  plugin_name: qdrant
-  kwargs:
-    host: "{qdrant_host}"
-    port: {qdrant_port}""",
-        "faiss": """vector_db:
-  plugin_name: local-faiss
-  kwargs: {}""",
-    }
+    # Vector DB might need host/port
+    vector_db_kwargs = {}
+    if vector_db == "qdrant":
+        vector_db_kwargs = {"host": qdrant_host, "port": qdrant_port}
+    vector_db_config = generate_plugin_config(vector_db, "vector_db", **vector_db_kwargs)
 
     # Rerank config
-    rerank_config = (
-        f"""rerank:
-  enabled: {str(enable_rerank).lower()}
-  plugin_name: {rerank_provider}
-  kwargs:
-    model: rerank-english-v3.0"""
-        if enable_rerank
-        else """rerank:
+    if enable_rerank and rerank_provider:
+        rerank_config = f"""rerank:
+  enabled: true
+{generate_plugin_config(rerank_provider, "rerank")}"""
+    else:
+        rerank_config = """rerank:
   enabled: false"""
-    )
 
     # Build full config
     config = f"""# Fitz RAG Configuration
@@ -214,17 +225,20 @@ def generate_config(
 # =============================================================================
 # Chat Configuration
 # =============================================================================
-{chat_configs.get(chat_provider, chat_configs['cohere'])}
+chat:
+{chat_config}
 
 # =============================================================================
 # Embedding Configuration  
 # =============================================================================
-{embedding_configs.get(embedding_provider, embedding_configs['cohere'])}
+embedding:
+{embedding_config}
 
 # =============================================================================
 # Vector Database Configuration
 # =============================================================================
-{vector_db_configs.get(vector_db, vector_db_configs['qdrant'])}
+vector_db:
+{vector_db_config}
 
 # =============================================================================
 # Retriever Configuration
@@ -282,11 +296,6 @@ def print_status(name: str, available: bool, details: str = "") -> None:
         print(f"  {icon} {name}: {details}")
 
 
-def print_provider_status(provider: ProviderStatus) -> None:
-    """Print status for a provider using ProviderStatus dataclass."""
-    print_status(provider.name, provider.available, provider.details)
-
-
 def prompt_choice(prompt: str, choices: list[str], default: str = None) -> str:
     """Prompt user for a choice."""
     choices_str = "/".join(choices)
@@ -324,18 +333,7 @@ def auto_select_or_prompt(
         default: str,
         prompt_text: str,
 ) -> str:
-    """
-    Auto-select if only one option, otherwise prompt user.
-
-    Args:
-        category: Category name for display (e.g., "Chat", "Embedding")
-        available: List of available options
-        default: Default choice
-        prompt_text: Text to show when prompting
-
-    Returns:
-        Selected option
-    """
+    """Auto-select if only one option, otherwise prompt user."""
     if len(available) == 1:
         choice = available[0]
         if RICH_AVAILABLE:
@@ -394,7 +392,7 @@ def command(
         print("=" * 60)
 
     # ==========================================================================
-    # Engine Selection (NEW!)
+    # Engine Selection
     # ==========================================================================
 
     engines = detect_engines()
@@ -415,70 +413,139 @@ def command(
         raise typer.Exit(code=0)
 
     # ==========================================================================
-    # Detection Phase (FIXED: Consistent display)
+    # Plugin Discovery (AGNOSTIC!)
     # ==========================================================================
 
-    print_header("Checking Chat Providers...")
+    print_header("Detecting Available Plugins...")
 
+    # Discover plugins from registries
+    available_chat = available_llm_plugins("chat")
+    available_embeddings = available_llm_plugins("embedding")
+    available_rerank = available_llm_plugins("rerank")
+    available_vector_dbs = available_vector_db_plugins()
+
+    # System detection for API keys and services
     system = detect_all()
 
-    # Display chat providers with consistent model info (FIXED!)
-    if system.api_keys["cohere"].available:
-        print_status("Cohere", True, "command-r-08-2024")
-    else:
-        print_status("Cohere", False, "Requires COHERE_API_KEY")
-    if system.api_keys["openai"].available:
-        print_status("OpenAI", True, "gpt-4o-mini")
-    else:
-        print_status("OpenAI", False, "Requires OPENAI_API_KEY")
-    if system.api_keys["anthropic"].available:
-        print_status("Anthropic", True, "claude-sonnet-4-20250514")
-    else:
-        print_status("Anthropic", False, "Requires ANTHROPIC_API_KEY")
-    if system.ollama.available:
-        print_status("Ollama", True, "llama3.2")
-    else:
-        print_status("Ollama", False, "Not running")
-
-    print_header("Checking Embedding Providers...")
-    # Show embedding-capable providers (Anthropic doesn't have embeddings)
-    if system.api_keys["cohere"].available:
-        print_status("Cohere", True, "embed-english-v3.0")
-    else:
-        print_status("Cohere", False, "Requires COHERE_API_KEY")
-    if system.api_keys["openai"].available:
-        print_status("OpenAI", True, "text-embedding-3-small")
-    else:
-        print_status("OpenAI", False, "Requires OPENAI_API_KEY")
-    if system.ollama.available:
-        print_status("Ollama", True, "nomic-embed-text")
-    else:
-        print_status("Ollama", False, "Not running")
-
-    print_header("Checking Rerank Providers...")
-    # Currently only Cohere supports reranking (FIXED: removed "Available")
-    if system.api_keys["cohere"].available:
-        print_status("Cohere", True, "rerank-english-v3.0")
-    else:
-        print_status("Cohere", False, "Requires COHERE_API_KEY")
-
-    print_header("Checking Vector Databases...")
-
-    print_provider_status(system.qdrant)
-    print_provider_status(system.faiss)
-
     # ==========================================================================
-    # Determine Best Defaults (using SystemStatus helpers)
+    # Display Available Plugins (AGNOSTIC!)
     # ==========================================================================
 
-    chat_default = system.best_llm
-    embedding_default = system.best_embedding
-    vector_db_default = system.best_vector_db
-    rerank_default = system.best_rerank
+    print_header("Available Chat Plugins")
+    for plugin in sorted(available_chat):
+        # Check if plugin is available (has API key or is local)
+        available = False
+        if plugin in ["ollama", "local"]:
+            available = system.ollama.available
+        elif plugin in system.api_keys:
+            available = system.api_keys[plugin].available
+
+        status = "✓ Available" if available else "✗ Not configured"
+        print_status(plugin, available, status)
+
+    print_header("Available Embedding Plugins")
+    for plugin in sorted(available_embeddings):
+        available = False
+        if plugin in ["ollama", "local"]:
+            available = system.ollama.available
+        elif plugin in system.api_keys:
+            available = system.api_keys[plugin].available
+
+        status = "✓ Available" if available else "✗ Not configured"
+        print_status(plugin, available, status)
+
+    print_header("Available Rerank Plugins")
+    for plugin in sorted(available_rerank):
+        available = False
+        if plugin in system.api_keys:
+            available = system.api_keys[plugin].available
+
+        status = "✓ Available" if available else "✗ Not configured"
+        print_status(plugin, available, status)
+
+    print_header("Available Vector Database Plugins")
+    for plugin in sorted(available_vector_dbs):
+        available = False
+        if plugin in ["local-faiss", "faiss"]:
+            available = system.faiss.available
+        elif plugin == "qdrant":
+            available = system.qdrant.available
+
+        status = "✓ Available" if available else "✗ Not configured"
+        print_status(plugin, available, status)
 
     # ==========================================================================
-    # User Choices (if interactive)
+    # Filter to Available Only
     # ==========================================================================
+
+    # Filter chat plugins to only available ones
+    available_chat_filtered = []
+    for plugin in available_chat:
+        if plugin in ["ollama", "local"] and system.ollama.available:
+            available_chat_filtered.append(plugin)
+        elif plugin in system.api_keys and system.api_keys[plugin].available:
+            available_chat_filtered.append(plugin)
+
+    # Filter embedding plugins
+    available_embeddings_filtered = []
+    for plugin in available_embeddings:
+        if plugin in ["ollama", "local"] and system.ollama.available:
+            available_embeddings_filtered.append(plugin)
+        elif plugin in system.api_keys and system.api_keys[plugin].available:
+            available_embeddings_filtered.append(plugin)
+
+    # Filter rerank plugins
+    available_rerank_filtered = []
+    for plugin in available_rerank:
+        if plugin in system.api_keys and system.api_keys[plugin].available:
+            available_rerank_filtered.append(plugin)
+
+    # Filter vector DB plugins
+    available_vector_dbs_filtered = []
+    for plugin in available_vector_dbs:
+        if plugin in ["local-faiss", "faiss"] and system.faiss.available:
+            available_vector_dbs_filtered.append(plugin)
+        elif plugin == "qdrant" and system.qdrant.available:
+            available_vector_dbs_filtered.append(plugin)
+
+    # ==========================================================================
+    # Check we have minimum required plugins
+    # ==========================================================================
+
+    if not available_chat_filtered:
+        if RICH_AVAILABLE:
+            console.print("\n[red]❌ No chat plugins available![/red]")
+            console.print("Set an API key or install Ollama.")
+        else:
+            print("\n❌ No chat plugins available!")
+            print("Set an API key or install Ollama.")
+        raise typer.Exit(code=1)
+
+    if not available_embeddings_filtered:
+        if RICH_AVAILABLE:
+            console.print("\n[red]❌ No embedding plugins available![/red]")
+        else:
+            print("\n❌ No embedding plugins available!")
+        raise typer.Exit(code=1)
+
+    if not available_vector_dbs_filtered:
+        if RICH_AVAILABLE:
+            console.print("\n[red]❌ No vector database plugins available![/red]")
+            console.print("Install FAISS (pip install faiss-cpu) or start Qdrant.")
+        else:
+            print("\n❌ No vector database plugins available!")
+            print("Install FAISS (pip install faiss-cpu) or start Qdrant.")
+        raise typer.Exit(code=1)
+
+    # ==========================================================================
+    # User Selection
+    # ==========================================================================
+
+    # Determine defaults (first available)
+    chat_default = available_chat_filtered[0]
+    embedding_default = available_embeddings_filtered[0]
+    vector_db_default = available_vector_dbs_filtered[0]
+    rerank_default = available_rerank_filtered[0] if available_rerank_filtered else None
 
     if non_interactive:
         chat_choice = chat_default
@@ -486,120 +553,51 @@ def command(
         vector_db_choice = vector_db_default
         collection_name = "default"
         enable_rerank = rerank_default is not None
-        rerank_choice = rerank_default or "cohere"
+        rerank_choice = rerank_default
     else:
         print_header("Configuration Options")
-
-        # Build available lists
-        available_chat = []
-        if system.api_keys["cohere"].available:
-            available_chat.append("cohere")
-        if system.api_keys["openai"].available:
-            available_chat.append("openai")
-        if system.api_keys["anthropic"].available:
-            available_chat.append("anthropic")
-        if system.ollama.available:
-            available_chat.append("ollama")
-
-        if not available_chat:
-            if RICH_AVAILABLE:
-                console.print("\n[red]❌ No chat providers available![/red]")
-                console.print(
-                    "Please set an API key (COHERE_API_KEY, OPENAI_API_KEY) " "or install Ollama."
-                )
-            else:
-                print("\n❌ No chat providers available!")
-                print(
-                    "Please set an API key (COHERE_API_KEY, OPENAI_API_KEY) " "or install Ollama."
-                )
-            raise typer.Exit(code=1)
-
-        # Embedding providers (same as chat minus anthropic which doesn't have embeddings)
-        available_embeddings = []
-        if system.api_keys["cohere"].available:
-            available_embeddings.append("cohere")
-        if system.api_keys["openai"].available:
-            available_embeddings.append("openai")
-        if system.ollama.available:
-            available_embeddings.append("ollama")
-
-        if not available_embeddings:
-            if RICH_AVAILABLE:
-                console.print("\n[red]❌ No embedding providers available![/red]")
-            else:
-                print("\n❌ No embedding providers available!")
-            raise typer.Exit(code=1)
-
-        # Rerank providers
-        available_rerank = []
-        if system.api_keys["cohere"].available:
-            available_rerank.append("cohere")
-
-        # Vector DB
-        available_vdbs = []
-        if system.qdrant.available:
-            available_vdbs.append("qdrant")
-        if system.faiss.available:
-            available_vdbs.append("faiss")
-
-        if not available_vdbs:
-            if RICH_AVAILABLE:
-                console.print("\n[red]❌ No vector databases available![/red]")
-                console.print("Please install FAISS (pip install faiss-cpu) or start Qdrant.")
-            else:
-                print("\n❌ No vector databases available!")
-                print("Please install FAISS (pip install faiss-cpu) or start Qdrant.")
-            raise typer.Exit(code=1)
 
         # Prompt for choices
         chat_choice = auto_select_or_prompt(
             "Chat",
-            available_chat,
+            available_chat_filtered,
             chat_default,
-            "Select chat provider",
+            "Select chat plugin",
         )
 
         embedding_choice = auto_select_or_prompt(
             "Embedding",
-            available_embeddings,
+            available_embeddings_filtered,
             embedding_default,
-            "Select embedding provider",
+            "Select embedding plugin",
         )
-
-        # Rerank
-        if available_rerank:
-            if len(available_rerank) == 1:
-                rerank_choice = available_rerank[0]
-                enable_rerank = prompt_confirm(
-                    f"Enable reranking? ({rerank_choice} available)", default=True
-                )
-            else:
-                enable_rerank = prompt_confirm("Enable reranking?", default=True)
-                if enable_rerank:
-                    rerank_choice = auto_select_or_prompt(
-                        "Rerank",
-                        available_rerank,
-                        rerank_default or "cohere",
-                        "Select rerank provider",
-                    )
-                else:
-                    rerank_choice = "cohere"
-        else:
-            enable_rerank = False
-            rerank_choice = "cohere"
-            if RICH_AVAILABLE:
-                console.print(
-                    "  [dim]Rerank:[/dim] [yellow]Unavailable[/yellow] [dim](requires COHERE_API_KEY)[/dim]"
-                )
-            else:
-                print("  Rerank: Unavailable (requires COHERE_API_KEY)")
 
         vector_db_choice = auto_select_or_prompt(
             "Vector DB",
-            available_vdbs,
+            available_vector_dbs_filtered,
             vector_db_default,
-            "Select vector database",
+            "Select vector database plugin",
         )
+
+        # Rerank
+        if available_rerank_filtered:
+            enable_rerank = prompt_confirm("Enable reranking?", default=True)
+            if enable_rerank:
+                rerank_choice = auto_select_or_prompt(
+                    "Rerank",
+                    available_rerank_filtered,
+                    rerank_default,
+                    "Select rerank plugin",
+                )
+            else:
+                rerank_choice = None
+        else:
+            enable_rerank = False
+            rerank_choice = None
+            if RICH_AVAILABLE:
+                console.print("  [dim]Rerank:[/dim] [yellow]No rerank plugins available[/yellow]")
+            else:
+                print("  Rerank: No rerank plugins available")
 
         # Collection name
         if RICH_AVAILABLE:
@@ -608,7 +606,7 @@ def command(
             collection_name = input("Collection name [default]: ").strip() or "default"
 
     # ==========================================================================
-    # Generate Config
+    # Generate Config (AGNOSTIC!)
     # ==========================================================================
 
     # Get Qdrant host/port from detection
@@ -623,7 +621,7 @@ def command(
         qdrant_port=qdrant_port,
         collection=collection_name,
         enable_rerank=enable_rerank,
-        rerank_provider=rerank_choice if enable_rerank else "cohere",
+        rerank_provider=rerank_choice,
     )
 
     # ==========================================================================
@@ -634,7 +632,6 @@ def command(
 
     if RICH_AVAILABLE:
         from rich.syntax import Syntax
-
         console.print(Syntax(config, "yaml", theme="monokai", line_numbers=False))
     else:
         print(config)
@@ -649,27 +646,23 @@ def command(
     cwd = Path.cwd()
     fitz_dir = cwd / ".fitz"
 
-    # Primary config locations that the code actually reads
+    # Primary config locations
     config_locations = [
         cwd / "fitz" / "engines" / "classic_rag" / "config" / "default.yaml",
         cwd / "fitz" / "pipeline" / "config" / "default.yaml",
     ]
 
-    # Also save a copy to .fitz for reference
     fitz_config = fitz_dir / "config.yaml"
 
     if not non_interactive:
-        # Check if any config exists
         existing = [p for p in config_locations if p.exists()]
         if existing or fitz_config.exists():
             if not prompt_confirm("Overwrite existing config files?", default=False):
                 print("Aborted.")
                 raise typer.Exit(code=0)
 
-    # Create .fitz directory
     fitz_dir.mkdir(exist_ok=True)
 
-    # Save to all locations that exist (don't create new directories)
     saved_to = []
     for config_path in config_locations:
         if config_path.parent.exists():
@@ -677,7 +670,6 @@ def command(
             saved_to.append(config_path)
             print(f"✓ Saved to {config_path.relative_to(cwd)}")
 
-    # Always save to .fitz/config.yaml as backup/reference
     fitz_config.write_text(config)
     saved_to.append(fitz_config)
     print(f"✓ Saved to {fitz_config.relative_to(cwd)}")
