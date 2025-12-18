@@ -3,9 +3,9 @@
 Run command: Ingest documents into vector database.
 
 Usage:
-    fitz-ingest run ./documents --collection my_docs
-    fitz-ingest run ./documents --collection my_docs --ingest-plugin local
-    fitz-ingest run ./documents --collection my_docs --embedding-plugin cohere
+    fitz ingest ./documents collection
+    fitz ingest ./documents collection --embedding openai
+    fitz ingest ./documents collection -q
 """
 
 from pathlib import Path
@@ -114,37 +114,35 @@ def _embed_with_progress(
 def command(
     source: Path = typer.Argument(
         ...,
-        help="Source to ingest (file or directory, depending on ingest plugin).",
+        help="Source to ingest (file or directory).",
     ),
-    collection: str = typer.Option(
-        ...,
-        "--collection",
-        "-c",
-        help="Target vector DB collection name.",
+    collection: str = typer.Argument(
+        "default",
+        help="Target collection name.",
     ),
     ingest_plugin: str = typer.Option(
         "local",
-        "--ingest-plugin",
+        "--ingest",
         "-i",
-        help="Ingestion plugin name (as registered in ingest.ingestion.registry).",
+        help="Ingestion plugin name.",
     ),
     embedding_plugin: str = typer.Option(
         "cohere",
-        "--embedding-plugin",
+        "--embedding",
         "-e",
-        help="Embedding plugin name (registered in llm.registry).",
+        help="Embedding plugin name.",
     ),
     vector_db_plugin: str = typer.Option(
         "qdrant",
-        "--vector-db-plugin",
+        "--vector-db",
         "-v",
-        help="Vector DB plugin name (registered in vector_db.registry).",
+        help="Vector DB plugin name.",
     ),
     batch_size: int = typer.Option(
         50,
         "--batch-size",
         "-b",
-        help="Number of chunks to process before writing to vector DB.",
+        help="Batch size for vector DB writes.",
     ),
     quiet: bool = typer.Option(
         False,
@@ -156,24 +154,11 @@ def command(
     """
     Ingest documents into a vector database.
 
-    This command performs the complete ingestion pipeline:
-    1. Ingest documents from source (file or directory)
-    2. Convert to chunks
-    3. Generate embeddings
-    4. Store in vector database
-
     Examples:
-        # Ingest local documents with default plugins
-        fitz-ingest run ./docs --collection my_knowledge
-
-        # Use specific plugins
-        fitz-ingest run ./docs --collection my_docs \\
-            --ingest-plugin local \\
-            --embedding-plugin openai \\
-            --vector-db-plugin qdrant
-
-        # Quiet mode (minimal output)
-        fitz-ingest run ./docs --collection my_docs -q
+        fitz ingest ./docs default
+        fitz ingest ./docs my_knowledge
+        fitz ingest ./docs my_docs --embedding openai
+        fitz ingest ./docs my_docs -q
     """
     # Validate source path
     if not source.exists():
@@ -197,7 +182,7 @@ def command(
             console.print(
                 Panel.fit(
                     f"[bold]Ingesting[/bold] {source}\n" f"[dim]Collection: {collection}[/dim]",
-                    title="🔄 fitz-ingest",
+                    title="🔄 fitz ingest",
                     border_style="blue",
                 )
             )
@@ -256,23 +241,24 @@ def command(
     else:
         chunks = _raw_to_chunks(raw_docs)
 
-    logger.info(f"{CHUNKING} Produced {len(chunks)} chunks (1:1 raw→chunk)")
+    logger.info(f"{CHUNKING} Created {len(chunks)} chunks from raw documents")
 
     # =========================================================================
     # Step 3: Generate embeddings
     # =========================================================================
     if show_progress:
         if RICH_AVAILABLE:
-            console.print(
-                f"[blue]⏳[/blue] Generating embeddings with [bold]{embedding_plugin}[/bold]..."
-            )
+            console.print(f"[bold blue]⏳[/bold blue] Generating embeddings with {embedding_plugin}...")
         else:
-            typer.echo(f"[3/4] Generating embeddings with '{embedding_plugin}'...")
+            typer.echo(f"[3/4] Generating embeddings with {embedding_plugin}...")
 
-    EmbedPluginCls = get_llm_plugin(plugin_name=embedding_plugin, plugin_type="embedding")
-    embed_engine = EmbeddingEngine(EmbedPluginCls())
+    EmbedPluginCls = get_llm_plugin(plugin_type="embedding", plugin_name=embedding_plugin)
+    embed_plugin = EmbedPluginCls()
+    embed_engine = EmbeddingEngine(embed_plugin)
 
     vectors = _embed_with_progress(embed_engine, chunks, show_progress=show_progress)
+
+    logger.info(f"{EMBEDDING} Generated {len(vectors)} embeddings")
 
     if show_progress:
         if RICH_AVAILABLE:
@@ -280,50 +266,34 @@ def command(
         else:
             typer.echo(f"  ✓ Generated {len(vectors)} embeddings")
 
-    logger.info(f"{EMBEDDING} Embedded {len(vectors)} chunks using '{embedding_plugin}'")
-
     # =========================================================================
-    # Step 4: Write to vector database
+    # Step 4: Write to vector DB
     # =========================================================================
     if show_progress:
         if RICH_AVAILABLE:
-            console.print(f"[blue]⏳[/blue] Writing to [bold]{vector_db_plugin}[/bold]...")
+            console.print(f"[bold blue]⏳[/bold blue] Writing to {vector_db_plugin}...")
         else:
-            typer.echo(f"[4/4] Writing to vector database '{vector_db_plugin}'...")
+            typer.echo(f"[4/4] Writing to {vector_db_plugin}...")
 
-    # All vector DBs have the same interface - no special handling needed!
     VectorDBPluginCls = get_vector_db_plugin(vector_db_plugin)
-    vdb_client = VectorDBPluginCls()
+    vdb_plugin = VectorDBPluginCls()
 
-    writer = VectorDBWriter(client=vdb_client)
+    writer = VectorDBWriter(client=vdb_plugin)
 
-    # Write in batches with progress
-    if RICH_AVAILABLE and show_progress and len(chunks) > batch_size:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            TimeElapsedColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Writing to DB...", total=len(chunks))
+    # Batch write
+    for i in range(0, len(chunks), batch_size):
+        batch_chunks = chunks[i : i + batch_size]
+        batch_vectors = vectors[i : i + batch_size]
+        writer.upsert(collection=collection, chunks=batch_chunks, vectors=batch_vectors)
+        logger.debug(f"{VECTOR_DB} Wrote batch {i // batch_size + 1}")
 
-            for i in range(0, len(chunks), batch_size):
-                batch_chunks = chunks[i : i + batch_size]
-                batch_vectors = vectors[i : i + batch_size]
-                writer.upsert(collection=collection, chunks=batch_chunks, vectors=batch_vectors)
-                progress.update(task, advance=len(batch_chunks))
-    else:
-        writer.upsert(collection=collection, chunks=chunks, vectors=vectors)
+    logger.info(f"{VECTOR_DB} Written {len(chunks)} chunks to collection '{collection}'")
 
     if show_progress:
         if RICH_AVAILABLE:
             console.print(f"[green]✓[/green] Written to collection [bold]{collection}[/bold]")
         else:
-            typer.echo(f"  ✓ Written to collection '{collection}'")
-
-    logger.info(f"{VECTOR_DB} Upserted {len(chunks)} chunks into collection='{collection}'")
+            typer.echo(f"  ✓ Written to collection {collection}")
 
     # =========================================================================
     # Summary
@@ -331,30 +301,26 @@ def command(
     if show_progress:
         if RICH_AVAILABLE:
             console.print()
+            console.print("[bold green]✅ Ingestion Complete[/bold green]")
 
-            # Summary table
-            table = Table(title="✅ Ingestion Complete", show_header=False, box=None)
-            table.add_column("Metric", style="dim")
+            table = Table(show_header=False, box=None)
+            table.add_column("Key", style="dim")
             table.add_column("Value", style="bold")
-
             table.add_row("Documents", str(len(raw_docs)))
             table.add_row("Chunks", str(len(chunks)))
             table.add_row("Collection", collection)
             table.add_row("Vector DB", vector_db_plugin)
             table.add_row("Embedding", embedding_plugin)
-
             console.print(table)
-            console.print()
-            console.print('[dim]Next: fitz-pipeline query "Your question" [/dim]')
+
+            console.print(f'\n[dim]Next:[/dim] fitz query "Your question"')
         else:
             typer.echo()
-            typer.echo("=" * 60)
-            typer.echo("✓ Ingestion complete!")
-            typer.echo("=" * 60)
-            typer.echo(f"Documents:  {len(raw_docs)}")
-            typer.echo(f"Chunks:     {len(chunks)}")
-            typer.echo(f"Collection: {collection}")
+            typer.echo("✅ Ingestion Complete")
+            typer.echo(f"  Documents: {len(raw_docs)}")
+            typer.echo(f"  Chunks: {len(chunks)}")
+            typer.echo(f"  Collection: {collection}")
+            typer.echo(f"  Vector DB: {vector_db_plugin}")
+            typer.echo(f"  Embedding: {embedding_plugin}")
             typer.echo()
-    else:
-        # Quiet mode - just confirm success
-        typer.echo(f"✓ Ingested {len(chunks)} chunks into '{collection}'")
+            typer.echo('Next: fitz query "Your question"')

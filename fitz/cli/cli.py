@@ -1,5 +1,4 @@
 # fitz/cli/cli.py
-
 """
 Main Fitz CLI.
 
@@ -41,12 +40,14 @@ app = typer.Typer(
 def _register_sub_apps():
     """Register ingest and pipeline sub-apps after module initialization."""
     # Import here to avoid circular imports at module load time
-    # v0.3.0: pipeline moved to engines/classic_rag/
-    from fitz.engines.classic_rag.pipeline.cli import app as pipeline_app
     from fitz.ingest.cli import app as ingest_app
 
     app.add_typer(ingest_app, name="ingest")
-    app.add_typer(pipeline_app, name="pipeline")
+
+    # Keep pipeline as hidden alias for backwards compatibility
+    from fitz.engines.classic_rag.pipeline.cli import app as pipeline_app
+
+    app.add_typer(pipeline_app, name="pipeline", hidden=True)
 
 
 # ---------------------------------------------------------------------------
@@ -59,6 +60,8 @@ def _register_commands():
     from fitz.cli import doctor
     from fitz.cli import help as help_module
     from fitz.cli import init, plugins, quickstart
+    from fitz.cli.query import command as query_command
+    from fitz.cli.config import command as config_command
 
     # Wrap commands with friendly error handling
     app.command("help")(friendly_errors(help_module.command))
@@ -66,6 +69,12 @@ def _register_commands():
     app.command("plugins")(friendly_errors(plugins.command))
     app.command("doctor")(friendly_errors(doctor.command))
     app.command("quickstart")(friendly_errors(quickstart.command))
+
+    # TOP-LEVEL query command (the main one users will use!)
+    app.command("query")(friendly_errors(query_command))
+
+    # TOP-LEVEL config command
+    app.command("config")(friendly_errors(config_command))
 
 
 # Call immediately during module initialization
