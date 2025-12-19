@@ -14,20 +14,20 @@ import typer
 
 # Try to import error handler, but don't fail if not present
 try:
-    from fitz_ai.cli.utils.errors import friendly_errors, install_global_handler
+    from fitz_ai.cli.errors import friendly_errors, install_global_handler
 
     install_global_handler()
     HAS_ERROR_HANDLER = True
 except ImportError:
     HAS_ERROR_HANDLER = False
 
+
     # Dummy decorator if errors.py not installed
     def friendly_errors(func):
         return func
 
-
 app = typer.Typer(
-    help="Fitz — local-first RAG framework",
+    help="Fitz - local-first RAG framework",
     no_args_is_help=True,
 )
 
@@ -39,42 +39,21 @@ app = typer.Typer(
 
 def _register_sub_apps():
     """Register ingest sub-app after module initialization."""
-    # Create ingest sub-app with its own commands
-    ingest_app = typer.Typer(
-        help="Document ingestion commands",
-        no_args_is_help=True,
-    )
-
-    # Register ingest sub-commands
+    # Try to import ingest CLI sub-app
     try:
-        from fitz_ai.cli.commands import ingest as ingest_module
-        from fitz_ai.cli.commands import validate as validate_module
-        from fitz_ai.cli.commands import stats as stats_module
-        from fitz_ai.cli.commands import list_plugins as list_plugins_module
-
-        # Main ingest command (fitz ingest ./docs collection)
-        ingest_app.command("run")(friendly_errors(ingest_module.command))
-        # Also register as default when calling "fitz ingest ./docs collection"
-        ingest_app.callback(invoke_without_command=True)(
-            lambda: None  # Allow subcommands
-        )
-
-        # Validate command (fitz ingest validate ./docs)
-        ingest_app.command("validate")(friendly_errors(validate_module.command))
-
-        # Stats command (fitz ingest stats collection)
-        ingest_app.command("stats")(friendly_errors(stats_module.command))
-
-        # List plugins command (fitz ingest plugins)
-        ingest_app.command("plugins")(friendly_errors(list_plugins_module.command))
-
-        # Add the ingest sub-app to main app
+        from fitz_ai.cli.ingest_app import ingest_app
         app.add_typer(ingest_app, name="ingest")
+    except (ImportError, ModuleNotFoundError):
+        # Ingest CLI not available - create a minimal one
+        ingest_app = typer.Typer(help="Document ingestion commands")
 
-    except (ImportError, ModuleNotFoundError) as e:
-        # Log the error for debugging but don't fail
-        import sys
-        print(f"Warning: Could not register ingest commands: {e}", file=sys.stderr)
+        @ingest_app.command("run")
+        def ingest_run_placeholder():
+            """Ingest documents (placeholder - module not found)."""
+            typer.echo("Ingest module not available. Check installation.")
+            raise typer.Exit(code=1)
+
+        app.add_typer(ingest_app, name="ingest")
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +92,6 @@ def _register_commands():
 # Call immediately during module initialization
 _register_sub_apps()
 _register_commands()
-
 
 if __name__ == "__main__":
     app()
