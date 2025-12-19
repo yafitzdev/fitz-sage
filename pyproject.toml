@@ -6,13 +6,51 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fitz-ai"
 version = "0.3.4"
-description = "A modular, production-ready engine platform with clean architecture and comprehensive observability."
+description = "A modular, production-ready knowledge engine platform with clean architecture and multi-paradigm support (RAG, CLaRa)."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
     { name = "Yan Fitzner" }
 ]
 requires-python = ">=3.10"
+
+# Keywords for PyPI search discoverability
+keywords = [
+    "rag",
+    "retrieval",
+    "augmented",
+    "generation",
+    "llm",
+    "ai",
+    "knowledge-base",
+    "vector-database",
+    "semantic-search",
+    "document-processing",
+    "embeddings",
+    "nlp",
+    "clara",
+    "compression",
+    "machine-learning",
+]
+
+# PyPI classifiers for better categorization
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Indexing",
+    "Topic :: Database",
+    "Typing :: Typed",
+]
 
 dependencies = [
     "pydantic>=2.0",
@@ -21,27 +59,49 @@ dependencies = [
     "httpx>=0.24",
     "typing-extensions>=4.7",
     "typer>=0.9",
-    "jinja2>=3.1",   # ← ADD THIS
+    "jinja2>=3.1",
 ]
 
 
 [project.optional-dependencies]
-ingest = ["pdfminer.six", "python-docx"]
-local = ["ollama>=0.1.0", "faiss-cpu>=1.7.0"]
+# Document ingestion support
+ingest = [
+    "pdfminer.six",
+    "python-docx",
+]
+
+# Local/offline capabilities
+local = [
+    "ollama>=0.1.0",
+    "faiss-cpu>=1.7.0",
+]
+
+# Development tools
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "black>=23.0",
     "isort>=5.0",
     "mypy>=1.0",
+    "ruff>=0.1.0",
+]
+
+# Install everything at once
+all = [
+    "pdfminer.six",
+    "python-docx",
+    "ollama>=0.1.0",
+    "faiss-cpu>=1.7.0",
 ]
 
 
 [project.urls]
 Homepage = "https://github.com/yafitzdev/fitz-ai"
 Repository = "https://github.com/yafitzdev/fitz-ai"
+Documentation = "https://github.com/yafitzdev/fitz-ai#readme"
 Issues = "https://github.com/yafitzdev/fitz-ai/issues"
 Changelog = "https://github.com/yafitzdev/fitz-ai/blob/main/CHANGELOG.md"
+"Source Code" = "https://github.com/yafitzdev/fitz-ai"
 
 
 [tool.setuptools.packages.find]
