@@ -1,4 +1,4 @@
-# fitz_ai/cli/config.py
+# fitz_ai/cli/commands/config.py
 """
 Top-level config command.
 
@@ -43,14 +43,23 @@ def command(
         fitz config --format json      # Show as JSON
         fitz config -c custom.yaml     # Show specific config file
     """
-    from fitz_ai.engines.classic_rag.config.loader import load_config
+    from fitz_ai.engines.classic_rag.config.loader import load_config_dict
 
     logger.info(
         f"{CLI}{PIPELINE} Showing config from " f"{config if config is not None else '<default>'}"
     )
 
-    # Load configuration
-    raw_cfg = load_config(str(config) if config is not None else None)
+    # Load configuration as dict
+    try:
+        raw_cfg = load_config_dict(str(config) if config is not None else None)
+    except FileNotFoundError:
+        typer.echo("No configuration file found.")
+        typer.echo()
+        typer.echo("Run 'fitz init' to create a configuration file.")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        typer.echo(f"Error loading config: {e}")
+        raise typer.Exit(code=1)
 
     typer.echo()
     typer.echo("=" * 60)

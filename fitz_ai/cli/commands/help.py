@@ -1,5 +1,10 @@
-# fitz_ai/cli/help.py
-"""Help command for Fitz CLI."""
+# fitz_ai/cli/commands/help.py
+"""
+Help command for Fitz CLI.
+
+Usage:
+    fitz help
+"""
 
 import typer
 
@@ -7,7 +12,7 @@ import typer
 def command() -> None:
     """Show help and common commands."""
     typer.echo()
-    typer.echo("Fitz — local-first RAG framework")
+    typer.echo("Fitz - local-first RAG framework")
     typer.echo()
     typer.echo("Commands:")
     typer.echo("  fitz init                       Setup wizard")

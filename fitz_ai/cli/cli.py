@@ -14,7 +14,7 @@ import typer
 
 # Try to import error handler, but don't fail if not present
 try:
-    from fitz_ai.cli.errors import friendly_errors, install_global_handler
+    from fitz_ai.cli.utils.errors import friendly_errors, install_global_handler
 
     install_global_handler()
     HAS_ERROR_HANDLER = True
@@ -38,22 +38,43 @@ app = typer.Typer(
 
 
 def _register_sub_apps():
-    """Register ingest and pipeline sub-apps after module initialization."""
-    # Try to import ingest CLI, but don't fail if not present
-    try:
-        from fitz_ai.cli import app as ingest_app
-        app.add_typer(ingest_app, name="ingest")
-    except (ImportError, ModuleNotFoundError):
-        # Ingest CLI not available - skip it
-        pass
+    """Register ingest sub-app after module initialization."""
+    # Create ingest sub-app with its own commands
+    ingest_app = typer.Typer(
+        help="Document ingestion commands",
+        no_args_is_help=True,
+    )
 
-    # Keep pipeline as hidden alias for backwards compatibility
+    # Register ingest sub-commands
     try:
-        from fitz_ai.cli import app as pipeline_app
-        app.add_typer(pipeline_app, name="pipeline", hidden=True)
-    except (ImportError, ModuleNotFoundError):
-        # Pipeline CLI not available - skip it
-        pass
+        from fitz_ai.cli.commands import ingest as ingest_module
+        from fitz_ai.cli.commands import validate as validate_module
+        from fitz_ai.cli.commands import stats as stats_module
+        from fitz_ai.cli.commands import list_plugins as list_plugins_module
+
+        # Main ingest command (fitz ingest ./docs collection)
+        ingest_app.command("run")(friendly_errors(ingest_module.command))
+        # Also register as default when calling "fitz ingest ./docs collection"
+        ingest_app.callback(invoke_without_command=True)(
+            lambda: None  # Allow subcommands
+        )
+
+        # Validate command (fitz ingest validate ./docs)
+        ingest_app.command("validate")(friendly_errors(validate_module.command))
+
+        # Stats command (fitz ingest stats collection)
+        ingest_app.command("stats")(friendly_errors(stats_module.command))
+
+        # List plugins command (fitz ingest plugins)
+        ingest_app.command("plugins")(friendly_errors(list_plugins_module.command))
+
+        # Add the ingest sub-app to main app
+        app.add_typer(ingest_app, name="ingest")
+
+    except (ImportError, ModuleNotFoundError) as e:
+        # Log the error for debugging but don't fail
+        import sys
+        print(f"Warning: Could not register ingest commands: {e}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -66,8 +87,8 @@ def _register_commands():
     from fitz_ai.cli.commands import chunk, db, doctor
     from fitz_ai.cli.commands import help as help_module
     from fitz_ai.cli.commands import init, plugins, quickstart
-    from fitz_ai.cli.commands import command as config_command
-    from fitz_ai.cli.commands import command as query_command
+    from fitz_ai.cli.commands import config as config_module
+    from fitz_ai.cli.commands import query as query_module
 
     # Wrap commands with friendly error handling
     app.command("help")(friendly_errors(help_module.command))
@@ -77,10 +98,10 @@ def _register_commands():
     app.command("quickstart")(friendly_errors(quickstart.command))
 
     # TOP-LEVEL query command (the main one users will use!)
-    app.command("query")(friendly_errors(query_command))
+    app.command("query")(friendly_errors(query_module.command))
 
     # TOP-LEVEL config command
-    app.command("config")(friendly_errors(config_command))
+    app.command("config")(friendly_errors(config_module.command))
 
     # Database inspection command
     app.command("db")(friendly_errors(db.command))

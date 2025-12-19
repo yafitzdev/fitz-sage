@@ -1,4 +1,4 @@
-# fitz_ai/ingest/cli/stats.py
+# fitz_ai/cli/commands/stats.py
 """
 Stats command: Show statistics about an ingested collection.
 
@@ -49,9 +49,8 @@ def command(
     """
     logger.info(f"{CLI}{VECTOR_DB} Getting stats for collection: {collection}")
 
-    # Get the vector DB plugin
-    VectorDBPluginCls = get_vector_db_plugin(vector_db_plugin)
-    vdb = VectorDBPluginCls()
+    # Get the vector DB plugin instance (returns instance, not class)
+    vdb = get_vector_db_plugin(vector_db_plugin)
 
     # Check if collection exists
     collections = vdb.list_collections()

@@ -37,7 +37,9 @@ class Embedder(Protocol):
 class Reranker(Protocol):
     """Protocol for rerank plugins."""
 
-    def rerank(self, query: str, documents: list[Any], top_n: int | None = None) -> list[Any]: ...
+    def rerank(
+            self, query: str, documents: list[str], top_n: int | None = None
+    ) -> list[tuple[int, float]]: ...
 
 
 # =============================================================================
@@ -125,10 +127,59 @@ class DenseRetrievalPlugin(RetrievalPlugin):
             )
             chunks.append(chunk)
 
-        if self.rerank_engine:
+        if self.rerank_engine and chunks:
             try:
-                chunks = self.rerank_engine.rerank(query, chunks)
+                chunks = self._rerank_chunks(query, chunks)
             except Exception as exc:
                 raise RerankError("Reranking failed") from exc
 
         return chunks
+
+    def _rerank_chunks(self, query: str, chunks: List[Chunk]) -> List[Chunk]:
+        """
+        Rerank chunks using the rerank engine.
+
+        The reranker expects a list of strings (document texts), not Chunk objects.
+        This method:
+        1. Extracts text content from each chunk
+        2. Calls the reranker with the text list
+        3. Reorders the original Chunk objects based on rerank results
+
+        Args:
+            query: The search query
+            chunks: List of Chunk objects to rerank
+
+        Returns:
+            Reordered list of Chunk objects based on relevance scores
+        """
+        if not chunks:
+            return chunks
+
+        # Extract text content from chunks for the reranker
+        documents = [chunk.content for chunk in chunks]
+
+        # Call reranker - returns list of (original_index, score) tuples
+        ranked_results = self.rerank_engine.rerank(query, documents)
+
+        # Reorder chunks based on rerank results
+        # ranked_results is [(index, score), ...] sorted by relevance
+        reranked_chunks: List[Chunk] = []
+        for idx, score in ranked_results:
+            if 0 <= idx < len(chunks):
+                chunk = chunks[idx]
+                # Update metadata with rerank score
+                updated_metadata = dict(chunk.metadata)
+                updated_metadata["rerank_score"] = score
+
+                reranked_chunk = Chunk(
+                    id=chunk.id,
+                    doc_id=chunk.doc_id,
+                    content=chunk.content,
+                    chunk_index=chunk.chunk_index,
+                    metadata=updated_metadata,
+                )
+                reranked_chunks.append(reranked_chunk)
+
+        logger.debug(f"{RETRIEVER} Reranked {len(chunks)} chunks → {len(reranked_chunks)} results")
+
+        return reranked_chunks

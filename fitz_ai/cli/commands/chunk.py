@@ -1,4 +1,4 @@
-# fitz_ai/cli/chunk.py
+# fitz_ai/cli/commands/chunk.py
 """
 Chunk command: Preview how documents will be chunked.
 
@@ -12,7 +12,7 @@ Usage:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import typer
 
@@ -36,8 +36,6 @@ except ImportError:
 
 def _read_file_content(path: Path) -> str:
     """Read file content, handling different file types."""
-    # For now, just read as text
-    # TODO: Add PDF extraction, etc.
     try:
         return path.read_text(encoding="utf-8", errors="ignore")
     except Exception as e:
@@ -66,51 +64,51 @@ def _get_content_from_source(source: Path) -> List[tuple[Path, str]]:
 
 
 def command(
-    source: Path = typer.Argument(
-        ...,
-        help="File or directory to chunk.",
-    ),
-    chunker: str = typer.Option(
-        "simple",
-        "--chunker",
-        "-c",
-        help="Chunking plugin to use.",
-    ),
-    size: int = typer.Option(
-        1000,
-        "--size",
-        "-s",
-        help="Target chunk size in characters.",
-    ),
-    overlap: int = typer.Option(
-        0,
-        "--overlap",
-        "-o",
-        help="Overlap between chunks in characters.",
-    ),
-    stats_only: bool = typer.Option(
-        False,
-        "--stats",
-        help="Only show statistics, no chunk content.",
-    ),
-    show_all: bool = typer.Option(
-        False,
-        "--all",
-        "-a",
-        help="Show all chunks (default: first 5).",
-    ),
-    limit: int = typer.Option(
-        5,
-        "--limit",
-        "-n",
-        help="Number of chunks to preview.",
-    ),
-    list_chunkers: bool = typer.Option(
-        False,
-        "--list",
-        "-l",
-        help="List available chunking plugins.",
-    ),
+        source: Optional[Path] = typer.Argument(
+            None,
+            help="File or directory to chunk.",
+        ),
+        chunker: str = typer.Option(
+            "simple",
+            "--chunker",
+            "-c",
+            help="Chunking plugin to use.",
+        ),
+        size: int = typer.Option(
+            1000,
+            "--size",
+            "-s",
+            help="Target chunk size in characters.",
+        ),
+        overlap: int = typer.Option(
+            0,
+            "--overlap",
+            "-o",
+            help="Overlap between chunks in characters.",
+        ),
+        stats_only: bool = typer.Option(
+            False,
+            "--stats",
+            help="Only show statistics, no chunk content.",
+        ),
+        show_all: bool = typer.Option(
+            False,
+            "--all",
+            "-a",
+            help="Show all chunks (default: first 5).",
+        ),
+        limit: int = typer.Option(
+            5,
+            "--limit",
+            "-n",
+            help="Number of chunks to preview.",
+        ),
+        list_chunkers: bool = typer.Option(
+            False,
+            "--list",
+            "-l",
+            help="List available chunking plugins.",
+        ),
 ) -> None:
     """
     Preview how documents will be chunked.
@@ -131,17 +129,25 @@ def command(
         typer.echo()
         typer.echo("Available chunking plugins:")
         for name in chunkers:
-            typer.echo(f"  • {name}")
+            typer.echo(f"  - {name}")
         typer.echo()
         typer.echo("Usage: fitz chunk ./file.txt --chunker <name>")
         return
+
+    # Require source if not listing
+    if source is None:
+        typer.echo("Error: SOURCE argument is required")
+        typer.echo()
+        typer.echo("Usage: fitz chunk <source> [OPTIONS]")
+        typer.echo("       fitz chunk --list")
+        raise typer.Exit(1)
 
     # Validate source
     if not source.exists():
         typer.echo(f"Error: {source} does not exist")
         raise typer.Exit(1)
 
-    # Get chunker
+    # Get chunker class
     try:
         ChunkerCls = get_chunking_plugin(chunker)
     except Exception:
@@ -149,7 +155,7 @@ def command(
         typer.echo()
         typer.echo("Available chunkers:")
         for name in available_chunking_plugins():
-            typer.echo(f"  • {name}")
+            typer.echo(f"  - {name}")
         raise typer.Exit(1)
 
     # Initialize chunker with options
@@ -207,7 +213,7 @@ def command(
             Panel.fit(
                 f"[bold]Chunking Preview[/bold]\n"
                 f"[dim]Chunker: {chunker} | Size: {size} | Overlap: {overlap}[/dim]",
-                title="✂️  fitz chunk",
+                title="fitz chunk",
                 border_style="blue",
             )
         )
@@ -258,8 +264,8 @@ def command(
         typer.echo(f"Total chars:     {total_chars:,}")
         typer.echo(f"Total chunks:    {total_chunks}")
         typer.echo(f"Avg chunk size:  {avg_size:,} chars")
-        typer.echo(f"Min chunk size:  {min(all_sizes):,} chars" if all_sizes else "N/A")
-        typer.echo(f"Max chunk size:  {max(all_sizes):,} chars" if all_sizes else "N/A")
+        typer.echo(f"Min chunk size:  {min(all_sizes):,} chars" if all_sizes else "Min chunk size:  N/A")
+        typer.echo(f"Max chunk size:  {max(all_sizes):,} chars" if all_sizes else "Max chunk size:  N/A")
 
     # If stats only, stop here
     if stats_only:
@@ -286,13 +292,18 @@ def command(
         content_preview = content_preview.replace("\n", " ").strip()
 
         if RICH_AVAILABLE:
+            from rich.markup import escape
+            # Escape content to prevent Rich markup interpretation
+            safe_content = escape(content_preview)
+            safe_doc_id = escape(Path(chunk.doc_id).name)
+
             console.print()
             console.print(
                 f"[dim]#{i + 1}[/dim] "
-                f"[cyan]{Path(chunk.doc_id).name}[/cyan] "
+                f"[cyan]{safe_doc_id}[/cyan] "
                 f"[dim]({len(chunk.content):,} chars)[/dim]"
             )
-            console.print(f"  [dim]{content_preview}[/dim]")
+            console.print(f"  [dim]{safe_content}[/dim]")
         else:
             typer.echo()
             typer.echo(f"#{i + 1} {Path(chunk.doc_id).name} ({len(chunk.content):,} chars)")

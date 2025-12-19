@@ -1,6 +1,11 @@
-# fitz_ai/cli/doctor.py
+# fitz_ai/cli/commands/doctor.py
 """
 Doctor command: Run diagnostics on Fitz setup.
+
+Usage:
+    fitz doctor           # Quick check
+    fitz doctor -v        # Verbose output
+    fitz doctor --test    # Test actual connections
 """
 
 from __future__ import annotations
@@ -53,13 +58,15 @@ def check_python() -> tuple[bool, str]:
 
 def check_fitz_dir() -> tuple[bool, str]:
     """Check if .fitz directory exists."""
-    fitz_dir = Path.cwd() / ".fitz"
-    config_file = fitz_dir / "config.yaml"
+    from fitz_ai.core.paths import FitzPaths
+
+    workspace = FitzPaths.workspace()
+    config_file = FitzPaths.config()
 
     if config_file.exists():
-        return True, ".fitz_ai/config.yaml exists"
-    elif fitz_dir.exists():
-        return True, ".fitz_ai/ exists (no config.yaml)"
+        return True, f"{workspace}/config.yaml exists"
+    elif workspace.exists():
+        return True, f"{workspace}/ exists (no config.yaml)"
     else:
         return False, "Not found (run 'fitz init')"
 
@@ -70,7 +77,9 @@ def check_config() -> tuple[bool, str, Optional[dict]]:
         from fitz_ai.engines.classic_rag.config.loader import load_config_dict
 
         config = load_config_dict()
-        return True, "Config loaded from config.yaml", config
+        return True, "Config loaded successfully", config
+    except FileNotFoundError:
+        return False, "No config file found (run 'fitz init')", None
     except Exception as e:
         return False, f"Failed to load: {e}", None
 
@@ -151,8 +160,8 @@ def test_rerank(config: dict) -> tuple[bool, str]:
 
 
 def command(
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed output"),
-    test_connections: bool = typer.Option(False, "--test", "-t", help="Test actual connections"),
+        verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed output"),
+        test_connections: bool = typer.Option(False, "--test", "-t", help="Test actual connections"),
 ) -> None:
     """
     Run diagnostics on your Fitz setup.
@@ -171,11 +180,11 @@ def command(
 
     if RICH_AVAILABLE:
         console.print(
-            Panel.fit("[bold]🩺 Fitz Doctor[/bold]\n" "Running diagnostics...", border_style="blue")
+            Panel.fit("[bold]Fitz Doctor[/bold]\nRunning diagnostics...", border_style="blue")
         )
     else:
         print("\n" + "=" * 60)
-        print("🩺 Fitz Doctor")
+        print("Fitz Doctor")
         print("Running diagnostics...")
         print("=" * 60)
 
@@ -280,8 +289,8 @@ def command(
             from qdrant_client import QdrantClient
 
             vdb_cfg = config.get("vector_db", {}).get("kwargs", {})
-            host = vdb_cfg.get("host", system.qdrant_host)
-            port = vdb_cfg.get("port", system.qdrant_port)
+            host = vdb_cfg.get("host") or (system.qdrant.host if system.qdrant.available else "localhost")
+            port = vdb_cfg.get("port") or (system.qdrant.port if system.qdrant.available else 6333)
             client = QdrantClient(host=host, port=port, timeout=5)
             collections = client.get_collections()
             print_status(
@@ -324,9 +333,11 @@ def command(
             print(f"⚠️  {len(warnings)} warning(s):")
             for warning in warnings:
                 print(f"  • {warning}")
-        print("✅ All checks passed!")
+        print("\n✅ All critical checks passed!")
     else:
         print("✅ All checks passed!")
+
+    print()
 
 
 if __name__ == "__main__":

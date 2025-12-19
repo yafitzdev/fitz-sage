@@ -1,10 +1,11 @@
+# fitz_ai/cli/commands/validate.py
 """
 Validate command: Check documents before full ingestion (dry-run).
 
 Usage:
-    fitz-ingest validate ./documents
-    fitz-ingest validate ./documents --ingest-plugin local
-    fitz-ingest validate ./documents --show-errors
+    fitz ingest validate ./documents
+    fitz ingest validate ./documents --ingest-plugin local
+    fitz ingest validate ./documents --show-errors
 """
 
 from pathlib import Path
@@ -58,13 +59,13 @@ def command(
 
     Examples:
         # Basic validation
-        fitz-ingest validate ./docs
+        fitz ingest validate ./docs
 
         # Show detailed errors
-        fitz-ingest validate ./docs --show-errors
+        fitz ingest validate ./docs --show-errors
 
         # Custom minimum character count
-        fitz-ingest validate ./docs --min-chars 50
+        fitz ingest validate ./docs --min-chars 50
     """
     # Validate source path
     if not source.exists():
@@ -148,5 +149,5 @@ def command(
         typer.echo("✓ All documents passed validation!")
 
     typer.echo()
-    typer.echo("💡 Next step: Run 'fitz-ingest run' to perform actual ingestion")
+    typer.echo("💡 Next step: Run 'fitz ingest run' to perform actual ingestion")
     typer.echo()

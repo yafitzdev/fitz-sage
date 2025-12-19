@@ -1,4 +1,4 @@
-# File: fitz_ai/cli/init.py
+# fitz_ai/cli/commands/init.py
 # PLUGIN-AGNOSTIC VERSION
 # Uses plugin registries for auto-discovery - NO hardcoded plugin names!
 
@@ -6,6 +6,11 @@
 Interactive setup wizard for Fitz.
 
 Detects available providers and creates a working configuration.
+
+Usage:
+    fitz init              # Interactive wizard
+    fitz init -y           # Auto-detect and use defaults
+    fitz init --show-config  # Preview config without saving
 """
 
 from __future__ import annotations
@@ -53,12 +58,7 @@ def _is_faiss_plugin(plugin_name: str) -> bool:
 
 
 def detect_engines() -> dict[str, str]:
-    """
-    Auto-discover all registered engines from the EngineRegistry.
-
-    Returns:
-        Dict mapping engine names to descriptions
-    """
+    """Auto-discover all registered engines."""
     # Import engines to trigger registration
     try:
         import fitz_ai.engines.classic_rag  # noqa
@@ -73,7 +73,6 @@ def detect_engines() -> dict[str, str]:
     # Get engines from registry
     try:
         from fitz_ai.runtime import list_engines_with_info
-
         return list_engines_with_info()
     except ImportError:
         # Fallback if runtime not available
@@ -89,9 +88,7 @@ def prompt_engine_choice(engines: dict[str, str]) -> str:
     if len(engines) == 1:
         engine = list(engines.keys())[0]
         if RICH_AVAILABLE:
-            console.print(
-                f"  [dim]Engine:[/dim] [green]{engine}[/green] [dim](auto-selected)[/dim]"
-            )
+            console.print(f"  [dim]Engine:[/dim] [green]{engine}[/green] [dim](auto-selected)[/dim]")
         else:
             print(f"  Engine: {engine} (auto-selected)")
         return engine
@@ -100,11 +97,7 @@ def prompt_engine_choice(engines: dict[str, str]) -> str:
     if RICH_AVAILABLE:
         console.print("\n[bold blue]Available Engines[/bold blue]")
         for i, (name, desc) in enumerate(engines.items(), 1):
-            status = (
-                "[bold green]Production[/bold green]"
-                if name == "classic_rag"
-                else "[yellow]Experimental[/yellow]"
-            )
+            status = "[bold green]Production[/bold green]" if name == "classic_rag" else "[yellow]Experimental[/yellow]"
             console.print(f"  {i}. [bold]{name}[/bold] ({status})")
             console.print(f"     [dim]{desc}[/dim]")
     else:
@@ -140,52 +133,19 @@ def prompt_engine_choice(engines: dict[str, str]) -> str:
 
 
 def get_plugin_defaults(plugin_name: str, plugin_type: str) -> Dict[str, Any]:
-    """
-    Get default configuration for a plugin.
-
-    This could be extended to query plugin classes for their own defaults.
-    For now, we use sensible defaults based on common conventions.
-    """
+    """Get default configuration for a plugin."""
     defaults = {
-        # Temperature for chat/LLM
         "temperature": 0.2,
-        # Common host/port defaults
-        "host": "localhost",
-        "port": 6333,
     }
-
-    # Plugin-specific model defaults (can be queried from plugin class later)
-    if plugin_type == "chat":
-        # Try to get default model from plugin class
-        try:
-            from fitz_ai.llm.registry import get_llm_plugin
-
-            plugin_cls = get_llm_plugin(plugin_name=plugin_name, plugin_type="chat")
-            # Look for default model in class attributes
-            if hasattr(plugin_cls, "default_model"):
-                defaults["model"] = plugin_cls.default_model
-        except:
-            pass
-
     return defaults
 
 
 def generate_plugin_config(plugin_name: str, plugin_type: str, **kwargs) -> str:
-    """
-    Generate YAML config for any plugin dynamically.
-
-    This is PLUGIN-AGNOSTIC - no hardcoded plugin names!
-    """
-    # Get defaults
-    defaults = get_plugin_defaults(plugin_name, plugin_type)
-
-    # Merge with provided kwargs
-    config_kwargs = {**defaults, **kwargs}
-
+    """Generate YAML config for any plugin dynamically."""
     # Build kwargs section
-    if config_kwargs:
+    if kwargs:
         kwargs_lines = []
-        for key, value in config_kwargs.items():
+        for key, value in kwargs.items():
             if isinstance(value, str):
                 kwargs_lines.append(f'    {key}: "{value}"')
             else:
@@ -357,9 +317,7 @@ def auto_select_or_prompt(
     if len(available) == 1:
         choice = available[0]
         if RICH_AVAILABLE:
-            console.print(
-                f"  [dim]{category}:[/dim] [green]{choice}[/green] [dim](auto-selected)[/dim]"
-            )
+            console.print(f"  [dim]{category}:[/dim] [green]{choice}[/green] [dim](auto-selected)[/dim]")
         else:
             print(f"  {category}: {choice} (auto-selected)")
         return choice
@@ -396,18 +354,19 @@ def command(
         fitz init -y           # Auto-detect and use defaults
         fitz init --show-config  # Preview config without saving
     """
+    from fitz_ai.core.paths import FitzPaths
 
     # Header
     if RICH_AVAILABLE:
         console.print(
             Panel.fit(
-                "[bold]🔧 Fitz Setup Wizard[/bold]\n" "Let's configure your RAG pipeline!",
+                "[bold]Fitz Setup Wizard[/bold]\nLet's configure your RAG pipeline!",
                 border_style="blue",
             )
         )
     else:
         print("\n" + "=" * 60)
-        print("🔧 Fitz Setup Wizard")
+        print("Fitz Setup Wizard")
         print("Let's configure your RAG pipeline!")
         print("=" * 60)
 
@@ -425,10 +384,10 @@ def command(
     # For now, only classic_rag is fully supported
     if engine != "classic_rag":
         if RICH_AVAILABLE:
-            console.print(f"\n[yellow]⚠ Setup wizard for '{engine}' coming soon![/yellow]")
+            console.print(f"\n[yellow]Setup wizard for '{engine}' coming soon![/yellow]")
             console.print("Please create config manually or use defaults.")
         else:
-            print(f"\n⚠ Setup wizard for '{engine}' coming soon!")
+            print(f"\nSetup wizard for '{engine}' coming soon!")
             print("Please create config manually or use defaults.")
         raise typer.Exit(code=0)
 
@@ -453,7 +412,6 @@ def command(
 
     print_header("Available Chat Plugins")
     for plugin in sorted(available_chat):
-        # Check if plugin is available (has API key or is local)
         available = False
         if _is_local_plugin(plugin):
             available = system.ollama.available
@@ -498,7 +456,6 @@ def command(
     # Filter to Available Only
     # ==========================================================================
 
-    # Filter chat plugins to only available ones
     available_chat_filtered = []
     for plugin in available_chat:
         if plugin in ["ollama", "local"] and system.ollama.available:
@@ -506,7 +463,6 @@ def command(
         elif plugin in system.api_keys and system.api_keys[plugin].available:
             available_chat_filtered.append(plugin)
 
-    # Filter embedding plugins
     available_embeddings_filtered = []
     for plugin in available_embeddings:
         if plugin in ["ollama", "local"] and system.ollama.available:
@@ -514,13 +470,11 @@ def command(
         elif plugin in system.api_keys and system.api_keys[plugin].available:
             available_embeddings_filtered.append(plugin)
 
-    # Filter rerank plugins
     available_rerank_filtered = []
     for plugin in available_rerank:
         if plugin in system.api_keys and system.api_keys[plugin].available:
             available_rerank_filtered.append(plugin)
 
-    # Filter vector DB plugins
     available_vector_dbs_filtered = []
     for plugin in available_vector_dbs:
         if plugin in ["local-faiss", "faiss"] and system.faiss.available:
@@ -534,26 +488,26 @@ def command(
 
     if not available_chat_filtered:
         if RICH_AVAILABLE:
-            console.print("\n[red]❌ No chat plugins available![/red]")
+            console.print("\n[red]No chat plugins available![/red]")
             console.print("Set an API key or install Ollama.")
         else:
-            print("\n❌ No chat plugins available!")
+            print("\nNo chat plugins available!")
             print("Set an API key or install Ollama.")
         raise typer.Exit(code=1)
 
     if not available_embeddings_filtered:
         if RICH_AVAILABLE:
-            console.print("\n[red]❌ No embedding plugins available![/red]")
+            console.print("\n[red]No embedding plugins available![/red]")
         else:
-            print("\n❌ No embedding plugins available!")
+            print("\nNo embedding plugins available!")
         raise typer.Exit(code=1)
 
     if not available_vector_dbs_filtered:
         if RICH_AVAILABLE:
-            console.print("\n[red]❌ No vector database plugins available![/red]")
+            console.print("\n[red]No vector database plugins available![/red]")
             console.print("Install FAISS (pip install faiss-cpu) or start Qdrant.")
         else:
-            print("\n❌ No vector database plugins available!")
+            print("\nNo vector database plugins available!")
             print("Install FAISS (pip install faiss-cpu) or start Qdrant.")
         raise typer.Exit(code=1)
 
@@ -561,7 +515,6 @@ def command(
     # User Selection
     # ==========================================================================
 
-    # Determine defaults (first available)
     chat_default = available_chat_filtered[0]
     embedding_default = available_embeddings_filtered[0]
     vector_db_default = available_vector_dbs_filtered[0]
@@ -577,7 +530,6 @@ def command(
     else:
         print_header("Configuration Options")
 
-        # Prompt for choices
         chat_choice = auto_select_or_prompt(
             "Chat",
             available_chat_filtered,
@@ -629,9 +581,8 @@ def command(
     # Generate Config (AGNOSTIC!)
     # ==========================================================================
 
-    # Get Qdrant host/port from detection
-    qdrant_host = system.qdrant_host
-    qdrant_port = system.qdrant_port
+    qdrant_host = system.qdrant.host if system.qdrant.available else "localhost"
+    qdrant_port = system.qdrant.port if system.qdrant.available else 6333
 
     config = generate_config(
         chat_provider=chat_choice,
@@ -652,7 +603,6 @@ def command(
 
     if RICH_AVAILABLE:
         from rich.syntax import Syntax
-
         console.print(Syntax(config, "yaml", theme="monokai", line_numbers=False))
     else:
         print(config)
@@ -663,46 +613,25 @@ def command(
     # Save config
     print_header("Saving Configuration")
 
-    # Determine save locations
-    cwd = Path.cwd()
-    fitz_dir = cwd / ".fitz"
-
-    # Primary config locations
-    config_locations = [
-        cwd / "fitz" / "engines" / "classic_rag" / "config" / "default.yaml",
-        cwd / "fitz" / "pipeline" / "config" / "default.yaml",
-    ]
-
-    fitz_config = fitz_dir / "config.yaml"
+    # Determine save location
+    fitz_dir = FitzPaths.workspace()
+    fitz_config = FitzPaths.config()
 
     if not non_interactive:
-        existing = [p for p in config_locations if p.exists()]
-        if existing or fitz_config.exists():
-            if not prompt_confirm("Overwrite existing config files?", default=False):
+        if fitz_config.exists():
+            if not prompt_confirm("Overwrite existing config file?", default=False):
                 print("Aborted.")
                 raise typer.Exit(code=0)
 
-    fitz_dir.mkdir(exist_ok=True)
-
-    saved_to = []
-    for config_path in config_locations:
-        if config_path.parent.exists():
-            config_path.write_text(config)
-            saved_to.append(config_path)
-            print(f"✓ Saved to {config_path.relative_to(cwd)}")
-
+    fitz_dir.mkdir(parents=True, exist_ok=True)
     fitz_config.write_text(config)
-    saved_to.append(fitz_config)
-    print(f"✓ Saved to {fitz_config.relative_to(cwd)}")
-
-    if not saved_to:
-        print("⚠ No config directories found - only saved to .fitz_ai/config.yaml")
+    print(f"✓ Saved to {fitz_config}")
 
     # ==========================================================================
     # Next Steps
     # ==========================================================================
 
-    print_header("🎉 Setup Complete!")
+    print_header("Setup Complete!")
 
     next_steps = f"""
 Your configuration is ready! Next steps:

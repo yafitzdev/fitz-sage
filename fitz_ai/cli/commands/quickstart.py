@@ -1,5 +1,4 @@
-# fitz_ai/cli/quickstart.py
-
+# fitz_ai/cli/commands/quickstart.py
 """
 Quickstart command: Run end-to-end test.
 
@@ -8,12 +7,15 @@ This command:
 2. Creates sample documents about RAG
 3. Ingests them into a vector database
 4. Runs a test query to verify everything works
+
+Usage:
+    fitz quickstart           # Run full quickstart
+    fitz quickstart --clean   # Clean and re-run
 """
 
 from __future__ import annotations
 
 import shutil
-import sys
 from pathlib import Path
 
 import typer
@@ -35,7 +37,6 @@ try:
 except ImportError:
     RICH_AVAILABLE = False
     console = None
-
 
 # =============================================================================
 # Sample Documents
@@ -162,46 +163,38 @@ def check_system() -> tuple[bool, dict]:
     """
     Check system requirements and available providers using plugin registries.
 
-    Returns (success, details) where details contains:
-    - llm_provider: name of available LLM provider
-    - embedding_provider: name of available embedding provider
-    - vector_db: name of available vector DB
+    Returns (success, details_dict).
     """
     details = {
         "llm_provider": None,
         "embedding_provider": None,
         "vector_db": None,
+        "qdrant_host": "localhost",
+        "qdrant_port": 6333,
         "issues": [],
     }
 
-    # Check Python version
-    major, minor = sys.version_info[:2]
-    if major < 3 or minor < 10:
-        details["issues"].append(f"Python 3.10+ required (you have {major}.{minor})")
-    else:
-        print_success(f"Python {major}.{minor}")
-
-    # Get system status
-    system = detect_all()
-
-    # Discover available plugins from registries
+    # Get available plugins from registries
     available_chat = available_llm_plugins("chat")
     available_embeddings = available_llm_plugins("embedding")
     available_vector_dbs = available_vector_db_plugins()
+
+    # Get system status
+    system = detect_all()
 
     # Find first available chat plugin
     for plugin in available_chat:
         if plugin in ["ollama", "local"] and system.ollama.available:
             details["llm_provider"] = plugin
-            print_success(f"{plugin.capitalize()} is running (local)")
+            print_success(f"Chat: {plugin} (Ollama)")
             break
         elif plugin in system.api_keys and system.api_keys[plugin].available:
             details["llm_provider"] = plugin
-            print_success(f"{plugin.capitalize()} API key found")
+            print_success(f"Chat: {plugin}")
             break
 
     if not details["llm_provider"]:
-        details["issues"].append("No LLM provider found. Set an API key or install Ollama.")
+        details["issues"].append("No chat/LLM provider found. Set an API key or install Ollama.")
 
     # Find first available embedding plugin
     for plugin in available_embeddings:
@@ -259,16 +252,14 @@ def create_sample_documents(base_dir: Path) -> list[Path]:
 
 
 def generate_quickstart_config(
-    llm_provider: str,
-    embedding_provider: str,
-    vector_db: str,
-    qdrant_host: str = "localhost",
-    qdrant_port: str = "6333",
+        llm_provider: str,
+        embedding_provider: str,
+        vector_db: str,
+        qdrant_host: str = "localhost",
+        qdrant_port: str = "6333",
 ) -> str:
-    """
-    Generate a minimal config for quickstart using dynamic plugin config.
-    """
-    # Chat config (using 'chat' not 'llm')
+    """Generate a minimal config for quickstart."""
+    # Chat config
     chat_config = f"""chat:
   plugin_name: {llm_provider}
   kwargs:
@@ -305,10 +296,16 @@ retriever:
   collection: quickstart
   top_k: 3
 
+rerank:
+  enabled: false
+
 rgs:
   enable_citations: true
   strict_grounding: true
   max_chunks: 5
+
+logging:
+  level: INFO
 """
     return config
 
@@ -319,16 +316,13 @@ rgs:
 
 
 def run_ingestion(
-    docs_path: Path,
-    collection: str,
-    embedding_plugin: str,
-    vector_db_plugin: str,
+        docs_path: Path,
+        collection: str,
+        embedding_plugin: str,
+        vector_db_plugin: str,
 ) -> tuple[bool, int]:
     """
     Run document ingestion.
-
-    Connection details are auto-detected from fitz_ai.core.detect.
-    No need to pass host/port - single source of truth!
 
     Returns (success, num_chunks).
     """
@@ -349,8 +343,7 @@ def run_ingestion(
         # Create embedder - returns an instance directly
         embedder = get_llm_plugin(plugin_name=embedding_plugin, plugin_type="embedding")
 
-        # Create vector DB - auto-detects connection from fitz_ai.core.detect!
-        # No need to pass host/port - it's handled automatically
+        # Create vector DB - auto-detects connection
         vector_db = get_vector_db_plugin(vector_db_plugin)
         writer = VectorDBWriter(client=vector_db)
 
@@ -369,7 +362,6 @@ def run_ingestion(
     except Exception as e:
         print_error(f"Ingestion failed: {e}")
         import traceback
-
         traceback.print_exc()
         return False, 0
 
@@ -407,7 +399,6 @@ def run_test_query(collection: str, config_path: Path) -> tuple[bool, str, list[
     except Exception as e:
         print_error(f"Query failed: {e}")
         import traceback
-
         traceback.print_exc()
         return False, str(e), []
 
@@ -418,16 +409,16 @@ def run_test_query(collection: str, config_path: Path) -> tuple[bool, str, list[
 
 
 def command(
-    clean: bool = typer.Option(
-        False,
-        "--clean",
-        help="Remove existing quickstart data before running",
-    ),
-    skip_query: bool = typer.Option(
-        False,
-        "--skip-query",
-        help="Skip the test query (useful for CI without LLM)",
-    ),
+        clean: bool = typer.Option(
+            False,
+            "--clean",
+            help="Remove existing quickstart data before running",
+        ),
+        skip_query: bool = typer.Option(
+            False,
+            "--skip-query",
+            help="Skip the test query (useful for CI without LLM)",
+        ),
 ) -> None:
     """
     Run a complete end-to-end test of Fitz.
@@ -444,7 +435,6 @@ def command(
         fitz quickstart           # Run full quickstart
         fitz quickstart --clean   # Clean and re-run
     """
-    # Import FitzPaths for consistent path management
     from fitz_ai.core.paths import FitzPaths
 
     TOTAL_STEPS = 5 if not skip_query else 4
@@ -453,13 +443,13 @@ def command(
     if RICH_AVAILABLE:
         console.print(
             Panel.fit(
-                "[bold]🚀 Fitz Quickstart[/bold]\n" "Let's verify your setup works end-to-end!",
+                "[bold]Fitz Quickstart[/bold]\nLet's verify your setup works end-to-end!",
                 border_style="blue",
             )
         )
     else:
         print("\n" + "=" * 60)
-        print("🚀 Fitz Quickstart")
+        print("Fitz Quickstart")
         print("Let's verify your setup works end-to-end!")
         print("=" * 60)
 
@@ -510,7 +500,7 @@ def command(
     print_step(2, TOTAL_STEPS, "Creating sample documents...")
 
     created_files = create_sample_documents(quickstart_dir)
-    print_success(f"Created {len(created_files)} sample docs in .fitz_ai/quickstart_docs/")
+    print_success(f"Created {len(created_files)} sample docs in .fitz/quickstart_docs/")
 
     for f in created_files:
         print_info(f"  • {f.name}")
@@ -525,11 +515,11 @@ def command(
         embedding_provider,
         vector_db,
         qdrant_host=details.get("qdrant_host", "localhost"),
-        qdrant_port=details.get("qdrant_port", "6333"),
+        qdrant_port=str(details.get("qdrant_port", "6333")),
     )
     FitzPaths.ensure_workspace()
     config_path.write_text(config)
-    print_success("Config saved to .fitz_ai/quickstart_config.yaml")
+    print_success("Config saved to .fitz/quickstart_config.yaml")
     print_info(f"  Chat: {llm_provider}")
     print_info(f"  Embedding: {embedding_provider}")
     print_info(f"  Vector DB: {vector_db}")
@@ -541,9 +531,9 @@ def command(
 
     if RICH_AVAILABLE:
         with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
         ) as progress:
             task = progress.add_task("Ingesting...", total=None)
             success, num_chunks = run_ingestion(
@@ -573,9 +563,9 @@ def command(
 
         if RICH_AVAILABLE:
             with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console,
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    console=console,
             ) as progress:
                 task = progress.add_task("Generating answer...", total=None)
                 success, answer, sources = run_test_query(collection, config_path)
@@ -590,15 +580,18 @@ def command(
 
         # Display answer
         if RICH_AVAILABLE:
+            from rich.markup import escape
+            safe_answer = escape(answer[:500] + ("..." if len(answer) > 500 else ""))
             console.print(
                 Panel(
-                    answer[:500] + ("..." if len(answer) > 500 else ""),
+                    safe_answer,
                     title="[green]Answer[/green]",
                     border_style="green",
                 )
             )
             if sources:
-                console.print(f"  [dim]Sources: {', '.join(sources)}[/dim]")
+                safe_sources = ", ".join(escape(s) for s in sources)
+                console.print(f"  [dim]Sources: {safe_sources}[/dim]")
         else:
             print()
             print("  Answer:")
@@ -615,17 +608,17 @@ def command(
 
     if RICH_AVAILABLE:
         success_message = """
-[bold green]✅ Fitz is working![/bold green]
+[bold green]Fitz is working![/bold green]
 
 You can now:
   • Query the quickstart collection:
-    [cyan]fitz-pipeline query "your question" --collection quickstart[/cyan]
+    [cyan]fitz query "your question" --collection quickstart[/cyan]
 
   • Ingest your own documents:
-    [cyan]fitz-ingest run ./your_docs --collection my_knowledge[/cyan]
+    [cyan]fitz ingest ./your_docs my_knowledge[/cyan]
 
   • View your configuration:
-    [cyan]fitz-pipeline config show[/cyan]
+    [cyan]fitz config[/cyan]
 
   • Run diagnostics:
     [cyan]fitz doctor[/cyan]
@@ -633,13 +626,13 @@ You can now:
         console.print(Panel(success_message, border_style="green"))
     else:
         print("=" * 60)
-        print("✅ Fitz is working!")
+        print("Fitz is working!")
         print("=" * 60)
         print()
         print("You can now:")
-        print('  • Query: fitz-pipeline query "your question" --collection quickstart')
-        print("  • Ingest: fitz-ingest run ./your_docs --collection my_knowledge")
-        print("  • Config: fitz-pipeline config show")
+        print('  • Query: fitz query "your question" --collection quickstart')
+        print("  • Ingest: fitz ingest ./your_docs my_knowledge")
+        print("  • Config: fitz config")
         print("  • Diagnose: fitz doctor")
         print()
 

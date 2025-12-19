@@ -1,4 +1,4 @@
-# fitz_ai/cli/query.py
+# fitz_ai/cli/commands/query.py
 """
 Top-level query command.
 
@@ -24,6 +24,7 @@ logger = get_logger(__name__)
 try:
     from rich.console import Console
     from rich.panel import Panel
+    from rich.markup import escape
 
     RICH_AVAILABLE = True
     console = Console()
@@ -154,16 +155,19 @@ def command(
 
     # Display answer
     typer.echo()
+    answer_text = answer.text or "(No answer generated)"
     if RICH_AVAILABLE:
+        # Escape answer text to prevent markup interpretation
+        safe_answer = escape(answer_text)
         console.print(
-            Panel(answer.text or "(No answer generated)", title="Answer", border_style="green")
+            Panel(safe_answer, title="Answer", border_style="green")
         )
     else:
         typer.echo("=" * 60)
         typer.echo("ANSWER")
         typer.echo("=" * 60)
         typer.echo()
-        typer.echo(answer.text or "(No answer generated)")
+        typer.echo(answer_text)
         typer.echo()
 
     # Display sources if available
@@ -176,14 +180,19 @@ def command(
             typer.echo("-" * 40)
 
         for i, prov in enumerate(answer.provenance, 1):
+            source_id = prov.source_id or "unknown"
             if RICH_AVAILABLE:
-                console.print(f"  [dim][{i}][/dim] {prov.source_id}")
+                safe_source_id = escape(source_id)
+                console.print(f"  [dim][{i}][/dim] {safe_source_id}")
             else:
-                typer.echo(f"[{i}] {prov.source_id}")
+                typer.echo(f"[{i}] {source_id}")
 
             if prov.excerpt:
                 excerpt = prov.excerpt[:150] + "..." if len(prov.excerpt) > 150 else prov.excerpt
                 if RICH_AVAILABLE:
-                    console.print(f"      [dim]{excerpt}[/dim]")
+                    safe_excerpt = escape(excerpt)
+                    console.print(f"      [dim]{safe_excerpt}[/dim]")
                 else:
                     typer.echo(f"    {excerpt}")
+
+    typer.echo()

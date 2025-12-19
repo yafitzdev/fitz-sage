@@ -1,4 +1,4 @@
-# fitz_ai/cli/db.py
+# fitz_ai/cli/commands/db.py
 """
 Database command: Inspect vector database collections.
 
@@ -68,9 +68,8 @@ def command(
     """
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
-    # Get vector DB client
-    VectorDBPluginCls = get_vector_db_plugin(vector_db)
-    vdb = VectorDBPluginCls()
+    # Get vector DB client (returns instance, not class)
+    vdb = get_vector_db_plugin(vector_db)
 
     # List mode
     if list_collections:
@@ -204,7 +203,7 @@ def _show_sample_chunks(vdb, collection: str, num_samples: int) -> None:
 
     try:
         # Access the underlying Qdrant client
-        client = getattr(vdb, "_client", None)
+        client = getattr(vdb, "_client", None) or getattr(vdb, "client", None)
         if not client:
             return
 

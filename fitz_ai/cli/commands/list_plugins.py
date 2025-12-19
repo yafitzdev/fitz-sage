@@ -1,11 +1,11 @@
-# fitz_ai/ingest/cli/list_plugins.py
+# fitz_ai/cli/commands/list_plugins.py
 """
 List-plugins command: Show available plugins for ingestion.
 
 Usage:
-    fitz-ingest list-plugins
-    fitz-ingest list-plugins --type ingest
-    fitz-ingest list-plugins --type embedding
+    fitz ingest plugins
+    fitz ingest plugins --type ingest
+    fitz ingest plugins --type embedding
 """
 
 from typing import Optional
@@ -44,13 +44,13 @@ def command(
 
     Examples:
         # Show all plugins
-        fitz-ingest list-plugins
+        fitz ingest plugins
 
         # Show only ingestion plugins
-        fitz-ingest list-plugins --type ingest
+        fitz ingest plugins --type ingest
 
         # Show only embedding plugins
-        fitz-ingest list-plugins --type embedding
+        fitz ingest plugins --type embedding
     """
     show_all = type is None or type == "all"
 
@@ -67,12 +67,15 @@ def command(
         ingest_plugins = available_ingest_plugins()
         if ingest_plugins:
             for name in ingest_plugins:
-                cls = get_ingest_plugin(name)
-                plugin_type = getattr(cls, "plugin_type", "N/A")
-                doc = cls.__doc__ or "No description"
-                desc = doc.strip().split("\n")[0]
-                typer.echo(f"  • {name:15} [{plugin_type}]")
-                typer.echo(f"    {desc}")
+                try:
+                    cls = get_ingest_plugin(name)
+                    plugin_type = getattr(cls, "plugin_type", "N/A")
+                    doc = cls.__doc__ or "No description"
+                    desc = doc.strip().split("\n")[0]
+                    typer.echo(f"  • {name:15} [{plugin_type}]")
+                    typer.echo(f"    {desc}")
+                except Exception:
+                    typer.echo(f"  • {name}")
         else:
             typer.echo("  (No ingestion plugins found)")
 
