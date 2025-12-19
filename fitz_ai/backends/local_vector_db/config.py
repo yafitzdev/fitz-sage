@@ -1,4 +1,4 @@
-# fitz/backends/local_vector_db/config.py
+# fitz_ai/backends/local_vector_db/config.py
 """
 Configuration for local vector database backends.
 

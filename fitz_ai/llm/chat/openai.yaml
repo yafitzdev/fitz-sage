@@ -1,4 +1,4 @@
-# fitz/llm/chat/openai.yaml
+# fitz_ai/llm/chat/openai.yaml
 # OpenAI Chat Plugin - Chat Completions API
 #
 # Documentation: https://platform.openai.com/docs/api-reference/chat

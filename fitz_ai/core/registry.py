@@ -1,4 +1,4 @@
-# fitz/core/registry.py
+# fitz_ai/core/registry.py
 """
 Centralized Plugin Registry System.
 
@@ -7,8 +7,8 @@ Single implementation of plugin registry logic used by all plugin types:
 - Chunking
 - Retriever
 - Pipeline
-- LLM (YAML-based, via fitz.llm.registry)
-- Vector DB (YAML-based, via fitz.vector_db.registry)
+- LLM (YAML-based, via fitz_ai.llm.registry)
+- Vector DB (YAML-based, via fitz_ai.vector_db.registry)
 
 This module is the SINGLE SOURCE OF TRUTH for all registry access.
 Import everything from here, not from domain-specific modules.
@@ -211,25 +211,25 @@ class PluginRegistry:
 
 INGEST_REGISTRY = PluginRegistry(
     name="ingest",
-    scan_packages=["fitz.ingest.ingestion.plugins"],
+    scan_packages=["fitz_ai.ingest.ingestion.plugins"],
     required_method="ingest",
 )
 
 CHUNKING_REGISTRY = PluginRegistry(
     name="chunking",
-    scan_packages=["fitz.ingest.chunking.plugins"],
+    scan_packages=["fitz_ai.ingest.chunking.plugins"],
     required_method="chunk_text",
 )
 
 RETRIEVER_REGISTRY = PluginRegistry(
     name="retriever",
-    scan_packages=["fitz.engines.classic_rag.retrieval.runtime.plugins"],
+    scan_packages=["fitz_ai.engines.classic_rag.retrieval.runtime.plugins"],
     required_method="retrieve",
 )
 
 PIPELINE_REGISTRY = PluginRegistry(
     name="pipeline",
-    scan_packages=["fitz.engines.classic_rag.pipeline.pipeline.plugins"],
+    scan_packages=["fitz_ai.engines.classic_rag.pipeline.pipeline.plugins"],
     required_method="build",
 )
 

@@ -1,4 +1,4 @@
-# fitz/engines/classic_rag/exceptions.py
+# fitz_ai/engines/classic_rag/exceptions.py
 """
 All exceptions for the Classic RAG engine.
 

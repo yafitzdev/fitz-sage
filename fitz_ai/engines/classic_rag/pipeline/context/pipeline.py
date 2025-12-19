@@ -1,4 +1,4 @@
-# fitz/engines/classic_rag/pipeline/context/pipeline.py
+# fitz_ai/engines/classic_rag/pipeline/context/pipeline.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field

@@ -1,8 +1,8 @@
-# fitz/engines/clara/config/loader.py
+# fitz_ai/engines/clara/config/loader.py
 """
 Configuration loader for CLaRa engine.
 
-This is a thin wrapper around fitz.core.config.
+This is a thin wrapper around fitz_ai.core.config.
 All the actual loading logic lives there.
 
 For new code, prefer importing directly from fitz_ai.core.config:

@@ -1,4 +1,4 @@
-# fitz/cli/plugins.py
+# fitz_ai/cli/plugins.py
 """
 Plugins command for Fitz CLI.
 
@@ -13,8 +13,8 @@ def command() -> None:
     List all discovered plugins.
     """
     # Import from correct locations:
-    # - LLM plugins (chat, embedding, rerank) are in fitz.llm.registry
-    # - Vector DB plugins are in fitz.core.registry
+    # - LLM plugins (chat, embedding, rerank) are in fitz_ai.llm.registry
+    # - Vector DB plugins are in fitz_ai.core.registry
     from fitz_ai.core.registry import available_vector_db_plugins
     from fitz_ai.llm.registry import available_llm_plugins
 

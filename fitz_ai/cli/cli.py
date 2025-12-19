@@ -1,4 +1,4 @@
-# fitz/cli/cli.py
+# fitz_ai/cli/cli.py
 """
 Main Fitz CLI.
 

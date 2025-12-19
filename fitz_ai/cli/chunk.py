@@ -1,4 +1,4 @@
-# fitz/cli/chunk.py
+# fitz_ai/cli/chunk.py
 """
 Chunk command: Preview how documents will be chunked.
 

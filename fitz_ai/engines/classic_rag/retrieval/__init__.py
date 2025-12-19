@@ -1,1 +1,1 @@
-# fitz/retrieval/__init__.py
+# fitz_ai/retrieval/__init__.py

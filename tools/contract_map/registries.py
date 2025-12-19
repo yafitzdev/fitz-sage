@@ -120,7 +120,7 @@ def extract_llm_registry(
                         module=module_name,
                         name=f"LLM_REGISTRY[{plugin_type!r}]",
                         plugins=sorted(str(p) for p in plugins),
-                        note=f"YAML-based discovery (fitz/llm/{plugin_type}/*.yaml)",
+                        note=f"YAML-based discovery (fitz_ai/llm/{plugin_type}/*.yaml)",
                     )
                 )
         except Exception as exc:
@@ -176,7 +176,7 @@ def extract_vector_db_registry(
                 module=module_name,
                 name="VECTOR_DB_REGISTRY",
                 plugins=sorted(str(p) for p in plugins),
-                note="YAML-based discovery (fitz/vector_db/plugins/*.yaml)",
+                note="YAML-based discovery (fitz_ai/vector_db/plugins/*.yaml)",
             )
     except Exception as exc:
         tb = traceback.format_exc() if verbose else None
@@ -194,20 +194,20 @@ def extract_vector_db_registry(
 def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     """Extract all registries from the codebase."""
     # LLM registry (chat, embedding, rerank) - YAML-based
-    cm.registries.extend(extract_llm_registry(cm, "fitz.llm.registry", verbose=verbose))
+    cm.registries.extend(extract_llm_registry(cm, "fitz_ai.llm.registry", verbose=verbose))
 
     # Vector DB registry (separate from LLM) - YAML-based
-    vdb = extract_vector_db_registry(cm, "fitz.vector_db.registry", verbose=verbose)
+    vdb = extract_vector_db_registry(cm, "fitz_ai.vector_db.registry", verbose=verbose)
     if vdb:
         cm.registries.append(vdb)
 
     # Retriever registry - Python-based
     rr = extract_registry_plugins(
         cm,
-        "fitz.engines.classic_rag.retrieval.runtime.registry",
+        "fitz_ai.engines.classic_rag.retrieval.runtime.registry",
         dict_attr="RETRIEVER_REGISTRY",
         discover_fns=("_auto_discover",),
-        note="Lazy discovery over fitz.engines.classic_rag.retrieval.runtime.plugins.*",
+        note="Lazy discovery over fitz_ai.engines.classic_rag.retrieval.runtime.plugins.*",
         verbose=verbose,
     )
     if rr:
@@ -216,7 +216,7 @@ def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     # Chunker registry - Python-based
     cr = extract_registry_plugins(
         cm,
-        "fitz.ingest.chunking.registry",
+        "fitz_ai.ingest.chunking.registry",
         dict_attr="CHUNKER_REGISTRY",
         discover_fns=("_auto_discover",),
         note="Lazy discovery over ingest.chunking.plugins.*",
@@ -228,7 +228,7 @@ def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     # Ingestion registry - Python-based
     ir = extract_registry_plugins(
         cm,
-        "fitz.ingest.ingestion.registry",
+        "fitz_ai.ingest.ingestion.registry",
         dict_attr="REGISTRY",
         discover_fns=("_auto_discover",),
         note="Lazy discovery over ingest.ingestion.plugins.*",
@@ -240,7 +240,7 @@ def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     # Pipeline registry - Python-based
     pr = extract_pipeline_registry(
         cm,
-        "fitz.engines.classic_rag.pipeline.pipeline.registry",
+        "fitz_ai.engines.classic_rag.pipeline.pipeline.registry",
         list_fn="available_pipeline_plugins",
         note="Lazy discovery over pipeline.pipeline.plugins.*",
         verbose=verbose,

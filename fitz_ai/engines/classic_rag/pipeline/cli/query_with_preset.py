@@ -1,4 +1,4 @@
-# fitz/engines/classic_rag/pipeline/cli/query_with_preset.py
+# fitz_ai/engines/classic_rag/pipeline/cli/query_with_preset.py
 """
 Query command with preset support.
 

@@ -1,4 +1,4 @@
-# fitz/core/config/normalize.py
+# fitz_ai/core/config/normalize.py
 from __future__ import annotations
 
 from typing import Any

@@ -1,4 +1,4 @@
-# fitz/engines/clara/engine.py
+# fitz_ai/engines/clara/engine.py
 """
 ClaraEngine - Knowledge engine implementation for CLaRa paradigm.
 

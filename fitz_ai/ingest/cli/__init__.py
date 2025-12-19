@@ -1,4 +1,4 @@
-# fitz/ingest/cli/__init__.py
+# fitz_ai/ingest/cli/__init__.py
 """
 CLI module for ingestion commands.
 

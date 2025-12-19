@@ -1,4 +1,4 @@
-# fitz/ingest/config/schema.py
+# fitz_ai/ingest/config/schema.py
 
 from __future__ import annotations
 

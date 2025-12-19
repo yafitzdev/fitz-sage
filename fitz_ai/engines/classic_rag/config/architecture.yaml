@@ -4,18 +4,18 @@
 # It is the ONLY place that needs updating when the project structure changes.
 #
 # Roles themselves are defined in:
-#   fitz/core/_contracts/roles.py
+#   fitz_ai/core/_contracts/roles.py
 #
 # This file is intentionally not user-facing.
 
 mapping:
-  fitz.core: foundation
+  fitz_ai.core: foundation
 
-  fitz.ingest: domain
-  fitz.engines.classic_rag.retrieval: domain
-  fitz.generation: domain
+  fitz_ai.ingest: domain
+  fitz_ai.engines.classic_rag.retrieval: domain
+  fitz_ai.generation: domain
 
-  fitz.engines.classic_rag.pipeline: orchestration
+  fitz_ai.engines.classic_rag.pipeline: orchestration
 
   tools: tooling
   tests: tests

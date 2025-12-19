@@ -1,4 +1,4 @@
-# fitz/vector_db/plugins/qdrant.yaml
+# fitz_ai/vector_db/plugins/qdrant.yaml
 #
 # Qdrant Vector Database Plugin
 #
@@ -17,7 +17,7 @@ features:
   # String IDs like "doc.txt:0" will be converted to deterministic UUIDs.
   requires_uuid_ids: true
 
-  # Enable auto-detection of Qdrant host/port via fitz.core.detect
+  # Enable auto-detection of Qdrant host/port via fitz_ai.core.detect
   # Uses get_qdrant_connection() which scans localhost and LAN.
   auto_detect: qdrant
 

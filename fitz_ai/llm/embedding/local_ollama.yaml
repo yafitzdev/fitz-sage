@@ -1,4 +1,4 @@
-# fitz/llm/embedding/ollama.yaml
+# fitz_ai/llm/embedding/ollama.yaml
 # Ollama Embedding Plugin - Local embeddings
 #
 # Documentation: https://github.com/ollama/ollama/blob/main/docs/api.md#generate-embeddings

@@ -1,4 +1,4 @@
-# fitz/core/detect.py
+# fitz_ai/core/detect.py
 """
 Centralized service detection for Fitz.
 

@@ -1,4 +1,4 @@
-# fitz/engines/classic_rag/generation/retrieval_guided/synthesis.py
+# fitz_ai/engines/classic_rag/generation/retrieval_guided/synthesis.py
 """
 Retrieval-Guided Synthesis (RGS) - Generates grounded answers from retrieved chunks.
 """

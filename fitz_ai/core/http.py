@@ -1,4 +1,4 @@
-# fitz/core/http.py
+# fitz_ai/core/http.py
 """
 Centralized HTTP client factory for API integrations.
 

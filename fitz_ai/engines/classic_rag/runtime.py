@@ -1,4 +1,4 @@
-# fitz/engines/classic_rag/runtime.py
+# fitz_ai/engines/classic_rag/runtime.py
 """
 Classic RAG Runtime - Canonical entry point for Classic RAG execution.
 

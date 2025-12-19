@@ -1,4 +1,4 @@
-# fitz/ingest/cli/run.py
+# fitz_ai/ingest/cli/run.py
 """
 Run command: Ingest documents into vector database.
 

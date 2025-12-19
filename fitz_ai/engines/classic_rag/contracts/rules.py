@@ -1,4 +1,4 @@
-# fitz/core/_contracts/rules.py
+# fitz_ai/core/_contracts/rules.py
 from __future__ import annotations
 
 from typing import Dict, FrozenSet

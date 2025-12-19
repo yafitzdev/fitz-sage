@@ -1,4 +1,4 @@
-# fitz/cli/query.py
+# fitz_ai/cli/query.py
 """
 Top-level query command.
 

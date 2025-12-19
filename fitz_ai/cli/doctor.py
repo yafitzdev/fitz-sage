@@ -1,4 +1,4 @@
-# fitz/cli/doctor.py
+# fitz_ai/cli/doctor.py
 """
 Doctor command: Run diagnostics on Fitz setup.
 """
@@ -57,9 +57,9 @@ def check_fitz_dir() -> tuple[bool, str]:
     config_file = fitz_dir / "config.yaml"
 
     if config_file.exists():
-        return True, ".fitz/config.yaml exists"
+        return True, ".fitz_ai/config.yaml exists"
     elif fitz_dir.exists():
-        return True, ".fitz/ exists (no config.yaml)"
+        return True, ".fitz_ai/ exists (no config.yaml)"
     else:
         return False, "Not found (run 'fitz init')"
 

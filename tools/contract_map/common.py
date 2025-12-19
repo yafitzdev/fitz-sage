@@ -38,10 +38,10 @@ REPO_ROOT = _ensure_repo_root_on_syspath()
 
 def _discover_fitz_subpackages() -> set[str]:
     """
-    Discover logical top-level packages inside fitz/.
+    Discover logical top-level packages inside fitz_ai/.
 
     Example:
-        fitz/
+        fitz_ai/
           core/
           pipeline/
           ingest/
@@ -49,7 +49,7 @@ def _discover_fitz_subpackages() -> set[str]:
 
     -> {"core", "pipeline", "ingest", "retrieval"}
     """
-    fitz_dir = REPO_ROOT / "fitz"
+    fitz_dir = REPO_ROOT / "fitz_ai"
     if not fitz_dir.is_dir():
         return set()
 
@@ -297,8 +297,8 @@ def module_name_from_path(path: Path) -> str | None:
     if parts[0] == "tools":
         return ".".join(parts)
 
-    # fitz.<subpkg>.*
-    if parts[0] == "fitz" and len(parts) > 1 and parts[1] in FITZ_SUBPACKAGES:
+    # fitz_ai.<subpkg>.*
+    if parts[0] == "fitz_ai" and len(parts) > 1 and parts[1] in FITZ_SUBPACKAGES:
         return ".".join(parts)
 
     return None
@@ -309,7 +309,7 @@ def toplevel(pkg: str | None) -> str | None:
     if not pkg:
         return None
 
-    if pkg.startswith("fitz."):
+    if pkg.startswith("fitz_ai."):
         parts = pkg.split(".")
         if len(parts) >= 2:
             return parts[1]

@@ -1,4 +1,4 @@
-# Fitz 
+# fitz-ai
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -6,13 +6,13 @@
 
 ## 🎯 Stable Knowledge Access, Today and Tomorrow
 
-Fitz is a **knowledge access platform** for teams that need reliable, configurable retrieval **today**, without locking themselves into a single reasoning paradigm **tomorrow**.
+fitz-ai is a **knowledge access platform** for teams that need reliable, configurable retrieval **today**, without locking themselves into a single reasoning paradigm **tomorrow**.
 
 You ingest your knowledge once. How it gets queried can evolve.
 
 ---
 
-## 🤔 Why Fitz Exists
+## 🤔 Why fitz-ai Exists
 
 Organizations repeatedly rebuild the same systems: ingest documents, chunk them, embed them, retrieve them, generate answers. Every time the reasoning method changes, everything breaks.
 
@@ -24,7 +24,7 @@ Organizations repeatedly rebuild the same systems: ingest documents, chunk them,
 
 But the knowledge layer remains.
 
-Most RAG tools optimize *one method*. Fitz stabilizes the **knowledge layer itself**.
+Most RAG tools optimize *one method*. fitz-ai stabilizes the **knowledge layer itself**.
 
 ---
 
@@ -33,7 +33,7 @@ Most RAG tools optimize *one method*. Fitz stabilizes the **knowledge layer itse
 ```
   Your Knowledge
       ↓
-  Fitz (Knowledge Access Layer)
+  fitz-ai (Knowledge Access Layer)
       ↓
   Engines (replaceable)
       ↓
@@ -48,25 +48,25 @@ You optimize for **stability where it matters** and **flexibility where change i
 
 ---
 
-## ⚖️ How Fitz Is Different
+## ⚖️ How fitz-ai Is Different
 
 This isn't a critique of other tools. It's a design difference.
 
-| | LangChain & Similar | Fitz |
+| | LangChain & Similar | fitz-ai |
 |---|---------------------|------|
 | **Optimizes for** | Flows & prompt chains | Knowledge stability |
 | **Assumes** | Rapid experimentation | Systems live for years |
 | **Switching paradigms** | Often means refactoring | Means changing engines |
 | **Best for** | Exploring ideas | Building infrastructure |
 
-If you're exploring ideas, LangChain is excellent. If you're building infrastructure that will outlive your current model choices, Fitz is designed for that.
+If you're exploring ideas, LangChain is excellent. If you're building infrastructure that will outlive your current model choices, fitz-ai is designed for that.
 
 ---
 
 ## 🚀 Quick Start
 
 ```bash
-pip install fitz
+pip install fitz-ai
 ```
 
 ```python
@@ -113,14 +113,14 @@ answer = engine.answer(Query(text="What patterns emerge across these reports?"))
 
 ---
 
-## ✅ When Fitz Makes Sense
+## ✅ When fitz-ai Makes Sense
 
 - Internal company knowledge bases
 - Compliance-sensitive environments
 - Teams running local and cloud LLMs
 - Long-lived systems where methods will change
 
-## ❌ When Fitz Is Not a Fit
+## ❌ When fitz-ai Is Not a Fit
 
 - Prompt-only experiments
 - One-off demos
@@ -131,7 +131,7 @@ answer = engine.answer(Query(text="What patterns emerge across these reports?"))
 ## 📁 Project Structure
 
 ```
-fitz/
+fitz_ai/
 ├── core/        # Stable contracts (Query, Answer, Provenance)
 ├── engines/     # Reasoning paradigms (classic_rag, clara)
 ├── ingest/      # Knowledge ingestion
@@ -218,7 +218,7 @@ fitz doctor
 RAG is a method.  
 Knowledge access is a strategy.
 
-Fitz is built for the strategy.
+fitz-ai is built for the strategy.
 
 ---
 

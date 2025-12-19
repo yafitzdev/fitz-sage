@@ -1,8 +1,8 @@
-# fitz/ingest/config/loader.py
+# fitz_ai/ingest/config/loader.py
 """
 Configuration loader for ingestion pipeline.
 
-This is a thin wrapper around fitz.core.config.
+This is a thin wrapper around fitz_ai.core.config.
 All the actual loading logic lives there.
 
 For new code, prefer importing directly from fitz_ai.core.config:
@@ -28,7 +28,7 @@ class IngestConfigError(ConfigError):
     """
     Raised for ingest configuration errors.
 
-    Deprecated: Use fitz.core.config.ConfigError instead.
+    Deprecated: Use fitz_ai.core.config.ConfigError instead.
     """
 
     pass

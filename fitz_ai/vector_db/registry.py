@@ -1,4 +1,4 @@
-# fitz/vector_db/registry.py
+# fitz_ai/vector_db/registry.py
 """
 Vector DB plugin registry - YAML-based system.
 

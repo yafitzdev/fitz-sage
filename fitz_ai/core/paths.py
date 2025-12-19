@@ -1,4 +1,4 @@
-# fitz/core/paths.py
+# fitz_ai/core/paths.py
 """
 Central path management for Fitz.
 
@@ -7,7 +7,7 @@ No hardcoded paths anywhere else in the codebase.
 
 Design principles:
 - Single source of truth
-- Workspace-relative by default (CWD/.fitz/)
+- Workspace-relative by default (CWD/.fitz_ai/)
 - Easy to override for testing
 - No magic, explicit paths
 """
@@ -69,7 +69,7 @@ class FitzPaths:
         """
         The .fitz workspace directory.
 
-        Default: {CWD}/.fitz/
+        Default: {CWD}/.fitz_ai/
 
         This is the root for all Fitz data in a project.
         """

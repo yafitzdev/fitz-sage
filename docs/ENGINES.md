@@ -38,7 +38,7 @@ Fitz v0.3.0 introduces a **pluggable engine architecture** that supports multipl
 
 ## Core Contracts
 
-All engines implement the same interface, defined in `fitz/core/`:
+All engines implement the same interface, defined in `fitz_ai/core/`:
 
 ### KnowledgeEngine Protocol
 
@@ -90,7 +90,7 @@ class Provenance:
 
 ### Classic RAG
 
-**Location**: `fitz/engines/classic_rag/`
+**Location**: `fitz_ai/engines/classic_rag/`
 
 Traditional Retrieval-Augmented Generation:
 
@@ -144,7 +144,7 @@ retriever:
 
 ### CLaRa
 
-**Location**: `fitz/engines/clara/`
+**Location**: `fitz_ai/engines/clara/`
 
 Apple's Continuous Latent Reasoning:
 
@@ -262,7 +262,7 @@ answer = engine.answer(Query(text="Question?"))
 Engines auto-register when their module is imported:
 
 ```python
-# In fitz/engines/clara/__init__.py
+# In fitz_ai/engines/clara/__init__.py
 
 def _register_clara_engine():
     from fitz_ai.runtime import EngineRegistry

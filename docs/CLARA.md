@@ -32,7 +32,7 @@ For development and testing without a powerful GPU:
 
 ```bash
 # Install with CLaRa dependencies
-pip install fitz[clara]
+pip install fitz_ai[clara]
 
 # Or manually
 pip install transformers torch

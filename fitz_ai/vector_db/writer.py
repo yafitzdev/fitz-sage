@@ -1,4 +1,4 @@
-# fitz/vector_db/writer.py
+# fitz_ai/vector_db/writer.py
 """
 Vector database writer utilities.
 

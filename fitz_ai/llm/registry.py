@@ -1,11 +1,11 @@
-# fitz/llm/registry.py
+# fitz_ai/llm/registry.py
 """
 LLM plugin registry - YAML-based system.
 
 Handles discovery and instantiation of:
-- chat plugins (YAML files in fitz/llm/chat/)
-- embedding plugins (YAML files in fitz/llm/embedding/)
-- rerank plugins (YAML files in fitz/llm/rerank/)
+- chat plugins (YAML files in fitz_ai/llm/chat/)
+- embedding plugins (YAML files in fitz_ai/llm/embedding/)
+- rerank plugins (YAML files in fitz_ai/llm/rerank/)
 
 Design principle: NO SILENT FALLBACK
 - If user configures "cohere", they get cohere or an error

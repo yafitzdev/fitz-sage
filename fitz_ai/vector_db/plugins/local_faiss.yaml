@@ -1,4 +1,4 @@
-# fitz/vector_db/plugins/local_faiss.yaml
+# fitz_ai/vector_db/plugins/local_faiss.yaml
 #
 # Local FAISS Vector Database Plugin
 #
@@ -34,4 +34,4 @@ connection:
 # =============================================================================
 operations:
   # Python class that implements the VectorDBPlugin protocol
-  python_class: fitz.backends.local_vector_db.faiss.FaissLocalVectorDB
+  python_class: fitz_ai.backends.local_vector_db.faiss.FaissLocalVectorDB

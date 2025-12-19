@@ -1,4 +1,4 @@
-# fitz/engines/classic_rag/config/schema.py
+# fitz_ai/engines/classic_rag/config/schema.py
 """
 Configuration schema for Classic RAG engine.
 

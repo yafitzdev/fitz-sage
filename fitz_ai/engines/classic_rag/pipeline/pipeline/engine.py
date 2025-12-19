@@ -1,4 +1,4 @@
-# fitz/engines/classic_rag/pipeline/pipeline/engine.py
+# fitz_ai/engines/classic_rag/pipeline/pipeline/engine.py
 """
 RAGPipeline - Core orchestration for retrieval-augmented generation.
 

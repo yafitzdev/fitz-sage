@@ -1,4 +1,4 @@
-# fitz/core/utils.py
+# fitz_ai/core/utils.py
 """
 Core utilities shared across the Fitz codebase.
 

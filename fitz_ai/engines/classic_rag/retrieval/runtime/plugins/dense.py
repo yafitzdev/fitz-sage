@@ -1,4 +1,4 @@
-# fitz/engines/classic_rag/retrieval/runtime/plugins/dense.py
+# fitz_ai/engines/classic_rag/retrieval/runtime/plugins/dense.py
 """
 Dense retrieval plugin using vector search.
 """

@@ -1,4 +1,4 @@
-# fitz/ingest/ingestion/plugins/local_fs.py
+# fitz_ai/ingest/ingestion/plugins/local_fs.py
 """
 Local filesystem ingestion plugin.
 

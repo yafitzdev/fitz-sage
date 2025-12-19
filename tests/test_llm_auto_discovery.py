@@ -4,7 +4,7 @@ Tests for LLM plugin auto-discovery.
 
 Architecture note:
 - LLM plugins: chat, embedding, rerank
-- Vector DB plugins have their OWN registry (fitz.vector_db.registry)
+- Vector DB plugins have their OWN registry (fitz_ai.vector_db.registry)
 - Do NOT mix them!
 """
 import pytest

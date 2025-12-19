@@ -20,13 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🚀 Added
 
 - **YAML-based LLM plugins**: Chat, Embedding, and Rerank plugins now use YAML specs
-  - `fitz/llm/chat/*.yaml` - Chat plugins (OpenAI, Cohere, Anthropic, Azure, Ollama)
-  - `fitz/llm/embedding/*.yaml` - Embedding plugins  
-  - `fitz/llm/rerank/*.yaml` - Rerank plugins
+  - `fitz_ai/llm/chat/*.yaml` - Chat plugins (OpenAI, Cohere, Anthropic, Azure, Ollama)
+  - `fitz_ai/llm/embedding/*.yaml` - Embedding plugins  
+  - `fitz_ai/llm/rerank/*.yaml` - Rerank plugins
 - **YAML-based Vector DB plugins**: Vector databases now use YAML specs
-  - `fitz/vector_db/plugins/qdrant.yaml`
-  - `fitz/vector_db/plugins/pinecone.yaml`
-  - `fitz/vector_db/plugins/local_faiss.yaml`
+  - `fitz_ai/vector_db/plugins/qdrant.yaml`
+  - `fitz_ai/vector_db/plugins/pinecone.yaml`
+  - `fitz_ai/vector_db/plugins/local_faiss.yaml`
 - **Generic plugin runtime**: `GenericVectorDBPlugin` and `YAMLPluginBase` execute YAML specs at runtime
 - **Provider-agnostic features**: YAML `features` section for provider-specific behavior
   - `requires_uuid_ids`: Auto-convert string IDs to UUIDs
@@ -39,13 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LLM plugins**: Migrated from Python classes to YAML specifications
 - **Vector DB plugins**: Migrated from Python classes to YAML specifications  
 - **Plugin discovery**: Now scans `*.yaml` files instead of `*.py` modules
-- **fitz/core/registry.py**: Single source of truth for all plugin access
+- **fitz_ai/core/registry.py**: Single source of truth for all plugin access
 
 ### 🐛 Fixed
 
 - **Qdrant 400 Bad Request**: String IDs now converted to UUIDs automatically
 - **Auto-create collection**: Collections created on first upsert (handles 404)
-- **Import errors in CLI**: Fixed by adding re-exports to `fitz/core/registry.py`
+- **Import errors in CLI**: Fixed by adding re-exports to `fitz_ai/core/registry.py`
 
 ---
 
@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🐛 Fixed
 
 - **CLI Import Error**: Fixed misleading error messages when internal fitz modules fail to import
-- **Detection Module**: Moved `fitz/cli/detect.py` to `fitz/core/detect.py` as single source of truth for service detection
+- **Detection Module**: Moved `fitz_ai/cli/detect.py` to `fitz_ai/core/detect.py` as single source of truth for service detection
 - **FAISS Detection**: `SystemStatus.faiss` now returns `ServiceStatus` instead of boolean for consistent API
 - **Registry Exceptions**: `LLMRegistryError` now inherits from `PluginNotFoundError` for consistent exception handling
 - **Invalid Plugin Type**: `get_llm_plugin()` now raises `ValueError` for invalid plugin types (not just unknown plugins)
@@ -86,9 +86,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔄 Changed
 
-- `fitz/core/detect.py` is now the canonical location for all service detection (Ollama, Qdrant, FAISS, API keys)
+- `fitz_ai/core/detect.py` is now the canonical location for all service detection (Ollama, Qdrant, FAISS, API keys)
 - `SystemStatus` now has `best_llm`, `best_embedding`, `best_vector_db` helper properties
-- CLI modules (`doctor.py`, `init.py`) now import from `fitz.core.detect` instead of `fitz.cli.detect`
+- CLI modules (`doctor.py`, `init.py`) now import from `fitz_ai.core.detect` instead of `fitz_ai.cli.detect`
 
 ---
 
@@ -107,7 +107,7 @@ Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine kn
 
 ### 🚀 Added
 
-#### Core Contracts (`fitz/core/`)
+#### Core Contracts (`fitz_ai/core/`)
 - `KnowledgeEngine` protocol for paradigm-agnostic engine interface
 - `Query` dataclass for standardized query representation with constraints
 - `Answer` dataclass for standardized response with provenance
@@ -115,14 +115,14 @@ Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine kn
 - `Constraints` dataclass for query-time limits (max_sources, filters)
 - Exception hierarchy: `QueryError`, `KnowledgeError`, `GenerationError`, `ConfigurationError`
 
-#### Universal Runtime (`fitz/runtime/`)
+#### Universal Runtime (`fitz_ai/runtime/`)
 - `run(query, engine="...")` universal entry point
 - `EngineRegistry` for global engine discovery and registration
 - `create_engine(engine="...")` factory for engine instances
 - `list_engines()` to discover available engines
 - `list_engines_with_info()` for engines with descriptions
 
-#### CLaRa Engine (`fitz/engines/clara/`)
+#### CLaRa Engine (`fitz_ai/engines/clara/`)
 - `ClaraEngine` full implementation of CLaRa paradigm
 - `run_clara()` convenience function for quick queries
 - `create_clara_engine()` factory for reusable instances
@@ -130,7 +130,7 @@ Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine kn
 - Auto-registration with global engine registry
 - 17 passing tests covering all functionality
 
-#### Classic RAG Engine (`fitz/engines/classic_rag/`)
+#### Classic RAG Engine (`fitz_ai/engines/classic_rag/`)
 - `ClassicRagEngine` wrapper implementing `KnowledgeEngine`
 - `run_classic_rag()` convenience function
 - `create_classic_rag_engine()` factory function
@@ -148,14 +148,14 @@ Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine kn
 #### Directory Structure
 ```
 OLD (v0.2.x):
-fitz/
+fitz_ai/
 ├── pipeline/          # RAG-specific
 ├── retrieval/         # RAG-specific
 ├── generation/        # RAG-specific
 └── core/              # Mixed concerns
 
 NEW (v0.3.0):
-fitz/
+fitz_ai/
 ├── core/              # Paradigm-agnostic contracts
 ├── engines/
 │   ├── classic_rag/   # Traditional RAG
@@ -267,10 +267,10 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz/compare/v0.3.3...HEAD
-[0.3.3]: https://github.com/yafitzdev/fitz/compare/v0.3.2...v0.3.3
-[0.3.2]: https://github.com/yafitzdev/fitz/compare/v0.3.1...v0.3.2
-[0.3.1]: https://github.com/yafitzdev/fitz/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/yafitzdev/fitz/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/yafitzdev/fitz/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/yafitzdev/fitz/releases/tag/v0.1.0
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/yafitzdev/fitz-ai/releases/tag/v0.1.0

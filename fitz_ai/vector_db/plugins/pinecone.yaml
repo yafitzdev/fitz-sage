@@ -1,4 +1,4 @@
-# fitz/vector_db/plugins/pinecone.yaml
+# fitz_ai/vector_db/plugins/pinecone.yaml
 
 name: pinecone
 type: vector_db

@@ -1,4 +1,4 @@
-# fitz/vector_db/__init__.py
+# fitz_ai/vector_db/__init__.py
 
 from __future__ import annotations
 

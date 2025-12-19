@@ -1,4 +1,4 @@
-# fitz/ingest/ingestion/registry.py
+# fitz_ai/ingest/ingestion/registry.py
 """Ingestion plugin registry."""
 from __future__ import annotations
 

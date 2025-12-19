@@ -1,4 +1,4 @@
-# fitz/engines/classic_rag/config/__init__.py
+# fitz_ai/engines/classic_rag/config/__init__.py
 """
 Configuration for Classic RAG engine.
 

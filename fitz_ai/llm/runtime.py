@@ -1,4 +1,4 @@
-# fitz/llm/runtime.py
+# fitz_ai/llm/runtime.py
 """
 Generic plugin runtime that executes YAML-defined plugins.
 

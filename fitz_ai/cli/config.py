@@ -1,4 +1,4 @@
-# fitz/cli/config.py
+# fitz_ai/cli/config.py
 """
 Top-level config command.
 

@@ -1,4 +1,4 @@
-# fitz/vector_db/loader.py
+# fitz_ai/vector_db/loader.py
 """
 Vector DB plugin loader with YAML specifications.
 
@@ -455,7 +455,7 @@ def _get_auto_detected_kwargs(spec: VectorDBSpec, kwargs: Dict[str, Any]) -> Dic
                 result["port"] = detected_port
 
     except ImportError:
-        # fitz.core.detect not available, fall back to YAML defaults
+        # fitz_ai.core.detect not available, fall back to YAML defaults
         pass
 
     return result

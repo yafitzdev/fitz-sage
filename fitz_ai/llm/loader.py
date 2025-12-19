@@ -1,4 +1,4 @@
-# fitz/llm/loader.py
+# fitz_ai/llm/loader.py
 """
 YAML plugin loader with schema validation.
 

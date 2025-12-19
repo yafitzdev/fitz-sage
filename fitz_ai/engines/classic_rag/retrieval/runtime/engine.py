@@ -1,4 +1,4 @@
-# fitz/retrieval/engine.py
+# fitz_ai/retrieval/engine.py
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,4 +1,4 @@
-# fitz/llm/embedding/azure_openai.yaml
+# fitz_ai/llm/embedding/azure_openai.yaml
 # Azure OpenAI Embedding Plugin
 #
 # Documentation: https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#embeddings

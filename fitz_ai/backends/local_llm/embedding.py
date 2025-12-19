@@ -1,4 +1,4 @@
-# fitz/backends/local_llm/embedding.py
+# fitz_ai/backends/local_llm/embedding.py
 from __future__ import annotations
 
 from dataclasses import dataclass

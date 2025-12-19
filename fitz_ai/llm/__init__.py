@@ -1,4 +1,4 @@
-# fitz/llm/__init__.py
+# fitz_ai/llm/__init__.py
 """
 LLM plugin system for Fitz.
 

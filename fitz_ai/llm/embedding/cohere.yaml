@@ -1,4 +1,4 @@
-# fitz/llm/embedding/cohere.yaml
+# fitz_ai/llm/embedding/cohere.yaml
 # Cohere Embedding Plugin - Embed API
 #
 # Documentation: https://docs.cohere.com/reference/embed

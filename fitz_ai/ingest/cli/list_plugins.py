@@ -1,4 +1,4 @@
-# fitz/ingest/cli/list_plugins.py
+# fitz_ai/ingest/cli/list_plugins.py
 """
 List-plugins command: Show available plugins for ingestion.
 
@@ -18,9 +18,9 @@ from fitz_ai.core.registry import (
 )
 
 # Import from correct locations:
-# - LLM plugins (embedding, rerank) are in fitz.llm.registry
-# - Ingest plugins are in fitz.core.registry
-# - Vector DB plugins are in fitz.vector_db.registry
+# - LLM plugins (embedding, rerank) are in fitz_ai.llm.registry
+# - Ingest plugins are in fitz_ai.core.registry
+# - Vector DB plugins are in fitz_ai.vector_db.registry
 from fitz_ai.llm.registry import available_llm_plugins
 from fitz_ai.vector_db.registry import available_vector_db_plugins
 

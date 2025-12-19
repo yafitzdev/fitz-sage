@@ -1,4 +1,4 @@
-# fitz/engines/clara/config/schema.py
+# fitz_ai/engines/clara/config/schema.py
 """
 CLaRa Configuration Schema.
 

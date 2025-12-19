@@ -1,4 +1,4 @@
-# fitz/pipeline/cli/__init__.py
+# fitz_ai/pipeline/cli/__init__.py
 """
 CLI module for pipeline commands.
 

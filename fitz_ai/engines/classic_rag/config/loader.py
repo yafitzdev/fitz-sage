@@ -1,4 +1,4 @@
-# fitz/engines/classic_rag/config/loader.py
+# fitz_ai/engines/classic_rag/config/loader.py
 """
 Configuration loader for Classic RAG engine.
 

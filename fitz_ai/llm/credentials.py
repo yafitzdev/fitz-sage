@@ -1,4 +1,4 @@
-# fitz/llm/credentials.py
+# fitz_ai/llm/credentials.py
 """
 Centralized credential resolution for LLM providers.
 

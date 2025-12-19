@@ -1,4 +1,4 @@
-# fitz/backends/local_llm/rerank.py
+# fitz_ai/backends/local_llm/rerank.py
 from __future__ import annotations
 
 from dataclasses import dataclass

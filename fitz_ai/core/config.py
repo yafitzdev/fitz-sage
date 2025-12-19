@@ -1,4 +1,4 @@
-# fitz/core/config.py
+# fitz_ai/core/config.py
 """
 Centralized configuration loading for Fitz.
 

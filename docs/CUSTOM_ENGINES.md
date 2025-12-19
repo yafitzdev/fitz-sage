@@ -101,7 +101,7 @@ Let's build a more complete engine with proper structure.
 ### Directory Structure
 
 ```
-fitz/engines/my_engine/
+fitz_ai/engines/my_engine/
 ├── __init__.py          # Package exports + registration
 ├── engine.py            # Main engine class
 ├── runtime.py           # Convenience functions
@@ -113,7 +113,7 @@ fitz/engines/my_engine/
 ### Step 1: Configuration (`config/schema.py`)
 
 ```python
-# fitz/engines/my_engine/config/schema.py
+# fitz_ai/engines/my_engine/config/schema.py
 
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
@@ -164,7 +164,7 @@ def load_my_engine_config(config_path: Optional[str] = None) -> MyEngineConfig:
 ### Step 2: Engine Class (`engine.py`)
 
 ```python
-# fitz/engines/my_engine/engine.py
+# fitz_ai/engines/my_engine/engine.py
 
 from typing import Optional, Dict, Any, List
 import logging
@@ -364,7 +364,7 @@ class MyEngine:
 ### Step 3: Runtime Functions (`runtime.py`)
 
 ```python
-# fitz/engines/my_engine/runtime.py
+# fitz_ai/engines/my_engine/runtime.py
 
 from typing import Optional, Union, List
 from pathlib import Path
@@ -452,7 +452,7 @@ def clear_engine_cache() -> None:
 ### Step 4: Package Init (`__init__.py`)
 
 ```python
-# fitz/engines/my_engine/__init__.py
+# fitz_ai/engines/my_engine/__init__.py
 
 """
 MyEngine - Custom knowledge engine for Fitz.
@@ -663,14 +663,14 @@ class MyEngine:
 2. Add entry point in `pyproject.toml`:
 
 ```toml
-[project.entry-points."fitz.engines"]
+[project.entry-points."fitz_ai.engines"]
 my_engine = "fitz_my_engine:register"
 ```
 
 3. Users install and use:
 
 ```bash
-pip install fitz-my-engine
+pip install fitz_ai-my-engine
 ```
 
 ```python
@@ -680,7 +680,7 @@ answer = run("Question?", engine="my_engine")
 
 ### Contributing to Fitz
 
-1. Add engine to `fitz/engines/`
+1. Add engine to `fitz_ai/engines/`
 2. Add tests to `tests/`
 3. Update documentation
 4. Submit PR

@@ -1,4 +1,4 @@
-# fitz/ingest/chunking/engine.py
+# fitz_ai/ingest/chunking/engine.py
 
 from __future__ import annotations
 

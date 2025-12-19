@@ -1,4 +1,4 @@
-# fitz/core/__init__.py
+# fitz_ai/core/__init__.py
 """
 Fitz Core - Paradigm-agnostic contracts for knowledge engines.
 

@@ -1,4 +1,4 @@
-# fitz/llm/rerank/cohere.yaml
+# fitz_ai/llm/rerank/cohere.yaml
 # Cohere Rerank Plugin - v2 Rerank API
 #
 # Documentation: https://docs.cohere.com/reference/rerank

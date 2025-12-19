@@ -1,4 +1,4 @@
-# fitz/engines/clara/config/__init__.py
+# fitz_ai/engines/clara/config/__init__.py
 """
 CLaRa configuration package.
 """

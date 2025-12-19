@@ -1,7 +1,7 @@
 # pipeline/__init__.py
 
 """
-fitz.engines.classic_rag.pipeline
+fitz_ai.engines.classic_rag.pipeline
 
 Retrieval-Augmented Generation (RAG) package.
 """

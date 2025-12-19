@@ -1,4 +1,4 @@
-# fitz/backends/local_vector_db/faiss.py
+# fitz_ai/backends/local_vector_db/faiss.py
 """
 Local FAISS-backed Vector Database.
 
@@ -37,7 +37,7 @@ class FaissLocalVectorDB:
         db = FaissLocalVectorDB()
 
         # Or with custom path
-        db = FaissLocalVectorDB(path=".fitz/vector_db")
+        db = FaissLocalVectorDB(path=".fitz_ai/vector_db")
 
         # Dimension is auto-detected on first upsert
         db.upsert("collection", [{"id": "1", "vector": [0.1, 0.2, ...], "payload": {...}}])

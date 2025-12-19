@@ -1,4 +1,4 @@
-# fitz/ingest/chunking/registry.py
+# fitz_ai/ingest/chunking/registry.py
 """Chunking plugin registry."""
 from __future__ import annotations
 

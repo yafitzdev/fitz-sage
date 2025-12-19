@@ -1,4 +1,4 @@
-# fitz/cli/errors.py
+# fitz_ai/cli/errors.py
 # -*- coding: utf-8 -*-
 """
 Global error handler for Fitz CLI.
@@ -433,7 +433,7 @@ def handle_import_error(exc: ImportError | ModuleNotFoundError) -> None:
         "sklearn": "scikit-learn",
     }
 
-    # Get the root module name (e.g., 'fitz.foo.bar' -> 'fitz')
+    # Get the root module name (e.g., 'fitz_ai.foo.bar' -> 'fitz')
     root_module = module_name.split(".")[0] if module_name else "unknown"
 
     # NEW: Check if this is an internal fitz module error
@@ -528,7 +528,7 @@ def handle_exception(exc: Exception) -> None:
                 ErrorFix(
                     "Report a bug",
                     "If this seems like a bug, please report it at:",
-                    ["https://github.com/yafitzdev/fitz/issues"],
+                    ["https://github.com/yafitzdev/fitz-ai/issues"],
                 ),
             ],
             original_error=tb if os.getenv("FITZ_DEBUG") else f"{error_type}: {error_str}",

@@ -1,4 +1,4 @@
-# fitz/ingest/cli/stats.py
+# fitz_ai/ingest/cli/stats.py
 """
 Stats command: Show statistics about an ingested collection.
 

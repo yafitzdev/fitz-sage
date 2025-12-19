@@ -3,9 +3,9 @@
 Tests for the centralized plugin registry system.
 
 Architecture:
-- Python-based registries use fitz.core.registry.PluginRegistry
-- LLM plugins use fitz.llm.registry (YAML-based)
-- Vector DB plugins use fitz.vector_db.registry (YAML-based)
+- Python-based registries use fitz_ai.core.registry.PluginRegistry
+- LLM plugins use fitz_ai.llm.registry (YAML-based)
+- Vector DB plugins use fitz_ai.vector_db.registry (YAML-based)
 """
 import pytest
 

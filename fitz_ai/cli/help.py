@@ -1,4 +1,4 @@
-# fitz/cli/help.py
+# fitz_ai/cli/help.py
 """Help command for Fitz CLI."""
 
 import typer

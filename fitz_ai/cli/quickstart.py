@@ -1,4 +1,4 @@
-# fitz/cli/quickstart.py
+# fitz_ai/cli/quickstart.py
 
 """
 Quickstart command: Run end-to-end test.
@@ -510,7 +510,7 @@ def command(
     print_step(2, TOTAL_STEPS, "Creating sample documents...")
 
     created_files = create_sample_documents(quickstart_dir)
-    print_success(f"Created {len(created_files)} sample docs in .fitz/quickstart_docs/")
+    print_success(f"Created {len(created_files)} sample docs in .fitz_ai/quickstart_docs/")
 
     for f in created_files:
         print_info(f"  • {f.name}")
@@ -529,7 +529,7 @@ def command(
     )
     FitzPaths.ensure_workspace()
     config_path.write_text(config)
-    print_success("Config saved to .fitz/quickstart_config.yaml")
+    print_success("Config saved to .fitz_ai/quickstart_config.yaml")
     print_info(f"  Chat: {llm_provider}")
     print_info(f"  Embedding: {embedding_provider}")
     print_info(f"  Vector DB: {vector_db}")

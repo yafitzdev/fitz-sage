@@ -39,7 +39,7 @@ Be respectful, inclusive, and constructive. We're all here to build something us
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/fitz.git
+git clone https://github.com/yafitzdev/fitz-ai.git
 cd fitz
 
 # Create virtual environment
@@ -63,7 +63,7 @@ Fitz follows strict architectural principles. Please respect these when contribu
 ### Project Structure (v0.3.0+)
 
 ```
-fitz/
+fitz_ai/
 ├── core/              # Paradigm-agnostic contracts (Query, Answer, Provenance)
 ├── engines/           # Engine implementations
 │   ├── classic_rag/   # Traditional RAG engine
@@ -205,7 +205,7 @@ Engines are the core abstraction in Fitz. Each engine is a complete implementati
 
 1. **Create the engine directory**
    ```
-   fitz/engines/my_engine/
+   fitz_ai/engines/my_engine/
    ├── __init__.py      # Public API exports
    ├── engine.py        # KnowledgeEngine implementation
    ├── runtime.py       # Convenience functions (run_my_engine, create_my_engine)
@@ -217,7 +217,7 @@ Engines are the core abstraction in Fitz. Each engine is a complete implementati
 
 2. **Implement the KnowledgeEngine protocol**
    ```python
-   # fitz/engines/my_engine/engine.py
+   # fitz_ai/engines/my_engine/engine.py
    from fitz_ai.core import KnowledgeEngine, Query, Answer, Provenance
    
    class MyEngine:
@@ -237,7 +237,7 @@ Engines are the core abstraction in Fitz. Each engine is a complete implementati
 
 3. **Register with the engine registry**
    ```python
-   # fitz/engines/my_engine/__init__.py
+   # fitz_ai/engines/my_engine/__init__.py
    from fitz_ai.runtime import EngineRegistry
    
    def _register():
@@ -253,7 +253,7 @@ Engines are the core abstraction in Fitz. Each engine is a complete implementati
 
 4. **Add convenience functions**
    ```python
-   # fitz/engines/my_engine/runtime.py
+   # fitz_ai/engines/my_engine/runtime.py
    from fitz_ai.core import Answer
    
    def run_my_engine(query: str, **kwargs) -> Answer:
@@ -284,7 +284,7 @@ Plugins extend functionality within engines (LLM providers, vector DBs, etc.).
 
 2. **Create the plugin file**:
    ```python
-   # fitz/llm/chat/plugins/my_provider.py
+   # fitz_ai/llm/chat/plugins/my_provider.py
    
    class MyProviderChatClient:
        plugin_name = "my_provider"

@@ -365,9 +365,9 @@ answer = service.query("How do X, Y, and Z relate?", engine="clara")
 
 ## Troubleshooting
 
-### ImportError: No module named 'fitz.pipeline'
+### ImportError: No module named 'fitz_ai.pipeline'
 
-The `fitz.pipeline` module has been moved. Update your imports:
+The `fitz_ai.pipeline` module has been moved. Update your imports:
 
 ```python
 # OLD
@@ -408,7 +408,7 @@ for prov in answer.provenance:
 CLaRa requires additional dependencies:
 
 ```bash
-pip install fitz[clara]
+pip install fitz_ai[clara]
 # or
 pip install transformers torch
 ```
@@ -436,8 +436,8 @@ python -c "from fitz_ai.core import Query, Answer, Provenance; print('✓ Core t
 
 ## Getting Help
 
-- **Issues**: https://github.com/yafitzdev/fitz/issues
-- **Discussions**: https://github.com/yafitzdev/fitz/discussions
+- **Issues**: https://github.com/yafitzdev/fitz-ai/issues
+- **Discussions**: https://github.com/yafitzdev/fitz-ai/discussions
 - **Documentation**: https://fitz.readthedocs.io
 
 If you encounter migration issues not covered here, please open an issue!

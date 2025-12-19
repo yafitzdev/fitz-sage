@@ -85,7 +85,7 @@ def list_loader_modules() -> List[str]:
     import importlib
 
     out: List[str] = []
-    for pkg in ("core.config", "fitz.engines.classic_rag.pipeline.config", "fitz.ingest.config"):
+    for pkg in ("core.config", "fitz_ai.engines.classic_rag.pipeline.config", "fitz_ai.ingest.config"):
         mod = f"{pkg}.loader"
         try:
             importlib.import_module(mod)
@@ -122,10 +122,10 @@ def compute_hotspots(root: Path, *, excludes: set[str]) -> List[Hotspot]:
     # Vector DB plugins are also YAML-based
     expected = [
         # Python-based plugins only
-        ("fitz.engines.classic_rag.retrieval.runtime.plugins", "RetrievalPlugin"),
-        ("fitz.engines.classic_rag.pipeline.pipeline.plugins", "PipelinePlugin"),
-        ("fitz.ingest.chunking.plugins", "ChunkerPlugin"),
-        ("fitz.ingest.ingestion.plugins", "IngestPlugin"),
+        ("fitz_ai.engines.classic_rag.retrieval.runtime.plugins", "RetrievalPlugin"),
+        ("fitz_ai.engines.classic_rag.pipeline.pipeline.plugins", "PipelinePlugin"),
+        ("fitz_ai.ingest.chunking.plugins", "ChunkerPlugin"),
+        ("fitz_ai.ingest.ingestion.plugins", "IngestPlugin"),
     ]
 
     # For YAML-based plugins, we'll use the registry directly
@@ -157,26 +157,26 @@ def compute_hotspots(root: Path, *, excludes: set[str]) -> List[Hotspot]:
 
     # Consumer patterns remain the same
     patterns = {
-        "ChatPlugin": ("fitz.llm.chat", 'plugin_type="chat"', "plugin_type='chat'"),
+        "ChatPlugin": ("fitz_ai.llm.chat", 'plugin_type="chat"', "plugin_type='chat'"),
         "EmbeddingPlugin": (
-            "fitz.llm.embedding",
+            "fitz_ai.llm.embedding",
             'plugin_type="embedding"',
             "plugin_type='embedding'",
         ),
-        "RerankPlugin": ("fitz.llm.rerank", 'plugin_type="rerank"', "plugin_type='rerank'"),
-        "VectorDBPlugin": ("fitz.vector_db", 'plugin_type="vector_db"', "plugin_type='vector_db'"),
+        "RerankPlugin": ("fitz_ai.llm.rerank", 'plugin_type="rerank"', "plugin_type='rerank'"),
+        "VectorDBPlugin": ("fitz_ai.vector_db", 'plugin_type="vector_db"', "plugin_type='vector_db'"),
         "RetrievalPlugin": (
-            "fitz.engines.classic_rag.retrieval.registry",
+            "fitz_ai.engines.classic_rag.retrieval.registry",
             "get_retriever_plugin(",
             "RetrieverEngine.from_name(",
         ),
         "PipelinePlugin": (
-            "fitz.engines.classic_rag.pipeline.pipeline",
+            "fitz_ai.engines.classic_rag.pipeline.pipeline",
             "get_pipeline_plugin(",
             "available_pipeline_plugins(",
         ),
-        "ChunkerPlugin": ("fitz.ingest.chunking", "get_chunker_plugin(", "ChunkingEngine"),
-        "IngestPlugin": ("fitz.ingest.ingestion", "get_ingest_plugin(", "IngestionEngine"),
+        "ChunkerPlugin": ("fitz_ai.ingest.chunking", "get_chunker_plugin(", "ChunkingEngine"),
+        "IngestPlugin": ("fitz_ai.ingest.ingestion", "get_ingest_plugin(", "IngestionEngine"),
     }
 
     for p in iter_python_files(root, excludes=excludes):

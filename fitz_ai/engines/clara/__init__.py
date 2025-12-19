@@ -1,4 +1,4 @@
-# fitz/engines/clara/__init__.py
+# fitz_ai/engines/clara/__init__.py
 """
 CLaRa Engine - Continuous Latent Reasoning for RAG.
 

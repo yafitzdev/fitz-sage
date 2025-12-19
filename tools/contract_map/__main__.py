@@ -88,10 +88,10 @@ def check_discovery_health(cm: ContractMap) -> None:
 
     # Check specific namespaces that should have plugins
     expected_namespaces = {
-        "fitz.llm.chat.plugins": "chat",
-        "fitz.llm.embedding.plugins": "embedding",
-        "fitz.vector_db.plugins": "vector_db",
-        "fitz.engines.classic_rag.retrieval.runtime.plugins": "retriever",
+        "fitz_ai.llm.chat.plugins": "chat",
+        "fitz_ai.llm.embedding.plugins": "embedding",
+        "fitz_ai.vector_db.plugins": "vector_db",
+        "fitz_ai.engines.classic_rag.retrieval.runtime.plugins": "retriever",
     }
 
     for report in cm.discovery:

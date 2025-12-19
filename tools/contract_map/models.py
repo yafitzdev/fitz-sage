@@ -106,12 +106,12 @@ def extract_models(cm: ContractMap, *, verbose: bool) -> None:
     # Updated paths to match actual project structure
     model_modules = [
         # Engine models (classic_rag)
-        "fitz.engines.classic_rag.config.schema",
-        "fitz.engines.classic_rag.models.chunk",
-        "fitz.engines.classic_rag.models.document",
+        "fitz_ai.engines.classic_rag.config.schema",
+        "fitz_ai.engines.classic_rag.models.chunk",
+        "fitz_ai.engines.classic_rag.models.document",
         # Ingest models
-        "fitz.ingest.config.schema",
-        "fitz.ingest.ingestion.base",
+        "fitz_ai.ingest.config.schema",
+        "fitz_ai.ingest.ingestion.base",
     ]
 
     for mod_name in model_modules:
@@ -149,13 +149,13 @@ def extract_protocols(cm: ContractMap, *, verbose: bool) -> None:
     # Updated paths to match actual project structure
     protocol_modules = [
         # Vector DB protocols
-        "fitz.vector_db.base",
+        "fitz_ai.vector_db.base",
         # Engine protocols (classic_rag)
-        "fitz.engines.classic_rag.retrieval.runtime.base",
-        "fitz.engines.classic_rag.pipeline.pipeline.base",
+        "fitz_ai.engines.classic_rag.retrieval.runtime.base",
+        "fitz_ai.engines.classic_rag.pipeline.pipeline.base",
         # Ingest protocols
-        "fitz.ingest.chunking.base",
-        "fitz.ingest.ingestion.base",
+        "fitz_ai.ingest.chunking.base",
+        "fitz_ai.ingest.ingestion.base",
     ]
 
     for mod_name in protocol_modules:

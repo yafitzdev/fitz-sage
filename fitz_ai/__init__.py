@@ -26,7 +26,7 @@ Public API:
         - create_classic_rag_engine: RAG engine factory
 
 Architecture:
-    fitz/
+    fitz_ai/
     ├── core/              # Paradigm-agnostic contracts
     ├── engines/           # Engine implementations
     │   └── classic_rag/   # Retrieval-augmented generation

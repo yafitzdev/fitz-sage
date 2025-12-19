@@ -1,4 +1,4 @@
-# fitz/llm/schema.py
+# fitz_ai/llm/schema.py
 """
 Pydantic schemas for YAML plugin validation.
 

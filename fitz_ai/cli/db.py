@@ -1,4 +1,4 @@
-# fitz/cli/db.py
+# fitz_ai/cli/db.py
 """
 Database command: Inspect vector database collections.
 
