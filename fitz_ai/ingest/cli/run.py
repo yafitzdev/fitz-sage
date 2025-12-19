@@ -4,16 +4,19 @@ Run command: Ingest documents into vector database.
 
 Usage:
     fitz ingest ./documents collection
+    fitz ingest ./documents collection --chunker pdf_sections
     fitz ingest ./documents collection --embedding openai
     fitz ingest ./documents collection -q
 """
 
 from pathlib import Path
-from typing import Any, Iterable, List
+from typing import Any, Dict, Iterable, List
 
 import typer
 
 from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.ingest.chunking.engine import ChunkingEngine
+from fitz_ai.ingest.config.schema import ChunkerConfig
 from fitz_ai.ingest.ingestion.engine import IngestionEngine
 from fitz_ai.ingest.ingestion.registry import get_ingest_plugin
 from fitz_ai.llm.registry import get_llm_plugin
@@ -46,41 +49,13 @@ except ImportError:
     console = None
 
 
-def _raw_to_chunks(raw_docs: Iterable[Any]) -> list[Chunk]:
-    """Convert raw documents to canonical chunks."""
-    chunks: list[Chunk] = []
-
-    for i, doc in enumerate(raw_docs):
-        meta = dict(getattr(doc, "metadata", None) or {})
-        path = getattr(doc, "path", None)
-        if path:
-            meta.setdefault("path", str(path))
-
-        # Be robust across RawDocument variants: some use .content, some .text
-        content = getattr(doc, "content", None)
-        if content is None:
-            content = getattr(doc, "text", None)
-        content = content or ""
-
-        chunks.append(
-            Chunk(
-                id=f"{meta.get('path', 'doc')}:{i}",
-                doc_id=str(meta.get("path") or meta.get("doc_id") or "unknown"),
-                chunk_index=i,
-                content=content,
-                metadata=meta,
-            )
-        )
-
-    return chunks
-
-
 def _embed_with_progress(
-    embed_plugin: Any,
-    chunks: List[Chunk],
-    show_progress: bool = True,
+        embed_plugin: Any,
+        chunks: List[Chunk],
+        show_progress: bool = True,
 ) -> List[List[float]]:
-    """Embed chunks with progress bar.
+    """
+    Embed chunks with progress bar.
 
     Args:
         embed_plugin: YAML embedding plugin instance with embed() method
@@ -94,13 +69,13 @@ def _embed_with_progress(
 
     if RICH_AVAILABLE and show_progress and len(chunks) > 1:
         with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-            console=console,
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+                console=console,
         ) as progress:
             task = progress.add_task("Embedding...", total=len(chunks))
 
@@ -120,44 +95,70 @@ def _embed_with_progress(
 
 
 def command(
-    source: Path = typer.Argument(
-        ...,
-        help="Source to ingest (file or directory).",
-    ),
-    collection: str = typer.Argument(
-        "default",
-        help="Target collection name.",
-    ),
-    ingest_plugin: str = typer.Option(
-        "local",
-        "--ingest",
-        "-i",
-        help="Ingestion plugin name.",
-    ),
-    embedding_plugin: str = typer.Option(
-        "cohere",
-        "--embedding",
-        "-e",
-        help="Embedding plugin name.",
-    ),
-    vector_db_plugin: str = typer.Option(
-        "qdrant",
-        "--vector-db",
-        "-v",
-        help="Vector DB plugin name.",
-    ),
-    batch_size: int = typer.Option(
-        50,
-        "--batch-size",
-        "-b",
-        help="Batch size for vector DB writes.",
-    ),
-    quiet: bool = typer.Option(
-        False,
-        "--quiet",
-        "-q",
-        help="Suppress progress output.",
-    ),
+        source: Path = typer.Argument(
+            ...,
+            help="Source to ingest (file or directory).",
+        ),
+        collection: str = typer.Argument(
+            "default",
+            help="Target collection name.",
+        ),
+        ingest_plugin: str = typer.Option(
+            "local",
+            "--ingest",
+            "-i",
+            help="Ingestion plugin name.",
+        ),
+        chunker: str = typer.Option(
+            "simple",
+            "--chunker",
+            "-c",
+            help="Chunking plugin to use.",
+        ),
+        chunk_size: int = typer.Option(
+            1000,
+            "--chunk-size",
+            help="Target chunk size in characters.",
+        ),
+        chunk_overlap: int = typer.Option(
+            0,
+            "--chunk-overlap",
+            help="Overlap between chunks in characters.",
+        ),
+        min_section_chars: int = typer.Option(
+            50,
+            "--min-section-chars",
+            help="Minimum section size for section-based chunkers.",
+        ),
+        max_section_chars: int = typer.Option(
+            3000,
+            "--max-section-chars",
+            help="Maximum section size for section-based chunkers.",
+        ),
+        embedding_plugin: str = typer.Option(
+            "cohere",
+            "--embedding",
+            "-e",
+            help="Embedding plugin name.",
+        ),
+        vector_db_plugin: str = typer.Option(
+            "qdrant",
+            "--vector-db",
+            "-v",
+            help="Vector DB plugin name.",
+        ),
+        batch_size: int = typer.Option(
+            50,
+            "--batch-size",
+            "-b",
+            help="Batch size for vector DB writes.",
+        ),
+        quiet: bool = typer.Option(
+            False,
+            "--quiet",
+            "-q",
+            help="Suppress progress output.",
+        ),
 ) -> None:
     """
     Ingest documents into a vector database.
@@ -167,6 +168,8 @@ def command(
         fitz ingest ./docs my_knowledge
         fitz ingest ./docs my_docs --embedding openai
         fitz ingest ./docs my_docs -q
+        fitz ingest ./doc.pdf papers --chunker pdf_sections
+        fitz ingest ./doc.pdf papers --chunker simple --chunk-size 500
     """
     # Validate source path
     if not source.exists():
@@ -179,7 +182,7 @@ def command(
 
     logger.info(
         f"{CLI}{INGEST} Starting ingestion: source='{source}' → collection='{collection}' "
-        f"(ingest='{ingest_plugin}', embedding='{embedding_plugin}', vdb='{vector_db_plugin}')"
+        f"(ingest='{ingest_plugin}', chunker='{chunker}', embedding='{embedding_plugin}', vdb='{vector_db_plugin}')"
     )
 
     show_progress = not quiet
@@ -189,7 +192,9 @@ def command(
         if RICH_AVAILABLE:
             console.print(
                 Panel.fit(
-                    f"[bold]Ingesting[/bold] {source}\n" f"[dim]Collection: {collection}[/dim]",
+                    f"[bold]Ingesting[/bold] {source}\n"
+                    f"[dim]Collection: {collection}[/dim]\n"
+                    f"[dim]Chunker: {chunker}[/dim]",
                     title="🔄 fitz ingest",
                     border_style="blue",
                 )
@@ -199,6 +204,7 @@ def command(
             typer.echo("=" * 60)
             typer.echo(f"Ingesting: {source}")
             typer.echo(f"Collection: {collection}")
+            typer.echo(f"Chunker: {chunker}")
             typer.echo("=" * 60)
 
     # =========================================================================
@@ -210,18 +216,18 @@ def command(
                 IngestPluginCls = get_ingest_plugin(ingest_plugin)
                 ingest_plugin_obj = IngestPluginCls()
                 ingest_engine = IngestionEngine(plugin=ingest_plugin_obj, kwargs={})
-                raw_docs = list(ingest_engine.ingest(str(source)))
+                raw_docs = list(ingest_engine.run(str(source)))
         else:
             typer.echo("[1/4] Reading documents...")
             IngestPluginCls = get_ingest_plugin(ingest_plugin)
             ingest_plugin_obj = IngestPluginCls()
             ingest_engine = IngestionEngine(plugin=ingest_plugin_obj, kwargs={})
-            raw_docs = list(ingest_engine.ingest(str(source)))
+            raw_docs = list(ingest_engine.run(str(source)))
     else:
         IngestPluginCls = get_ingest_plugin(ingest_plugin)
         ingest_plugin_obj = IngestPluginCls()
         ingest_engine = IngestionEngine(plugin=ingest_plugin_obj, kwargs={})
-        raw_docs = list(ingest_engine.ingest(str(source)))
+        raw_docs = list(ingest_engine.run(str(source)))
 
     logger.info(f"{INGEST} Ingested {len(raw_docs)} raw documents from {source}")
 
@@ -236,15 +242,57 @@ def command(
         raise typer.Exit(code=0)
 
     # =========================================================================
-    # Step 2: Convert to chunks
+    # Step 2: Chunk documents with configured strategy
     # =========================================================================
     if show_progress:
         if RICH_AVAILABLE:
-            console.print("[bold blue]⏳[/bold blue] Creating chunks...")
+            console.print(f"[bold blue]⏳[/bold blue] Chunking with {chunker}...")
         else:
-            typer.echo("[2/4] Creating chunks...")
+            typer.echo(f"[2/4] Chunking with {chunker}...")
 
-    chunks = _raw_to_chunks(raw_docs)
+    # Build chunker kwargs dynamically based on CLI parameters
+    chunker_kwargs: Dict[str, Any] = {}
+
+    # Add common parameters (only if non-default to keep kwargs clean)
+    if chunk_size != 1000:
+        chunker_kwargs["chunk_size"] = chunk_size
+    if chunk_overlap > 0:
+        chunker_kwargs["chunk_overlap"] = chunk_overlap
+
+    # Add section-based chunker parameters (only for relevant chunkers)
+    if "section" in chunker.lower():
+        if min_section_chars != 50:
+            chunker_kwargs["min_section_chars"] = min_section_chars
+        if max_section_chars != 3000:
+            chunker_kwargs["max_section_chars"] = max_section_chars
+
+    # Create chunker config and engine
+    chunker_config = ChunkerConfig(plugin_name=chunker, kwargs=chunker_kwargs)
+
+    try:
+        chunking_engine = ChunkingEngine.from_config(chunker_config)
+    except Exception as e:
+        typer.echo(f"ERROR: Failed to initialize chunker '{chunker}': {e}")
+        typer.echo()
+        typer.echo("Available chunkers:")
+        from fitz_ai.core.registry import available_chunking_plugins
+        for name in available_chunking_plugins():
+            typer.echo(f"  • {name}")
+        raise typer.Exit(code=1)
+
+    # Process all documents through chunking engine
+    chunks: List[Chunk] = []
+    for raw_doc in raw_docs:
+        try:
+            doc_chunks = chunking_engine.run(raw_doc)
+            chunks.extend(doc_chunks)
+        except Exception as e:
+            logger.error(f"{CHUNKING} Failed to chunk document: {e}")
+            typer.echo(f"WARNING: Failed to chunk {getattr(raw_doc, 'path', 'unknown')}: {e}")
+
+    if not chunks:
+        typer.echo("ERROR: No chunks were created. Check your documents and chunker settings.")
+        raise typer.Exit(code=1)
 
     if show_progress:
         if RICH_AVAILABLE:
@@ -252,7 +300,7 @@ def command(
         else:
             typer.echo(f"  ✓ Created {len(chunks)} chunks")
 
-    logger.info(f"{CHUNKING} Created {len(chunks)} chunks from raw documents")
+    logger.info(f"{CHUNKING} Created {len(chunks)} chunks using '{chunker}' chunker")
 
     # =========================================================================
     # Step 3: Generate embeddings
@@ -287,15 +335,14 @@ def command(
         else:
             typer.echo(f"[4/4] Writing to {vector_db_plugin}...")
 
-    VectorDBPluginCls = get_vector_db_plugin(vector_db_plugin)
-    vdb_plugin = VectorDBPluginCls()
+    vdb_plugin = get_vector_db_plugin(vector_db_plugin)
 
     writer = VectorDBWriter(client=vdb_plugin)
 
     # Batch write
     for i in range(0, len(chunks), batch_size):
-        batch_chunks = chunks[i : i + batch_size]
-        batch_vectors = vectors[i : i + batch_size]
+        batch_chunks = chunks[i: i + batch_size]
+        batch_vectors = vectors[i: i + batch_size]
         writer.upsert(collection=collection, chunks=batch_chunks, vectors=batch_vectors)
         logger.debug(f"{VECTOR_DB} Wrote batch {i // batch_size + 1}")
 
@@ -320,19 +367,21 @@ def command(
             table.add_column("Value", style="bold")
             table.add_row("Documents", str(len(raw_docs)))
             table.add_row("Chunks", str(len(chunks)))
+            table.add_row("Chunker", chunker)
             table.add_row("Collection", collection)
             table.add_row("Vector DB", vector_db_plugin)
             table.add_row("Embedding", embedding_plugin)
             console.print(table)
 
-            console.print('\n[dim]Next:[/dim] fitz query "Your question"')
+            console.print(f'\n[dim]Next:[/dim] fitz query "Your question" --collection {collection}')
         else:
             typer.echo()
             typer.echo("✅ Ingestion Complete")
             typer.echo(f"  Documents: {len(raw_docs)}")
             typer.echo(f"  Chunks: {len(chunks)}")
+            typer.echo(f"  Chunker: {chunker}")
             typer.echo(f"  Collection: {collection}")
             typer.echo(f"  Vector DB: {vector_db_plugin}")
             typer.echo(f"  Embedding: {embedding_plugin}")
             typer.echo()
-            typer.echo('Next: fitz query "Your question"')
+            typer.echo(f'Next: fitz query "Your question" --collection {collection}')

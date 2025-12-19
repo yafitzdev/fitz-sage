@@ -43,6 +43,13 @@ def _register_commands():
         source: str = typer.Argument(None, help="Source to ingest (file or directory)."),
         collection: str = typer.Argument(None, help="Target collection name."),
         ingest_plugin: str = typer.Option("local", "--ingest", "-i", help="Ingestion plugin name."),
+        # Chunker options
+        chunker: str = typer.Option("simple", "--chunker", "-c", help="Chunking plugin to use."),
+        chunk_size: int = typer.Option(1000, "--chunk-size", help="Target chunk size in characters."),
+        chunk_overlap: int = typer.Option(0, "--chunk-overlap", help="Overlap between chunks in characters."),
+        min_section_chars: int = typer.Option(50, "--min-section-chars", help="Minimum section size for section-based chunkers."),
+        max_section_chars: int = typer.Option(3000, "--max-section-chars", help="Maximum section size for section-based chunkers."),
+        # Other options
         embedding_plugin: str = typer.Option(
             "cohere", "--embedding", "-e", help="Embedding plugin name."
         ),
@@ -61,6 +68,7 @@ def _register_commands():
             fitz ingest ./docs default
             fitz ingest ./docs my_knowledge
             fitz ingest ./docs my_docs --embedding openai
+            fitz ingest ./doc.pdf papers --chunker pdf_sections
         """
         # If a subcommand was invoked, let it handle things
         if ctx.invoked_subcommand is not None:
@@ -79,6 +87,11 @@ def _register_commands():
             source=Path(source),
             collection=collection or "default",
             ingest_plugin=ingest_plugin,
+            chunker=chunker,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            min_section_chars=min_section_chars,
+            max_section_chars=max_section_chars,
             embedding_plugin=embedding_plugin,
             vector_db_plugin=vector_db_plugin,
             batch_size=batch_size,
