@@ -1,11 +1,11 @@
 # fitz_ai/cli/commands/query.py
 """
-Top-level query command.
+Interactive query command.
 
 Usage:
-    fitz query "What is in my documents?"
-    fitz query "Explain X" --max-sources 5
-    fitz query "Question" -c custom.yaml
+    fitz query                     # Interactive mode
+    fitz query "What is RAG?"      # Direct query
+    fitz query -c my_collection    # Specify collection
 """
 
 from __future__ import annotations
@@ -15,184 +15,344 @@ from typing import Optional
 
 import typer
 
+from fitz_ai.core.config import load_config_dict, ConfigNotFoundError
+from fitz_ai.core.paths import FitzPaths
+from fitz_ai.engines.classic_rag.config import load_config, ClassicRagConfig
+from fitz_ai.engines.classic_rag.pipeline.pipeline.engine import RAGPipeline
 from fitz_ai.logging.logger import get_logger
-from fitz_ai.logging.tags import CLI, PIPELINE
 
 logger = get_logger(__name__)
 
-# Try to import rich for pretty output
+# Rich for UI (optional)
 try:
     from rich.console import Console
     from rich.panel import Panel
-    from rich.markup import escape
+    from rich.prompt import Prompt, Confirm
+    from rich.markdown import Markdown
+    from rich.table import Table
 
-    RICH_AVAILABLE = True
     console = Console()
+    RICH = True
 except ImportError:
-    RICH_AVAILABLE = False
     console = None
+    RICH = False
+
+
+# =============================================================================
+# UI Helpers
+# =============================================================================
+
+
+def _print(msg: str, style: str = "") -> None:
+    if RICH and style:
+        console.print(f"[{style}]{msg}[/{style}]")
+    else:
+        print(msg)
+
+
+def _header(title: str) -> None:
+    if RICH:
+        console.print(Panel.fit(f"[bold]{title}[/bold]", border_style="blue"))
+    else:
+        print(f"\n{'=' * 50}")
+        print(title)
+        print('=' * 50)
+
+
+def _error(msg: str) -> None:
+    if RICH:
+        console.print(f"[red]✗[/red] {msg}")
+    else:
+        print(f"✗ {msg}")
+
+
+def _prompt_text(prompt: str, default: str = "") -> str:
+    if RICH:
+        return Prompt.ask(prompt, default=default) if default else Prompt.ask(prompt)
+    else:
+        if default:
+            response = input(f"{prompt} [{default}]: ").strip()
+            return response if response else default
+        else:
+            return input(f"{prompt}: ").strip()
+
+
+def _prompt_confirm(prompt: str, default: bool = True) -> bool:
+    if RICH:
+        return Confirm.ask(prompt, default=default)
+    else:
+        yn = "Y/n" if default else "y/N"
+        response = input(f"{prompt} [{yn}]: ").strip().lower()
+        if not response:
+            return default
+        return response in ("y", "yes")
+
+
+# =============================================================================
+# Config Loading
+# =============================================================================
+
+
+def _load_config_safe() -> tuple[dict, ClassicRagConfig]:
+    """Load config or exit with helpful message."""
+    try:
+        config_path = FitzPaths.config()
+        raw_config = load_config_dict(config_path)
+        typed_config = load_config(str(config_path))
+        return raw_config, typed_config
+    except (ConfigNotFoundError, FileNotFoundError):
+        _error("No config found. Run 'fitz init' first.")
+        raise typer.Exit(1)
+    except Exception as e:
+        _error(f"Failed to load config: {e}")
+        raise typer.Exit(1)
+
+
+# =============================================================================
+# Answer Display
+# =============================================================================
+
+
+def _display_answer(answer, show_sources: bool = True) -> None:
+    """Display the answer with optional sources."""
+    # Extract answer text
+    answer_text = getattr(answer, "answer", None) or getattr(answer, "text", None) or str(answer)
+
+    if RICH:
+        # Display answer
+        console.print()
+        console.print(Panel(
+            Markdown(answer_text),
+            title="[bold green]Answer[/bold green]",
+            border_style="green",
+            padding=(1, 2),
+        ))
+
+        # Display sources if available
+        if show_sources:
+            sources = getattr(answer, "sources", None) or getattr(answer, "citations", None) or []
+            if sources:
+                console.print()
+                table = Table(title="Sources", show_header=True, header_style="bold cyan")
+                table.add_column("#", style="dim", width=3)
+                table.add_column("Source", style="cyan")
+                table.add_column("Excerpt", style="dim", max_width=60)
+
+                for i, source in enumerate(sources[:5], 1):
+                    source_id = getattr(source, "source_id", None) or getattr(source, "doc_id", None) or "?"
+                    text = getattr(source, "text", None) or getattr(source, "content", None) or ""
+                    # Truncate excerpt
+                    excerpt = text[:100] + "..." if len(text) > 100 else text
+                    excerpt = excerpt.replace("\n", " ")
+                    table.add_row(str(i), str(source_id), excerpt)
+
+                console.print(table)
+    else:
+        # Plain text output
+        print()
+        print("=" * 60)
+        print("ANSWER")
+        print("=" * 60)
+        print()
+        print(answer_text)
+        print()
+
+        if show_sources:
+            sources = getattr(answer, "sources", None) or getattr(answer, "citations", None) or []
+            if sources:
+                print("-" * 60)
+                print("SOURCES")
+                print("-" * 60)
+                for i, source in enumerate(sources[:5], 1):
+                    source_id = getattr(source, "source_id", None) or getattr(source, "doc_id", None) or "?"
+                    print(f"  [{i}] {source_id}")
+                print()
+
+
+# =============================================================================
+# Main Command
+# =============================================================================
 
 
 def command(
-    question: str = typer.Argument(..., help="The question to answer"),
-    config: Optional[Path] = typer.Option(
+    question: Optional[str] = typer.Argument(
         None,
-        "--config",
-        "-c",
-        help="Path to config YAML file.",
-    ),
-    preset: Optional[str] = typer.Option(
-        None,
-        "--preset",
-        "-p",
-        help="Use a named preset (local, openai, cohere).",
-    ),
-    max_sources: Optional[int] = typer.Option(
-        None,
-        "--max-sources",
-        "-n",
-        help="Maximum number of sources to retrieve.",
+        help="Question to ask (will prompt if not provided).",
     ),
     collection: Optional[str] = typer.Option(
         None,
         "--collection",
-        "-k",
-        help="Collection to query (overrides config).",
+        "-c",
+        help="Collection to query (default: from config).",
     ),
-    filters: Optional[str] = typer.Option(
+    top_k: Optional[int] = typer.Option(
         None,
-        "--filters",
-        "-f",
-        help='JSON metadata filters (e.g., \'{"topic": "physics"}\')',
+        "--top-k",
+        "-k",
+        help="Number of chunks to retrieve.",
+    ),
+    no_rerank: bool = typer.Option(
+        False,
+        "--no-rerank",
+        help="Disable reranking even if configured.",
+    ),
+    show_sources: bool = typer.Option(
+        True,
+        "--sources/--no-sources",
+        help="Show/hide source citations.",
+    ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        "-i",
+        help="Enter interactive chat mode.",
     ),
 ) -> None:
     """
     Query your knowledge base.
 
-    Examples:
-        fitz query "What is machine learning?"
-        fitz query "Explain RAG" --max-sources 5
-        fitz query "Question" --collection my_docs
-        fitz query "Question" --preset local
+    Run without arguments for interactive mode:
+        fitz query
+
+    Or ask directly:
+        fitz query "What is RAG?"
+
+    Options:
+        fitz query "question" -c my_collection   # Specific collection
+        fitz query "question" -k 10              # More results
+        fitz query "question" --no-rerank        # Skip reranking
+        fitz query -i                            # Interactive chat mode
     """
-    from fitz_ai.core import Constraints, GenerationError, KnowledgeError, QueryError
-    from fitz_ai.engines.classic_rag.config.loader import load_config as load_rag_config
-    from fitz_ai.engines.classic_rag.exceptions import LLMError
-    from fitz_ai.engines.classic_rag.runtime import run_classic_rag
+    # =========================================================================
+    # Load config
+    # =========================================================================
 
-    # Determine config source
-    config_path = None
-    if preset:
-        logger.info(f"{CLI}{PIPELINE} Using preset: {preset}")
-        from fitz_ai.engines.classic_rag.config.presets import get_preset
+    raw_config, typed_config = _load_config_safe()
 
-        try:
-            preset_dict = get_preset(preset)
-        except ValueError as e:
-            typer.echo(f"Error: {e}", err=True)
-            raise typer.Exit(code=1)
+    # Extract settings from config
+    chat_plugin = raw_config.get("chat", {}).get("plugin_name", "?")
+    embedding_plugin = raw_config.get("embedding", {}).get("plugin_name", "?")
+    vector_db_plugin = raw_config.get("vector_db", {}).get("plugin_name", "?")
+    rerank_enabled = raw_config.get("rerank", {}).get("enabled", False)
+    rerank_plugin = raw_config.get("rerank", {}).get("plugin_name", None)
+    default_collection = raw_config.get("retriever", {}).get("collection", "default")
+    default_top_k = raw_config.get("retriever", {}).get("top_k", 5)
 
-        from fitz_ai.engines.classic_rag.config.schema import FitzConfig
-
-        config_obj = FitzConfig.from_dict(preset_dict)
+    # Apply CLI overrides
+    if collection:
+        typed_config.retriever.collection = collection
     else:
-        config_path = str(config) if config else None
-        config_source = config_path or "<default>"
-        logger.info(f"{CLI}{PIPELINE} Running query with config={config_source}")
-        config_obj = load_rag_config(config_path)
+        collection = default_collection
 
-    # Override collection if specified
-    if collection and hasattr(config_obj, "retriever"):
-        config_obj.retriever.collection = collection
-
-    # Build constraints if provided
-    constraints = None
-    if max_sources or filters:
-        filter_dict = {}
-        if filters:
-            import json
-
-            try:
-                filter_dict = json.loads(filters)
-            except json.JSONDecodeError as e:
-                typer.echo(f"Error: Invalid JSON in --filters: {e}", err=True)
-                raise typer.Exit(code=1)
-
-        constraints = Constraints(max_sources=max_sources, filters=filter_dict)
-
-    # Run query
-    if RICH_AVAILABLE:
-        console.print("[dim]Processing query...[/dim]")
+    if top_k:
+        typed_config.retriever.top_k = top_k
     else:
-        typer.echo("Processing query...")
+        top_k = default_top_k
+
+    if no_rerank:
+        typed_config.rerank.enabled = False
+        rerank_enabled = False
+
+    # =========================================================================
+    # Header
+    # =========================================================================
+
+    _header("Fitz Query")
+
+    if RICH:
+        info_parts = [
+            f"[dim]Collection:[/dim] {collection}",
+            f"[dim]Chat:[/dim] {chat_plugin}",
+            f"[dim]Embedding:[/dim] {embedding_plugin}",
+        ]
+        if rerank_enabled and rerank_plugin:
+            info_parts.append(f"[dim]Rerank:[/dim] {rerank_plugin}")
+        console.print("  ".join(info_parts))
+        console.print()
+    else:
+        print(f"Collection: {collection} | Chat: {chat_plugin} | Rerank: {'on' if rerank_enabled else 'off'}")
+        print()
+
+    # =========================================================================
+    # Build pipeline
+    # =========================================================================
 
     try:
-        answer = run_classic_rag(query=question, config=config_obj, constraints=constraints)
-    except LLMError as e:
-        typer.echo(str(e), err=True)
-        raise typer.Exit(code=1)
-    except QueryError as e:
-        typer.echo(f"Query error: {e}", err=True)
-        raise typer.Exit(code=1)
-    except KnowledgeError as e:
-        typer.echo(f"Knowledge retrieval error: {e}", err=True)
-        raise typer.Exit(code=1)
-    except GenerationError as e:
-        typer.echo(f"Answer generation error: {e}", err=True)
-        raise typer.Exit(code=1)
-    except Exception as e:
-        # Check if the root cause is an LLMError
-        root_cause = e.__cause__
-        while root_cause:
-            if isinstance(root_cause, LLMError):
-                typer.echo(str(root_cause), err=True)
-                raise typer.Exit(code=1)
-            root_cause = getattr(root_cause, "__cause__", None)
-
-        typer.echo(f"Unexpected error: {e}", err=True)
-        logger.exception("Unexpected error during query execution")
-        raise typer.Exit(code=1)
-
-    # Display answer
-    typer.echo()
-    answer_text = answer.text or "(No answer generated)"
-    if RICH_AVAILABLE:
-        # Escape answer text to prevent markup interpretation
-        safe_answer = escape(answer_text)
-        console.print(
-            Panel(safe_answer, title="Answer", border_style="green")
-        )
-    else:
-        typer.echo("=" * 60)
-        typer.echo("ANSWER")
-        typer.echo("=" * 60)
-        typer.echo()
-        typer.echo(answer_text)
-        typer.echo()
-
-    # Display sources if available
-    if answer.provenance:
-        typer.echo()
-        if RICH_AVAILABLE:
-            console.print("[bold]Sources:[/bold]")
+        if RICH:
+            with console.status("[bold blue]Loading pipeline...", spinner="dots"):
+                pipeline = RAGPipeline.from_config(typed_config)
         else:
-            typer.echo("SOURCES:")
-            typer.echo("-" * 40)
+            print("Loading pipeline...")
+            pipeline = RAGPipeline.from_config(typed_config)
+    except Exception as e:
+        _error(f"Failed to initialize pipeline: {e}")
+        raise typer.Exit(1)
 
-        for i, prov in enumerate(answer.provenance, 1):
-            source_id = prov.source_id or "unknown"
-            if RICH_AVAILABLE:
-                safe_source_id = escape(source_id)
-                console.print(f"  [dim][{i}][/dim] {safe_source_id}")
-            else:
-                typer.echo(f"[{i}] {source_id}")
+    # =========================================================================
+    # Interactive mode
+    # =========================================================================
 
-            if prov.excerpt:
-                excerpt = prov.excerpt[:150] + "..." if len(prov.excerpt) > 150 else prov.excerpt
-                if RICH_AVAILABLE:
-                    safe_excerpt = escape(excerpt)
-                    console.print(f"      [dim]{safe_excerpt}[/dim]")
+    if interactive or question is None:
+        _print("Enter your questions (type 'exit' or 'quit' to stop):", "dim")
+        print()
+
+        while True:
+            try:
+                if RICH:
+                    q = Prompt.ask("[bold cyan]You[/bold cyan]")
                 else:
-                    typer.echo(f"    {excerpt}")
+                    q = input("You: ").strip()
 
-    typer.echo()
+                if not q:
+                    continue
+
+                if q.lower() in ("exit", "quit", "q"):
+                    _print("Goodbye!", "dim")
+                    break
+
+                # Run query
+                if RICH:
+                    with console.status("[bold blue]Thinking...", spinner="dots"):
+                        answer = pipeline.run(q)
+                else:
+                    print("Thinking...")
+                    answer = pipeline.run(q)
+
+                _display_answer(answer, show_sources=show_sources)
+                print()
+
+            except KeyboardInterrupt:
+                print()
+                _print("Interrupted. Goodbye!", "dim")
+                break
+            except Exception as e:
+                _error(f"Query failed: {e}")
+                logger.exception("Query error")
+
+        return
+
+    # =========================================================================
+    # Single query mode
+    # =========================================================================
+
+    if not question or not question.strip():
+        _error("No question provided.")
+        raise typer.Exit(1)
+
+    _print(f"[bold]Question:[/bold] {question}" if RICH else f"Question: {question}")
+    print()
+
+    try:
+        if RICH:
+            with console.status("[bold blue]Thinking...", spinner="dots"):
+                answer = pipeline.run(question)
+        else:
+            print("Thinking...")
+            answer = pipeline.run(question)
+
+        _display_answer(answer, show_sources=show_sources)
+
+    except Exception as e:
+        _error(f"Query failed: {e}")
+        logger.exception("Query error")
+        raise typer.Exit(1)

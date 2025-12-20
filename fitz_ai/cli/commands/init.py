@@ -1,328 +1,241 @@
 # fitz_ai/cli/commands/init.py
-# PLUGIN-AGNOSTIC VERSION
-# Uses plugin registries for auto-discovery - NO hardcoded plugin names!
-
 """
 Interactive setup wizard for Fitz.
-
-Detects available providers and creates a working configuration.
 
 Usage:
     fitz init              # Interactive wizard
     fitz init -y           # Auto-detect and use defaults
-    fitz init --show-config  # Preview config without saving
+    fitz init --show       # Preview config without saving
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import typer
 
-# Import centralized detection
 from fitz_ai.core.detect import detect_all
-
-# Import plugin registries
 from fitz_ai.llm.registry import available_llm_plugins
 from fitz_ai.vector_db.registry import available_vector_db_plugins
 
-# Rich for pretty output (optional, falls back gracefully)
+# Rich for pretty output (optional)
 try:
     from rich.console import Console
     from rich.panel import Panel
     from rich.prompt import Confirm, Prompt
+    from rich.syntax import Syntax
+    from rich.table import Table
 
-    RICH_AVAILABLE = True
     console = Console()
+    RICH = True
 except ImportError:
-    RICH_AVAILABLE = False
     console = None
+    RICH = False
 
 
 # =============================================================================
-# Engine Discovery
+# Helpers
 # =============================================================================
 
 
-def _is_local_plugin(plugin_name: str) -> bool:
-    """Check if a plugin is local/Ollama-based (doesn't require API keys)."""
-    plugin_lower = plugin_name.lower()
-    return any(x in plugin_lower for x in ("ollama", "local", "offline"))
+def _is_local_plugin(name: str) -> bool:
+    """Check if plugin is local/Ollama-based."""
+    return any(x in name.lower() for x in ("ollama", "local", "offline"))
 
 
-def _is_faiss_plugin(plugin_name: str) -> bool:
-    """Check if a plugin is FAISS-based (local vector DB)."""
-    plugin_lower = plugin_name.lower()
-    return "faiss" in plugin_lower or plugin_lower == "local"
+def _is_faiss_plugin(name: str) -> bool:
+    """Check if plugin is FAISS-based."""
+    return "faiss" in name.lower()
 
 
-def detect_engines() -> dict[str, str]:
-    """Auto-discover all registered engines."""
-    # Import engines to trigger registration
-    try:
-        import fitz_ai.engines.classic_rag  # noqa
-    except ImportError:
-        pass
-
-    try:
-        import fitz_ai.engines.clara  # noqa
-    except ImportError:
-        pass
-
-    # Get engines from registry
-    try:
-        from fitz_ai.runtime import list_engines_with_info
-        return list_engines_with_info()
-    except ImportError:
-        # Fallback if runtime not available
-        return {"classic_rag": "Retrieval-augmented generation using vector search"}
-
-
-def prompt_engine_choice(engines: dict[str, str]) -> str:
-    """Prompt user to select an engine."""
-    if not engines:
-        raise ValueError("No engines available")
-
-    # If only one engine, auto-select
-    if len(engines) == 1:
-        engine = list(engines.keys())[0]
-        if RICH_AVAILABLE:
-            console.print(f"  [dim]Engine:[/dim] [green]{engine}[/green] [dim](auto-selected)[/dim]")
-        else:
-            print(f"  Engine: {engine} (auto-selected)")
-        return engine
-
-    # Show available engines
-    if RICH_AVAILABLE:
-        console.print("\n[bold blue]Available Engines[/bold blue]")
-        for i, (name, desc) in enumerate(engines.items(), 1):
-            status = "[bold green]Production[/bold green]" if name == "classic_rag" else "[yellow]Experimental[/yellow]"
-            console.print(f"  {i}. [bold]{name}[/bold] ({status})")
-            console.print(f"     [dim]{desc}[/dim]")
+def _print(msg: str, style: str = "") -> None:
+    """Print with optional Rich styling."""
+    if RICH and style:
+        console.print(f"[{style}]{msg}[/{style}]")
     else:
-        print("\nAvailable Engines:")
-        for i, (name, desc) in enumerate(engines.items(), 1):
-            status = "Production" if name == "classic_rag" else "Experimental"
-            print(f"  {i}. {name} ({status})")
-            print(f"     {desc}")
+        print(msg)
 
-    # Get user choice
-    choices = list(engines.keys())
-    default_idx = 0
-    if "classic_rag" in choices:
-        default_idx = choices.index("classic_rag")
 
-    if RICH_AVAILABLE:
-        choice = Prompt.ask(
-            "\nSelect engine",
-            choices=[str(i) for i in range(1, len(choices) + 1)],
-            default=str(default_idx + 1),
-        )
+def _header(title: str) -> None:
+    """Print section header."""
+    if RICH:
+        console.print(f"\n[bold blue]{title}[/bold blue]")
     else:
-        choice = input(f"\nSelect engine [1-{len(choices)}] ({default_idx + 1}): ").strip()
-        if not choice:
-            choice = str(default_idx + 1)
-
-    return choices[int(choice) - 1]
+        print(f"\n{title}")
+        print("-" * len(title))
 
 
-# =============================================================================
-# Plugin Discovery (AGNOSTIC!)
-# =============================================================================
-
-
-def get_plugin_defaults(plugin_name: str, plugin_type: str) -> Dict[str, Any]:
-    """Get default configuration for a plugin."""
-    defaults = {
-        "temperature": 0.2,
-    }
-    return defaults
-
-
-def generate_plugin_config(plugin_name: str, plugin_type: str, **kwargs) -> str:
-    """Generate YAML config for any plugin dynamically."""
-    # Build kwargs section
-    if kwargs:
-        kwargs_lines = []
-        for key, value in kwargs.items():
-            if isinstance(value, str):
-                kwargs_lines.append(f'    {key}: "{value}"')
-            else:
-                kwargs_lines.append(f"    {key}: {value}")
-        kwargs_str = "\n".join(kwargs_lines)
+def _status(name: str, available: bool, detail: str = "") -> None:
+    """Print status line."""
+    icon = "✓" if available else "✗"
+    color = "green" if available else "dim"
+    if RICH:
+        console.print(f"  [{color}]{icon}[/{color}] {name}" + (f" [dim]({detail})[/dim]" if detail else ""))
     else:
-        kwargs_str = "    {}"
-
-    return f"""  plugin_name: {plugin_name}
-  kwargs:
-{kwargs_str}"""
+        print(f"  {icon} {name}" + (f" ({detail})" if detail else ""))
 
 
-# =============================================================================
-# Config Generation (AGNOSTIC!)
-# =============================================================================
-
-
-def generate_config(
-    chat_provider: str,
-    embedding_provider: str,
-    vector_db: str,
-    qdrant_host: str = "localhost",
-    qdrant_port: int = 6333,
-    collection: str = "default",
-    enable_rerank: bool = False,
-    rerank_provider: str | None = None,
-) -> str:
-    """Generate YAML config dynamically based on selected plugins."""
-
-    # Generate each section dynamically
-    chat_config = generate_plugin_config(chat_provider, "chat")
-    embedding_config = generate_plugin_config(embedding_provider, "embedding")
-
-    # Vector DB might need host/port
-    vector_db_kwargs = {}
-    if vector_db == "qdrant":
-        vector_db_kwargs = {"host": qdrant_host, "port": qdrant_port}
-    vector_db_config = generate_plugin_config(vector_db, "vector_db", **vector_db_kwargs)
-
-    # Rerank config
-    if enable_rerank and rerank_provider:
-        rerank_config = f"""rerank:
-  enabled: true
-{generate_plugin_config(rerank_provider, "rerank")}"""
+def _prompt_choice(prompt: str, choices: list[str], default: str) -> str:
+    """Prompt user to select from choices."""
+    if RICH:
+        return Prompt.ask(prompt, choices=choices, default=default)
     else:
-        rerank_config = """rerank:
-  enabled: false"""
-
-    # Build full config
-    config = f"""# Fitz RAG Configuration
-# Generated by: fitz init
-# 
-# Edit this file to customize your setup.
-# Documentation: https://github.com/yafitzdev/fitz-ai
-
-# =============================================================================
-# Chat Configuration
-# =============================================================================
-chat:
-{chat_config}
-
-# =============================================================================
-# Embedding Configuration  
-# =============================================================================
-embedding:
-{embedding_config}
-
-# =============================================================================
-# Vector Database Configuration
-# =============================================================================
-vector_db:
-{vector_db_config}
-
-# =============================================================================
-# Retriever Configuration
-# =============================================================================
-retriever:
-  plugin_name: dense
-  collection: {collection}
-  top_k: 5
-
-# =============================================================================
-# Reranker (improves retrieval quality)
-# =============================================================================
-{rerank_config}
-
-# =============================================================================
-# RGS (Retrieval-Guided Synthesis)
-# =============================================================================
-rgs:
-  enable_citations: true
-  strict_grounding: true
-  max_chunks: 8
-  include_query_in_context: true
-  source_label_prefix: S
-
-# =============================================================================
-# Logging
-# =============================================================================
-logging:
-  level: INFO
-"""
-    return config
+        choice_str = "/".join(choices)
+        while True:
+            response = input(f"{prompt} [{choice_str}] ({default}): ").strip()
+            if not response:
+                return default
+            if response in choices:
+                return response
+            print(f"Invalid. Choose from: {', '.join(choices)}")
 
 
-# =============================================================================
-# Display Helpers
-# =============================================================================
-
-
-def print_header(text: str) -> None:
-    """Print a header."""
-    if RICH_AVAILABLE:
-        console.print(f"\n[bold blue]{text}[/bold blue]")
-    else:
-        print(f"\n{text}")
-
-
-def print_status(name: str, available: bool, details: str = "") -> None:
-    """Print status of a provider."""
-    if RICH_AVAILABLE:
-        icon = "✓" if available else "✗"
-        color = "green" if available else "red"
-        console.print(f"  [{color}]{icon}[/{color}] {name}: {details}")
-    else:
-        icon = "✓" if available else "✗"
-        print(f"  {icon} {name}: {details}")
-
-
-def prompt_choice(prompt: str, choices: list[str], default: str = None) -> str:
-    """Prompt user for a choice."""
-    choices_str = "/".join(choices)
-    default_str = f" ({default})" if default else ""
-
-    while True:
-        if RICH_AVAILABLE:
-            response = Prompt.ask(f"{prompt} ", default=default or "", choices=choices)
-        else:
-            response = input(f"{prompt} [{choices_str}]{default_str}: ").strip()
-            if not response and default:
-                response = default
-
-        if response in choices:
-            return response
-
-        print(f"Invalid choice. Please enter one of: {', '.join(choices)}")
-
-
-def prompt_confirm(prompt: str, default: bool = True) -> bool:
-    """Prompt user for yes/no."""
-    if RICH_AVAILABLE:
+def _prompt_confirm(prompt: str, default: bool = True) -> bool:
+    """Prompt for yes/no."""
+    if RICH:
         return Confirm.ask(prompt, default=default)
     else:
-        default_str = "Y/n" if default else "y/N"
-        response = input(f"{prompt} [{default_str}]: ").strip().lower()
+        yn = "Y/n" if default else "y/N"
+        response = input(f"{prompt} [{yn}]: ").strip().lower()
         if not response:
             return default
         return response in ("y", "yes")
 
 
-def auto_select_or_prompt(
-    category: str,
-    available: list[str],
-    default: str,
-    prompt_text: str,
-) -> str:
-    """Auto-select if only one option, otherwise prompt user."""
+def _prompt_text(prompt: str, default: str) -> str:
+    """Prompt for text input."""
+    if RICH:
+        return Prompt.ask(prompt, default=default)
+    else:
+        response = input(f"{prompt} ({default}): ").strip()
+        return response if response else default
+
+
+def _auto_or_prompt(category: str, available: list[str], default: str, prompt: str) -> str:
+    """Auto-select if one option, otherwise prompt."""
     if len(available) == 1:
         choice = available[0]
-        if RICH_AVAILABLE:
-            console.print(f"  [dim]{category}:[/dim] [green]{choice}[/green] [dim](auto-selected)[/dim]")
+        if RICH:
+            console.print(f"  [dim]{category}:[/dim] [green]{choice}[/green] [dim](auto)[/dim]")
         else:
-            print(f"  {category}: {choice} (auto-selected)")
+            print(f"  {category}: {choice} (auto)")
         return choice
+    return _prompt_choice(prompt, available, default)
+
+
+# =============================================================================
+# Plugin Filtering
+# =============================================================================
+
+
+def _filter_available_plugins(
+    plugins: list[str],
+    plugin_type: str,
+    system: Any,
+) -> list[str]:
+    """Filter plugins to only those that are available."""
+    available = []
+
+    for plugin in plugins:
+        is_available = False
+
+        # Check local/Ollama plugins
+        if _is_local_plugin(plugin):
+            is_available = system.ollama.available
+
+        # Check FAISS
+        elif _is_faiss_plugin(plugin):
+            is_available = system.faiss.available
+
+        # Check Qdrant
+        elif plugin == "qdrant":
+            is_available = system.qdrant.available
+
+        # Check API key providers
+        elif plugin in system.api_keys:
+            is_available = system.api_keys[plugin].available
+
+        if is_available:
+            available.append(plugin)
+
+    return available
+
+
+# =============================================================================
+# Config Generation
+# =============================================================================
+
+
+def _generate_config(
+    chat: str,
+    embedding: str,
+    vector_db: str,
+    collection: str,
+    rerank: str | None,
+    qdrant_host: str,
+    qdrant_port: int,
+) -> str:
+    """Generate YAML configuration."""
+
+    # Vector DB kwargs
+    vdb_kwargs = ""
+    if vector_db == "qdrant":
+        vdb_kwargs = f"""
+    host: "{qdrant_host}"
+    port: {qdrant_port}"""
+
+    # Rerank section
+    if rerank:
+        rerank_section = f"""
+# Reranker (improves retrieval quality)
+rerank:
+  enabled: true
+  plugin_name: {rerank}
+  kwargs: {{}}
+"""
     else:
-        return prompt_choice(prompt_text, available, default=default)
+        rerank_section = """
+# Reranker (disabled)
+rerank:
+  enabled: false
+"""
+
+    return f"""# Fitz RAG Configuration
+# Generated by: fitz init
+
+# Chat (LLM for answering questions)
+chat:
+  plugin_name: {chat}
+  kwargs:
+    temperature: 0.2
+
+# Embedding (text to vectors)
+embedding:
+  plugin_name: {embedding}
+  kwargs: {{}}
+
+# Vector Database
+vector_db:
+  plugin_name: {vector_db}
+  kwargs:{vdb_kwargs if vdb_kwargs else " {}"}
+
+# Retriever
+retriever:
+  plugin_name: dense
+  collection: {collection}
+  top_k: 5
+{rerank_section}
+# RGS (Retrieval-Guided Synthesis)
+rgs:
+  enable_citations: true
+  strict_grounding: true
+  max_chunks: 8
+
+# Logging
+logging:
+  level: INFO
+"""
 
 
 # =============================================================================
@@ -335,12 +248,13 @@ def command(
         False,
         "--non-interactive",
         "-y",
-        help="Use detected defaults without prompting",
+        help="Use detected defaults without prompting.",
     ),
     show_config: bool = typer.Option(
         False,
-        "--show-config",
-        help="Only show what config would be generated",
+        "--show",
+        "-s",
+        help="Preview config without saving.",
     ),
 ) -> None:
     """
@@ -350,299 +264,183 @@ def command(
     creates a working configuration file.
 
     Examples:
-        fitz init              # Interactive wizard
-        fitz init -y           # Auto-detect and use defaults
-        fitz init --show-config  # Preview config without saving
+        fitz init           # Interactive wizard
+        fitz init -y        # Auto-detect and use defaults
+        fitz init --show    # Preview config without saving
     """
     from fitz_ai.core.paths import FitzPaths
 
+    # =========================================================================
     # Header
-    if RICH_AVAILABLE:
-        console.print(
-            Panel.fit(
-                "[bold]Fitz Setup Wizard[/bold]\nLet's configure your RAG pipeline!",
-                border_style="blue",
-            )
-        )
+    # =========================================================================
+
+    if RICH:
+        console.print(Panel.fit(
+            "[bold]Fitz Setup Wizard[/bold]\n[dim]Let's configure your RAG pipeline[/dim]",
+            border_style="blue",
+        ))
     else:
-        print("\n" + "=" * 60)
+        print("\n" + "=" * 50)
         print("Fitz Setup Wizard")
-        print("Let's configure your RAG pipeline!")
-        print("=" * 60)
+        print("=" * 50)
 
-    # ==========================================================================
-    # Engine Selection
-    # ==========================================================================
+    # =========================================================================
+    # Detect System
+    # =========================================================================
 
-    engines = detect_engines()
+    _header("Detecting System")
 
-    if non_interactive or len(engines) == 1:
-        engine = "classic_rag" if "classic_rag" in engines else list(engines.keys())[0]
-    else:
-        engine = prompt_engine_choice(engines)
-
-    # For now, only classic_rag is fully supported
-    if engine != "classic_rag":
-        if RICH_AVAILABLE:
-            console.print(f"\n[yellow]Setup wizard for '{engine}' coming soon![/yellow]")
-            console.print("Please create config manually or use defaults.")
-        else:
-            print(f"\nSetup wizard for '{engine}' coming soon!")
-            print("Please create config manually or use defaults.")
-        raise typer.Exit(code=0)
-
-    # ==========================================================================
-    # Plugin Discovery (AGNOSTIC!)
-    # ==========================================================================
-
-    print_header("Detecting Available Plugins...")
-
-    # Discover plugins from registries
-    available_chat = available_llm_plugins("chat")
-    available_embeddings = available_llm_plugins("embedding")
-    available_rerank = available_llm_plugins("rerank")
-    available_vector_dbs = available_vector_db_plugins()
-
-    # System detection for API keys and services
     system = detect_all()
 
-    # ==========================================================================
-    # Display Available Plugins (AGNOSTIC!)
-    # ==========================================================================
+    # Show detection results
+    _status("Ollama", system.ollama.available, system.ollama.details if not system.ollama.available else "")
+    _status("Qdrant", system.qdrant.available, f"{system.qdrant.host}:{system.qdrant.port}" if system.qdrant.available else "")
+    _status("FAISS", system.faiss.available)
 
-    print_header("Available Chat Plugins")
-    for plugin in sorted(available_chat):
-        available = False
-        if _is_local_plugin(plugin):
-            available = system.ollama.available
-        elif plugin in system.api_keys:
-            available = system.api_keys[plugin].available
+    for name, key_status in system.api_keys.items():
+        _status(name.capitalize(), key_status.available)
 
-        status = "✓ Available" if available else "✗ Not configured"
-        print_status(plugin, available, status)
+    # =========================================================================
+    # Discover Plugins
+    # =========================================================================
 
-    print_header("Available Embedding Plugins")
-    for plugin in sorted(available_embeddings):
-        available = False
-        if _is_local_plugin(plugin):
-            available = system.ollama.available
-        elif plugin in system.api_keys:
-            available = system.api_keys[plugin].available
+    all_chat = available_llm_plugins("chat")
+    all_embedding = available_llm_plugins("embedding")
+    all_rerank = available_llm_plugins("rerank")
+    all_vector_db = available_vector_db_plugins()
 
-        status = "✓ Available" if available else "✗ Not configured"
-        print_status(plugin, available, status)
+    # Filter to available only
+    avail_chat = _filter_available_plugins(all_chat, "chat", system)
+    avail_embedding = _filter_available_plugins(all_embedding, "embedding", system)
+    avail_rerank = _filter_available_plugins(all_rerank, "rerank", system)
+    avail_vector_db = _filter_available_plugins(all_vector_db, "vector_db", system)
 
-    print_header("Available Rerank Plugins")
-    for plugin in sorted(available_rerank):
-        available = False
-        if plugin in system.api_keys:
-            available = system.api_keys[plugin].available
+    # =========================================================================
+    # Validate Minimum Requirements
+    # =========================================================================
 
-        status = "✓ Available" if available else "✗ Not configured"
-        print_status(plugin, available, status)
+    if not avail_chat:
+        _print("\n✗ No chat plugins available!", "red")
+        _print("  Set an API key (COHERE_API_KEY, OPENAI_API_KEY) or start Ollama.", "dim")
+        raise typer.Exit(1)
 
-    print_header("Available Vector Database Plugins")
-    for plugin in sorted(available_vector_dbs):
-        available = False
-        if _is_faiss_plugin(plugin):
-            available = system.faiss.available
-        elif plugin == "qdrant":
-            available = system.qdrant.available
+    if not avail_embedding:
+        _print("\n✗ No embedding plugins available!", "red")
+        raise typer.Exit(1)
 
-        status = "✓ Available" if available else "✗ Not configured"
-        print_status(plugin, available, status)
+    if not avail_vector_db:
+        _print("\n✗ No vector database available!", "red")
+        _print("  Install FAISS (pip install faiss-cpu) or start Qdrant.", "dim")
+        raise typer.Exit(1)
 
-    # ==========================================================================
-    # Filter to Available Only
-    # ==========================================================================
-
-    available_chat_filtered = []
-    for plugin in available_chat:
-        if plugin in ["ollama", "local"] and system.ollama.available:
-            available_chat_filtered.append(plugin)
-        elif plugin in system.api_keys and system.api_keys[plugin].available:
-            available_chat_filtered.append(plugin)
-
-    available_embeddings_filtered = []
-    for plugin in available_embeddings:
-        if plugin in ["ollama", "local"] and system.ollama.available:
-            available_embeddings_filtered.append(plugin)
-        elif plugin in system.api_keys and system.api_keys[plugin].available:
-            available_embeddings_filtered.append(plugin)
-
-    available_rerank_filtered = []
-    for plugin in available_rerank:
-        if plugin in system.api_keys and system.api_keys[plugin].available:
-            available_rerank_filtered.append(plugin)
-
-    available_vector_dbs_filtered = []
-    for plugin in available_vector_dbs:
-        if plugin in ["local-faiss", "faiss"] and system.faiss.available:
-            available_vector_dbs_filtered.append(plugin)
-        elif plugin == "qdrant" and system.qdrant.available:
-            available_vector_dbs_filtered.append(plugin)
-
-    # ==========================================================================
-    # Check we have minimum required plugins
-    # ==========================================================================
-
-    if not available_chat_filtered:
-        if RICH_AVAILABLE:
-            console.print("\n[red]No chat plugins available![/red]")
-            console.print("Set an API key or install Ollama.")
-        else:
-            print("\nNo chat plugins available!")
-            print("Set an API key or install Ollama.")
-        raise typer.Exit(code=1)
-
-    if not available_embeddings_filtered:
-        if RICH_AVAILABLE:
-            console.print("\n[red]No embedding plugins available![/red]")
-        else:
-            print("\nNo embedding plugins available!")
-        raise typer.Exit(code=1)
-
-    if not available_vector_dbs_filtered:
-        if RICH_AVAILABLE:
-            console.print("\n[red]No vector database plugins available![/red]")
-            console.print("Install FAISS (pip install faiss-cpu) or start Qdrant.")
-        else:
-            print("\nNo vector database plugins available!")
-            print("Install FAISS (pip install faiss-cpu) or start Qdrant.")
-        raise typer.Exit(code=1)
-
-    # ==========================================================================
+    # =========================================================================
     # User Selection
-    # ==========================================================================
+    # =========================================================================
 
-    chat_default = available_chat_filtered[0]
-    embedding_default = available_embeddings_filtered[0]
-    vector_db_default = available_vector_dbs_filtered[0]
-    rerank_default = available_rerank_filtered[0] if available_rerank_filtered else None
+    _header("Configuration")
 
     if non_interactive:
-        chat_choice = chat_default
-        embedding_choice = embedding_default
-        vector_db_choice = vector_db_default
+        # Use first available for each
+        chat_choice = avail_chat[0]
+        embedding_choice = avail_embedding[0]
+        vector_db_choice = avail_vector_db[0]
+        rerank_choice = avail_rerank[0] if avail_rerank else None
         collection_name = "default"
-        enable_rerank = rerank_default is not None
-        rerank_choice = rerank_default
+
+        _print(f"  Chat: {chat_choice}", "dim")
+        _print(f"  Embedding: {embedding_choice}", "dim")
+        _print(f"  Vector DB: {vector_db_choice}", "dim")
+        _print(f"  Rerank: {rerank_choice or 'disabled'}", "dim")
+        _print(f"  Collection: {collection_name}", "dim")
     else:
-        print_header("Configuration Options")
+        # Interactive selection
+        chat_choice = _auto_or_prompt("Chat", avail_chat, avail_chat[0], "Select chat plugin")
+        embedding_choice = _auto_or_prompt("Embedding", avail_embedding, avail_embedding[0], "Select embedding plugin")
+        vector_db_choice = _auto_or_prompt("Vector DB", avail_vector_db, avail_vector_db[0], "Select vector database")
 
-        chat_choice = auto_select_or_prompt(
-            "Chat",
-            available_chat_filtered,
-            chat_default,
-            "Select chat plugin",
-        )
-
-        embedding_choice = auto_select_or_prompt(
-            "Embedding",
-            available_embeddings_filtered,
-            embedding_default,
-            "Select embedding plugin",
-        )
-
-        vector_db_choice = auto_select_or_prompt(
-            "Vector DB",
-            available_vector_dbs_filtered,
-            vector_db_default,
-            "Select vector database plugin",
-        )
-
-        # Rerank
-        if available_rerank_filtered:
-            enable_rerank = prompt_confirm("Enable reranking?", default=True)
-            if enable_rerank:
-                rerank_choice = auto_select_or_prompt(
-                    "Rerank",
-                    available_rerank_filtered,
-                    rerank_default,
-                    "Select rerank plugin",
-                )
+        # Rerank is optional
+        if avail_rerank:
+            if _prompt_confirm("Enable reranking?", default=True):
+                rerank_choice = _auto_or_prompt("Rerank", avail_rerank, avail_rerank[0], "Select rerank plugin")
             else:
                 rerank_choice = None
         else:
-            enable_rerank = False
             rerank_choice = None
-            if RICH_AVAILABLE:
-                console.print("  [dim]Rerank:[/dim] [yellow]No rerank plugins available[/yellow]")
-            else:
-                print("  Rerank: No rerank plugins available")
+            _print("  Rerank: not available", "dim")
 
-        # Collection name
-        if RICH_AVAILABLE:
-            collection_name = Prompt.ask("Collection name", default="default")
-        else:
-            collection_name = input("Collection name [default]: ").strip() or "default"
+        collection_name = _prompt_text("Collection name", "default")
 
-    # ==========================================================================
-    # Generate Config (AGNOSTIC!)
-    # ==========================================================================
+    # =========================================================================
+    # Generate Config
+    # =========================================================================
 
     qdrant_host = system.qdrant.host if system.qdrant.available else "localhost"
     qdrant_port = system.qdrant.port if system.qdrant.available else 6333
 
-    config = generate_config(
-        chat_provider=chat_choice,
-        embedding_provider=embedding_choice,
+    config_yaml = _generate_config(
+        chat=chat_choice,
+        embedding=embedding_choice,
         vector_db=vector_db_choice,
+        collection=collection_name,
+        rerank=rerank_choice,
         qdrant_host=qdrant_host,
         qdrant_port=qdrant_port,
-        collection=collection_name,
-        enable_rerank=enable_rerank,
-        rerank_provider=rerank_choice,
     )
 
-    # ==========================================================================
-    # Output
-    # ==========================================================================
+    # =========================================================================
+    # Show Config
+    # =========================================================================
 
-    print_header("Generated Configuration")
+    _header("Generated Configuration")
 
-    if RICH_AVAILABLE:
-        from rich.syntax import Syntax
-        console.print(Syntax(config, "yaml", theme="monokai", line_numbers=False))
+    if RICH:
+        console.print(Syntax(config_yaml, "yaml", theme="monokai"))
     else:
-        print(config)
+        print(config_yaml)
 
     if show_config:
         return
 
-    # Save config
-    print_header("Saving Configuration")
+    # =========================================================================
+    # Save Config
+    # =========================================================================
 
-    # Determine save location
+    _header("Saving")
+
     fitz_dir = FitzPaths.workspace()
     fitz_config = FitzPaths.config()
 
-    if not non_interactive:
-        if fitz_config.exists():
-            if not prompt_confirm("Overwrite existing config file?", default=False):
-                print("Aborted.")
-                raise typer.Exit(code=0)
+    # Confirm overwrite if exists
+    if fitz_config.exists() and not non_interactive:
+        if not _prompt_confirm("Config exists. Overwrite?", default=False):
+            _print("Aborted.", "yellow")
+            raise typer.Exit(0)
 
     fitz_dir.mkdir(parents=True, exist_ok=True)
-    fitz_config.write_text(config)
-    print(f"✓ Saved to {fitz_config}")
+    fitz_config.write_text(config_yaml)
+    _print(f"✓ Saved to {fitz_config}", "green")
 
-    # ==========================================================================
+    # =========================================================================
     # Next Steps
-    # ==========================================================================
+    # =========================================================================
 
-    print_header("Setup Complete!")
+    _header("Done!")
 
-    next_steps = f"""
-Your configuration is ready! Next steps:
+    if RICH:
+        console.print(f"""
+[green]Your configuration is ready![/green]
 
-1. Ingest some documents:
-   fitz ingest ./your_docs {collection_name}
+Next steps:
+  [cyan]fitz ingest ./docs {collection_name}[/cyan]  # Ingest documents
+  [cyan]fitz query "your question"[/cyan]           # Query knowledge base
+  [cyan]fitz doctor[/cyan]                          # Verify setup
+""")
+    else:
+        print(f"""
+Your configuration is ready!
 
-2. Query your documents:
-   fitz query "What is in my documents?"
-
-3. Check your setup:
-   fitz doctor
-"""
-    print(next_steps)
+Next steps:
+  fitz ingest ./docs {collection_name}  # Ingest documents
+  fitz query "your question"            # Query knowledge base
+  fitz doctor                           # Verify setup
+""")

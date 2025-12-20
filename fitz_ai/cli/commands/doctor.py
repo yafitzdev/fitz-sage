@@ -1,344 +1,469 @@
 # fitz_ai/cli/commands/doctor.py
 """
-Doctor command: Run diagnostics on Fitz setup.
+System diagnostics command.
 
 Usage:
-    fitz doctor           # Quick check
-    fitz doctor -v        # Verbose output
-    fitz doctor --test    # Test actual connections
+    fitz doctor              # Run all checks
+    fitz doctor --verbose    # Show more details
+    fitz doctor --test       # Test actual connections
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+import sys
 from typing import Optional
 
 import typer
 
+from fitz_ai.core.config import load_config_dict, ConfigNotFoundError
 from fitz_ai.core.detect import detect_all
+from fitz_ai.core.paths import FitzPaths
+from fitz_ai.logging.logger import get_logger
 
-# Rich for pretty output
+logger = get_logger(__name__)
+
+# Rich for UI (optional)
 try:
     from rich.console import Console
     from rich.panel import Panel
+    from rich.table import Table
 
-    RICH_AVAILABLE = True
     console = Console()
+    RICH = True
 except ImportError:
-    RICH_AVAILABLE = False
     console = None
+    RICH = False
 
 
-def print_status(name: str, status: str, details: str, ok: bool) -> None:
+# =============================================================================
+# UI Helpers
+# =============================================================================
+
+
+def _print(msg: str, style: str = "") -> None:
+    if RICH and style:
+        console.print(f"[{style}]{msg}[/{style}]")
+    else:
+        print(msg)
+
+
+def _header(title: str) -> None:
+    if RICH:
+        console.print(Panel.fit(f"[bold]{title}[/bold]", border_style="blue"))
+    else:
+        print(f"\n{'=' * 50}")
+        print(title)
+        print('=' * 50)
+
+
+def _section(title: str) -> None:
+    if RICH:
+        console.print(f"\n[bold cyan]{title}[/bold cyan]")
+    else:
+        print(f"\n{title}")
+        print("-" * len(title))
+
+
+def _status(name: str, ok: bool, detail: str = "") -> None:
     """Print a status line."""
-    if RICH_AVAILABLE:
-        icon = "✓" if ok else "⚠" if status == "WARN" or status == "INFO" else "✗"
-        color = "green" if ok else "yellow" if status == "WARN" or status == "INFO" else "red"
-        console.print(f"  [{color}]{icon}[/{color}] {name}: {details}")
+    if RICH:
+        icon = "✓" if ok else "✗"
+        color = "green" if ok else "red"
+        detail_str = f" [dim]({detail})[/dim]" if detail else ""
+        console.print(f"  [{color}]{icon}[/{color}] {name}{detail_str}")
     else:
-        icon = "✓" if ok else "⚠" if status == "WARN" else "✗"
-        print(f"  {icon} {name}: {details}")
+        icon = "✓" if ok else "✗"
+        detail_str = f" ({detail})" if detail else ""
+        print(f"  {icon} {name}{detail_str}")
 
 
-def print_provider_status(provider) -> None:
-    """Print status for a provider."""
-    print_status(
-        provider.name, "OK" if provider.available else "WARN", provider.details, provider.available
-    )
+def _warning(name: str, detail: str = "") -> None:
+    """Print a warning line."""
+    if RICH:
+        detail_str = f" [dim]({detail})[/dim]" if detail else ""
+        console.print(f"  [yellow]⚠[/yellow] {name}{detail_str}")
+    else:
+        detail_str = f" ({detail})" if detail else ""
+        print(f"  ⚠ {name}{detail_str}")
 
 
-def check_python() -> tuple[bool, str]:
+def _info(msg: str) -> None:
+    """Print info line."""
+    if RICH:
+        console.print(f"  [dim]{msg}[/dim]")
+    else:
+        print(f"    {msg}")
+
+
+# =============================================================================
+# Check Functions
+# =============================================================================
+
+
+def _check_python() -> tuple[bool, str]:
     """Check Python version."""
-    import sys
-
-    version = f"Python {sys.version.split()[0]}"
+    version = sys.version.split()[0]
     ok = sys.version_info >= (3, 10)
-    return ok, version
+    return ok, f"Python {version}"
 
 
-def check_fitz_dir() -> tuple[bool, str]:
-    """Check if .fitz directory exists."""
-    from fitz_ai.core.paths import FitzPaths
-
+def _check_workspace() -> tuple[bool, str]:
+    """Check if workspace exists."""
     workspace = FitzPaths.workspace()
-    config_file = FitzPaths.config()
-
-    if config_file.exists():
-        return True, f"{workspace}/config.yaml exists"
-    elif workspace.exists():
-        return True, f"{workspace}/ exists (no config.yaml)"
-    else:
-        return False, "Not found (run 'fitz init')"
+    if workspace.exists():
+        return True, str(workspace)
+    return False, "Not found (run 'fitz init')"
 
 
-def check_config() -> tuple[bool, str, Optional[dict]]:
-    """Check if config can be loaded."""
+def _check_config() -> tuple[bool, str, Optional[dict]]:
+    """Check if config exists and is valid."""
+    config_path = FitzPaths.config()
+
+    if not config_path.exists():
+        return False, "Not found (run 'fitz init')", None
+
     try:
-        from fitz_ai.engines.classic_rag.config.loader import load_config_dict
-
-        config = load_config_dict()
-        return True, "Config loaded successfully", config
-    except FileNotFoundError:
-        return False, "No config file found (run 'fitz init')", None
+        config = load_config_dict(config_path)
+        return True, "Valid", config
     except Exception as e:
-        return False, f"Failed to load: {e}", None
+        return False, f"Invalid: {e}", None
 
 
-def check_dependencies() -> list[tuple[str, bool, str]]:
-    """Check required dependencies."""
-    deps = []
-
+def _check_dependencies() -> list[tuple[str, bool, str]]:
+    """Check required Python packages."""
     packages = [
         ("typer", "CLI framework"),
         ("httpx", "HTTP client"),
         ("pydantic", "Config validation"),
         ("yaml", "YAML parsing", "pyyaml"),
+        ("rich", "Pretty output", "rich"),
     ]
 
+    results = []
     for item in packages:
         name = item[0]
         desc = item[1]
         import_name = item[2] if len(item) > 2 else item[0]
 
         try:
-            __import__(import_name.replace("-", "_"))
-            deps.append((f"{name}", True, "Installed"))
+            mod = __import__(import_name.replace("-", "_"))
+            version = getattr(mod, "__version__", "")
+            results.append((name, True, version))
         except ImportError:
-            deps.append((f"{name}", False, f"Missing (pip install {import_name})"))
+            results.append((name, False, f"pip install {import_name}"))
 
-    return deps
-
-
-def test_chat(config: dict) -> tuple[bool, str]:
-    """Test chat configuration."""
-    chat_cfg = config.get("chat", {})
-    plugin = chat_cfg.get("plugin_name", "?")
-    model = chat_cfg.get("kwargs", {}).get("model", "default")
-
-    if plugin == "?":
-        return False, "Not configured (missing 'chat' in config)"
-
-    return True, f"Plugin '{plugin}' model '{model}'"
+    return results
 
 
-def test_embedding(config: dict) -> tuple[bool, str]:
-    """Test embedding configuration."""
-    emb_cfg = config.get("embedding", {})
-    plugin = emb_cfg.get("plugin_name", "?")
-    model = emb_cfg.get("kwargs", {}).get("model", "default")
+def _check_optional_dependencies() -> list[tuple[str, bool, str]]:
+    """Check optional Python packages."""
+    packages = [
+        ("faiss", "Local vector DB", "faiss-cpu"),
+        ("qdrant_client", "Qdrant client", "qdrant-client"),
+        ("cohere", "Cohere API", "cohere"),
+        ("openai", "OpenAI API", "openai"),
+    ]
 
-    if plugin == "?":
-        return False, "Not configured"
+    results = []
+    for item in packages:
+        name = item[0]
+        desc = item[1]
+        import_name = item[2] if len(item) > 2 else item[0]
 
-    return True, f"Plugin '{plugin}'" + (
-        f" model '{model}'" if model != "default" else " configured"
-    )
+        try:
+            mod = __import__(name.replace("-", "_"))
+            version = getattr(mod, "__version__", "installed")
+            results.append((desc, True, version))
+        except ImportError:
+            results.append((desc, False, "not installed"))
+
+    return results
 
 
-def test_rerank(config: dict) -> tuple[bool, str]:
-    """Test rerank configuration."""
-    rerank_cfg = config.get("rerank", {})
+def _test_embedding(config: dict) -> tuple[bool, str]:
+    """Test embedding plugin."""
+    try:
+        from fitz_ai.llm.registry import get_llm_plugin
 
-    if not rerank_cfg:
-        return False, "Not configured (optional)"
+        plugin_name = config.get("embedding", {}).get("plugin_name")
+        if not plugin_name:
+            return False, "Not configured"
 
-    enabled = rerank_cfg.get("enabled", False)
-    if not enabled:
-        return False, "Disabled (optional)"
+        plugin = get_llm_plugin(plugin_type="embedding", plugin_name=plugin_name)
 
-    plugin = rerank_cfg.get("plugin_name", "?")
-    model = rerank_cfg.get("kwargs", {}).get("model", "")
+        # Try a test embedding
+        vector = plugin.embed("test")
+        if vector and len(vector) > 0:
+            return True, f"{plugin_name} (dim={len(vector)})"
+        return False, "Empty response"
 
-    if plugin == "?" or plugin is None:
-        return False, "Enabled but no plugin specified"
+    except Exception as e:
+        return False, str(e)[:50]
 
-    detail = f"Plugin '{plugin}'"
-    if model:
-        detail += f" model '{model}'"
 
-    return True, detail
+def _test_chat(config: dict) -> tuple[bool, str]:
+    """Test chat plugin (without making actual call)."""
+    try:
+        from fitz_ai.llm.registry import get_llm_plugin
+
+        plugin_name = config.get("chat", {}).get("plugin_name")
+        if not plugin_name:
+            return False, "Not configured"
+
+        # Just try to instantiate
+        plugin = get_llm_plugin(plugin_type="chat", plugin_name=plugin_name)
+        return True, f"{plugin_name} ready"
+
+    except Exception as e:
+        return False, str(e)[:50]
+
+
+def _test_vector_db(config: dict) -> tuple[bool, str]:
+    """Test vector DB connection."""
+    try:
+        from fitz_ai.vector_db.registry import get_vector_db_plugin
+
+        plugin_name = config.get("vector_db", {}).get("plugin_name")
+        if not plugin_name:
+            return False, "Not configured"
+
+        plugin = get_vector_db_plugin(plugin_name)
+
+        # Try to list collections
+        collections = plugin.list_collections()
+        return True, f"{plugin_name} ({len(collections)} collections)"
+
+    except Exception as e:
+        return False, str(e)[:50]
+
+
+def _test_rerank(config: dict) -> tuple[bool, str]:
+    """Test rerank plugin."""
+    rerank_config = config.get("rerank", {})
+
+    if not rerank_config.get("enabled"):
+        return True, "Disabled (optional)"
+
+    try:
+        from fitz_ai.llm.registry import get_llm_plugin
+
+        plugin_name = rerank_config.get("plugin_name")
+        if not plugin_name:
+            return False, "Enabled but no plugin"
+
+        # Just try to instantiate
+        plugin = get_llm_plugin(plugin_type="rerank", plugin_name=plugin_name)
+        return True, f"{plugin_name} ready"
+
+    except Exception as e:
+        return False, str(e)[:50]
+
+
+# =============================================================================
+# Main Command
+# =============================================================================
 
 
 def command(
-        verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed output"),
-        test_connections: bool = typer.Option(False, "--test", "-t", help="Test actual connections"),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show detailed output.",
+    ),
+    test: bool = typer.Option(
+        False,
+        "--test",
+        "-t",
+        help="Test actual connections.",
+    ),
 ) -> None:
     """
     Run diagnostics on your Fitz setup.
 
-    Checks:
-    - Python version and dependencies
-    - Configuration files
-    - API keys and credentials
-    - External services (Ollama, Qdrant)
+    Checks system requirements, configuration, and connections.
 
     Examples:
         fitz doctor           # Quick check
         fitz doctor -v        # Verbose output
         fitz doctor --test    # Test actual connections
     """
-
-    if RICH_AVAILABLE:
-        console.print(
-            Panel.fit("[bold]Fitz Doctor[/bold]\nRunning diagnostics...", border_style="blue")
-        )
-    else:
-        print("\n" + "=" * 60)
-        print("Fitz Doctor")
-        print("Running diagnostics...")
-        print("=" * 60)
-
     issues = []
     warnings = []
+
+    # =========================================================================
+    # Header
+    # =========================================================================
+
+    _header("Fitz Doctor")
 
     # =========================================================================
     # Core Checks
     # =========================================================================
 
-    print("\n📦 Core:")
+    _section("System")
 
-    ok, msg = check_python()
-    print_status("Python", "OK" if ok else "ERROR", msg, ok)
+    # Python
+    ok, detail = _check_python()
+    _status("Python", ok, detail)
     if not ok:
         issues.append("Python 3.10+ required")
 
-    ok, msg = check_fitz_dir()
-    print_status("Workspace", "OK" if ok else "WARN", msg, ok)
+    # Workspace
+    ok, detail = _check_workspace()
+    _status("Workspace", ok, detail)
     if not ok:
         warnings.append("Run 'fitz init' to create workspace")
 
-    ok, msg, config = check_config()
-    print_status("Config", "OK" if ok else "WARN", msg, ok)
+    # Config
+    ok, detail, config = _check_config()
+    _status("Config", ok, detail)
     if not ok:
         warnings.append("Run 'fitz init' to create config")
+        config = {}
 
     # =========================================================================
     # Dependencies
     # =========================================================================
 
+    _section("Dependencies")
+
+    for name, ok, detail in _check_dependencies():
+        _status(name, ok, detail)
+        if not ok:
+            issues.append(f"Missing: {name}")
+
+    # =========================================================================
+    # Optional Dependencies (verbose only)
+    # =========================================================================
+
     if verbose:
-        print("\n📚 Dependencies:")
-        for name, ok, msg in check_dependencies():
-            print_status(name, "OK" if ok else "ERROR", msg, ok)
-            if not ok:
-                issues.append(f"Missing dependency: {name}")
+        _section("Optional Packages")
+        for name, ok, detail in _check_optional_dependencies():
+            if ok:
+                _status(name, True, detail)
+            else:
+                _warning(name, detail)
 
     # =========================================================================
-    # LLM Providers (using centralized detection)
+    # Services
     # =========================================================================
 
-    print("\n🤖 LLM Providers:")
+    _section("Services")
 
     system = detect_all()
 
-    print_provider_status(system.ollama)
-    print_provider_status(system.api_keys["cohere"])
-    print_provider_status(system.api_keys["openai"])
-    print_provider_status(system.api_keys["anthropic"])
+    # Ollama
+    if system.ollama.available:
+        _status("Ollama", True, system.ollama.details)
+    else:
+        _warning("Ollama", system.ollama.details)
+
+    # Qdrant
+    if system.qdrant.available:
+        _status("Qdrant", True, f"{system.qdrant.host}:{system.qdrant.port}")
+    else:
+        _warning("Qdrant", system.qdrant.details)
+
+    # FAISS
+    if system.faiss.available:
+        _status("FAISS", True, "installed")
+    else:
+        _warning("FAISS", system.faiss.details)
 
     # =========================================================================
-    # Vector Databases (using centralized detection)
+    # API Keys
     # =========================================================================
 
-    print("\n🗄️  Vector Databases:")
+    _section("API Keys")
 
-    print_provider_status(system.qdrant)
-    print_provider_status(system.faiss)
+    for name, key_status in system.api_keys.items():
+        if key_status.available:
+            _status(name.capitalize(), True, "configured")
+        else:
+            _warning(name.capitalize(), f"${key_status.env_var} not set")
 
     # =========================================================================
-    # Config Validation
+    # Connection Tests (if --test)
     # =========================================================================
 
-    if config:
-        print("\n⚙️  Configuration:")
-
-        # Chat
-        ok, msg = test_chat(config)
-        print_status("Chat", "OK" if ok else "WARN", msg, ok)
-        if not ok:
-            warnings.append(f"Chat: {msg}")
+    if test and config:
+        _section("Connection Tests")
 
         # Embedding
-        ok, msg = test_embedding(config)
-        print_status("Embedding", "OK" if ok else "WARN", msg, ok)
+        ok, detail = _test_embedding(config)
+        _status("Embedding", ok, detail)
         if not ok:
-            warnings.append(f"Embedding: {msg}")
+            issues.append(f"Embedding failed: {detail}")
+
+        # Chat
+        ok, detail = _test_chat(config)
+        _status("Chat", ok, detail)
+        if not ok:
+            issues.append(f"Chat failed: {detail}")
+
+        # Vector DB
+        ok, detail = _test_vector_db(config)
+        _status("Vector DB", ok, detail)
+        if not ok:
+            issues.append(f"Vector DB failed: {detail}")
 
         # Rerank
-        ok, msg = test_rerank(config)
-        print_status("Rerank", "OK" if ok else "INFO", msg, ok)
-
-        # Show configured values in verbose mode
-        if verbose:
-            print("\n  Configured values:")
-            print(f"    Chat: {config.get('chat', {}).get('plugin_name', '?')}")
-            print(f"    Embedding: {config.get('embedding', {}).get('plugin_name', '?')}")
-            print(f"    Rerank: {config.get('rerank', {}).get('plugin_name', 'disabled')}")
-            print(f"    Vector DB: {config.get('vector_db', {}).get('plugin_name', '?')}")
-            print(f"    Collection: {config.get('retriever', {}).get('collection', '?')}")
+        ok, detail = _test_rerank(config)
+        _status("Rerank", ok, detail)
 
     # =========================================================================
-    # Connection Tests
+    # Config Summary (verbose)
     # =========================================================================
 
-    if test_connections and config:
-        print("\n🔌 Connection Tests:")
+    if verbose and config:
+        _section("Config Summary")
 
-        # Test Qdrant connection with actual client
-        try:
-            from qdrant_client import QdrantClient
+        chat = config.get("chat", {}).get("plugin_name", "?")
+        embedding = config.get("embedding", {}).get("plugin_name", "?")
+        vector_db = config.get("vector_db", {}).get("plugin_name", "?")
+        rerank = config.get("rerank", {})
+        rerank_str = rerank.get("plugin_name", "disabled") if rerank.get("enabled") else "disabled"
 
-            vdb_cfg = config.get("vector_db", {}).get("kwargs", {})
-            host = vdb_cfg.get("host") or (system.qdrant.host if system.qdrant.available else "localhost")
-            port = vdb_cfg.get("port") or (system.qdrant.port if system.qdrant.available else 6333)
-            client = QdrantClient(host=host, port=port, timeout=5)
-            collections = client.get_collections()
-            print_status(
-                "Qdrant connection",
-                "OK",
-                f"Connected, {len(collections.collections)} collections",
-                True,
-            )
-        except Exception as e:
-            print_status("Qdrant connection", "ERROR", str(e), False)
-            issues.append(f"Qdrant connection failed: {e}")
-
-        # Test embedding
-        try:
-            print_status("Embedding test", "SKIP", "Not implemented", True)
-        except Exception as e:
-            print_status("Embedding test", "ERROR", str(e), False)
+        _info(f"Chat: {chat}")
+        _info(f"Embedding: {embedding}")
+        _info(f"Vector DB: {vector_db}")
+        _info(f"Rerank: {rerank_str}")
 
     # =========================================================================
     # Summary
     # =========================================================================
 
-    print("\n" + "=" * 60)
-
-    if issues:
-        if RICH_AVAILABLE:
-            console.print(f"[red]❌ {len(issues)} issue(s) found:[/red]")
-            for issue in issues:
-                console.print(f"  [red]•[/red] {issue}")
-        else:
-            print(f"❌ {len(issues)} issue(s) found:")
-            for issue in issues:
-                print(f"  • {issue}")
-    elif warnings:
-        if RICH_AVAILABLE:
-            console.print(f"[yellow]⚠️  {len(warnings)} warning(s):[/yellow]")
-            for warning in warnings:
-                console.print(f"  [yellow]•[/yellow] {warning}")
-        else:
-            print(f"⚠️  {len(warnings)} warning(s):")
-            for warning in warnings:
-                print(f"  • {warning}")
-        print("\n✅ All critical checks passed!")
-    else:
-        print("✅ All checks passed!")
-
     print()
 
+    if issues:
+        if RICH:
+            console.print(Panel(
+                "\n".join(f"[red]✗[/red] {issue}" for issue in issues),
+                title="[red]Issues Found[/red]",
+                border_style="red",
+            ))
+        else:
+            print("Issues Found:")
+            for issue in issues:
+                print(f"  ✗ {issue}")
 
-if __name__ == "__main__":
-    typer.run(command)
+        raise typer.Exit(1)
+
+    elif warnings:
+        if RICH:
+            console.print("[yellow]Some warnings, but Fitz should work.[/yellow]")
+        else:
+            print("Some warnings, but Fitz should work.")
+
+        if not test:
+            _info("Run 'fitz doctor --test' to verify connections")
+
+    else:
+        if RICH:
+            console.print("[green bold]✓ All checks passed![/green bold]")
+        else:
+            print("✓ All checks passed!")
+
+        if not test:
+            _info("Run 'fitz doctor --test' to verify connections")

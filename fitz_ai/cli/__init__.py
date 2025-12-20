@@ -1,7 +1,14 @@
+# fitz_ai/cli/v2/__init__.py
 """
-Main fitz CLI module.
+Fitz CLI v2 - Clean, minimal CLI.
 
-Provides the top-level `fitz` command with setup and utility commands.
+Usage:
+    fitz init              # Setup wizard
+    fitz ingest ./docs     # Ingest documents
+    fitz query "question"  # Query knowledge base
+    fitz db                # Inspect collections
+    fitz config            # Show configuration
+    fitz doctor            # System diagnostics
 """
 
 from fitz_ai.cli.cli import app

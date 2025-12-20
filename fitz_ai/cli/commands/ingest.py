@@ -1,390 +1,461 @@
-# fitz_ai/ingest/cli/run.py
+# fitz_ai/cli/commands/ingest.py
 """
-Run command: Ingest documents into vector database.
+Interactive document ingestion.
 
 Usage:
-    fitz ingest ./documents collection
-    fitz ingest ./documents collection --chunker pdf_sections
-    fitz ingest ./documents collection --embedding openai
-    fitz ingest ./documents collection -q
+    fitz ingest              # Interactive mode - prompts for everything
+    fitz ingest ./docs       # Skip source prompt
+    fitz ingest -y           # Use defaults, no prompts
 """
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, List, Optional
 
 import typer
 
+from fitz_ai.core.config import load_config_dict, ConfigNotFoundError
+from fitz_ai.core.paths import FitzPaths
+from fitz_ai.core.registry import available_chunking_plugins
 from fitz_ai.engines.classic_rag.models.chunk import Chunk
 from fitz_ai.ingest.chunking.engine import ChunkingEngine
 from fitz_ai.ingest.config.schema import ChunkerConfig
 from fitz_ai.ingest.ingestion.engine import IngestionEngine
 from fitz_ai.ingest.ingestion.registry import get_ingest_plugin
 from fitz_ai.llm.registry import get_llm_plugin
-from fitz_ai.logging.logger import get_logger
-from fitz_ai.logging.tags import CHUNKING, CLI, EMBEDDING, INGEST, VECTOR_DB
 from fitz_ai.vector_db.registry import get_vector_db_plugin
 from fitz_ai.vector_db.writer import VectorDBWriter
+from fitz_ai.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Try to import rich for progress bars
+# Rich for UI (optional)
 try:
     from rich.console import Console
     from rich.panel import Panel
+    from rich.prompt import Prompt, Confirm, IntPrompt
     from rich.progress import (
-        BarColumn,
         Progress,
         SpinnerColumn,
-        TaskProgressColumn,
         TextColumn,
+        BarColumn,
+        TaskProgressColumn,
         TimeElapsedColumn,
-        TimeRemainingColumn,
     )
-    from rich.table import Table
 
-    RICH_AVAILABLE = True
     console = Console()
+    RICH = True
 except ImportError:
-    RICH_AVAILABLE = False
     console = None
+    RICH = False
 
 
-def _embed_with_progress(
-        embed_plugin: Any,
-        chunks: List[Chunk],
-        show_progress: bool = True,
+# =============================================================================
+# UI Helpers
+# =============================================================================
+
+
+def _print(msg: str, style: str = "") -> None:
+    if RICH and style:
+        console.print(f"[{style}]{msg}[/{style}]")
+    else:
+        print(msg)
+
+
+def _header(title: str) -> None:
+    if RICH:
+        console.print(Panel.fit(f"[bold]{title}[/bold]", border_style="blue"))
+    else:
+        print(f"\n{'=' * 50}")
+        print(title)
+        print('=' * 50)
+
+
+def _step(num: int, total: int, msg: str) -> None:
+    if RICH:
+        console.print(f"[bold blue][{num}/{total}][/bold blue] {msg}")
+    else:
+        print(f"[{num}/{total}] {msg}")
+
+
+def _success(msg: str) -> None:
+    if RICH:
+        console.print(f"[green]✓[/green] {msg}")
+    else:
+        print(f"✓ {msg}")
+
+
+def _error(msg: str) -> None:
+    if RICH:
+        console.print(f"[red]✗[/red] {msg}")
+    else:
+        print(f"✗ {msg}")
+
+
+def _prompt_text(prompt: str, default: str) -> str:
+    if RICH:
+        return Prompt.ask(prompt, default=default)
+    else:
+        response = input(f"{prompt} [{default}]: ").strip()
+        return response if response else default
+
+
+def _prompt_int(prompt: str, default: int) -> int:
+    if RICH:
+        return IntPrompt.ask(prompt, default=default)
+    else:
+        response = input(f"{prompt} [{default}]: ").strip()
+        return int(response) if response else default
+
+
+def _prompt_choice(prompt: str, choices: list[str], default: str) -> str:
+    if RICH:
+        return Prompt.ask(prompt, choices=choices, default=default)
+    else:
+        choices_str = "/".join(choices)
+        while True:
+            response = input(f"{prompt} [{choices_str}] ({default}): ").strip()
+            if not response:
+                return default
+            if response in choices:
+                return response
+            print(f"Choose from: {', '.join(choices)}")
+
+
+def _prompt_path(prompt: str, default: str = ".") -> Path:
+    """Prompt for a path with validation."""
+    while True:
+        if RICH:
+            path_str = Prompt.ask(prompt, default=default)
+        else:
+            response = input(f"{prompt} [{default}]: ").strip()
+            path_str = response if response else default
+
+        path = Path(path_str).expanduser().resolve()
+
+        if path.exists():
+            return path
+        else:
+            _error(f"Path does not exist: {path}")
+            if RICH:
+                if not Confirm.ask("Try again?", default=True):
+                    raise typer.Exit(1)
+            else:
+                retry = input("Try again? [Y/n]: ").strip().lower()
+                if retry in ("n", "no"):
+                    raise typer.Exit(1)
+
+
+# =============================================================================
+# Config Loading
+# =============================================================================
+
+
+def _load_config() -> dict:
+    """Load config or exit with helpful message."""
+    try:
+        return load_config_dict(FitzPaths.config())
+    except ConfigNotFoundError:
+        _error("No config found. Run 'fitz init' first.")
+        raise typer.Exit(1)
+    except Exception as e:
+        _error(f"Failed to load config: {e}")
+        raise typer.Exit(1)
+
+
+# =============================================================================
+# Embedding with Progress
+# =============================================================================
+
+
+def _embed_chunks(
+    embedder: Any,
+    chunks: List[Chunk],
+    show_progress: bool = True,
 ) -> List[List[float]]:
-    """
-    Embed chunks with progress bar.
-
-    Args:
-        embed_plugin: YAML embedding plugin instance with embed() method
-        chunks: List of chunks to embed
-        show_progress: Whether to show progress bar
-
-    Returns:
-        List of embedding vectors
-    """
+    """Embed chunks with progress bar."""
     vectors = []
 
-    if RICH_AVAILABLE and show_progress and len(chunks) > 1:
+    if RICH and show_progress and len(chunks) > 1:
         with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(),
-                TimeElapsedColumn(),
-                TimeRemainingColumn(),
-                console=console,
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            console=console,
         ) as progress:
             task = progress.add_task("Embedding...", total=len(chunks))
-
             for chunk in chunks:
-                vector = embed_plugin.embed(chunk.content)
-                vectors.append(vector)
+                vectors.append(embedder.embed(chunk.content))
                 progress.update(task, advance=1)
     else:
-        # Fallback without rich
         for i, chunk in enumerate(chunks):
-            vector = embed_plugin.embed(chunk.content)
-            vectors.append(vector)
-            if not RICH_AVAILABLE and (i + 1) % 10 == 0:
-                typer.echo(f"  Embedded {i + 1}/{len(chunks)} chunks...")
+            vectors.append(embedder.embed(chunk.content))
+            if show_progress and (i + 1) % 20 == 0:
+                print(f"  Embedded {i + 1}/{len(chunks)}...")
 
     return vectors
 
 
+# =============================================================================
+# Main Command
+# =============================================================================
+
+
 def command(
-        source: Path = typer.Argument(
-            ...,
-            help="Source to ingest (file or directory).",
-        ),
-        collection: str = typer.Argument(
-            "default",
-            help="Target collection name.",
-        ),
-        ingest_plugin: str = typer.Option(
-            "local",
-            "--ingest",
-            "-i",
-            help="Ingestion plugin name.",
-        ),
-        chunker: str = typer.Option(
-            "simple",
-            "--chunker",
-            "-c",
-            help="Chunking plugin to use.",
-        ),
-        chunk_size: int = typer.Option(
-            1000,
-            "--chunk-size",
-            help="Target chunk size in characters.",
-        ),
-        chunk_overlap: int = typer.Option(
-            0,
-            "--chunk-overlap",
-            help="Overlap between chunks in characters.",
-        ),
-        min_section_chars: int = typer.Option(
-            50,
-            "--min-section-chars",
-            help="Minimum section size for section-based chunkers.",
-        ),
-        max_section_chars: int = typer.Option(
-            3000,
-            "--max-section-chars",
-            help="Maximum section size for section-based chunkers.",
-        ),
-        embedding_plugin: str = typer.Option(
-            "cohere",
-            "--embedding",
-            "-e",
-            help="Embedding plugin name.",
-        ),
-        vector_db_plugin: str = typer.Option(
-            "qdrant",
-            "--vector-db",
-            "-v",
-            help="Vector DB plugin name.",
-        ),
-        batch_size: int = typer.Option(
-            50,
-            "--batch-size",
-            "-b",
-            help="Batch size for vector DB writes.",
-        ),
-        quiet: bool = typer.Option(
-            False,
-            "--quiet",
-            "-q",
-            help="Suppress progress output.",
-        ),
+    source: Optional[Path] = typer.Argument(
+        None,
+        help="Source file or directory (will prompt if not provided).",
+    ),
+    non_interactive: bool = typer.Option(
+        False,
+        "--non-interactive",
+        "-y",
+        help="Use defaults without prompting.",
+    ),
 ) -> None:
     """
-    Ingest documents into a vector database.
+    Ingest documents into the vector database.
 
-    Examples:
-        fitz ingest ./docs default
-        fitz ingest ./docs my_knowledge
-        fitz ingest ./docs my_docs --embedding openai
-        fitz ingest ./docs my_docs -q
-        fitz ingest ./doc.pdf papers --chunker pdf_sections
-        fitz ingest ./doc.pdf papers --chunker simple --chunk-size 500
+    Run without arguments for interactive mode:
+        fitz ingest
+
+    Or provide source directly:
+        fitz ingest ./docs
+
+    Use -y for non-interactive mode with defaults:
+        fitz ingest ./docs -y
     """
-    # Validate source path
-    if not source.exists():
-        typer.echo(f"ERROR: source does not exist: {source}")
-        raise typer.Exit(code=1)
+    # =========================================================================
+    # Load config (for defaults)
+    # =========================================================================
 
-    if not (source.is_file() or source.is_dir()):
-        typer.echo(f"ERROR: source is not file or directory: {source}")
-        raise typer.Exit(code=1)
+    config = _load_config()
 
-    logger.info(
-        f"{CLI}{INGEST} Starting ingestion: source='{source}' → collection='{collection}' "
-        f"(ingest='{ingest_plugin}', chunker='{chunker}', embedding='{embedding_plugin}', vdb='{vector_db_plugin}')"
-    )
+    # Extract defaults from config
+    embedding_plugin = config.get("embedding", {}).get("plugin_name", "cohere")
+    vector_db_plugin = config.get("vector_db", {}).get("plugin_name", "qdrant")
+    default_collection = config.get("retriever", {}).get("collection", "default")
 
-    show_progress = not quiet
+    # Get available chunkers
+    available_chunkers = available_chunking_plugins()
+    if not available_chunkers:
+        available_chunkers = ["simple"]
 
+    # =========================================================================
     # Header
-    if show_progress:
-        if RICH_AVAILABLE:
-            console.print(
-                Panel.fit(
-                    f"[bold]Ingesting[/bold] {source}\n"
-                    f"[dim]Collection: {collection}[/dim]\n"
-                    f"[dim]Chunker: {chunker}[/dim]",
-                    title="🔄 fitz ingest",
-                    border_style="blue",
-                )
-            )
-        else:
-            typer.echo()
-            typer.echo("=" * 60)
-            typer.echo(f"Ingesting: {source}")
-            typer.echo(f"Collection: {collection}")
-            typer.echo(f"Chunker: {chunker}")
-            typer.echo("=" * 60)
+    # =========================================================================
 
-    # =========================================================================
-    # Step 1: Ingest documents
-    # =========================================================================
-    if show_progress:
-        if RICH_AVAILABLE:
-            with console.status("[bold blue]Reading documents...", spinner="dots"):
-                IngestPluginCls = get_ingest_plugin(ingest_plugin)
-                ingest_plugin_obj = IngestPluginCls()
-                ingest_engine = IngestionEngine(plugin=ingest_plugin_obj, kwargs={})
-                raw_docs = list(ingest_engine.run(str(source)))
-        else:
-            typer.echo("[1/4] Reading documents...")
-            IngestPluginCls = get_ingest_plugin(ingest_plugin)
-            ingest_plugin_obj = IngestPluginCls()
-            ingest_engine = IngestionEngine(plugin=ingest_plugin_obj, kwargs={})
-            raw_docs = list(ingest_engine.run(str(source)))
+    _header("Fitz Ingest")
+
+    if RICH:
+        console.print(f"[dim]Embedding:[/dim] {embedding_plugin}")
+        console.print(f"[dim]Vector DB:[/dim] {vector_db_plugin}")
+        console.print()
     else:
-        IngestPluginCls = get_ingest_plugin(ingest_plugin)
-        ingest_plugin_obj = IngestPluginCls()
-        ingest_engine = IngestionEngine(plugin=ingest_plugin_obj, kwargs={})
-        raw_docs = list(ingest_engine.run(str(source)))
+        print(f"Embedding: {embedding_plugin}")
+        print(f"Vector DB: {vector_db_plugin}")
+        print()
 
-    logger.info(f"{INGEST} Ingested {len(raw_docs)} raw documents from {source}")
+    # =========================================================================
+    # Interactive Prompts (or use defaults)
+    # =========================================================================
 
-    if show_progress:
-        if RICH_AVAILABLE:
-            console.print(f"[green]✓[/green] Found [bold]{len(raw_docs)}[/bold] documents")
+    if non_interactive:
+        # Use defaults
+        if source is None:
+            _error("Source path required in non-interactive mode.")
+            _print("Usage: fitz ingest ./docs -y", "dim")
+            raise typer.Exit(1)
+
+        collection = default_collection
+        chunker = "simple"
+        chunk_size = 1000
+        chunk_overlap = 0
+
+        _print(f"Source: {source}", "dim")
+        _print(f"Collection: {collection}", "dim")
+        _print(f"Chunker: {chunker} (size={chunk_size})", "dim")
+
+    else:
+        # Interactive mode
+        _print("[bold]Configure ingestion:[/bold]" if RICH else "Configure ingestion:")
+        print()
+
+        # Source path
+        if source is None:
+            source = _prompt_path("Source path (file or directory)", ".")
         else:
-            typer.echo(f"  ✓ Found {len(raw_docs)} documents")
+            # Validate provided source
+            if not source.exists():
+                _error(f"Source does not exist: {source}")
+                raise typer.Exit(1)
+            _print(f"Source: {source}", "dim")
+
+        # Collection name
+        collection = _prompt_text("Collection name", default_collection)
+
+        # Chunking strategy
+        chunker = _prompt_choice(
+            "Chunking strategy",
+            choices=available_chunkers,
+            default="simple",
+        )
+
+        # Chunk size
+        chunk_size = _prompt_int("Chunk size (characters)", 1000)
+
+        # Chunk overlap
+        chunk_overlap = _prompt_int("Chunk overlap", 0)
+
+        print()
+
+    # =========================================================================
+    # Confirm before proceeding
+    # =========================================================================
+
+    if not non_interactive:
+        if RICH:
+            console.print(Panel(
+                f"[bold]Source:[/bold] {source}\n"
+                f"[bold]Collection:[/bold] {collection}\n"
+                f"[bold]Chunker:[/bold] {chunker} (size={chunk_size}, overlap={chunk_overlap})\n"
+                f"[bold]Embedding:[/bold] {embedding_plugin}\n"
+                f"[bold]Vector DB:[/bold] {vector_db_plugin}",
+                title="Summary",
+                border_style="green",
+            ))
+
+            if not Confirm.ask("Proceed with ingestion?", default=True):
+                _print("Cancelled.", "yellow")
+                raise typer.Exit(0)
+        else:
+            print("\nSummary:")
+            print(f"  Source: {source}")
+            print(f"  Collection: {collection}")
+            print(f"  Chunker: {chunker} (size={chunk_size}, overlap={chunk_overlap})")
+            print(f"  Embedding: {embedding_plugin}")
+            print(f"  Vector DB: {vector_db_plugin}")
+
+            confirm = input("\nProceed? [Y/n]: ").strip().lower()
+            if confirm in ("n", "no"):
+                print("Cancelled.")
+                raise typer.Exit(0)
+
+        print()
+
+    # =========================================================================
+    # Step 1: Read documents
+    # =========================================================================
+
+    _step(1, 4, "Reading documents...")
+
+    try:
+        IngestPluginCls = get_ingest_plugin("local")
+        ingest_plugin = IngestPluginCls()
+        ingest_engine = IngestionEngine(plugin=ingest_plugin, kwargs={})
+        raw_docs = list(ingest_engine.run(str(source)))
+    except Exception as e:
+        _error(f"Failed to read documents: {e}")
+        raise typer.Exit(1)
 
     if not raw_docs:
-        typer.echo("No documents found to ingest.")
-        raise typer.Exit(code=0)
+        _error("No documents found.")
+        raise typer.Exit(1)
+
+    _success(f"Found {len(raw_docs)} documents")
 
     # =========================================================================
-    # Step 2: Chunk documents with configured strategy
+    # Step 2: Chunk documents
     # =========================================================================
-    if show_progress:
-        if RICH_AVAILABLE:
-            console.print(f"[bold blue]⏳[/bold blue] Chunking with {chunker}...")
-        else:
-            typer.echo(f"[2/4] Chunking with {chunker}...")
 
-    # Build chunker kwargs dynamically based on CLI parameters AND chunker type
-    chunker_kwargs: Dict[str, Any] = {}
+    _step(2, 4, f"Chunking ({chunker})...")
 
-    # Section-based chunkers use different parameters
-    if "section" in chunker.lower():
-        # Section chunkers: min_section_chars, max_section_chars, preserve_short_sections
-        if min_section_chars != 50:
-            chunker_kwargs["min_section_chars"] = min_section_chars
-        if max_section_chars != 3000:
-            chunker_kwargs["max_section_chars"] = max_section_chars
-        # Always include preserve_short_sections for section chunkers
-        chunker_kwargs["preserve_short_sections"] = True
-    else:
-        # Standard chunkers: chunk_size, chunk_overlap
-        if chunk_size != 1000:
-            chunker_kwargs["chunk_size"] = chunk_size
-        if chunk_overlap > 0:
-            chunker_kwargs["chunk_overlap"] = chunk_overlap
+    chunker_kwargs = {"chunk_size": chunk_size}
+    if chunk_overlap > 0:
+        chunker_kwargs["chunk_overlap"] = chunk_overlap
 
-    # Create chunker config and engine
     chunker_config = ChunkerConfig(plugin_name=chunker, kwargs=chunker_kwargs)
 
     try:
         chunking_engine = ChunkingEngine.from_config(chunker_config)
     except Exception as e:
-        typer.echo(f"ERROR: Failed to initialize chunker '{chunker}': {e}")
-        typer.echo()
-        typer.echo("Available chunkers:")
-        from fitz_ai.core.registry import available_chunking_plugins
-        for name in available_chunking_plugins():
-            typer.echo(f"  • {name}")
-        raise typer.Exit(code=1)
+        _error(f"Failed to initialize chunker: {e}")
+        raise typer.Exit(1)
 
-    # Process all documents through chunking engine
     chunks: List[Chunk] = []
     for raw_doc in raw_docs:
         try:
             doc_chunks = chunking_engine.run(raw_doc)
             chunks.extend(doc_chunks)
         except Exception as e:
-            logger.error(f"{CHUNKING} Failed to chunk document: {e}")
-            typer.echo(f"WARNING: Failed to chunk {getattr(raw_doc, 'path', 'unknown')}: {e}")
+            logger.warning(f"Failed to chunk {getattr(raw_doc, 'path', '?')}: {e}")
 
     if not chunks:
-        typer.echo("ERROR: No chunks were created. Check your documents and chunker settings.")
-        raise typer.Exit(code=1)
+        _error("No chunks created.")
+        raise typer.Exit(1)
 
-    if show_progress:
-        if RICH_AVAILABLE:
-            console.print(f"[green]✓[/green] Created [bold]{len(chunks)}[/bold] chunks")
-        else:
-            typer.echo(f"  ✓ Created {len(chunks)} chunks")
-
-    logger.info(f"{CHUNKING} Created {len(chunks)} chunks using '{chunker}' chunker")
+    _success(f"Created {len(chunks)} chunks")
 
     # =========================================================================
     # Step 3: Generate embeddings
     # =========================================================================
-    if show_progress:
-        if RICH_AVAILABLE:
-            console.print(
-                f"[bold blue]⏳[/bold blue] Generating embeddings with {embedding_plugin}..."
-            )
-        else:
-            typer.echo(f"[3/4] Generating embeddings with {embedding_plugin}...")
 
-    # Use YAML plugin directly - no EmbeddingEngine wrapper needed
-    embed_plugin = get_llm_plugin(plugin_type="embedding", plugin_name=embedding_plugin)
+    _step(3, 4, f"Embedding ({embedding_plugin})...")
 
-    vectors = _embed_with_progress(embed_plugin, chunks, show_progress=show_progress)
+    try:
+        embedder = get_llm_plugin(plugin_type="embedding", plugin_name=embedding_plugin)
+    except Exception as e:
+        _error(f"Failed to initialize embedder: {e}")
+        raise typer.Exit(1)
 
-    logger.info(f"{EMBEDDING} Generated {len(vectors)} embeddings")
+    try:
+        vectors = _embed_chunks(embedder, chunks)
+    except Exception as e:
+        _error(f"Embedding failed: {e}")
+        raise typer.Exit(1)
 
-    if show_progress:
-        if RICH_AVAILABLE:
-            console.print(f"[green]✓[/green] Generated [bold]{len(vectors)}[/bold] embeddings")
-        else:
-            typer.echo(f"  ✓ Generated {len(vectors)} embeddings")
+    _success(f"Generated {len(vectors)} embeddings")
 
     # =========================================================================
     # Step 4: Write to vector DB
     # =========================================================================
-    if show_progress:
-        if RICH_AVAILABLE:
-            console.print(f"[bold blue]⏳[/bold blue] Writing to {vector_db_plugin}...")
-        else:
-            typer.echo(f"[4/4] Writing to {vector_db_plugin}...")
 
-    vdb_plugin = get_vector_db_plugin(vector_db_plugin)
+    _step(4, 4, f"Writing to {vector_db_plugin}...")
 
-    writer = VectorDBWriter(client=vdb_plugin)
+    try:
+        vdb = get_vector_db_plugin(vector_db_plugin)
+        writer = VectorDBWriter(client=vdb)
+    except Exception as e:
+        _error(f"Failed to connect to vector DB: {e}")
+        raise typer.Exit(1)
 
-    # Batch write
-    for i in range(0, len(chunks), batch_size):
-        batch_chunks = chunks[i: i + batch_size]
-        batch_vectors = vectors[i: i + batch_size]
-        writer.upsert(collection=collection, chunks=batch_chunks, vectors=batch_vectors)
-        logger.debug(f"{VECTOR_DB} Wrote batch {i // batch_size + 1}")
+    batch_size = 50
+    try:
+        for i in range(0, len(chunks), batch_size):
+            batch_chunks = chunks[i:i + batch_size]
+            batch_vectors = vectors[i:i + batch_size]
+            writer.upsert(collection=collection, chunks=batch_chunks, vectors=batch_vectors)
+    except Exception as e:
+        _error(f"Failed to write: {e}")
+        raise typer.Exit(1)
 
-    logger.info(f"{VECTOR_DB} Written {len(chunks)} chunks to collection '{collection}'")
-
-    if show_progress:
-        if RICH_AVAILABLE:
-            console.print(f"[green]✓[/green] Written to collection [bold]{collection}[/bold]")
-        else:
-            typer.echo(f"  ✓ Written to collection {collection}")
+    _success(f"Written to '{collection}'")
 
     # =========================================================================
-    # Summary
+    # Done
     # =========================================================================
-    if show_progress:
-        if RICH_AVAILABLE:
-            console.print()
-            console.print("[bold green]✅ Ingestion Complete[/bold green]")
 
-            table = Table(show_header=False, box=None)
-            table.add_column("Key", style="dim")
-            table.add_column("Value", style="bold")
-            table.add_row("Documents", str(len(raw_docs)))
-            table.add_row("Chunks", str(len(chunks)))
-            table.add_row("Chunker", chunker)
-            table.add_row("Collection", collection)
-            table.add_row("Vector DB", vector_db_plugin)
-            table.add_row("Embedding", embedding_plugin)
-            console.print(table)
-
-            console.print(f'\n[dim]Next:[/dim] fitz query "Your question" --collection {collection}')
-        else:
-            typer.echo()
-            typer.echo("✅ Ingestion Complete")
-            typer.echo(f"  Documents: {len(raw_docs)}")
-            typer.echo(f"  Chunks: {len(chunks)}")
-            typer.echo(f"  Chunker: {chunker}")
-            typer.echo(f"  Collection: {collection}")
-            typer.echo(f"  Vector DB: {vector_db_plugin}")
-            typer.echo(f"  Embedding: {embedding_plugin}")
-            typer.echo()
-            typer.echo(f'Next: fitz query "Your question" --collection {collection}')
+    print()
+    if RICH:
+        console.print(Panel.fit(
+            f"[green bold]Success![/green bold]\n\n"
+            f"Ingested [bold]{len(chunks)}[/bold] chunks into [bold]'{collection}'[/bold]\n\n"
+            f"[dim]Query with:[/dim] fitz query \"your question\"",
+            border_style="green",
+        ))
+    else:
+        print(f"Success! Ingested {len(chunks)} chunks into '{collection}'")
+        print(f"\nQuery with: fitz query \"your question\"")
