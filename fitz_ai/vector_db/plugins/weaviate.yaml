@@ -1,0 +1,195 @@
+# fitz_ai/vector_db/plugins/weaviate.yaml
+#
+# Weaviate Vector Database Plugin
+# ===============================
+#
+# Documentation: https://weaviate.io/developers/weaviate
+# API Reference: https://weaviate.io/developers/weaviate/api/rest
+#
+# Weaviate supports both self-hosted and cloud deployments.
+# For Weaviate Cloud Services (WCS): set WEAVIATE_API_KEY
+#
+# Note: Weaviate calls collections "classes". The collection parameter
+# maps to Weaviate class name (PascalCase recommended).
+
+name: weaviate
+type: vector_db
+description: Weaviate vector database - supports local and cloud deployments
+
+# =============================================================================
+# Provider-specific features
+# =============================================================================
+features:
+  # Weaviate generates UUIDs automatically, but accepts any valid UUID
+  requires_uuid_ids: false
+
+  # Weaviate can be auto-detected on local deployments
+  auto_detect: weaviate
+
+  # Weaviate uses classes, not namespaces
+  supports_namespaces: false
+
+# =============================================================================
+# Connection Configuration
+# =============================================================================
+connection:
+  type: http
+  base_url: "http://{{host}}:{{port}}"
+  default_host: localhost
+  default_port: 8080
+
+  auth:
+    type: bearer
+    env_var: WEAVIATE_API_KEY
+    header: Authorization
+    scheme: Bearer
+    optional: true  # Optional for local deployments
+
+# =============================================================================
+# Operations
+# =============================================================================
+operations:
+  # ---------------------------------------------------------------------------
+  # Search for similar vectors (using GraphQL endpoint)
+  # ---------------------------------------------------------------------------
+  # Note: Weaviate's REST API for search is limited. The GraphQL API
+  # is more powerful but requires different handling. This uses the
+  # objects/search endpoint for vector similarity.
+  search:
+    endpoint: /v1/objects
+    method: GET
+    # Query params handled differently - using nearVector search
+    query_params:
+      class: "{{collection}}"
+      nearVector: '{"vector": {{query_vector}}}'
+      limit: "{{limit}}"
+      include: "vector"
+
+    # Alternative: Use the dedicated search endpoint
+    # For better results, we use POST to /v1/graphql with nearVector
+    # This is a simplified REST approach
+    response:
+      results_path: objects
+      mapping:
+        id: id
+        score: _additional.certainty
+        payload: properties
+
+  # ---------------------------------------------------------------------------
+  # Search using GraphQL (preferred method)
+  # ---------------------------------------------------------------------------
+  search_graphql:
+    endpoint: /v1/graphql
+    method: POST
+    body:
+      query: |
+        {
+          Get {
+            {{collection}}(
+              nearVector: {
+                vector: {{query_vector}}
+              }
+              limit: {{limit}}
+            ) {
+              _additional {
+                id
+                certainty
+              }
+            }
+          }
+        }
+
+    response:
+      results_path: data.Get.{{collection}}
+      mapping:
+        id: _additional.id
+        score: _additional.certainty
+        payload: ""  # All other fields become payload
+
+  # ---------------------------------------------------------------------------
+  # Insert or update objects
+  # ---------------------------------------------------------------------------
+  upsert:
+    endpoint: /v1/batch/objects
+    method: POST
+
+    auto_create_collection: true
+    create_collection_endpoint: /v1/schema
+    create_collection_method: POST
+    create_collection_body:
+      class: "{{collection}}"
+      vectorizer: none  # We provide our own vectors
+      properties: []
+
+    body:
+      objects: "{{points}}"
+
+    # Transform standard format to Weaviate format
+    # Standard: {id, vector, payload}
+    # Weaviate: {class, id, vector, properties}
+    point_transform:
+      id: id
+      vector: vector
+      properties: payload
+      class: "{{collection}}"
+
+  # ---------------------------------------------------------------------------
+  # Count objects in class
+  # ---------------------------------------------------------------------------
+  count:
+    endpoint: /v1/graphql
+    method: POST
+    body:
+      query: |
+        {
+          Aggregate {
+            {{collection}} {
+              meta {
+                count
+              }
+            }
+          }
+        }
+    response:
+      count_path: data.Aggregate.{{collection}}.0.meta.count
+
+  # ---------------------------------------------------------------------------
+  # Create a new class (collection)
+  # ---------------------------------------------------------------------------
+  create_collection:
+    endpoint: /v1/schema
+    method: POST
+    body:
+      class: "{{collection}}"
+      vectorizer: none
+      properties: []
+      vectorIndexConfig:
+        distance: cosine
+
+  # ---------------------------------------------------------------------------
+  # Delete class (collection)
+  # ---------------------------------------------------------------------------
+  delete_collection:
+    endpoint: /v1/schema/{{collection}}
+    method: DELETE
+    response:
+      success_codes: [200, 404]
+
+  # ---------------------------------------------------------------------------
+  # List all classes (collections)
+  # ---------------------------------------------------------------------------
+  list_collections:
+    endpoint: /v1/schema
+    method: GET
+    response:
+      collections_path: classes
+      name_field: class
+
+  # ---------------------------------------------------------------------------
+  # Get class (collection) statistics
+  # ---------------------------------------------------------------------------
+  get_stats:
+    endpoint: /v1/schema/{{collection}}
+    method: GET
+    response:
+      stats_path: ""  # Returns the class schema itself

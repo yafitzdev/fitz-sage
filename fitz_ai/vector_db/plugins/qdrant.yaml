@@ -1,9 +1,13 @@
 # fitz_ai/vector_db/plugins/qdrant.yaml
 #
 # Qdrant Vector Database Plugin
+# =============================
 #
 # Documentation: https://qdrant.tech/documentation/
-# Supports both local and cloud deployments.
+# API Reference: https://qdrant.github.io/qdrant/redoc/index.html
+#
+# Supports both local and Qdrant Cloud deployments.
+# For cloud: set QDRANT_API_KEY and pass host/port for your cluster.
 
 name: qdrant
 type: vector_db
@@ -17,9 +21,12 @@ features:
   # String IDs like "doc.txt:0" will be converted to deterministic UUIDs.
   requires_uuid_ids: true
 
-  # Enable auto-detection of Qdrant host/port via fitz_ai.core.detect
+  # Enable auto-detection of Qdrant host/port via fitz_ai.core.detect.
   # Uses get_qdrant_connection() which scans localhost and LAN.
   auto_detect: qdrant
+
+  # Qdrant uses collections natively (not namespaces)
+  supports_namespaces: false
 
 # =============================================================================
 # Connection Configuration
@@ -29,10 +36,12 @@ connection:
   base_url: "http://{{host}}:{{port}}"
   default_host: localhost
   default_port: 6333
+
   auth:
     type: bearer
     env_var: QDRANT_API_KEY
     header: api-key
+    scheme: ""  # Qdrant uses just the key, no "Bearer" prefix
     optional: true  # API key is optional for local deployments
 
 # =============================================================================
@@ -79,6 +88,26 @@ operations:
     # No transformation needed - standard format matches Qdrant
     point_transform:
       identity: true
+
+  # ---------------------------------------------------------------------------
+  # Count points in collection
+  # ---------------------------------------------------------------------------
+  count:
+    endpoint: /collections/{{collection}}
+    method: GET
+    response:
+      count_path: result.points_count
+
+  # ---------------------------------------------------------------------------
+  # Create a new collection
+  # ---------------------------------------------------------------------------
+  create_collection:
+    endpoint: /collections/{{collection}}
+    method: PUT
+    body:
+      vectors:
+        size: "{{vector_size}}"
+        distance: Cosine
 
   # ---------------------------------------------------------------------------
   # Delete entire collection

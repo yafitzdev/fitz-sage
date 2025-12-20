@@ -2,12 +2,30 @@
 """
 Vector DB plugin loader with YAML specifications.
 
-Supports three types of plugins:
-1. HTTP-based (Qdrant, Pinecone) - operations defined in YAML
-2. Local (FAISS) - Python class implementation
-3. Custom - user defines operations in config.yaml
+This module provides a generic, YAML-driven plugin system for HTTP-based
+vector databases. Drop a conforming YAML file into plugins/ and it works
+automatically - no Python code needed.
+
+For local vector DBs (like FAISS), the YAML spec points to a Python class
+that implements the VectorDBPlugin protocol.
 
 Auto-detects connection details from fitz_ai.core.detect (single source of truth).
+
+Usage:
+    from fitz_ai.vector_db import get_vector_db_plugin
+
+    # HTTP-based (loads from YAML)
+    db = get_vector_db_plugin("qdrant")
+    db = get_vector_db_plugin("pinecone", index_name="my-index", project_id="abc123")
+    db = get_vector_db_plugin("weaviate", host="localhost", port=8080)
+
+    # Local (delegates to Python class)
+    db = get_vector_db_plugin("local-faiss")
+
+    # All plugins support the same interface
+    db.upsert("collection", points)
+    results = db.search("collection", vector, limit=10)
+    count = db.count("collection")
 """
 
 from __future__ import annotations
@@ -55,10 +73,6 @@ class VectorDBSpec:
         """Check if this is a local (non-HTTP) plugin."""
         return self.connection.get("type") == "local"
 
-    def is_custom(self) -> bool:
-        """Check if this is a custom plugin (user-defined operations)."""
-        return self.connection.get("type") == "custom"
-
     def get_local_class_path(self) -> Optional[str]:
         """Get Python class path for local implementations."""
         return self.operations.get("python_class")
@@ -70,6 +84,10 @@ class VectorDBSpec:
     def get_auto_detect_service(self) -> Optional[str]:
         """Get the service name for auto-detection (from YAML spec)."""
         return self.features.get("auto_detect")
+
+    def supports_namespaces(self) -> bool:
+        """Check if this vector DB uses namespaces (like Pinecone)."""
+        return self.features.get("supports_namespaces", False)
 
     def build_base_url(self, **kwargs) -> str:
         """Build base URL from template and kwargs."""
@@ -86,7 +104,7 @@ class VectorDBSpec:
                 "environment", self.connection["default_environment"]
             )
 
-        # Add all other kwargs
+        # Add all other kwargs (for Pinecone: index_name, project_id, etc.)
         context.update(kwargs)
 
         return Template(template).render(context)
@@ -99,23 +117,29 @@ class VectorDBSpec:
         auth = self.connection["auth"]
 
         # Optional auth - skip if not present
-        if auth.get("optional") and not os.getenv(auth["env_var"]):
+        if auth.get("optional") and not os.getenv(auth.get("env_var", "")):
             return {}
 
-        env_var = auth["env_var"]
-        api_key = os.getenv(env_var)
+        env_var = auth.get("env_var", "")
+        api_key = os.getenv(env_var) if env_var else None
 
         if not api_key:
             if not auth.get("optional"):
                 raise ValueError(f"{env_var} not set")
             return {}
 
-        if auth["type"] == "bearer":
-            header = auth.get("header", "Authorization")
+        auth_type = auth.get("type", "bearer")
+        header = auth.get("header", "Authorization")
+
+        if auth_type == "bearer":
             scheme = auth.get("scheme", "Bearer")
-            return {header: f"{scheme} {api_key}"}
-        elif auth["type"] == "custom":
-            return {auth["header"]: api_key}
+            if scheme:
+                return {header: f"{scheme} {api_key}"}
+            else:
+                # No scheme (like Qdrant's api-key header)
+                return {header: api_key}
+        elif auth_type == "custom":
+            return {header: api_key}
 
         return {}
 
@@ -124,6 +148,7 @@ class VectorDBSpec:
         if isinstance(template, str):
             if "{{" in template:
                 stripped = template.strip()
+                # Direct variable substitution (no string conversion)
                 if stripped.startswith("{{") and stripped.endswith("}}"):
                     var_name = stripped[2:-2].strip()
                     if var_name in context:
@@ -142,25 +167,48 @@ class VectorDBSpec:
         op_spec = self.operations.get(operation, {})
         transform = op_spec.get("point_transform", {})
 
-        if transform.get("identity"):
+        if not transform or transform.get("identity"):
             return points
 
-        if not transform:
-            return points
+        # Check for flatten_payload (Milvus style)
+        flatten_payload = transform.pop("flatten_payload", False)
 
         transformed = []
         for point in points:
             new_point = {}
+
+            # Apply field mapping
             for target_field, source_field in transform.items():
                 if source_field in point:
                     new_point[target_field] = point[source_field]
+
+            # Flatten payload if requested
+            if flatten_payload and "payload" in point:
+                payload = point.get("payload", {})
+                if isinstance(payload, dict):
+                    for k, v in payload.items():
+                        if k not in new_point:
+                            new_point[k] = v
+
+            # Add collection if specified in transform
+            if "class" in transform and "collection" in self._current_context:
+                new_point["class"] = self._current_context["collection"]
+
             transformed.append(new_point)
 
         return transformed
 
 
 class GenericVectorDBPlugin:
-    """Generic vector DB plugin that executes YAML specifications."""
+    """
+    Generic vector DB plugin that executes YAML specifications.
+
+    This class handles all HTTP-based vector databases by reading their
+    YAML specs and executing the defined operations. No provider-specific
+    code needed - just drop a YAML file.
+
+    Implements the VectorDBPlugin protocol.
+    """
 
     plugin_type = "vector_db"
 
@@ -168,6 +216,9 @@ class GenericVectorDBPlugin:
         self.spec = spec
         self.plugin_name = spec.name
         self.kwargs = kwargs
+
+        # Store for template rendering
+        self.spec._current_context = kwargs
 
         base_url = spec.build_base_url(**kwargs)
         headers = spec.get_auth_headers()
@@ -251,6 +302,7 @@ class GenericVectorDBPlugin:
                 item, mapping.get("payload", ""), default={}, strict=False
             )
 
+            # Restore original ID if we converted it
             if result_payload and "_original_id" in result_payload:
                 result_id = result_payload["_original_id"]
 
@@ -282,6 +334,7 @@ class GenericVectorDBPlugin:
             "vector_dim": self._vector_dim,
             **self.kwargs,
         }
+        self.spec._current_context = context
 
         endpoint = Template(op["endpoint"]).render(context)
         body = self.spec.render_template(op.get("body", {}), context)
@@ -292,6 +345,7 @@ class GenericVectorDBPlugin:
             json=body,
         )
 
+        # Auto-create collection on 404 if configured
         if response.status_code == 404 and op.get("auto_create_collection"):
             self._auto_create_collection(collection, op, context)
             response = self.client.request(
@@ -328,13 +382,50 @@ class GenericVectorDBPlugin:
             json=body,
         )
 
+        # Accept 200, 201, 409 (already exists)
         if response.status_code not in (200, 201, 409):
             response.raise_for_status()
+
+    def count(self, collection: str) -> int:
+        """Get the number of points in a collection."""
+        if "count" not in self.spec.operations:
+            # Fall back to get_stats if count not available
+            if "get_stats" in self.spec.operations:
+                stats = self.get_collection_stats(collection)
+                return stats.get("points_count", stats.get("vectorCount", 0))
+            raise NotImplementedError(f"{self.plugin_name} does not support count")
+
+        op = self.spec.operations["count"]
+        context = {"collection": collection, **self.kwargs}
+
+        endpoint = Template(op["endpoint"]).render(context)
+        body = self.spec.render_template(op.get("body", {}), context)
+
+        if op["method"] == "GET":
+            response = self.client.get(endpoint)
+        else:
+            response = self.client.request(
+                method=op["method"],
+                url=endpoint,
+                json=body if body else None,
+            )
+        response.raise_for_status()
+
+        data = response.json()
+        count_path = op["response"]["count_path"]
+
+        # Handle dynamic path (e.g., namespaces.{{collection}}.vectorCount)
+        resolved_path = Template(count_path).render(context)
+        count = extract_path(data, resolved_path, default=0, strict=False)
+
+        return int(count) if count else 0
 
     def create_collection(self, name: str, vector_size: int) -> None:
         """Create a new collection."""
         if "create_collection" not in self.spec.operations:
-            raise NotImplementedError(f"{self.plugin_name} does not support create_collection")
+            raise NotImplementedError(
+                f"{self.plugin_name} does not support create_collection"
+            )
 
         op = self.spec.operations["create_collection"]
         context = {
@@ -356,58 +447,111 @@ class GenericVectorDBPlugin:
     def delete_collection(self, name: str) -> None:
         """Delete a collection."""
         if "delete_collection" not in self.spec.operations:
-            raise NotImplementedError(f"{self.plugin_name} does not support delete_collection")
+            raise NotImplementedError(
+                f"{self.plugin_name} does not support delete_collection"
+            )
 
         op = self.spec.operations["delete_collection"]
         context = {"collection": name, **self.kwargs}
 
         endpoint = Template(op["endpoint"]).render(context)
+        body = self.spec.render_template(op.get("body", {}), context)
 
-        response = self.client.request(
-            method=op["method"],
-            url=endpoint,
-        )
-        response.raise_for_status()
+        if body:
+            response = self.client.request(
+                method=op["method"],
+                url=endpoint,
+                json=body,
+            )
+        else:
+            response = self.client.request(
+                method=op["method"],
+                url=endpoint,
+            )
+
+        # Check for custom success codes
+        success_codes = op.get("response", {}).get("success_codes", [200])
+        if response.status_code not in success_codes:
+            response.raise_for_status()
 
     def list_collections(self) -> List[str]:
         """List all collections."""
         if "list_collections" not in self.spec.operations:
-            raise NotImplementedError(f"{self.plugin_name} does not support list_collections")
+            raise NotImplementedError(
+                f"{self.plugin_name} does not support list_collections"
+            )
 
         op = self.spec.operations["list_collections"]
         context = {**self.kwargs}
 
         endpoint = Template(op["endpoint"]).render(context)
+        body = self.spec.render_template(op.get("body", {}), context)
 
-        response = self.client.get(endpoint)
+        if op["method"] == "GET":
+            response = self.client.get(endpoint)
+        else:
+            response = self.client.request(
+                method=op["method"],
+                url=endpoint,
+                json=body if body else None,
+            )
         response.raise_for_status()
 
         data = response.json()
-        collections = extract_path(
-            data, op["response"]["collections_path"], default=[], strict=False
-        )
+        collections_path = op["response"]["collections_path"]
+        collections = extract_path(data, collections_path, default=[], strict=False)
 
         if not collections:
             return []
 
-        name_field = op["response"].get("name_field", "name")
-        return [c[name_field] if isinstance(c, dict) else c for c in collections]
+        # Handle different response formats
+        response_config = op.get("response", {})
+
+        # Dict with keys as collection names (Pinecone namespaces)
+        if response_config.get("extract_keys"):
+            if isinstance(collections, dict):
+                return list(collections.keys())
+
+        # List of strings (Milvus)
+        if response_config.get("is_string_list"):
+            return [str(c) for c in collections]
+
+        # List of objects with name field (default)
+        name_field = response_config.get("name_field", "name")
+        return [c[name_field] if isinstance(c, dict) else str(c) for c in collections]
 
     def get_collection_stats(self, collection: str) -> Dict[str, Any]:
         """Get statistics for a collection."""
         if "get_stats" not in self.spec.operations:
-            raise NotImplementedError(f"{self.plugin_name} does not support get_collection_stats")
+            raise NotImplementedError(
+                f"{self.plugin_name} does not support get_collection_stats"
+            )
 
         op = self.spec.operations["get_stats"]
         context = {"collection": collection, **self.kwargs}
 
         endpoint = Template(op["endpoint"]).render(context)
+        body = self.spec.render_template(op.get("body", {}), context)
 
-        response = self.client.get(endpoint)
+        if op["method"] == "GET":
+            response = self.client.get(endpoint)
+        else:
+            response = self.client.request(
+                method=op["method"],
+                url=endpoint,
+                json=body if body else None,
+            )
         response.raise_for_status()
 
         data = response.json()
-        return extract_path(data, op["response"]["stats_path"], default={}, strict=False)
+        stats_path = op["response"]["stats_path"]
+
+        if not stats_path:
+            return data
+
+        # Handle dynamic path
+        resolved_path = Template(stats_path).render(context)
+        return extract_path(data, resolved_path, default={}, strict=False)
 
     def __del__(self):
         """Cleanup HTTP client."""
@@ -424,12 +568,16 @@ def load_vector_db_spec(plugin_name: str) -> VectorDBSpec:
     yaml_path = plugins_dir / f"{plugin_name}.yaml"
 
     if not yaml_path.exists():
-        raise ValueError(f"Vector DB plugin '{plugin_name}' not found. " f"Expected: {yaml_path}")
+        raise ValueError(
+            f"Vector DB plugin '{plugin_name}' not found. Expected: {yaml_path}"
+        )
 
     return VectorDBSpec(yaml_path)
 
 
-def _get_auto_detected_kwargs(spec: VectorDBSpec, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+def _get_auto_detected_kwargs(
+    spec: VectorDBSpec, kwargs: Dict[str, Any]
+) -> Dict[str, Any]:
     """
     Auto-detect connection parameters based on YAML spec.
 
@@ -455,6 +603,8 @@ def _get_auto_detected_kwargs(spec: VectorDBSpec, kwargs: Dict[str, Any]) -> Dic
         detection_functions = {
             "qdrant": detect.get_qdrant_connection,
             "ollama": detect.get_ollama_connection,
+            "weaviate": getattr(detect, "get_weaviate_connection", None),
+            "milvus": getattr(detect, "get_milvus_connection", None),
         }
 
         detect_func = detection_functions.get(auto_detect_service)
@@ -466,8 +616,8 @@ def _get_auto_detected_kwargs(spec: VectorDBSpec, kwargs: Dict[str, Any]) -> Dic
             if "port" not in result:
                 result["port"] = detected_port
 
-    except ImportError:
-        # fitz_ai.core.detect not available, fall back to YAML defaults
+    except (ImportError, AttributeError):
+        # Detection not available, fall back to YAML defaults
         pass
 
     return result
@@ -477,21 +627,36 @@ def create_vector_db_plugin(plugin_name: str, **kwargs):
     """
     Create a vector DB plugin from YAML specification.
 
-    Supports three types of plugins:
-    1. HTTP-based (Qdrant, Pinecone) - operations defined in YAML
-    2. Local (FAISS) - Python class implementation
-    3. Custom - user defines operations in config.yaml kwargs
-
     Connection details are AUTO-DETECTED based on the YAML spec's
     'features.auto_detect' field. This is provider-agnostic.
 
+    For HTTP-based plugins: Returns GenericVectorDBPlugin
+    For local plugins: Returns the specific Python implementation
+
     Args:
-        plugin_name: Name of the plugin (e.g., 'qdrant', 'custom', 'local_faiss')
-        **kwargs: Plugin configuration. For 'custom' plugin, must include
-                  'base_url', 'upsert', and 'search' operation definitions.
+        plugin_name: Name of the plugin (e.g., 'qdrant', 'pinecone', 'local-faiss')
+        **kwargs: Plugin configuration (host, port, index_name, etc.)
 
     Returns:
         Vector DB plugin instance
+
+    Examples:
+        # Auto-detect Qdrant connection
+        db = create_vector_db_plugin("qdrant")
+
+        # Explicit connection
+        db = create_vector_db_plugin("qdrant", host="localhost", port=6333)
+
+        # Pinecone (cloud service)
+        db = create_vector_db_plugin(
+            "pinecone",
+            index_name="my-index",
+            project_id="abc123",
+            environment="us-east-1-aws"
+        )
+
+        # Local FAISS
+        db = create_vector_db_plugin("local-faiss")
     """
     spec = load_vector_db_spec(plugin_name)
 
@@ -499,7 +664,9 @@ def create_vector_db_plugin(plugin_name: str, **kwargs):
     if spec.is_local():
         class_path = spec.get_local_class_path()
         if not class_path:
-            raise ValueError(f"Local plugin '{plugin_name}' missing python_class specification")
+            raise ValueError(
+                f"Local plugin '{plugin_name}' missing python_class specification"
+            )
 
         module_path, class_name = class_path.rsplit(".", 1)
         module = importlib.import_module(module_path)
@@ -507,15 +674,14 @@ def create_vector_db_plugin(plugin_name: str, **kwargs):
 
         return PluginClass(**kwargs)
 
-    # Handle custom plugins (user-defined operations in config.yaml)
-    if spec.is_custom():
-        from fitz_ai.vector_db.custom import CustomVectorDB
-        return CustomVectorDB(**kwargs)
-
     # For HTTP-based plugins, auto-detect connection based on YAML spec
     resolved_kwargs = _get_auto_detected_kwargs(spec, kwargs)
 
     return GenericVectorDBPlugin(spec, **resolved_kwargs)
+
+
+# Convenience alias
+get_vector_db_plugin = create_vector_db_plugin
 
 
 __all__ = [
@@ -523,4 +689,5 @@ __all__ = [
     "GenericVectorDBPlugin",
     "load_vector_db_spec",
     "create_vector_db_plugin",
+    "get_vector_db_plugin",
 ]

@@ -1,0 +1,153 @@
+# fitz_ai/vector_db/plugins/milvus.yaml
+#
+# Milvus Vector Database Plugin
+# =============================
+#
+# Documentation: https://milvus.io/docs/
+# API Reference: https://milvus.io/api-reference/restful/v2.3.x/About.md
+#
+# Milvus supports both self-hosted and Zilliz Cloud deployments.
+# Note: Milvus v2.3+ includes a RESTful API. Earlier versions need gRPC.
+#
+# For Zilliz Cloud: set ZILLIZ_API_KEY
+# For self-hosted: typically no auth required
+
+name: milvus
+type: vector_db
+description: Milvus vector database - supports local and Zilliz Cloud
+
+# =============================================================================
+# Provider-specific features
+# =============================================================================
+features:
+  # Milvus accepts any int64 as ID (or auto-generates)
+  requires_uuid_ids: false
+
+  # Milvus can be auto-detected on local deployments
+  auto_detect: milvus
+
+  # Milvus uses collections natively
+  supports_namespaces: false
+
+# =============================================================================
+# Connection Configuration
+# =============================================================================
+connection:
+  type: http
+  # Milvus RESTful API runs on port 9091 by default (separate from gRPC 19530)
+  base_url: "http://{{host}}:{{port}}/v1"
+  default_host: localhost
+  default_port: 9091
+
+  auth:
+    type: bearer
+    env_var: MILVUS_API_KEY
+    header: Authorization
+    scheme: Bearer
+    optional: true  # Optional for local deployments
+
+# =============================================================================
+# Operations
+# =============================================================================
+operations:
+  # ---------------------------------------------------------------------------
+  # Search for similar vectors
+  # ---------------------------------------------------------------------------
+  search:
+    endpoint: /vector/search
+    method: POST
+    body:
+      collectionName: "{{collection}}"
+      vector: "{{query_vector}}"
+      limit: "{{limit}}"
+      outputFields:
+        - "*"
+
+    response:
+      results_path: data
+      mapping:
+        id: id
+        score: distance
+        payload: ""  # Milvus returns all fields at top level
+
+  # ---------------------------------------------------------------------------
+  # Insert vectors (Milvus uses insert, not upsert by default)
+  # ---------------------------------------------------------------------------
+  upsert:
+    endpoint: /vector/insert
+    method: POST
+
+    # Auto-create collection if needed
+    auto_create_collection: true
+    create_collection_endpoint: /vector/collections/create
+    create_collection_method: POST
+    create_collection_body:
+      collectionName: "{{collection}}"
+      dimension: "{{vector_dim}}"
+      metricType: COSINE
+
+    body:
+      collectionName: "{{collection}}"
+      data: "{{points}}"
+
+    # Transform standard format to Milvus format
+    # Standard: {id, vector, payload}
+    # Milvus v2 REST: {id, vector, ...fields}
+    point_transform:
+      id: id
+      vector: vector
+      # Payload fields get flattened to top level
+      flatten_payload: true
+
+  # ---------------------------------------------------------------------------
+  # Count vectors in collection
+  # ---------------------------------------------------------------------------
+  count:
+    endpoint: /vector/collections/{{collection}}/stats
+    method: GET
+    response:
+      count_path: data.row_count
+
+  # ---------------------------------------------------------------------------
+  # Create a new collection
+  # ---------------------------------------------------------------------------
+  create_collection:
+    endpoint: /vector/collections/create
+    method: POST
+    body:
+      collectionName: "{{collection}}"
+      dimension: "{{vector_size}}"
+      metricType: COSINE
+      primaryField: id
+      vectorField: vector
+
+  # ---------------------------------------------------------------------------
+  # Delete collection
+  # ---------------------------------------------------------------------------
+  delete_collection:
+    endpoint: /vector/collections/drop
+    method: POST
+    body:
+      collectionName: "{{collection}}"
+    response:
+      success_codes: [200]
+
+  # ---------------------------------------------------------------------------
+  # List all collections
+  # ---------------------------------------------------------------------------
+  list_collections:
+    endpoint: /vector/collections
+    method: GET
+    response:
+      collections_path: data
+      # Milvus returns list of collection names directly
+      is_string_list: true
+
+  # ---------------------------------------------------------------------------
+  # Get collection statistics
+  # ---------------------------------------------------------------------------
+  get_stats:
+    endpoint: /vector/collections/{{collection}}/stats
+    method: GET
+    response:
+      stats_path: data
