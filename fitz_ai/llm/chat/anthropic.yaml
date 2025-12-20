@@ -1,17 +1,25 @@
 # fitz_ai/llm/chat/anthropic.yaml
-# Anthropic Chat Plugin - Messages API
 #
+# Anthropic Chat Plugin - Messages API
 # Documentation: https://docs.anthropic.com/en/api/messages
-# Required: ANTHROPIC_API_KEY environment variable
 
+# =============================================================================
+# IDENTITY
+# =============================================================================
 plugin_name: "anthropic"
 plugin_type: "chat"
 version: "1.0"
 
+# =============================================================================
+# PROVIDER
+# =============================================================================
 provider:
   name: "anthropic"
   base_url: "https://api.anthropic.com/v1"
 
+# =============================================================================
+# AUTHENTICATION
+# =============================================================================
 auth:
   type: "header"
   header_name: "x-api-key"
@@ -19,16 +27,35 @@ auth:
   env_vars:
     - "ANTHROPIC_API_KEY"
 
+# =============================================================================
+# REQUIRED ENVIRONMENT VARIABLES (optional section)
+# =============================================================================
+required_env: []
+
+# =============================================================================
+# HEALTH CHECK (optional section)
+# =============================================================================
+health_check: null
+
+# =============================================================================
+# ENDPOINT
+# =============================================================================
 endpoint:
   path: "/messages"
   method: "POST"
   timeout: 120
 
+# =============================================================================
+# DEFAULTS
+# =============================================================================
 defaults:
   model: "claude-sonnet-4-20250514"
-  max_tokens: 4096
   temperature: 0.2
+  max_tokens: 4096
 
+# =============================================================================
+# REQUEST CONFIGURATION
+# =============================================================================
 request:
   messages_transform: "anthropic_chat"
   static_fields:
@@ -38,8 +65,13 @@ request:
     temperature: "temperature"
     max_tokens: "max_tokens"
 
+# =============================================================================
+# RESPONSE CONFIGURATION
+# =============================================================================
 response:
   content_path: "content[0].text"
+  is_array: false
+  array_index: 0
   metadata_paths:
     stop_reason: "stop_reason"
     tokens_input: "usage.input_tokens"

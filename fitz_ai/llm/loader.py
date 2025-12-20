@@ -2,7 +2,10 @@
 """
 YAML plugin loader with schema validation.
 
-Loads YAML plugin definitions and validates them against Pydantic schemas.
+Loads YAML plugin definitions and validates them against:
+1. Pydantic schemas (type checking)
+2. Master schema files (field completeness)
+
 Invalid plugins fail fast with clear error messages.
 """
 from __future__ import annotations
@@ -33,6 +36,11 @@ _SPEC_CLASSES: dict[str, type[PluginSpec]] = {
 }
 
 
+# =============================================================================
+# Exceptions
+# =============================================================================
+
+
 class YAMLPluginError(Exception):
     """Base error for YAML plugin operations."""
 
@@ -61,9 +69,19 @@ class YAMLPluginValidationError(YAMLPluginError, ValueError):
         super().__init__("\n".join(error_lines))
 
 
+# =============================================================================
+# Path Resolution
+# =============================================================================
+
+
 def _get_yaml_path(plugin_type: str, plugin_name: str) -> Path:
     """Get the path to a YAML plugin file."""
     return YAML_PLUGINS_DIR / plugin_type / f"{plugin_name}.yaml"
+
+
+# =============================================================================
+# YAML Loading
+# =============================================================================
 
 
 def _load_yaml_file(path: Path) -> dict:
@@ -83,6 +101,78 @@ def _load_yaml_file(path: Path) -> dict:
     return data
 
 
+# =============================================================================
+# Schema Defaults Application
+# =============================================================================
+
+
+def _apply_defaults(data: dict, plugin_type: str) -> dict:
+    """
+    Apply defaults from master schema to plugin data.
+
+    Missing optional fields get their default values from the schema YAML.
+    """
+    try:
+        from fitz_ai.llm.schema_defaults import get_nested_defaults
+        defaults = get_nested_defaults(plugin_type)
+    except (ImportError, FileNotFoundError):
+        # Schema files not available, skip defaults
+        return data
+
+    return _deep_merge(defaults, data)
+
+
+def _deep_merge(defaults: dict, overrides: dict) -> dict:
+    """
+    Deep merge two dicts. Values in overrides take precedence.
+    """
+    result = dict(defaults)
+
+    for key, value in overrides.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+
+    return result
+
+
+# =============================================================================
+# Schema Validation
+# =============================================================================
+
+
+def _validate_against_master_schema(data: dict, plugin_type: str, path: Path) -> list[str]:
+    """
+    Validate plugin data against master schema.
+
+    Returns list of warning messages (non-fatal).
+    """
+    warnings = []
+
+    try:
+        from fitz_ai.llm.schema_defaults import validate_plugin_fields
+        errors = validate_plugin_fields(plugin_type, data, strict=False)
+
+        for error in errors:
+            if "Missing required field" in error:
+                # Required field missing is a hard error, will be caught by Pydantic
+                pass
+            else:
+                warnings.append(error)
+
+    except (ImportError, FileNotFoundError):
+        # Schema files not available, skip validation
+        pass
+
+    return warnings
+
+
+# =============================================================================
+# Plugin Loading
+# =============================================================================
+
+
 @lru_cache(maxsize=256)
 def _load_plugin_cached(plugin_type: str, plugin_name: str) -> PluginSpec:
     """Load and validate a plugin specification (cached)."""
@@ -92,14 +182,31 @@ def _load_plugin_cached(plugin_type: str, plugin_name: str) -> PluginSpec:
             f"Must be one of: {sorted(_SPEC_CLASSES.keys())}"
         )
 
+    yaml_path = _get_yaml_path(plugin_type, plugin_name)
+    raw_data = _load_yaml_file(yaml_path)
+
+    # Apply defaults from master schema
+    data = _apply_defaults(raw_data, plugin_type)
+
+    # Validate against master schema (warnings only)
+    warnings = _validate_against_master_schema(data, plugin_type, yaml_path)
+    for warning in warnings:
+        logger.warning(f"Plugin {plugin_name}: {warning}")
+
+    # Validate with Pydantic
     spec_class = _SPEC_CLASSES[plugin_type]
-    path = _get_yaml_path(plugin_type, plugin_name)
-    data = _load_yaml_file(path)
 
     try:
-        return spec_class.model_validate(data)
+        spec = spec_class.model_validate(data)
     except ValidationError as e:
-        raise YAMLPluginValidationError(path, e.errors()) from e
+        raise YAMLPluginValidationError(yaml_path, e.errors()) from e
+
+    return spec
+
+
+# =============================================================================
+# Public API
+# =============================================================================
 
 
 @overload
@@ -120,39 +227,43 @@ def load_plugin(plugin_type: str, plugin_name: str) -> PluginSpec: ...
 
 def load_plugin(plugin_type: str, plugin_name: str) -> PluginSpec:
     """
-    Load and validate a plugin specification.
+    Load a plugin specification from YAML.
 
     Args:
-        plugin_type: Type of plugin ("chat", "embedding", "rerank")
-        plugin_name: Name of the plugin (e.g., "cohere", "openai")
+        plugin_type: "chat", "embedding", or "rerank"
+        plugin_name: Plugin name (e.g., "openai", "cohere")
 
     Returns:
-        Validated PluginSpec
+        Validated PluginSpec instance
+
+    Raises:
+        YAMLPluginNotFoundError: If YAML file doesn't exist
+        YAMLPluginValidationError: If validation fails
+
+    Example:
+        >>> spec = load_plugin("chat", "openai")
+        >>> spec.provider.base_url
+        'https://api.openai.com/v1'
     """
     return _load_plugin_cached(plugin_type, plugin_name)
 
 
-def list_yaml_plugins(plugin_type: str) -> list[str]:
+def list_plugins(plugin_type: str) -> list[str]:
     """
-    List available YAML plugins for a type.
+    List available plugins of a given type.
 
     Args:
-        plugin_type: Type of plugin ("chat", "embedding", "rerank")
+        plugin_type: "chat", "embedding", or "rerank"
 
     Returns:
-        Sorted list of plugin names
+        List of plugin names (without .yaml extension)
     """
-    if plugin_type not in _SPEC_CLASSES:
-        raise ValueError(
-            f"Invalid plugin type: {plugin_type!r}. "
-            f"Must be one of: {sorted(_SPEC_CLASSES.keys())}"
-        )
+    plugins_dir = YAML_PLUGINS_DIR / plugin_type
 
-    plugin_dir = YAML_PLUGINS_DIR / plugin_type
-    if not plugin_dir.exists():
+    if not plugins_dir.exists():
         return []
 
-    return sorted(p.stem for p in plugin_dir.glob("*.yaml") if not p.stem.startswith("_"))
+    return sorted(f.stem for f in plugins_dir.glob("*.yaml"))
 
 
 def clear_cache() -> None:
@@ -160,11 +271,17 @@ def clear_cache() -> None:
     _load_plugin_cached.cache_clear()
 
 
+# =============================================================================
+# Exports
+# =============================================================================
+
 __all__ = [
-    "load_plugin",
-    "list_yaml_plugins",
-    "clear_cache",
+    # Exceptions
     "YAMLPluginError",
     "YAMLPluginNotFoundError",
     "YAMLPluginValidationError",
+    # Functions
+    "load_plugin",
+    "list_plugins",
+    "clear_cache",
 ]

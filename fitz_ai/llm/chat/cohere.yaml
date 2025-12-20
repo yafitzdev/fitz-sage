@@ -1,24 +1,30 @@
 # fitz_ai/llm/chat/cohere.yaml
-# Cohere Chat Plugin - v1 Chat API
 #
+# Cohere Chat Plugin - v1 Chat API
 # Documentation: https://docs.cohere.com/reference/chat
-# Required: COHERE_API_KEY environment variable
 #
 # Available models (as of 2025):
 #   - command-a-03-2025       (newest, best performance)
 #   - command-r-plus-08-2024  (powerful, complex tasks)
 #   - command-r-08-2024       (efficient, general purpose)
-#
-# Note: command-r-plus was retired September 15, 2025
 
+# =============================================================================
+# IDENTITY
+# =============================================================================
 plugin_name: "cohere"
 plugin_type: "chat"
 version: "1.0"
 
+# =============================================================================
+# PROVIDER
+# =============================================================================
 provider:
   name: "cohere"
   base_url: "https://api.cohere.ai/v1"
 
+# =============================================================================
+# AUTHENTICATION
+# =============================================================================
 auth:
   type: "bearer"
   header_name: "Authorization"
@@ -26,15 +32,35 @@ auth:
   env_vars:
     - "COHERE_API_KEY"
 
+# =============================================================================
+# REQUIRED ENVIRONMENT VARIABLES (optional section)
+# =============================================================================
+required_env: []
+
+# =============================================================================
+# HEALTH CHECK (optional section)
+# =============================================================================
+health_check: null
+
+# =============================================================================
+# ENDPOINT
+# =============================================================================
 endpoint:
   path: "/chat"
   method: "POST"
   timeout: 120
 
+# =============================================================================
+# DEFAULTS
+# =============================================================================
 defaults:
   model: "command-r-plus-08-2024"
   temperature: 0.2
+  max_tokens: null
 
+# =============================================================================
+# REQUEST CONFIGURATION
+# =============================================================================
 request:
   messages_transform: "cohere_chat"
   static_fields:
@@ -44,8 +70,13 @@ request:
     temperature: "temperature"
     max_tokens: "max_tokens"
 
+# =============================================================================
+# RESPONSE CONFIGURATION
+# =============================================================================
 response:
   content_path: "text"
+  is_array: false
+  array_index: 0
   metadata_paths:
     finish_reason: "finish_reason"
     tokens_input: "meta.billed_units.input_tokens"

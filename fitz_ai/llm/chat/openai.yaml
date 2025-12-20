@@ -1,17 +1,25 @@
 # fitz_ai/llm/chat/openai.yaml
-# OpenAI Chat Plugin - Chat Completions API
 #
+# OpenAI Chat Plugin - Chat Completions API
 # Documentation: https://platform.openai.com/docs/api-reference/chat
-# Required: OPENAI_API_KEY environment variable
 
+# =============================================================================
+# IDENTITY
+# =============================================================================
 plugin_name: "openai"
 plugin_type: "chat"
 version: "1.0"
 
+# =============================================================================
+# PROVIDER
+# =============================================================================
 provider:
   name: "openai"
   base_url: "https://api.openai.com/v1"
 
+# =============================================================================
+# AUTHENTICATION
+# =============================================================================
 auth:
   type: "bearer"
   header_name: "Authorization"
@@ -19,15 +27,35 @@ auth:
   env_vars:
     - "OPENAI_API_KEY"
 
+# =============================================================================
+# REQUIRED ENVIRONMENT VARIABLES (optional section)
+# =============================================================================
+required_env: []
+
+# =============================================================================
+# HEALTH CHECK (optional section)
+# =============================================================================
+health_check: null
+
+# =============================================================================
+# ENDPOINT
+# =============================================================================
 endpoint:
   path: "/chat/completions"
   method: "POST"
   timeout: 120
 
+# =============================================================================
+# DEFAULTS
+# =============================================================================
 defaults:
   model: "gpt-4o-mini"
   temperature: 0.2
+  max_tokens: null
 
+# =============================================================================
+# REQUEST CONFIGURATION
+# =============================================================================
 request:
   messages_transform: "openai_chat"
   static_fields: {}
@@ -36,9 +64,13 @@ request:
     temperature: "temperature"
     max_tokens: "max_tokens"
 
+# =============================================================================
+# RESPONSE CONFIGURATION
+# =============================================================================
 response:
   content_path: "choices[0].message.content"
   is_array: false
+  array_index: 0
   metadata_paths:
     finish_reason: "choices[0].finish_reason"
     tokens_input: "usage.prompt_tokens"

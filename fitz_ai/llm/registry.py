@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any, List
 
 from fitz_ai.core.registry import LLMRegistryError
-from fitz_ai.llm.loader import YAMLPluginNotFoundError, list_yaml_plugins
+from fitz_ai.llm.loader import YAMLPluginNotFoundError, list_plugins
 from fitz_ai.llm.runtime import create_yaml_client
 
 VALID_LLM_TYPES = frozenset({"chat", "embedding", "rerank"})
@@ -38,7 +38,7 @@ def available_llm_plugins(plugin_type: str) -> List[str]:
             f"Must be one of: {sorted(VALID_LLM_TYPES)}"
         )
 
-    return sorted(list_yaml_plugins(plugin_type))
+    return sorted(list_plugins(plugin_type))
 
 
 def get_llm_plugin(*, plugin_name: str, plugin_type: str, **kwargs: Any) -> Any:

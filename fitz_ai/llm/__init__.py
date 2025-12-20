@@ -11,7 +11,7 @@ from fitz_ai.llm.loader import (
     YAMLPluginNotFoundError,
     YAMLPluginValidationError,
     clear_cache,
-    list_yaml_plugins,
+    list_plugins,
     load_plugin,
 )
 from fitz_ai.llm.registry import LLMRegistryError, available_llm_plugins, get_llm_plugin
@@ -30,7 +30,7 @@ __all__ = [
     "LLMRegistryError",
     # Loader
     "load_plugin",
-    "list_yaml_plugins",
+    "list_plugins",
     "clear_cache",
     # Errors
     "YAMLPluginError",

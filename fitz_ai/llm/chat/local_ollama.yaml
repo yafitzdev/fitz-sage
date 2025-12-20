@@ -1,38 +1,64 @@
-# fitz_ai/llm/chat/ollama.yaml
-# Ollama Chat Plugin - Local LLM
+# fitz_ai/llm/chat/local_ollama.yaml
 #
+# Ollama Chat Plugin - Local LLM
 # Documentation: https://github.com/ollama/ollama/blob/main/docs/api.md
-# Required: Ollama running locally (no API key needed)
+# No API key required - runs locally
 
+# =============================================================================
+# IDENTITY
+# =============================================================================
 plugin_name: "ollama"
 plugin_type: "chat"
 version: "1.0"
 
+# =============================================================================
+# PROVIDER
+# =============================================================================
 provider:
   name: "ollama"
   base_url: "http://localhost:11434"
 
+# =============================================================================
+# AUTHENTICATION
+# =============================================================================
 auth:
   type: "none"
   header_name: ""
   header_format: ""
   env_vars: []
 
-# Health check to verify Ollama is running
+# =============================================================================
+# REQUIRED ENVIRONMENT VARIABLES (optional section)
+# =============================================================================
+required_env: []
+
+# =============================================================================
+# HEALTH CHECK (optional section)
+# =============================================================================
 health_check:
   path: "/api/tags"
   method: "GET"
   timeout: 2
 
+# =============================================================================
+# ENDPOINT
+# =============================================================================
 endpoint:
   path: "/api/chat"
   method: "POST"
   timeout: 120
 
+# =============================================================================
+# DEFAULTS
+# =============================================================================
 defaults:
   model: "llama3.2"
   temperature: 0.2
+  max_tokens: null
 
+# =============================================================================
+# REQUEST CONFIGURATION
+# =============================================================================
 request:
   messages_transform: "ollama_chat"
   static_fields:
@@ -40,9 +66,15 @@ request:
   param_map:
     model: "model"
     temperature: "options.temperature"
+    max_tokens: "max_tokens"
 
+# =============================================================================
+# RESPONSE CONFIGURATION
+# =============================================================================
 response:
   content_path: "message.content"
+  is_array: false
+  array_index: 0
   metadata_paths:
     done: "done"
     total_duration: "total_duration"

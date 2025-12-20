@@ -5,6 +5,10 @@ Pydantic schemas for YAML plugin validation.
 These schemas ensure YAML plugin definitions are correct BEFORE runtime,
 catching typos, missing fields, and invalid values early.
 
+IMPORTANT: Default values are loaded from the master schema files in
+fitz_ai/llm/schemas/. This keeps defaults in ONE place (the YAML files)
+rather than scattered across Python code.
+
 Schema hierarchy:
 - BasePluginSpec: Common fields shared by all plugin types
   - ChatPluginSpec: Chat/completion plugins
@@ -14,9 +18,38 @@ Schema hierarchy:
 from __future__ import annotations
 
 from enum import Enum
+from functools import lru_cache
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+# =============================================================================
+# Load defaults from schema YAML files
+# =============================================================================
+
+
+@lru_cache(maxsize=8)
+def _load_schema_defaults(plugin_type: str) -> dict[str, Any]:
+    """Load defaults from schema YAML file."""
+    try:
+        from fitz_ai.llm.schema_defaults import get_nested_defaults
+        return get_nested_defaults(plugin_type)
+    except (ImportError, FileNotFoundError):
+        # Fallback to hardcoded defaults if schema files not available
+        return {}
+
+
+def _get_default(plugin_type: str, *path: str, fallback: Any = None) -> Any:
+    """Get a default value from schema, with fallback."""
+    defaults = _load_schema_defaults(plugin_type)
+    current = defaults
+    for key in path:
+        if isinstance(current, dict) and key in current:
+            current = current[key]
+        else:
+            return fallback
+    return current if current is not None else fallback
+
 
 # =============================================================================
 # Enums
@@ -290,6 +323,7 @@ class RerankPluginSpec(BasePluginSpec):
     """Complete specification for a rerank plugin."""
 
     plugin_type: Literal["rerank"] = "rerank"
+    health_check: HealthCheckConfig | None = None
 
     request: RerankRequestConfig
     response: RerankResponseConfig
@@ -301,6 +335,10 @@ class RerankPluginSpec(BasePluginSpec):
 
 PluginSpec = ChatPluginSpec | EmbeddingPluginSpec | RerankPluginSpec
 
+
+# =============================================================================
+# Exports
+# =============================================================================
 
 __all__ = [
     # Enums

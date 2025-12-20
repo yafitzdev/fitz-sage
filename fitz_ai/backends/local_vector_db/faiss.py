@@ -11,8 +11,9 @@ Design principles:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -21,6 +22,14 @@ from fitz_ai.logging.tags import VECTOR_DB
 from fitz_ai.vector_db.base import SearchResult
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class _FaissRecord:
+    """Simple record object for FAISS scroll results."""
+
+    id: str
+    payload: Dict[str, Any]
 
 
 class FaissLocalVectorDB:
@@ -66,7 +75,8 @@ class FaissLocalVectorDB:
             self._faiss = faiss
         except ImportError:
             raise ImportError(
-                "faiss is required for local-faiss plugin. " "Install with: pip install faiss-cpu"
+                "faiss is required for local-faiss plugin. "
+                "Install with: pip install faiss-cpu"
             )
 
         # Resolve path
@@ -82,8 +92,8 @@ class FaissLocalVectorDB:
         # Lazy initialization - these are set on first upsert
         self._dim: Optional[int] = None
         self._index: Optional[Any] = None  # faiss.IndexFlatL2
-        self._payloads: list[dict] = []
-        self._ids: list[str] = []
+        self._payloads: List[Dict] = []
+        self._ids: List[str] = []
 
         # File paths
         self._index_path = self._base_path / "index.faiss"
@@ -95,7 +105,8 @@ class FaissLocalVectorDB:
         self._try_load()
 
         logger.info(
-            f"{VECTOR_DB} Local FAISS initialized (path={self._base_path}, dim={self._dim or 'auto'})"
+            f"{VECTOR_DB} Local FAISS initialized "
+            f"(path={self._base_path}, dim={self._dim or 'auto'})"
         )
 
     def _try_load(self) -> bool:
@@ -166,11 +177,25 @@ class FaissLocalVectorDB:
 
         logger.info(f"{VECTOR_DB} Initialized new FAISS index (dim={dim})")
 
+    def _save(self) -> None:
+        """Save index and metadata to disk."""
+        if self._index is None:
+            return
+
+        self._base_path.mkdir(parents=True, exist_ok=True)
+
+        self._faiss.write_index(self._index, str(self._index_path))
+        np.save(str(self._meta_path), self._payloads, allow_pickle=True)
+        np.save(str(self._ids_path), self._ids, allow_pickle=True)
+        self._dim_path.write_text(str(self._dim))
+
+        logger.debug(f"{VECTOR_DB} Persisted FAISS index to {self._base_path}")
+
     # =========================================================================
     # Public API - Standard VectorDBPlugin Contract
     # =========================================================================
 
-    def upsert(self, collection: str, points: list[dict[str, Any]]) -> None:
+    def upsert(self, collection: str, points: List[Dict[str, Any]]) -> None:
         """
         Upsert points into the vector database.
 
@@ -216,10 +241,10 @@ class FaissLocalVectorDB:
     def search(
         self,
         collection_name: str,
-        query_vector: list[float],
+        query_vector: List[float],
         limit: int,
         with_payload: bool = True,
-    ) -> list[SearchResult]:
+    ) -> List[SearchResult]:
         """
         Search for similar vectors.
 
@@ -241,7 +266,7 @@ class FaissLocalVectorDB:
         query = np.asarray([query_vector], dtype="float32")
         distances, indices = self._index.search(query, search_limit)
 
-        results: list[SearchResult] = []
+        results: List[SearchResult] = []
 
         for idx, distance in zip(indices[0], distances[0]):
             if idx < 0:
@@ -273,6 +298,81 @@ class FaissLocalVectorDB:
                 break
 
         return results
+
+    def list_collections(self) -> List[str]:
+        """
+        List all collections stored in this FAISS index.
+
+        FAISS doesn't have native collections - we store collection name
+        in payload._collection field. This extracts unique collection names.
+
+        Returns:
+            Sorted list of collection names
+        """
+        if not self._payloads:
+            return []
+
+        collections = set()
+        for payload in self._payloads:
+            coll = payload.get("_collection")
+            if coll:
+                collections.add(coll)
+
+        return sorted(collections)
+
+    def get_collection_stats(self, collection: str) -> Dict[str, Any]:
+        """
+        Get statistics for a collection.
+
+        Args:
+            collection: Collection name
+
+        Returns:
+            Dict with points_count, vectors_count, status, vector_size
+        """
+        count = sum(1 for p in self._payloads if p.get("_collection") == collection)
+
+        return {
+            "points_count": count,
+            "vectors_count": count,
+            "status": "ready",
+            "vector_size": self._dim,
+        }
+
+    def scroll(
+        self,
+        collection: str,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> Tuple[List[_FaissRecord], Optional[int]]:
+        """
+        Scroll through records in a collection.
+
+        Args:
+            collection: Collection name
+            limit: Max records to return
+            offset: Starting position
+
+        Returns:
+            Tuple of (records, next_offset or None if done)
+        """
+        # Filter to collection
+        matching = []
+        for i, payload in enumerate(self._payloads):
+            if payload.get("_collection") == collection:
+                record_id = self._ids[i] if i < len(self._ids) else f"id_{i}"
+                # Remove internal fields from payload
+                clean_payload = {k: v for k, v in payload.items() if k != "_collection"}
+                matching.append(_FaissRecord(record_id, clean_payload))
+
+        # Apply offset and limit
+        start = offset
+        end = offset + limit
+        batch = matching[start:end]
+
+        next_offset = end if end < len(matching) else None
+
+        return batch, next_offset
 
     def count(self, collection: Optional[str] = None) -> int:
         """
@@ -341,53 +441,5 @@ class FaissLocalVectorDB:
         logger.info(f"{VECTOR_DB} Deleted {deleted} vectors from collection '{collection}'")
         return deleted
 
-    def _save(self) -> None:
-        """Save index and metadata to disk."""
-        if self._index is None:
-            return
 
-        self._base_path.mkdir(parents=True, exist_ok=True)
-
-        self._faiss.write_index(self._index, str(self._index_path))
-        np.save(str(self._meta_path), self._payloads, allow_pickle=True)
-        np.save(str(self._ids_path), self._ids, allow_pickle=True)
-        self._dim_path.write_text(str(self._dim))
-
-        logger.debug(f"{VECTOR_DB} Persisted FAISS index to {self._base_path}")
-
-    # =========================================================================
-    # Legacy API (for backwards compatibility)
-    # =========================================================================
-
-    def add(self, chunks: Any) -> None:
-        """
-        Legacy method: Add chunks with pre-computed embeddings.
-
-        Deprecated: Use upsert() instead.
-        """
-
-        points = []
-        for chunk in chunks:
-            embedding = getattr(chunk, "embedding", None)
-            if embedding is None:
-                raise ValueError(f"Chunk {chunk.id} has no embedding attached")
-
-            points.append(
-                {
-                    "id": chunk.id,
-                    "vector": list(embedding),
-                    "payload": {
-                        "doc_id": chunk.doc_id,
-                        "chunk_index": chunk.chunk_index,
-                        "content": chunk.content,
-                        **(chunk.metadata or {}),
-                    },
-                }
-            )
-
-        # Use "default" collection for legacy API
-        self.upsert("default", points)
-
-    def persist(self) -> None:
-        """Legacy method: Explicitly save to disk."""
-        self._save()
+__all__ = ["FaissLocalVectorDB"]

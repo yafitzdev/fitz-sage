@@ -1,0 +1,228 @@
+# fitz_ai/llm/schemas/rerank_plugin_schema.yaml
+#
+# MASTER SCHEMA: All fields for rerank plugins
+# =============================================
+#
+# This is the SINGLE SOURCE OF TRUTH for rerank plugin fields.
+# - All rerank plugin YAML files must follow this structure
+# - Code reads defaults from here
+# - Add new fields HERE first
+#
+# Field definition format:
+#   field_name:
+#     required: true/false
+#     type: string/integer/float/boolean/list/object
+#     default: <value> (only if required=false)
+#     options: [...] (optional, restricts allowed values)
+#     description: "..."
+#     example: <value>
+
+fields:
+
+  # ============================================================================
+  # IDENTITY
+  # ============================================================================
+
+  plugin_name:
+    required: true
+    type: string
+    description: "Unique plugin identifier"
+    example: "cohere"
+
+  plugin_type:
+    required: true
+    type: string
+    options: ["rerank"]
+    description: "Must be 'rerank' for rerank plugins"
+    example: "rerank"
+
+  version:
+    required: false
+    type: string
+    default: "1.0"
+    description: "Plugin schema version"
+    example: "1.0"
+
+  # ============================================================================
+  # PROVIDER
+  # ============================================================================
+
+  provider.name:
+    required: true
+    type: string
+    description: "Provider name for credential lookup"
+    example: "cohere"
+
+  provider.base_url:
+    required: true
+    type: string
+    description: "API base URL (can contain {placeholders})"
+    example: "https://api.cohere.ai/v1"
+
+  # ============================================================================
+  # AUTHENTICATION
+  # ============================================================================
+
+  auth.type:
+    required: false
+    type: string
+    default: "bearer"
+    options: ["bearer", "header", "query", "none"]
+    description: "Authentication method"
+    example: "bearer"
+
+  auth.header_name:
+    required: false
+    type: string
+    default: "Authorization"
+    description: "HTTP header name for auth token"
+    example: "Authorization"
+
+  auth.header_format:
+    required: false
+    type: string
+    default: "Bearer {key}"
+    description: "Header value format. {key} replaced with API key"
+    example: "Bearer {key}"
+
+  auth.env_vars:
+    required: false
+    type: list
+    default: []
+    description: "Environment variable names to check for API key"
+    example: ["COHERE_API_KEY"]
+
+  # ============================================================================
+  # REQUIRED ENVIRONMENT VARIABLES (for Azure, etc.)
+  # ============================================================================
+
+  required_env:
+    required: false
+    type: list
+    default: []
+    description: "Additional required env vars (each item has: name, inject_as, default)"
+    example: []
+
+  # ============================================================================
+  # HEALTH CHECK (for local services)
+  # ============================================================================
+
+  health_check:
+    required: false
+    type: object
+    default: null
+    description: "Optional health check config for local services"
+
+  health_check.path:
+    required: false
+    type: string
+    default: "/health"
+    description: "Health check endpoint path"
+
+  health_check.method:
+    required: false
+    type: string
+    default: "GET"
+    options: ["GET", "POST"]
+    description: "HTTP method for health check"
+
+  health_check.timeout:
+    required: false
+    type: integer
+    default: 2
+    description: "Health check timeout in seconds"
+
+  # ============================================================================
+  # ENDPOINT
+  # ============================================================================
+
+  endpoint.path:
+    required: true
+    type: string
+    description: "API endpoint path"
+    example: "/rerank"
+
+  endpoint.method:
+    required: false
+    type: string
+    default: "POST"
+    options: ["GET", "POST", "PUT", "DELETE"]
+    description: "HTTP method"
+
+  endpoint.timeout:
+    required: false
+    type: integer
+    default: 30
+    description: "Request timeout in seconds"
+
+  # ============================================================================
+  # DEFAULTS
+  # ============================================================================
+
+  defaults.model:
+    required: false
+    type: string
+    default: null
+    description: "Default model name"
+    example: "rerank-english-v3.0"
+
+  defaults.top_n:
+    required: false
+    type: integer
+    default: null
+    description: "Default number of results to return"
+
+  # ============================================================================
+  # REQUEST CONFIGURATION
+  # ============================================================================
+
+  request.query_field:
+    required: false
+    type: string
+    default: "query"
+    description: "Field name for query text in request body"
+    example: "query"
+
+  request.documents_field:
+    required: false
+    type: string
+    default: "documents"
+    description: "Field name for documents array in request body"
+    example: "documents"
+
+  request.static_fields:
+    required: false
+    type: object
+    default: {}
+    description: "Fields always included in request body"
+    example: {}
+
+  request.param_map:
+    required: false
+    type: object
+    default:
+      model: "model"
+      top_n: "top_n"
+    description: "Maps Fitz parameter names to provider parameter names"
+
+  # ============================================================================
+  # RESPONSE CONFIGURATION
+  # ============================================================================
+
+  response.results_path:
+    required: true
+    type: string
+    description: "JSONPath to extract results array from API response"
+    example: "results"
+
+  response.result_index_path:
+    required: false
+    type: string
+    default: "index"
+    description: "Path within each result to get original document index"
+
+  response.result_score_path:
+    required: false
+    type: string
+    default: "relevance_score"
+    description: "Path within each result to get relevance score"
