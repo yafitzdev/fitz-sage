@@ -1,20 +1,30 @@
 # fitz_ai/llm/embedding/azure_openai.yaml
-# Azure OpenAI Embedding Plugin
 #
-# Documentation: https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#embeddings
+# Azure OpenAI Embedding Plugin
+# Documentation: https://learn.microsoft.com/en-us/azure/ai-services/openai/reference
+#
 # Required environment variables:
 #   - AZURE_OPENAI_API_KEY
 #   - AZURE_OPENAI_ENDPOINT
-#   - AZURE_OPENAI_EMBEDDING_DEPLOYMENT (or pass deployment kwarg)
+#   - AZURE_OPENAI_EMBEDDING_DEPLOYMENT
 
+# =============================================================================
+# IDENTITY
+# =============================================================================
 plugin_name: "azure_openai"
 plugin_type: "embedding"
 version: "1.0"
 
+# =============================================================================
+# PROVIDER
+# =============================================================================
 provider:
   name: "azure_openai"
   base_url: "{endpoint}/openai/deployments/{deployment}"
 
+# =============================================================================
+# AUTHENTICATION
+# =============================================================================
 auth:
   type: "header"
   header_name: "api-key"
@@ -22,27 +32,50 @@ auth:
   env_vars:
     - "AZURE_OPENAI_API_KEY"
 
+# =============================================================================
+# REQUIRED ENVIRONMENT VARIABLES (optional section)
+# =============================================================================
 required_env:
   - name: "AZURE_OPENAI_ENDPOINT"
     inject_as: "endpoint"
+    default: null
   - name: "AZURE_OPENAI_EMBEDDING_DEPLOYMENT"
     inject_as: "deployment"
+    default: null
 
+# =============================================================================
+# HEALTH CHECK (optional section)
+# =============================================================================
+health_check: null
+
+# =============================================================================
+# ENDPOINT
+# =============================================================================
 endpoint:
   path: "/embeddings"
   method: "POST"
   timeout: 30
 
+# =============================================================================
+# DEFAULTS
+# =============================================================================
 defaults:
   api_version: "2024-02-15-preview"
 
+# =============================================================================
+# REQUEST CONFIGURATION
+# =============================================================================
 request:
   input_field: "input"
   input_wrap: "string"
   static_fields: {}
   param_map:
+    model: "model"
     dimensions: "dimensions"
 
+# =============================================================================
+# RESPONSE CONFIGURATION
+# =============================================================================
 response:
   embeddings_path: "data[0].embedding"
   is_array: true

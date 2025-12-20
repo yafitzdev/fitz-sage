@@ -1,17 +1,25 @@
 # fitz_ai/llm/embedding/openai.yaml
-# OpenAI Embedding Plugin - Embeddings API
 #
+# OpenAI Embedding Plugin - Embeddings API
 # Documentation: https://platform.openai.com/docs/api-reference/embeddings
-# Required: OPENAI_API_KEY environment variable
 
+# =============================================================================
+# IDENTITY
+# =============================================================================
 plugin_name: "openai"
 plugin_type: "embedding"
 version: "1.0"
 
+# =============================================================================
+# PROVIDER
+# =============================================================================
 provider:
   name: "openai"
   base_url: "https://api.openai.com/v1"
 
+# =============================================================================
+# AUTHENTICATION
+# =============================================================================
 auth:
   type: "bearer"
   header_name: "Authorization"
@@ -19,14 +27,33 @@ auth:
   env_vars:
     - "OPENAI_API_KEY"
 
+# =============================================================================
+# REQUIRED ENVIRONMENT VARIABLES (optional section)
+# =============================================================================
+required_env: []
+
+# =============================================================================
+# HEALTH CHECK (optional section)
+# =============================================================================
+health_check: null
+
+# =============================================================================
+# ENDPOINT
+# =============================================================================
 endpoint:
   path: "/embeddings"
   method: "POST"
   timeout: 30
 
+# =============================================================================
+# DEFAULTS
+# =============================================================================
 defaults:
   model: "text-embedding-3-small"
 
+# =============================================================================
+# REQUEST CONFIGURATION
+# =============================================================================
 request:
   input_field: "input"
   input_wrap: "string"
@@ -35,6 +62,9 @@ request:
     model: "model"
     dimensions: "dimensions"
 
+# =============================================================================
+# RESPONSE CONFIGURATION
+# =============================================================================
 response:
   embeddings_path: "data[0].embedding"
   is_array: true

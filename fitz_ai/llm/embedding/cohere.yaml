@@ -1,17 +1,25 @@
 # fitz_ai/llm/embedding/cohere.yaml
-# Cohere Embedding Plugin - Embed API
 #
+# Cohere Embedding Plugin - Embed API
 # Documentation: https://docs.cohere.com/reference/embed
-# Required: COHERE_API_KEY environment variable
 
+# =============================================================================
+# IDENTITY
+# =============================================================================
 plugin_name: "cohere"
 plugin_type: "embedding"
 version: "1.0"
 
+# =============================================================================
+# PROVIDER
+# =============================================================================
 provider:
   name: "cohere"
   base_url: "https://api.cohere.ai/v1"
 
+# =============================================================================
+# AUTHENTICATION
+# =============================================================================
 auth:
   type: "bearer"
   header_name: "Authorization"
@@ -19,15 +27,34 @@ auth:
   env_vars:
     - "COHERE_API_KEY"
 
+# =============================================================================
+# REQUIRED ENVIRONMENT VARIABLES (optional section)
+# =============================================================================
+required_env: []
+
+# =============================================================================
+# HEALTH CHECK (optional section)
+# =============================================================================
+health_check: null
+
+# =============================================================================
+# ENDPOINT
+# =============================================================================
 endpoint:
   path: "/embed"
   method: "POST"
   timeout: 30
 
+# =============================================================================
+# DEFAULTS
+# =============================================================================
 defaults:
   model: "embed-english-v3.0"
   input_type: "search_document"
 
+# =============================================================================
+# REQUEST CONFIGURATION
+# =============================================================================
 request:
   input_field: "texts"
   input_wrap: "list"
@@ -37,6 +64,9 @@ request:
     input_type: "input_type"
     dimensions: "output_dimension"
 
+# =============================================================================
+# RESPONSE CONFIGURATION
+# =============================================================================
 response:
   embeddings_path: "embeddings[0]"
   is_array: true
