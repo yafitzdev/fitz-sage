@@ -19,80 +19,9 @@ from fitz_ai.core.config import load_config_dict, ConfigNotFoundError
 from fitz_ai.core.detect import detect_all
 from fitz_ai.core.paths import FitzPaths
 from fitz_ai.logging.logger import get_logger
+from fitz_ai.cli.ui import ui, console, RICH, Panel
 
 logger = get_logger(__name__)
-
-# Rich for UI (optional)
-try:
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.table import Table
-
-    console = Console()
-    RICH = True
-except ImportError:
-    console = None
-    RICH = False
-
-
-# =============================================================================
-# UI Helpers
-# =============================================================================
-
-
-def _print(msg: str, style: str = "") -> None:
-    if RICH and style:
-        console.print(f"[{style}]{msg}[/{style}]")
-    else:
-        print(msg)
-
-
-def _header(title: str) -> None:
-    if RICH:
-        console.print(Panel.fit(f"[bold]{title}[/bold]", border_style="blue"))
-    else:
-        print(f"\n{'=' * 50}")
-        print(title)
-        print('=' * 50)
-
-
-def _section(title: str) -> None:
-    if RICH:
-        console.print(f"\n[bold cyan]{title}[/bold cyan]")
-    else:
-        print(f"\n{title}")
-        print("-" * len(title))
-
-
-def _status(name: str, ok: bool, detail: str = "") -> None:
-    """Print a status line."""
-    if RICH:
-        icon = "✓" if ok else "✗"
-        color = "green" if ok else "red"
-        detail_str = f" [dim]({detail})[/dim]" if detail else ""
-        console.print(f"  [{color}]{icon}[/{color}] {name}{detail_str}")
-    else:
-        icon = "✓" if ok else "✗"
-        detail_str = f" ({detail})" if detail else ""
-        print(f"  {icon} {name}{detail_str}")
-
-
-def _warning(name: str, detail: str = "") -> None:
-    """Print a warning line."""
-    if RICH:
-        detail_str = f" [dim]({detail})[/dim]" if detail else ""
-        console.print(f"  [yellow]⚠[/yellow] {name}{detail_str}")
-    else:
-        detail_str = f" ({detail})" if detail else ""
-        print(f"  ⚠ {name}{detail_str}")
-
-
-def _info(msg: str) -> None:
-    """Print info line."""
-    if RICH:
-        console.print(f"  [dim]{msg}[/dim]")
-    else:
-        print(f"    {msg}")
 
 
 # =============================================================================
@@ -295,29 +224,29 @@ def command(
     # Header
     # =========================================================================
 
-    _header("Fitz Doctor")
+    ui.header("Fitz Doctor")
 
     # =========================================================================
     # Core Checks
     # =========================================================================
 
-    _section("System")
+    ui.section("System")
 
     # Python
     ok, detail = _check_python()
-    _status("Python", ok, detail)
+    ui.status("Python", ok, detail)
     if not ok:
         issues.append("Python 3.10+ required")
 
     # Workspace
     ok, detail = _check_workspace()
-    _status("Workspace", ok, detail)
+    ui.status("Workspace", ok, detail)
     if not ok:
         warnings.append("Run 'fitz init' to create workspace")
 
     # Config
     ok, detail, config = _check_config()
-    _status("Config", ok, detail)
+    ui.status("Config", ok, detail)
     if not ok:
         warnings.append("Run 'fitz init' to create config")
         config = {}
@@ -326,10 +255,10 @@ def command(
     # Dependencies
     # =========================================================================
 
-    _section("Dependencies")
+    ui.section("Dependencies")
 
     for name, ok, detail in _check_dependencies():
-        _status(name, ok, detail)
+        ui.status(name, ok, detail)
         if not ok:
             issues.append(f"Missing: {name}")
 
@@ -338,86 +267,86 @@ def command(
     # =========================================================================
 
     if verbose:
-        _section("Optional Packages")
+        ui.section("Optional Packages")
         for name, ok, detail in _check_optional_dependencies():
             if ok:
-                _status(name, True, detail)
+                ui.status(name, True, detail)
             else:
-                _warning(name, detail)
+                ui.warning(name, detail)
 
     # =========================================================================
     # Services
     # =========================================================================
 
-    _section("Services")
+    ui.section("Services")
 
     system = detect_all()
 
     # Ollama
     if system.ollama.available:
-        _status("Ollama", True, system.ollama.details)
+        ui.status("Ollama", True, system.ollama.details)
     else:
-        _warning("Ollama", system.ollama.details)
+        ui.warning("Ollama", system.ollama.details)
 
     # Qdrant
     if system.qdrant.available:
-        _status("Qdrant", True, f"{system.qdrant.host}:{system.qdrant.port}")
+        ui.status("Qdrant", True, f"{system.qdrant.host}:{system.qdrant.port}")
     else:
-        _warning("Qdrant", system.qdrant.details)
+        ui.warning("Qdrant", system.qdrant.details)
 
     # FAISS
     if system.faiss.available:
-        _status("FAISS", True, "installed")
+        ui.status("FAISS", True, "installed")
     else:
-        _warning("FAISS", system.faiss.details)
+        ui.warning("FAISS", system.faiss.details)
 
     # =========================================================================
     # API Keys
     # =========================================================================
 
-    _section("API Keys")
+    ui.section("API Keys")
 
     for name, key_status in system.api_keys.items():
         if key_status.available:
-            _status(name.capitalize(), True, "configured")
+            ui.status(name.capitalize(), True, "configured")
         else:
-            _warning(name.capitalize(), f"${key_status.env_var} not set")
+            ui.warning(name.capitalize(), f"${key_status.env_var} not set")
 
     # =========================================================================
     # Connection Tests (if --test)
     # =========================================================================
 
     if test and config:
-        _section("Connection Tests")
+        ui.section("Connection Tests")
 
         # Embedding
         ok, detail = _test_embedding(config)
-        _status("Embedding", ok, detail)
+        ui.status("Embedding", ok, detail)
         if not ok:
             issues.append(f"Embedding failed: {detail}")
 
         # Chat
         ok, detail = _test_chat(config)
-        _status("Chat", ok, detail)
+        ui.status("Chat", ok, detail)
         if not ok:
             issues.append(f"Chat failed: {detail}")
 
         # Vector DB
         ok, detail = _test_vector_db(config)
-        _status("Vector DB", ok, detail)
+        ui.status("Vector DB", ok, detail)
         if not ok:
             issues.append(f"Vector DB failed: {detail}")
 
         # Rerank
         ok, detail = _test_rerank(config)
-        _status("Rerank", ok, detail)
+        ui.status("Rerank", ok, detail)
 
     # =========================================================================
     # Config Summary (verbose)
     # =========================================================================
 
     if verbose and config:
-        _section("Config Summary")
+        ui.section("Config Summary")
 
         chat = config.get("chat", {}).get("plugin_name", "?")
         embedding = config.get("embedding", {}).get("plugin_name", "?")
@@ -425,10 +354,10 @@ def command(
         rerank = config.get("rerank", {})
         rerank_str = rerank.get("plugin_name", "disabled") if rerank.get("enabled") else "disabled"
 
-        _info(f"Chat: {chat}")
-        _info(f"Embedding: {embedding}")
-        _info(f"Vector DB: {vector_db}")
-        _info(f"Rerank: {rerank_str}")
+        ui.info(f"Chat: {chat}")
+        ui.info(f"Embedding: {embedding}")
+        ui.info(f"Vector DB: {vector_db}")
+        ui.info(f"Rerank: {rerank_str}")
 
     # =========================================================================
     # Summary
@@ -451,19 +380,13 @@ def command(
         raise typer.Exit(1)
 
     elif warnings:
-        if RICH:
-            console.print("[yellow]Some warnings, but Fitz should work.[/yellow]")
-        else:
-            print("Some warnings, but Fitz should work.")
+        ui.print("Some warnings, but Fitz should work.", "yellow")
 
         if not test:
-            _info("Run 'fitz doctor --test' to verify connections")
+            ui.info("Run 'fitz doctor --test' to verify connections")
 
     else:
-        if RICH:
-            console.print("[green bold]✓ All checks passed![/green bold]")
-        else:
-            print("✓ All checks passed!")
+        ui.success("All checks passed!")
 
         if not test:
-            _info("Run 'fitz doctor --test' to verify connections")
+            ui.info("Run 'fitz doctor --test' to verify connections")

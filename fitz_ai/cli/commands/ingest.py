@@ -1,4 +1,4 @@
-# fitz_ai/cli/v2/commands/ingest.py
+# fitz_ai/cli/commands/ingest.py
 """
 Interactive document ingestion.
 
@@ -27,124 +27,45 @@ from fitz_ai.llm.registry import get_llm_plugin
 from fitz_ai.vector_db.registry import get_vector_db_plugin
 from fitz_ai.vector_db.writer import VectorDBWriter
 from fitz_ai.logging.logger import get_logger
+from fitz_ai.cli.ui import ui, console, RICH, Panel
 
 logger = get_logger(__name__)
 
-# Rich for UI (optional)
-try:
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.prompt import Prompt, Confirm, IntPrompt
-    from rich.progress import (
-        Progress,
-        SpinnerColumn,
-        TextColumn,
-        BarColumn,
-        TaskProgressColumn,
-        TimeElapsedColumn,
-    )
-
-    console = Console()
-    RICH = True
-except ImportError:
-    console = None
-    RICH = False
-
 
 # =============================================================================
-# UI Helpers
+# File Display
 # =============================================================================
 
 
-def _print(msg: str, style: str = "") -> None:
-    if RICH and style:
-        console.print(f"[{style}]{msg}[/{style}]")
-    else:
-        print(msg)
+def _show_files(raw_docs: List, max_show: int = 8) -> None:
+    """Show files being processed."""
+    if not raw_docs:
+        return
 
-
-def _header(title: str) -> None:
-    if RICH:
-        console.print(Panel.fit(f"[bold]{title}[/bold]", border_style="blue"))
-    else:
-        print(f"\n{'=' * 50}")
-        print(title)
-        print('=' * 50)
-
-
-def _step(num: int, total: int, msg: str) -> None:
-    if RICH:
-        console.print(f"[bold blue][{num}/{total}][/bold blue] {msg}")
-    else:
-        print(f"[{num}/{total}] {msg}")
-
-
-def _success(msg: str) -> None:
-    if RICH:
-        console.print(f"[green]✓[/green] {msg}")
-    else:
-        print(f"✓ {msg}")
-
-
-def _error(msg: str) -> None:
-    if RICH:
-        console.print(f"[red]✗[/red] {msg}")
-    else:
-        print(f"✗ {msg}")
-
-
-def _prompt_text(prompt: str, default: str) -> str:
-    if RICH:
-        return Prompt.ask(prompt, default=default)
-    else:
-        response = input(f"{prompt} [{default}]: ").strip()
-        return response if response else default
-
-
-def _prompt_int(prompt: str, default: int) -> int:
-    if RICH:
-        return IntPrompt.ask(prompt, default=default)
-    else:
-        response = input(f"{prompt} [{default}]: ").strip()
-        return int(response) if response else default
-
-
-def _prompt_choice(prompt: str, choices: list[str], default: str) -> str:
-    if RICH:
-        return Prompt.ask(prompt, choices=choices, default=default)
-    else:
-        choices_str = "/".join(choices)
-        while True:
-            response = input(f"{prompt} [{choices_str}] ({default}): ").strip()
-            if not response:
-                return default
-            if response in choices:
-                return response
-            print(f"Choose from: {', '.join(choices)}")
-
-
-def _prompt_path(prompt: str, default: str = ".") -> Path:
-    """Prompt for a path with validation."""
-    while True:
-        if RICH:
-            path_str = Prompt.ask(prompt, default=default)
+    # Extract file paths/names
+    files = []
+    for doc in raw_docs:
+        path = getattr(doc, 'path', None) or getattr(doc, 'source_file', None) or getattr(doc, 'doc_id', '?')
+        if hasattr(path, 'name'):
+            # Path object - get just the filename
+            files.append(str(path.name))
         else:
-            response = input(f"{prompt} [{default}]: ").strip()
-            path_str = response if response else default
+            # String - get last part
+            files.append(str(path).split('/')[-1].split('\\')[-1])
 
-        path = Path(path_str).expanduser().resolve()
+    # Show files
+    show_count = min(len(files), max_show)
 
-        if path.exists():
-            return path
-        else:
-            _error(f"Path does not exist: {path}")
-            if RICH:
-                if not Confirm.ask("Try again?", default=True):
-                    raise typer.Exit(1)
-            else:
-                retry = input("Try again? [Y/n]: ").strip().lower()
-                if retry in ("n", "no"):
-                    raise typer.Exit(1)
+    if RICH:
+        for f in files[:show_count]:
+            console.print(f"    [dim]•[/dim] {f}")
+        if len(files) > max_show:
+            console.print(f"    [dim]... and {len(files) - max_show} more[/dim]")
+    else:
+        for f in files[:show_count]:
+            print(f"    • {f}")
+        if len(files) > max_show:
+            print(f"    ... and {len(files) - max_show} more")
 
 
 # =============================================================================
@@ -157,10 +78,10 @@ def _load_config() -> dict:
     try:
         return load_config_dict(FitzPaths.config())
     except ConfigNotFoundError:
-        _error("No config found. Run 'fitz init' first.")
+        ui.error("No config found. Run 'fitz init' first.")
         raise typer.Exit(1)
     except Exception as e:
-        _error(f"Failed to load config: {e}")
+        ui.error(f"Failed to load config: {e}")
         raise typer.Exit(1)
 
 
@@ -210,23 +131,11 @@ def _embed_chunks(
     """
     Embed chunks with adaptive batching and progress bar.
 
-    Batching significantly reduces API calls:
-    - 1000 chunks with batch_size=96 = ~11 API calls instead of 1000
-
     Adaptive batch sizing:
     - Starts at batch_size (default 96)
     - If batch fails, halves batch size and retries
     - Continues halving until batch_size=1 (single embedding)
     - Remembers working batch size for remaining chunks
-
-    Args:
-        embedder: Embedding plugin with embed() method
-        chunks: List of chunks to embed
-        batch_size: Initial batch size (will adapt down if needed)
-        show_progress: Whether to show progress bar
-
-    Returns:
-        List of embedding vectors
     """
     vectors: List[List[float]] = []
     total_chunks = len(chunks)
@@ -242,45 +151,7 @@ def _embed_chunks(
     current_batch_size = batch_size
     position = 0
 
-    if RICH and show_progress:
-        with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(),
-                TimeElapsedColumn(),
-                console=console,
-        ) as progress:
-            task = progress.add_task(
-                f"Embedding (batch={current_batch_size})...",
-                total=total_chunks
-            )
-
-            while position < total_chunks:
-                batch_end = min(position + current_batch_size, total_chunks)
-                batch_texts = [c.content for c in chunks[position:batch_end]]
-
-                try:
-                    batch_vectors = _embed_batch_native(embedder, batch_texts)
-                    vectors.extend(batch_vectors)
-                    position = batch_end
-                    progress.update(task, advance=len(batch_texts))
-
-                except Exception as e:
-                    if _is_batch_size_error(e) and current_batch_size > 1:
-                        # Halve batch size and retry
-                        current_batch_size = max(1, current_batch_size // 2)
-                        progress.update(
-                            task,
-                            description=f"Embedding (batch={current_batch_size})..."
-                        )
-                        if current_batch_size == 1:
-                            _print(f"Falling back to single embedding", "yellow" if RICH else "")
-                    else:
-                        # Not a batch size error or already at batch_size=1
-                        raise
-    else:
-        # Non-rich progress
+    with ui.progress(f"Embedding (batch={current_batch_size})", total=total_chunks) as update:
         while position < total_chunks:
             batch_end = min(position + current_batch_size, total_chunks)
             batch_texts = [c.content for c in chunks[position:batch_end]]
@@ -288,19 +159,15 @@ def _embed_chunks(
             try:
                 batch_vectors = _embed_batch_native(embedder, batch_texts)
                 vectors.extend(batch_vectors)
-
-                if show_progress:
-                    print(f"  Embedded {batch_end}/{total_chunks} (batch={current_batch_size})...")
-
                 position = batch_end
+                update(len(batch_texts))
 
             except Exception as e:
                 if _is_batch_size_error(e) and current_batch_size > 1:
                     # Halve batch size and retry
-                    old_size = current_batch_size
                     current_batch_size = max(1, current_batch_size // 2)
                     if show_progress:
-                        print(f"  Batch size {old_size} failed, trying {current_batch_size}...")
+                        ui.warning(f"Reducing batch size to {current_batch_size}")
                 else:
                     raise
 
@@ -316,24 +183,10 @@ def _embed_chunks_sequential(
     vectors: List[List[float]] = []
     total_chunks = len(chunks)
 
-    if RICH and show_progress and total_chunks > 1:
-        with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(),
-                TimeElapsedColumn(),
-                console=console,
-        ) as progress:
-            task = progress.add_task("Embedding...", total=total_chunks)
-            for chunk in chunks:
-                vectors.append(embedder.embed(chunk.content))
-                progress.update(task, advance=1)
-    else:
-        for i, chunk in enumerate(chunks):
+    with ui.progress("Embedding", total=total_chunks) as update:
+        for chunk in chunks:
             vectors.append(embedder.embed(chunk.content))
-            if show_progress and (i + 1) % 20 == 0:
-                print(f"  Embedded {i + 1}/{total_chunks}...")
+            update(1)
 
     return vectors
 
@@ -387,16 +240,10 @@ def command(
     # Header
     # =========================================================================
 
-    _header("Fitz Ingest")
-
-    if RICH:
-        console.print(f"[dim]Embedding:[/dim] {embedding_plugin}")
-        console.print(f"[dim]Vector DB:[/dim] {vector_db_plugin}")
-        console.print()
-    else:
-        print(f"Embedding: {embedding_plugin}")
-        print(f"Vector DB: {vector_db_plugin}")
-        print()
+    ui.header("Fitz Ingest")
+    ui.info(f"Embedding: {embedding_plugin}")
+    ui.info(f"Vector DB: {vector_db_plugin}")
+    print()
 
     # =========================================================================
     # Interactive Prompts (or use defaults)
@@ -405,8 +252,8 @@ def command(
     if non_interactive:
         # Use defaults
         if source is None:
-            _error("Source path required in non-interactive mode.")
-            _print("Usage: fitz ingest ./docs -y", "dim")
+            ui.error("Source path required in non-interactive mode.")
+            ui.info("Usage: fitz ingest ./docs -y")
             raise typer.Exit(1)
 
         collection = default_collection
@@ -414,40 +261,36 @@ def command(
         chunk_size = 1000
         chunk_overlap = 0
 
-        _print(f"Source: {source}", "dim")
-        _print(f"Collection: {collection}", "dim")
-        _print(f"Chunker: {chunker} (size={chunk_size})", "dim")
+        ui.info(f"Source: {source}")
+        ui.info(f"Collection: {collection}")
+        ui.info(f"Chunker: {chunker} (size={chunk_size})")
 
     else:
         # Interactive mode
-        _print("[bold]Configure ingestion:[/bold]" if RICH else "Configure ingestion:")
+        ui.print("Configure ingestion:", "bold")
         print()
 
         # Source path
         if source is None:
-            source = _prompt_path("Source path (file or directory)", ".")
+            source = ui.prompt_path("Source path (file or directory)", ".")
         else:
             # Validate provided source
             if not source.exists():
-                _error(f"Source does not exist: {source}")
+                ui.error(f"Source does not exist: {source}")
                 raise typer.Exit(1)
-            _print(f"Source: {source}", "dim")
+            ui.info(f"Source: {source}")
 
         # Collection name
-        collection = _prompt_text("Collection name", default_collection)
+        collection = ui.prompt_text("Collection name", default_collection)
 
         # Chunking strategy
-        chunker = _prompt_choice(
-            "Chunking strategy",
-            choices=available_chunkers,
-            default="simple",
-        )
+        chunker = ui.prompt_choice("Chunking strategy", available_chunkers, "simple")
 
         # Chunk size
-        chunk_size = _prompt_int("Chunk size (characters)", 1000)
+        chunk_size = ui.prompt_int("Chunk size (characters)", 1000)
 
         # Chunk overlap
-        chunk_overlap = _prompt_int("Chunk overlap", 0)
+        chunk_overlap = ui.prompt_int("Chunk overlap", 0)
 
         print()
 
@@ -466,10 +309,6 @@ def command(
                 title="Summary",
                 border_style="green",
             ))
-
-            if not Confirm.ask("Proceed with ingestion?", default=True):
-                _print("Cancelled.", "yellow")
-                raise typer.Exit(0)
         else:
             print("\nSummary:")
             print(f"  Source: {source}")
@@ -478,10 +317,9 @@ def command(
             print(f"  Embedding: {embedding_plugin}")
             print(f"  Vector DB: {vector_db_plugin}")
 
-            confirm = input("\nProceed? [Y/n]: ").strip().lower()
-            if confirm in ("n", "no"):
-                print("Cancelled.")
-                raise typer.Exit(0)
+        if not ui.prompt_confirm("Proceed with ingestion?", default=True):
+            ui.warning("Cancelled.")
+            raise typer.Exit(0)
 
         print()
 
@@ -489,7 +327,7 @@ def command(
     # Step 1: Read documents
     # =========================================================================
 
-    _step(1, 4, "Reading documents...")
+    ui.step(1, 4, "Reading documents...")
 
     try:
         IngestPluginCls = get_ingest_plugin("local")
@@ -497,20 +335,23 @@ def command(
         ingest_engine = IngestionEngine(plugin=ingest_plugin, kwargs={})
         raw_docs = list(ingest_engine.run(str(source)))
     except Exception as e:
-        _error(f"Failed to read documents: {e}")
+        ui.error(f"Failed to read documents: {e}")
         raise typer.Exit(1)
 
     if not raw_docs:
-        _error("No documents found.")
+        ui.error("No documents found.")
         raise typer.Exit(1)
 
-    _success(f"Found {len(raw_docs)} documents")
+    # Show files being processed
+    _show_files(raw_docs, max_show=8)
+
+    ui.success(f"Found {len(raw_docs)} documents")
 
     # =========================================================================
     # Step 2: Chunk documents
     # =========================================================================
 
-    _step(2, 4, f"Chunking ({chunker})...")
+    ui.step(2, 4, f"Chunking ({chunker})...")
 
     chunker_kwargs = {"chunk_size": chunk_size}
     if chunk_overlap > 0:
@@ -521,7 +362,7 @@ def command(
     try:
         chunking_engine = ChunkingEngine.from_config(chunker_config)
     except Exception as e:
-        _error(f"Failed to initialize chunker: {e}")
+        ui.error(f"Failed to initialize chunker: {e}")
         raise typer.Exit(1)
 
     chunks: List[Chunk] = []
@@ -533,21 +374,21 @@ def command(
             logger.warning(f"Failed to chunk {getattr(raw_doc, 'path', '?')}: {e}")
 
     if not chunks:
-        _error("No chunks created.")
+        ui.error("No chunks created.")
         raise typer.Exit(1)
 
-    _success(f"Created {len(chunks)} chunks")
+    ui.success(f"Created {len(chunks)} chunks")
 
     # =========================================================================
     # Step 3: Generate embeddings
     # =========================================================================
 
-    _step(3, 4, f"Embedding ({embedding_plugin})...")
+    ui.step(3, 4, f"Embedding ({embedding_plugin})...")
 
     try:
         embedder = get_llm_plugin(plugin_type="embedding", plugin_name=embedding_plugin)
     except Exception as e:
-        _error(f"Failed to initialize embedder: {e}")
+        ui.error(f"Failed to initialize embedder: {e}")
         raise typer.Exit(1)
 
     # Use batch size of 96 (Cohere max) for efficiency
@@ -556,22 +397,22 @@ def command(
     try:
         vectors = _embed_chunks(embedder, chunks, batch_size=embed_batch_size)
     except Exception as e:
-        _error(f"Embedding failed: {e}")
+        ui.error(f"Embedding failed: {e}")
         raise typer.Exit(1)
 
-    _success(f"Generated {len(vectors)} embeddings")
+    ui.success(f"Generated {len(vectors)} embeddings")
 
     # =========================================================================
     # Step 4: Write to vector DB
     # =========================================================================
 
-    _step(4, 4, f"Writing to {vector_db_plugin}...")
+    ui.step(4, 4, f"Writing to {vector_db_plugin}...")
 
     try:
         vdb = get_vector_db_plugin(vector_db_plugin)
         writer = VectorDBWriter(client=vdb)
     except Exception as e:
-        _error(f"Failed to connect to vector DB: {e}")
+        ui.error(f"Failed to connect to vector DB: {e}")
         raise typer.Exit(1)
 
     batch_size = 50
@@ -581,10 +422,10 @@ def command(
             batch_vectors = vectors[i:i + batch_size]
             writer.upsert(collection=collection, chunks=batch_chunks, vectors=batch_vectors)
     except Exception as e:
-        _error(f"Failed to write: {e}")
+        ui.error(f"Failed to write: {e}")
         raise typer.Exit(1)
 
-    _success(f"Written to '{collection}'")
+    ui.success(f"Written to '{collection}'")
 
     # =========================================================================
     # Done

@@ -1,4 +1,4 @@
-# fitz_ai/cli/v2/__init__.py
+# fitz_ai/cli/__init__.py
 """
 Fitz CLI v2 - Clean, minimal CLI.
 

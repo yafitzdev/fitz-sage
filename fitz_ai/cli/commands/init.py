@@ -10,28 +10,15 @@ Usage:
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import typer
 
 from fitz_ai.core.detect import detect_all
 from fitz_ai.llm.registry import available_llm_plugins
+from fitz_ai.llm.loader import load_plugin
 from fitz_ai.vector_db.registry import available_vector_db_plugins
-
-# Rich for pretty output (optional)
-try:
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.prompt import Confirm, Prompt
-    from rich.syntax import Syntax
-    from rich.table import Table
-
-    console = Console()
-    RICH = True
-except ImportError:
-    console = None
-    RICH = False
+from fitz_ai.cli.ui import ui, console, RICH
 
 
 # =============================================================================
@@ -49,69 +36,6 @@ def _is_faiss_plugin(name: str) -> bool:
     return "faiss" in name.lower()
 
 
-def _print(msg: str, style: str = "") -> None:
-    """Print with optional Rich styling."""
-    if RICH and style:
-        console.print(f"[{style}]{msg}[/{style}]")
-    else:
-        print(msg)
-
-
-def _header(title: str) -> None:
-    """Print section header."""
-    if RICH:
-        console.print(f"\n[bold blue]{title}[/bold blue]")
-    else:
-        print(f"\n{title}")
-        print("-" * len(title))
-
-
-def _status(name: str, available: bool, detail: str = "") -> None:
-    """Print status line."""
-    icon = "✓" if available else "✗"
-    color = "green" if available else "dim"
-    if RICH:
-        console.print(f"  [{color}]{icon}[/{color}] {name}" + (f" [dim]({detail})[/dim]" if detail else ""))
-    else:
-        print(f"  {icon} {name}" + (f" ({detail})" if detail else ""))
-
-
-def _prompt_choice(prompt: str, choices: list[str], default: str) -> str:
-    """Prompt user to select from choices."""
-    if RICH:
-        return Prompt.ask(prompt, choices=choices, default=default)
-    else:
-        choice_str = "/".join(choices)
-        while True:
-            response = input(f"{prompt} [{choice_str}] ({default}): ").strip()
-            if not response:
-                return default
-            if response in choices:
-                return response
-            print(f"Invalid. Choose from: {', '.join(choices)}")
-
-
-def _prompt_confirm(prompt: str, default: bool = True) -> bool:
-    """Prompt for yes/no."""
-    if RICH:
-        return Confirm.ask(prompt, default=default)
-    else:
-        yn = "Y/n" if default else "y/N"
-        response = input(f"{prompt} [{yn}]: ").strip().lower()
-        if not response:
-            return default
-        return response in ("y", "yes")
-
-
-def _prompt_text(prompt: str, default: str) -> str:
-    """Prompt for text input."""
-    if RICH:
-        return Prompt.ask(prompt, default=default)
-    else:
-        response = input(f"{prompt} ({default}): ").strip()
-        return response if response else default
-
-
 def _auto_or_prompt(category: str, available: list[str], default: str, prompt: str) -> str:
     """Auto-select if one option, otherwise prompt."""
     if len(available) == 1:
@@ -121,7 +45,25 @@ def _auto_or_prompt(category: str, available: list[str], default: str, prompt: s
         else:
             print(f"  {category}: {choice} (auto)")
         return choice
-    return _prompt_choice(prompt, available, default)
+    return ui.prompt_choice(prompt, available, default)
+
+
+def _get_default_model(plugin_type: str, plugin_name: str) -> str:
+    """Get default model from YAML plugin spec."""
+    try:
+        spec = load_plugin(plugin_type, plugin_name)
+        return spec.defaults.get("model", "")
+    except Exception:
+        return ""
+
+
+def _prompt_model(plugin_type: str, plugin_name: str) -> str:
+    """Prompt for model with default from YAML plugin."""
+    default = _get_default_model(plugin_type, plugin_name)
+    if not default:
+        return ""  # No model config for this plugin
+
+    return ui.prompt_text(f"  {plugin_type.capitalize()} model", default)
 
 
 # =============================================================================
@@ -130,9 +72,9 @@ def _auto_or_prompt(category: str, available: list[str], default: str, prompt: s
 
 
 def _filter_available_plugins(
-    plugins: list[str],
-    plugin_type: str,
-    system: Any,
+        plugins: list[str],
+        plugin_type: str,
+        system: Any,
 ) -> list[str]:
     """Filter plugins to only those that are available."""
     available = []
@@ -168,15 +110,28 @@ def _filter_available_plugins(
 
 
 def _generate_config(
-    chat: str,
-    embedding: str,
-    vector_db: str,
-    collection: str,
-    rerank: str | None,
-    qdrant_host: str,
-    qdrant_port: int,
+        chat: str,
+        chat_model: str,
+        embedding: str,
+        embedding_model: str,
+        vector_db: str,
+        collection: str,
+        rerank: str | None,
+        rerank_model: str,
+        qdrant_host: str,
+        qdrant_port: int,
 ) -> str:
     """Generate YAML configuration."""
+
+    # Chat kwargs
+    chat_kwargs = "\n    temperature: 0.2"
+    if chat_model:
+        chat_kwargs = f"\n    model: {chat_model}\n    temperature: 0.2"
+
+    # Embedding kwargs
+    embedding_kwargs = " {}"
+    if embedding_model:
+        embedding_kwargs = f"\n    model: {embedding_model}"
 
     # Vector DB kwargs
     vdb_kwargs = ""
@@ -187,12 +142,15 @@ def _generate_config(
 
     # Rerank section
     if rerank:
+        rerank_kwargs = " {}"
+        if rerank_model:
+            rerank_kwargs = f"\n    model: {rerank_model}"
         rerank_section = f"""
 # Reranker (improves retrieval quality)
 rerank:
   enabled: true
   plugin_name: {rerank}
-  kwargs: {{}}
+  kwargs:{rerank_kwargs}
 """
     else:
         rerank_section = """
@@ -207,13 +165,12 @@ rerank:
 # Chat (LLM for answering questions)
 chat:
   plugin_name: {chat}
-  kwargs:
-    temperature: 0.2
+  kwargs:{chat_kwargs}
 
 # Embedding (text to vectors)
 embedding:
   plugin_name: {embedding}
-  kwargs: {{}}
+  kwargs:{embedding_kwargs}
 
 # Vector Database
 vector_db:
@@ -244,18 +201,18 @@ logging:
 
 
 def command(
-    non_interactive: bool = typer.Option(
-        False,
-        "--non-interactive",
-        "-y",
-        help="Use detected defaults without prompting.",
-    ),
-    show_config: bool = typer.Option(
-        False,
-        "--show",
-        "-s",
-        help="Preview config without saving.",
-    ),
+        non_interactive: bool = typer.Option(
+            False,
+            "--non-interactive",
+            "-y",
+            help="Use detected defaults without prompting.",
+        ),
+        show_config: bool = typer.Option(
+            False,
+            "--show",
+            "-s",
+            help="Preview config without saving.",
+        ),
 ) -> None:
     """
     Initialize Fitz with an interactive setup wizard.
@@ -274,31 +231,27 @@ def command(
     # Header
     # =========================================================================
 
-    if RICH:
-        console.print(Panel.fit(
-            "[bold]Fitz Setup Wizard[/bold]\n[dim]Let's configure your RAG pipeline[/dim]",
-            border_style="blue",
-        ))
-    else:
-        print("\n" + "=" * 50)
-        print("Fitz Setup Wizard")
-        print("=" * 50)
+    ui.panel(
+        "[bold]Fitz Setup Wizard[/bold]\n[dim]Let's configure your RAG pipeline[/dim]" if RICH else "Fitz Setup Wizard\nLet's configure your RAG pipeline",
+        style="blue",
+    )
 
     # =========================================================================
     # Detect System
     # =========================================================================
 
-    _header("Detecting System")
+    ui.section("Detecting System")
 
     system = detect_all()
 
     # Show detection results
-    _status("Ollama", system.ollama.available, system.ollama.details if not system.ollama.available else "")
-    _status("Qdrant", system.qdrant.available, f"{system.qdrant.host}:{system.qdrant.port}" if system.qdrant.available else "")
-    _status("FAISS", system.faiss.available)
+    ui.status("Ollama", system.ollama.available, system.ollama.details if not system.ollama.available else "")
+    ui.status("Qdrant", system.qdrant.available,
+              f"{system.qdrant.host}:{system.qdrant.port}" if system.qdrant.available else "")
+    ui.status("FAISS", system.faiss.available)
 
     for name, key_status in system.api_keys.items():
-        _status(name.capitalize(), key_status.available)
+        ui.status(name.capitalize(), key_status.available)
 
     # =========================================================================
     # Discover Plugins
@@ -320,55 +273,66 @@ def command(
     # =========================================================================
 
     if not avail_chat:
-        _print("\n✗ No chat plugins available!", "red")
-        _print("  Set an API key (COHERE_API_KEY, OPENAI_API_KEY) or start Ollama.", "dim")
+        ui.error("No chat plugins available!")
+        ui.info("Set an API key (COHERE_API_KEY, OPENAI_API_KEY) or start Ollama.")
         raise typer.Exit(1)
 
     if not avail_embedding:
-        _print("\n✗ No embedding plugins available!", "red")
+        ui.error("No embedding plugins available!")
         raise typer.Exit(1)
 
     if not avail_vector_db:
-        _print("\n✗ No vector database available!", "red")
-        _print("  Install FAISS (pip install faiss-cpu) or start Qdrant.", "dim")
+        ui.error("No vector database available!")
+        ui.info("Install FAISS (pip install faiss-cpu) or start Qdrant.")
         raise typer.Exit(1)
 
     # =========================================================================
     # User Selection
     # =========================================================================
 
-    _header("Configuration")
+    ui.section("Configuration")
 
     if non_interactive:
-        # Use first available for each
+        # Use first available for each with defaults from YAML
         chat_choice = avail_chat[0]
+        chat_model = _get_default_model("chat", chat_choice)
         embedding_choice = avail_embedding[0]
+        embedding_model = _get_default_model("embedding", embedding_choice)
         vector_db_choice = avail_vector_db[0]
         rerank_choice = avail_rerank[0] if avail_rerank else None
+        rerank_model = _get_default_model("rerank", rerank_choice) if rerank_choice else ""
         collection_name = "default"
 
-        _print(f"  Chat: {chat_choice}", "dim")
-        _print(f"  Embedding: {embedding_choice}", "dim")
-        _print(f"  Vector DB: {vector_db_choice}", "dim")
-        _print(f"  Rerank: {rerank_choice or 'disabled'}", "dim")
-        _print(f"  Collection: {collection_name}", "dim")
+        ui.info(f"Chat: {chat_choice}" + (f" ({chat_model})" if chat_model else ""))
+        ui.info(f"Embedding: {embedding_choice}" + (f" ({embedding_model})" if embedding_model else ""))
+        ui.info(f"Vector DB: {vector_db_choice}")
+        ui.info(f"Rerank: {rerank_choice or 'disabled'}" + (f" ({rerank_model})" if rerank_model else ""))
+        ui.info(f"Collection: {collection_name}")
     else:
         # Interactive selection
+
+        # Chat plugin + model
         chat_choice = _auto_or_prompt("Chat", avail_chat, avail_chat[0], "Select chat plugin")
+        chat_model = _prompt_model("chat", chat_choice)
+
+        # Embedding plugin + model
         embedding_choice = _auto_or_prompt("Embedding", avail_embedding, avail_embedding[0], "Select embedding plugin")
+        embedding_model = _prompt_model("embedding", embedding_choice)
+
+        # Vector DB
         vector_db_choice = _auto_or_prompt("Vector DB", avail_vector_db, avail_vector_db[0], "Select vector database")
 
         # Rerank is optional
+        rerank_choice = None
+        rerank_model = ""
         if avail_rerank:
-            if _prompt_confirm("Enable reranking?", default=True):
+            if ui.prompt_confirm("Enable reranking?", default=True):
                 rerank_choice = _auto_or_prompt("Rerank", avail_rerank, avail_rerank[0], "Select rerank plugin")
-            else:
-                rerank_choice = None
+                rerank_model = _prompt_model("rerank", rerank_choice)
         else:
-            rerank_choice = None
-            _print("  Rerank: not available", "dim")
+            ui.info("Rerank: not available")
 
-        collection_name = _prompt_text("Collection name", "default")
+        collection_name = ui.prompt_text("Collection name", "default")
 
     # =========================================================================
     # Generate Config
@@ -379,10 +343,13 @@ def command(
 
     config_yaml = _generate_config(
         chat=chat_choice,
+        chat_model=chat_model,
         embedding=embedding_choice,
+        embedding_model=embedding_model,
         vector_db=vector_db_choice,
         collection=collection_name,
         rerank=rerank_choice,
+        rerank_model=rerank_model,
         qdrant_host=qdrant_host,
         qdrant_port=qdrant_port,
     )
@@ -391,12 +358,8 @@ def command(
     # Show Config
     # =========================================================================
 
-    _header("Generated Configuration")
-
-    if RICH:
-        console.print(Syntax(config_yaml, "yaml", theme="monokai"))
-    else:
-        print(config_yaml)
+    ui.section("Generated Configuration")
+    ui.syntax(config_yaml, "yaml")
 
     if show_config:
         return
@@ -405,26 +368,26 @@ def command(
     # Save Config
     # =========================================================================
 
-    _header("Saving")
+    ui.section("Saving")
 
     fitz_dir = FitzPaths.workspace()
     fitz_config = FitzPaths.config()
 
     # Confirm overwrite if exists
     if fitz_config.exists() and not non_interactive:
-        if not _prompt_confirm("Config exists. Overwrite?", default=False):
-            _print("Aborted.", "yellow")
+        if not ui.prompt_confirm("Config exists. Overwrite?", default=False):
+            ui.warning("Aborted.")
             raise typer.Exit(0)
 
     fitz_dir.mkdir(parents=True, exist_ok=True)
     fitz_config.write_text(config_yaml)
-    _print(f"✓ Saved to {fitz_config}", "green")
+    ui.success(f"Saved to {fitz_config}")
 
     # =========================================================================
     # Next Steps
     # =========================================================================
 
-    _header("Done!")
+    ui.section("Done!")
 
     if RICH:
         console.print(f"""

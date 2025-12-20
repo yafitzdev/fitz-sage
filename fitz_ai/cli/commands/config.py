@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import os
 import subprocess
 
@@ -20,56 +21,9 @@ import typer
 from fitz_ai.core.config import load_config_dict, ConfigNotFoundError
 from fitz_ai.core.paths import FitzPaths
 from fitz_ai.logging.logger import get_logger
+from fitz_ai.cli.ui import ui, console, RICH, Table
 
 logger = get_logger(__name__)
-
-# Rich for UI (optional)
-try:
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.syntax import Syntax
-    from rich.table import Table
-
-    console = Console()
-    RICH = True
-except ImportError:
-    console = None
-    RICH = False
-
-
-# =============================================================================
-# UI Helpers
-# =============================================================================
-
-
-def _print(msg: str, style: str = "") -> None:
-    if RICH and style:
-        console.print(f"[{style}]{msg}[/{style}]")
-    else:
-        print(msg)
-
-
-def _header(title: str) -> None:
-    if RICH:
-        console.print(Panel.fit(f"[bold]{title}[/bold]", border_style="blue"))
-    else:
-        print(f"\n{'=' * 50}")
-        print(title)
-        print('=' * 50)
-
-
-def _error(msg: str) -> None:
-    if RICH:
-        console.print(f"[red]✗[/red] {msg}")
-    else:
-        print(f"✗ {msg}")
-
-
-def _success(msg: str) -> None:
-    if RICH:
-        console.print(f"[green]✓[/green] {msg}")
-    else:
-        print(f"✓ {msg}")
 
 
 # =============================================================================
@@ -161,25 +115,20 @@ def _show_config_yaml(config_path: Path) -> None:
     try:
         content = config_path.read_text()
     except Exception as e:
-        _error(f"Failed to read config: {e}")
+        ui.error(f"Failed to read config: {e}")
         return
 
     print()
-    if RICH:
-        console.print(Syntax(content, "yaml", theme="monokai", line_numbers=True))
-    else:
-        print(content)
+    ui.syntax(content, "yaml")
     print()
 
 
 def _show_config_json(config: dict) -> None:
     """Show config as JSON."""
-    import json
-
     print()
     if RICH:
         json_str = json.dumps(config, indent=2)
-        console.print(Syntax(json_str, "json", theme="monokai"))
+        ui.syntax(json_str, "json")
     else:
         print(json.dumps(config, indent=2))
     print()
@@ -194,7 +143,6 @@ def _open_in_editor(config_path: Path) -> None:
         # Try to find a common editor
         for candidate in ["code", "nano", "vim", "vi", "notepad"]:
             try:
-                # Check if editor exists
                 result = subprocess.run(
                     ["which", candidate] if os.name != "nt" else ["where", candidate],
                     capture_output=True,
@@ -207,16 +155,16 @@ def _open_in_editor(config_path: Path) -> None:
                 continue
 
     if not editor:
-        _error("No editor found. Set EDITOR environment variable.")
-        _print(f"Config path: {config_path}", "dim")
+        ui.error("No editor found. Set EDITOR environment variable.")
+        ui.info(f"Config path: {config_path}")
         return
 
     try:
-        _print(f"Opening in {editor}...", "dim")
+        ui.info(f"Opening in {editor}...")
         subprocess.run([editor, str(config_path)])
     except Exception as e:
-        _error(f"Failed to open editor: {e}")
-        _print(f"Config path: {config_path}", "dim")
+        ui.error(f"Failed to open editor: {e}")
+        ui.info(f"Config path: {config_path}")
 
 
 # =============================================================================
@@ -276,8 +224,8 @@ def command(
         if config_path.exists():
             print(str(config_path))
         else:
-            _error(f"Config not found: {config_path}")
-            _print("Run 'fitz init' to create one.", "dim")
+            ui.error(f"Config not found: {config_path}")
+            ui.info("Run 'fitz init' to create one.")
             raise typer.Exit(1)
         return
 
@@ -287,8 +235,8 @@ def command(
 
     if edit:
         if not config_path.exists():
-            _error("No config file to edit.")
-            _print("Run 'fitz init' first.", "dim")
+            ui.error("No config file to edit.")
+            ui.info("Run 'fitz init' first.")
             raise typer.Exit(1)
 
         _open_in_editor(config_path)
@@ -299,24 +247,24 @@ def command(
     # =========================================================================
 
     if not config_path.exists():
-        _error("No configuration found.")
+        ui.error("No configuration found.")
         print()
-        _print(f"Expected: {config_path}", "dim")
-        _print("Run 'fitz init' to create a configuration.", "dim")
+        ui.info(f"Expected: {config_path}")
+        ui.info("Run 'fitz init' to create a configuration.")
         raise typer.Exit(1)
 
     try:
         config = load_config_dict(config_path)
     except Exception as e:
-        _error(f"Failed to load config: {e}")
+        ui.error(f"Failed to load config: {e}")
         raise typer.Exit(1)
 
     # =========================================================================
     # Header
     # =========================================================================
 
-    _header("Fitz Configuration")
-    _print(f"File: {config_path}", "dim")
+    ui.header("Fitz Configuration")
+    ui.info(f"File: {config_path}")
 
     # =========================================================================
     # JSON output
@@ -341,7 +289,4 @@ def command(
     _show_config_summary(config)
 
     # Show helpful hints
-    if RICH:
-        console.print("[dim]Tip: Use --raw for full YAML, --edit to modify[/dim]")
-    else:
-        print("Tip: Use --raw for full YAML, --edit to modify")
+    ui.info("Tip: Use --raw for full YAML, --edit to modify")
