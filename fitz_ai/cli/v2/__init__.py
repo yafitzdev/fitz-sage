@@ -1,0 +1,16 @@
+# fitz_ai/cli/v2/__init__.py
+"""
+Fitz CLI v2 - Clean, minimal CLI.
+
+Usage:
+    fitz init              # Setup wizard
+    fitz ingest ./docs     # Ingest documents
+    fitz query "question"  # Query knowledge base
+    fitz db                # Inspect collections
+    fitz config            # Show configuration
+    fitz doctor            # System diagnostics
+"""
+
+from fitz_ai.cli.v2.cli import app
+
+__all__ = ["app"]
