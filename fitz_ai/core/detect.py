@@ -27,8 +27,9 @@ from __future__ import annotations
 import logging
 import os
 import socket
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -144,48 +145,218 @@ def _get_local_ip() -> Optional[str]:
         return None
 
 
-def _get_lan_hosts_to_try() -> list[str]:
+def _get_all_local_ips() -> List[str]:
     """
-    Build a list of hosts to try for LAN service detection.
+    Get all local IP addresses from all network interfaces.
+
+    This handles machines with multiple NICs (e.g., WiFi + Ethernet,
+    or machines connected to multiple networks).
+    """
+    ips = []
+
+    try:
+        # Method 1: Use socket to get hostname-based IPs
+        hostname = socket.gethostname()
+        try:
+            # getaddrinfo returns all IPs for the hostname
+            for info in socket.getaddrinfo(hostname, None, socket.AF_INET):
+                ip = info[4][0]
+                if ip not in ips and not ip.startswith("127."):
+                    ips.append(ip)
+        except socket.gaierror:
+            pass
+
+        # Method 2: Try the UDP trick for the "primary" interface
+        primary_ip = _get_local_ip()
+        if primary_ip and primary_ip not in ips:
+            ips.append(primary_ip)
+
+    except Exception as e:
+        logger.debug(f"Error getting local IPs: {e}")
+
+    return ips
+
+
+def _get_subnets_from_ips(ips: List[str]) -> List[str]:
+    """Extract unique /24 subnets from a list of IPs."""
+    subnets = []
+    for ip in ips:
+        parts = ip.split(".")
+        if len(parts) == 4:
+            subnet = ".".join(parts[:3])
+            if subnet not in subnets:
+                subnets.append(subnet)
+    return subnets
+
+
+def _check_host_port(host: str, port: int, timeout: float = 0.5) -> bool:
+    """
+    Quick TCP check if a host:port is reachable.
+
+    This is faster than a full HTTP request for initial filtering.
+    """
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        result = sock.connect_ex((host, port))
+        sock.close()
+        return result == 0
+    except Exception:
+        return False
+
+
+def _check_qdrant_http(host: str, port: int, timeout: float = 1.0) -> Optional[dict]:
+    """
+    Check if Qdrant is running at host:port via HTTP.
+
+    Returns the collections response if successful, None otherwise.
+    """
+    try:
+        import httpx
+        response = httpx.get(
+            f"http://{host}:{port}/collections",
+            timeout=timeout,
+        )
+        if response.status_code == 200:
+            return response.json()
+    except Exception:
+        pass
+    return None
+
+
+def _get_config_qdrant_host() -> Optional[str]:
+    """
+    Try to get Qdrant host from existing Fitz config.
+
+    This allows detection to use a previously configured host.
+    """
+    try:
+        from fitz_ai.core.paths import FitzPaths
+        from fitz_ai.core.config import load_config_dict
+
+        config_path = FitzPaths.config()
+        if config_path.exists():
+            config = load_config_dict(config_path)
+            # Check for qdrant host in vector_db config
+            vector_db = config.get("vector_db", {})
+            if vector_db.get("plugin_name") == "qdrant":
+                host = vector_db.get("host")
+                if host:
+                    return host
+    except Exception:
+        pass
+    return None
+
+
+def _build_lan_scan_hosts(port: int) -> List[str]:
+    """
+    Build a comprehensive list of hosts to scan for LAN services.
 
     Returns hosts in priority order:
     1. QDRANT_HOST env var (if set)
-    2. localhost / 127.0.0.1
-    3. Common LAN gateway IPs (where services often run)
-    4. Same subnet as local machine
+    2. Host from existing Fitz config (if available)
+    3. localhost / 127.0.0.1
+    4. All detected local subnets with common server addresses
+
+    This handles:
+    - Multi-NIC machines (scans all detected subnets)
+    - Common server IP patterns (.1, .2, .10, .100, .200, .254)
+    - Docker default bridge (172.17.0.x)
     """
     hosts = []
+    seen = set()
+
+    def add_host(h: str):
+        if h not in seen:
+            seen.add(h)
+            hosts.append(h)
 
     # 1. Environment variable (highest priority)
     env_host = os.getenv("QDRANT_HOST")
     if env_host:
-        hosts.append(env_host)
+        add_host(env_host)
 
-    # 2. Localhost variants
-    hosts.extend(["localhost", "127.0.0.1"])
+    # 2. Previously configured host
+    config_host = _get_config_qdrant_host()
+    if config_host:
+        add_host(config_host)
 
-    # 3. Get local IP and try common LAN patterns
-    local_ip = _get_local_ip()
-    if local_ip:
-        # Parse the subnet (e.g., 192.168.178.x)
-        parts = local_ip.split(".")
-        if len(parts) == 4:
-            subnet = ".".join(parts[:3])
+    # 3. Localhost variants
+    add_host("localhost")
+    add_host("127.0.0.1")
 
-            # Common addresses where services run on LANs
-            common_hosts = [
-                f"{subnet}.1",  # Router/gateway
-                f"{subnet}.2",  # Common server address
-                f"{subnet}.100",  # DHCP range start
-                f"{subnet}.254",  # Often used for servers
-            ]
+    # 4. Get all local IPs and their subnets
+    local_ips = _get_all_local_ips()
+    subnets = _get_subnets_from_ips(local_ips)
 
-            # Add hosts we haven't seen yet
-            for h in common_hosts:
-                if h not in hosts:
-                    hosts.append(h)
+    # Common IP endings where servers/services typically run
+    # Expanded from original [1, 2, 100, 254] to catch more cases
+    common_endings = [
+        1,  # Gateway/router
+        2,  # Often first server after gateway
+        3, 4, 5,  # Small network servers
+        10,  # Common static IP
+        50,  # Mid-range static
+        100,  # DHCP range start or static
+        150,  # Mid-range
+        200,  # Common static
+        254,  # Last usable (often used for servers)
+    ]
+
+    for subnet in subnets:
+        for ending in common_endings:
+            add_host(f"{subnet}.{ending}")
+
+    # 5. Docker default bridge network (172.17.0.x)
+    # Common for Docker-hosted Qdrant
+    docker_subnet = "172.17.0"
+    for ending in [1, 2, 3, 4, 5]:
+        add_host(f"{docker_subnet}.{ending}")
 
     return hosts
+
+
+def _scan_hosts_concurrent(
+        hosts: List[str],
+        port: int,
+        check_fn,
+        max_workers: int = 10,
+        timeout: float = 0.5,
+) -> Optional[Tuple[str, any]]:
+    """
+    Scan multiple hosts concurrently and return the first successful result.
+
+    Args:
+        hosts: List of hosts to scan
+        port: Port to check
+        check_fn: Function(host, port, timeout) -> result or None
+        max_workers: Max concurrent connections
+        timeout: Per-host timeout
+
+    Returns:
+        Tuple of (host, result) for first successful host, or None
+    """
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all checks
+        future_to_host = {
+            executor.submit(check_fn, host, port, timeout): host
+            for host in hosts
+        }
+
+        # Return first successful result
+        for future in as_completed(future_to_host):
+            host = future_to_host[future]
+            try:
+                result = future.result()
+                if result is not None:
+                    # Cancel remaining futures
+                    for f in future_to_host:
+                        f.cancel()
+                    return (host, result)
+            except Exception:
+                continue
+
+    return None
 
 
 # =============================================================================
@@ -254,10 +425,12 @@ def detect_qdrant() -> ServiceStatus:
     """
     Detect if Qdrant is accessible.
 
-    Checks these addresses in order:
+    Uses concurrent scanning for fast LAN detection. Checks:
     1. QDRANT_HOST env var (if set)
-    2. localhost / 127.0.0.1
-    3. Common LAN addresses (gateway, .2, .100, .254)
+    2. Previously configured host from .fitz/config.yaml
+    3. localhost / 127.0.0.1
+    4. Common LAN addresses on all detected subnets
+    5. Docker bridge network (172.17.0.x)
 
     Returns:
         ServiceStatus with host/port if found
@@ -271,53 +444,58 @@ def detect_qdrant() -> ServiceStatus:
             details="httpx not installed",
         )
 
-    # Build list of hosts to try (includes LAN scanning)
-    hosts_to_try = _get_lan_hosts_to_try()
     port = int(os.getenv("QDRANT_PORT", "6333"))
 
-    tried_hosts = []
-    for host in hosts_to_try:
-        tried_hosts.append(host)
-        try:
-            response = httpx.get(
-                f"http://{host}:{port}/collections",
-                timeout=1.0,  # Short timeout for LAN scanning
-            )
-            if response.status_code == 200:
-                data = response.json()
-                collections = data.get("result", {}).get("collections", [])
-                col_names = [c.get("name", "?") for c in collections[:3]]
+    # Build comprehensive host list
+    hosts_to_try = _build_lan_scan_hosts(port)
 
-                if col_names:
-                    details = f"Collections: {', '.join(col_names)}"
-                    if len(collections) > 3:
-                        details += f" (+{len(collections) - 3} more)"
-                else:
-                    details = "No collections"
+    logger.debug(f"Scanning {len(hosts_to_try)} hosts for Qdrant on port {port}")
 
-                return ServiceStatus(
-                    name="Qdrant",
-                    available=True,
-                    host=host,
-                    port=port,
-                    details=details,
-                )
-        except Exception as e:
-            logger.debug(f"Qdrant not found at {host}:{port}: {e}")
-            continue
+    # Use concurrent scanning for speed
+    result = _scan_hosts_concurrent(
+        hosts=hosts_to_try,
+        port=port,
+        check_fn=_check_qdrant_http,
+        max_workers=15,  # Scan up to 15 hosts in parallel
+        timeout=1.0,
+    )
+
+    if result:
+        host, data = result
+        collections = data.get("result", {}).get("collections", [])
+        col_names = [c.get("name", "?") for c in collections[:3]]
+
+        if col_names:
+            details = f"Collections: {', '.join(col_names)}"
+            if len(collections) > 3:
+                details += f" (+{len(collections) - 3} more)"
+        else:
+            details = "No collections"
+
+        return ServiceStatus(
+            name="Qdrant",
+            available=True,
+            host=host,
+            port=port,
+            details=details,
+        )
 
     # Build informative error message
-    if len(tried_hosts) <= 2:
-        tried_str = f"tried {', '.join(tried_hosts)}"
+    local_ips = _get_all_local_ips()
+    subnets = _get_subnets_from_ips(local_ips)
+
+    if subnets:
+        subnet_str = ", ".join(f"{s}.x" for s in subnets[:2])
+        if len(subnets) > 2:
+            subnet_str += f" +{len(subnets) - 2} more"
+        details = f"Not found (scanned localhost and {subnet_str} on port {port})"
     else:
-        tried_str = (
-            f"tried {tried_hosts[0]}, {tried_hosts[1]}, and {len(tried_hosts) - 2} LAN addresses"
-        )
+        details = f"Not found (scanned localhost:{port}, couldn't detect LAN)"
 
     return ServiceStatus(
         name="Qdrant",
         available=False,
-        details=f"Not running ({tried_str}:{port})",
+        details=details,
     )
 
 

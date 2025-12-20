@@ -3,4 +3,4 @@
 
 from fitz_ai.cli.commands import config
 
-__all__ = ["init", "ingest", "query", "db", "config", "doctor"]
+__all__ = ["init", "ingest", "query", "config", "doctor"]

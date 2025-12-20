@@ -72,14 +72,15 @@ def _check_dependencies() -> list[tuple[str, bool, str]]:
     for item in packages:
         name = item[0]
         desc = item[1]
-        import_name = item[2] if len(item) > 2 else item[0]
+        pip_pkg = item[2] if len(item) > 2 else item[0]
 
         try:
-            mod = __import__(import_name.replace("-", "_"))
+            # FIX: Import using 'name' (the module name), not 'pip_pkg'
+            mod = __import__(name.replace("-", "_"))
             version = getattr(mod, "__version__", "")
             results.append((name, True, version))
         except ImportError:
-            results.append((name, False, f"pip install {import_name}"))
+            results.append((name, False, f"pip install {pip_pkg}"))
 
     return results
 

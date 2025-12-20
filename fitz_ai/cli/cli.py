@@ -8,7 +8,6 @@ Commands:
     fitz init       Setup wizard
     fitz ingest     Ingest documents
     fitz query      Query knowledge base
-    fitz db         Inspect collections
     fitz config     View configuration
     fitz doctor     System diagnostics
 """
@@ -27,13 +26,12 @@ app = typer.Typer(
 
 def _register_commands() -> None:
     """Register all commands."""
-    from fitz_ai.cli.commands import init, ingest, query, db, doctor
+    from fitz_ai.cli.commands import init, ingest, query, doctor
     from fitz_ai.cli.commands import config
 
     app.command("init")(init.command)
     app.command("ingest")(ingest.command)
     app.command("query")(query.command)
-    app.command("db")(db.command)
     app.command("config")(config.command)
     app.command("doctor")(doctor.command)
 

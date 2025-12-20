@@ -6,7 +6,6 @@ Usage:
     fitz init              # Setup wizard
     fitz ingest ./docs     # Ingest documents
     fitz query "question"  # Query knowledge base
-    fitz db                # Inspect collections
     fitz config            # Show configuration
     fitz doctor            # System diagnostics
 """
