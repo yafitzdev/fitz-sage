@@ -25,9 +25,9 @@ class MockEmbedder:
 
 
 class MockRerankEngine:
-    def rerank(self, query, chunks):
-        # reverse order to prove it ran
-        return list(reversed(chunks))
+    def rerank(self, query, documents):
+        # Return list of (index, score) tuples in reversed order to prove it ran
+        return [(i, 1.0 - i * 0.1) for i in reversed(range(len(documents)))]
 
 
 def test_retriever_rerank_flow():

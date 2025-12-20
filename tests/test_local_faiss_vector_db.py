@@ -86,29 +86,6 @@ def test_local_faiss_vector_db_upsert_search_and_persist(tmp_path: Path):
     assert results_reloaded[0].id == results[0].id
 
 
-def test_local_faiss_vector_db_legacy_add_interface(tmp_path: Path):
-    """Test the legacy add() interface with Chunk objects."""
-    dim = 4
-
-    db = FaissLocalVectorDB(path=tmp_path, persist=True)
-
-    # Use legacy add() with chunks that have embeddings
-    chunks = [_make_chunk(i, dim) for i in range(5)]
-    db.add(chunks)
-
-    assert db.count() == 5
-
-    # Search using "default" collection (legacy add uses "default")
-    query = (np.ones(dim, dtype="float32") * 3).tolist()
-    results = db.search(
-        collection_name="default",
-        query_vector=query,
-        limit=2,
-    )
-
-    assert len(results) == 2
-
-
 def test_local_faiss_dimension_auto_detection(tmp_path: Path):
     """Test that dimension is correctly auto-detected."""
     db = FaissLocalVectorDB(path=tmp_path)

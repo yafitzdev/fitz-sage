@@ -2,16 +2,16 @@
 """Tests for YAML plugin discovery system."""
 import pytest
 
-from fitz_ai.llm import available_llm_plugins, get_llm_plugin, list_yaml_plugins
+from fitz_ai.llm import available_llm_plugins, get_llm_plugin, list_plugins
 from fitz_ai.llm.registry import LLMRegistryError
 
 
 class TestYAMLPluginDiscovery:
     """Tests for YAML-based plugin discovery."""
 
-    def test_list_yaml_plugins(self):
-        """list_yaml_plugins returns available plugins."""
-        chat_plugins = list_yaml_plugins("chat")
+    def test_list_plugins(self):
+        """list_plugins returns available plugins."""
+        chat_plugins = list_plugins("chat")
         assert isinstance(chat_plugins, list)
         assert len(chat_plugins) > 0
 
@@ -23,7 +23,7 @@ class TestYAMLPluginDiscovery:
 
     def test_get_llm_plugin_returns_instance(self):
         """get_llm_plugin returns instance for YAML plugins."""
-        yaml_plugins = list_yaml_plugins("chat")
+        yaml_plugins = list_plugins("chat")
         if not yaml_plugins:
             pytest.skip("No YAML chat plugins")
 
