@@ -56,7 +56,7 @@ def _get_collections(raw_config: dict) -> List[str]:
 
 
 def _select_collection(collections: List[str], default: str) -> str:
-    """Let user select a collection."""
+    """Let user select a collection via numbered menu."""
     if not collections:
         ui.warning("No collections found. Using config default.")
         return default
@@ -65,17 +65,36 @@ def _select_collection(collections: List[str], default: str) -> str:
         ui.info(f"Collection: {collections[0]} (only one available)")
         return collections[0]
 
-    # Show available collections
-    ui.info("Available collections:")
-    for c in collections:
-        marker = " (default)" if c == default else ""
-        ui.info(f"  • {c}{marker}")
+    # Sort collections: default first, then alphabetically
+    sorted_collections = sorted(collections)
+    if default in sorted_collections:
+        sorted_collections.remove(default)
+        sorted_collections.insert(0, default)
 
-    return ui.prompt_choice(
-        "Select collection",
-        collections,
-        default if default in collections else collections[0],
-    )
+    # Show available collections with numbers
+    ui.info("Available collections:")
+    for idx, collection in enumerate(sorted_collections, 1):
+        marker = " (default)" if collection == default else ""
+        ui.info(f"  [{idx}] {collection}{marker}")
+
+    # Prompt for number selection (default is always 1)
+    while True:
+        if RICH:
+            from rich.prompt import Prompt
+            response = Prompt.ask("Select collection number", default="1")
+        else:
+            response = input(f"Select collection number [1]: ").strip()
+            if not response:
+                response = "1"
+
+        try:
+            selection = int(response)
+            if 1 <= selection <= len(sorted_collections):
+                return sorted_collections[selection - 1]
+            else:
+                ui.error(f"Please enter a number between 1 and {len(sorted_collections)}")
+        except ValueError:
+            ui.error("Please enter a valid number")
 
 
 # =============================================================================
@@ -133,38 +152,38 @@ def _display_answer(answer, show_sources: bool = True) -> None:
 
 
 def command(
-    question: Optional[str] = typer.Argument(
-        None,
-        help="Question to ask (will prompt if not provided).",
-    ),
-    collection: Optional[str] = typer.Option(
-        None,
-        "--collection",
-        "-c",
-        help="Collection to query (uses config default if not specified).",
-    ),
-    top_k: Optional[int] = typer.Option(
-        None,
-        "--top-k",
-        "-k",
-        help="Number of chunks to retrieve.",
-    ),
-    no_rerank: bool = typer.Option(
-        False,
-        "--no-rerank",
-        help="Disable reranking.",
-    ),
-    no_sources: bool = typer.Option(
-        False,
-        "--no-sources",
-        help="Don't show source documents.",
-    ),
-    interactive: bool = typer.Option(
-        False,
-        "--interactive",
-        "-i",
-        help="Interactive mode (continuous Q&A).",
-    ),
+        question: Optional[str] = typer.Argument(
+            None,
+            help="Question to ask (will prompt if not provided).",
+        ),
+        collection: Optional[str] = typer.Option(
+            None,
+            "--collection",
+            "-c",
+            help="Collection to query (uses config default if not specified).",
+        ),
+        top_k: Optional[int] = typer.Option(
+            None,
+            "--top-k",
+            "-k",
+            help="Number of chunks to retrieve.",
+        ),
+        no_rerank: bool = typer.Option(
+            False,
+            "--no-rerank",
+            help="Disable reranking.",
+        ),
+        no_sources: bool = typer.Option(
+            False,
+            "--no-sources",
+            help="Don't show source documents.",
+        ),
+        interactive: bool = typer.Option(
+            False,
+            "--interactive",
+            "-i",
+            help="Interactive mode (continuous Q&A).",
+        ),
 ) -> None:
     """
     Query your knowledge base.
@@ -188,19 +207,23 @@ def command(
     default_collection = typed_config.retriever.collection
 
     # =========================================================================
-    # Collection selection (interactive mode without -c flag)
+    # Collection selection (if not specified via -c flag)
     # =========================================================================
 
     if collection:
         # User specified collection via flag
         typed_config.retriever.collection = collection
-    elif question is None:
-        # Interactive mode - let user pick collection
+    else:
+        # Show collection menu (whether question provided or not)
         collections = _get_collections(raw_config)
-        if collections:
+        if collections and len(collections) > 1:
             selected = _select_collection(collections, default_collection)
             typed_config.retriever.collection = selected
-        print()
+            print()
+        elif collections:
+            # Only one collection available
+            ui.info(f"Collection: {collections[0]} (only one available)")
+            typed_config.retriever.collection = collections[0]
 
     # Override top_k if specified
     if top_k:
@@ -213,70 +236,47 @@ def command(
     # Get display info
     display_collection = typed_config.retriever.collection
     display_chat = raw_config.get("chat", {}).get("plugin_name", "?")
-    rerank_status = "on" if typed_config.rerank.enabled else "off"
 
     # =========================================================================
-    # Header
+    # Query loop
     # =========================================================================
 
-    ui.header("Fitz Query")
-    ui.info(f"Collection: {display_collection}")
-    ui.info(f"Chat: {display_chat} | Rerank: {rerank_status}")
+    if interactive:
+        ui.info(f"Interactive mode - Collection: {display_collection}")
+        ui.info("Type 'quit' or 'exit' to end session")
+        print()
 
-    # =========================================================================
-    # Build pipeline
-    # =========================================================================
-
-    try:
         pipeline = RAGPipeline.from_config(typed_config)
-    except Exception as e:
-        ui.error(f"Failed to initialize pipeline: {e}")
-        raise typer.Exit(1)
-
-    # =========================================================================
-    # Interactive mode
-    # =========================================================================
-
-    if interactive or question is None:
-        print()
-        ui.info("Interactive mode. Type 'exit' or 'quit' to stop.")
-        print()
 
         while True:
-            try:
-                q = ui.prompt_text("Question", "")
-                if not q:
-                    continue
-                if q.lower() in ("exit", "quit", "q"):
-                    ui.info("Goodbye!")
-                    break
-
-                # Run query
-                try:
-                    answer = pipeline.run(q)
-                    _display_answer(answer, show_sources=not no_sources)
-                except Exception as e:
-                    ui.error(f"Query failed: {e}")
-
-                print()
-
-            except KeyboardInterrupt:
-                print()
+            question_text = ui.prompt_text("Question")
+            if question_text.lower() in ("quit", "exit", "q"):
                 ui.info("Goodbye!")
                 break
 
-        return
+            try:
+                answer = pipeline.run(question_text)
+                _display_answer(answer, show_sources=not no_sources)
+            except Exception as e:
+                ui.error(f"Query failed: {e}")
+                logger.exception("Query error")
 
-    # =========================================================================
-    # Single query mode
-    # =========================================================================
+    else:
+        # Single query mode
+        if question is None:
+            question_text = ui.prompt_text("Question")
+        else:
+            question_text = question
 
-    ui.info(f"Question: {question}")
-    print()
+        ui.info(f"Collection: {display_collection}")
+        ui.info(f"Chat: {display_chat}")
+        print()
 
-    try:
-        answer = pipeline.run(question)
-        _display_answer(answer, show_sources=not no_sources)
-    except Exception as e:
-        ui.error(f"Query failed: {e}")
-        raise typer.Exit(1)
+        try:
+            pipeline = RAGPipeline.from_config(typed_config)
+            answer = pipeline.run(question_text)
+            _display_answer(answer, show_sources=not no_sources)
+        except Exception as e:
+            ui.error(f"Query failed: {e}")
+            logger.exception("Query error")
+            raise typer.Exit(1)
