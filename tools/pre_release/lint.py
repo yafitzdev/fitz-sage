@@ -13,6 +13,9 @@ Usage:
 
 Requirements:
     pip install ruff black isort
+
+Ruff unsafe fix:
+    ruff check --fix --unsafe-fixes fitz_ai tests tools
 """
 
 from __future__ import annotations
