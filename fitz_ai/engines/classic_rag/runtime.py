@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 
 from fitz_ai.core import Answer, Constraints, Provenance
 from fitz_ai.engines.classic_rag.config import ClassicRagConfig, load_config
-from fitz_ai.engines.classic_rag.pipeline.pipeline.engine import RAGPipeline
+from fitz_ai.engines.classic_rag.pipeline.engine import RAGPipeline
 
 
 def run_classic_rag(

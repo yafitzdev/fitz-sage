@@ -17,7 +17,7 @@ from fitz_ai.core import (
 )
 from fitz_ai.engines.classic_rag.config.schema import ClassicRagConfig
 from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import RGSAnswer
-from fitz_ai.engines.classic_rag.pipeline.pipeline.engine import RAGPipeline
+from fitz_ai.engines.classic_rag.pipeline.engine import RAGPipeline
 
 
 class ClassicRagEngine:

@@ -58,7 +58,7 @@ Use the examples as templates. Key patterns:
 
 ```python
 # Config-driven pipeline creation
-from fitz_ai.engines.classic_rag.pipeline.pipeline.engine import create_pipeline_from_yaml
+from fitz_ai.engines.classic_rag.pipeline.engine import create_pipeline_from_yaml
 
 pipeline = create_pipeline_from_yaml("my_config.yaml")
 

@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 
 from fitz_ai.engines.classic_rag.models.chunk import Chunk
-from fitz_ai.engines.classic_rag.retrieval.runtime.loader import (
+from fitz_ai.engines.classic_rag.retrieval.loader import (
     RetrievalDependencies,
     RetrievalPluginSpec,
     StepSpec,
@@ -27,7 +27,7 @@ from fitz_ai.engines.classic_rag.retrieval.runtime.loader import (
     list_available_plugins,
     load_plugin_spec,
 )
-from fitz_ai.engines.classic_rag.retrieval.runtime.registry import (
+from fitz_ai.engines.classic_rag.retrieval.registry import (
     available_retrieval_plugins,
     get_retrieval_plugin,
 )
@@ -294,7 +294,7 @@ class TestRegistry:
 
     def test_get_nonexistent_plugin_raises(self):
         """Should raise PluginNotFoundError for missing plugin."""
-        from fitz_ai.engines.classic_rag.retrieval.runtime.registry import (
+        from fitz_ai.engines.classic_rag.retrieval.registry import (
             PluginNotFoundError,
         )
 

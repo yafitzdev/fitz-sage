@@ -20,8 +20,8 @@ from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import (
 from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import (
     RGSConfig as RGSRuntimeConfig,
 )
-from fitz_ai.engines.classic_rag.pipeline.context.pipeline import ContextPipeline
-from fitz_ai.engines.classic_rag.retrieval.runtime.registry import get_retrieval_plugin
+from fitz_ai.engines.classic_rag.pipeline.pipeline import ContextPipeline
+from fitz_ai.engines.classic_rag.retrieval.registry import get_retrieval_plugin
 from fitz_ai.llm.registry import get_llm_plugin
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE, VECTOR_DB

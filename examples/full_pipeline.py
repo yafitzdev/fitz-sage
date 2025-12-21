@@ -31,7 +31,7 @@ if not os.getenv("COHERE_API_KEY"):
     sys.exit(1)
 
 from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
-from fitz_ai.engines.classic_rag.pipeline.context.pipeline import ContextPipeline
+from fitz_ai.engines.classic_rag.pipeline.pipeline import ContextPipeline
 from fitz_ai.engines.classic_rag.retrieval.runtime.plugins.dense import DenseRetrievalPlugin
 from fitz_ai.ingest.chunking.plugins.simple import SimpleChunker
 from fitz_ai.ingest.ingestion.registry import get_ingest_plugin

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fitz_ai.engines.classic_rag.retrieval.runtime.loader import (
+from fitz_ai.engines.classic_rag.retrieval.loader import (
     RetrievalDependencies,
     RetrievalPipelineFromYaml,
     create_retrieval_pipeline,

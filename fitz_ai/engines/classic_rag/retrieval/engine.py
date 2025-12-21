@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing import Any, List
 
 from fitz_ai.engines.classic_rag.models.chunk import Chunk
-from fitz_ai.engines.classic_rag.retrieval.runtime.base import RetrievalPlugin
-from fitz_ai.engines.classic_rag.retrieval.runtime.registry import get_retriever_plugin
+from fitz_ai.engines.classic_rag.retrieval.base import RetrievalPlugin
+from fitz_ai.engines.classic_rag.retrieval.registry import get_retrieval_plugin
 
 
 @dataclass(slots=True)
@@ -24,7 +24,7 @@ class RetrieverEngine:
 
     @classmethod
     def from_name(cls, name: str, **plugin_kwargs: Any) -> "RetrieverEngine":
-        plugin_cls = get_retriever_plugin(name)
+        plugin_cls = get_retrieval_plugin(name)
         plugin = plugin_cls(**plugin_kwargs)  # type: ignore[arg-type]
         return cls(plugin=plugin)
 

@@ -11,7 +11,7 @@ from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import (
     RGSConfig,
 )
 from fitz_ai.engines.classic_rag.models.chunk import Chunk
-from fitz_ai.engines.classic_rag.pipeline.pipeline.engine import RAGPipeline
+from fitz_ai.engines.classic_rag.pipeline.engine import RAGPipeline
 
 
 # =============================================================================

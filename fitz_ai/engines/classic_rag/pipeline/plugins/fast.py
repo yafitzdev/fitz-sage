@@ -4,16 +4,16 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass
 
-from fitz_ai.engines.classic_rag.config.schema import RAGConfig
-from fitz_ai.engines.classic_rag.pipeline.pipeline.base import Pipeline, PipelinePlugin
-from fitz_ai.engines.classic_rag.pipeline.pipeline.engine import RAGPipeline
+from fitz_ai.engines.classic_rag.config.schema import ClassicRagConfig
+from fitz_ai.engines.classic_rag.pipeline.base import Pipeline, PipelinePlugin
+from fitz_ai.engines.classic_rag.pipeline.engine import RAGPipeline
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
 logger = get_logger(__name__)
 
 
-def _clone_cfg(cfg: RAGConfig) -> RAGConfig:
+def _clone_cfg(cfg: ClassicRagConfig) -> ClassicRagConfig:
     if hasattr(cfg, "model_copy"):
         return cfg.model_copy(deep=True)  # pydantic v2
     if hasattr(cfg, "copy"):
@@ -36,7 +36,7 @@ class FastPipelinePlugin(PipelinePlugin):
 
     plugin_name: str = "fast"
 
-    def build(self, cfg: RAGConfig) -> Pipeline:
+    def build(self, cfg: ClassicRagConfig) -> Pipeline:
         logger.info(f"{PIPELINE} Building Fast pipeline (rerank disabled)")
 
         clone = _clone_cfg(cfg)

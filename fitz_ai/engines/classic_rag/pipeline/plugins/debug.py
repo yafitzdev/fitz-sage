@@ -4,9 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from fitz_ai.engines.classic_rag.config.schema import RAGConfig
-from fitz_ai.engines.classic_rag.pipeline.pipeline.base import Pipeline, PipelinePlugin
-from fitz_ai.engines.classic_rag.pipeline.pipeline.engine import RAGPipeline
+from fitz_ai.engines.classic_rag.config.schema import ClassicRagConfig
+from fitz_ai.engines.classic_rag.pipeline.base import Pipeline, PipelinePlugin
+from fitz_ai.engines.classic_rag.pipeline.engine import RAGPipeline
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
@@ -24,7 +24,7 @@ class DebugPipelinePlugin(PipelinePlugin):
 
     plugin_name: str = "debug"
 
-    def build(self, cfg: RAGConfig) -> Pipeline:
+    def build(self, cfg: ClassicRagConfig) -> Pipeline:
         logger.info(f"{PIPELINE} Building Debug pipeline")
         return DebugRunner(RAGPipeline.from_config(cfg))
 
