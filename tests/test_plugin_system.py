@@ -174,7 +174,7 @@ class TestChatPlugins:
         spec = load_plugin("chat", "cohere")
 
         assert spec.plugin_name == "cohere"
-        assert spec.provider.base_url == "https://api.cohere.ai/v1"
+        assert spec.provider.base_url == "https://api.cohere.ai/v2"
         assert spec.endpoint.path == "/chat"
         assert spec.request.messages_transform.value == "cohere_chat"
         assert "COHERE_API_KEY" in spec.auth.env_vars
