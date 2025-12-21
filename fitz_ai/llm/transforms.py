@@ -56,13 +56,45 @@ class OpenAIChatTransform:
 
 
 # =============================================================================
-# Cohere format
+# Cohere v2 format (current API)
 # =============================================================================
 
 
 class CohereChatTransform:
     """
-    Cohere v1 Chat API format.
+    Cohere v2 Chat API format.
+
+    Cohere v2 API uses OpenAI-compatible message format with messages array.
+    System messages use role "system", user messages use "user",
+    assistant messages use "assistant".
+
+    Documentation: https://docs.cohere.com/reference/chat
+
+    Output:
+    {
+        "messages": [
+            {"role": "system", "content": "System prompt here"},
+            {"role": "user", "content": "User message"},
+            {"role": "assistant", "content": "Assistant response"}
+        ]
+    }
+    """
+
+    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+        # Cohere v2 API accepts OpenAI-compatible format directly
+        return {"messages": messages}
+
+
+# =============================================================================
+# Cohere v1 format (legacy, kept for backwards compatibility)
+# =============================================================================
+
+
+class CohereChatV1Transform:
+    """
+    Cohere v1 Chat API format (LEGACY).
+
+    This is the OLD format for Cohere v1 API. Use CohereChatTransform for v2.
 
     Splits messages into:
     - preamble: System message (optional)
@@ -239,7 +271,8 @@ class OllamaChatTransform:
 
 TRANSFORM_REGISTRY: dict[str, type[MessageTransformer]] = {
     "openai_chat": OpenAIChatTransform,
-    "cohere_chat": CohereChatTransform,
+    "cohere_chat": CohereChatTransform,  # v2 API (current)
+    "cohere_chat_v1": CohereChatV1Transform,  # v1 API (legacy)
     "anthropic_chat": AnthropicChatTransform,
     "gemini_chat": GeminiChatTransform,
     "ollama_chat": OllamaChatTransform,

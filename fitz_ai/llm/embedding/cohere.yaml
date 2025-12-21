@@ -2,6 +2,10 @@
 #
 # Cohere Embedding Plugin - v2 Embed API
 # Documentation: https://docs.cohere.com/reference/embed
+#
+# IMPORTANT: Cohere v2 API returns embeddings in a different format:
+#   { "embeddings": { "float": [[...], [...]] } }
+# The path must be "embeddings.float[0]" for single text or "embeddings.float" for batch.
 
 # =============================================================================
 # IDENTITY
@@ -67,7 +71,15 @@ request:
 # =============================================================================
 # RESPONSE CONFIGURATION
 # =============================================================================
+# Cohere v2 API response format:
+#   {
+#     "embeddings": {
+#       "float": [[0.1, 0.2, ...], [0.3, 0.4, ...]]
+#     }
+#   }
+# For single text: embeddings.float[0]
+# For batch: embeddings.float
 response:
-  embeddings_path: "embeddings[0]"
+  embeddings_path: "embeddings.float[0]"
   is_array: true
   array_index: 0

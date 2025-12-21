@@ -7,6 +7,10 @@
 #   - command-a-03-2025       (newest, best performance)
 #   - command-r-plus-08-2024  (powerful, complex tasks)
 #   - command-r-08-2024       (efficient, general purpose)
+#
+# IMPORTANT: This plugin is configured for Cohere v2 API which uses:
+#   - OpenAI-compatible messages format (messages array with role/content)
+#   - Response in message.content[0].text format
 
 # =============================================================================
 # IDENTITY
@@ -61,6 +65,8 @@ defaults:
 # =============================================================================
 # REQUEST CONFIGURATION
 # =============================================================================
+# Cohere v2 API uses OpenAI-compatible message format:
+#   {"messages": [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]}
 request:
   messages_transform: "cohere_chat"
   static_fields:
@@ -73,11 +79,18 @@ request:
 # =============================================================================
 # RESPONSE CONFIGURATION
 # =============================================================================
+# Cohere v2 API response format:
+#   {
+#     "message": {
+#       "role": "assistant",
+#       "content": [{"type": "text", "text": "Response here..."}]
+#     }
+#   }
 response:
-  content_path: "text"
+  content_path: "message.content[0].text"
   is_array: false
   array_index: 0
   metadata_paths:
     finish_reason: "finish_reason"
-    tokens_input: "meta.billed_units.input_tokens"
-    tokens_output: "meta.billed_units.output_tokens"
+    tokens_input: "usage.billed_units.input_tokens"
+    tokens_output: "usage.billed_units.output_tokens"
