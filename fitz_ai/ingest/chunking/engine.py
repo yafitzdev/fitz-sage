@@ -52,21 +52,44 @@ class ChunkingEngine:
         return cls(plugin)
 
     def run(self, raw_doc: object) -> List[Chunk]:
-        path = Path(raw_doc.path)
+        """
+        Chunk a raw document into smaller pieces.
 
-        logger.debug(f"{CHUNKING} Chunking file: {path}")
+        Args:
+            raw_doc: A RawDocument object with 'path', 'content', and 'metadata' attributes.
+                     The 'content' attribute contains the already-extracted text.
 
-        if not path.exists() or not path.is_file():
-            raise IngestionChunkingError(f"File does not exist or is not a file: {path}")
+        Returns:
+            List of Chunk objects.
+        """
+        # Get the path for logging/metadata purposes
+        path_str = getattr(raw_doc, "path", "unknown")
+        path = Path(path_str) if path_str != "unknown" else None
 
-        try:
-            text = path.read_text(encoding="utf-8", errors="ignore")
-        except Exception as e:
-            logger.error(f"{CHUNKING} Failed reading file '{path}': {e}")
-            raise IngestionChunkingError(f"Failed reading file for chunking: {path}") from e
+        logger.debug(f"{CHUNKING} Chunking document: {path_str}")
 
+        # IMPORTANT: Use the content from raw_doc, NOT re-read from disk!
+        # The ingestion plugin has already extracted the text (including PDF text extraction).
+        text = getattr(raw_doc, "content", None)
+
+        if text is None:
+            # Fallback: try to read from disk (for backwards compatibility)
+            logger.warning(f"{CHUNKING} raw_doc has no 'content' attribute, falling back to disk read")
+            if path is None or not path.exists() or not path.is_file():
+                raise IngestionChunkingError(f"File does not exist or is not a file: {path_str}")
+            try:
+                text = path.read_text(encoding="utf-8", errors="ignore")
+            except Exception as e:
+                logger.error(f"{CHUNKING} Failed reading file '{path}': {e}")
+                raise IngestionChunkingError(f"Failed reading file for chunking: {path}") from e
+
+        if not text or not text.strip():
+            logger.warning(f"{CHUNKING} Empty content for document: {path_str}")
+            return []
+
+        # Build base metadata
         base_meta: Dict[str, Any] = {
-            "source_file": str(path),
+            "source_file": str(path) if path else path_str,
             **(getattr(raw_doc, "metadata", None) or {}),
         }
 
@@ -75,8 +98,8 @@ class ChunkingEngine:
         except IngestionChunkingError:
             raise
         except Exception as e:
-            logger.error(f"{CHUNKING} Chunking plugin failed for '{path}': {e}")
-            raise IngestionChunkingError(f"Chunking plugin failed for file '{path}'") from e
+            logger.error(f"{CHUNKING} Chunking plugin failed for '{path_str}': {e}")
+            raise IngestionChunkingError(f"Chunking plugin failed for file '{path_str}'") from e
 
-        logger.debug(f"{CHUNKING} Extracted {len(chunks)} chunks from '{path}'")
+        logger.debug(f"{CHUNKING} Extracted {len(chunks)} chunks from '{path_str}'")
         return chunks

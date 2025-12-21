@@ -8,6 +8,9 @@
 #
 # Supports both local and Qdrant Cloud deployments.
 # For cloud: set QDRANT_API_KEY and pass host/port for your cluster.
+#
+# NOTE: This is updated for Qdrant 1.0+ API which uses "query" instead of "vector"
+#       for the search endpoint.
 
 name: qdrant
 type: vector_db
@@ -49,18 +52,18 @@ connection:
 # =============================================================================
 operations:
   # ---------------------------------------------------------------------------
-  # Search for similar vectors
+  # Search for similar vectors (Qdrant 1.0+ API)
   # ---------------------------------------------------------------------------
   search:
-    endpoint: /collections/{{collection}}/points/search
+    endpoint: /collections/{{collection}}/points/query
     method: POST
     body:
-      vector: "{{query_vector}}"
+      query: "{{query_vector}}"
       limit: "{{limit}}"
       with_payload: "{{with_payload}}"
 
     response:
-      results_path: result
+      results_path: result.points
       mapping:
         id: id
         score: score
