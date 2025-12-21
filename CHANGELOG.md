@@ -11,6 +11,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.5] - 2025-12-21
+
+### 🎉 Highlights
+**Plugin Schema Standardization** - All LLM plugin YAMLs now follow an identical structure with master schema files as the single source of truth. Adding new providers is now more predictable and self-documenting.
+
+**Generic HTTP Vector DB Plugin System** - HTTP-based vector databases (Qdrant, Pinecone, Weaviate, Milvus) now work with just a YAML config drop - no Python code needed. The same plugin interface works for both HTTP and local vector DBs.
+
+### 🚀 Added
+- **Master schema files** for plugin validation and defaults
+  - `fitz_ai/llm/schemas/chat_plugin_schema.yaml`
+  - `fitz_ai/llm/schemas/embedding_plugin_schema.yaml`
+  - `fitz_ai/llm/schemas/rerank_plugin_schema.yaml`
+  - `fitz_ai/vector_db/schemas/vector_db_plugin_schema.yaml` - documents all YAML fields for vector DB plugins
+- **Schema defaults loader** `fitz_ai/llm/schema_defaults.py` - reads defaults from YAML schemas instead of hardcoding in Python
+- **FAISS admin methods** - `list_collections()`, `get_collection_stats()`, `scroll()` for feature parity with HTTP-based vector DBs
+- **Azure OpenAI embedding plugin** `fitz_ai/llm/embedding/azure_openai.yaml`
+- **New vector DB plugins** (YAML-only, no Python needed):
+  - `fitz_ai/vector_db/plugins/pinecone.yaml` - Pinecone cloud vector DB
+  - `fitz_ai/vector_db/plugins/weaviate.yaml` - Weaviate vector DB
+  - `fitz_ai/vector_db/plugins/milvus.yaml` - Milvus vector DB
+- **Vector DB base class for local plugins** `fitz_ai/vector_db/base_local.py` - reduces boilerplate when implementing local vector DBs
+- **Comprehensive plugin tests** `tests/test_plugin_system.py` covering chat, embedding, rerank, and FAISS
+- **Vector DB plugin tests** `tests/test_generic_vector_db_plugin.py` - validates YAML loading, HTTP operations, point transformation, UUID conversion, and auth handling
+
+### 📄 Changed
+- **Standardized plugin YAML structure** - All 13 LLM plugins now follow identical section ordering:
+```
+  IDENTITY → PROVIDER → AUTHENTICATION → REQUIRED_ENV → HEALTH_CHECK → ENDPOINT → DEFAULTS → REQUEST → RESPONSE
+```
+- **Chat plugins updated**: openai, cohere, anthropic, local_ollama, azure_openai
+- **Embedding plugins updated**: openai, cohere, local_ollama, azure_openai
+- **Rerank plugins updated**: cohere
+- **Renamed** `list_yaml_plugins()` → `list_plugins()` (removed redundant "yaml" prefix)
+- **Loader applies defaults** from master schema - missing optional fields get default values automatically
+- **Updated `qdrant.yaml`** - added `count` and `create_collection` operations for full feature parity
+
+### 🛠️ Improved
+- **Single source of truth** - Field definitions, types, defaults, and allowed values all live in schema YAMLs
+- **Self-documenting schemas** - Each field has `description` and `example` in the schema
+- **Forward compatibility** - New fields with defaults don't break existing plugin YAMLs
+- **Consistent vector DB interface** - FAISS now implements same admin methods as Qdrant, no backend-specific code needed
+- **Generic HTTP vector DB loader** - `GenericVectorDBPlugin` executes YAML specs for any HTTP-based vector DB with support for:
+  - All standard operations: `search`, `upsert`, `count`, `create_collection`, `delete_collection`, `list_collections`, `get_collection_stats`
+  - Auto-collection creation on 404
+  - Point format transformation (standard → provider-specific)
+  - UUID conversion for DBs that require it (e.g., Qdrant)
+  - Flexible auth (bearer, custom headers, optional)
+  - Jinja2 templating for endpoints and request bodies
+- **`available_vector_db_plugins()`** - lists all available plugins (both YAML and local)
+
+### 🐛 Fixed
+- **FAISS missing interface methods** - Added `list_collections()`, `get_collection_stats()`, `scroll()` to match vector DB contract
+- **Rerank mock in tests** - Fixed `MockRerankEngine` to return `List[Tuple[int, float]]` instead of flat list
+
+---
+
 ## [0.3.4] - 2025-12-19
 
 ### 🎉 Pypi-Release
@@ -275,7 +331,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.5...HEAD
+[0.3.4]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.1...v0.3.2
