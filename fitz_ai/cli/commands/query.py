@@ -65,6 +65,8 @@ def _get_collections(raw_config: dict) -> List[str]:
 
 def _display_answer(answer, show_sources: bool = True) -> None:
     """Display the answer with optional sources."""
+    import os
+
     print()
 
     if RICH:
@@ -82,15 +84,43 @@ def _display_answer(answer, show_sources: bool = True) -> None:
             print()
             table = Table(title="Sources")
             table.add_column("#", style="dim", width=3)
-            table.add_column("Document", style="cyan")
-            table.add_column("Excerpt", style="dim", max_width=60)
+            table.add_column("Document", style="cyan", max_width=40)
+            table.add_column("Chunk", style="dim", justify="center", width=5)
+            table.add_column("Vector", style="yellow", justify="right", width=7)
+            table.add_column("Rerank", style="green", justify="right", width=7)
+            table.add_column("Excerpt", style="dim", max_width=45)
 
             for i, source in enumerate(answer.sources[:5], 1):
                 doc_id = getattr(source, "doc_id", getattr(source, "source_file", "?"))
                 content = getattr(source, "content", getattr(source, "text", ""))
-                excerpt = content[:100] + "..." if len(content) > 100 else content
+                metadata = getattr(source, "metadata", {})
+
+                # Get filename only (not full path)
+                filename = os.path.basename(doc_id) if doc_id else "?"
+
+                # Get title if available, otherwise use filename
+                title = metadata.get("title", "")
+                display_name = title if title else filename
+
+                # Truncate display name if too long
+                if len(display_name) > 38:
+                    display_name = display_name[:35] + "..."
+
+                # Get chunk index
+                chunk_idx = metadata.get("chunk_index", "-")
+                chunk_str = str(chunk_idx) if chunk_idx != "-" else "-"
+
+                # Get scores
+                vector_score = metadata.get("vector_score")
+                rerank_score = metadata.get("rerank_score")
+                vector_str = f"{vector_score:.3f}" if vector_score is not None else "-"
+                rerank_str = f"{rerank_score:.3f}" if rerank_score is not None else "-"
+
+                # Excerpt
+                excerpt = content[:70] + "..." if len(content) > 70 else content
                 excerpt = excerpt.replace("\n", " ")
-                table.add_row(str(i), doc_id, excerpt)
+
+                table.add_row(str(i), display_name, chunk_str, vector_str, rerank_str, excerpt)
 
             console.print(table)
     else:
@@ -104,7 +134,28 @@ def _display_answer(answer, show_sources: bool = True) -> None:
             print("Sources:")
             for i, source in enumerate(answer.sources[:5], 1):
                 doc_id = getattr(source, "doc_id", getattr(source, "source_file", "?"))
-                print(f"  [{i}] {doc_id}")
+                metadata = getattr(source, "metadata", {})
+
+                # Get filename only
+                filename = os.path.basename(doc_id) if doc_id else "?"
+                title = metadata.get("title", "")
+                display_name = title if title else filename
+
+                # Get chunk index
+                chunk_idx = metadata.get("chunk_index", "")
+                chunk_str = f" [chunk {chunk_idx}]" if chunk_idx != "" else ""
+
+                # Get scores
+                vector_score = metadata.get("vector_score")
+                rerank_score = metadata.get("rerank_score")
+                scores = []
+                if vector_score is not None:
+                    scores.append(f"vec={vector_score:.3f}")
+                if rerank_score is not None:
+                    scores.append(f"rerank={rerank_score:.3f}")
+                score_str = f" ({', '.join(scores)})" if scores else ""
+
+                print(f"  [{i}] {display_name}{chunk_str}{score_str}")
 
 
 # =============================================================================
