@@ -10,6 +10,12 @@ Usage:
     ui.header("My Command")
     ui.success("Done!")
     name = ui.prompt_text("Enter name", default="default")
+
+    # Numbered choice selection
+    choice = ui.prompt_numbered_choice("Select plugin", ["cohere", "local_ollama"], "cohere")
+
+    # Smart defaults (prefers non-local)
+    default = get_preferred_default(["local_faiss", "qdrant"])  # Returns "qdrant"
 """
 
 from __future__ import annotations
@@ -50,6 +56,53 @@ except ImportError:
     Syntax = None  # type: ignore
     Markdown = None  # type: ignore
     Progress = None  # type: ignore
+
+
+# =============================================================================
+# Plugin Utilities
+# =============================================================================
+
+
+def is_local_plugin(name: str) -> bool:
+    """
+    Check if a plugin is local/offline-based.
+
+    Local plugins (like local_ollama, local_faiss) should be treated as
+    fallbacks rather than defaults.
+
+    Args:
+        name: Plugin name to check
+
+    Returns:
+        True if plugin is local/offline-based
+    """
+    return any(x in name.lower() for x in ("ollama", "local", "offline"))
+
+
+def get_preferred_default(choices: list[str], fallback: str = "") -> str:
+    """
+    Get the preferred default from a list of choices.
+
+    Prioritizes non-local options over local ones (local_faiss, local_ollama).
+    Local options should be fallbacks, not defaults.
+
+    Args:
+        choices: List of available choices
+        fallback: Fallback if no choices available
+
+    Returns:
+        Best default choice (non-local preferred)
+    """
+    if not choices:
+        return fallback
+
+    # Find first non-local option
+    for choice in choices:
+        if not is_local_plugin(choice):
+            return choice
+
+    # All options are local, return first one
+    return choices[0]
 
 
 # =============================================================================
@@ -197,7 +250,11 @@ class UI:
                     print("Please enter a valid number.")
 
     def prompt_choice(self, prompt: str, choices: list[str], default: str = "") -> str:
-        """Prompt for choice from list."""
+        """
+        Prompt for choice from list (simple inline format).
+
+        For a better UX with numbered selection, use prompt_numbered_choice().
+        """
         if not default and choices:
             default = choices[0]
 
@@ -213,6 +270,85 @@ class UI:
                     return response
                 print(f"Choose from: {', '.join(choices)}")
 
+    def prompt_numbered_choice(
+            self,
+            prompt: str,
+            choices: list[str],
+            default: str = "",
+    ) -> str:
+        """
+        Prompt user to select from numbered choices.
+
+        The default option is always shown at position [1].
+
+        Example output:
+            Chat plugin:
+              [1] cohere (default)
+              [2] local_ollama
+            Choice [1]:
+            → cohere
+
+        Args:
+            prompt: The prompt text to display
+            choices: List of choices to select from
+            default: Default choice (will be shown first)
+
+        Returns:
+            The selected choice
+        """
+        if not choices:
+            return default
+
+        # Ensure default is in choices, fallback to first
+        if default not in choices:
+            default = choices[0]
+
+        # Reorder choices: default first, then the rest in original order
+        ordered_choices = [default] + [c for c in choices if c != default]
+
+        # Print prompt and choices
+        if RICH:
+            console.print(f"  [bold]{prompt}:[/bold]")
+            for i, choice in enumerate(ordered_choices, 1):
+                if choice == default:
+                    console.print(f"    [cyan][{i}][/cyan] {choice} [dim](default)[/dim]")
+                else:
+                    console.print(f"    [cyan][{i}][/cyan] {choice}")
+        else:
+            print(f"  {prompt}:")
+            for i, choice in enumerate(ordered_choices, 1):
+                if choice == default:
+                    print(f"    [{i}] {choice} (default)")
+                else:
+                    print(f"    [{i}] {choice}")
+
+        # Get user input (default is always 1)
+        while True:
+            if RICH:
+                response = Prompt.ask("  Choice", default="1")
+            else:
+                response = input("  Choice [1]: ").strip()
+                if not response:
+                    response = "1"
+
+            try:
+                idx = int(response)
+                if 1 <= idx <= len(ordered_choices):
+                    selected = ordered_choices[idx - 1]
+                    if RICH:
+                        console.print(f"  [dim]→ {selected}[/dim]")
+                    return selected
+                else:
+                    if RICH:
+                        console.print(f"  [red]Please enter 1-{len(ordered_choices)}[/red]")
+                    else:
+                        print(f"  Please enter 1-{len(ordered_choices)}")
+            except ValueError:
+                if RICH:
+                    console.print("  [red]Please enter a number[/red]")
+                else:
+                    print("  Please enter a number")
+
     def prompt_confirm(self, prompt: str, default: bool = True) -> bool:
         """Prompt for yes/no confirmation."""
         if RICH:
@@ -225,10 +361,10 @@ class UI:
             return response in ("y", "yes")
 
     def prompt_path(
-        self,
-        prompt: str,
-        default: str = ".",
-        must_exist: bool = True,
+            self,
+            prompt: str,
+            default: str = ".",
+            must_exist: bool = True,
     ) -> Path:
         """Prompt for a path with optional validation."""
         while True:
@@ -252,10 +388,10 @@ class UI:
     # -------------------------------------------------------------------------
 
     def table(
-        self,
-        headers: list[str],
-        rows: list[list[str]],
-        title: str = "",
+            self,
+            headers: list[str],
+            rows: list[list[str]],
+            title: str = "",
     ) -> None:
         """Print a table."""
         if RICH:
@@ -312,9 +448,9 @@ class UI:
     # -------------------------------------------------------------------------
 
     def progress(
-        self,
-        description: str = "Working...",
-        total: Optional[int] = None,
+            self,
+            description: str = "Working...",
+            total: Optional[int] = None,
     ):
         """
         Create a progress context manager.
@@ -409,6 +545,9 @@ __all__ = [
     "console",
     "RICH",
     "UI",
+    # Plugin utilities
+    "is_local_plugin",
+    "get_preferred_default",
     # Re-export Rich components for advanced use
     "Panel",
     "Table",

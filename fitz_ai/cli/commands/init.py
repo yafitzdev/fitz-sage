@@ -14,124 +14,21 @@ from typing import Any
 
 import typer
 
-from fitz_ai.cli.ui import RICH, console, ui
+from fitz_ai.cli.ui import RICH, console, ui, is_local_plugin, get_preferred_default
 from fitz_ai.core.detect import detect_all
 from fitz_ai.llm.loader import load_plugin
 from fitz_ai.llm.registry import available_llm_plugins
 from fitz_ai.vector_db.registry import available_vector_db_plugins
 from fitz_ai.engines.classic_rag.retrieval import available_retrieval_plugins
 
-
 # =============================================================================
 # Helpers
 # =============================================================================
 
 
-def _is_local_plugin(name: str) -> bool:
-    """Check if plugin is local/Ollama-based."""
-    return any(x in name.lower() for x in ("ollama", "local", "offline"))
-
-
-def _get_preferred_default(choices: list[str], fallback: str = "") -> str:
-    """
-    Get the preferred default from a list of choices.
-
-    Prioritizes non-local options over local ones (local_faiss, local_ollama).
-    Local options should be fallbacks, not defaults.
-
-    Args:
-        choices: List of available choices
-        fallback: Fallback if no choices available
-
-    Returns:
-        Best default choice (non-local preferred)
-    """
-    if not choices:
-        return fallback
-
-    # Find first non-local option
-    for choice in choices:
-        if not _is_local_plugin(choice):
-            return choice
-
-    # All options are local, return first one
-    return choices[0]
-
-
 def _is_faiss_plugin(name: str) -> bool:
     """Check if plugin is FAISS-based."""
     return "faiss" in name.lower()
-
-
-def _prompt_numbered_choice(
-        prompt: str,
-        choices: list[str],
-        default: str = "",
-) -> str:
-    """
-    Prompt user to select from numbered choices.
-
-    The default option is always shown at position [1].
-
-    Example output:
-        Select chat plugin:
-          [1] cohere (default)
-          [2] local_ollama
-        Choice [1]:
-    """
-    if not choices:
-        return default
-
-    # Ensure default is in choices, fallback to first
-    if default not in choices:
-        default = choices[0]
-
-    # Reorder choices: default first, then the rest in original order
-    ordered_choices = [default] + [c for c in choices if c != default]
-
-    # Print prompt and choices
-    if RICH:
-        console.print(f"  [bold]{prompt}:[/bold]")
-        for i, choice in enumerate(ordered_choices, 1):
-            if choice == default:
-                console.print(f"    [cyan][{i}][/cyan] {choice} [dim](default)[/dim]")
-            else:
-                console.print(f"    [cyan][{i}][/cyan] {choice}")
-    else:
-        print(f"  {prompt}:")
-        for i, choice in enumerate(ordered_choices, 1):
-            if choice == default:
-                print(f"    [{i}] {choice} (default)")
-            else:
-                print(f"    [{i}] {choice}")
-
-    # Get user input (default is always 1)
-    while True:
-        if RICH:
-            from rich.prompt import Prompt
-            response = Prompt.ask("  Choice", default="1")
-        else:
-            response = input("  Choice [1]: ").strip()
-            if not response:
-                response = "1"
-
-        try:
-            idx = int(response)
-            if 1 <= idx <= len(ordered_choices):
-                selected = ordered_choices[idx - 1]
-                if RICH:
-                    console.print(f"  [dim]→ {selected}[/dim]")
-                return selected
-            else:
-                if RICH:
-                    console.print(f"  [red]Please enter 1-{len(ordered_choices)}[/red]")
-                else:
-                    print(f"  Please enter 1-{len(ordered_choices)}")
-        except ValueError:
-            if RICH:
-                console.print("  [red]Please enter a number[/red]")
-            else:
-                print("  Please enter a number")
 
 
 def _get_default_model(plugin_type: str, plugin_name: str) -> str:
@@ -149,7 +46,7 @@ def _prompt_model(plugin_type: str, plugin_name: str) -> str:
     if not default:
         return ""  # No model config for this plugin
 
-    return ui.prompt_text(f"  Model", default)
+    return ui.prompt_text("  Model", default)
 
 
 # =============================================================================
@@ -158,9 +55,9 @@ def _prompt_model(plugin_type: str, plugin_name: str) -> str:
 
 
 def _filter_available_plugins(
-        plugins: list[str],
-        plugin_type: str,
-        system: Any,
+    plugins: list[str],
+    plugin_type: str,
+    system: Any,
 ) -> list[str]:
     """Filter plugins to only those that are available."""
     available = []
@@ -169,7 +66,7 @@ def _filter_available_plugins(
         is_available = False
 
         # Check local/Ollama plugins
-        if _is_local_plugin(plugin):
+        if is_local_plugin(plugin):
             is_available = system.ollama.available
 
         # Check FAISS
@@ -196,17 +93,16 @@ def _filter_available_plugins(
 
 
 def _generate_config(
-        chat: str,
-        chat_model: str,
-        embedding: str,
-        embedding_model: str,
-        vector_db: str,
-        collection: str,
-        retrieval: str,
-        rerank: str | None,
-        rerank_model: str,
-        qdrant_host: str,
-        qdrant_port: int,
+    chat: str,
+    chat_model: str,
+    embedding: str,
+    embedding_model: str,
+    vector_db: str,
+    retrieval: str,
+    rerank: str | None,
+    rerank_model: str,
+    qdrant_host: str,
+    qdrant_port: int,
 ) -> str:
     """Generate YAML configuration."""
 
@@ -269,10 +165,9 @@ vector_db:
 
 # Retrieval (YAML-based plugin)
 # The plugin defines the retrieval pipeline steps.
-# Plugins like 'dense_rerank' will use the reranker if available.
+# Collection is set per-query or during ingestion.
 retrieval:
   plugin_name: {retrieval}
-  collection: {collection}
   top_k: 5
 {rerank_section}
 # RGS (Retrieval-Guided Synthesis)
@@ -293,18 +188,18 @@ logging:
 
 
 def command(
-        non_interactive: bool = typer.Option(
-            False,
-            "--non-interactive",
-            "-y",
-            help="Use detected defaults without prompting.",
-        ),
-        show_config: bool = typer.Option(
-            False,
-            "--show",
-            "-s",
-            help="Preview config without saving.",
-        ),
+    non_interactive: bool = typer.Option(
+        False,
+        "--non-interactive",
+        "-y",
+        help="Use detected defaults without prompting.",
+    ),
+    show_config: bool = typer.Option(
+        False,
+        "--show",
+        "-s",
+        help="Preview config without saving.",
+    ),
 ) -> None:
     """
     Initialize Fitz with an interactive setup wizard.
@@ -398,17 +293,16 @@ def command(
 
     if non_interactive:
         # Use best available for each (prefer non-local options)
-        chat_choice = _get_preferred_default(avail_chat)
+        chat_choice = get_preferred_default(avail_chat)
         chat_model = _get_default_model("chat", chat_choice)
-        embedding_choice = _get_preferred_default(avail_embedding)
+        embedding_choice = get_preferred_default(avail_embedding)
         embedding_model = _get_default_model("embedding", embedding_choice)
-        vector_db_choice = _get_preferred_default(avail_vector_db)
-        retrieval_choice = _get_preferred_default(avail_retrieval, "dense")
-        rerank_choice = _get_preferred_default(avail_rerank) if avail_rerank else None
+        vector_db_choice = get_preferred_default(avail_vector_db)
+        retrieval_choice = get_preferred_default(avail_retrieval, "dense")
+        rerank_choice = get_preferred_default(avail_rerank) if avail_rerank else None
         rerank_model = (
             _get_default_model("rerank", rerank_choice) if rerank_choice else ""
         )
-        collection_name = "default"
 
         ui.info(f"Chat: {chat_choice}" + (f" ({chat_model})" if chat_model else ""))
         ui.info(
@@ -421,36 +315,35 @@ def command(
             f"Rerank: {rerank_choice or 'not available'}"
             + (f" ({rerank_model})" if rerank_model else "")
         )
-        ui.info(f"Collection: {collection_name}")
     else:
         # Interactive selection with numbered choices
 
         # Chat plugin + model
-        chat_choice = _prompt_numbered_choice(
-            "Chat plugin", avail_chat, _get_preferred_default(avail_chat)
+        chat_choice = ui.prompt_numbered_choice(
+            "Chat plugin", avail_chat, get_preferred_default(avail_chat)
         )
         chat_model = _prompt_model("chat", chat_choice)
 
         print()  # Spacing between sections
 
         # Embedding plugin + model
-        embedding_choice = _prompt_numbered_choice(
-            "Embedding plugin", avail_embedding, _get_preferred_default(avail_embedding)
+        embedding_choice = ui.prompt_numbered_choice(
+            "Embedding plugin", avail_embedding, get_preferred_default(avail_embedding)
         )
         embedding_model = _prompt_model("embedding", embedding_choice)
 
         print()
 
         # Vector DB
-        vector_db_choice = _prompt_numbered_choice(
-            "Vector database", avail_vector_db, _get_preferred_default(avail_vector_db)
+        vector_db_choice = ui.prompt_numbered_choice(
+            "Vector database", avail_vector_db, get_preferred_default(avail_vector_db)
         )
 
         print()
 
         # Retrieval plugin
-        retrieval_choice = _prompt_numbered_choice(
-            "Retrieval plugin", avail_retrieval, _get_preferred_default(avail_retrieval, "dense")
+        retrieval_choice = ui.prompt_numbered_choice(
+            "Retrieval plugin", avail_retrieval, get_preferred_default(avail_retrieval, "dense")
         )
 
         print()
@@ -461,17 +354,12 @@ def command(
         rerank_choice = None
         rerank_model = ""
         if avail_rerank:
-            rerank_choice = _prompt_numbered_choice(
-                "Rerank plugin", avail_rerank, _get_preferred_default(avail_rerank)
+            rerank_choice = ui.prompt_numbered_choice(
+                "Rerank plugin", avail_rerank, get_preferred_default(avail_rerank)
             )
             rerank_model = _prompt_model("rerank", rerank_choice)
-            print()
         else:
             ui.info("Rerank: not available (no rerank plugins detected)")
-            print()
-
-        # Collection name
-        collection_name = ui.prompt_text("  Collection name", "default")
 
     # =========================================================================
     # Generate Config
@@ -486,7 +374,6 @@ def command(
         embedding=embedding_choice,
         embedding_model=embedding_model,
         vector_db=vector_db_choice,
-        collection=collection_name,
         retrieval=retrieval_choice,
         rerank=rerank_choice,
         rerank_model=rerank_model,
@@ -530,20 +417,20 @@ def command(
     ui.section("Done!")
 
     if RICH:
-        console.print(f"""
+        console.print("""
 [green]Your configuration is ready![/green]
 
 Next steps:
-  [cyan]fitz ingest ./docs {collection_name}[/cyan]  # Ingest documents
-  [cyan]fitz query "your question"[/cyan]           # Query knowledge base
-  [cyan]fitz doctor[/cyan]                          # Verify setup
+  [cyan]fitz ingest ./docs my_collection[/cyan]  # Ingest documents
+  [cyan]fitz query "your question"[/cyan]        # Query knowledge base
+  [cyan]fitz doctor[/cyan]                       # Verify setup
 """)
     else:
-        print(f"""
+        print("""
 Your configuration is ready!
 
 Next steps:
-  fitz ingest ./docs {collection_name}  # Ingest documents
-  fitz query "your question"            # Query knowledge base
-  fitz doctor                           # Verify setup
+  fitz ingest ./docs my_collection  # Ingest documents
+  fitz query "your question"        # Query knowledge base
+  fitz doctor                       # Verify setup
 """)

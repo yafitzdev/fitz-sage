@@ -58,90 +58,6 @@ def _get_collections(raw_config: dict) -> List[str]:
         return []
 
 
-def _select_collection(collections: List[str], default: str) -> str:
-    """Let user select a collection via numbered menu."""
-    if not collections:
-        ui.warning("No collections found. Using config default.")
-        return default
-
-    if len(collections) == 1:
-        ui.info(f"Collection: {collections[0]} (only one available)")
-        return collections[0]
-
-    # Sort collections: default first, then alphabetically
-    sorted_collections = sorted(collections)
-    if default in sorted_collections:
-        sorted_collections.remove(default)
-        sorted_collections.insert(0, default)
-
-    # Show available collections with numbers
-    ui.info("Available collections:")
-    for idx, collection in enumerate(sorted_collections, 1):
-        marker = " (default)" if collection == default else ""
-        ui.info(f"  [{idx}] {collection}{marker}")
-
-    # Prompt for number selection (default is always 1)
-    while True:
-        if RICH:
-            from rich.prompt import Prompt
-            response = Prompt.ask("Select collection number", default="1")
-        else:
-            response = input("Select collection number [1]: ").strip()
-            if not response:
-                response = "1"
-
-        try:
-            selection = int(response)
-            if 1 <= selection <= len(sorted_collections):
-                return sorted_collections[selection - 1]
-            else:
-                ui.error(f"Please enter a number between 1 and {len(sorted_collections)}")
-        except ValueError:
-            ui.error("Please enter a valid number")
-
-
-def _select_retrieval(retrievals: List[str], default: str) -> str:
-    """Let user select a retrieval strategy via numbered menu."""
-    if not retrievals:
-        ui.warning("No retrieval plugins found. Using default.")
-        return default
-
-    if len(retrievals) == 1:
-        ui.info(f"Retrieval: {retrievals[0]} (only one available)")
-        return retrievals[0]
-
-    # Sort retrievals: default first, then alphabetically
-    sorted_retrievals = sorted(retrievals)
-    if default in sorted_retrievals:
-        sorted_retrievals.remove(default)
-        sorted_retrievals.insert(0, default)
-
-    # Show available retrievals with numbers
-    ui.info("Available retrieval strategies:")
-    for idx, retrieval in enumerate(sorted_retrievals, 1):
-        marker = " (default)" if retrieval == default else ""
-        ui.info(f"  [{idx}] {retrieval}{marker}")
-
-    # Prompt for number selection (default is always 1)
-    while True:
-        if RICH:
-            from rich.prompt import Prompt
-            response = Prompt.ask("Select retrieval strategy", default="1")
-        else:
-            response = input("Select retrieval strategy [1]: ").strip()
-            if not response:
-                response = "1"
-
-        try:
-            selection = int(response)
-            if 1 <= selection <= len(sorted_retrievals):
-                return sorted_retrievals[selection - 1]
-            else:
-                ui.error(f"Please enter a number between 1 and {len(sorted_retrievals)}")
-        except ValueError:
-            ui.error("Please enter a valid number")
-
-
 # =============================================================================
 # Answer Display
 # =============================================================================
@@ -281,11 +197,12 @@ def command(
     else:
         collections = _get_collections(raw_config)
         if collections and len(collections) > 1:
-            selected = _select_collection(collections, default_collection)
+            selected = ui.prompt_numbered_choice(
+                "Collection", collections, default_collection
+            )
             typed_config.retrieval.collection = selected
             print()
         elif collections:
-            ui.info(f"Collection: {collections[0]} (only one available)")
             typed_config.retrieval.collection = collections[0]
 
     # Retrieval strategy selection
@@ -293,11 +210,15 @@ def command(
         typed_config.retrieval.plugin_name = retrieval
     else:
         if len(available_retrievals) > 1:
-            selected_retrieval = _select_retrieval(available_retrievals, default_retrieval)
+            # Use config's retrieval as the default (set in fitz init)
+            selected_retrieval = ui.prompt_numbered_choice(
+                "Retrieval strategy",
+                available_retrievals,
+                default_retrieval,  # Use the config default, not get_preferred_default
+            )
             typed_config.retrieval.plugin_name = selected_retrieval
             print()
         elif available_retrievals:
-            ui.info(f"Retrieval: {available_retrievals[0]} (only one available)")
             typed_config.retrieval.plugin_name = available_retrievals[0]
 
     # Override top_k if specified
@@ -311,44 +232,49 @@ def command(
     # Get display info
     display_collection = typed_config.retrieval.collection
     display_retrieval = typed_config.retrieval.plugin_name
-    display_chat = raw_config.get("chat", {}).get("plugin_name", "?")
+
+    # Chat
+    chat_plugin = raw_config.get("chat", {}).get("plugin_name", "?")
+    chat_model = raw_config.get("chat", {}).get("kwargs", {}).get("model", "")
+    display_chat = f"{chat_plugin} ({chat_model})" if chat_model else chat_plugin
+
+    # Embedding
+    embedding_plugin = raw_config.get("embedding", {}).get("plugin_name", "?")
+    embedding_model = raw_config.get("embedding", {}).get("kwargs", {}).get("model", "")
+    display_embedding = f"{embedding_plugin} ({embedding_model})" if embedding_model else embedding_plugin
+
+    # Rerank
+    display_rerank = None
+    if raw_config.get("rerank", {}).get("enabled"):
+        rerank_plugin = raw_config.get("rerank", {}).get("plugin_name", "?")
+        rerank_model = raw_config.get("rerank", {}).get("kwargs", {}).get("model", "")
+        display_rerank = f"{rerank_plugin} ({rerank_model})" if rerank_model else rerank_plugin
 
     # =========================================================================
-    # Query execution
+    # Show query info
     # =========================================================================
 
-    if interactive:
-        ui.info(f"Interactive mode - Collection: {display_collection}, Retrieval: {display_retrieval}")
-        ui.info("Type 'quit' or 'exit' to end session")
-        print()
+    info_parts = [
+        f"Collection: {display_collection}",
+        f"Retrieval: {display_retrieval}",
+        f"Chat: {display_chat}",
+        f"Embedding: {display_embedding}",
+    ]
+    if display_rerank:
+        info_parts.append(f"Rerank: {display_rerank}")
 
+    ui.info(" | ".join(info_parts))
+    print()
+
+    # =========================================================================
+    # Execute query
+    # =========================================================================
+
+    try:
         pipeline = RAGPipeline.from_config(typed_config)
-
-        while True:
-            question_text = ui.prompt_text("Question")
-            if question_text.lower() in ("quit", "exit", "q"):
-                ui.info("Goodbye!")
-                break
-
-            try:
-                answer = pipeline.run(question_text)
-                _display_answer(answer, show_sources=not no_sources)
-            except Exception as e:
-                ui.error(f"Query failed: {e}")
-                logger.exception("Query error")
-
-    else:
-        # Single query mode
-        ui.info(f"Collection: {display_collection}")
-        ui.info(f"Retrieval: {display_retrieval}")
-        ui.info(f"Chat: {display_chat}")
-        print()
-
-        try:
-            pipeline = RAGPipeline.from_config(typed_config)
-            answer = pipeline.run(question_text)
-            _display_answer(answer, show_sources=not no_sources)
-        except Exception as e:
-            ui.error(f"Query failed: {e}")
-            logger.exception("Query error")
-            raise typer.Exit(1)
+        answer = pipeline.run(question_text)
+        _display_answer(answer, show_sources=not no_sources)
+    except Exception as e:
+        ui.error(f"Query failed: {e}")
+        logger.exception("Query error")
+        raise typer.Exit(1)
