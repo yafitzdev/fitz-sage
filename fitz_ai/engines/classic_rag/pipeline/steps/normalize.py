@@ -1,4 +1,4 @@
-# pipeline/context/steps/normalize.py
+# fitz_ai/engines/classic_rag/pipeline/steps/normalize.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -22,58 +22,47 @@ def _normalize_text(text: str) -> str:
     return " ".join(str(text or "").split())
 
 
+def _get_attr(obj: Any, *keys: str, default: Any = None) -> Any:
+    """
+    Get attribute from dict or object, trying multiple keys.
+
+    Args:
+        obj: Dict or object to extract from
+        *keys: Keys/attributes to try in order
+        default: Default value if none found
+    """
+    is_dict = isinstance(obj, dict)
+    for key in keys:
+        val = obj.get(key) if is_dict else getattr(obj, key, None)
+        if val is not None:
+            return val
+    return default
+
+
 def _to_chunk_dict(chunk_like: Any) -> ChunkDict:
     """
-    Convert chunk-like objects into canonical dict form.
+    Convert chunk-like objects (dict or dataclass) into canonical dict form.
     """
-    if isinstance(chunk_like, dict):
-        data = dict(chunk_like)
-        metadata = data.get("metadata") or {}
-        if not isinstance(metadata, Mapping):
-            metadata = {}
-
-        doc_id = str(
-            data.get("doc_id")
-            or data.get("document_id")
-            or data.get("source")
-            or "unknown"
-        )
-        chunk_index = int(
-            data.get("chunk_index") if data.get("chunk_index") is not None else 0
-        )
-        chunk_id = data.get("id")
-        if chunk_id is None or str(chunk_id).strip() == "":
-            chunk_id = f"{doc_id}:{chunk_index}"
-
-        return {
-            "id": str(chunk_id),
-            "doc_id": doc_id,
-            "chunk_index": chunk_index,
-            "content": str(data.get("content") or ""),
-            "metadata": dict(metadata),
-        }
-
-    metadata = getattr(chunk_like, "metadata", {}) or {}
+    metadata = _get_attr(chunk_like, "metadata", default={})
     if not isinstance(metadata, Mapping):
         metadata = {}
 
-    doc_id = str(
-        getattr(chunk_like, "doc_id", None)
-        or getattr(chunk_like, "document_id", None)
-        or getattr(chunk_like, "source", None)
-        or "unknown"
-    )
-    chunk_index = int(getattr(chunk_like, "chunk_index", 0) or 0)
+    doc_id = str(_get_attr(chunk_like, "doc_id", "document_id", "source", default="unknown"))
 
-    chunk_id = getattr(chunk_like, "id", None)
+    chunk_index_raw = _get_attr(chunk_like, "chunk_index", default=0)
+    chunk_index = int(chunk_index_raw) if chunk_index_raw is not None else 0
+
+    chunk_id = _get_attr(chunk_like, "id")
     if chunk_id is None or str(chunk_id).strip() == "":
         chunk_id = f"{doc_id}:{chunk_index}"
+
+    content = str(_get_attr(chunk_like, "content", default="") or "")
 
     return {
         "id": str(chunk_id),
         "doc_id": doc_id,
         "chunk_index": chunk_index,
-        "content": str(getattr(chunk_like, "content", "") or ""),
+        "content": content,
         "metadata": dict(metadata),
     }
 

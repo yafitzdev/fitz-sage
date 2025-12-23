@@ -5,8 +5,9 @@ Retrieval-Guided Synthesis (RGS) - Generates grounded answers from retrieved chu
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.engines.classic_rag.exceptions import PipelineError, RGSGenerationError
 from fitz_ai.engines.classic_rag.generation.prompting.assembler import PromptAssembler
@@ -17,18 +18,28 @@ if TYPE_CHECKING:
     from fitz_ai.core.answer_mode import AnswerMode
 
 
+def _get_attr(obj: Any, *keys: str, default: Any = None) -> Any:
+    """Get attribute from dict or object, trying multiple keys in order."""
+    is_dict = isinstance(obj, dict)
+    for key in keys:
+        val = obj.get(key) if is_dict else getattr(obj, key, None)
+        if val is not None:
+            return val
+    return default
+
+
 @dataclass
 class RGSConfig:
     """Configuration for Retrieval-Guided Synthesis."""
 
     enable_citations: bool = True
     strict_grounding: bool = True
-    answer_style: Optional[str] = None
-    max_chunks: Optional[int] = 8
-    max_answer_chars: Optional[int] = None
+    answer_style: str | None = None
+    max_chunks: int | None = 8
+    max_answer_chars: int | None = None
     include_query_in_context: bool = True
     source_label_prefix: str = "S"
-    prompt_config: Optional[Dict[str, str]] = None
+    prompt_config: dict[str, str] | None = None
 
 
 @dataclass
@@ -45,11 +56,9 @@ class RGSSourceRef:
 
     source_id: str
     index: int
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    # Added fields for proper source display
-    doc_id: Optional[str] = None
-    content: Optional[str] = None
-    text: Optional[str] = None  # Alias for content
+    metadata: dict[str, Any] = field(default_factory=dict)
+    doc_id: str | None = None
+    content: str | None = None
 
 
 @dataclass
@@ -57,8 +66,8 @@ class RGSAnswer:
     """Structured answer from RGS."""
 
     answer: str
-    sources: List[RGSSourceRef] = field(default_factory=list)
-    mode: Optional["AnswerMode"] = None
+    sources: list[RGSSourceRef] = field(default_factory=list)
+    mode: "AnswerMode | None" = None
     """
     Epistemic posture of the answer.
 
@@ -68,7 +77,7 @@ class RGSAnswer:
 
 
 # Type alias for chunk-like inputs
-ChunkInput = Union[Dict[str, Any], Any]
+ChunkInput = dict[str, Any] | Any
 
 
 class RGS:
@@ -78,7 +87,7 @@ class RGS:
     Builds prompts and structures answers from retrieved chunks.
     """
 
-    def __init__(self, config: Optional[RGSConfig] = None):
+    def __init__(self, config: RGSConfig | None = None):
         self.config = config or RGSConfig()
         self._assembler = PromptAssembler(
             defaults=PromptSlots(),
@@ -100,12 +109,12 @@ class RGS:
             self,
             raw_answer: str,
             chunks: Sequence[ChunkInput],
-            mode: Optional["AnswerMode"] = None,
+            mode: "AnswerMode | None" = None,
     ) -> RGSAnswer:
         """Structure raw LLM output into RGSAnswer with source references."""
         try:
             limited = self._limit_chunks(chunks)
-            sources: List[RGSSourceRef] = []
+            sources: list[RGSSourceRef] = []
 
             for idx, chunk in enumerate(limited, start=1):
                 cid = self._get_chunk_id(chunk, idx)
@@ -120,7 +129,6 @@ class RGS:
                         metadata=meta,
                         doc_id=doc_id,
                         content=content,
-                        text=content,  # Alias for backwards compatibility
                     )
                 )
 
@@ -128,7 +136,7 @@ class RGS:
         except Exception as e:
             raise PipelineError("Failed to build RGS answer") from e
 
-    def _limit_chunks(self, chunks: Sequence[ChunkInput]) -> List[ChunkInput]:
+    def _limit_chunks(self, chunks: Sequence[ChunkInput]) -> list[ChunkInput]:
         """Limit chunks to max_chunks config."""
         if self.config.max_chunks is None:
             return list(chunks)
@@ -162,44 +170,20 @@ class RGS:
 
     def _get_chunk_content(self, chunk: ChunkInput) -> str:
         """Extract content from chunk-like object."""
-        if isinstance(chunk, dict):
-            return str(chunk.get("content") or chunk.get("text") or "")
-        return str(getattr(chunk, "content", None) or getattr(chunk, "text", "") or "")
+        return str(_get_attr(chunk, "content", "text", default="") or "")
 
     def _get_chunk_id(self, chunk: ChunkInput, index: int) -> str:
         """Extract or generate chunk ID."""
-        if isinstance(chunk, dict):
-            return str(chunk.get("id") or chunk.get("chunk_id") or f"chunk_{index}")
-        return str(
-            getattr(chunk, "id", None)
-            or getattr(chunk, "chunk_id", None)
-            or f"chunk_{index}"
-        )
+        chunk_id = _get_attr(chunk, "id", "chunk_id")
+        return str(chunk_id) if chunk_id is not None else f"chunk_{index}"
 
     def _get_chunk_doc_id(self, chunk: ChunkInput) -> str:
         """Extract document ID from chunk-like object."""
-        if isinstance(chunk, dict):
-            return str(
-                chunk.get("doc_id")
-                or chunk.get("document_id")
-                or chunk.get("source_file")
-                or chunk.get("source")
-                or "unknown"
-            )
-        return str(
-            getattr(chunk, "doc_id", None)
-            or getattr(chunk, "document_id", None)
-            or getattr(chunk, "source_file", None)
-            or getattr(chunk, "source", None)
-            or "unknown"
-        )
+        return str(_get_attr(chunk, "doc_id", "document_id", "source_file", "source", default="unknown"))
 
-    def _get_chunk_metadata(self, chunk: ChunkInput) -> Dict[str, Any]:
+    def _get_chunk_metadata(self, chunk: ChunkInput) -> dict[str, Any]:
         """Extract metadata from chunk-like object."""
-        if isinstance(chunk, dict):
-            meta = chunk.get("metadata", {})
-            return dict(meta) if isinstance(meta, Mapping) else {}
-        meta = getattr(chunk, "metadata", {})
+        meta = _get_attr(chunk, "metadata", default={})
         return dict(meta) if isinstance(meta, Mapping) else {}
 
 

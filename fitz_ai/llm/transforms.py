@@ -87,63 +87,6 @@ class CohereChatTransform:
 
 
 # =============================================================================
-# Cohere v1 format (legacy, kept for backwards compatibility)
-# =============================================================================
-
-
-class CohereChatV1Transform:
-    """
-    Cohere v1 Chat API format (LEGACY).
-
-    This is the OLD format for Cohere v1 API. Use CohereChatTransform for v2.
-
-    Splits messages into:
-    - preamble: System message (optional)
-    - message: The current user message
-    - chat_history: Previous turns
-
-    Output:
-    {
-        "preamble": "System prompt here",
-        "message": "Current user message",
-        "chat_history": [
-            {"role": "USER", "message": "Previous user message"},
-            {"role": "CHATBOT", "message": "Previous assistant response"}
-        ]
-    }
-    """
-
-    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
-        preamble = ""
-        chat_history: list[dict[str, str]] = []
-        current_message = ""
-
-        for msg in messages:
-            role = msg.get("role", "")
-            content = msg.get("content", "")
-
-            if role == "system":
-                preamble = content
-            elif role == "user":
-                # If we have a previous user message, add it to history
-                if current_message:
-                    chat_history.append({"role": "USER", "message": current_message})
-                current_message = content
-            elif role == "assistant":
-                chat_history.append({"role": "CHATBOT", "message": content})
-
-        result: dict[str, Any] = {"message": current_message}
-
-        if preamble:
-            result["preamble"] = preamble
-
-        if chat_history:
-            result["chat_history"] = chat_history
-
-        return result
-
-
-# =============================================================================
 # Anthropic format
 # =============================================================================
 
@@ -274,8 +217,7 @@ class OllamaChatTransform:
 
 TRANSFORM_REGISTRY: dict[str, type[MessageTransformer]] = {
     "openai_chat": OpenAIChatTransform,
-    "cohere_chat": CohereChatTransform,  # v2 API (current)
-    "cohere_chat_v1": CohereChatV1Transform,  # v1 API (legacy)
+    "cohere_chat": CohereChatTransform,
     "anthropic_chat": AnthropicChatTransform,
     "gemini_chat": GeminiChatTransform,
     "ollama_chat": OllamaChatTransform,

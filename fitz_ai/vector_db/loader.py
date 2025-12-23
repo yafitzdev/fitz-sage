@@ -162,13 +162,17 @@ class VectorDBSpec:
         else:
             return template
 
-    def transform_points(self, points: List[Dict], operation: str) -> List[Dict]:
+    def transform_points(
+        self, points: List[Dict], operation: str, context: Dict[str, Any] | None = None
+    ) -> List[Dict]:
         """Transform standard points format to provider-specific format."""
         op_spec = self.operations.get(operation, {})
         transform = op_spec.get("point_transform", {})
 
         if not transform or transform.get("identity"):
             return points
+
+        context = context or {}
 
         # Check for flatten_payload (Milvus style)
         flatten_payload = transform.pop("flatten_payload", False)
@@ -191,8 +195,8 @@ class VectorDBSpec:
                             new_point[k] = v
 
             # Add collection if specified in transform
-            if "class" in transform and "collection" in self._current_context:
-                new_point["class"] = self._current_context["collection"]
+            if "class" in transform and "collection" in context:
+                new_point["class"] = context["collection"]
 
             transformed.append(new_point)
 
@@ -216,9 +220,6 @@ class GenericVectorDBPlugin:
         self.spec = spec
         self.plugin_name = spec.name
         self.kwargs = kwargs
-
-        # Store for template rendering
-        self.spec._current_context = kwargs
 
         base_url = spec.build_base_url(**kwargs)
         headers = spec.get_auth_headers()
@@ -326,15 +327,16 @@ class GenericVectorDBPlugin:
         op = self.spec.operations["upsert"]
 
         converted_points = self._convert_point_ids(points)
-        transformed_points = self.spec.transform_points(converted_points, "upsert")
 
+        # Build context for template rendering and point transformation
         context = {
             "collection": collection,
-            "points": transformed_points,
             "vector_dim": self._vector_dim,
             **self.kwargs,
         }
-        self.spec._current_context = context
+
+        transformed_points = self.spec.transform_points(converted_points, "upsert", context)
+        context["points"] = transformed_points
 
         endpoint = Template(op["endpoint"]).render(context)
         body = self.spec.render_template(op.get("body", {}), context)

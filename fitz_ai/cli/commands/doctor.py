@@ -17,7 +17,7 @@ import typer
 
 from fitz_ai.cli.ui import RICH, Panel, console, ui
 from fitz_ai.core.config import load_config_dict
-from fitz_ai.core.detect import detect_all
+from fitz_ai.core.detect import detect_system_status
 from fitz_ai.core.paths import FitzPaths
 from fitz_ai.logging.logger import get_logger
 
@@ -281,7 +281,7 @@ def command(
 
     ui.section("Services")
 
-    system = detect_all()
+    system = detect_system_status()
 
     # Ollama
     if system.ollama.available:

@@ -41,11 +41,11 @@ def _load_default_config() -> dict:
 # =============================================================================
 
 
-def detect_all():
+def detect_system():
     """Detect all available services and API keys."""
-    from fitz_ai.core.detect import detect_all as _detect_all
+    from fitz_ai.core.detect import detect_system_status
 
-    return _detect_all()
+    return detect_system_status()
 
 
 # =============================================================================
@@ -286,7 +286,7 @@ def command(
 
     ui.section("Detecting System")
 
-    system = detect_all()
+    system = detect_system()
 
     # Show detection results
     ui.status(
