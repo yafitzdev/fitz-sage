@@ -1,9 +1,4 @@
-# fitz-ai
-
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.3.5-green.svg)](CHANGELOG.md)
+# fitz-ai 🔍
 
 **RAG in 5 minutes. No infrastructure. No boilerplate.**
 
@@ -16,7 +11,7 @@ That's it. Your documents are now searchable with AI.
 
 ---
 
-## The Problem with RAG Today
+## The Problem with RAG Today 💢
 
 Building RAG shouldn't require a PhD in prompt engineering. Yet here we are:
 
@@ -34,7 +29,7 @@ Building RAG shouldn't require a PhD in prompt engineering. Yet here we are:
 
 ---
 
-## What Makes Fitz Different
+## What Makes Fitz Different ✨
 
 ### 1. Zero-Config Start, Full Control Later
 
@@ -88,7 +83,7 @@ LangChain requires you to subclass `BaseChatModel` and implement 47 methods. Fit
 
 ---
 
-## Quick Start
+## Quick Start 🚀
 
 ```bash
 pip install fitz-ai
@@ -113,20 +108,25 @@ No data leaves your machine. No API costs. Same interface.
 
 ---
 
-## Real-World Usage
+## Real-World Usage 💼
 
-### Personal Chatbot
+### Chatbot Backend
 
-```bash
-# Point fitz at your notes, journals, or saved articles
-fitz ingest ~/Documents/notes --collection personal
+Fitz handles the hard part—retrieval and grounded answers. Add your conversation layer on top.
 
-# Chat with your own knowledge base
-fitz query "What did I write about productivity last month?"
-fitz query "Summarize my notes on Python async"
+```python
+from fitz_ai import run
+
+def handle_message(user_message: str) -> str:
+    answer = run(user_message, collection="support_docs")
+    return answer.text
+
+# Plug into Slack, Discord, Teams, or your own UI
 ```
 
-### Internal Knowledge Base
+No hallucinations. Sources included. You build the chat UX, fitz builds the knowledge.
+
+### Company Knowledge Base
 
 ```bash
 # Ingest your company docs once
@@ -138,20 +138,26 @@ fitz query "What's the incident response process?"
 fitz query "Who approves expenses over $5000?"
 ```
 
-### Code Repository Q&A
+### Customer Support Automation
 
 ```bash
-fitz ingest ./src --collection codebase
-fitz query "How does the authentication flow work?"
-fitz query "Where is the rate limiting implemented?"
+fitz ingest ./help-center ./faqs ./product-docs --collection support
+
+fitz query "How do I reset my password?"
+fitz query "What's the refund policy?"
+fitz query "Why is my payment failing?"
 ```
 
-### Research Paper Analysis
+Plug the answers into your support chatbot, help desk, or internal tools.
+
+### Research & Literature Review
 
 ```bash
 fitz ingest ./papers --collection research
+
 fitz query "What methods achieve SOTA on ImageNet?"
 fitz query "Compare transformer vs CNN approaches"
+fitz query "Which papers cite attention mechanisms for NLP?"
 ```
 
 ---
@@ -166,21 +172,21 @@ fitz query "Compare transformer vs CNN approaches"
 │  quickstart | init | ingest | query | config | doctor       │
 ├─────────────────────────────────────────────────────────────┤
 │  Engines                                                    │
-│  ┌─────────────┐  ┌─────────────┐                          │
-│  │ Classic RAG │  │   CLaRa     │  (pluggable)             │
-│  └─────────────┘  └─────────────┘                          │
+│  ┌─────────────┐  ┌─────────────┐                           │
+│  │ Classic RAG │  │   CLaRa     │  (pluggable)              │
+│  └─────────────┘  └─────────────┘                           │
 ├─────────────────────────────────────────────────────────────┤
-│  Plugin System (all YAML-defined)                          │
-│  ┌────────┐ ┌───────────┐ ┌────────┐ ┌─────────┐          │
-│  │  LLM   │ │ Embedding │ │ Rerank │ │VectorDB │          │
-│  └────────┘ └───────────┘ └────────┘ └─────────┘          │
-│  openai, cohere, anthropic, ollama, azure...               │
+│  Plugin System (all YAML-defined)                           │
+│  ┌────────┐ ┌───────────┐ ┌────────┐ ┌─────────┐            │
+│  │  LLM   │ │ Embedding │ │ Rerank │ │VectorDB │            │
+│  └────────┘ └───────────┘ └────────┘ └─────────┘            │
+│  openai, cohere, anthropic, ollama, azure...                │
 ├─────────────────────────────────────────────────────────────┤
-│  Retrieval Pipelines (YAML-composed)                       │
-│  dense.yaml | dense_rerank.yaml | custom...                │
+│  Retrieval Pipelines (YAML-composed)                        │
+│  dense.yaml | dense_rerank.yaml | custom...                 │
 ├─────────────────────────────────────────────────────────────┤
-│  Constraints (epistemic safety)                            │
-│  ConflictAware | InsufficientEvidence | CausalAttribution  │
+│  Constraints (epistemic safety)                             │
+│  ConflictAware | InsufficientEvidence | CausalAttribution   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -217,7 +223,7 @@ fitz doctor                        # System diagnostics
 
 ---
 
-## Beyond RAG
+## Beyond RAG 🔮
 
 > **RAG is a method. Knowledge access is a strategy.**
 
@@ -258,7 +264,7 @@ MIT
 
 ## About
 
-Solo project by [Yan Fitzner](https://github.com/yafitzdev). ~15k lines of Python. 350+ tests. Built from scratch—no LangChain or LlamaIndex under the hood.
+Solo project by [Yan Fitzner](https://github.com/yafitzdev). ~15k lines of Python. 400+ tests. Built from scratch—no LangChain or LlamaIndex under the hood.
 
 ---
 
