@@ -7,7 +7,7 @@ No hardcoded paths anywhere else in the codebase.
 
 Design principles:
 - Single source of truth
-- Workspace-relative by default (CWD/.fitz_ai/)
+- Workspace-relative by default (CWD/.fitz/)
 - Easy to override for testing
 - No magic, explicit paths
 """
@@ -32,6 +32,7 @@ class FitzPaths:
         # Get paths
         config_path = FitzPaths.config()
         vector_db_path = FitzPaths.vector_db()
+        ingest_state_path = FitzPaths.ingest_state()
 
         # Override workspace for testing
         FitzPaths.set_workspace("/tmp/test_fitz")
@@ -69,7 +70,7 @@ class FitzPaths:
         """
         The .fitz workspace directory.
 
-        Default: {CWD}/.fitz_ai/
+        Default: {CWD}/.fitz/
 
         This is the root for all Fitz data in a project.
         """
@@ -107,19 +108,37 @@ class FitzPaths:
         return cls.workspace() / "config"
 
     # =========================================================================
+    # Ingestion State
+    # =========================================================================
+
+    @classmethod
+    def ingest_state(cls) -> Path:
+        """
+        Ingestion state file for incremental ingestion.
+
+        Location: {workspace}/ingest.json
+
+        This file tracks:
+        - Which files have been ingested
+        - Content hashes for change detection
+        - Deletion tracking
+        - Config snapshots for staleness detection
+        """
+        return cls.workspace() / "ingest.json"
+
+    # =========================================================================
     # Vector Database
     # =========================================================================
 
     @classmethod
     def vector_db(cls, collection: Optional[str] = None) -> Path:
         """
-        Vector database storage directory.
+        Local vector database storage path.
 
         Location: {workspace}/vector_db/
         Or with collection: {workspace}/vector_db/{collection}/
 
-        Args:
-            collection: Optional collection name for collection-specific path
+        Used by local vector DB implementations (FAISS, etc.)
         """
         base = cls.workspace() / "vector_db"
         if collection:
@@ -134,22 +153,31 @@ class FitzPaths:
         return path
 
     # =========================================================================
-    # Documents & Ingestion
+    # Cache Paths
     # =========================================================================
 
     @classmethod
-    def uploads(cls) -> Path:
+    def cache(cls) -> Path:
         """
-        Directory for uploaded/ingested documents.
+        Cache directory root.
 
-        Location: {workspace}/uploads/
+        Location: {workspace}/cache/
         """
-        return cls.workspace() / "uploads"
+        return cls.workspace() / "cache"
+
+    @classmethod
+    def embeddings_cache(cls) -> Path:
+        """
+        Cached embeddings.
+
+        Location: {workspace}/cache/embeddings/
+        """
+        return cls.workspace() / "cache" / "embeddings"
 
     @classmethod
     def chunks_cache(cls) -> Path:
         """
-        Cache for processed chunks (optional optimization).
+        Cached chunks.
 
         Location: {workspace}/cache/chunks/
         """
@@ -216,3 +244,8 @@ def get_vector_db_path(collection: Optional[str] = None) -> Path:
 def get_config_path() -> Path:
     """Convenience function to get config path."""
     return FitzPaths.config()
+
+
+def get_ingest_state_path() -> Path:
+    """Convenience function to get ingest state path."""
+    return FitzPaths.ingest_state()
