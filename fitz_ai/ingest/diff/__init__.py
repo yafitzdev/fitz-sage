@@ -2,19 +2,22 @@
 """
 Incremental (diff) ingestion for Fitz.
 
-This package implements content-hash based incremental ingestion:
-- Only ingest files that have changed
-- Skip files that match state file (authoritative source)
+This package implements content-hash AND config-aware incremental ingestion:
+- Only ingest files that have changed content
+- Re-ingest files when chunking/parsing/embedding config changes
 - Track deletions via state file
 
 Key components:
 - Scanner: Walks directories and computes content hashes
-- Differ: Computes action plan by checking state file
-- Executor: Orchestrates the full pipeline
+- Differ: Computes action plan by checking state AND config
+- Executor: Orchestrates the full pipeline with ChunkingRouter
 
 Usage:
     from fitz_ai.ingest.diff import run_diff_ingest
     from fitz_ai.ingest.state import IngestStateManager
+    from fitz_ai.ingest.chunking import ChunkingRouter
+
+    router = ChunkingRouter.from_config(config)
 
     summary = run_diff_ingest(
         source="./documents",
@@ -22,20 +25,23 @@ Usage:
         vector_db_writer=writer,
         embedder=embedder,
         parser=parser,
-        chunker=chunker_plugin,
+        chunking_router=router,
         collection="my_docs",
+        embedding_id="cohere:embed-english-v3.0",
     )
-    print(summary)  # "scanned 10, ingested 3, skipped 7, ..."
+    print(summary)
 """
 
-from .differ import (
+from fitz_ai.ingest.diff.differ import (
+    ConfigProvider,
     Differ,
     DiffResult,
     FileCandidate,
+    ReingestReason,
     StateReader,
     compute_diff,
 )
-from .executor import (
+from fitz_ai.ingest.diff.executor import (
     DiffIngestExecutor,
     Embedder,
     IngestSummary,
@@ -43,10 +49,9 @@ from .executor import (
     VectorDBWriter,
     run_diff_ingest,
 )
-from .scanner import (
+from fitz_ai.ingest.diff.scanner import (
     SUPPORTED_EXTENSIONS,
     FileScanner,
-    scan_directory,
     ScannedFile,
     ScanResult,
 )
@@ -57,11 +62,12 @@ __all__ = [
     "ScannedFile",
     "ScanResult",
     "FileScanner",
-    "scan_directory",
     # Differ
     "StateReader",
+    "ConfigProvider",
     "FileCandidate",
     "DiffResult",
+    "ReingestReason",
     "Differ",
     "compute_diff",
     # Executor

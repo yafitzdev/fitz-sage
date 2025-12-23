@@ -1,6 +1,6 @@
 # fitz_ai/cli/commands/init.py
 """
-Interactive setup wizard for Fitz.
+Init command - Interactive setup wizard.
 
 Usage:
     fitz init              # Interactive wizard
@@ -10,43 +10,30 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any
-
 import typer
 
-from fitz_ai.cli.ui import RICH, console, ui, is_local_plugin, get_preferred_default
-from fitz_ai.core.detect import detect_all
-from fitz_ai.llm.loader import load_plugin
-from fitz_ai.llm.registry import available_llm_plugins
-from fitz_ai.vector_db.registry import available_vector_db_plugins
-from fitz_ai.engines.classic_rag.retrieval import available_retrieval_plugins
+from fitz_ai.cli.ui import RICH, console, get_preferred_default, ui
+from fitz_ai.core.registry import (
+    available_chunking_plugins,
+    available_llm_plugins,
+    available_retrieval_plugins,
+    available_vector_db_plugins,
+)
+from fitz_ai.logging.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 # =============================================================================
-# Helpers
+# System Detection
 # =============================================================================
 
 
-def _is_faiss_plugin(name: str) -> bool:
-    """Check if plugin is FAISS-based."""
-    return "faiss" in name.lower()
+def detect_all():
+    """Detect all available services and API keys."""
+    from fitz_ai.core.detect import detect_all as _detect_all
 
-
-def _get_default_model(plugin_type: str, plugin_name: str) -> str:
-    """Get default model from YAML plugin spec."""
-    try:
-        spec = load_plugin(plugin_type, plugin_name)
-        return spec.defaults.get("model", "")
-    except Exception:
-        return ""
-
-
-def _prompt_model(plugin_type: str, plugin_name: str) -> str:
-    """Prompt for model with default from YAML plugin."""
-    default = _get_default_model(plugin_type, plugin_name)
-    if not default:
-        return ""  # No model config for this plugin
-
-    return ui.prompt_text("  Model", default)
+    return _detect_all()
 
 
 # =============================================================================
@@ -54,37 +41,87 @@ def _prompt_model(plugin_type: str, plugin_name: str) -> str:
 # =============================================================================
 
 
-def _filter_available_plugins(
-    plugins: list[str],
-    plugin_type: str,
-    system: Any,
-) -> list[str]:
+def _filter_available_plugins(plugins: list[str], plugin_type: str, system) -> list[str]:
     """Filter plugins to only those that are available."""
     available = []
 
     for plugin in plugins:
-        is_available = False
+        plugin_lower = plugin.lower()
 
-        # Check local/Ollama plugins
-        if is_local_plugin(plugin):
-            is_available = system.ollama.available
+        # Ollama plugins require Ollama
+        if "ollama" in plugin_lower:
+            if system.ollama.available:
+                available.append(plugin)
+            continue
 
-        # Check FAISS
-        elif _is_faiss_plugin(plugin):
-            is_available = system.faiss.available
+        # Qdrant requires Qdrant
+        if "qdrant" in plugin_lower:
+            if system.qdrant.available:
+                available.append(plugin)
+            continue
 
-        # Check Qdrant
-        elif plugin == "qdrant":
-            is_available = system.qdrant.available
+        # FAISS requires faiss
+        if "faiss" in plugin_lower:
+            if system.faiss.available:
+                available.append(plugin)
+            continue
 
-        # Check API key providers
-        elif plugin in system.api_keys:
-            is_available = system.api_keys[plugin].available
+        # API-based plugins require API keys
+        if "cohere" in plugin_lower:
+            if system.api_keys.get("cohere", type("", (), {"available": False})).available:
+                available.append(plugin)
+            continue
 
-        if is_available:
-            available.append(plugin)
+        if "openai" in plugin_lower or "azure" in plugin_lower:
+            if system.api_keys.get("openai", type("", (), {"available": False})).available:
+                available.append(plugin)
+            continue
+
+        if "anthropic" in plugin_lower:
+            if system.api_keys.get("anthropic", type("", (), {"available": False})).available:
+                available.append(plugin)
+            continue
+
+        # Default: include unknown plugins
+        available.append(plugin)
 
     return available
+
+
+# =============================================================================
+# Model Selection Helpers
+# =============================================================================
+
+
+def _get_default_model(plugin_type: str, plugin_name: str) -> str:
+    """Get the default model for a plugin."""
+    defaults = {
+        "chat": {
+            "cohere": "command-a-03-2025",
+            "openai": "gpt-4o-mini",
+            "anthropic": "claude-sonnet-4-20250514",
+            "local_ollama": "llama3.2",
+        },
+        "embedding": {
+            "cohere": "embed-english-v3.0",
+            "openai": "text-embedding-3-small",
+            "local_ollama": "nomic-embed-text",
+        },
+        "rerank": {
+            "cohere": "rerank-v3.5",
+        },
+    }
+    return defaults.get(plugin_type, {}).get(plugin_name, "")
+
+
+def _prompt_model(plugin_type: str, plugin_name: str) -> str:
+    """Prompt for model selection with smart default."""
+    default_model = _get_default_model(plugin_type, plugin_name)
+
+    if not default_model:
+        return ""
+
+    return ui.prompt_text(f"  Model for {plugin_name}", default_model)
 
 
 # =============================================================================
@@ -93,6 +130,7 @@ def _filter_available_plugins(
 
 
 def _generate_config(
+    *,
     chat: str,
     chat_model: str,
     embedding: str,
@@ -103,30 +141,28 @@ def _generate_config(
     rerank_model: str,
     qdrant_host: str,
     qdrant_port: int,
+    # Chunking config
+    chunker: str,
+    chunk_size: int,
+    chunk_overlap: int,
 ) -> str:
-    """Generate YAML configuration."""
-
-    # Chat kwargs
-    chat_kwargs = "\n    temperature: 0.2"
+    """Generate the config YAML string."""
+    # Build chat kwargs
+    chat_kwargs = ""
     if chat_model:
         chat_kwargs = f"\n    model: {chat_model}\n    temperature: 0.2"
 
-    # Embedding kwargs
-    embedding_kwargs = " {}"
+    # Build embedding kwargs
+    embedding_kwargs = ""
     if embedding_model:
         embedding_kwargs = f"\n    model: {embedding_model}"
 
-    # Vector DB kwargs
+    # Build vector DB kwargs
     vdb_kwargs = ""
     if vector_db == "qdrant":
-        vdb_kwargs = f"""
-    host: "{qdrant_host}"
-    port: {qdrant_port}"""
+        vdb_kwargs = f'\n    host: "{qdrant_host}"\n    port: {qdrant_port}'
 
-    # Rerank section
-    # Note: The retrieval plugin (e.g., dense_rerank) controls whether reranking
-    # is used via `enabled_if: reranker`. This config just provides the reranker
-    # service for plugins that need it.
+    # Build rerank section
     if rerank:
         rerank_kwargs = " {}"
         if rerank_model:
@@ -143,6 +179,19 @@ rerank:
 # Reranker (no reranker available)
 rerank:
   enabled: false
+"""
+
+    # Build chunking section
+    chunking_section = f"""
+# Chunking (document splitting for ingestion)
+chunking:
+  default:
+    plugin_name: {chunker}
+    kwargs:
+      chunk_size: {chunk_size}
+      chunk_overlap: {chunk_overlap}
+  by_extension: {{}}
+  warn_on_fallback: true
 """
 
     return f"""# Fitz RAG Configuration
@@ -164,12 +213,11 @@ vector_db:
   kwargs:{vdb_kwargs if vdb_kwargs else " {}"}
 
 # Retrieval (YAML-based plugin)
-# The plugin defines the retrieval pipeline steps.
 retrieval:
   plugin_name: {retrieval}
   collection: default
   top_k: 5
-{rerank_section}
+{rerank_section}{chunking_section}
 # RGS (Retrieval-Guided Synthesis)
 rgs:
   enable_citations: true
@@ -215,7 +263,7 @@ def command(
     from fitz_ai.core.paths import FitzPaths
 
     # =========================================================================
-    # Header (uses ui.header for consistent fitted box styling)
+    # Header
     # =========================================================================
 
     ui.header("Fitz Init", "Let's configure your RAG pipeline")
@@ -253,14 +301,15 @@ def command(
     all_rerank = available_llm_plugins("rerank")
     all_vector_db = available_vector_db_plugins()
     all_retrieval = available_retrieval_plugins()
+    all_chunkers = available_chunking_plugins()
 
     # Filter to available only
     avail_chat = _filter_available_plugins(all_chat, "chat", system)
     avail_embedding = _filter_available_plugins(all_embedding, "embedding", system)
     avail_rerank = _filter_available_plugins(all_rerank, "rerank", system)
     avail_vector_db = _filter_available_plugins(all_vector_db, "vector_db", system)
-    # Retrieval plugins are always available (they're local YAML definitions)
     avail_retrieval = all_retrieval
+    avail_chunkers = all_chunkers if all_chunkers else ["simple"]
 
     # =========================================================================
     # Validate Minimum Requirements
@@ -295,6 +344,10 @@ def command(
         retrieval_choice = get_preferred_default(avail_retrieval, "dense")
         rerank_choice = get_preferred_default(avail_rerank) if avail_rerank else None
         rerank_model = _get_default_model("rerank", rerank_choice) if rerank_choice else ""
+        # Chunking defaults
+        chunker_choice = "simple"
+        chunk_size = 1000
+        chunk_overlap = 0
 
     else:
         # Interactive selection
@@ -326,8 +379,6 @@ def command(
         )
 
         # Rerank (optional)
-        # Note: Reranking is controlled by the retrieval plugin via `enabled_if: reranker`.
-        # We just configure which reranker service is available.
         rerank_choice = None
         rerank_model = ""
         if avail_rerank:
@@ -338,6 +389,15 @@ def command(
             rerank_model = _prompt_model("rerank", rerank_choice)
         else:
             ui.info("Rerank: not available (no rerank plugins detected)")
+
+        # Chunking
+        print()
+        ui.print("Chunking configuration:", "bold")
+        chunker_choice = ui.prompt_numbered_choice(
+            "Default chunker", avail_chunkers, "simple"
+        )
+        chunk_size = ui.prompt_int("Chunk size", 1000)
+        chunk_overlap = ui.prompt_int("Chunk overlap", 0)
 
     # =========================================================================
     # Generate Config
@@ -357,6 +417,9 @@ def command(
         rerank_model=rerank_model,
         qdrant_host=qdrant_host,
         qdrant_port=qdrant_port,
+        chunker=chunker_choice,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
     )
 
     # =========================================================================
@@ -399,16 +462,16 @@ def command(
 [green]Your configuration is ready![/green]
 
 Next steps:
-  [cyan]fitz ingest ./docs my_collection[/cyan]  # Ingest documents
-  [cyan]fitz query "your question"[/cyan]        # Query knowledge base
-  [cyan]fitz doctor[/cyan]                       # Verify setup
+  [cyan]fitz ingest ./docs[/cyan]          # Ingest documents
+  [cyan]fitz query "your question"[/cyan]  # Query knowledge base
+  [cyan]fitz doctor[/cyan]                 # Verify setup
 """)
     else:
         print("""
 Your configuration is ready!
 
 Next steps:
-  fitz ingest ./docs my_collection  # Ingest documents
-  fitz query "your question"        # Query knowledge base
-  fitz doctor                       # Verify setup
+  fitz ingest ./docs          # Ingest documents
+  fitz query "your question"  # Query knowledge base
+  fitz doctor                 # Verify setup
 """)

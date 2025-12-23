@@ -5,14 +5,15 @@ Diff computation for incremental ingestion.
 Computes the action plan by comparing:
 1. Scanned files from disk
 2. State file (authoritative source for skip decisions)
+3. Current chunking configuration (chunker_id per extension)
 
-Key design decision:
-- State file (ingest.json) is the single source of truth
-- If state says file was ingested with same hash → skip
-- If state file is deleted → re-ingest everything (safe, idempotent upserts)
+Re-ingestion is triggered when:
+- File content changes (content_hash differs)
+- Chunking config changes (chunker_id differs)
+- Embedding config changes (embedding_id differs)
+- Parser config changes (parser_id differs)
 
 This module ONLY computes actions - it does NOT execute them.
-Execution is handled by the executor.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ class StateReader(Protocol):
     """
     Protocol for reading ingestion state.
 
-    Used for both skip decisions and deletion detection.
+    Used for skip decisions and deletion detection.
     """
 
     def get_active_paths(self, root: str) -> Set[str]:
@@ -42,16 +43,17 @@ class StateReader(Protocol):
         """Get file entry if it exists. Returns None if not found."""
         ...
 
-    def get_parser_id(self, ext: str) -> str:
-        """Get parser ID for an extension."""
-        ...
+
+@runtime_checkable
+class ConfigProvider(Protocol):
+    """
+    Protocol for providing current configuration IDs.
+
+    The ChunkingRouter implements this via get_chunker_id().
+    """
 
     def get_chunker_id(self, ext: str) -> str:
-        """Get chunker ID for an extension."""
-        ...
-
-    def get_embedding_id(self) -> str:
-        """Get the current embedding ID."""
+        """Get the current chunker_id for an extension."""
         ...
 
 
@@ -62,6 +64,7 @@ class FileCandidate:
 
     Contains all information needed to ingest or skip a file.
     """
+
     path: str  # Absolute path
     root: str  # Absolute path of scan root
     ext: str  # Extension (e.g., ".md")
@@ -74,11 +77,11 @@ class FileCandidate:
 
     @classmethod
     def from_scanned(
-            cls,
-            scanned: ScannedFile,
-            parser_id: str,
-            chunker_id: str,
-            embedding_id: str,
+        cls,
+        scanned: ScannedFile,
+        parser_id: str,
+        chunker_id: str,
+        embedding_id: str,
     ) -> "FileCandidate":
         """Create from a ScannedFile with config IDs."""
         return cls(
@@ -100,10 +103,11 @@ class DiffResult:
     Result of diff computation.
 
     Contains three lists of actions:
-    - to_ingest: Files that need to be ingested (new or changed)
-    - to_skip: Files that already exist in state (unchanged)
+    - to_ingest: Files that need to be ingested (new, changed, or config changed)
+    - to_skip: Files that are unchanged (same content AND same config)
     - to_mark_deleted: File paths that no longer exist on disk
     """
+
     to_ingest: List[FileCandidate] = field(default_factory=list)
     to_skip: List[FileCandidate] = field(default_factory=list)
     to_mark_deleted: List[str] = field(default_factory=list)
@@ -118,96 +122,180 @@ class DiffResult:
         )
 
 
+@dataclass
+class ReingestReason:
+    """Reason why a file needs re-ingestion."""
+
+    content_changed: bool = False
+    chunker_changed: bool = False
+    parser_changed: bool = False
+    embedding_changed: bool = False
+    is_new: bool = False
+
+    @property
+    def needs_reingest(self) -> bool:
+        return (
+            self.content_changed
+            or self.chunker_changed
+            or self.parser_changed
+            or self.embedding_changed
+            or self.is_new
+        )
+
+    def __str__(self) -> str:
+        reasons = []
+        if self.is_new:
+            reasons.append("new")
+        if self.content_changed:
+            reasons.append("content_changed")
+        if self.chunker_changed:
+            reasons.append("chunker_changed")
+        if self.parser_changed:
+            reasons.append("parser_changed")
+        if self.embedding_changed:
+            reasons.append("embedding_changed")
+        return ", ".join(reasons) if reasons else "none"
+
+
 class Differ:
     """
     Computes diff between disk state and ingestion state.
 
-    IMPORTANT: This class ONLY computes actions - it does NOT execute them.
-
-    The diff algorithm:
-    1. For each scanned file, check if state has entry with matching content_hash
-    2. If state entry exists with same hash → skip
-    3. If no state entry or hash differs → ingest
-    4. For paths in state but not on disk → mark deleted
+    The diff algorithm checks for:
+    1. New files (not in state)
+    2. Content changes (content_hash differs)
+    3. Config changes (chunker_id, parser_id, or embedding_id differs)
 
     Usage:
-        differ = Differ(state_reader)
+        differ = Differ(
+            state_reader=state_manager.state,
+            config_provider=chunking_router,
+            parser_id_func=lambda ext: f"{ext.lstrip('.')}.v1",
+            embedding_id="cohere:embed-english-v3.0",
+        )
         result = differ.compute_diff(scan_result.files)
-
-        # Result contains action plan, NOT executed actions
-        for file in result.to_ingest:
-            # These files need to be ingested
-            pass
     """
 
-    def __init__(self, state_reader: StateReader) -> None:
+    def __init__(
+        self,
+        state_reader: StateReader,
+        config_provider: ConfigProvider,
+        parser_id_func: callable,
+        embedding_id: str,
+    ) -> None:
         """
         Initialize the differ.
 
         Args:
-            state_reader: Reader for state (authoritative source)
+            state_reader: Reader for ingestion state.
+            config_provider: Provider for current config IDs (e.g., ChunkingRouter).
+            parser_id_func: Function to get parser_id for an extension.
+            embedding_id: Current embedding configuration ID.
         """
         self._state = state_reader
+        self._config = config_provider
+        self._get_parser_id = parser_id_func
+        self._embedding_id = embedding_id
+
+    def _check_reingest_reason(
+        self,
+        scanned: ScannedFile,
+        current_chunker_id: str,
+        current_parser_id: str,
+    ) -> ReingestReason:
+        """
+        Check why a file might need re-ingestion.
+
+        Args:
+            scanned: The scanned file from disk.
+            current_chunker_id: Current chunker_id from config.
+            current_parser_id: Current parser_id from config.
+
+        Returns:
+            ReingestReason with flags for what changed.
+        """
+        existing = self._state.get_file_entry(scanned.root, scanned.path)
+
+        if existing is None:
+            return ReingestReason(is_new=True)
+
+        reason = ReingestReason()
+
+        # Check content change
+        if existing.content_hash != scanned.content_hash:
+            reason.content_changed = True
+
+        # Check chunker config change
+        existing_chunker_id = getattr(existing, "chunker_id", None)
+        if existing_chunker_id != current_chunker_id:
+            reason.chunker_changed = True
+
+        # Check parser config change
+        existing_parser_id = getattr(existing, "parser_id", None)
+        if existing_parser_id != current_parser_id:
+            reason.parser_changed = True
+
+        # Check embedding config change
+        existing_embedding_id = getattr(existing, "embedding_id", None)
+        if existing_embedding_id != self._embedding_id:
+            reason.embedding_changed = True
+
+        return reason
 
     def compute_diff(
-            self,
-            scanned_files: List[ScannedFile],
-            force: bool = False,
-            root: str | None = None,
+        self,
+        scanned_files: List[ScannedFile],
+        force: bool = False,
+        root: str | None = None,
     ) -> DiffResult:
         """
         Compute the diff action plan.
 
         Args:
-            scanned_files: Files from the scanner
-            force: If True, ingest all files regardless of state
-            root: Root path for deletion detection. If None, extracted from scanned files.
+            scanned_files: Files from the scanner.
+            force: If True, ingest all files regardless of state.
+            root: Root path for deletion detection.
 
         Returns:
-            DiffResult with action plan
+            DiffResult with action plan.
         """
         result = DiffResult()
 
-        # Get embedding ID once
-        embedding_id = self._state.get_embedding_id()
-
-        # Track which paths we've seen for deletion detection
         seen_paths: Set[str] = set()
         detected_root: str | None = root
 
         for scanned in scanned_files:
-            # Track root for deletion detection
             if detected_root is None:
                 detected_root = scanned.root
             seen_paths.add(scanned.path)
 
-            # Get config IDs for this file type
-            parser_id = self._state.get_parser_id(scanned.ext)
-            chunker_id = self._state.get_chunker_id(scanned.ext)
+            # Get current config IDs
+            current_chunker_id = self._config.get_chunker_id(scanned.ext)
+            current_parser_id = self._get_parser_id(scanned.ext)
 
             candidate = FileCandidate.from_scanned(
                 scanned,
-                parser_id=parser_id,
-                chunker_id=chunker_id,
-                embedding_id=embedding_id,
+                parser_id=current_parser_id,
+                chunker_id=current_chunker_id,
+                embedding_id=self._embedding_id,
             )
 
             if force:
-                # Force mode: ingest everything
                 result.to_ingest.append(candidate)
                 continue
 
-            # Check state file for existing entry with same hash
-            existing_entry = self._state.get_file_entry(scanned.root, scanned.path)
+            # Check if re-ingestion is needed
+            reason = self._check_reingest_reason(
+                scanned, current_chunker_id, current_parser_id
+            )
 
-            if existing_entry is not None and existing_entry.content_hash == scanned.content_hash:
-                # Same hash in state → skip
-                result.to_skip.append(candidate)
-            else:
-                # New file or hash changed → ingest
+            if reason.needs_reingest:
+                logger.debug(f"Re-ingest {scanned.path}: {reason}")
                 result.to_ingest.append(candidate)
+            else:
+                result.to_skip.append(candidate)
 
-        # Deletion detection: compare state paths with scanned paths
+        # Deletion detection
         if detected_root is not None:
             previously_known = self._state.get_active_paths(detected_root)
             removed_paths = previously_known - seen_paths
@@ -219,31 +307,44 @@ class Differ:
 
 
 def compute_diff(
-        scanned_files: List[ScannedFile],
-        state_reader: StateReader,
-        force: bool = False,
-        root: str | None = None,
+    scanned_files: List[ScannedFile],
+    state_reader: StateReader,
+    config_provider: ConfigProvider,
+    parser_id_func: callable,
+    embedding_id: str,
+    force: bool = False,
+    root: str | None = None,
 ) -> DiffResult:
     """
     Convenience function to compute diff.
 
     Args:
-        scanned_files: Files from the scanner
-        state_reader: Reader for state (authoritative source)
-        force: If True, ingest all files regardless of state
-        root: Root path for deletion detection. If None, extracted from scanned files.
+        scanned_files: Files from the scanner.
+        state_reader: Reader for ingestion state.
+        config_provider: Provider for current config IDs.
+        parser_id_func: Function to get parser_id for an extension.
+        embedding_id: Current embedding configuration ID.
+        force: If True, ingest all files regardless of state.
+        root: Root path for deletion detection.
 
     Returns:
-        DiffResult with action plan
+        DiffResult with action plan.
     """
-    differ = Differ(state_reader)
+    differ = Differ(
+        state_reader=state_reader,
+        config_provider=config_provider,
+        parser_id_func=parser_id_func,
+        embedding_id=embedding_id,
+    )
     return differ.compute_diff(scanned_files, force=force, root=root)
 
 
 __all__ = [
     "StateReader",
+    "ConfigProvider",
     "FileCandidate",
     "DiffResult",
+    "ReingestReason",
     "Differ",
     "compute_diff",
 ]

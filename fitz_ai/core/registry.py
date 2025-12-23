@@ -265,7 +265,7 @@ def get_retriever_plugin(plugin_name: str) -> Type[Any]:
     return RETRIEVER_REGISTRY.get(plugin_name)
 
 
-def available_retriever_plugins() -> List[str]:
+def available_retrieval_plugins() -> List[str]:
     """List available retriever plugins."""
     return RETRIEVER_REGISTRY.list_available()
 
@@ -373,7 +373,7 @@ __all__ = [
     "get_chunking_plugin",
     "available_chunking_plugins",
     "get_retriever_plugin",
-    "available_retriever_plugins",
+    "available_retrieval_plugins",
     "get_pipeline_plugin",
     "available_pipeline_plugins",
     # YAML-based plugin accessors (re-exported)

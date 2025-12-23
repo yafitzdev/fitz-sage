@@ -1,17 +1,13 @@
 # fitz_ai/cli/commands/ingest.py
 """
-Interactive document ingestion with incremental (diff) support.
+Document ingestion with incremental (diff) support.
 
 Usage:
-    fitz ingest              # Interactive mode - prompts for everything
+    fitz ingest              # Interactive mode - prompts for source/collection
     fitz ingest ./docs       # Ingest specific directory
     fitz ingest ./docs -y    # Non-interactive with defaults
-    fitz ingest ./docs --force  # Force re-ingest everything
 
-Default behavior (per spec):
-- Silently skip unchanged files (same content hash in vector DB)
-- Mark deleted files as is_deleted=true in vector DB
-- Summary output: "scanned N, ingested A, skipped B, marked_deleted D, errors E"
+Chunking configuration is loaded from fitz.yaml (set via fitz init).
 """
 
 from __future__ import annotations
@@ -21,82 +17,12 @@ from typing import Any, Dict, List, Optional
 
 import typer
 
-from fitz_ai.cli.ui import RICH, Panel, console, ui
+from fitz_ai.cli.ui import RICH, console, ui
 from fitz_ai.core.config import ConfigNotFoundError, load_config_dict
 from fitz_ai.core.paths import FitzPaths
-from fitz_ai.core.registry import available_chunking_plugins
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
 from fitz_ai.logging.logger import get_logger
 
 logger = get_logger(__name__)
-
-
-# =============================================================================
-# File Display
-# =============================================================================
-
-
-def _show_files(raw_docs: List, max_show: int = 8) -> None:
-    """Show files being processed."""
-    if not raw_docs:
-        return
-
-    files = []
-    for doc in raw_docs:
-        path = (
-                getattr(doc, "path", None)
-                or getattr(doc, "source_file", None)
-                or getattr(doc, "doc_id", "?")
-        )
-        if hasattr(path, "name"):
-            files.append(str(path.name))
-        else:
-            files.append(str(path).split("/")[-1].split("\\")[-1])
-
-    show_count = min(len(files), max_show)
-
-    if RICH:
-        for f in files[:show_count]:
-            console.print(f"    [dim]•[/dim] {f}")
-        if len(files) > max_show:
-            console.print(f"    [dim]... and {len(files) - max_show} more[/dim]")
-    else:
-        for f in files[:show_count]:
-            print(f"    • {f}")
-        if len(files) > max_show:
-            print(f"    ... and {len(files) - max_show} more")
-
-
-# =============================================================================
-# Chunker Parameter Mapping
-# =============================================================================
-
-
-def _get_chunker_kwargs(chunker: str, chunk_size: int, chunk_overlap: int) -> Dict[str, Any]:
-    """
-    Map CLI parameters to chunker-specific kwargs.
-
-    Different chunkers use different parameter names:
-    - simple: chunk_size
-    - pdf_sections: max_section_chars (doesn't use overlap)
-    - overlap: chunk_size, chunk_overlap
-    """
-    if chunker == "pdf_sections":
-        # PDF sections chunker uses different parameter names
-        return {
-            "max_section_chars": chunk_size,
-        }
-    elif chunker == "overlap":
-        kwargs = {"chunk_size": chunk_size}
-        if chunk_overlap > 0:
-            kwargs["chunk_overlap"] = chunk_overlap
-        return kwargs
-    else:
-        # Default/simple chunker
-        kwargs = {"chunk_size": chunk_size}
-        if chunk_overlap > 0:
-            kwargs["chunk_overlap"] = chunk_overlap
-        return kwargs
 
 
 # =============================================================================
@@ -113,8 +39,54 @@ def _load_config() -> dict:
         raise typer.Exit(1)
 
 
+def _build_chunking_router_config(config: dict):
+    """
+    Build ChunkingRouterConfig from fitz.yaml config.
+
+    Expected config structure:
+        chunking:
+          default:
+            plugin_name: simple
+            kwargs:
+              chunk_size: 1000
+              chunk_overlap: 0
+          by_extension:
+            .md:
+              plugin_name: markdown
+              kwargs: {...}
+          warn_on_fallback: true
+    """
+    from fitz_ai.ingest.config.schema import (
+        ChunkingRouterConfig,
+        ExtensionChunkerConfig,
+    )
+
+    chunking = config.get("chunking", {})
+
+    # Build default config
+    default_cfg = chunking.get("default", {})
+    default = ExtensionChunkerConfig(
+        plugin_name=default_cfg.get("plugin_name", "simple"),
+        kwargs=default_cfg.get("kwargs", {"chunk_size": 1000, "chunk_overlap": 0}),
+    )
+
+    # Build per-extension configs
+    by_extension = {}
+    for ext, ext_cfg in chunking.get("by_extension", {}).items():
+        by_extension[ext] = ExtensionChunkerConfig(
+            plugin_name=ext_cfg.get("plugin_name", "simple"),
+            kwargs=ext_cfg.get("kwargs", {}),
+        )
+
+    return ChunkingRouterConfig(
+        default=default,
+        by_extension=by_extension,
+        warn_on_fallback=chunking.get("warn_on_fallback", True),
+    )
+
+
 # =============================================================================
-# Adapter Classes for Diff Ingest
+# Adapter Classes
 # =============================================================================
 
 
@@ -142,18 +114,6 @@ class VectorDBWriterAdapter:
         """Upsert points into collection."""
         self._client.upsert(collection, points)
 
-    def mark_deleted(self, collection: str, source_path: str) -> int:
-        """
-        Mark vectors for a source path as deleted.
-
-        Note: This is a best-effort operation. Not all vector DBs support
-        payload updates. If not supported, returns 0.
-        """
-        # For now, we don't actually update the vector DB
-        # The state file is authoritative, so this is optional
-        logger.debug(f"mark_deleted called for {source_path} (no-op)")
-        return 0
-
 
 # =============================================================================
 # Main Command
@@ -161,28 +121,37 @@ class VectorDBWriterAdapter:
 
 
 def command(
-        source: Optional[str] = typer.Argument(
-            None,
-            help="Source path (file or directory). Prompts if not provided.",
-        ),
-        non_interactive: bool = typer.Option(
-            False,
-            "--non-interactive",
-            "-y",
-            help="Use defaults without prompting.",
-        ),
-        force: bool = typer.Option(
-            False,
-            "--force",
-            "-f",
-            help="Force re-ingest all files, ignoring vector DB state.",
-        ),
+    source: Optional[str] = typer.Argument(
+        None,
+        help="Source path (file or directory). Prompts if not provided.",
+    ),
+    collection: Optional[str] = typer.Option(
+        None,
+        "--collection",
+        "-c",
+        help="Collection name. Uses config default if not provided.",
+    ),
+    non_interactive: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Non-interactive mode, use defaults.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Force re-ingest all files, ignoring state.",
+    ),
 ) -> None:
     """
     Ingest documents into the vector database.
 
+    Chunking configuration is loaded from fitz.yaml (set via fitz init).
+
     Default behavior (incremental):
-    - Skip unchanged files (same content already in vector DB)
+    - Skip unchanged files (same content AND same config)
+    - Re-ingest files when chunking config changes
     - Only ingest new or modified files
     - Mark deleted files in vector DB
 
@@ -194,9 +163,8 @@ def command(
         fitz ingest ./docs -y    # Non-interactive with defaults
         fitz ingest --force      # Force re-ingest everything
     """
-    from fitz_ai.ingest.chunking.engine import ChunkingEngine
-    from fitz_ai.ingest.config.schema import ChunkerConfig
-    from fitz_ai.ingest.diff import run_diff_ingest, IngestSummary
+    from fitz_ai.ingest.chunking.router import ChunkingRouter
+    from fitz_ai.ingest.diff import run_diff_ingest
     from fitz_ai.ingest.ingestion.registry import get_ingest_plugin
     from fitz_ai.ingest.state import IngestStateManager
     from fitz_ai.llm.registry import get_llm_plugin
@@ -209,12 +177,19 @@ def command(
     config = _load_config()
 
     embedding_plugin = config.get("embedding", {}).get("plugin_name", "cohere")
+    embedding_model = config.get("embedding", {}).get("kwargs", {}).get(
+        "model", "embed-english-v3.0"
+    )
+    embedding_id = f"{embedding_plugin}:{embedding_model}"
+
     vector_db_plugin = config.get("vector_db", {}).get("plugin_name", "qdrant")
     default_collection = config.get("retrieval", {}).get("collection", "default")
 
-    available_chunkers = available_chunking_plugins()
-    if not available_chunkers:
-        available_chunkers = ["simple"]
+    # Get chunking config from fitz.yaml
+    chunking_config = config.get("chunking", {})
+    default_chunker = chunking_config.get("default", {}).get("plugin_name", "simple")
+    chunk_size = chunking_config.get("default", {}).get("kwargs", {}).get("chunk_size", 1000)
+    chunk_overlap = chunking_config.get("default", {}).get("kwargs", {}).get("chunk_overlap", 0)
 
     # =========================================================================
     # Header
@@ -225,12 +200,13 @@ def command(
         ui.warning("Force mode: will re-ingest all files")
     else:
         ui.info("Incremental mode: skipping unchanged files")
-    ui.info(f"Embedding: {embedding_plugin}")
+    ui.info(f"Embedding: {embedding_id}")
     ui.info(f"Vector DB: {vector_db_plugin}")
+    ui.info(f"Chunking: {default_chunker} (size={chunk_size}, overlap={chunk_overlap})")
     print()
 
     # =========================================================================
-    # Interactive Prompts (or use defaults)
+    # Interactive Prompts (only source and collection)
     # =========================================================================
 
     if non_interactive:
@@ -239,26 +215,18 @@ def command(
             ui.info("Usage: fitz ingest ./docs -y")
             raise typer.Exit(1)
 
-        collection = default_collection
-        chunker = "simple"
-        chunk_size = 1000
-        chunk_overlap = 0
+        if collection is None:
+            collection = default_collection
 
         ui.info(f"Source: {source}")
         ui.info(f"Collection: {collection}")
-        ui.info(f"Chunker: {chunker} (size={chunk_size})")
 
     else:
-        ui.print("Configure ingestion:", "bold")
-        print()
-
         if source is None:
             source = ui.prompt_path("Source path (file or directory)", ".")
 
-        collection = ui.prompt_text("Collection name", default_collection)
-        chunker = ui.prompt_choice("Chunker", available_chunkers, default="simple")
-        chunk_size = ui.prompt_int("Chunk size", 1000)
-        chunk_overlap = ui.prompt_int("Chunk overlap", 0)
+        if collection is None:
+            collection = ui.prompt_text("Collection name", default_collection)
 
     print()
 
@@ -273,22 +241,16 @@ def command(
         state_manager = IngestStateManager()
         state_manager.load()
 
-        # Set embedding config in state
-        embedding_model = config.get("embedding", {}).get("kwargs", {}).get("model", "unknown")
-        state_manager.set_embedding_config(embedding_plugin, embedding_model)
-
         # Ingest plugin (for parsing)
         IngestPluginCls = get_ingest_plugin("local")
         ingest_plugin = IngestPluginCls()
         parser = ParserAdapter(ingest_plugin)
 
-        # Chunker - map CLI params to chunker-specific kwargs
-        chunker_kwargs = _get_chunker_kwargs(chunker, chunk_size, chunk_overlap)
-        chunker_config = ChunkerConfig(
-            plugin_name=chunker,
-            kwargs=chunker_kwargs,
-        )
-        chunking_engine = ChunkingEngine.from_config(chunker_config)
+        # Build chunking router from config
+        router_config = _build_chunking_router_config(config)
+        chunking_router = ChunkingRouter.from_config(router_config)
+
+        ui.info(f"Router: {chunking_router}")
 
         # Embedder
         embedder = get_llm_plugin(plugin_type="embedding", plugin_name=embedding_plugin)
@@ -316,49 +278,53 @@ def command(
             vector_db_writer=writer,
             embedder=embedder,
             parser=parser,
-            chunker=chunking_engine.plugin,  # Pass the plugin directly
+            chunking_router=chunking_router,
             collection=collection,
+            embedding_id=embedding_id,
             force=force,
         )
     except Exception as e:
         ui.error(f"Ingestion failed: {e}")
+        logger.exception("Ingestion error")
         raise typer.Exit(1)
 
     # =========================================================================
-    # Show results
+    # Summary
     # =========================================================================
 
-    ui.step(3, 4, "Processing complete")
-    ui.step(4, 4, "Summary")
-
+    ui.step(4, 4, "Complete!")
     print()
+
     if RICH:
-        console.print(
-            Panel(
-                f"[bold green]✓[/bold green] Scanned {summary.scanned} files\n"
-                f"[bold green]✓[/bold green] Ingested {summary.ingested} files\n"
-                f"[bold blue]→[/bold blue] Skipped {summary.skipped} unchanged files\n"
-                f"[bold yellow]⚠[/bold yellow] Marked {summary.marked_deleted} deleted\n"
-                f"[bold red]✗[/bold red] Errors: {summary.errors}\n"
-                f"\n[dim]Collection: {collection}[/dim]",
-                title="Ingestion Complete",
-                border_style="green" if summary.errors == 0 else "yellow",
-            )
-        )
+        from rich.table import Table
+
+        table = Table(show_header=False, box=None, padding=(0, 2))
+        table.add_column("Metric", style="bold")
+        table.add_column("Value", style="cyan")
+
+        table.add_row("Scanned", str(summary.scanned))
+        table.add_row("Ingested", str(summary.ingested))
+        table.add_row("Skipped", str(summary.skipped))
+        table.add_row("Marked deleted", str(summary.marked_deleted))
+        table.add_row("Errors", str(summary.errors))
+        table.add_row("Duration", f"{summary.duration_seconds:.1f}s")
+
+        console.print(table)
     else:
-        print("=" * 60)
-        print("Ingestion Complete!")
-        print("=" * 60)
-        print(f"✓ Scanned {summary.scanned} files")
-        print(f"✓ Ingested {summary.ingested} files")
-        print(f"→ Skipped {summary.skipped} unchanged files")
-        print(f"⚠ Marked {summary.marked_deleted} deleted")
-        print(f"✗ Errors: {summary.errors}")
-        print(f"\nCollection: {collection}")
+        print(f"  Scanned: {summary.scanned}")
+        print(f"  Ingested: {summary.ingested}")
+        print(f"  Skipped: {summary.skipped}")
+        print(f"  Marked deleted: {summary.marked_deleted}")
+        print(f"  Errors: {summary.errors}")
+        print(f"  Duration: {summary.duration_seconds:.1f}s")
 
     if summary.errors > 0:
-        ui.warning(f"{summary.errors} errors occurred. Check logs for details.")
-        for detail in summary.error_details[:5]:
-            ui.error(f"  {detail}")
+        print()
+        ui.warning(f"{summary.errors} errors occurred:")
+        for err in summary.error_details[:5]:
+            ui.info(f"  • {err}")
         if len(summary.error_details) > 5:
-            ui.info(f"  ... and {len(summary.error_details) - 5} more errors")
+            ui.info(f"  ... and {len(summary.error_details) - 5} more")
+
+    print()
+    ui.success(f"Documents ingested into collection '{collection}'")

@@ -2,17 +2,13 @@
 """
 State manager for incremental ingestion.
 
-Manages reading and writing of .fitz/ingest.json.
+Handles loading, saving, and updating the .fitz/ingest.json state file.
 
 Key responsibilities:
-- Load/save state from disk
-- Update file entries (mark active, mark deleted)
-- Track timestamps
-
-Key non-responsibilities:
-- NO vector DB access (that's executor's job)
-- NO ingestion logic
-- NO diffing logic
+- Load/create state file
+- Mark files as active (after successful ingestion)
+- Mark files as deleted (when no longer on disk)
+- Track config IDs (chunker_id, parser_id, embedding_id) per file
 """
 
 from __future__ import annotations
@@ -25,8 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 from fitz_ai.core.paths import FitzPaths
-
-from .schema import (
+from fitz_ai.ingest.state.schema import (
     EmbeddingConfig,
     FileEntry,
     FileStatus,
@@ -39,56 +34,58 @@ logger = logging.getLogger(__name__)
 
 class IngestStateManager:
     """
-    Manages .fitz/ingest.json state file.
+    Manages the ingestion state file.
 
-    This class handles ONLY JSON state - no vector DB operations.
+    The state file tracks:
+    - Which files have been ingested
+    - Content hashes for change detection
+    - Config IDs for re-chunking detection
+    - Deletion tracking
 
     Usage:
         manager = IngestStateManager()
         manager.load()
 
-        # Update entries
-        manager.mark_active("/abs/path/to/file.md", "sha256:abc123", ...)
-        manager.mark_deleted("/abs/path/to/deleted.md", "/root/path")
+        # After successful ingestion
+        manager.mark_active(
+            file_path="/path/to/file.md",
+            root="/path/to",
+            content_hash="sha256:abc123",
+            ext=".md",
+            size_bytes=1234,
+            mtime_epoch=1234567890.0,
+            chunker_id="simple:1000:0",
+            parser_id="md.v1",
+            embedding_id="cohere:embed-english-v3.0",
+        )
 
-        # Save changes
         manager.save()
     """
 
-    def __init__(self, state_path: Optional[Path] = None) -> None:
+    def __init__(self, path: Optional[Path] = None) -> None:
         """
         Initialize the state manager.
 
         Args:
-            state_path: Path to ingest.json. If None, uses FitzPaths.ingest_state()
+            path: Path to state file. Defaults to .fitz/ingest.json
         """
-        if state_path is None:
-            state_path = FitzPaths.workspace() / "ingest.json"
-        self._path = state_path
+        self._path = path or FitzPaths.ingest_state()
         self._state: Optional[IngestState] = None
-        self._dirty = False
+        self._dirty: bool = False
 
     @property
     def state(self) -> IngestState:
-        """Get current state, loading if necessary."""
+        """Get the current state. Raises if not loaded."""
         if self._state is None:
-            self.load()
-        assert self._state is not None
+            raise RuntimeError("State not loaded. Call load() first.")
         return self._state
-
-    @property
-    def path(self) -> Path:
-        """Get state file path."""
-        return self._path
 
     def load(self) -> IngestState:
         """
-        Load state from disk.
-
-        Creates new state if file doesn't exist.
+        Load state from disk, or create new if not exists.
 
         Returns:
-            Loaded or created IngestState
+            The loaded or created state.
         """
         if self._path.exists():
             try:
@@ -96,14 +93,15 @@ class IngestStateManager:
                     data = json.load(f)
                 self._state = IngestState.model_validate(data)
                 logger.debug(f"Loaded ingest state from {self._path}")
-            except (json.JSONDecodeError, Exception) as e:
-                logger.warning(f"Failed to load ingest state, creating new: {e}")
+            except Exception as e:
+                logger.warning(f"Failed to load state, creating new: {e}")
                 self._state = self._create_new_state()
+                self._dirty = True
         else:
-            logger.info(f"No ingest state found at {self._path}, creating new")
             self._state = self._create_new_state()
+            self._dirty = True
+            logger.debug("Created new ingest state")
 
-        self._dirty = False
         return self._state
 
     def save(self) -> None:
@@ -133,7 +131,7 @@ class IngestStateManager:
                     self._state.model_dump(mode="json"),
                     f,
                     indent=2,
-                    default=str,  # Handle datetime serialization
+                    default=str,
                 )
             temp_path.replace(self._path)
             self._dirty = False
@@ -165,6 +163,9 @@ class IngestStateManager:
         ext: str,
         size_bytes: int,
         mtime_epoch: float,
+        chunker_id: str,
+        parser_id: str,
+        embedding_id: str,
     ) -> None:
         """
         Mark a file as active in state.
@@ -172,12 +173,15 @@ class IngestStateManager:
         Called after successful ingestion or when file is unchanged.
 
         Args:
-            file_path: Absolute path to file
-            root: Absolute path to root directory
-            content_hash: SHA-256 content hash
-            ext: File extension (e.g., ".md")
-            size_bytes: File size in bytes
-            mtime_epoch: File modification time as Unix epoch
+            file_path: Absolute path to file.
+            root: Absolute path to root directory.
+            content_hash: SHA-256 content hash.
+            ext: File extension (e.g., ".md").
+            size_bytes: File size in bytes.
+            mtime_epoch: File modification time as Unix epoch.
+            chunker_id: Chunker ID used (e.g., "simple:1000:0").
+            parser_id: Parser ID used (e.g., "md.v1").
+            embedding_id: Embedding ID used (e.g., "cohere:embed-english-v3.0").
         """
         root_entry = self._ensure_root(root)
 
@@ -187,20 +191,23 @@ class IngestStateManager:
             mtime_epoch=mtime_epoch,
             content_hash=content_hash,
             status=FileStatus.ACTIVE,
-            last_seen_at=datetime.utcnow(),
+            ingested_at=datetime.utcnow(),
+            chunker_id=chunker_id,
+            parser_id=parser_id,
+            embedding_id=embedding_id,
         )
-        root_entry.last_run_at = datetime.utcnow()
+        root_entry.last_scan_at = datetime.utcnow()
         self._dirty = True
 
-    def mark_deleted(self, file_path: str, root: str) -> None:
+    def mark_deleted(self, root: str, file_path: str) -> None:
         """
         Mark a file as deleted in state.
 
         Called when a file is no longer present on disk.
 
         Args:
-            file_path: Absolute path to file
-            root: Absolute path to root directory
+            root: Absolute path to root directory.
+            file_path: Absolute path to file.
         """
         root_entry = self.state.roots.get(root)
         if root_entry is None:
@@ -212,21 +219,10 @@ class IngestStateManager:
 
         if file_entry.status != FileStatus.DELETED:
             file_entry.status = FileStatus.DELETED
-            file_entry.last_seen_at = datetime.utcnow()
             self._dirty = True
 
-    def get_known_paths(self, root: str) -> set[str]:
-        """
-        Get all known file paths for a root.
-
-        Returns both active and deleted paths.
-        """
-        return self.state.get_known_paths(root)
-
     def get_active_paths(self, root: str) -> set[str]:
-        """
-        Get all active (non-deleted) file paths for a root.
-        """
+        """Get all active (non-deleted) file paths for a root."""
         return self.state.get_active_paths(root)
 
     def get_file_entry(self, root: str, file_path: str) -> Optional[FileEntry]:
@@ -243,24 +239,12 @@ class IngestStateManager:
         Set the current embedding configuration.
 
         Args:
-            provider: Embedding provider name
-            model: Model name
-            **kwargs: Additional config (dimension, normalize)
+            provider: Embedding provider name.
+            model: Model name.
+            **kwargs: Additional config (dimension, etc.).
         """
         self.state.embedding = EmbeddingConfig.create(provider, model, **kwargs)
         self._dirty = True
-
-    def get_embedding_id(self) -> str:
-        """Get the current embedding ID."""
-        return self.state.get_embedding_id()
-
-    def get_parser_id(self, ext: str) -> str:
-        """Get parser ID for an extension."""
-        return self.state.get_parser_id(ext)
-
-    def get_chunker_id(self, ext: str) -> str:
-        """Get chunker ID for an extension."""
-        return self.state.get_chunker_id(ext)
 
 
 __all__ = ["IngestStateManager"]

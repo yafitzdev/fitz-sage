@@ -5,23 +5,21 @@ State management for incremental ingestion.
 This package handles the .fitz/ingest.json state file that tracks:
 - Which files have been ingested
 - Content hashes for change detection
+- Config IDs (chunker_id, parser_id, embedding_id) for re-chunking detection
 - Deletion tracking
-- Config snapshots for staleness detection
 
 Key exports:
 - IngestStateManager: Load/save state, update entries
 - IngestState: Root Pydantic model
-- FileEntry: Per-file tracking
+- FileEntry: Per-file tracking with config IDs
 """
 
-from .manager import IngestStateManager
-from .schema import (
-    ChunkingConfigEntry,
+from fitz_ai.ingest.state.manager import IngestStateManager
+from fitz_ai.ingest.state.schema import (
     EmbeddingConfig,
     FileEntry,
     FileStatus,
     IngestState,
-    ParsingConfigEntry,
     RootEntry,
 )
 
@@ -34,6 +32,4 @@ __all__ = [
     "FileEntry",
     "FileStatus",
     "EmbeddingConfig",
-    "ChunkingConfigEntry",
-    "ParsingConfigEntry",
 ]

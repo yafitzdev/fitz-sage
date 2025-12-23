@@ -1,14 +1,26 @@
 # fitz_ai/ingest/chunking/engine.py
+"""
+ChunkingEngine - Central controller for chunking operations.
+
+Uses ChunkingRouter to route files to type-specific chunkers based on extension.
+
+Architecture:
+    ChunkingEngine
+        └── ChunkingRouter
+            ├── .md → MarkdownChunker
+            ├── .py → PythonChunker
+            └── default → SimpleChunker
+"""
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, Dict, List
 
 from fitz_ai.engines.classic_rag.models.chunk import Chunk
-from fitz_ai.ingest.chunking.base import ChunkerPlugin
-from fitz_ai.ingest.chunking.registry import get_chunking_plugin
-from fitz_ai.ingest.config.schema import ChunkerConfig
+from fitz_ai.ingest.chunking.router import ChunkingRouter
+from fitz_ai.ingest.config.schema import ChunkingRouterConfig
 from fitz_ai.ingest.exceptions.chunking import IngestionChunkingError
 from fitz_ai.ingest.exceptions.config import IngestionConfigError
 from fitz_ai.logging.logger import get_logger
@@ -21,88 +33,107 @@ class ChunkingEngine:
     """
     Central controller for chunking operations.
 
-    Architecture:
-    - Single contract: ChunkerPlugin.chunk_text(text, base_meta) -> list[Chunk]
+    Routes files to type-specific chunkers via ChunkingRouter.
+
+    Usage:
+        engine = ChunkingEngine.from_config(router_config)
+        chunks = engine.run(raw_doc)
     """
 
-    def __init__(self, plugin: ChunkerPlugin):
-        self.plugin = plugin
+    def __init__(self, router: ChunkingRouter) -> None:
+        """
+        Initialize the engine with a router.
+
+        Args:
+            router: ChunkingRouter for file-type specific chunking.
+        """
+        self._router = router
 
     @classmethod
-    def from_config(cls, cfg: ChunkerConfig) -> "ChunkingEngine":
-        if cfg is None or not getattr(cfg, "plugin_name", None):
-            raise IngestionConfigError("ChunkerConfig.plugin_name is required")
+    def from_config(cls, config: ChunkingRouterConfig) -> "ChunkingEngine":
+        """
+        Create engine from a ChunkingRouterConfig.
 
+        Args:
+            config: Router configuration with default and per-extension settings.
+
+        Returns:
+            Configured ChunkingEngine instance.
+
+        Raises:
+            IngestionConfigError: If config is invalid.
+        """
         try:
-            PluginCls = get_chunking_plugin(cfg.plugin_name)
-        except Exception as e:
-            raise IngestionConfigError(
-                f"Unknown chunker plugin {cfg.plugin_name!r}"
-            ) from e
+            router = ChunkingRouter.from_config(config)
+        except IngestionChunkingError as e:
+            raise IngestionConfigError(f"Failed to build chunking router: {e}") from e
 
-        # Simple: just pass all kwargs to the plugin
-        # The plugin defines what parameters it accepts
-        kwargs: Dict[str, Any] = dict(cfg.kwargs or {})
+        return cls(router=router)
 
-        try:
-            plugin = PluginCls(**kwargs)
-        except Exception as e:
-            raise IngestionConfigError(
-                f"Failed to initialize chunker plugin {cfg.plugin_name!r}"
-            ) from e
+    @property
+    def router(self) -> ChunkingRouter:
+        """Get the router."""
+        return self._router
 
-        return cls(plugin)
+    def get_chunker_id(self, ext: str) -> str:
+        """
+        Get the chunker_id for a file extension.
+
+        Args:
+            ext: File extension.
+
+        Returns:
+            The chunker_id string.
+        """
+        return self._router.get_chunker_id(ext)
 
     def run(self, raw_doc: object) -> List[Chunk]:
         """
         Chunk a raw document into smaller pieces.
 
+        Automatically selects the chunker based on file extension.
+
         Args:
-            raw_doc: A RawDocument object with 'path', 'content', and 'metadata' attributes.
-                     The 'content' attribute contains the already-extracted text.
+            raw_doc: A RawDocument object with 'path', 'content', and 'metadata'.
 
         Returns:
             List of Chunk objects.
+
+        Raises:
+            IngestionChunkingError: If chunking fails.
         """
-        # Get the path for logging/metadata purposes
         path_str = getattr(raw_doc, "path", "unknown")
         path = Path(path_str) if path_str != "unknown" else None
 
         logger.debug(f"{CHUNKING} Chunking document: {path_str}")
 
-        # IMPORTANT: Use the content from raw_doc, NOT re-read from disk!
-        # The ingestion plugin has already extracted the text (including PDF text extraction).
-        text = getattr(raw_doc, "content", None)
-
-        if text is None:
-            # Fallback: try to read from disk (for backwards compatibility)
-            logger.warning(
-                f"{CHUNKING} raw_doc has no 'content' attribute, falling back to disk read"
+        content = getattr(raw_doc, "content", None)
+        if content is None:
+            raise IngestionChunkingError(
+                f"RawDocument has no 'content' attribute: {path_str}"
             )
-            if path is None or not path.exists() or not path.is_file():
-                raise IngestionChunkingError(
-                    f"File does not exist or is not a file: {path_str}"
-                )
-            try:
-                text = path.read_text(encoding="utf-8", errors="ignore")
-            except Exception as e:
-                logger.error(f"{CHUNKING} Failed reading file '{path}': {e}")
-                raise IngestionChunkingError(
-                    f"Failed reading file for chunking: {path}"
-                ) from e
 
-        if not text or not text.strip():
+        if not content or not content.strip():
             logger.warning(f"{CHUNKING} Empty content for document: {path_str}")
             return []
 
         # Build base metadata
         base_meta: Dict[str, Any] = {
             "source_file": str(path) if path else path_str,
+            "doc_id": path.stem if path else "unknown",
             **(getattr(raw_doc, "metadata", None) or {}),
         }
 
+        ext = path.suffix.lower() if path else ".txt"
+        chunker = self._router.get_chunker(ext)
+
+        logger.debug(
+            f"{CHUNKING} Using chunker '{chunker.plugin_name}' "
+            f"(id: {chunker.chunker_id}) for '{path_str}'"
+        )
+
         try:
-            chunks = self.plugin.chunk_text(text, base_meta)
+            chunks = chunker.chunk_text(content, base_meta)
         except IngestionChunkingError:
             raise
         except Exception as e:
@@ -113,3 +144,6 @@ class ChunkingEngine:
 
         logger.debug(f"{CHUNKING} Extracted {len(chunks)} chunks from '{path_str}'")
         return chunks
+
+
+__all__ = ["ChunkingEngine"]

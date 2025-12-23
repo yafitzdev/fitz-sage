@@ -14,7 +14,6 @@ from fitz_ai.ingest.state import (
     FileEntry,
     FileStatus,
     EmbeddingConfig,
-    ChunkingConfigEntry,
 )
 
 
@@ -28,31 +27,6 @@ class TestIngestState:
         assert state.schema_version == 1
         assert state.project_id == "test-123"
         assert state.roots == {}
-        assert ".md" in state.parsing_by_ext
-        assert ".md" in state.chunking_by_ext
-
-    def test_get_parser_id(self):
-        """Test getting parser ID for known and unknown extensions."""
-        state = IngestState(project_id="test")
-
-        assert state.get_parser_id(".md") == "md.v1"
-        assert state.get_parser_id(".txt") == "txt.v1"
-        assert state.get_parser_id(".unknown") == "unknown.v1"
-
-    def test_get_chunker_id(self):
-        """Test getting chunker ID for known and unknown extensions."""
-        state = IngestState(project_id="test")
-
-        assert state.get_chunker_id(".md") == "tokens_800_120"
-        assert state.get_chunker_id(".unknown") == "tokens_800_120"
-
-    def test_get_embedding_id(self):
-        """Test getting embedding ID."""
-        state = IngestState(project_id="test")
-        assert state.get_embedding_id() == "unknown:unknown"
-
-        state.embedding = EmbeddingConfig.create("openai", "text-embedding-3-small")
-        assert state.get_embedding_id() == "openai:text-embedding-3-small"
 
     def test_get_active_paths(self):
         """Test getting active paths from state."""
@@ -80,6 +54,9 @@ class TestFileEntry:
             mtime_epoch=1234567890.0,
             content_hash="sha256:abc",
             status=FileStatus.ACTIVE,
+            chunker_id="simple:1000:0",
+            parser_id="md.v1",
+            embedding_id="cohere:embed-english-v3.0",
         )
         assert active.is_active() is True
 
@@ -89,6 +66,9 @@ class TestFileEntry:
             mtime_epoch=1234567890.0,
             content_hash="sha256:abc",
             status=FileStatus.DELETED,
+            chunker_id="simple:1000:0",
+            parser_id="md.v1",
+            embedding_id="cohere:embed-english-v3.0",
         )
         assert deleted.is_active() is False
 
@@ -110,24 +90,9 @@ class TestEmbeddingConfig:
             "openai",
             "text-embedding-3-small",
             dimension=1536,
-            normalize=True,
         )
 
         assert config.dimension == 1536
-        assert config.normalize is True
-
-
-class TestChunkingConfigEntry:
-    """Tests for ChunkingConfigEntry model."""
-
-    def test_create(self):
-        """Test creating chunking config."""
-        config = ChunkingConfigEntry.create("tokens", 800, 120)
-
-        assert config.strategy == "tokens"
-        assert config.chunk_size == 800
-        assert config.overlap == 120
-        assert config.id == "tokens_800_120"
 
 
 class TestIngestStateManager:
@@ -153,8 +118,6 @@ class TestIngestStateManager:
             "project_id": "existing-project",
             "updated_at": "2024-01-01T00:00:00",
             "roots": {},
-            "chunking_by_ext": {},
-            "parsing_by_ext": {},
         }
         state_path.write_text(json.dumps(state_data))
 
@@ -176,12 +139,18 @@ class TestIngestStateManager:
             ext=".md",
             size_bytes=1234,
             mtime_epoch=1234567890.0,
+            chunker_id="simple:1000:0",
+            parser_id="md.v1",
+            embedding_id="cohere:embed-english-v3.0",
         )
 
         entry = manager.get_file_entry("/root", "/root/test.md")
         assert entry is not None
         assert entry.content_hash == "sha256:abc123"
         assert entry.status == FileStatus.ACTIVE
+        assert entry.chunker_id == "simple:1000:0"
+        assert entry.parser_id == "md.v1"
+        assert entry.embedding_id == "cohere:embed-english-v3.0"
 
     def test_mark_deleted(self, tmp_path: Path):
         """Test marking a file as deleted."""
@@ -197,10 +166,13 @@ class TestIngestStateManager:
             ext=".md",
             size_bytes=1234,
             mtime_epoch=1234567890.0,
+            chunker_id="simple:1000:0",
+            parser_id="md.v1",
+            embedding_id="cohere:embed-english-v3.0",
         )
 
         # Then mark as deleted
-        manager.mark_deleted("/root/test.md", "/root")
+        manager.mark_deleted("/root", "/root/test.md")
 
         entry = manager.get_file_entry("/root", "/root/test.md")
         assert entry is not None
@@ -219,6 +191,9 @@ class TestIngestStateManager:
             ext=".md",
             size_bytes=1234,
             mtime_epoch=1234567890.0,
+            chunker_id="simple:1000:0",
+            parser_id="md.v1",
+            embedding_id="cohere:embed-english-v3.0",
         )
         manager.save()
 
@@ -229,6 +204,7 @@ class TestIngestStateManager:
         entry = manager2.get_file_entry("/root", "/root/test.md")
         assert entry is not None
         assert entry.content_hash == "sha256:abc123"
+        assert entry.chunker_id == "simple:1000:0"
 
     def test_get_active_paths(self, tmp_path: Path):
         """Test getting active paths."""
@@ -237,12 +213,21 @@ class TestIngestStateManager:
         manager.load()
 
         # Add some files
-        manager.mark_active("/root/a.md", "/root", "sha256:a", ".md", 100, 1234567890.0)
-        manager.mark_active("/root/b.md", "/root", "sha256:b", ".md", 100, 1234567890.0)
-        manager.mark_active("/root/c.md", "/root", "sha256:c", ".md", 100, 1234567890.0)
+        manager.mark_active(
+            "/root/a.md", "/root", "sha256:a", ".md", 100, 1234567890.0,
+            "simple:1000:0", "md.v1", "cohere:embed-english-v3.0"
+        )
+        manager.mark_active(
+            "/root/b.md", "/root", "sha256:b", ".md", 100, 1234567890.0,
+            "simple:1000:0", "md.v1", "cohere:embed-english-v3.0"
+        )
+        manager.mark_active(
+            "/root/c.md", "/root", "sha256:c", ".md", 100, 1234567890.0,
+            "simple:1000:0", "md.v1", "cohere:embed-english-v3.0"
+        )
 
         # Delete one
-        manager.mark_deleted("/root/b.md", "/root")
+        manager.mark_deleted("/root", "/root/b.md")
 
         active = manager.get_active_paths("/root")
         assert active == {"/root/a.md", "/root/c.md"}
@@ -255,4 +240,33 @@ class TestIngestStateManager:
 
         manager.set_embedding_config("openai", "text-embedding-3-small")
 
-        assert manager.get_embedding_id() == "openai:text-embedding-3-small"
+        assert manager.state.embedding is not None
+        assert manager.state.embedding.id == "openai:text-embedding-3-small"
+
+    def test_config_ids_persisted(self, tmp_path: Path):
+        """Test that config IDs are persisted and loaded correctly."""
+        state_path = tmp_path / "ingest.json"
+        manager = IngestStateManager(state_path)
+        manager.load()
+
+        manager.mark_active(
+            file_path="/root/test.md",
+            root="/root",
+            content_hash="sha256:abc123",
+            ext=".md",
+            size_bytes=1234,
+            mtime_epoch=1234567890.0,
+            chunker_id="markdown:800:100",
+            parser_id="md.v2",
+            embedding_id="openai:text-embedding-3-large",
+        )
+        manager.save()
+
+        # Reload and verify
+        manager2 = IngestStateManager(state_path)
+        manager2.load()
+
+        entry = manager2.get_file_entry("/root", "/root/test.md")
+        assert entry.chunker_id == "markdown:800:100"
+        assert entry.parser_id == "md.v2"
+        assert entry.embedding_id == "openai:text-embedding-3-large"

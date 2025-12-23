@@ -1,14 +1,38 @@
-# ingest/chunking/__init__.py
+# fitz_ai/ingest/chunking/__init__.py
 """
-Chunking subsystem for ingest.
+Chunking subsystem for ingestion.
 
 Provides:
-- Chunker plugins
-- ChunkingEngine
-- Registry + auto-discovery
+- ChunkerPlugin protocol for implementing chunkers
+- ChunkingRouter for file-type specific routing
+- ChunkingEngine for orchestration
+- Built-in chunker plugins (simple, etc.)
+
+Usage:
+    from fitz_ai.ingest.chunking import (
+        ChunkingRouter,
+        ChunkingEngine,
+        ChunkerPlugin,
+    )
+    from fitz_ai.ingest.config.schema import ChunkingRouterConfig
+
+    config = ChunkingRouterConfig(...)
+    router = ChunkingRouter.from_config(config)
+    engine = ChunkingEngine(router)
+
+    chunks = engine.run(raw_doc)
 """
 
-from .base import BaseChunker, Chunk, ChunkerPlugin
-from .engine import ChunkingEngine
+from fitz_ai.ingest.chunking.base import ChunkerPlugin, Chunk
+from fitz_ai.ingest.chunking.engine import ChunkingEngine
+from fitz_ai.ingest.chunking.router import ChunkingRouter
 
-__all__ = ["BaseChunker", "ChunkerPlugin", "ChunkingEngine", "Chunk"]
+__all__ = [
+    # Protocol
+    "ChunkerPlugin",
+    "Chunk",
+    # Router
+    "ChunkingRouter",
+    # Engine
+    "ChunkingEngine",
+]

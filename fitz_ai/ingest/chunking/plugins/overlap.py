@@ -1,13 +1,13 @@
-# fitz_ai/ingest/chunking/plugins/simple.py
+# fitz_ai/ingest/chunking/plugins/overlap.py
 """
-Simple fixed-size character chunker.
+Overlap chunker - character-based chunking with overlap.
 
-Splits text into fixed-size character blocks with optional overlap.
-This is the default/fallback chunker used when no file-type specific
-chunker is configured.
+This is essentially an alias for SimpleChunker with a different plugin_name,
+provided for backwards compatibility and clarity when overlap is the primary
+concern.
 
-Chunker ID format: "simple:{chunk_size}:{chunk_overlap}"
-Example: "simple:1000:0" for 1000-char chunks with no overlap
+Chunker ID format: "overlap:{chunk_size}:{chunk_overlap}"
+Example: "overlap:1000:200" for 1000-char chunks with 200-char overlap
 """
 
 from __future__ import annotations
@@ -19,20 +19,25 @@ from fitz_ai.engines.classic_rag.models.chunk import Chunk
 
 
 @dataclass
-class SimpleChunker:
+class OverlapChunker:
     """
-    Fixed-size character chunker with optional overlap.
+    Character-based chunker with configurable overlap.
+
+    Identical to SimpleChunker but with a distinct plugin_name for
+    cases where you want to explicitly use overlap chunking.
+
+    The overlap helps maintain context across chunk boundaries, which
+    can improve retrieval quality for queries that span chunk boundaries.
 
     Example:
-        >>> chunker = SimpleChunker(chunk_size=500, chunk_overlap=50)
+        >>> chunker = OverlapChunker(chunk_size=1000, chunk_overlap=200)
         >>> chunker.chunker_id
-        'simple:500:50'
-        >>> chunks = chunker.chunk_text("...", {"doc_id": "test"})
+        'overlap:1000:200'
     """
 
-    plugin_name: str = field(default="simple", repr=False)
+    plugin_name: str = field(default="overlap", repr=False)
     chunk_size: int = 1000
-    chunk_overlap: int = 0
+    chunk_overlap: int = 200  # Default to 200 for overlap chunker
 
     def __post_init__(self) -> None:
         """Validate parameters."""
@@ -50,20 +55,20 @@ class SimpleChunker:
         """
         Unique identifier for this chunker configuration.
 
-        Format: "simple:{chunk_size}:{chunk_overlap}"
+        Format: "overlap:{chunk_size}:{chunk_overlap}"
         """
         return f"{self.plugin_name}:{self.chunk_size}:{self.chunk_overlap}"
 
     def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Chunk]:
         """
-        Split text into fixed-size character chunks.
+        Split text into overlapping character chunks.
 
         Args:
             text: The text content to chunk.
             base_meta: Base metadata to include in each chunk.
 
         Returns:
-            List of Chunk objects. Empty list if text is empty/whitespace.
+            List of Chunk objects with overlapping content.
         """
         if not text or not text.strip():
             return []
@@ -75,6 +80,7 @@ class SimpleChunker:
         chunks: List[Chunk] = []
         chunk_index = 0
 
+        # Step size: how far to advance after each chunk
         step = self.chunk_size - self.chunk_overlap
         if step < 1:
             step = 1
@@ -102,4 +108,4 @@ class SimpleChunker:
         return chunks
 
 
-__all__ = ["SimpleChunker"]
+__all__ = ["OverlapChunker"]
