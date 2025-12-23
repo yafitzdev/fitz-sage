@@ -11,6 +11,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.6] - 2025-12-23
+
+### 🎉 Highlights
+
+**Quickstart Command** - Zero-friction entry point for new users. Get a working RAG system in ~5 minutes with just `pip install fitz-ai` and `fitz quickstart`.
+
+**Incremental Ingestion** - Content-hash-based incremental ingestion that skips unchanged files. State-file-authoritative architecture enables user-implemented vector DB plugins without requiring scroll/filter APIs.
+
+**File-Type Based Chunking** - Intelligent routing to specialized chunkers based on file extension. Markdown, Python, and PDF each get purpose-built chunking strategies.
+
+**Epistemic Safety Layer** - Constraint plugins and answer modes prevent overconfident answers when evidence is insufficient, disputed, or lacks causal attribution.
+
+**YAML Retrieval Pipelines** - Retrieval strategies now defined in YAML. Compose steps like `vector_search → rerank → threshold → limit` declaratively.
+
+### 🚀 Added
+
+#### Quickstart Experience
+- `fitz quickstart` command for zero-config RAG setup
+- Interactive mode with path/question prompts
+- Direct mode: `fitz quickstart ./docs "question"`
+- Auto-prompts for Cohere API key, offers to save to shell config
+- Auto-generates `.fitz/config.yaml` on first run
+- Uses Cohere + local FAISS (no external services required)
+
+#### Incremental Ingestion System
+- Content-hash-based file tracking in `.fitz/ingest.json`
+- Files skipped if content hash matches previous ingestion
+- `--force` flag to bypass skip logic and re-ingest everything
+- `FileScanner`: Walks directories, filters by supported extensions
+- `Differ`: Computes ingestion plan (new/changed/deleted files)
+- `DiffIngestExecutor`: Orchestrates parse → chunk → embed → upsert
+- `IngestStateManager`: Persists and queries ingestion state
+
+#### File-Type Based Chunking
+- `ChunkingRouter`: Routes documents to file-type specific chunkers
+- Per-extension chunker configuration via `by_extension` map
+- Config ID tracking (`chunker_id`, `parser_id`, `embedding_id`) for re-chunking detection
+- `MarkdownChunker`: Splits on headers, preserves code blocks
+- `PythonCodeChunker`: AST-based splitting by class/function, includes imports
+- `PdfSectionChunker`: Detects ALL CAPS headers, numbered sections, keyword sections
+
+#### Constraint Plugin System
+- `ConflictAwareConstraint`: Detects contradicting classifications across chunks
+- `InsufficientEvidenceConstraint`: Blocks confident answers when evidence is weak
+- `CausalAttributionConstraint`: Prevents implicit causality synthesis
+- `ConstraintResult` with `allow_decisive_answer`, `reason`, `signal` fields
+
+#### Answer Mode System
+- `AnswerMode` enum: `CONFIDENT`, `QUALIFIED`, `DISPUTED`, `ABSTAIN`
+- `AnswerModeResolver`: Maps constraint signals to answer mode
+- Mode-specific LLM instruction prefixes for epistemic tone control
+- `mode` field added to `RGSAnswer` and core `Answer`
+
+#### YAML Retrieval Pipelines
+- `dense.yaml` and `dense_rerank.yaml` pipeline definitions
+- Modular retrieval steps: `vector_search`, `rerank`, `threshold`, `limit`, `dedupe`
+- `RetrievalPipelineFromYaml` with `retrieve()` method
+- Step registry with `get_step_class()` and `list_available_steps()`
+
+#### CLI Improvements
+- `fitz init` prompts for chunking configuration
+- `fitz ingest` loads chunking config from `fitz.yaml`
+- `fitz query --retrieval/-r` flag for retrieval strategy selection
+- Shared `display_answer()` for consistent output formatting
+
+### 🔄 Changed
+
+- Config field `retriever` → `retrieval` across codebase
+- State schema requires `chunker_id`, `parser_id`, `embedding_id` fields
+- `IngestStateManager.mark_active()` requires config ID parameters
+- `DiffIngestExecutor` takes `chunking_router` instead of single chunker
+- FAISS moved to base dependencies (not optional)
+
+### 🗑️ Deprecated
+
+- `OverlapChunker`: Use `SimpleChunker` with `chunk_overlap` instead
+
+### 🐛 Fixed
+
+- Threshold regression for temporal/causal queries (reordered pipeline steps)
+- Plugin discovery paths for YAML-based plugins
+- Windows path separator issue in scanner tests
+- Contract map now correctly discovers all 25 plugins
+
+---
+
 ## [0.3.5] - 2025-12-21
 
 ### 🎉 Highlights
@@ -331,8 +417,9 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.5...HEAD
-[0.3.4]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.4...v0.3.5
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.6...HEAD
+[0.3.6]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.5...v0.3.6
+[0.3.5]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.1...v0.3.2
