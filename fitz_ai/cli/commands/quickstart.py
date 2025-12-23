@@ -72,7 +72,7 @@ def command(
     # Header
     # =========================================================================
 
-    ui.header("Fitz Quickstart")
+    ui.header("Fitz Quickstart", "Zero-friction RAG in one command")
 
     # =========================================================================
     # Prompt for source if not provided

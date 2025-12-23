@@ -120,6 +120,12 @@ def command(
         fitz query "question" --no-rerank
     """
     # =========================================================================
+    # Header
+    # =========================================================================
+
+    ui.header("Fitz Query", "Retrieve answers from your knowledge base")
+
+    # =========================================================================
     # Load config
     # =========================================================================
 
@@ -149,11 +155,11 @@ def command(
     else:
         collections = _get_collections(raw_config)
         if collections and len(collections) > 1:
+            print()
             selected = ui.prompt_numbered_choice(
                 "Collection", collections, default_collection
             )
             typed_config.retrieval.collection = selected
-            print()
         elif collections:
             typed_config.retrieval.collection = collections[0]
 
@@ -162,6 +168,7 @@ def command(
         typed_config.retrieval.plugin_name = retrieval
     else:
         if len(available_retrievals) > 1:
+            print()
             # Use config's retrieval as the default (set in fitz init)
             selected_retrieval = ui.prompt_numbered_choice(
                 "Retrieval strategy",
@@ -169,7 +176,6 @@ def command(
                 default_retrieval,
             )
             typed_config.retrieval.plugin_name = selected_retrieval
-            print()
         elif available_retrievals:
             typed_config.retrieval.plugin_name = available_retrievals[0]
 
@@ -206,6 +212,7 @@ def command(
     # Show query info
     # =========================================================================
 
+    print()
     info_parts = [
         f"Collection: {display_collection}",
         f"Retrieval: {display_retrieval}",

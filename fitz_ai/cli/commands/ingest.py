@@ -220,7 +220,7 @@ def command(
     # Header
     # =========================================================================
 
-    ui.header("Fitz Ingest")
+    ui.header("Fitz Ingest", "Feed your documents into the vector database")
     if force:
         ui.warning("Force mode: will re-ingest all files")
     else:

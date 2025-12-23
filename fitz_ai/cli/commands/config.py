@@ -267,7 +267,7 @@ def command(
     # Header
     # =========================================================================
 
-    ui.header("Fitz Configuration")
+    ui.header("Fitz Config", "Check your RAG configuration")
     ui.info(f"File: {config_path}")
 
     # =========================================================================

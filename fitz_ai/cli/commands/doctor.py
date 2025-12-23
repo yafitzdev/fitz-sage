@@ -225,7 +225,7 @@ def command(
     # Header
     # =========================================================================
 
-    ui.header("Fitz Doctor")
+    ui.header("Fitz Doctor", "System diagnostics")
 
     # =========================================================================
     # Core Checks
