@@ -1,4 +1,4 @@
-# fitz-ai 🔍
+# fitz-ai ✨
 
 **RAG in 5 minutes. No infrastructure. No boilerplate.**
 
@@ -11,7 +11,7 @@ That's it. Your documents are now searchable with AI.
 
 ---
 
-## The Problem with RAG Today 💢
+## The Problem with RAG Today ☔️
 
 Building RAG shouldn't require a PhD in prompt engineering. Yet here we are:
 
@@ -29,7 +29,7 @@ Building RAG shouldn't require a PhD in prompt engineering. Yet here we are:
 
 ---
 
-## What Makes Fitz Different ✨
+## What Makes Fitz Different ☀️
 
 ### 1. Zero-Config Start, Full Control Later
 
@@ -162,7 +162,7 @@ fitz query "Which papers cite attention mechanisms for NLP?"
 
 ---
 
-## Architecture
+## Architecture 🏛
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -205,7 +205,7 @@ fitz doctor                        # System diagnostics
 
 ---
 
-## Comparison
+## Comparison ⚖️
 
 | | fitz-ai | LangChain | LlamaIndex |
 |--|---------|-----------|------------|
@@ -246,7 +246,7 @@ The engine is an implementation detail. Your ingested knowledge, your queries, y
 
 ---
 
-## Philosophy
+## Philosophy 📍
 
 **Principles:**
 - **Explicit over clever**: No magic. Read the config, know what happens.
