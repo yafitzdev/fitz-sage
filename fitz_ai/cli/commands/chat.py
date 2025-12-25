@@ -116,22 +116,45 @@ Guidelines:
 # Chat Display
 # =============================================================================
 
+ASSISTANT_INDENT = "    "  # 4 spaces
 
-def _display_assistant_message(text: str) -> None:
-    """Display the assistant's response."""
+
+def _display_user_message(text: str) -> None:
+    """Display user message in a panel."""
     if RICH:
-        from rich.markdown import Markdown
         from rich.panel import Panel
 
         console.print(
             Panel(
-                Markdown(text),
-                title="[bold cyan]Assistant[/bold cyan]",
-                border_style="cyan",
+                text,
+                title="[bold green]You[/bold green]",
+                title_align="left",
+                border_style="green",
+                padding=(0, 1),
             )
         )
     else:
-        print(f"\nAssistant: {text}\n")
+        print(f"\nYou: {text}")
+
+
+def _display_assistant_message(text: str) -> None:
+    """Display assistant message in an indented panel."""
+    if RICH:
+        from rich.markdown import Markdown
+        from rich.padding import Padding
+        from rich.panel import Panel
+
+        console.print()  # Empty line before bubble
+        panel = Panel(
+            Markdown(text),
+            title="[bold cyan]Assistant[/bold cyan]",
+            title_align="left",
+            border_style="cyan",
+            padding=(0, 1),
+        )
+        console.print(Padding(panel, (0, 0, 0, 12)))  # left padding of 12
+    else:
+        print(f"\n\nAssistant: {text}")
 
 
 def _display_welcome(collection: str) -> None:
@@ -239,9 +262,9 @@ def command(
             try:
                 if RICH:
                     from rich.prompt import Prompt
-                    user_input = Prompt.ask("[bold]You[/bold]")
+                    user_input = Prompt.ask("\n[bold green]You[/bold green]")
                 else:
-                    user_input = input("You: ").strip()
+                    user_input = input("\nYou: ").strip()
             except EOFError:
                 break
 
