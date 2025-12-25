@@ -25,83 +25,57 @@ That's it. Your documents are now searchable with AI.
 - **Runs locally.** Ollama support, no API keys required to start.
 - **One config file when you need control.** Zero config when you don't.
 - **Full provenance.** Every answer traces back to the exact chunk and document.
+- **Data privacy**: Fitz runs entirely on your infrastructure. No telemetry, no cloud, no external calls except to the LLM provider you configure.
 
-Two commands to your first answer:
+Any questions? Try fitz on itself:
 
 ```bash
-pip install fitz-ai
-fitz quickstart ./docs "What is our refund policy?"
+fitz quickstart ./fitz_ai "How does the chunking pipeline work?"
 ```
 
-That's the whole tutorial.
+The codebase speaks for itself.
 
 ---
 
-## Features
+## Features 🎁
 
-### 1. Zero-Config Start, Full Control Later
+### Epistemic Honesty
 
-```bash
-# Day 1: Just works
-fitz quickstart ./contracts "What are the payment terms?"
-
-# Day 30: Full customization when you need it
-fitz init                    # Configure everything
-fitz ingest ./docs           # Fine-tune chunking
-fitz query "..." --retrieval dense_rerank
-```
-
-Most RAG frameworks force you to understand the entire stack before you can ask a single question. Fitz inverts this: start with answers, learn the internals only if you need them.
-
-### 2. Epistemic Honesty Built-In
-
-When your documents don't contain the answer, fitz says so:
+When documents don't contain the answer, fitz says so:
 
 ```
 Q: "What was our Q4 revenue?"
-A: "I cannot find Q4 revenue figures in the provided documents. 
+A: "I cannot find Q4 revenue figures in the provided documents.
     The available financial data covers Q1-Q3 only."
-    
+
     Mode: ABSTAIN
 ```
 
 Three constraint plugins run automatically:
-- 🧊 **ConflictAwareConstraint**: Detects contradictions across sources
-- 🎲 **InsufficientEvidenceConstraint**: Blocks confident answers without evidence  
-- 📦 **CausalAttributionConstraint**: Prevents hallucinated cause-effect claims
+- **ConflictAwareConstraint**: Detects contradictions across sources
+- **InsufficientEvidenceConstraint**: Blocks answers without evidence
+- **CausalAttributionConstraint**: Prevents hallucinated cause-effect claims
 
-No prompt engineering required. No "be careful" system messages. Just honest answers.
+### Full Provenance
 
-### 3. Full Provenance
-
-Every answer includes sources - which documents, which chunks, what scores:
+Every answer traces back to its source:
 
 ```
-Answer: The refund policy allows returns within 30 days of purchase...
+Answer: The refund policy allows returns within 30 days...
 
 Sources:
-  [1] policies/refund.md [chunk 3] (vec=0.847, rerank=0.92)
-  [2] faq/payments.md [chunk 1] (vec=0.812, rerank=0.87)
+  [1] policies/refund.md [chunk 3] (score: 0.92)
+  [2] faq/payments.md [chunk 1] (score: 0.87)
 ```
 
-No black boxes. Audit every answer back to its source.
+### Enrichment
 
-### 4. YAML-Defined Everything
+Opt-in enrichment plugins enhance your knowledge base:
 
-```yaml
-# Add a new LLM provider: just drop a YAML file
-# fitz_ai/llm/chat/my_provider.yaml
-plugin_name: "my_provider"
-plugin_type: "chat"
-endpoint:
-  path: "/v1/chat/completions"
-  method: "POST"
-defaults:
-  model: "my-model"
-  temperature: 0.2
-```
+- **Code-derived artifacts**: Navigation indexes, interface catalogs, dependency graphs—extracted directly from your codebase via AST analysis. No LLM required.
+- **LLM-generated summaries**: Natural language descriptions for chunks, making code more discoverable via semantic search.
 
-LangChain requires you to subclass `BaseChatModel` and implement 47 methods. Fitz plugins are YAML files. Adding OpenAI, Cohere, Anthropic, Ollama, or your custom endpoint is the same: describe the API, done.
+Your question matches enriched context, not just raw text. Fully extensible—add your own enrichment plugins.
 
 ---
 
@@ -115,33 +89,18 @@ fitz quickstart ./docs "Your question here"
 
 That's it. Fitz will prompt you for anything it needs.
 
-- **Don't have docs yet?** Point fitz at its own source:
+Want to go fully local with Ollama? No problem:
 
-    ```bash
-    fitz quickstart ./fitz_ai "How does the chunking pipeline work?"
-    ```
-    
-    Learn the platform by querying it. The codebase is the documentation.
+```bash
+pip install fitz-ai
 
+ollama pull llama3.2
+ollama pull nomic-embed-text
 
-- Want to go fully local with Ollama? No problem:
+fitz quickstart ./docs "Your question here"
+```
 
-    ```bash
-    pip install fitz-ai
-    
-    ollama pull llama3.2
-    ollama pull nomic-embed-text
-    
-    fitz quickstart ./docs "Your question here"
-    ```
-
-    No data leaves your machine. No API costs. Same interface.
-
-
-- **Data privacy**: Fitz runs entirely on your infrastructure. No telemetry, no cloud, no external calls except to the LLM provider you configure.
-
-
-- **Production deployments**: For Qdrant, Docker, and API serving, see the [Deployment Guide](docs/deployment.md).
+No data leaves your machine. No API costs. Same interface.
 
 ---
 
@@ -149,35 +108,50 @@ That's it. Fitz will prompt you for anything it needs.
 
 Fitz is a foundation. It handles document ingestion and grounded retrieval—you build whatever sits on top: chatbots, dashboards, alerts, or automation.
 
-### Chatbot Backend
+<details>
+<summary><strong>Chatbot Backend</strong></summary>
 
-Connect fitz to Slack, Discord, Teams, or your own UI. One function call returns an answer with sources—no hallucinations, full provenance. You handle the conversation flow; fitz handles the knowledge.
+> Connect fitz to Slack, Discord, Teams, or your own UI. One function call returns an answer with sources—no hallucinations, full provenance. You handle the conversation flow; fitz handles the knowledge.
+>
+> *Example:* A SaaS company plugs fitz into their support bot. Tier-1 questions like "How do I reset my password?" get instant answers. Their support team focuses on edge cases while fitz deflects 60% of incoming tickets.
 
-*Example:* A SaaS company plugs fitz into their support bot. Tier-1 questions like "How do I reset my password?" get instant answers. Their support team focuses on edge cases while fitz deflects 60% of incoming tickets.
+</details>
 
-### Internal Knowledge Base
+<details>
+<summary><strong>Internal Knowledge Base</strong></summary>
 
-Point fitz at your wiki, policies, and runbooks. Employees ask natural language questions instead of hunting through folders or pinging colleagues on Slack.
+> Point fitz at your wiki, policies, and runbooks. Employees ask natural language questions instead of hunting through folders or pinging colleagues on Slack.
+>
+> *Example:* A 200-person startup ingests their Notion workspace and compliance docs. New hires find answers to "How do I request PTO?" on day one—no more waiting for someone in HR to respond.
 
-*Example:* A 200-person startup ingests their Notion workspace and compliance docs. New hires find answers to "How do I request PTO?" on day one—no more waiting for someone in HR to respond.
+</details>
 
-### Continuous Intelligence & Alerting
+<details>
+<summary><strong>Continuous Intelligence & Alerting</strong></summary>
 
-Pair fitz with cron, Airflow, or Lambda. Ingest data on a schedule, run queries automatically, trigger alerts when conditions match. Fitz provides the retrieval primitive; you wire the automation.
+> Pair fitz with cron, Airflow, or Lambda. Ingest data on a schedule, run queries automatically, trigger alerts when conditions match. Fitz provides the retrieval primitive; you wire the automation.
+>
+> *Example:* A security team ingests SIEM logs nightly. Every morning, a scheduled job asks "Were there failed logins from unusual locations?" If fitz finds evidence, an alert fires to the on-call channel before anyone checks email.
 
-*Example:* A security team ingests SIEM logs nightly. Every morning, a scheduled job asks "Were there failed logins from unusual locations?" If fitz finds evidence, an alert fires to the on-call channel before anyone checks email.
+</details>
 
-### Web Knowledge Base
+<details>
+<summary><strong>Web Knowledge Base</strong></summary>
 
-Scrape the web with Scrapy, BeautifulSoup, or Playwright. Save to disk, ingest with fitz. The web becomes a queryable knowledge base.
+> Scrape the web with Scrapy, BeautifulSoup, or Playwright. Save to disk, ingest with fitz. The web becomes a queryable knowledge base.
+>
+> *Example:* A football analytics hobbyist scrapes Premier League match reports. After ingesting, they ask "How did Arsenal perform against top 6 teams?" or "What tactics did Liverpool use in away games?"—insights that would take hours to compile manually.
 
-*Example:* A football analytics hobbyist scrapes Premier League match reports. After ingesting, they ask "How did Arsenal perform against top 6 teams?" or "What tactics did Liverpool use in away games?"—insights that would take hours to compile manually.
+</details>
 
-### Codebase Search
+<details>
+<summary><strong>Codebase Search</strong></summary>
 
-Fitz includes built-in AST-aware chunking for Python. Functions, classes, and modules become individual searchable units with docstrings and imports preserved. Ask questions in natural language; get answers pointing to specific code.
+> Fitz includes built-in AST-aware chunking for Python. Functions, classes, and modules become individual searchable units with docstrings and imports preserved. Ask questions in natural language; get answers pointing to specific code.
+>
+> *Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They ingest the codebase and ask "Where is user authentication handled?" or "What API endpoints modify the billing table?" New developers onboard in days instead of weeks.
 
-*Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They ingest the codebase and ask "Where is user authentication handled?" or "What API endpoints modify the billing table?" New developers onboard in days instead of weeks.
+</details>
 
 ---
 
@@ -204,43 +178,26 @@ Fitz includes built-in AST-aware chunking for Python. Functions, classes, and mo
 │  Retrieval Pipelines (YAML-composed)                        │
 │  dense.yaml | dense_rerank.yaml | custom...                 │
 ├─────────────────────────────────────────────────────────────┤
+│  Enrichment (opt-in)                                        │
+│  code artifacts | LLM summaries | custom plugins            │
+├─────────────────────────────────────────────────────────────┤
 │  Constraints (epistemic safety)                             │
 │  ConflictAware | InsufficientEvidence | CausalAttribution   │
 └─────────────────────────────────────────────────────────────┘
 ```
-
 ---
 
 ## CLI Reference
 
 ```bash
-fitz quickstart [PATH] [QUESTION]  # Zero-config RAG (start here)
-fitz init                          # Interactive setup wizard
-fitz ingest [PATH]                 # Ingest documents
-fitz query [QUESTION]              # Query knowledge base
-fitz collections                   # List and delete knowledge collections
-fitz config                        # View/edit configuration
-fitz doctor                        # System diagnostics
+fitz quickstart [PATH] [QUESTION]    # Zero-config RAG (start here)
+fitz init                            # Interactive setup wizard
+fitz ingest (optional: [PATH])       # Ingest documents
+fitz query [QUESTION]                # Query knowledge base
+fitz collections                     # List and delete knowledge collections
+fitz config                          # View/edit configuration
+fitz doctor                          # System diagnostics
 ```
-
----
-
-## Comparison ⚖️
-
-| | fitz-ai | LangChain | LlamaIndex |
-|--|---------|-----------|------------|
-| Time to first answer | 5 min | 30+ min | 20+ min |
-| Config required to start | None | Yes | Yes |
-| Knows when to say "I don't know" | Built-in | DIY | DIY |
-| Source citations | Automatic | Manual setup | Manual setup |
-| Add new LLM provider | Drop a YAML | Subclass + 200 LOC | Subclass + 150 LOC |
-| Swap retrieval paradigm | Change 1 line | Rewrite pipeline | Rewrite pipeline |
-
-**Choose fitz-ai if**: You want to query your documents with AI, not build an AI platform.
-
-**Choose LangChain if**: You're building complex agent workflows with tool use, memory, and multi-step reasoning.
-
-**Choose LlamaIndex if**: You need deep customization of retrieval strategies across heterogeneous data sources.
 
 ---
 
