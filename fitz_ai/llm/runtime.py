@@ -261,7 +261,7 @@ class YAMLEmbeddingClient(YAMLPluginBase):
         num_batches = (len(texts) + batch_size - 1) // batch_size
 
         logger.info(
-            f"[EMBED] Processing {len(texts)} texts in up to {num_batches} batches (max {batch_size}/batch)"
+            f"[EMBED] Processing {len(texts)} texts in {num_batches} batches (size={batch_size})"
         )
 
         for i in range(0, len(texts), batch_size):
@@ -273,22 +273,18 @@ class YAMLEmbeddingClient(YAMLPluginBase):
                 embeddings = self._embed_single_batch(batch)
                 elapsed = time.perf_counter() - t0
                 logger.info(
-                    f"[EMBED] Batch {batch_num}/{num_batches}: {len(batch)} texts in {elapsed:.2f}s "
-                    f"({elapsed/len(batch)*1000:.0f}ms/text)"
+                    f"[EMBED] Batch {batch_num}/{num_batches}: {len(batch)} texts in {elapsed:.2f}s"
                 )
                 all_embeddings.extend(embeddings)
             except Exception as e:
                 if batch_size == 1:
-                    # Can't reduce further, propagate error
                     raise
 
-                # Halve batch size and retry this batch
                 new_batch_size = max(1, batch_size // 2)
                 logger.warning(
                     f"[EMBED] Batch {batch_num} FAILED with size {batch_size}, "
                     f"retrying with size {new_batch_size}: {e}"
                 )
-                # Recursively process this batch with smaller size
                 embeddings = self._embed_batch_with_retry(batch, new_batch_size)
                 all_embeddings.extend(embeddings)
 

@@ -10,7 +10,7 @@ Config structure in .fitz/config.yaml:
     enrichment:
       enabled: true
       summary:
-        enabled: true
+        enabled: false  # Opt-in: 1 LLM call per chunk
       artifacts:
         auto: true
         disabled: []
@@ -31,13 +31,16 @@ class SummaryConfig:
     They are universal - applied to all chunk types using type-specific
     context builders for optimal results.
 
+    WARNING: Summaries make 1 LLM call per chunk. For a codebase with 1000
+    chunks, that's 1000 API calls. Enable explicitly only when needed.
+
     Attributes:
-        enabled: Whether to generate summaries
+        enabled: Whether to generate summaries (default: False - opt-in)
         provider: LLM provider to use (defaults to config's chat provider)
         model: Model to use (defaults to config's chat model)
     """
 
-    enabled: bool = True
+    enabled: bool = False  # Opt-in: 1 LLM call per chunk is expensive
     provider: str | None = None
     model: str | None = None
 
@@ -102,7 +105,7 @@ class EnrichmentConfig:
         return cls(
             enabled=data.get("enabled", False),
             summary=SummaryConfig(
-                enabled=summary_data.get("enabled", True),
+                enabled=summary_data.get("enabled", False),  # Opt-in
                 provider=summary_data.get("provider"),
                 model=summary_data.get("model"),
             ),
