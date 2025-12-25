@@ -39,7 +39,7 @@ The codebase speaks for itself.
 
 ## Features 🎁
 
-### Epistemic Honesty
+### Actually admits when it doesn't know
 
 When documents don't contain the answer, fitz says so:
 
