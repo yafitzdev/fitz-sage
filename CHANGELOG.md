@@ -11,6 +11,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2025-12-26
+
+### 🎉 Highlights
+
+**Conversational RAG** - New `fitz chat` command for interactive multi-turn conversations with your knowledge base. Each turn retrieves fresh context while maintaining conversation history.
+
+**Enrichment Pipeline** - New semantic enrichment system that enhances chunks with LLM-generated summaries and produces project-level artifacts for improved retrieval context.
+
+**Batch Embedding** - Automatic batch size adjustment with recursive halving on failure. Significantly faster ingestion for large document sets.
+
+**Collection Management CLI** - New `fitz collections` command for interactive vector DB management.
+
+### 🚀 Added
+
+#### Enrichment System (`fitz_ai/ingest/enrichment/`)
+- **EnrichmentPipeline**: Unified entry point for all enrichment operations
+- **ChunkSummarizer**: LLM-generated descriptions for each chunk to improve search
+- **Artifact Generation**: Project-level insights stored and retrieved with queries
+  - `architecture_narrative` - High-level codebase description
+  - `data_model_reference` - Data structures and models
+  - `dependency_summary` - External dependency overview
+  - `interface_catalog` - Public APIs and interfaces
+  - `navigation_index` - Codebase navigation guide
+- **Context Plugins**: File-type specific context builders (Python, generic)
+- **SummaryCache**: Hash-based caching to avoid re-summarizing unchanged content
+- **EnrichmentRouter**: Routes documents to appropriate enrichers by file type
+
+#### Batch Embedding
+- `embed_batch()` method on `EmbeddingClient`
+- Automatic batch size adjustment (starts at 96)
+- Recursive halving on API failures
+- Progress logging per batch
+
+#### Conversational Interface
+- `fitz chat` - Interactive conversation with your knowledge base
+- Collection selection on startup
+- Per-turn retrieval with conversation history
+- Graceful exit handling (Ctrl+C, 'exit', 'quit')
+
+#### CLI Improvements
+- `fitz collections` - Interactive collection management
+- Enhanced `fitz_ai/cli/ui.py` with Rich console utilities
+- Improved ingest command with enrichment support
+
+#### Retrieval Pipeline
+- `ArtifactFetchStep` - Prepends artifacts to every query result (score=1.0)
+- Artifacts provide consistent codebase context for all queries
+
+### 🔄 Changed
+
+- Ingest executor now integrates enrichment pipeline
+- Ingestion state schema includes enrichment metadata
+- README simplified and updated
+
+---
+
 ## [0.3.6] - 2025-12-23
 
 ### 🎉 Highlights
@@ -417,7 +473,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.6...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.6...v0.4.0
 [0.3.6]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.3...v0.3.4

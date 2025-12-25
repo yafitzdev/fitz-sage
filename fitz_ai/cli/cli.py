@@ -7,6 +7,7 @@ Commands:
     fitz init          Setup wizard (for custom configuration)
     fitz ingest        Ingest documents
     fitz query         Query knowledge base
+    fitz chat          Interactive conversation with your knowledge base
     fitz collections   Manage collections (list, info, delete)
     fitz config        View configuration
     fitz doctor        System diagnostics
@@ -27,6 +28,7 @@ app = typer.Typer(
 def _register_commands() -> None:
     """Register all commands."""
     from fitz_ai.cli.commands import (
+        chat,
         collections,
         config,
         doctor,
@@ -43,6 +45,7 @@ def _register_commands() -> None:
     app.command("init")(init.command)
     app.command("ingest")(ingest.command)
     app.command("query")(query.command)
+    app.command("chat")(chat.command)
 
     # Collection management (interactive)
     app.command("collections")(collections.command)
