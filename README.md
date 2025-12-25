@@ -22,9 +22,8 @@ That's it. Your documents are now searchable with AI.
 - **Point at a folder. Ask a question. Get an answer with sources.**
 - **Says "I don't know" when the answer isn't there.** No hallucinations, no confident nonsense.
 - **Smart chunking out of the box.** AST-aware for Python, section-based for PDFs, heading-aware for Markdown.
-- **Runs locally.** Ollama support, no API keys required to start.
+- **Local execution possible.** FAISS and Ollama support, no API keys required to start.
 - **Plugin-based architecture.** Swap LLMs, vector databases, rerankers, and retrieval pipelines via YAML config.
-- **One config file when you need control.** Zero config when you don't.
 - **Full provenance.** Every answer traces back to the exact chunk and document.
 - **Data privacy**: Fitz runs entirely on your infrastructure. No telemetry, no cloud, no external calls except to the LLM provider you configure.
 
