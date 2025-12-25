@@ -275,8 +275,8 @@ class DiffIngestExecutor:
                 file_vectors = all_vectors[vector_offset:vector_offset + num_texts]
                 vector_offset += num_texts
 
-                # Build and upsert points
-                self._upsert_file(candidate, file_data, file_vectors)
+                # Build and upsert points (defer persist to batch at end)
+                self._upsert_file(candidate, file_data, file_vectors, defer_persist=True)
                 summary.ingested += 1
 
                 # Update state on success
@@ -296,6 +296,12 @@ class DiffIngestExecutor:
                 summary.errors += 1
                 summary.error_details.append(f"Upsert error: {candidate.path}: {e}")
                 logger.warning(f"Failed to upsert {candidate.path}: {e}")
+
+        # Flush vector DB once after all upserts
+        if hasattr(self._vdb_writer, 'flush'):
+            self._vdb_writer.flush()
+        elif hasattr(self._vdb_writer, '_client') and hasattr(self._vdb_writer._client, 'flush'):
+            self._vdb_writer._client.flush()
 
         # Final progress update
         if on_progress and total_to_ingest > 0:
@@ -413,6 +419,7 @@ class DiffIngestExecutor:
         candidate: FileCandidate,
         file_data: Dict,
         vectors: List[List[float]],
+        defer_persist: bool = False,
     ) -> None:
         """
         Build points and upsert to vector DB.
@@ -421,6 +428,7 @@ class DiffIngestExecutor:
             candidate: File candidate with all metadata.
             file_data: Prepared file data from _prepare_file.
             vectors: Embedding vectors for this file's chunks.
+            defer_persist: If True, defer disk persistence (for batching).
         """
         chunk_data = file_data["chunk_data"]
         points = []
@@ -453,7 +461,12 @@ class DiffIngestExecutor:
                 "payload": payload,
             })
 
-        self._vdb_writer.upsert(self._collection, points)
+        # Pass defer_persist if the writer supports it
+        try:
+            self._vdb_writer.upsert(self._collection, points, defer_persist=defer_persist)
+        except TypeError:
+            # Writer doesn't support defer_persist, fall back to normal upsert
+            self._vdb_writer.upsert(self._collection, points)
         logger.debug(f"Upserted {len(points)} chunks from {candidate.path}")
 
     def _ingest_file(self, candidate: FileCandidate) -> int:

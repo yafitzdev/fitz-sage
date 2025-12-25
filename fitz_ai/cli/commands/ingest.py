@@ -210,9 +210,20 @@ class VectorDBWriterAdapter:
     def __init__(self, client):
         self._client = client
 
-    def upsert(self, collection: str, points: List[Dict[str, Any]]) -> None:
+    def upsert(
+        self, collection: str, points: List[Dict[str, Any]], defer_persist: bool = False
+    ) -> None:
         """Upsert points into collection."""
-        self._client.upsert(collection, points)
+        # Try to pass defer_persist if supported
+        try:
+            self._client.upsert(collection, points, defer_persist=defer_persist)
+        except TypeError:
+            self._client.upsert(collection, points)
+
+    def flush(self) -> None:
+        """Flush any pending writes to disk."""
+        if hasattr(self._client, 'flush'):
+            self._client.flush()
 
 
 # =============================================================================

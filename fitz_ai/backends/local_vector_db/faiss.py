@@ -195,7 +195,12 @@ class FaissLocalVectorDB:
     # Public API - Standard VectorDBPlugin Contract
     # =========================================================================
 
-    def upsert(self, collection: str, points: List[Dict[str, Any]]) -> None:
+    def upsert(
+        self,
+        collection: str,
+        points: List[Dict[str, Any]],
+        defer_persist: bool = False,
+    ) -> None:
         """
         Upsert points into the vector database.
 
@@ -205,6 +210,7 @@ class FaissLocalVectorDB:
         Args:
             collection: Collection name (stored in metadata)
             points: List of points with 'id', 'vector', and 'payload' keys
+            defer_persist: If True, don't persist to disk (call flush() later)
         """
         if not points:
             return
@@ -234,7 +240,12 @@ class FaissLocalVectorDB:
                 self._ids.append(point_id)
                 self._payloads.append(payload)
 
-        # Auto-persist if enabled
+        # Auto-persist if enabled and not deferred
+        if self._persist and not defer_persist:
+            self._save()
+
+    def flush(self) -> None:
+        """Explicitly persist index to disk."""
         if self._persist:
             self._save()
 

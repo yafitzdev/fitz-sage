@@ -255,13 +255,27 @@ class YAMLEmbeddingClient(YAMLPluginBase):
         If a batch fails, halves the batch size and retries.
         Continues halving until batch_size=1, then raises the error.
         """
+        import time
+
         all_embeddings: list[list[float]] = []
+        num_batches = (len(texts) + batch_size - 1) // batch_size
+
+        logger.info(
+            f"[EMBED] Processing {len(texts)} texts in up to {num_batches} batches (max {batch_size}/batch)"
+        )
 
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
+            batch_num = i // batch_size + 1
 
             try:
+                t0 = time.perf_counter()
                 embeddings = self._embed_single_batch(batch)
+                elapsed = time.perf_counter() - t0
+                logger.info(
+                    f"[EMBED] Batch {batch_num}/{num_batches}: {len(batch)} texts in {elapsed:.2f}s "
+                    f"({elapsed/len(batch)*1000:.0f}ms/text)"
+                )
                 all_embeddings.extend(embeddings)
             except Exception as e:
                 if batch_size == 1:
@@ -271,7 +285,7 @@ class YAMLEmbeddingClient(YAMLPluginBase):
                 # Halve batch size and retry this batch
                 new_batch_size = max(1, batch_size // 2)
                 logger.warning(
-                    f"Batch embed failed with size {batch_size}, "
+                    f"[EMBED] Batch {batch_num} FAILED with size {batch_size}, "
                     f"retrying with size {new_batch_size}: {e}"
                 )
                 # Recursively process this batch with smaller size
