@@ -227,33 +227,59 @@ class DiffIngestExecutor:
 
         summary.skipped = len(diff.to_skip)
 
-        # 3. Ingest files - two-phase: prepare all, then batch embed
+        # 3. Ingest files - three phases: prepare, summarize, embed
         summaries_enabled = self._enrichment_pipeline and self._enrichment_pipeline.summaries_enabled
         enrichment_status = "enabled" if summaries_enabled else "disabled"
-        logger.info(f"Ingesting {len(diff.to_ingest)} files (enrichment: {enrichment_status})...")
+        logger.info(f"Ingesting {len(diff.to_ingest)} files (summaries: {enrichment_status})...")
 
         total_to_ingest = len(diff.to_ingest)
 
-        # Phase 1: Prepare all files (parse, chunk, enrich) - collect texts to embed
-        all_prepared: List[tuple] = []  # (candidate, file_data, texts_to_embed)
-        all_texts: List[str] = []  # Flat list for batch embedding
-        text_offsets: List[int] = []  # Start offset for each file's texts
+        # Phase 1: Prepare all files (parse, chunk) - NO summarization yet
+        all_prepared: List[tuple] = []  # (candidate, file_data)
+        all_chunk_info: List[tuple] = []  # (content, file_path, content_hash) for batch summarization
 
         for i, candidate in enumerate(diff.to_ingest):
             if on_progress:
                 on_progress(i, total_to_ingest, f"Preparing {Path(candidate.path).name}")
 
             try:
-                file_data, texts = self._prepare_file(candidate)
+                file_data = self._prepare_file_no_enrich(candidate)
                 if file_data is not None:
-                    text_offsets.append(len(all_texts))
-                    all_texts.extend(texts)
-                    all_prepared.append((candidate, file_data, len(texts)))
-                    summary.enriched += file_data.get("enriched_count", 0)
+                    all_prepared.append((candidate, file_data))
+                    # Collect chunk info for batch summarization
+                    for chunk_data in file_data["chunk_data"]:
+                        all_chunk_info.append((
+                            chunk_data["chunk"].content,
+                            candidate.path,
+                            chunk_data["content_hash"],
+                        ))
             except Exception as e:
                 summary.errors += 1
                 summary.error_details.append(f"Prepare error: {candidate.path}: {e}")
                 logger.warning(f"Failed to prepare {candidate.path}: {e}")
+
+        # Phase 1.5: Batch summarize ALL chunks at once
+        all_descriptions: List[str | None] = []
+        if summaries_enabled and all_chunk_info:
+            t0 = time.perf_counter()
+            all_descriptions = self._enrichment_pipeline.summarize_chunks_batch(all_chunk_info)
+            summarize_time = time.perf_counter() - t0
+            summary.enriched = sum(1 for d in all_descriptions if d is not None)
+            logger.info(f"Summarized {len(all_chunk_info)} chunks in {summarize_time:.2f}s")
+        else:
+            all_descriptions = [None] * len(all_chunk_info)
+
+        # Apply descriptions back to chunk data and build texts to embed
+        all_texts: List[str] = []
+        desc_idx = 0
+        for candidate, file_data in all_prepared:
+            for chunk_data in file_data["chunk_data"]:
+                description = all_descriptions[desc_idx]
+                chunk_data["description"] = description
+                # Embed description if available, otherwise content
+                text_to_embed = description if description else chunk_data["chunk"].content
+                all_texts.append(text_to_embed)
+                desc_idx += 1
 
         # Phase 2: Batch embed ALL texts at once
         if all_texts:
@@ -266,14 +292,15 @@ class DiffIngestExecutor:
 
         # Phase 3: Upsert to vector DB and update state
         vector_offset = 0
-        for idx, (candidate, file_data, num_texts) in enumerate(all_prepared):
+        for idx, (candidate, file_data) in enumerate(all_prepared):
             if on_progress:
                 on_progress(idx + 1, len(all_prepared), f"Saving {Path(candidate.path).name}")
 
             try:
+                num_chunks = len(file_data["chunk_data"])
                 # Get vectors for this file
-                file_vectors = all_vectors[vector_offset:vector_offset + num_texts]
-                vector_offset += num_texts
+                file_vectors = all_vectors[vector_offset:vector_offset + num_chunks]
+                vector_offset += num_chunks
 
                 # Build and upsert points (defer persist to batch at end)
                 self._upsert_file(candidate, file_data, file_vectors, defer_persist=True)
@@ -339,9 +366,66 @@ class DiffIngestExecutor:
 
         return summary
 
+    def _prepare_file_no_enrich(self, candidate: FileCandidate) -> Optional[Dict]:
+        """
+        Prepare a file for ingestion (parse, chunk) without enrichment.
+
+        Enrichment happens in a separate batch phase for efficiency.
+
+        Args:
+            candidate: File candidate with all metadata.
+
+        Returns:
+            file_data dict or None if file should be skipped.
+        """
+        # 1. Parse file
+        text = self._parser.parse(candidate.path)
+        if not text or not text.strip():
+            logger.warning(f"Empty content from {candidate.path}, skipping")
+            return None
+
+        # 2. Get chunker for this file type and chunk
+        chunker = self._router.get_chunker(candidate.ext)
+        base_meta = {
+            "source_file": candidate.path,
+            "doc_id": Path(candidate.path).stem,
+            "content_hash": candidate.content_hash,
+            "parser_id": candidate.parser_id,
+            "chunker_id": candidate.chunker_id,
+        }
+        chunks = chunker.chunk_text(text, base_meta)
+
+        if not chunks:
+            logger.warning(f"No chunks from {candidate.path}, skipping")
+            return None
+
+        # 3. Prepare chunk data (no enrichment yet - that's batched later)
+        chunk_data = []
+        for chunk in chunks:
+            chunk_id = compute_chunk_id(
+                content_hash=candidate.content_hash,
+                chunk_index=chunk.chunk_index,
+                parser_id=candidate.parser_id,
+                chunker_id=candidate.chunker_id,
+                embedding_id=candidate.embedding_id,
+            )
+
+            chunk_content_hash = _hash_text(chunk.content)
+
+            chunk_data.append({
+                "chunk_id": chunk_id,
+                "chunk": chunk,
+                "content_hash": chunk_content_hash,
+                "description": None,  # Filled in by batch summarization
+            })
+
+        return {"chunk_data": chunk_data}
+
     def _prepare_file(self, candidate: FileCandidate) -> tuple[Optional[Dict], List[str]]:
         """
         Prepare a file for ingestion (parse, chunk, enrich) without embedding.
+
+        DEPRECATED: Use _prepare_file_no_enrich + batch summarization instead.
 
         Args:
             candidate: File candidate with all metadata.

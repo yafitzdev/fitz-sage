@@ -19,7 +19,7 @@ from fitz_ai.ingest.enrichment.artifacts.base import (
 
 plugin_name = "architecture_narrative"
 plugin_type = "artifact"
-description = "High-level system overview"
+description = "High-level system overview (requires LLM, adds ~5s per 20 chunks)"
 supported_types = {ContentType.PYTHON, ContentType.CODE}
 requires_llm = True
 

@@ -436,10 +436,8 @@ def command(
         if selected_artifacts is not None and len(selected_artifacts) > 0:
             enrichment_cfg["enabled"] = True
             enrichment_cfg["artifacts"] = {"enabled": selected_artifacts}
-            # IMPORTANT: Disable per-chunk summaries unless explicitly enabled in config
-            # Per-chunk summaries make 1 LLM call per chunk = extremely slow
-            if "summary" not in enrichment_cfg:
-                enrichment_cfg["summary"] = {"enabled": False}
+            # Note: Summaries are opt-in (default False) - user can enable in config
+            # Now that we use batch summarization (20 chunks per LLM call), it's efficient
         elif selected_artifacts is not None and len(selected_artifacts) == 0:
             # Explicitly disabled via 'none'
             enrichment_cfg["enabled"] = False

@@ -93,8 +93,9 @@ class MockReranker:
             {"query": query, "documents": documents, "top_n": top_n}
         )
         # Return in original order with descending scores
+        # Start at 0.99 to avoid triggering VIP handling (score=1.0)
         n = top_n or len(documents)
-        results = [(i, 1.0 - i * 0.1) for i in range(min(n, len(documents)))]
+        results = [(i, 0.99 - i * 0.1) for i in range(min(n, len(documents)))]
         return results
 
 
@@ -149,7 +150,11 @@ class TestPluginSpecLoading:
 
         assert spec.plugin_name == "dense"
         assert len(spec.steps) > 0
-        assert spec.steps[0].type == "vector_search"
+        # First step in raw spec is artifact_fetch (conditionally enabled)
+        assert spec.steps[0].type == "artifact_fetch"
+        assert spec.steps[0].enabled_if == "fetch_artifacts"
+        # Vector search is second
+        assert spec.steps[1].type == "vector_search"
 
     def test_step_spec_from_dict(self):
         """Should parse step spec from dict."""

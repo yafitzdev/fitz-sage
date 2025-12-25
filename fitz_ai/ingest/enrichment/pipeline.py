@@ -36,7 +36,7 @@ from typing import Any, Dict, List, Protocol, Set, runtime_checkable
 from fitz_ai.ingest.enrichment.config import EnrichmentConfig
 from fitz_ai.ingest.enrichment.base import ContentType
 from fitz_ai.ingest.enrichment.summary.cache import SummaryCache
-from fitz_ai.ingest.enrichment.summary.summarizer import ChunkSummarizer
+from fitz_ai.ingest.enrichment.summary.summarizer import ChunkSummarizer, ChunkInfo
 from fitz_ai.ingest.enrichment.artifacts.base import Artifact, ProjectAnalysis
 from fitz_ai.ingest.enrichment.artifacts.analyzer import ProjectAnalyzer
 from fitz_ai.ingest.enrichment.artifacts.registry import (
@@ -174,6 +174,34 @@ class EnrichmentPipeline:
             return None
 
         return self._summarizer.summarize(content, file_path, content_hash)
+
+    def summarize_chunks_batch(
+        self,
+        chunks: List[tuple[str, str, str]],
+        batch_size: int = 20,
+    ) -> List[str | None]:
+        """
+        Generate summaries for multiple chunks efficiently.
+
+        Uses batched LLM calls to reduce API overhead (e.g., 20 chunks per call
+        instead of 1 call per chunk).
+
+        Args:
+            chunks: List of (content, file_path, content_hash) tuples
+            batch_size: Max chunks per LLM call (default 20)
+
+        Returns:
+            List of summaries in same order as input, or None values if disabled
+        """
+        if not self.summaries_enabled:
+            return [None] * len(chunks)
+
+        chunk_infos = [
+            ChunkInfo(content=c, file_path=f, content_hash=h)
+            for c, f, h in chunks
+        ]
+
+        return self._summarizer.summarize_batch(chunk_infos, batch_size=batch_size)
 
     def analyze_project(self) -> ProjectAnalysis:
         """

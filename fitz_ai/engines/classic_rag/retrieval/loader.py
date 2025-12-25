@@ -169,7 +169,7 @@ def build_pipeline_from_spec(
         # Check if step should be enabled
         if step_spec.enabled_if:
             dep_value = getattr(deps, step_spec.enabled_if, None)
-            if dep_value is None:
+            if not dep_value:
                 logger.debug(
                     f"{RETRIEVER} Skipping step {step_spec.type}: {step_spec.enabled_if} not provided"
                 )
