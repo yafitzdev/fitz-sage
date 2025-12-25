@@ -3,9 +3,9 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.3.5-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.6-green.svg)](CHANGELOG.md)
 
-**RAG in 5 minutes. No infrastructure. No boilerplate.**
+**Setup RAG in 5 minutes. No infrastructure. No boilerplate.**
 
 ```bash
 pip install fitz-ai
@@ -17,25 +17,27 @@ That's it. Your documents are now searchable with AI.
 
 ---
 
-## The Problem with RAG Today ☔️
+## Why Fitz? ☀️
 
-Building RAG shouldn't require a PhD in prompt engineering. Yet here we are:
+- **Point at a folder. Ask a question. Get an answer with sources.**
+- **Says "I don't know" when the answer isn't there.** No hallucinations, no confident nonsense.
+- **Smart chunking out of the box.** AST-aware for Python, section-based for PDFs, heading-aware for Markdown.
+- **Runs locally.** Ollama support, no API keys required to start.
+- **One config file when you need control.** Zero config when you don't.
+- **Full provenance.** Every answer traces back to the exact chunk and document.
 
-| Framework | Lines to "Hello World" | External Services | Time to First Answer |
-|-----------|------------------------|-------------------|---------------------|
-| LangChain | 50+ | Vector DB required | 30+ min |
-| LlamaIndex | 30+ | Vector DB required | 20+ min |
-| **fitz-ai** | **2** | **None** | **5 min** |
+Two commands to your first answer:
 
-**LangChain** gives you infinite flexibility—and infinite ways to shoot yourself in the foot. Chains, agents, callbacks, memory modules... great for building the next ChatGPT, overkill for "search my docs."
+```bash
+pip install fitz-ai
+fitz quickstart ./docs "What is our refund policy?"
+```
 
-**LlamaIndex** is better for pure retrieval, but still assumes you want to configure chunk sizes, embedding models, index types, and vector stores before asking your first question.
-
-**fitz-ai** assumes you want answers. Configuration is optional.
+That's the whole tutorial.
 
 ---
 
-## What Makes Fitz Different ☀️
+## Features
 
 ### 1. Zero-Config Start, Full Control Later
 
@@ -64,9 +66,9 @@ A: "I cannot find Q4 revenue figures in the provided documents.
 ```
 
 Three constraint plugins run automatically:
-- **ConflictAwareConstraint**: Detects contradictions across sources
-- **InsufficientEvidenceConstraint**: Blocks confident answers without evidence  
-- **CausalAttributionConstraint**: Prevents hallucinated cause-effect claims
+- 🧊 **ConflictAwareConstraint**: Detects contradictions across sources
+- 🎲 **InsufficientEvidenceConstraint**: Blocks confident answers without evidence  
+- 📦 **CausalAttributionConstraint**: Prevents hallucinated cause-effect claims
 
 No prompt engineering required. No "be careful" system messages. Just honest answers.
 
@@ -113,76 +115,69 @@ fitz quickstart ./docs "Your question here"
 
 That's it. Fitz will prompt you for anything it needs.
 
-Want to go fully local with Ollama? No problem:
+- **Don't have docs yet?** Point fitz at its own source:
 
-```bash
-pip install fitz-ai
+    ```bash
+    fitz quickstart ./fitz_ai "How does the chunking pipeline work?"
+    ```
+    
+    Learn the platform by querying it. The codebase is the documentation.
 
-ollama pull llama3.2
-ollama pull nomic-embed-text
 
-fitz quickstart ./docs "Your question here"
-```
+- Want to go fully local with Ollama? No problem:
 
-No data leaves your machine. No API costs. Same interface.
+    ```bash
+    pip install fitz-ai
+    
+    ollama pull llama3.2
+    ollama pull nomic-embed-text
+    
+    fitz quickstart ./docs "Your question here"
+    ```
 
-**Data privacy**: Fitz runs entirely on your infrastructure. No telemetry, no cloud, no external calls except to the LLM provider you configure.
+    No data leaves your machine. No API costs. Same interface.
 
-**Production deployments**: For Qdrant, Docker, and API serving, see the [Deployment Guide](docs/deployment.md).
+
+- **Data privacy**: Fitz runs entirely on your infrastructure. No telemetry, no cloud, no external calls except to the LLM provider you configure.
+
+
+- **Production deployments**: For Qdrant, Docker, and API serving, see the [Deployment Guide](docs/deployment.md).
 
 ---
 
 ## Real-World Usage 💼
 
+Fitz is a foundation. It handles document ingestion and grounded retrieval—you build whatever sits on top: chatbots, dashboards, alerts, or automation.
+
 ### Chatbot Backend
 
-Fitz handles the hard part—retrieval and grounded answers. Add your conversation layer on top.
+Connect fitz to Slack, Discord, Teams, or your own UI. One function call returns an answer with sources—no hallucinations, full provenance. You handle the conversation flow; fitz handles the knowledge.
 
-```python
-from fitz_ai import run
+*Example:* A SaaS company plugs fitz into their support bot. Tier-1 questions like "How do I reset my password?" get instant answers. Their support team focuses on edge cases while fitz deflects 60% of incoming tickets.
 
-def handle_message(user_message: str) -> str:
-    answer = run(user_message, collection="support_docs")
-    return answer.text
+### Internal Knowledge Base
 
-# Plug into Slack, Discord, Teams, or your own UI
-```
+Point fitz at your wiki, policies, and runbooks. Employees ask natural language questions instead of hunting through folders or pinging colleagues on Slack.
 
-No hallucinations. Sources included. You build the chat UX, fitz builds the knowledge.
+*Example:* A 200-person startup ingests their Notion workspace and compliance docs. New hires find answers to "How do I request PTO?" on day one—no more waiting for someone in HR to respond.
 
-### Company Knowledge Base
+### Continuous Intelligence & Alerting
 
-```bash
-# Ingest your company docs once
-fitz ingest ./wiki ./policies ./runbooks
+Pair fitz with cron, Airflow, or Lambda. Ingest data on a schedule, run queries automatically, trigger alerts when conditions match. Fitz provides the retrieval primitive; you wire the automation.
 
-# Anyone can query
-fitz query "How do I request PTO?"
-fitz query "What's the incident response process?"
-fitz query "Who approves expenses over $5000?"
-```
+*Example:* A security team ingests SIEM logs nightly. Every morning, a scheduled job asks "Were there failed logins from unusual locations?" If fitz finds evidence, an alert fires to the on-call channel before anyone checks email.
 
-### Customer Support Automation
+### Web Knowledge Base
 
-```bash
-fitz ingest ./help-center ./faqs ./product-docs --collection support
+Scrape the web with Scrapy, BeautifulSoup, or Playwright. Save to disk, ingest with fitz. The web becomes a queryable knowledge base.
 
-fitz query "How do I reset my password?"
-fitz query "What's the refund policy?"
-fitz query "Why is my payment failing?"
-```
+*Example:* A football analytics hobbyist scrapes Premier League match reports. After ingesting, they ask "How did Arsenal perform against top 6 teams?" or "What tactics did Liverpool use in away games?"—insights that would take hours to compile manually.
 
-Plug the answers into your support chatbot, help desk, or internal tools.
+### Codebase Search
 
-### Research & Literature Review
+Fitz includes built-in AST-aware chunking for Python. Functions, classes, and modules become individual searchable units with docstrings and imports preserved. Ask questions in natural language; get answers pointing to specific code.
 
-```bash
-fitz ingest ./papers --collection research
-
-fitz query "What methods achieve SOTA on ImageNet?"
-fitz query "Compare transformer vs CNN approaches"
-fitz query "Which papers cite attention mechanisms for NLP?"
-```
+*Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They ingest the codebase and ask "Where is user authentication handled?" or "What API endpoints modify the billing table?" New developers onboard in days instead of weeks.
 
 ---
 
@@ -223,6 +218,7 @@ fitz quickstart [PATH] [QUESTION]  # Zero-config RAG (start here)
 fitz init                          # Interactive setup wizard
 fitz ingest [PATH]                 # Ingest documents
 fitz query [QUESTION]              # Query knowledge base
+fitz collections                   # List and delete knowledge collections
 fitz config                        # View/edit configuration
 fitz doctor                        # System diagnostics
 ```

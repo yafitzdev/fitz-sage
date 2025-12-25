@@ -80,7 +80,16 @@ ingest:
       kwargs:
         chunk_size: 1000
         chunk_overlap: 200
-    by_extension: {}
+    by_extension:
+      .py:
+        plugin_name: python_code
+        kwargs: {}
+      .md:
+        plugin_name: markdown
+        kwargs: {}
+      .pdf:
+        plugin_name: pdf_sections
+        kwargs: {}
     warn_on_fallback: true
 
   collection: default
