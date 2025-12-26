@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-
 from fitz_ai.ingest.enrichment import (
     ChunkSummarizer,
     CodeEnrichmentContext,

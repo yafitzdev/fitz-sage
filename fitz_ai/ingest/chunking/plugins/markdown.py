@@ -154,7 +154,6 @@ class MarkdownChunker:
 
         # Need to split - find paragraph boundaries
         chunks: List[Tuple[Optional[str], str]] = []
-        code_ranges = self._find_code_blocks(content)
 
         # Split by double newlines (paragraphs)
         paragraphs = re.split(r"\n\n+", content)

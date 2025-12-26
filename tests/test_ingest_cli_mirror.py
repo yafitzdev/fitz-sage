@@ -9,7 +9,6 @@ import logging
 import time
 from pathlib import Path
 
-
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 

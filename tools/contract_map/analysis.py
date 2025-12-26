@@ -372,8 +372,8 @@ def render_config_surface_section(cs: ConfigSurface | None) -> str:
     for y in cs.default_yamls:
         lines.append(f"  - `{y}`")
     lines.append("- loaders:")
-    for l in cs.loaders:
-        lines.append(f"  - `{l}`")
+    for loader in cs.loaders:
+        lines.append(f"  - `{loader}`")
     lines.append("- load callsites:")
     for c in cs.load_callsites:
         lines.append(f"  - `{c}`")
@@ -453,7 +453,7 @@ def analyze_any_breakdown(root, excludes):
                     categories["lazy_param"] += 1
                 elif " Any" in line or "Any]" in line or "Any," in line:
                     categories["other"] += 1
-        except:
+        except Exception:
             pass
 
     return categories
@@ -546,7 +546,7 @@ def analyze_exception_patterns(root, excludes):
                         elif "raise" in next_line:
                             patterns["reraise_exceptions"] += 1
 
-        except:
+        except Exception:
             pass
 
     return patterns, problem_files

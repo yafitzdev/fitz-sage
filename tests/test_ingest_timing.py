@@ -293,7 +293,6 @@ def test_ingest_with_real_embedder_mock(
 
     # Calculate what time WOULD have been with per-file batching
     per_file_time = len(files) * 0.1  # 100ms per file
-    cross_file_time = embedder.embed_batch_calls * 0.1 * 0.1  # batch is 10x faster
 
     print(f"  Files processed:           {len(files)}")
     print(f"  embed_batch() calls:       {embedder.embed_batch_calls}")

@@ -438,7 +438,7 @@ def detect_qdrant() -> ServiceStatus:
         ServiceStatus with host/port if found
     """
     try:
-        import httpx
+        import httpx  # noqa: F401
     except ImportError:
         return ServiceStatus(
             name="Qdrant",
@@ -509,7 +509,7 @@ def detect_faiss() -> ServiceStatus:
         ServiceStatus with available=True if faiss can be imported
     """
     try:
-        import faiss
+        import faiss  # noqa: F401
 
         return ServiceStatus(
             name="FAISS",
