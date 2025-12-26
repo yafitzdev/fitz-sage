@@ -46,9 +46,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Conversational Interface
 - `fitz chat` - Interactive conversation with your knowledge base
-- Collection selection on startup
-- Per-turn retrieval with conversation history
+- `-c, --collection` option to specify collection directly
+- Collection selection on startup (prompts if not specified)
+- Per-turn retrieval with conversation history (last 15 messages)
+- Rich UI with styled panels for user/assistant messages
+- `display_sources()` utility for consistent source table display (vector score, rerank score, excerpt)
 - Graceful exit handling (Ctrl+C, 'exit', 'quit')
+
+#### Documentation
+- Expanded CLI documentation in `docs/CLI.md` with chat command examples
 
 #### CLI Improvements
 - `fitz collections` - Interactive collection management
