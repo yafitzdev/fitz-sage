@@ -188,7 +188,7 @@ answer = run("What are the payment terms?", engine="graph_rag")  # future
 
 No migration. No re-ingestion. No new API to learn.
 
-#### Enrichment 📥
+#### Enrichment ✨
 
 Opt-in enrichment plugins enhance your knowledge base:
 
