@@ -21,7 +21,7 @@ That's it. Your documents are now searchable with AI.
 
 ## About 🧑‍🌾
 
-Solo project by [Yan Fitzner](https://github.com/yafitzdev). ~40k lines of Python. 400+ tests. 
+Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)). ~40k lines of Python. 400+ tests. 
 
 Built from scratch—no LangChain or LlamaIndex under the hood.
 
