@@ -42,14 +42,13 @@ The codebase speaks for itself.
 
 <summary><strong>Fitz vs LangChain vs LlamaIndex</strong></summary>
 
-**Fitz opts for a deliberately narrower approach.** 
+#### Fitz opts for a deliberately narrower approach.
 
 LangChain and LlamaIndex are powerful **LLM application frameworks** designed to help developers build complex, end-to-end AI systems. 
 It provides a **minimal, replaceable RAG engine** with strong epistemic guarantees — without locking users into a framework, ecosystem, or long-term architectural commitment.
 
 Fitz is not a competitor in scope.  
 It is an infrastructure primitive.
-
 
 #### Core philosophical differences
 
