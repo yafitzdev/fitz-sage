@@ -19,11 +19,15 @@ That's it. Your documents are now searchable with AI.
 
 ---
 
-## About
+## About 🧑‍🌾
 
 Solo project by [Yan Fitzner](https://github.com/yafitzdev). ~40k lines of Python. 400+ tests. 
 
 Built from scratch—no LangChain or LlamaIndex under the hood.
+
+![fitz-ai honest_rag](docs/assets/honest_rag.jpg)
+
+
 
 
 ---
