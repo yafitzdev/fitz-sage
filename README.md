@@ -42,16 +42,16 @@ The codebase speaks for itself.
 
 <summary><strong>Fitz vs LangChain vs LlamaIndex</strong></summary>
 
-LangChain and LlamaIndex are powerful **LLM application frameworks** designed to help developers build complex, end-to-end AI systems.
+**Fitz opts for a deliberately narrower approach.** 
 
-**Fitz takes a deliberately narrower approach.**  
+LangChain and LlamaIndex are powerful **LLM application frameworks** designed to help developers build complex, end-to-end AI systems. 
 It provides a **minimal, replaceable RAG engine** with strong epistemic guarantees — without locking users into a framework, ecosystem, or long-term architectural commitment.
 
 Fitz is not a competitor in scope.  
 It is an infrastructure primitive.
 
 
-### Core philosophical differences
+#### Core philosophical differences
 
 | Dimension | Fitz | LangChain | LlamaIndex |
 |--------|------|-----------|------------|
@@ -62,7 +62,7 @@ It is an infrastructure primitive.
 | Long-term risk | Low | Migration-heavy | Migration-heavy |
 
 
-### Epistemic behavior (truth over fluency)
+#### Epistemic behavior (truth over fluency)
 
 | Aspect | Fitz | LangChain / LlamaIndex |
 |-----|------|------------------------|
@@ -73,7 +73,7 @@ It is an infrastructure primitive.
 Fitz treats uncertainty as a **feature**, not a failure.  
 If the system cannot support an answer with retrieved evidence, it says so.
 
-### Transparency & provenance
+#### Transparency & provenance
 
 | Capability | Fitz | LangChain / LlamaIndex |
 |---------|------|------------------------|
@@ -83,7 +83,7 @@ If the system cannot support an answer with retrieved evidence, it says so.
 
 Every answer in Fitz is fully auditable down to the retrieval step.
 
-### Scope & complexity
+#### Scope & complexity
 
 | Aspect | Fitz | LangChain / LlamaIndex |
 |-----|------|------------------------|
@@ -101,7 +101,7 @@ Fitz intentionally does less — so it can be trusted more.
 
 <summary><strong>When Fitz is the right choice</strong></summary>
 
-Use Fitz if you want:
+#### Use Fitz if you want:
 
 - A replaceable RAG engine, not a framework marriage
 - Strong epistemic guarantees (“I don’t know” is valid output)
@@ -116,7 +116,7 @@ Use Fitz if you want:
 
 <summary><strong>Features</strong></summary>
 
-### Actually admits when it doesn't know
+#### Actually admits when it doesn't know
 
 When documents don't contain the answer, fitz says so:
 
@@ -133,7 +133,7 @@ Three constraint plugins run automatically:
 - **InsufficientEvidenceConstraint**: Blocks answers without evidence
 - **CausalAttributionConstraint**: Prevents hallucinated cause-effect claims
 
-### Full Provenance
+#### Full Provenance
 
 Every answer traces back to its source:
 
@@ -145,7 +145,7 @@ Sources:
   [2] faq/payments.md [chunk 1] (score: 0.87)
 ```
 
-### Enrichment
+#### Enrichment
 
 Opt-in enrichment plugins enhance your knowledge base:
 
