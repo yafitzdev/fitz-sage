@@ -153,6 +153,41 @@ Sources:
   [2] faq/payments.md [chunk 1] (score: 0.87)
 ```
 
+#### Swappable RAG Engines
+
+Your data stays. Your queries stay. Only the engine changes.
+
+```
+        ┌─────────────────────────────────────┐
+        │           Your Query                │
+        │   "What are the payment terms?"     │
+        └──────────────────┬──────────────────┘
+                           │
+                           ▼
+        ┌─────────────────────────────────────┐
+        │       engine="..."                  │
+        │  ┌─────────┐ ┌───────┐ ┌─────────┐  │
+        │  │ classic │ │ clara │ │ graph   │  │
+        │  │  _rag   │ │       │ │  _rag   │  │
+        │  └────┬────┘ └───┬───┘ └────┬────┘  │
+        │       └──────────┼──────────┘       │
+        └──────────────────┼──────────────────┘
+                           │
+                           ▼
+        ┌─────────────────────────────────────┐
+        │       Your Ingested Knowledge       │
+        │      (unchanged across engines)     │
+        └─────────────────────────────────────┘
+```
+
+```python
+answer = run("What are the payment terms?", engine="classic_rag")
+answer = run("What are the payment terms?", engine="clara")
+answer = run("What are the payment terms?", engine="graph_rag")  # future
+```
+
+No migration. No re-ingestion. No new API to learn.
+
 #### Enrichment
 
 Opt-in enrichment plugins enhance your knowledge base:
