@@ -22,7 +22,7 @@ That's it. Your documents are now searchable with AI.
 ## Why Fitz? ☀️
 
 > - **Point at a folder. Ask a question. Get an answer with sources.**
-> - **RAG is a plugin and therefore swappable.** Fitz is designed for people who expect RAG to evolve and don’t want to rewrite their system when it does.
+> - **❗RAG is a plugin and therefore swappable.** Fitz is designed for people who expect RAG to evolve.
 > - **Says "I don't know" when the answer isn't there.** No hallucinations, no confident nonsense.
 > - **Local execution possible.** FAISS and Ollama support, no API keys required to start.
 > - **Plugin-based architecture.** Swap LLMs, vector databases, rerankers, and retrieval pipelines via YAML config.
@@ -50,7 +50,7 @@ It provides a **minimal, replaceable RAG engine** with strong epistemic guarante
 Fitz is not a competitor in scope.  
 It is an infrastructure primitive.
 
-#### Core philosophical differences
+#### Core philosophical differences ⚖️
 
 | Dimension | Fitz | LangChain | LlamaIndex |
 |--------|------|-----------|------------|
@@ -61,7 +61,7 @@ It is an infrastructure primitive.
 | Long-term risk | Low | Migration-heavy | Migration-heavy |
 
 
-#### Epistemic behavior (truth over fluency)
+#### Epistemic behavior (truth over fluency) 🎯
 
 | Aspect | Fitz | LangChain / LlamaIndex |
 |-----|------|------------------------|
@@ -72,7 +72,7 @@ It is an infrastructure primitive.
 Fitz treats uncertainty as a **feature**, not a failure.  
 If the system cannot support an answer with retrieved evidence, it says so.
 
-#### Transparency & provenance
+#### Transparency & provenance 🔎
 
 | Capability | Fitz | LangChain / LlamaIndex |
 |---------|------|------------------------|
@@ -82,7 +82,7 @@ If the system cannot support an answer with retrieved evidence, it says so.
 
 Every answer in Fitz is fully auditable down to the retrieval step.
 
-#### Scope & complexity
+#### Scope & complexity 🔭
 
 | Aspect | Fitz | LangChain / LlamaIndex |
 |-----|------|------------------------|
