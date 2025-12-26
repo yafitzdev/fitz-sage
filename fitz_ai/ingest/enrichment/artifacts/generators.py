@@ -132,9 +132,7 @@ class InterfaceCatalogGenerator:
                 if proto.get("methods"):
                     lines.append("**Methods:**")
                     for method in proto["methods"]:
-                        lines.append(
-                            f"- `{method['name']}{method.get('signature', '()')}`"
-                        )
+                        lines.append(f"- `{method['name']}{method.get('signature', '()')}`")
                     lines.append("")
 
                 # Find implementations

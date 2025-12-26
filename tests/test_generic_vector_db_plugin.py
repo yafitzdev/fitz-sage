@@ -216,16 +216,12 @@ class TestUUIDConversion:
 class TestPointTransformation:
     """Tests for point format transformation."""
 
-    def test_qdrant_identity_transform(
-        self, qdrant_spec: VectorDBSpec, sample_points: List[Dict]
-    ):
+    def test_qdrant_identity_transform(self, qdrant_spec: VectorDBSpec, sample_points: List[Dict]):
         """Qdrant uses identity transform (no changes)."""
         transformed = qdrant_spec.transform_points(sample_points, "upsert")
         assert transformed == sample_points
 
-    def test_pinecone_transform(
-        self, pinecone_spec: VectorDBSpec, sample_points: List[Dict]
-    ):
+    def test_pinecone_transform(self, pinecone_spec: VectorDBSpec, sample_points: List[Dict]):
         """Pinecone transforms vector->values, payload->metadata."""
         transformed = pinecone_spec.transform_points(sample_points, "upsert")
 
@@ -245,9 +241,7 @@ class TestGenericVectorDBPlugin:
     """Tests for GenericVectorDBPlugin operations."""
 
     @patch("fitz_ai.vector_db.loader.httpx.Client")
-    def test_search_returns_search_results(
-        self, mock_client_class, qdrant_spec: VectorDBSpec
-    ):
+    def test_search_returns_search_results(self, mock_client_class, qdrant_spec: VectorDBSpec):
         """Search returns properly formatted SearchResult objects."""
         # Setup mock
         mock_response = MagicMock()
@@ -349,9 +343,7 @@ class TestGenericVectorDBPlugin:
         """Count returns an integer."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "result": {"points_count": 42, "status": "green"}
-        }
+        mock_response.json.return_value = {"result": {"points_count": 42, "status": "green"}}
         mock_response.raise_for_status = MagicMock()
 
         mock_client = MagicMock()
@@ -496,10 +488,7 @@ class TestCreateVectorDBPlugin:
         # The test validates that the loader attempts to load the class
         try:
             plugin = create_vector_db_plugin("local_faiss")
-            assert (
-                plugin.plugin_name == "local_faiss"
-                or plugin.plugin_name == "local-faiss"
-            )
+            assert plugin.plugin_name == "local_faiss" or plugin.plugin_name == "local-faiss"
         except ImportError:
             # faiss not installed - that's fine, we tested the path
             pytest.skip("faiss not installed")
@@ -602,9 +591,7 @@ class TestYAMLSchemaCompliance:
             search_op = spec.operations.get("search", {})
             response = search_op.get("response", {})
 
-            assert "results_path" in response, (
-                f"{spec.name} search missing results_path"
-            )
+            assert "results_path" in response, f"{spec.name} search missing results_path"
             assert "mapping" in response, f"{spec.name} search missing mapping"
 
 

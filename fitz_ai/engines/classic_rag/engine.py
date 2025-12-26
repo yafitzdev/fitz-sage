@@ -63,9 +63,7 @@ class ClassicRagEngine:
             self._pipeline = RAGPipeline.from_config(config)
             self._config = config
         except Exception as e:
-            raise ConfigurationError(
-                f"Failed to initialize Classic RAG engine: {e}"
-            ) from e
+            raise ConfigurationError(f"Failed to initialize Classic RAG engine: {e}") from e
 
     def answer(self, query: Query) -> Answer:
         """

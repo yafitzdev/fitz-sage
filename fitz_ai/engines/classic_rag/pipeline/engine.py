@@ -146,9 +146,7 @@ class RAGPipeline:
                 result = constraint.apply(query, chunks)
                 results.append(result)
             except Exception as e:
-                logger.warning(
-                    f"{PIPELINE} Constraint '{constraint.name}' raised exception: {e}"
-                )
+                logger.warning(f"{PIPELINE} Constraint '{constraint.name}' raised exception: {e}")
                 # Fail-safe: continue without this constraint's result
                 continue
 
@@ -178,9 +176,7 @@ class RAGPipeline:
         logger.info(f"{PIPELINE} Constructing RAGPipeline from config")
 
         # Vector DB
-        vector_client = get_vector_db_plugin(
-            cfg.vector_db.plugin_name, **cfg.vector_db.kwargs
-        )
+        vector_client = get_vector_db_plugin(cfg.vector_db.plugin_name, **cfg.vector_db.kwargs)
         logger.info(f"{VECTOR_DB} Using vector DB plugin='{cfg.vector_db.plugin_name}'")
 
         # Chat LLM

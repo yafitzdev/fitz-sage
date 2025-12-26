@@ -85,9 +85,7 @@ def _build_messages(
     recent_history = history[-MAX_HISTORY_MESSAGES:] if history else []
 
     # Build chunk context
-    chunk_context = "\n\n".join(
-        f"[{i}] {chunk.content}" for i, chunk in enumerate(chunks, 1)
-    )
+    chunk_context = "\n\n".join(f"[{i}] {chunk.content}" for i, chunk in enumerate(chunks, 1))
 
     system_prompt = f"""You are a helpful assistant answering questions about a knowledge base.
 
@@ -169,9 +167,7 @@ def _display_welcome(collection: str) -> None:
         )
     else:
         print(f"\nChat started with collection: {collection}")
-        print(
-            "Type 'exit' or 'quit' to end the conversation. Press Ctrl+C to interrupt.\n"
-        )
+        print("Type 'exit' or 'quit' to end the conversation. Press Ctrl+C to interrupt.\n")
 
 
 def _display_goodbye() -> None:
@@ -228,9 +224,7 @@ def command(
     else:
         collections = _get_collections(raw_config)
         if not collections:
-            ui.error(
-                "No collections found. Run 'fitz ingest' first to create a collection."
-            )
+            ui.error("No collections found. Run 'fitz ingest' first to create a collection.")
             raise typer.Exit(1)
         elif len(collections) == 1:
             selected_collection = collections[0]

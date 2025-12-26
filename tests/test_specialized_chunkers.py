@@ -119,10 +119,7 @@ Content here.
         # Header might be in metadata
         for chunk in chunks:
             if "Introduction" in chunk.content:
-                assert (
-                    "section_header" in chunk.metadata
-                    or "Introduction" in chunk.content
-                )
+                assert "section_header" in chunk.metadata or "Introduction" in chunk.content
 
 
 class TestPythonCodeChunker:

@@ -54,11 +54,7 @@ class StepSpec:
 
         return cls(
             type=step_type,
-            params={
-                k: v
-                for k, v in data.items()
-                if k not in ("type", "enabled_if", "use_config")
-            },
+            params={k: v for k, v in data.items() if k not in ("type", "enabled_if", "use_config")},
             enabled_if=data.get("enabled_if"),
             use_config=data.get("use_config"),
         )
@@ -292,9 +288,7 @@ class RetrievalPipelineFromYaml:
         """Execute the retrieval pipeline."""
         from fitz_ai.engines.classic_rag.models.chunk import Chunk
 
-        logger.info(
-            f"{RETRIEVER} Running {self.plugin_name} pipeline ({len(self.steps)} steps)"
-        )
+        logger.info(f"{RETRIEVER} Running {self.plugin_name} pipeline ({len(self.steps)} steps)")
 
         chunks: list[Chunk] = []
 

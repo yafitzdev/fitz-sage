@@ -171,9 +171,7 @@ class GeminiChatTransform:
             if role == "system":
                 system_instruction = {"parts": [{"text": content}]}
             elif role in self.ROLE_MAP:
-                contents.append(
-                    {"role": self.ROLE_MAP[role], "parts": [{"text": content}]}
-                )
+                contents.append({"role": self.ROLE_MAP[role], "parts": [{"text": content}]})
 
         result: dict[str, Any] = {"contents": contents}
 

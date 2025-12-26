@@ -97,9 +97,7 @@ def _load_yaml_file(path: Path) -> dict:
             raise YAMLPluginError(f"Invalid YAML syntax in {path}: {e}") from e
 
     if not isinstance(data, dict):
-        raise YAMLPluginError(
-            f"YAML plugin must be a mapping, got {type(data).__name__}"
-        )
+        raise YAMLPluginError(f"YAML plugin must be a mapping, got {type(data).__name__}")
 
     return data
 
@@ -146,9 +144,7 @@ def _deep_merge(defaults: dict, overrides: dict) -> dict:
 # =============================================================================
 
 
-def _validate_against_master_schema(
-    data: dict, plugin_type: str, path: Path
-) -> list[str]:
+def _validate_against_master_schema(data: dict, plugin_type: str, path: Path) -> list[str]:
     """
     Validate plugin data against master schema.
 
@@ -221,15 +217,11 @@ def load_plugin(plugin_type: Literal["chat"], plugin_name: str) -> ChatPluginSpe
 
 
 @overload
-def load_plugin(
-    plugin_type: Literal["embedding"], plugin_name: str
-) -> EmbeddingPluginSpec: ...
+def load_plugin(plugin_type: Literal["embedding"], plugin_name: str) -> EmbeddingPluginSpec: ...
 
 
 @overload
-def load_plugin(
-    plugin_type: Literal["rerank"], plugin_name: str
-) -> RerankPluginSpec: ...
+def load_plugin(plugin_type: Literal["rerank"], plugin_name: str) -> RerankPluginSpec: ...
 
 
 @overload

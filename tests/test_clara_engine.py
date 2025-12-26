@@ -32,9 +32,7 @@ class TestClaraConfig:
 
         config = ClaraConfig()
 
-        assert (
-            config.model.model_name_or_path == "apple/CLaRa-7B-Instruct/compression-16"
-        )
+        assert config.model.model_name_or_path == "apple/CLaRa-7B-Instruct/compression-16"
         assert config.model.variant == "instruct"
         assert config.compression.compression_rate == 16
         assert config.retrieval.top_k == 5
@@ -155,9 +153,7 @@ class TestClaraEngine:
         """Test adding documents to knowledge base."""
         # Mock the compression to return mock tensors
         mock_tensor = MagicMock()
-        mock_engine._compress_documents = MagicMock(
-            return_value=[mock_tensor for _ in range(3)]
-        )
+        mock_engine._compress_documents = MagicMock(return_value=[mock_tensor for _ in range(3)])
 
         doc_ids = mock_engine.add_documents(
             [
@@ -174,13 +170,9 @@ class TestClaraEngine:
     def test_add_documents_with_ids(self, mock_engine):
         """Test adding documents with custom IDs."""
         mock_tensor = MagicMock()
-        mock_engine._compress_documents = MagicMock(
-            return_value=[mock_tensor for _ in range(2)]
-        )
+        mock_engine._compress_documents = MagicMock(return_value=[mock_tensor for _ in range(2)])
 
-        doc_ids = mock_engine.add_documents(
-            ["Doc 1", "Doc 2"], doc_ids=["custom_1", "custom_2"]
-        )
+        doc_ids = mock_engine.add_documents(["Doc 1", "Doc 2"], doc_ids=["custom_1", "custom_2"])
 
         assert doc_ids == ["custom_1", "custom_2"]
         assert "custom_1" in mock_engine._compressed_docs
@@ -217,9 +209,7 @@ class TestClaraEngine:
         mock_engine._retrieve = MagicMock(return_value=(["doc_1", "doc_2"], [0.9, 0.8]))
 
         # Mock generation
-        mock_engine._generate = MagicMock(
-            return_value=("Quantum computing uses qubits.", [0, 1])
-        )
+        mock_engine._generate = MagicMock(return_value=("Quantum computing uses qubits.", [0, 1]))
 
         query = Query(text="What is quantum computing?")
         answer = mock_engine.answer(query)

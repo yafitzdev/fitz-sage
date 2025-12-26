@@ -120,9 +120,7 @@ class ProviderConfig(BaseModel):
     @classmethod
     def validate_base_url(cls, v: str) -> str:
         if not v.startswith(("http://", "https://", "{")):
-            raise ValueError(
-                "base_url must start with http://, https://, or be a {placeholder}"
-            )
+            raise ValueError("base_url must start with http://, https://, or be a {placeholder}")
         return v.rstrip("/")
 
 
@@ -133,9 +131,7 @@ class EndpointConfig(BaseModel):
 
     path: str = Field(..., description="API endpoint path")
     method: Literal["GET", "POST", "PUT", "DELETE"] = "POST"
-    timeout: int = Field(
-        default=30, ge=1, le=600, description="Request timeout in seconds"
-    )
+    timeout: int = Field(default=30, ge=1, le=600, description="Request timeout in seconds")
 
     @field_validator("path")
     @classmethod
@@ -161,9 +157,7 @@ class RequiredEnvConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(..., description="Environment variable name")
-    inject_as: str = Field(
-        ..., description="Placeholder name to inject into base_url/config"
-    )
+    inject_as: str = Field(..., description="Placeholder name to inject into base_url/config")
     default: str | None = Field(default=None, description="Optional default value")
 
 
@@ -206,9 +200,7 @@ class BasePluginSpec(BaseModel):
     def validate_auth_env_vars(self) -> "BasePluginSpec":
         """Ensure auth has env_vars if type is not none."""
         if self.auth.type != AuthType.NONE and not self.auth.env_vars:
-            raise ValueError(
-                f"auth.env_vars required when auth.type is {self.auth.type}"
-            )
+            raise ValueError(f"auth.env_vars required when auth.type is {self.auth.type}")
         return self
 
 
@@ -265,9 +257,7 @@ class EmbeddingRequestConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     input_field: str = Field(default="input", description="Field name for input text")
-    input_wrap: InputWrap = Field(
-        default=InputWrap.LIST, description="How to wrap input"
-    )
+    input_wrap: InputWrap = Field(default=InputWrap.LIST, description="How to wrap input")
 
     static_fields: dict[str, Any] = Field(default_factory=dict)
     param_map: dict[str, str] = Field(
@@ -308,9 +298,7 @@ class RerankRequestConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query_field: str = Field(default="query", description="Field name for query")
-    documents_field: str = Field(
-        default="documents", description="Field name for documents"
-    )
+    documents_field: str = Field(default="documents", description="Field name for documents")
 
     static_fields: dict[str, Any] = Field(default_factory=dict)
     param_map: dict[str, str] = Field(
@@ -327,9 +315,7 @@ class RerankResponseConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     results_path: str = Field(..., description="Path to results array")
-    result_index_path: str = Field(
-        default="index", description="Path to index within result"
-    )
+    result_index_path: str = Field(default="index", description="Path to index within result")
     result_score_path: str = Field(
         default="relevance_score", description="Path to score within result"
     )

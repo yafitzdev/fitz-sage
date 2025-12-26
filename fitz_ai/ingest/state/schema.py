@@ -119,9 +119,7 @@ class IngestState(BaseModel):
 
     schema_version: int = Field(default=1, description="Schema version for migrations")
     project_id: str = Field(..., description="UUID for this project")
-    updated_at: datetime = Field(
-        default_factory=datetime.utcnow, description="Last update time"
-    )
+    updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update time")
     roots: Dict[str, RootEntry] = Field(
         default_factory=dict, description="Tracked roots keyed by abs path"
     )

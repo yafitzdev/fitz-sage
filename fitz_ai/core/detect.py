@@ -341,9 +341,7 @@ def _scan_hosts_concurrent(
     """
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all checks
-        future_to_host = {
-            executor.submit(check_fn, host, port, timeout): host for host in hosts
-        }
+        future_to_host = {executor.submit(check_fn, host, port, timeout): host for host in hosts}
 
         # Return first successful result
         for future in as_completed(future_to_host):

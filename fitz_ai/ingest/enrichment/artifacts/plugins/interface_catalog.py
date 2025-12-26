@@ -55,9 +55,7 @@ class Generator:
                 if proto.get("methods"):
                     lines.append("**Methods:**")
                     for method in proto["methods"]:
-                        lines.append(
-                            f"- `{method['name']}{method.get('signature', '()')}`"
-                        )
+                        lines.append(f"- `{method['name']}{method.get('signature', '()')}`")
                     lines.append("")
 
                 implementations = self._find_implementations(proto["name"], analysis)

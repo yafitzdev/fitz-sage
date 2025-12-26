@@ -80,9 +80,7 @@ class TestCoreContracts:
 
     def test_provenance_creation(self):
         """Test Provenance object creation."""
-        prov = Provenance(
-            source_id="doc_123", excerpt="Some text", metadata={"title": "Paper"}
-        )
+        prov = Provenance(source_id="doc_123", excerpt="Some text", metadata={"title": "Paper"})
         assert prov.source_id == "doc_123"
         assert prov.excerpt == "Some text"
         assert prov.metadata["title"] == "Paper"
@@ -125,9 +123,7 @@ class TestEngineRegistry:
         def mock_factory(config):
             return Mock()
 
-        registry.register(
-            name="test_engine", factory=mock_factory, description="Test engine"
-        )
+        registry.register(name="test_engine", factory=mock_factory, description="Test engine")
 
         assert "test_engine" in registry.list()
 
@@ -197,9 +193,7 @@ class TestEngineRegistry:
         """Test decorator-based registration."""
         registry = get_engine_registry()
 
-        @EngineRegistry.register_engine(
-            name="decorated", description="Decorated engine"
-        )
+        @EngineRegistry.register_engine(name="decorated", description="Decorated engine")
         def create_engine(config):
             return Mock(spec=KnowledgeEngine)
 

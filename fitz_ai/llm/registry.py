@@ -72,9 +72,7 @@ def get_llm_plugin(*, plugin_name: str, plugin_type: str, **kwargs: Any) -> Any:
             f"Unknown {plugin_type} plugin: {plugin_name!r}. Available: {available}"
         )
     except Exception as e:
-        raise LLMRegistryError(
-            f"Failed to load {plugin_type} plugin '{plugin_name}': {e}"
-        ) from e
+        raise LLMRegistryError(f"Failed to load {plugin_type} plugin '{plugin_name}': {e}") from e
 
 
 __all__ = [

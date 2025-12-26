@@ -38,9 +38,7 @@ class PluginConfig(BaseModel):
     """
 
     plugin_name: str = Field(..., description="Plugin name in the central registry")
-    kwargs: dict[str, Any] = Field(
-        default_factory=dict, description="Plugin init kwargs"
-    )
+    kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin init kwargs")
 
     model_config = ConfigDict(extra="forbid")
 
@@ -54,9 +52,7 @@ class IngesterConfig(BaseModel):
     """Configuration for the ingestion plugin."""
 
     plugin_name: str = Field(..., description="Ingester plugin name")
-    kwargs: dict[str, Any] = Field(
-        default_factory=dict, description="Ingester init kwargs"
-    )
+    kwargs: dict[str, Any] = Field(default_factory=dict, description="Ingester init kwargs")
 
     model_config = ConfigDict(extra="forbid")
 
@@ -73,9 +69,7 @@ class ExtensionChunkerConfig(BaseModel):
     """
 
     plugin_name: str = Field(..., description="Chunker plugin name")
-    kwargs: dict[str, Any] = Field(
-        default_factory=dict, description="Chunker-specific parameters"
-    )
+    kwargs: dict[str, Any] = Field(default_factory=dict, description="Chunker-specific parameters")
 
     model_config = ConfigDict(extra="forbid")
 
@@ -301,9 +295,7 @@ class ArtifactConfig(BaseModel):
     """
 
     auto: bool = Field(default=True, description="Auto-discover applicable plugins")
-    enabled: list[str] = Field(
-        default_factory=list, description="Explicit plugins to run"
-    )
+    enabled: list[str] = Field(default_factory=list, description="Explicit plugins to run")
     disabled: list[str] = Field(default_factory=list, description="Plugins to skip")
 
     model_config = ConfigDict(extra="forbid")
@@ -332,9 +324,7 @@ class EnrichmentConfig(BaseModel):
         artifacts: Project-level artifact configuration.
     """
 
-    enabled: bool = Field(
-        default=False, description="Enable enrichment during ingestion"
-    )
+    enabled: bool = Field(default=False, description="Enable enrichment during ingestion")
     summary: SummaryConfig = Field(
         default_factory=SummaryConfig,
         description="Chunk-level summary configuration",
@@ -393,19 +383,13 @@ class ClassicRagConfig(BaseModel):
     # Required plugins
     chat: PluginConfig = Field(..., description="Chat/LLM plugin configuration")
     embedding: PluginConfig = Field(..., description="Embedding plugin configuration")
-    vector_db: PluginConfig = Field(
-        ..., description="Vector database plugin configuration"
-    )
+    vector_db: PluginConfig = Field(..., description="Vector database plugin configuration")
 
     # Retrieval (new step-based config)
-    retrieval: RetrievalConfig = Field(
-        ..., description="Retrieval pipeline configuration"
-    )
+    retrieval: RetrievalConfig = Field(..., description="Retrieval pipeline configuration")
 
     # Optional components
-    rerank: RerankConfig = Field(
-        default_factory=RerankConfig, description="Reranker configuration"
-    )
+    rerank: RerankConfig = Field(default_factory=RerankConfig, description="Reranker configuration")
     rgs: RGSConfig = Field(default_factory=RGSConfig, description="RGS configuration")
     logging: LoggingConfig = Field(
         default_factory=LoggingConfig, description="Logging configuration"

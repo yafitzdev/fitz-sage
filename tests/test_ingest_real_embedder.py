@@ -42,9 +42,7 @@ class TracingParser:
     def parse(self, path: str) -> str:
         self.parse_calls += 1
         # Return content that creates multiple chunks
-        return f"# {Path(path).name}\n\n" + (
-            "This is test content for embedding. " * 100
-        )
+        return f"# {Path(path).name}\n\n" + ("This is test content for embedding. " * 100)
 
 
 @pytest.fixture
@@ -211,18 +209,14 @@ def test_embedder_single_vs_batch(tmp_path: Path):
     for text in texts:
         embedder.embed(text)
     t_single = time.perf_counter() - t0
-    print(
-        f"[TEST] Single calls: {t_single:.2f}s ({t_single / len(texts) * 1000:.0f}ms each)"
-    )
+    print(f"[TEST] Single calls: {t_single:.2f}s ({t_single / len(texts) * 1000:.0f}ms each)")
 
     # Test batch embed
     print("\n[TEST] Testing 1 embed_batch() call with 10 texts...")
     t0 = time.perf_counter()
     embedder.embed_batch(texts)
     t_batch = time.perf_counter() - t0
-    print(
-        f"[TEST] Batch call: {t_batch:.2f}s ({t_batch / len(texts) * 1000:.0f}ms per text)"
-    )
+    print(f"[TEST] Batch call: {t_batch:.2f}s ({t_batch / len(texts) * 1000:.0f}ms per text)")
 
     print(f"\n{'=' * 70}")
     print("RESULTS")

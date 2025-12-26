@@ -73,13 +73,9 @@ class PdfSectionChunker:
     def __post_init__(self) -> None:
         """Validate parameters."""
         if self.max_section_chars < 100:
-            raise ValueError(
-                f"max_section_chars must be >= 100, got {self.max_section_chars}"
-            )
+            raise ValueError(f"max_section_chars must be >= 100, got {self.max_section_chars}")
         if self.min_section_chars < 1:
-            raise ValueError(
-                f"min_section_chars must be >= 1, got {self.min_section_chars}"
-            )
+            raise ValueError(f"min_section_chars must be >= 1, got {self.min_section_chars}")
         if self.min_section_chars >= self.max_section_chars:
             raise ValueError(
                 f"min_section_chars ({self.min_section_chars}) must be < max_section_chars ({self.max_section_chars})"
@@ -192,9 +188,7 @@ class PdfSectionChunker:
             if para_size > max_chars:
                 if current_chunk:
                     chunk_content = "\n\n".join(current_chunk).strip()
-                    chunk_header = (
-                        f"{header} (Part {part_num})" if part_num > 1 else header
-                    )
+                    chunk_header = f"{header} (Part {part_num})" if part_num > 1 else header
                     chunks.append((chunk_header, chunk_content))
                     part_num += 1
                     current_chunk = []
@@ -257,9 +251,7 @@ class PdfSectionChunker:
         if not text or not text.strip():
             return []
 
-        doc_id = str(
-            base_meta.get("doc_id") or base_meta.get("source_file") or "unknown"
-        )
+        doc_id = str(base_meta.get("doc_id") or base_meta.get("source_file") or "unknown")
 
         # Split into sections
         sections = self._split_into_sections(text)
@@ -273,16 +265,11 @@ class PdfSectionChunker:
 
         for header, content in sections:
             # Skip very short sections unless preserve_short_sections is True
-            if (
-                not self.preserve_short_sections
-                and len(content) < self.min_section_chars
-            ):
+            if not self.preserve_short_sections and len(content) < self.min_section_chars:
                 continue
 
             # Split large sections if needed
-            section_parts = self._split_large_section(
-                header, content, self.max_section_chars
-            )
+            section_parts = self._split_large_section(header, content, self.max_section_chars)
 
             for part_header, part_content in section_parts:
                 if not part_content.strip():

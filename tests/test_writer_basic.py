@@ -21,12 +21,8 @@ class DummyClient:
 
 
 def test_compute_chunk_hash_is_deterministic():
-    a = DummyChunk(
-        id="1", doc_id="d", chunk_index=0, content="hello", metadata={"x": 1}
-    )
-    b = DummyChunk(
-        id="2", doc_id="d", chunk_index=0, content="hello", metadata={"x": 999}
-    )
+    a = DummyChunk(id="1", doc_id="d", chunk_index=0, content="hello", metadata={"x": 1})
+    b = DummyChunk(id="2", doc_id="d", chunk_index=0, content="hello", metadata={"x": 999})
     assert compute_chunk_hash(a) == compute_chunk_hash(b)
 
 

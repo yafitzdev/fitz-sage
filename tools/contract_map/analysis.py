@@ -47,9 +47,7 @@ def discover_entrypoints(root: Path, *, excludes: set[str]) -> List[Entrypoint]:
         if isinstance(scripts, dict):
             for name, target in sorted(scripts.items()):
                 if isinstance(target, str):
-                    eps.append(
-                        Entrypoint(kind="console_script", name=name, target=target)
-                    )
+                    eps.append(Entrypoint(kind="console_script", name=name, target=target))
 
         tool = data.get("tool") or {}
         poetry = tool.get("poetry") or {}
@@ -57,20 +55,14 @@ def discover_entrypoints(root: Path, *, excludes: set[str]) -> List[Entrypoint]:
         if isinstance(poetry_scripts, dict):
             for name, target in sorted(poetry_scripts.items()):
                 if isinstance(target, str):
-                    eps.append(
-                        Entrypoint(kind="poetry_script", name=name, target=target)
-                    )
+                    eps.append(Entrypoint(kind="poetry_script", name=name, target=target))
 
     for p in iter_python_files(root, excludes=excludes):
         rel = p.relative_to(root)
         if p.name == "__main__.py":
-            eps.append(
-                Entrypoint(kind="module_main", name=str(rel.parent), target=str(rel))
-            )
+            eps.append(Entrypoint(kind="module_main", name=str(rel.parent), target=str(rel)))
         if p.name == "cli.py":
-            eps.append(
-                Entrypoint(kind="cli_module", name=str(rel.parent), target=str(rel))
-            )
+            eps.append(Entrypoint(kind="cli_module", name=str(rel.parent), target=str(rel)))
 
     eps.sort(key=lambda e: (e.kind, e.name, e.target))
     return eps
@@ -151,9 +143,7 @@ def compute_hotspots(root: Path, *, excludes: set[str]) -> List[Hotspot]:
         from fitz_ai.llm.registry import available_llm_plugins
 
         impl["ChatPlugin"] = [f"{p} (YAML)" for p in available_llm_plugins("chat")]
-        impl["EmbeddingPlugin"] = [
-            f"{p} (YAML)" for p in available_llm_plugins("embedding")
-        ]
+        impl["EmbeddingPlugin"] = [f"{p} (YAML)" for p in available_llm_plugins("embedding")]
         impl["RerankPlugin"] = [f"{p} (YAML)" for p in available_llm_plugins("rerank")]
     except Exception:
         impl["ChatPlugin"] = []
@@ -278,9 +268,7 @@ def compute_stats(root: Path, *, excludes: set[str]) -> CodeStats:
 
 def compute_config_surface(cm: ContractMap, *, excludes: set[str]) -> ConfigSurface:
     """Compute the configuration surface area."""
-    config_models = [
-        f"{m.module}.{m.name}" for m in cm.models if ".config.schema" in m.module
-    ]
+    config_models = [f"{m.module}.{m.name}" for m in cm.models if ".config.schema" in m.module]
     default_yamls = find_default_yamls(REPO_ROOT, excludes=excludes)
     loaders = list_loader_modules()
     load_callsites = find_load_callsites(REPO_ROOT, excludes=excludes)
@@ -438,10 +426,7 @@ def analyze_any_breakdown(root, excludes):
                 # Categorize
                 if "kwargs: dict[str, Any]" in line or "kwargs: Dict[str, Any]" in line:
                     categories["legitimate_kwargs"] += 1
-                elif (
-                    "metadata: dict[str, Any]" in line
-                    or "metadata: Dict[str, Any]" in line
-                ):
+                elif "metadata: dict[str, Any]" in line or "metadata: Dict[str, Any]" in line:
                     categories["legitimate_metadata"] += 1
                 elif "messages: list[dict[str, Any]]" in line:
                     categories["legitimate_messages"] += 1
@@ -473,11 +458,7 @@ def render_any_breakdown_section(stats):
     lines.append("### By Category")
     lines.append("")
 
-    legit = (
-        cats["legitimate_kwargs"]
-        + cats["legitimate_metadata"]
-        + cats["legitimate_messages"]
-    )
+    legit = cats["legitimate_kwargs"] + cats["legitimate_metadata"] + cats["legitimate_messages"]
     lazy = cats["lazy_type"] + cats["lazy_return"] + cats["lazy_param"]
 
     lines.append(f"- **Legitimate (Keep)**: ~{legit}")
@@ -571,12 +552,8 @@ def render_exception_analysis_section(stats):
 
     lines.append("### Patterns Found")
     lines.append("")
-    lines.append(
-        f"- **Silent failures** (`except: continue`): {patterns['bare_except_continue']}"
-    )
-    lines.append(
-        f"- **Silent ignores** (`except: pass`): {patterns['bare_except_pass']}"
-    )
+    lines.append(f"- **Silent failures** (`except: continue`): {patterns['bare_except_continue']}")
+    lines.append(f"- **Silent ignores** (`except: pass`): {patterns['bare_except_pass']}")
     lines.append(f"- **Logged exceptions**: {patterns['logged_exceptions']}")
     lines.append(f"- **Re-raised exceptions**: {patterns['reraise_exceptions']}")
     lines.append("")

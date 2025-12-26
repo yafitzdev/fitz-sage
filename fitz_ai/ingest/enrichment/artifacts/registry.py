@@ -53,9 +53,7 @@ class ArtifactPluginInfo:
         """Create a generator instance."""
         if self.requires_llm:
             if chat_client is None:
-                raise ValueError(
-                    f"Plugin '{self.name}' requires an LLM client but none provided"
-                )
+                raise ValueError(f"Plugin '{self.name}' requires an LLM client but none provided")
             return self.generator_class(chat_client)
         return self.generator_class()
 
@@ -153,14 +151,10 @@ class ArtifactRegistry:
         """Get all discovered plugins."""
         return list(self._plugins.values())
 
-    def get_plugins_for_type(
-        self, content_type: ContentType
-    ) -> List[ArtifactPluginInfo]:
+    def get_plugins_for_type(self, content_type: ContentType) -> List[ArtifactPluginInfo]:
         """Get plugins that support a specific content type."""
         return [
-            plugin
-            for plugin in self._plugins.values()
-            if content_type in plugin.supported_types
+            plugin for plugin in self._plugins.values() if content_type in plugin.supported_types
         ]
 
     def get_plugins_by_names(self, names: List[str]) -> List[ArtifactPluginInfo]:

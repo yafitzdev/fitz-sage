@@ -194,9 +194,7 @@ class ConflictAwareConstraint:
 
         # If query explicitly asks for resolution, allow decisive answer
         if _is_resolution_query(query):
-            logger.debug(
-                f"{PIPELINE} ConflictAwareConstraint: resolution query detected, allowing"
-            )
+            logger.debug(f"{PIPELINE} ConflictAwareConstraint: resolution query detected, allowing")
             return ConstraintResult.allow()
 
         # Detect conflicts
@@ -210,9 +208,7 @@ class ConflictAwareConstraint:
         for chunk1_id, class1, chunk2_id, class2 in conflicts[:3]:  # Limit to 3
             conflict_descriptions.append(f"'{class1}' vs '{class2}'")
 
-        reason = (
-            f"Conflicting classifications detected: {', '.join(conflict_descriptions)}"
-        )
+        reason = f"Conflicting classifications detected: {', '.join(conflict_descriptions)}"
 
         logger.info(f"{PIPELINE} ConflictAwareConstraint: {reason}")
 

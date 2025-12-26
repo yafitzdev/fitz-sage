@@ -259,9 +259,7 @@ class ProjectAnalyzer:
             "is_async": isinstance(node, ast.AsyncFunctionDef),
         }
 
-    def _get_function_signature(
-        self, node: ast.FunctionDef | ast.AsyncFunctionDef
-    ) -> str:
+    def _get_function_signature(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
         """Get function signature as string."""
         args = []
         for arg in node.args.args:

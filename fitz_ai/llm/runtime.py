@@ -52,11 +52,7 @@ class YAMLPluginBase:
         # Resolve required env vars
         self._env_values: dict[str, str] = {}
         for req_env in spec.required_env:
-            value = (
-                kwargs.get(req_env.inject_as)
-                or os.getenv(req_env.name)
-                or req_env.default
-            )
+            value = kwargs.get(req_env.inject_as) or os.getenv(req_env.name) or req_env.default
             if not value:
                 raise ValueError(
                     f"{req_env.name} is required. "
@@ -72,9 +68,7 @@ class YAMLPluginBase:
             try:
                 self._api_key = resolve_api_key(
                     provider=spec.provider.name,
-                    config={"api_key": kwargs.get("api_key")}
-                    if kwargs.get("api_key")
-                    else None,
+                    config={"api_key": kwargs.get("api_key")} if kwargs.get("api_key") else None,
                 )
             except CredentialError as e:
                 raise RuntimeError(str(e)) from e
@@ -167,9 +161,7 @@ class YAMLChatClient(YAMLPluginBase):
             content = extract_path(response, self.spec.response.content_path)
             return str(content) if content else ""
         except (KeyError, IndexError) as e:
-            logger.warning(
-                f"Failed to extract response: {e}. Full response: {response}"
-            )
+            logger.warning(f"Failed to extract response: {e}. Full response: {response}")
             return ""
 
 
@@ -211,9 +203,7 @@ class YAMLEmbeddingClient(YAMLPluginBase):
             embedding = extract_path(response, self.spec.response.embeddings_path)
             return list(embedding)
         except (KeyError, IndexError) as e:
-            raise RuntimeError(
-                f"Failed to extract embedding: {e}. Response: {response}"
-            ) from e
+            raise RuntimeError(f"Failed to extract embedding: {e}. Response: {response}") from e
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """
@@ -246,9 +236,7 @@ class YAMLEmbeddingClient(YAMLPluginBase):
         # Start with batch size of 96 (Cohere's limit, conservative for others)
         return self._embed_batch_with_retry(texts, batch_size=96)
 
-    def _embed_batch_with_retry(
-        self, texts: list[str], batch_size: int
-    ) -> list[list[float]]:
+    def _embed_batch_with_retry(self, texts: list[str], batch_size: int) -> list[list[float]]:
         """
         Embed texts in batches with recursive halving on failure.
 
@@ -406,14 +394,10 @@ def create_yaml_client(
 
 
 @overload
-def create_yaml_client(
-    plugin_type: str, plugin_name: str, **kwargs: Any
-) -> YAMLPluginBase: ...
+def create_yaml_client(plugin_type: str, plugin_name: str, **kwargs: Any) -> YAMLPluginBase: ...
 
 
-def create_yaml_client(
-    plugin_type: str, plugin_name: str, **kwargs: Any
-) -> YAMLPluginBase:
+def create_yaml_client(plugin_type: str, plugin_name: str, **kwargs: Any) -> YAMLPluginBase:
     """
     Create a YAML plugin client.
 

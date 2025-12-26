@@ -17,14 +17,10 @@ def get_classes_for_file(path: Path) -> list[str]:
     except Exception:
         return []
 
-    return sorted(
-        node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef)
-    )
+    return sorted(node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
 
 
-def build_layout_tree(
-    root: Path, *, max_depth: int | None, excludes: set[str]
-) -> Dict[str, Any]:
+def build_layout_tree(root: Path, *, max_depth: int | None, excludes: set[str]) -> Dict[str, Any]:
     """Build a hierarchical tree structure of the project layout."""
     tree: Dict[str, Any] = {}
 
@@ -103,9 +99,7 @@ def render_layout_section(*, layout_depth: int | None) -> str:
     lines = ["## Project Layout"]
     lines.append(f"- root: `{REPO_ROOT}`")
     lines.append(f"- excludes: `{sorted(DEFAULT_LAYOUT_EXCLUDES)}`")
-    lines.append(
-        f"- max_depth: `{layout_depth if layout_depth is not None else 'unlimited'}`"
-    )
+    lines.append(f"- max_depth: `{layout_depth if layout_depth is not None else 'unlimited'}`")
     lines.append("")
 
     layout_tree = build_layout_tree(

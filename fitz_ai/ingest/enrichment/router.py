@@ -258,9 +258,7 @@ class EnrichmentRouter:
 
         # Format used_by
         if context.used_by:
-            used_by_parts = [
-                f"{Path(f).name} ({role})" for f, role in context.used_by[:5]
-            ]
+            used_by_parts = [f"{Path(f).name} ({role})" for f, role in context.used_by[:5]]
             used_by_str = ", ".join(used_by_parts)
             if len(context.used_by) > 5:
                 used_by_str += f" (+{len(context.used_by) - 5} more)"
@@ -413,9 +411,7 @@ class EnrichmentRouterBuilder:
         self._code_extensions = extensions
         return self
 
-    def with_document_extensions(
-        self, extensions: Set[str]
-    ) -> "EnrichmentRouterBuilder":
+    def with_document_extensions(self, extensions: Set[str]) -> "EnrichmentRouterBuilder":
         """Set custom document extensions."""
         self._document_extensions = extensions
         return self

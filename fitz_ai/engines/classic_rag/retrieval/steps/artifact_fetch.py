@@ -65,9 +65,7 @@ class ArtifactFetchStep(RetrievalStep):
         artifact_chunks = []
         for payload in artifact_payloads:
             chunk = Chunk(
-                id=payload.get(
-                    "id", f"artifact:{payload.get('artifact_type', 'unknown')}"
-                ),
+                id=payload.get("id", f"artifact:{payload.get('artifact_type', 'unknown')}"),
                 doc_id=payload.get("doc_id", "artifact"),
                 content=payload.get("content", ""),
                 chunk_index=0,

@@ -303,12 +303,8 @@ def command(
     # Get chunking config from fitz.yaml
     chunking_config = config.get("chunking", {})
     default_chunker = chunking_config.get("default", {}).get("plugin_name", "simple")
-    chunk_size = (
-        chunking_config.get("default", {}).get("kwargs", {}).get("chunk_size", 1000)
-    )
-    chunk_overlap = (
-        chunking_config.get("default", {}).get("kwargs", {}).get("chunk_overlap", 0)
-    )
+    chunk_size = chunking_config.get("default", {}).get("kwargs", {}).get("chunk_size", 1000)
+    chunk_overlap = chunking_config.get("default", {}).get("kwargs", {}).get("chunk_overlap", 0)
 
     # =========================================================================
     # Header
@@ -359,9 +355,7 @@ def command(
                 print()
                 suggested = _suggest_collection_name(source)
                 choices = existing_collections + [f"+ Create new: {suggested}"]
-                selected = ui.prompt_numbered_choice(
-                    "Collection", choices, default_collection
-                )
+                selected = ui.prompt_numbered_choice("Collection", choices, default_collection)
                 if selected.startswith("+ Create new:"):
                     collection = suggested
                 else:
@@ -382,18 +376,14 @@ def command(
                     defaults = [name for name, _ in available_artifacts]
                 else:
                     defaults = [
-                        name
-                        for name, desc in available_artifacts
-                        if "requires LLM" not in desc
+                        name for name, desc in available_artifacts if "requires LLM" not in desc
                     ]
                 selected_artifacts = ui.prompt_multi_select(
                     "Select artifacts to generate",
                     available_artifacts,
                     defaults=defaults,
                 )
-                artifacts = (
-                    ",".join(selected_artifacts) if selected_artifacts else "none"
-                )
+                artifacts = ",".join(selected_artifacts) if selected_artifacts else "none"
 
     print()
 
@@ -402,9 +392,7 @@ def command(
     # =========================================================================
 
     # Determine total steps based on whether artifacts are enabled
-    has_artifacts = artifacts != "none" and (
-        artifacts is not None or _is_code_project(source)
-    )
+    has_artifacts = artifacts != "none" and (artifacts is not None or _is_code_project(source))
     total_steps = 4 if has_artifacts else 3
 
     ui.step(1, total_steps, "Initializing...")
@@ -440,12 +428,8 @@ def command(
         enrichment_cfg = config.get("enrichment", {})
 
         # Parse artifact selection from CLI or config
-        available_artifact_names = [
-            name for name, _ in _get_available_artifacts(has_llm=False)
-        ]
-        selected_artifacts = _parse_artifact_selection(
-            artifacts, available_artifact_names
-        )
+        available_artifact_names = [name for name, _ in _get_available_artifacts(has_llm=False)]
+        selected_artifacts = _parse_artifact_selection(artifacts, available_artifact_names)
 
         # If artifacts were selected (via CLI or interactive), enable enrichment
         if selected_artifacts is not None and len(selected_artifacts) > 0:
@@ -478,9 +462,7 @@ def command(
                 if needs_llm:
                     # Get chat client from config
                     chat_plugin = config.get("chat", {}).get("plugin_name", "cohere")
-                    chat_client = get_llm_plugin(
-                        plugin_type="chat", plugin_name=chat_plugin
-                    )
+                    chat_client = get_llm_plugin(plugin_type="chat", plugin_name=chat_plugin)
                     ui.info(f"Chat LLM: {chat_plugin} (for LLM-based artifacts)")
 
             enrichment_pipeline = EnrichmentPipeline(
@@ -552,9 +534,7 @@ def command(
                     nonlocal task_id
                     if task_id is None:
                         task_id = progress.add_task("Artifacts", total=total, name="")
-                    progress.update(
-                        task_id, completed=current, name=name if name != "Done" else ""
-                    )
+                    progress.update(task_id, completed=current, name=name if name != "Done" else "")
 
                 with progress:
                     artifacts_generated, artifact_errors = executor.ingest_artifacts(

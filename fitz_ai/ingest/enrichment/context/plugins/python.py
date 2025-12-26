@@ -139,9 +139,7 @@ class PythonProjectAnalyzer:
 
         return imports
 
-    def _resolve_relative_import(
-        self, file_path: Path, module: str, level: int
-    ) -> str | None:
+    def _resolve_relative_import(self, file_path: Path, module: str, level: int) -> str | None:
         """Resolve a relative import to an absolute module name."""
         try:
             rel_path = file_path.relative_to(self._root)

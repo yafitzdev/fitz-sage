@@ -184,9 +184,7 @@ def main() -> int:
     print("FITZ LOCAL LLM SMOKETEST")
     print("=" * 60)
     print("\nTesting local LLM components (chat, embedding, rerank)...")
-    print(
-        "(For detailed pytest output, run: pytest tools/smoketest/smoke_local_llm.py)\n"
-    )
+    print("(For detailed pytest output, run: pytest tools/smoketest/smoke_local_llm.py)\n")
 
     # Run all tests and collect results
     results = []

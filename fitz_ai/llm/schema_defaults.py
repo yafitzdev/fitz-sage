@@ -290,9 +290,7 @@ def validate_plugin_fields(
         # Check options
         options = field_info.get("options")
         if options and value not in options:
-            errors.append(
-                f"Invalid value for {field_name}: {value!r}. Must be one of: {options}"
-            )
+            errors.append(f"Invalid value for {field_name}: {value!r}. Must be one of: {options}")
 
     return errors
 

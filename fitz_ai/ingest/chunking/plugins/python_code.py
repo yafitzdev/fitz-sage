@@ -52,9 +52,7 @@ class PythonCodeChunker:
     def __post_init__(self) -> None:
         """Validate parameters."""
         if self.max_chunk_size < 100:
-            raise ValueError(
-                f"max_chunk_size must be >= 100, got {self.max_chunk_size}"
-            )
+            raise ValueError(f"max_chunk_size must be >= 100, got {self.max_chunk_size}")
         if self.min_chunk_size < 1:
             raise ValueError(f"min_chunk_size must be >= 1, got {self.min_chunk_size}")
 
@@ -77,11 +75,7 @@ class PythonCodeChunker:
         start_line = node.lineno - 1
 
         # Include decorators if present
-        if (
-            include_decorators
-            and hasattr(node, "decorator_list")
-            and node.decorator_list
-        ):
+        if include_decorators and hasattr(node, "decorator_list") and node.decorator_list:
             first_decorator = node.decorator_list[0]
             if hasattr(first_decorator, "lineno"):
                 start_line = first_decorator.lineno - 1
@@ -96,9 +90,7 @@ class PythonCodeChunker:
 
         for node in ast.walk(tree):
             if isinstance(node, (ast.Import, ast.ImportFrom)):
-                segment = self._get_source_segment(
-                    source_lines, node, include_decorators=False
-                )
+                segment = self._get_source_segment(source_lines, node, include_decorators=False)
                 if segment:
                     imports.append(segment)
 
@@ -106,9 +98,7 @@ class PythonCodeChunker:
 
     def _get_docstring(self, node: ast.AST) -> Optional[str]:
         """Extract docstring from a node if present."""
-        if isinstance(
-            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)
-        ):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)):
             return ast.get_docstring(node)
         return None
 
@@ -168,9 +158,7 @@ class PythonCodeChunker:
                     for j in range(i + 1, min(i + 10, len(source_lines))):
                         doc_line = source_lines[j]
                         header_lines.append(doc_line)
-                        if doc_line.strip().endswith(
-                            '"""'
-                        ) or doc_line.strip().endswith("'''"):
+                        if doc_line.strip().endswith('"""') or doc_line.strip().endswith("'''"):
                             if '"""' in doc_line or "'''" in doc_line:
                                 break
                 break
@@ -220,9 +208,7 @@ class PythonCodeChunker:
                 if len(chunks) == 0
                 else f"class {class_name} (Part {len(chunks) + 1})"
             )
-            chunks.append(
-                (chunk_name, content, {"type": "class", "partial": len(chunks) > 0})
-            )
+            chunks.append((chunk_name, content, {"type": "class", "partial": len(chunks) > 0}))
 
         return chunks
 
@@ -243,16 +229,10 @@ class PythonCodeChunker:
             # Fall back to returning entire text as single chunk
             if len(text.strip()) >= self.min_chunk_size:
                 return [("module", text.strip(), {"type": "unparseable"})]
-            return (
-                [("module", text.strip(), {"type": "unparseable"})]
-                if text.strip()
-                else []
-            )
+            return [("module", text.strip(), {"type": "unparseable"})] if text.strip() else []
 
         source_lines = text.splitlines()
-        imports = (
-            self._extract_imports(tree, source_lines) if self.include_imports else ""
-        )
+        imports = self._extract_imports(tree, source_lines) if self.include_imports else ""
 
         # Track which lines we've processed
         processed_ranges: List[Tuple[int, int]] = []
@@ -271,18 +251,13 @@ class PythonCodeChunker:
                 docstring = self._get_docstring(node)
 
                 # Check if class is too large
-                if (
-                    self.split_classes_by_method
-                    and len(class_source) > self.max_chunk_size
-                ):
+                if self.split_classes_by_method and len(class_source) > self.max_chunk_size:
                     class_chunks = self._chunk_large_class(
                         class_name, class_source, node, source_lines, imports
                     )
                     chunks.extend(class_chunks)
                 else:
-                    content = (
-                        imports + "\n\n" + class_source if imports else class_source
-                    )
+                    content = imports + "\n\n" + class_source if imports else class_source
                     meta = {"type": "class"}
                     if docstring:
                         meta["docstring"] = docstring[:200]
@@ -321,9 +296,7 @@ class PythonCodeChunker:
             module_code = "\n".join(module_code_lines)
             # Only include if substantial
             if len(module_code.strip()) >= self.min_chunk_size:
-                chunks.insert(
-                    0, ("module_level", module_code, {"type": "module_level"})
-                )
+                chunks.insert(0, ("module_level", module_code, {"type": "module_level"}))
 
         return chunks
 
@@ -341,9 +314,7 @@ class PythonCodeChunker:
         if not text or not text.strip():
             return []
 
-        doc_id = str(
-            base_meta.get("doc_id") or base_meta.get("source_file") or "unknown"
-        )
+        doc_id = str(base_meta.get("doc_id") or base_meta.get("source_file") or "unknown")
 
         # Parse and extract chunks
         raw_chunks = self._parse_and_chunk(text)

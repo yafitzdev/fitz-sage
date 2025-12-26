@@ -335,9 +335,7 @@ class GenericVectorDBPlugin:
             **self.kwargs,
         }
 
-        transformed_points = self.spec.transform_points(
-            converted_points, "upsert", context
-        )
+        transformed_points = self.spec.transform_points(converted_points, "upsert", context)
         context["points"] = transformed_points
 
         endpoint = Template(op["endpoint"]).render(context)
@@ -427,9 +425,7 @@ class GenericVectorDBPlugin:
     def create_collection(self, name: str, vector_size: int) -> None:
         """Create a new collection."""
         if "create_collection" not in self.spec.operations:
-            raise NotImplementedError(
-                f"{self.plugin_name} does not support create_collection"
-            )
+            raise NotImplementedError(f"{self.plugin_name} does not support create_collection")
 
         op = self.spec.operations["create_collection"]
         context = {
@@ -451,9 +447,7 @@ class GenericVectorDBPlugin:
     def delete_collection(self, name: str) -> None:
         """Delete a collection."""
         if "delete_collection" not in self.spec.operations:
-            raise NotImplementedError(
-                f"{self.plugin_name} does not support delete_collection"
-            )
+            raise NotImplementedError(f"{self.plugin_name} does not support delete_collection")
 
         op = self.spec.operations["delete_collection"]
         context = {"collection": name, **self.kwargs}
@@ -481,9 +475,7 @@ class GenericVectorDBPlugin:
     def list_collections(self) -> List[str]:
         """List all collections."""
         if "list_collections" not in self.spec.operations:
-            raise NotImplementedError(
-                f"{self.plugin_name} does not support list_collections"
-            )
+            raise NotImplementedError(f"{self.plugin_name} does not support list_collections")
 
         op = self.spec.operations["list_collections"]
         context = {**self.kwargs}
@@ -527,9 +519,7 @@ class GenericVectorDBPlugin:
     def get_collection_stats(self, collection: str) -> Dict[str, Any]:
         """Get statistics for a collection."""
         if "get_stats" not in self.spec.operations:
-            raise NotImplementedError(
-                f"{self.plugin_name} does not support get_collection_stats"
-            )
+            raise NotImplementedError(f"{self.plugin_name} does not support get_collection_stats")
 
         op = self.spec.operations["get_stats"]
         context = {"collection": collection, **self.kwargs}
@@ -572,16 +562,12 @@ def load_vector_db_spec(plugin_name: str) -> VectorDBSpec:
     yaml_path = plugins_dir / f"{plugin_name}.yaml"
 
     if not yaml_path.exists():
-        raise ValueError(
-            f"Vector DB plugin '{plugin_name}' not found. Expected: {yaml_path}"
-        )
+        raise ValueError(f"Vector DB plugin '{plugin_name}' not found. Expected: {yaml_path}")
 
     return VectorDBSpec(yaml_path)
 
 
-def _get_auto_detected_kwargs(
-    spec: VectorDBSpec, kwargs: Dict[str, Any]
-) -> Dict[str, Any]:
+def _get_auto_detected_kwargs(spec: VectorDBSpec, kwargs: Dict[str, Any]) -> Dict[str, Any]:
     """
     Auto-detect connection parameters based on YAML spec.
 
@@ -668,9 +654,7 @@ def create_vector_db_plugin(plugin_name: str, **kwargs):
     if spec.is_local():
         class_path = spec.get_local_class_path()
         if not class_path:
-            raise ValueError(
-                f"Local plugin '{plugin_name}' missing python_class specification"
-            )
+            raise ValueError(f"Local plugin '{plugin_name}' missing python_class specification")
 
         module_path, class_name = class_path.rsplit(".", 1)
         module = importlib.import_module(module_path)

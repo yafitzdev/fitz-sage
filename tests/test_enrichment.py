@@ -14,9 +14,7 @@ from fitz_ai.ingest.enrichment import (
     EnrichmentPipeline,
     SummaryCache,
 )
-from fitz_ai.ingest.enrichment.context.plugins.python import (
-    Builder as PythonContextBuilder,
-)
+from fitz_ai.ingest.enrichment.context.plugins.python import Builder as PythonContextBuilder
 from fitz_ai.ingest.enrichment.context.plugins.python import (
     PythonProjectAnalyzer,
 )
@@ -161,20 +159,24 @@ class TestPythonProjectAnalyzer:
         pkg.mkdir()
 
         (pkg / "__init__.py").write_text("")
-        (pkg / "module_a.py").write_text('''
+        (pkg / "module_a.py").write_text(
+            '''
 """Module A."""
 
 def func_a():
     pass
-''')
-        (pkg / "module_b.py").write_text('''
+'''
+        )
+        (pkg / "module_b.py").write_text(
+            '''
 """Module B - imports module_a."""
 
 from mypackage import module_a
 
 def func_b():
     return module_a.func_a()
-''')
+'''
+        )
 
         analyzer = PythonProjectAnalyzer(tmp_path)
         analyzer.analyze()
@@ -188,9 +190,7 @@ def func_b():
         # Check module_b analysis
         analysis_b = analyzer.get_analysis(str(pkg / "module_b.py"))
         assert analysis_b is not None
-        assert "mypackage" in analysis_b.imports or "module_a" in str(
-            analysis_b.imports
-        )
+        assert "mypackage" in analysis_b.imports or "module_a" in str(analysis_b.imports)
 
 
 class TestChunkSummarizer:
@@ -274,7 +274,8 @@ class TestEnrichmentPipeline:
         proj = tmp_path / "myproject"
         proj.mkdir()
         (proj / "__init__.py").write_text("")
-        (proj / "module.py").write_text('''
+        (proj / "module.py").write_text(
+            '''
 """A simple module."""
 
 class MyClass:
@@ -284,7 +285,8 @@ class MyClass:
 def my_func():
     """My function."""
     pass
-''')
+'''
+        )
 
         config = EnrichmentConfig(enabled=True)
         pipeline = EnrichmentPipeline(

@@ -87,9 +87,7 @@ class TracingVectorDBWriter:
         )
 
     def mark_deleted(self, collection: str, source_path: str) -> int:
-        self._tracker.log(
-            "mark_deleted()", f"collection={collection}, path={source_path}"
-        )
+        self._tracker.log("mark_deleted()", f"collection={collection}, path={source_path}")
         return 1
 
 
@@ -103,9 +101,7 @@ class TracingParser:
 
     def parse(self, path: str) -> str:
         self.parse_calls += 1
-        self._tracker.log(
-            "parse()", f"call #{self.parse_calls}, path={Path(path).name}"
-        )
+        self._tracker.log("parse()", f"call #{self.parse_calls}, path={Path(path).name}")
         # Return content that will create multiple chunks
         return f"# File: {path}\n\n" + ("Lorem ipsum dolor sit amet. " * 50) * (
             self._content_size // 100
@@ -137,18 +133,13 @@ def test_files(tmp_path: Path):
     # Create 2 large files
     for i in range(2):
         f = tmp_path / f"large_{i}.py"
-        f.write_text(
-            f"# large file {i}\n"
-            + "class Foo:\n    def bar(self):\n        pass\n" * 500
-        )
+        f.write_text(f"# large file {i}\n" + "class Foo:\n    def bar(self):\n        pass\n" * 500)
         files.append(f)
 
     return tmp_path, files
 
 
-def test_ingest_timing_detailed(
-    tmp_path: Path, timing_tracker: TimingTracker, test_files
-):
+def test_ingest_timing_detailed(tmp_path: Path, timing_tracker: TimingTracker, test_files):
     """
     Detailed timing test for ingestion pipeline.
 
@@ -217,12 +208,10 @@ def test_ingest_timing_detailed(
     print(f"{'=' * 60}")
 
     # Assertions to verify batching is working
-    assert embedder.embed_calls == 0, (
-        f"embed() should not be called, but was called {embedder.embed_calls} times"
-    )
-    assert embedder.embed_batch_calls >= 1, (
-        "embed_batch() should be called at least once"
-    )
+    assert (
+        embedder.embed_calls == 0
+    ), f"embed() should not be called, but was called {embedder.embed_calls} times"
+    assert embedder.embed_batch_calls >= 1, "embed_batch() should be called at least once"
 
     # If we have 17 files and batching works, we should have far fewer embed_batch calls than files
     if len(files) > 5:
@@ -236,9 +225,7 @@ def test_ingest_timing_detailed(
     print(f"  - {embedder.total_texts_embedded} total chunks embedded")
 
 
-def test_ingest_with_real_embedder_mock(
-    tmp_path: Path, timing_tracker: TimingTracker, test_files
-):
+def test_ingest_with_real_embedder_mock(tmp_path: Path, timing_tracker: TimingTracker, test_files):
     """
     Test with a mock that simulates real API latency.
 

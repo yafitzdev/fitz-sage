@@ -308,9 +308,7 @@ def document_ingestion(config: TestConfig) -> tuple[list[dict], bool]:
             if path.suffix.lower() in {".txt", ".md"}:
                 try:
                     content = path.read_text(encoding="utf-8", errors="ignore")
-                    documents.append(
-                        {"id": str(path.stem), "path": str(path), "content": content}
-                    )
+                    documents.append({"id": str(path.stem), "path": str(path), "content": content})
                 except Exception as e:
                     print(f"  ⚠ Failed to read {path}: {e}")
     else:
@@ -455,9 +453,7 @@ def retrieval(
 
     retrieved_chunks = []
     for i, result in enumerate(results):
-        retrieved_chunks.append(
-            {"id": result.id, "score": result.score, **result.payload}
-        )
+        retrieved_chunks.append({"id": result.id, "score": result.score, **result.payload})
         if config.verbose:
             preview = result.payload.get("content", "")[:40].replace("\n", " ")
             print(f"    {i + 1}. [{result.score:.4f}] {result.id}: {preview}...")
@@ -536,11 +532,7 @@ def rgs_prompt_building(chunks: list[dict], config: TestConfig) -> tuple[dict, b
     ]
 
     # Build RGS prompt
-    rgs = RGS(
-        RGSConfig(
-            enable_citations=True, strict_grounding=True, max_chunks=config.max_chunks
-        )
-    )
+    rgs = RGS(RGSConfig(enable_citations=True, strict_grounding=True, max_chunks=config.max_chunks))
 
     prompt = rgs.build_prompt(query, chunk_objects)
 
@@ -554,9 +546,7 @@ def rgs_prompt_building(chunks: list[dict], config: TestConfig) -> tuple[dict, b
         print("\n  --- User Prompt Preview ---")
         print(f"  {prompt.user[:200]}...")
 
-    return {"system": prompt.system, "user": prompt.user}, bool(
-        prompt.system and prompt.user
-    )
+    return {"system": prompt.system, "user": prompt.user}, bool(prompt.system and prompt.user)
 
 
 def llm_generation(prompt: dict, llm: MockLLM, config: TestConfig) -> tuple[str, bool]:
@@ -582,9 +572,7 @@ def llm_generation(prompt: dict, llm: MockLLM, config: TestConfig) -> tuple[str,
     return response, bool(response)
 
 
-def answer_formatting(
-    response: str, chunks: list[dict], config: TestConfig
-) -> tuple[dict, bool]:
+def answer_formatting(response: str, chunks: list[dict], config: TestConfig) -> tuple[dict, bool]:
     """Test 9: Answer formatting with provenance."""
     print("\n" + "=" * 60)
     print("TEST 9: ANSWER FORMATTING")
@@ -628,9 +616,7 @@ def answer_formatting(
 
     return {
         "text": answer.text,
-        "provenance": [
-            {"source_id": p.source_id, "excerpt": p.excerpt} for p in answer.provenance
-        ],
+        "provenance": [{"source_id": p.source_id, "excerpt": p.excerpt} for p in answer.provenance],
         "metadata": answer.metadata,
     }, bool(answer.text and answer.provenance)
 
@@ -738,17 +724,13 @@ def run_all_tests(config: TestConfig) -> bool:
 
 def main() -> int:
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="End-to-end smoketest for Classic RAG engine"
-    )
+    parser = argparse.ArgumentParser(description="End-to-end smoketest for Classic RAG engine")
     parser.add_argument(
         "--with-files",
         type=Path,
         help="Path to directory with test documents (uses sample docs if not provided)",
     )
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Show detailed output"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed output")
     parser.add_argument(
         "--top-k",
         type=int,
@@ -758,9 +740,7 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    config = TestConfig(
-        docs_path=args.with_files, verbose=args.verbose, top_k=args.top_k
-    )
+    config = TestConfig(docs_path=args.with_files, verbose=args.verbose, top_k=args.top_k)
 
     success = run_all_tests(config)
     return 0 if success else 1

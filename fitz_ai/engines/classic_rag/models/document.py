@@ -13,6 +13,4 @@ class Document(BaseModel):
 
     id: str = Field(..., description="Document ID")
     content: str = Field(..., description="Full document content")
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Document metadata"
-    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Document metadata")

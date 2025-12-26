@@ -108,9 +108,7 @@ class ChunkingEngine:
 
         content = getattr(raw_doc, "content", None)
         if content is None:
-            raise IngestionChunkingError(
-                f"RawDocument has no 'content' attribute: {path_str}"
-            )
+            raise IngestionChunkingError(f"RawDocument has no 'content' attribute: {path_str}")
 
         if not content or not content.strip():
             logger.warning(f"{CHUNKING} Empty content for document: {path_str}")
@@ -137,9 +135,7 @@ class ChunkingEngine:
             raise
         except Exception as e:
             logger.error(f"{CHUNKING} Chunking plugin failed for '{path_str}': {e}")
-            raise IngestionChunkingError(
-                f"Chunking plugin failed for file '{path_str}'"
-            ) from e
+            raise IngestionChunkingError(f"Chunking plugin failed for file '{path_str}'") from e
 
         logger.debug(f"{CHUNKING} Extracted {len(chunks)} chunks from '{path_str}'")
         return chunks

@@ -102,9 +102,7 @@ def _display_collection_info(name: str, stats: Dict[str, Any]) -> None:
         table.add_column("Value", style="cyan")
 
         table.add_row("Name", name)
-        table.add_row(
-            "Chunks", str(stats.get("points_count", stats.get("vectors_count", "?")))
-        )
+        table.add_row("Chunks", str(stats.get("points_count", stats.get("vectors_count", "?"))))
         table.add_row("Vector Size", str(stats.get("vector_size", "?")))
         table.add_row("Status", stats.get("status", "ready"))
 
@@ -129,9 +127,7 @@ def _display_example_chunks(client: Any, collection: str, limit: int = 3) -> Non
             for i, record in enumerate(records, 1):
                 payload = record.payload if hasattr(record, "payload") else {}
                 content = payload.get("content", payload.get("text", ""))
-                doc_id = payload.get(
-                    "doc_id", record.id if hasattr(record, "id") else "?"
-                )
+                doc_id = payload.get("doc_id", record.id if hasattr(record, "id") else "?")
 
                 # Truncate content
                 if len(content) > 200:
@@ -184,8 +180,7 @@ def command() -> None:
         # Multiple DBs available - let user choose
         print()
         db_names = [
-            f"{db['name']} {'(configured)' if db['is_configured'] else ''}"
-            for db in available_dbs
+            f"{db['name']} {'(configured)' if db['is_configured'] else ''}" for db in available_dbs
         ]
         selected_name = ui.prompt_numbered_choice(
             "Select vector database",

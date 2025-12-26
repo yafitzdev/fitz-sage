@@ -194,9 +194,7 @@ class TestDiffIngestExecutor:
         assert summary.errors == 1
 
         state_manager = executor_deps["state_manager"]
-        entry = state_manager.get_file_entry(
-            str(tmp_path.resolve()), str(test_file.resolve())
-        )
+        entry = state_manager.get_file_entry(str(tmp_path.resolve()), str(test_file.resolve()))
         assert entry is None
 
     def test_marks_deletions_in_state(self, tmp_path: Path, executor_deps):
@@ -212,9 +210,7 @@ class TestDiffIngestExecutor:
         executor.run(tmp_path)
 
         state_manager = executor_deps["state_manager"]
-        entry = state_manager.get_file_entry(
-            str(tmp_path.resolve()), str(test_file.resolve())
-        )
+        entry = state_manager.get_file_entry(str(tmp_path.resolve()), str(test_file.resolve()))
         assert entry is not None
         assert entry.status.value == "deleted"
 
@@ -273,9 +269,7 @@ class TestDiffIngestExecutor:
         writer = executor_deps["vector_db_writer"]
         assert len(writer.upserted) > 0
 
-    def test_vector_payload_contains_required_metadata(
-        self, tmp_path: Path, executor_deps
-    ):
+    def test_vector_payload_contains_required_metadata(self, tmp_path: Path, executor_deps):
         """Test that vector payload contains all required metadata (spec §5.1)."""
         (tmp_path / "test.md").write_text("# Test content")
 

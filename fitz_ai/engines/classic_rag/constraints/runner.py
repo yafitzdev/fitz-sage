@@ -52,9 +52,7 @@ def apply_constraints(
             result = constraint.apply(query, chunks)
 
             if not result.allow_decisive_answer:
-                logger.info(
-                    f"{PIPELINE} Constraint '{constraint.name}' denied: {result.reason}"
-                )
+                logger.info(f"{PIPELINE} Constraint '{constraint.name}' denied: {result.reason}")
                 if result.reason:
                     denial_reasons.append(result.reason)
                 all_metadata[constraint.name] = result.metadata
@@ -62,9 +60,7 @@ def apply_constraints(
         except Exception as e:
             # Fail-safe: if constraint crashes, log and continue
             # Do NOT block the answer due to constraint errors
-            logger.warning(
-                f"{PIPELINE} Constraint '{constraint.name}' raised exception: {e}"
-            )
+            logger.warning(f"{PIPELINE} Constraint '{constraint.name}' raised exception: {e}")
             continue
 
     if denial_reasons:

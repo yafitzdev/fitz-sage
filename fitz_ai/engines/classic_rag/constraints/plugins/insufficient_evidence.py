@@ -42,9 +42,7 @@ FACT_QUERY_PATTERNS: tuple[re.Pattern, ...] = (
     re.compile(r"^\s*who\b", re.I),
     re.compile(r"^\s*where\b", re.I),
     re.compile(r"^\s*when\b", re.I),
-    re.compile(
-        r"\bwhich\s+\w+\s+(is|was|are|were|does|did|has|have|supports?|caused?)\b", re.I
-    ),
+    re.compile(r"\bwhich\s+\w+\s+(is|was|are|were|does|did|has|have|supports?|caused?)\b", re.I),
 )
 
 CAUSAL_QUERY_PATTERNS: tuple[re.Pattern, ...] = (
@@ -268,9 +266,7 @@ class InsufficientEvidenceConstraint:
 
         # Rule 1: Empty context
         if not chunks:
-            logger.info(
-                f"{PIPELINE} InsufficientEvidenceConstraint: no chunks retrieved"
-            )
+            logger.info(f"{PIPELINE} InsufficientEvidenceConstraint: no chunks retrieved")
             return ConstraintResult.deny(
                 reason="No evidence retrieved",
                 signal="abstain",
@@ -286,9 +282,7 @@ class InsufficientEvidenceConstraint:
 
         # Rule 2 & 3: Check for sufficient evidence
         if is_causal:
-            evidence_count = _count_relevant_chunks(
-                chunks, query_keywords, require_causal=True
-            )
+            evidence_count = _count_relevant_chunks(chunks, query_keywords, require_causal=True)
 
             if evidence_count < self.min_evidence_count:
                 logger.info(
@@ -303,9 +297,7 @@ class InsufficientEvidenceConstraint:
                 )
 
         elif is_fact:
-            evidence_count = _count_relevant_chunks(
-                chunks, query_keywords, require_causal=False
-            )
+            evidence_count = _count_relevant_chunks(chunks, query_keywords, require_causal=False)
 
             if evidence_count < self.min_evidence_count:
                 logger.info(

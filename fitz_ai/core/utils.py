@@ -11,9 +11,7 @@ import re
 from typing import Any
 
 
-def extract_path(
-    data: Any, path: str, *, default: Any = None, strict: bool = True
-) -> Any:
+def extract_path(data: Any, path: str, *, default: Any = None, strict: bool = True) -> Any:
     """
     Extract a value from nested data using dot/bracket notation.
 
@@ -68,9 +66,7 @@ def extract_path(
                 current = getattr(current, part)
             else:
                 if strict:
-                    raise KeyError(
-                        f"Cannot traverse {type(current).__name__} with key {part!r}"
-                    )
+                    raise KeyError(f"Cannot traverse {type(current).__name__} with key {part!r}")
                 return default
         except (KeyError, IndexError, TypeError):
             if strict:

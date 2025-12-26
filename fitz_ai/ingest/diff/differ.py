@@ -285,9 +285,7 @@ class Differ:
                 continue
 
             # Check if re-ingestion is needed
-            reason = self._check_reingest_reason(
-                scanned, current_chunker_id, current_parser_id
-            )
+            reason = self._check_reingest_reason(scanned, current_chunker_id, current_parser_id)
 
             if reason.needs_reingest:
                 logger.debug(f"Re-ingest {scanned.path}: {reason}")

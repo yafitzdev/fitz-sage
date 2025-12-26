@@ -89,9 +89,7 @@ class MockReranker:
     def rerank(
         self, query: str, documents: list[str], top_n: int | None = None
     ) -> list[tuple[int, float]]:
-        self.rerank_calls.append(
-            {"query": query, "documents": documents, "top_n": top_n}
-        )
+        self.rerank_calls.append({"query": query, "documents": documents, "top_n": top_n})
         # Return in original order with descending scores
         # Start at 0.99 to avoid triggering VIP handling (score=1.0)
         n = top_n or len(documents)

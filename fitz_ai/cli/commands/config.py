@@ -66,9 +66,7 @@ def _show_config_summary(config: dict) -> None:
         ret_plugin = ret.get("plugin_name", "dense")
         ret_collection = ret.get("collection", "default")
         ret_top_k = ret.get("top_k", 5)
-        table.add_row(
-            "Retriever", ret_plugin, f"collection={ret_collection}, top_k={ret_top_k}"
-        )
+        table.add_row("Retriever", ret_plugin, f"collection={ret_collection}, top_k={ret_top_k}")
 
         # Rerank
         rerank = config.get("rerank", {})

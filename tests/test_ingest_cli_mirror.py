@@ -3,11 +3,16 @@
 Exact mirror of the CLI ingest process with detailed logging.
 
 Run with: pytest tests/test_ingest_cli_mirror.py -v -s --log-cli-level=DEBUG
+
+NOTE: This is an integration test that requires a real config file.
+It is skipped in CI when no config is present.
 """
 
 import logging
 import time
 from pathlib import Path
+
+import pytest
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -19,12 +24,24 @@ def log_timing(phase: str, start: float, details: str = ""):
     return time.perf_counter()
 
 
+@pytest.mark.integration
 def test_ingest_cli_mirror():
     """
     Mirror the exact CLI ingest process.
 
     Run: pytest tests/test_ingest_cli_mirror.py::test_ingest_cli_mirror -v -s --log-cli-level=DEBUG
     """
+    from fitz_ai.core.config import ConfigNotFoundError, load_config_dict
+    from fitz_ai.core.paths import FitzPaths
+
+    # Skip if no config file exists (e.g., in CI)
+    try:
+        config_path = FitzPaths.config()
+        if not config_path.exists():
+            pytest.skip("No config file found - run 'fitz init' first")
+    except Exception:
+        pytest.skip("No config file found - run 'fitz init' first")
+
     T0 = time.perf_counter()
     t = T0
 
@@ -38,10 +55,10 @@ def test_ingest_cli_mirror():
     print("[PHASE 1] Loading config...")
     t = time.perf_counter()
 
-    from fitz_ai.core.config import load_config_dict
-    from fitz_ai.core.paths import FitzPaths
-
-    config = load_config_dict(FitzPaths.config())
+    try:
+        config = load_config_dict(FitzPaths.config())
+    except ConfigNotFoundError:
+        pytest.skip("Config file not found - run 'fitz init' first")
     t = log_timing("Config loaded", t, f"keys: {list(config.keys())}")
 
     embedding_plugin = config.get("embedding", {}).get("plugin_name", "cohere")

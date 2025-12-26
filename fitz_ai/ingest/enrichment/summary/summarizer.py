@@ -158,9 +158,7 @@ class ChunkSummarizer:
             batch_num = batch_start // batch_size + 1
             total_batches = (len(to_summarize) + batch_size - 1) // batch_size
 
-            logger.info(
-                f"[SUMMARIZE] Batch {batch_num}/{total_batches}: {len(batch)} chunks"
-            )
+            logger.info(f"[SUMMARIZE] Batch {batch_num}/{total_batches}: {len(batch)} chunks")
 
             descriptions = self._summarize_batch_single(batch)
 
@@ -192,14 +190,10 @@ class ChunkSummarizer:
         for i, (_, chunk) in enumerate(batch, 1):
             file_name = Path(chunk.file_path).name
             # Truncate content to avoid token limits
-            content = (
-                chunk.content[:1500] if len(chunk.content) > 1500 else chunk.content
-            )
+            content = chunk.content[:1500] if len(chunk.content) > 1500 else chunk.content
             prompt_parts.append(f"\n--- CHUNK [{i}] from {file_name} ---\n{content}\n")
 
-        prompt_parts.append(
-            "\n--- END OF CHUNKS ---\n\nNow provide numbered descriptions:"
-        )
+        prompt_parts.append("\n--- END OF CHUNKS ---\n\nNow provide numbered descriptions:")
 
         prompt = "".join(prompt_parts)
         messages = [{"role": "user", "content": prompt}]
@@ -247,9 +241,7 @@ class ChunkSummarizer:
             if i in descriptions:
                 result.append(descriptions[i])
             else:
-                logger.warning(
-                    f"[SUMMARIZE] Missing description for chunk {i}, using fallback"
-                )
+                logger.warning(f"[SUMMARIZE] Missing description for chunk {i}, using fallback")
                 result.append("Code chunk - see source for details.")
 
         return result
@@ -293,9 +285,7 @@ class ChunkSummarizer:
             exports_str += f" (+{len(context.exports) - 10} more)"
 
         if context.used_by:
-            used_by_parts = [
-                f"{Path(f).name} ({role})" for f, role in context.used_by[:5]
-            ]
+            used_by_parts = [f"{Path(f).name} ({role})" for f, role in context.used_by[:5]]
             used_by_str = ", ".join(used_by_parts)
             if len(context.used_by) > 5:
                 used_by_str += f" (+{len(context.used_by) - 5} more)"

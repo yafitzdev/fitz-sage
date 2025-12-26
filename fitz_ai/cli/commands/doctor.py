@@ -353,11 +353,7 @@ def command(
         embedding = config.get("embedding", {}).get("plugin_name", "?")
         vector_db = config.get("vector_db", {}).get("plugin_name", "?")
         rerank = config.get("rerank", {})
-        rerank_str = (
-            rerank.get("plugin_name", "disabled")
-            if rerank.get("enabled")
-            else "disabled"
-        )
+        rerank_str = rerank.get("plugin_name", "disabled") if rerank.get("enabled") else "disabled"
 
         ui.info(f"Chat: {chat}")
         ui.info(f"Embedding: {embedding}")

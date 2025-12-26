@@ -49,9 +49,7 @@ class LimitStep(RetrievalStep):
             else:
                 regular.append(chunk)
 
-        logger.debug(
-            f"{RETRIEVER} LimitStep: k={self.k}, vip={len(vip)}, regular={len(regular)}"
-        )
+        logger.debug(f"{RETRIEVER} LimitStep: k={self.k}, vip={len(vip)}, regular={len(regular)}")
 
         # Limit only regular chunks
         limited = regular[: self.k]

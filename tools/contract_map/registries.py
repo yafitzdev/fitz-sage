@@ -9,9 +9,7 @@ from typing import Iterable, List
 from .common import ContractMap, ImportFailure, RegistryContract, safe_import
 
 
-def maybe_call(
-    cm: ContractMap, module_obj: object, fn_name: str, *, verbose: bool
-) -> None:
+def maybe_call(cm: ContractMap, module_obj: object, fn_name: str, *, verbose: bool) -> None:
     """Try to call a function on a module, logging failures."""
     fn = getattr(module_obj, fn_name, None)
     if callable(fn):
@@ -50,9 +48,7 @@ def extract_registry_plugins(
         return None
 
     plugins = sorted(str(k) for k in reg.keys())
-    return RegistryContract(
-        module=module_name, name=dict_attr, plugins=plugins, note=note
-    )
+    return RegistryContract(module=module_name, name=dict_attr, plugins=plugins, note=note)
 
 
 def extract_pipeline_registry(
@@ -199,9 +195,7 @@ def extract_vector_db_registry(
 def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
     """Extract all registries from the codebase."""
     # LLM registry (chat, embedding, rerank) - YAML-based
-    cm.registries.extend(
-        extract_llm_registry(cm, "fitz_ai.llm.registry", verbose=verbose)
-    )
+    cm.registries.extend(extract_llm_registry(cm, "fitz_ai.llm.registry", verbose=verbose))
 
     # Vector DB registry (separate from LLM) - YAML-based
     vdb = extract_vector_db_registry(cm, "fitz_ai.vector_db.registry", verbose=verbose)

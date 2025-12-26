@@ -116,9 +116,7 @@ def command(
         collections = _get_collections(raw_config)
         if collections and len(collections) > 1:
             print()
-            selected = ui.prompt_numbered_choice(
-                "Collection", collections, default_collection
-            )
+            selected = ui.prompt_numbered_choice("Collection", collections, default_collection)
             typed_config.retrieval.collection = selected
         elif collections:
             typed_config.retrieval.collection = collections[0]
@@ -136,9 +134,7 @@ def command(
     embedding_plugin = raw_config.get("embedding", {}).get("plugin_name", "?")
     embedding_model = raw_config.get("embedding", {}).get("kwargs", {}).get("model", "")
     display_embedding = (
-        f"{embedding_plugin} ({embedding_model})"
-        if embedding_model
-        else embedding_plugin
+        f"{embedding_plugin} ({embedding_model})" if embedding_model else embedding_plugin
     )
 
     # Rerank
@@ -146,9 +142,7 @@ def command(
     if raw_config.get("rerank", {}).get("enabled"):
         rerank_plugin = raw_config.get("rerank", {}).get("plugin_name", "?")
         rerank_model = raw_config.get("rerank", {}).get("kwargs", {}).get("model", "")
-        display_rerank = (
-            f"{rerank_plugin} ({rerank_model})" if rerank_model else rerank_plugin
-        )
+        display_rerank = f"{rerank_plugin} ({rerank_model})" if rerank_model else rerank_plugin
 
     # =========================================================================
     # Show query info

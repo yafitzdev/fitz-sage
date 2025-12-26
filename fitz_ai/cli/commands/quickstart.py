@@ -135,9 +135,7 @@ def command(
             collection=collection,
             verbose=verbose,
         )
-        ui.success(
-            f"Ingested {stats['documents']} documents ({stats['chunks']} chunks)"
-        )
+        ui.success(f"Ingested {stats['documents']} documents ({stats['chunks']} chunks)")
 
     except Exception as e:
         ui.error(f"Ingestion failed: {e}")
@@ -256,9 +254,7 @@ def _save_api_key_to_shell(api_key: str) -> None:
 
             # Append to file
             with open(rc_file, "a") as f:
-                f.write(
-                    f'\n# Added by fitz quickstart\nexport COHERE_API_KEY="{api_key}"\n'
-                )
+                f.write(f'\n# Added by fitz quickstart\nexport COHERE_API_KEY="{api_key}"\n')
 
             ui.success(f"Saved to ~/{rc_file.name}")
             ui.info(f"Run `source ~/{rc_file.name}` or restart your terminal")
@@ -358,9 +354,7 @@ def _run_ingestion(
         ChunkingRouterConfig,
         ExtensionChunkerConfig,
     )
-    from fitz_ai.engines.classic_rag.config import (
-        load_config_dict as load_default_config_dict,
-    )
+    from fitz_ai.engines.classic_rag.config import load_config_dict as load_default_config_dict
     from fitz_ai.ingest.chunking.engine import ChunkingEngine
     from fitz_ai.ingest.ingestion.engine import IngestionEngine
     from fitz_ai.ingest.ingestion.registry import get_ingest_plugin

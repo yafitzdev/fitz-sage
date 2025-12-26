@@ -202,9 +202,7 @@ class UI:
             if title:
                 print("-" * (len(title) + 8))
 
-    def summary_panel(
-        self, content: str, title: str = "", style: str = "green"
-    ) -> None:
+    def summary_panel(self, content: str, title: str = "", style: str = "green") -> None:
         """
         Print a summary panel (full-width, typically at end of command).
 
@@ -332,9 +330,7 @@ class UI:
             console.print(f"  [bold]{prompt}:[/bold]")
             for i, choice in enumerate(ordered_choices, 1):
                 if choice == default:
-                    console.print(
-                        f"    [cyan][{i}][/cyan] {choice} [dim](default)[/dim]"
-                    )
+                    console.print(f"    [cyan][{i}][/cyan] {choice} [dim](default)[/dim]")
                 else:
                     console.print(f"    [cyan][{i}][/cyan] {choice}")
         else:
@@ -363,9 +359,7 @@ class UI:
                     return selected
                 else:
                     if RICH:
-                        console.print(
-                            f"  [red]Please enter 1-{len(ordered_choices)}[/red]"
-                        )
+                        console.print(f"  [red]Please enter 1-{len(ordered_choices)}[/red]")
                     else:
                         print(f"  Please enter 1-{len(ordered_choices)}")
             except ValueError:
@@ -414,9 +408,7 @@ class UI:
                 console.print(f"\n  [bold]{prompt}:[/bold]")
                 for i, (name, desc) in enumerate(choices, 1):
                     check = "[green]x[/green]" if name in selected else " "
-                    console.print(
-                        f"    [cyan][{i}][/cyan] [{check}] {name} [dim]- {desc}[/dim]"
-                    )
+                    console.print(f"    [cyan][{i}][/cyan] [{check}] {name} [dim]- {desc}[/dim]")
             else:
                 print(f"\n  {prompt}:")
                 for i, (name, desc) in enumerate(choices, 1):
@@ -435,9 +427,7 @@ class UI:
                 )
                 response = Prompt.ask("  ", default="").strip().lower()
             else:
-                print(
-                    f"\n  Toggle (1-{len(choices)}), 'a' for all, 'n' for none, Enter to confirm"
-                )
+                print(f"\n  Toggle (1-{len(choices)}), 'a' for all, 'n' for none, Enter to confirm")
                 response = input("  : ").strip().lower()
 
             if response == "":
@@ -502,17 +492,13 @@ class UI:
                     col_widths[i] = max(col_widths[i], len(str(cell)))
 
             # Header
-            header_line = "  ".join(
-                h.ljust(col_widths[i]) for i, h in enumerate(headers)
-            )
+            header_line = "  ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers))
             print(header_line)
             print("-" * len(header_line))
 
             # Rows
             for row in rows:
-                row_line = "  ".join(
-                    str(c).ljust(col_widths[i]) for i, c in enumerate(row)
-                )
+                row_line = "  ".join(str(c).ljust(col_widths[i]) for i, c in enumerate(row))
                 print(row_line)
 
     # -------------------------------------------------------------------------

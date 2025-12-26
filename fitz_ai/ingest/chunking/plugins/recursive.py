@@ -37,9 +37,7 @@ class RecursiveChunker:
     plugin_name: str = "recursive"
     chunk_size: int = 1000
     chunk_overlap: int = 200
-    separators: List[str] = field(
-        default_factory=lambda: ["\n\n", "\n", ". ", ", ", " ", ""]
-    )
+    separators: List[str] = field(default_factory=lambda: ["\n\n", "\n", ". ", ", ", " ", ""])
 
     @property
     def chunker_id(self) -> str:
@@ -93,9 +91,7 @@ class RecursiveChunker:
                     # Check if this part alone is too big
                     if len(part_with_sep) > self.chunk_size:
                         # Recursively split with remaining separators
-                        sub_chunks = self._split_text(
-                            part_with_sep, separators[i + 1 :]
-                        )
+                        sub_chunks = self._split_text(part_with_sep, separators[i + 1 :])
                         chunks.extend(sub_chunks)
                         current = ""
                     else:
@@ -167,9 +163,7 @@ class RecursiveChunker:
         Returns:
             List of Chunk objects
         """
-        doc_id = str(
-            base_meta.get("doc_id") or base_meta.get("source_file") or "unknown"
-        )
+        doc_id = str(base_meta.get("doc_id") or base_meta.get("source_file") or "unknown")
 
         # Split text
         raw_chunks = self._split_text(text, self.separators)

@@ -87,8 +87,6 @@ class ThresholdStep(RetrievalStep):
             # Take top N from below_threshold (already sorted by score)
             result_regular.extend(below_threshold[:needed])
 
-        logger.debug(
-            f"{RETRIEVER} ThresholdStep: vip={len(vip)}, regular={len(result_regular)}"
-        )
+        logger.debug(f"{RETRIEVER} ThresholdStep: vip={len(vip)}, regular={len(result_regular)}")
 
         return vip + result_regular

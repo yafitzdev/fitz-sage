@@ -25,9 +25,7 @@ class LocalRerankerConfig:
 
 
 class LocalReranker:
-    def __init__(
-        self, embedder: LocalEmbedder, cfg: LocalRerankerConfig | None = None
-    ) -> None:
+    def __init__(self, embedder: LocalEmbedder, cfg: LocalRerankerConfig | None = None) -> None:
         self._emb = embedder
         self._cfg = cfg or LocalRerankerConfig()
 

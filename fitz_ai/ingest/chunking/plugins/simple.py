@@ -68,9 +68,7 @@ class SimpleChunker:
         if not text or not text.strip():
             return []
 
-        doc_id = str(
-            base_meta.get("doc_id") or base_meta.get("source_file") or "unknown"
-        )
+        doc_id = str(base_meta.get("doc_id") or base_meta.get("source_file") or "unknown")
 
         chunks: List[Chunk] = []
         chunk_index = 0
