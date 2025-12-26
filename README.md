@@ -22,7 +22,7 @@ That's it. Your documents are now searchable with AI.
 ## Why Fitz? ☀️
 
 > - **Point at a folder. Ask a question. Get an answer with sources.**
-> - **❗RAG is a plugin and therefore swappable.** Fitz is designed for people who expect RAG to evolve.
+> - **❗Swap RAG engines in one line, no migration needed.** Fitz is designed for people who anticipate RAG to evolve.
 > - **Says "I don't know" when the answer isn't there.** No hallucinations, no confident nonsense.
 > - **Local execution possible.** FAISS and Ollama support, no API keys required to start.
 > - **Plugin-based architecture.** Swap LLMs, vector databases, rerankers, and retrieval pipelines via YAML config.
@@ -45,7 +45,7 @@ The codebase speaks for itself.
 #### Fitz opts for a deliberately narrower approach.
 
 LangChain and LlamaIndex are powerful **LLM application frameworks** designed to help developers build complex, end-to-end AI systems. 
-It provides a **minimal, replaceable RAG engine** with strong epistemic guarantees — without locking users into a framework, ecosystem, or long-term architectural commitment.
+Fitz provides a **minimal, replaceable RAG engine** with strong epistemic guarantees — without locking users into a framework, ecosystem, or long-term architectural commitment.
 
 Fitz is not a competitor in scope.  
 It is an infrastructure primitive.
@@ -82,7 +82,7 @@ If the system cannot support an answer with retrieved evidence, it says so.
 
 Every answer in Fitz is fully auditable down to the retrieval step.
 
-#### Scope & complexity 🔭
+#### Scope & complexity 🪐
 
 | Aspect | Fitz | LangChain / LlamaIndex |
 |-----|------|------------------------|
