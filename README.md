@@ -3,7 +3,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.3.6-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.0-green.svg)](CHANGELOG.md)
 
 **Setup RAG in 5 minutes. No infrastructure. No boilerplate.**
 
@@ -104,86 +104,71 @@ No data leaves your machine. No API costs. Same interface.
 
 ---
 
-## Real-World Usage 💼
+## Real-World Usage
 
 Fitz is a foundation. It handles document ingestion and grounded retrieval—you build whatever sits on top: chatbots, dashboards, alerts, or automation.
 
-<details>
-<summary><strong>Chatbot Backend</strong></summary>
+<summary><strong>Chatbot Backend 🤖​</strong></summary>
 
 > Connect fitz to Slack, Discord, Teams, or your own UI. One function call returns an answer with sources—no hallucinations, full provenance. You handle the conversation flow; fitz handles the knowledge.
 >
 > *Example:* A SaaS company plugs fitz into their support bot. Tier-1 questions like "How do I reset my password?" get instant answers. Their support team focuses on edge cases while fitz deflects 60% of incoming tickets.
 
-</details>
-
-<details>
-<summary><strong>Internal Knowledge Base</strong></summary>
+<summary><strong>Internal Knowledge Base 📚</strong></summary>
 
 > Point fitz at your companies wiki, policies, and runbooks. Employees ask natural language questions instead of hunting through folders or pinging colleagues on Slack.
 >
 > *Example:* A 200-person startup ingests their Notion workspace and compliance docs. New hires find answers to "How do I request PTO?" on day one—no more waiting for someone in HR to respond.
 
-</details>
-
-<details>
-<summary><strong>Continuous Intelligence & Alerting</strong></summary>
+<summary><strong>Continuous Intelligence & Alerting 🐶</strong></summary>
 
 > Pair fitz with cron, Airflow, or Lambda. Ingest data on a schedule, run queries automatically, trigger alerts when conditions match. Fitz provides the retrieval primitive; you wire the automation.
 >
 > *Example:* A security team ingests SIEM logs nightly. Every morning, a scheduled job asks "Were there failed logins from unusual locations?" If fitz finds evidence, an alert fires to the on-call channel before anyone checks email.
 
-</details>
-
-<details>
-<summary><strong>Web Knowledge Base</strong></summary>
+<summary><strong>Web Knowledge Base 🌎</strong></summary>
 
 > Scrape the web with Scrapy, BeautifulSoup, or Playwright. Save to disk, ingest with fitz. The web becomes a queryable knowledge base.
 >
 > *Example:* A football analytics hobbyist scrapes Premier League match reports. After ingesting, they ask "How did Arsenal perform against top 6 teams?" or "What tactics did Liverpool use in away games?"—insights that would take hours to compile manually.
 
-</details>
-
-<details>
-<summary><strong>Codebase Search</strong></summary>
+<summary><strong>Codebase Search 🐍</strong></summary>
 
 > Fitz includes built-in AST-aware chunking for Python. Functions, classes, and modules become individual searchable units with docstrings and imports preserved. Ask questions in natural language; get answers pointing to specific code.
 >
 > *Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They ingest the codebase and ask "Where is user authentication handled?" or "What API endpoints modify the billing table?" New developers onboard in days instead of weeks.
-
-</details>
 
 ---
 
 ## Architecture 🏛
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         fitz-ai                             │
-├─────────────────────────────────────────────────────────────┤
-│  CLI Layer                                                  │
-│  quickstart | init | ingest | query | config | doctor       │
-├─────────────────────────────────────────────────────────────┤
-│  Engines                                                    │
-│  ┌─────────────┐  ┌─────────────┐                           │
-│  │ Classic RAG │  │   CLaRa     │  (pluggable)              │
-│  └─────────────┘  └─────────────┘                           │
-├─────────────────────────────────────────────────────────────┤
-│  Plugin System (all YAML-defined)                           │
-│  ┌────────┐ ┌───────────┐ ┌────────┐ ┌─────────┐            │
-│  │  LLM   │ │ Embedding │ │ Rerank │ │VectorDB │            │
-│  └────────┘ └───────────┘ └────────┘ └─────────┘            │
-│  openai, cohere, anthropic, ollama, azure...                │
-├─────────────────────────────────────────────────────────────┤
-│  Retrieval Pipelines (YAML-composed)                        │
-│  dense.yaml | dense_rerank.yaml | custom...                 │
-├─────────────────────────────────────────────────────────────┤
-│  Enrichment (opt-in)                                        │
-│  code artifacts | LLM summaries | custom plugins            │
-├─────────────────────────────────────────────────────────────┤
-│  Constraints (epistemic safety)                             │
-│  ConflictAware | InsufficientEvidence | CausalAttribution   │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                         fitz-ai                               │
+├───────────────────────────────────────────────────────────────┤
+│  CLI Layer                                                    │
+│  quickstart | init | ingest | query | chat | config | doctor  │
+├───────────────────────────────────────────────────────────────┤
+│  Engines                                                      │
+│  ┌───────────────┐  ┌───────────┐                             │
+│  │  Classic RAG  │  │   CLaRa   │  (pluggable)                │
+│  └───────────────┘  └───────────┘                             │
+├───────────────────────────────────────────────────────────────┤
+│  Plugin System (all YAML-defined)                             │
+│  ┌────────┐ ┌───────────┐ ┌────────┐ ┌──────────┐             │
+│  │  LLM   │ │ Embedding │ │ Rerank │ │ VectorDB │             │
+│  └────────┘ └───────────┘ └────────┘ └──────────┘             │
+│  openai, cohere, anthropic, ollama, azure...                  │
+├───────────────────────────────────────────────────────────────┤
+│  Retrieval Pipelines (YAML-composed)                          │
+│  dense.yaml | dense_rerank.yaml | custom...                   │
+├───────────────────────────────────────────────────────────────┤
+│  Enrichment (opt-in)                                          │
+│  code artifacts | LLM summaries | custom plugins              │
+├───────────────────────────────────────────────────────────────┤
+│  Constraints (epistemic safety)                               │
+│  ConflictAware | InsufficientEvidence | CausalAttribution     │
+└───────────────────────────────────────────────────────────────┘
 ```
 ---
 
@@ -193,7 +178,8 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 fitz quickstart [PATH] [QUESTION]    # Zero-config RAG (start here)
 fitz init                            # Interactive setup wizard
 fitz ingest                          # Interactive ingestion
-fitz query                           # Interactive querying of knowledge base
+fitz query                           # Single question with sources
+fitz chat                            # Multi-turn conversation with your knowledge base
 fitz collections                     # List and delete knowledge collections
 fitz config                          # View/edit configuration
 fitz doctor                          # System diagnostics

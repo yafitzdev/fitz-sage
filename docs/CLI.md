@@ -162,6 +162,61 @@ fitz query "What are the main topics in the ingested documents?"
 
 ---
 
+#### `fitz chat`
+Interactive multi-turn conversation with your knowledge base.
+
+**Usage:**
+```bash
+fitz chat                    # Interactive mode (prompts for collection)
+fitz chat -c my_collection   # Specify collection directly
+```
+
+**Options:**
+- `-c, --collection` - Collection to chat with (will prompt if not provided)
+
+**What it does:**
+1. Prompts for collection selection (if not specified)
+2. Starts an interactive chat loop
+3. For each question:
+   - Retrieves relevant chunks from the knowledge base
+   - Sends query + retrieved context + conversation history to LLM
+   - Displays response with sources
+4. Maintains conversation history (last 15 messages)
+5. Exit with `exit`, `quit`, or Ctrl+C
+
+**Examples:**
+```bash
+# Interactive mode
+fitz chat
+
+# Specify collection
+fitz chat -c documentation
+
+# Conversation flow
+You: What is the main architecture?
+            ╭─ Assistant ─────────────────────────╮
+            │ The architecture consists of...     │
+            ╰─────────────────────────────────────╯
+            # Sources table shown here
+
+You: Tell me more about the plugin system
+            ╭─ Assistant ─────────────────────────╮
+            │ Building on the architecture, the   │
+            │ plugin system allows...             │
+            ╰─────────────────────────────────────╯
+
+You: exit
+Chat ended. Goodbye!
+```
+
+**Key features:**
+- **Conversation memory**: Follow-up questions understand context
+- **Per-turn retrieval**: Each question gets fresh relevant chunks
+- **Source transparency**: See which documents informed each response
+- **Graceful exit**: Type `exit`, `quit`, or press Ctrl+C
+
+---
+
 ### Diagnostics
 
 #### `fitz doctor`
@@ -252,11 +307,11 @@ fitz ingest ./my-documents -y
 
 ### 3. Query Your Knowledge
 ```bash
-# Ask questions
+# Single question
 fitz query "What are the main topics?"
 
-# Get streaming responses
-fitz query "Explain the architecture" --stream
+# Multi-turn conversation
+fitz chat
 ```
 
 ### 4. Verify Setup
@@ -392,9 +447,14 @@ fitz doctor --test
 # Ingest documents
 fitz ingest ./project-docs -y
 
-# Query iteratively
+# Single questions
 fitz query "How does X work?"
-fitz query "What about Y?"
+
+# Interactive exploration
+fitz chat
+# > What is the architecture?
+# > Tell me more about the plugin system
+# > How do I add a new provider?
 
 # View configuration
 fitz config
@@ -468,6 +528,7 @@ fitz --help
 fitz init --help
 fitz ingest --help
 fitz query --help
+fitz chat --help
 fitz config --help
 fitz doctor --help
 ```
