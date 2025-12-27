@@ -19,19 +19,6 @@ That's it. Your documents are now searchable with AI.
 
 ---
 
-## About 🧑‍🌾
-
-Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)). ~40k lines of Python. 400+ tests. 
-
-Built from scratch—no LangChain or LlamaIndex under the hood.
-
-![fitz-ai honest_rag](docs/assets/honest_rag.jpg)
-
-
-
-
----
-
 ## Why Fitz? 💡
 
 1. [x] **Point at a folder. Ask a question. Get an answer with sources.**
@@ -57,6 +44,17 @@ fitz quickstart ./fitz_ai "How does the chunking pipeline work?"
 The codebase speaks for itself.
 
 ---
+
+## About 🧑‍🌾
+
+Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)). ~40k lines of Python. 400+ tests. 
+
+Built from scratch—no LangChain or LlamaIndex under the hood.
+
+![fitz-ai honest_rag](docs/assets/honest_rag.jpg)
+
+---
+
 <details>
 
 <summary><strong>📦 Fitz vs LangChain vs LlamaIndex</strong></summary>
@@ -326,6 +324,8 @@ No data leaves your machine. No API costs. Same interface.
 
 <summary><strong>📦 Real-World Usage</strong></summary>
 
+#### 
+
 Fitz is a foundation. It handles document ingestion and grounded retrieval—you build whatever sits on top: chatbots, dashboards, alerts, or automation.
 
 <strong>Chatbot Backend 🤖</strong>
@@ -366,6 +366,8 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 
 <summary><strong>📦 Architecture</strong></summary>
 
+#### 
+
 ```
 ┌───────────────────────────────────────────────────────────────┐
 │                         fitz-ai                               │
@@ -403,6 +405,8 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 
 <summary><strong>📦 CLI Reference</strong></summary>
 
+#### 
+
 ```bash
 fitz quickstart [PATH] [QUESTION]    # Zero-config RAG (start here)
 fitz init                            # Interactive setup wizard
@@ -421,6 +425,8 @@ fitz doctor                          # System diagnostics
 <details>
 
 <summary><strong>📦 Beyond RAG</strong></summary>
+
+#### 
 
 > **RAG is a method. Knowledge access is a strategy.**
 
@@ -449,6 +455,8 @@ The engine is an implementation detail. Your ingested knowledge, your queries, y
 
 <summary><strong>📦 Philosophy</strong></summary>
 
+#### 
+
 **Principles:**
 - **Explicit over clever**: No magic. Read the config, know what happens.
 - **Answers over architecture**: Optimize for time-to-insight, not flexibility.
@@ -459,13 +467,13 @@ The engine is an implementation detail. Your ingested knowledge, your queries, y
 
 ---
 
-## License
+### License
 
 MIT
 
 ---
 
-## Links
+### Links
 
 - [GitHub](https://github.com/yafitzdev/fitz-ai)
 - [PyPI](https://pypi.org/project/fitz-ai/)
