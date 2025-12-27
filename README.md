@@ -382,7 +382,7 @@ That's it. Fitz will prompt you for anything it needs.
 Want to go fully local with Ollama? No problem:
 
 ```bash
-pip install fitz-ai
+pip install fitz-ai[local]
 
 ollama pull llama3.2
 ollama pull nomic-embed-text
