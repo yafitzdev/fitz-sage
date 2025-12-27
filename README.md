@@ -92,15 +92,13 @@ You can—but you'll hit walls fast.
 **Analytical queries that actually work 📊**
 > Standard RAG fails on questions like "What are the trends?"—it retrieves random chunks instead of insights. Fitz's hierarchical RAG generates multi-level summaries during ingestion. Ask for trends, get aggregated analysis. Ask for specifics, get detail chunks. No special syntax required.
 
-
-
-#### Other Features at a Glance
-
-1. [x] **Local execution possible.** FAISS and Ollama support, no API keys required to start.
-2. [x] **Plugin-based architecture.** Swap LLMs, vector databases, rerankers, and retrieval pipelines via YAML config.
-3. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
-4. [x] **Full provenance.** Every answer traces back to the exact chunk and document.
-5. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
+**Other Features at a Glance 🃏**
+>
+>1. [x] **Local execution possible.** FAISS and Ollama support, no API keys required to start.
+>2. [x] **Plugin-based architecture.** Swap LLMs, vector databases, rerankers, and retrieval pipelines via YAML config.
+>3. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
+>4. [x] **Full provenance.** Every answer traces back to the exact chunk and document.
+>5. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
 ####
 Any questions left? Try fitz on itself:
 
