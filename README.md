@@ -23,7 +23,7 @@ That's it. Your documents are now searchable with AI.
 
 1. [x] **Point at a folder. Ask a question. Get an answer with sources.**
 ####
-2. [x] **❗Swap RAG engines in one line, no migration needed.** Fitz is designed for people who anticipate RAG to evolve.
+2. [x] **❗Swap RAG engines in one line, no migration needed.** Fitz is designed for users who anticipate RAG to evolve.
 3. [x] **❗Admits it doesn't know when the answer isn't there.** No hallucinations, no confident nonsense.
 4. [x] **❗Hierarchical RAG for analytical queries.** "What are the trends?" retrieves summaries, not random chunks.
 ####
