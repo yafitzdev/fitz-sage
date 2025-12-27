@@ -295,6 +295,8 @@ Fitz intentionally does less — so it can be trusted more.
 
 <summary><strong>📦 Quick Start</strong></summary>
 
+#### 
+
 ```bash
 pip install fitz-ai
 
