@@ -21,13 +21,17 @@ That's it. Your documents are now searchable with AI.
 
 ---
 
-## What is RAG?
+<details>
+
+<summary><strong>📦 What is RAG?</strong></summary>
+
+<br>
 
 Instead of sending all your documents to an AI, RAG:
 
-1.[X] **Indexes your documents once** — Splits them into chunks, converts to vectors, stores in a database
-2.[X] **Retrieves only what's relevant** — When you ask a question, finds the 5-10 most relevant chunks
-3.[X] **Sends just those chunks to the LLM** — The AI answers based on focused, relevant context
+1. [X] **Indexes your documents once** — Splits them into chunks, converts to vectors, stores in a database
+2. [X] **Retrieves only what's relevant** — When you ask a question, finds the 5-10 most relevant chunks
+3. [X] **Sends just those chunks to the LLM** — The AI answers based on focused, relevant context
 
 Traditional approach:
 ```
@@ -46,41 +50,57 @@ RAG approach:
 
 RAG is how ChatGPT's "file search," Notion AI, and enterprise knowledge tools actually work under the hood.
 
+</details>
+
 ---
 
-## Why Can't I Just Send My Documents to ChatGPT directly?
+<details>
+
+<summary><strong>📦 Why Can't I Just Send My Documents to ChatGPT directly?</strong></summary>
+
+<br>
 
 You can—but you'll hit walls fast.
 
 **Context window limits.** 
 > GPT-4 accepts ~128k tokens. That's roughly 300 pages. Your company wiki, codebase, or document archive is likely 10x-100x larger. You physically cannot paste it all.
 
->**Cost explosion.** Even if you could fit everything, you'd pay for every token on every query. Sending 100k tokens costs ~\$1-3 per question. Ask 50 questions a day? That's $50-150 daily—for one user.
+**Cost explosion.**
+> Even if you could fit everything, you'd pay for every token on every query. Sending 100k tokens costs ~\$1-3 per question. Ask 50 questions a day? That's $50-150 daily—for one user.
 
->**No selective retrieval.** When you paste documents, the model reads everything equally. It can't focus on what's relevant. Ask about refund policies and it's also processing your hiring guidelines, engineering specs, and meeting notes—wasting context and degrading answers.
+**No selective retrieval.**
+> When you paste documents, the model reads everything equally. It can't focus on what's relevant. Ask about refund policies and it's also processing your hiring guidelines, engineering specs, and meeting notes—wasting context and degrading answers.
 
->**No persistence.** Every conversation starts fresh. You re-upload, re-paste, re-explain. There's no knowledge base that accumulates and improves.
+**No persistence.**
+> Every conversation starts fresh. You re-upload, re-paste, re-explain. There's no knowledge base that accumulates and improves.
 
----
-
-## Why Fitz?
-
->**Honest answers.** Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."*
-
->**Swap engines, keep everything else.** RAG is evolving fast—GraphRAG, HyDE, ColBERT, whatever's next. Fitz lets you switch engines in one line. Your ingested data stays. Your queries stay. No migration, no re-ingestion, no new API to learn. Frameworks lock you in; Fitz lets you move.
-
->**Analytical queries that actually work.** Standard RAG fails on questions like "What are the trends?"—it retrieves random chunks instead of insights. Fitz's hierarchical RAG generates multi-level summaries during ingestion. Ask for trends, get aggregated analysis. Ask for specifics, get detail chunks. No special syntax required.
+</details>
 
 ---
 
-## Other Features at a Glance
+### Why Fitz?
 
-1. [x] **Point at a folder. Ask a question. Get an answer with sources.**
-5. [x] **Local execution possible.** FAISS and Ollama support, no API keys required to start.
-6. [x] **Plugin-based architecture.** Swap LLMs, vector databases, rerankers, and retrieval pipelines via YAML config.
-7. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
-8. [x] **Full provenance.** Every answer traces back to the exact chunk and document.
-9. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
+**Super fast setup.**
+> Point at a folder. Ask a question. Get an answer with sources. Everything else is handled by Fitz.
+
+**Honest answers.**
+> Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."*
+
+**Swap engines, keep everything else.**
+> RAG is evolving fast—GraphRAG, HyDE, ColBERT, whatever's next. Fitz lets you switch engines in one line. Your ingested data stays. Your queries stay. No migration, no re-ingestion, no new API to learn. Frameworks lock you in; Fitz lets you move.
+
+**Analytical queries that actually work.**
+> Standard RAG fails on questions like "What are the trends?"—it retrieves random chunks instead of insights. Fitz's hierarchical RAG generates multi-level summaries during ingestion. Ask for trends, get aggregated analysis. Ask for specifics, get detail chunks. No special syntax required.
+
+
+
+#### Other Features at a Glance
+
+1. [x] **Local execution possible.** FAISS and Ollama support, no API keys required to start.
+2. [x] **Plugin-based architecture.** Swap LLMs, vector databases, rerankers, and retrieval pipelines via YAML config.
+3. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
+4. [x] **Full provenance.** Every answer traces back to the exact chunk and document.
+5. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
 ####
 Any questions left? Try fitz on itself:
 
@@ -92,7 +112,7 @@ The codebase speaks for itself.
 
 ---
 
-## About 🧑‍🌾
+### About 🧑‍🌾
 
 Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)). ~40k lines of Python. 400+ tests. 
 
@@ -166,21 +186,15 @@ Built from scratch—no LangChain or LlamaIndex under the hood.
 >
 >Fitz intentionally does less — so it can be trusted more.
 
-</details>
-
----
-
-<details>
-
-<summary><strong>📦 When Fitz is the right choice</strong></summary>
+<br>
 
 #### Use Fitz if you want:
-
-- A replaceable RAG engine, not a framework marriage
-- Strong epistemic guarantees (“I don’t know” is valid output)
-- Full provenance for every answer
-- A transparent, extensible plugin architecture
-- A future-proof ingestion pipeline that survives engine changes
+>
+>- A replaceable RAG engine, not a framework marriage
+>- Strong epistemic guarantees (“I don’t know” is valid output)
+>- Full provenance for every answer
+>- A transparent, extensible plugin architecture
+>- A future-proof ingestion pipeline that survives engine changes
 
 </details>
 
