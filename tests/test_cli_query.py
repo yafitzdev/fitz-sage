@@ -1,0 +1,163 @@
+# tests/test_cli_query.py
+"""
+Tests for the query command.
+"""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+from typer.testing import CliRunner
+
+from fitz_ai.cli.cli import app
+
+runner = CliRunner()
+
+
+class TestQueryCommand:
+    """Tests for fitz query command."""
+
+    def test_query_shows_help(self):
+        """Test that query --help works."""
+        result = runner.invoke(app, ["query", "--help"])
+
+        assert result.exit_code == 0
+        assert "Query your knowledge base" in result.output or "query" in result.output.lower()
+
+    def test_query_requires_config(self, tmp_path, monkeypatch):
+        """Test that query requires a config file."""
+        # Set workspace to temp dir without config
+        monkeypatch.setattr(
+            "fitz_ai.cli.commands.query.FitzPaths.config",
+            lambda: tmp_path / "nonexistent" / "fitz.yaml",
+        )
+
+        result = runner.invoke(app, ["query", "test question"])
+
+        assert result.exit_code != 0
+        assert "init" in result.output.lower() or "config" in result.output.lower()
+
+
+class TestQueryHelpers:
+    """Tests for query helper functions."""
+
+    def test_load_config_safe_returns_config(self, tmp_path):
+        """Test _load_config_safe loads valid config."""
+        import yaml
+
+        config_path = tmp_path / "fitz.yaml"
+        config = {
+            "chat": {"plugin_name": "cohere"},
+            "embedding": {"plugin_name": "cohere"},
+            "vector_db": {"plugin_name": "local_faiss"},
+            "retrieval": {"plugin_name": "dense", "collection": "test"},
+        }
+        config_path.write_text(yaml.dump(config))
+
+        with patch(
+            "fitz_ai.cli.commands.query.FitzPaths.config",
+            return_value=config_path,
+        ):
+            from fitz_ai.cli.commands.query import _load_config_safe
+
+            raw, typed = _load_config_safe()
+
+        assert raw["chat"]["plugin_name"] == "cohere"
+        assert typed.retrieval.collection == "test"
+
+    def test_get_collections_returns_list(self):
+        """Test _get_collections returns collection list."""
+        mock_vdb = MagicMock()
+        mock_vdb.list_collections.return_value = ["coll_a", "coll_b"]
+
+        with patch(
+            "fitz_ai.cli.commands.query.get_vector_db_plugin",
+            return_value=mock_vdb,
+        ):
+            from fitz_ai.cli.commands.query import _get_collections
+
+            collections = _get_collections({"vector_db": {"plugin_name": "local_faiss"}})
+
+        assert collections == ["coll_a", "coll_b"]
+
+    def test_get_collections_handles_error(self):
+        """Test _get_collections returns empty list on error."""
+        with patch(
+            "fitz_ai.cli.commands.query.get_vector_db_plugin",
+            side_effect=Exception("connection failed"),
+        ):
+            from fitz_ai.cli.commands.query import _get_collections
+
+            collections = _get_collections({})
+
+        assert collections == []
+
+
+class TestQueryExecution:
+    """Tests for query execution with mocked pipeline."""
+
+    def test_query_direct_mode(self, tmp_path):
+        """Test query with direct question argument."""
+        import yaml
+
+        config_path = tmp_path / "fitz.yaml"
+        config = {
+            "chat": {"plugin_name": "cohere", "kwargs": {"model": "command"}},
+            "embedding": {"plugin_name": "cohere", "kwargs": {"model": "embed-english-v3.0"}},
+            "vector_db": {"plugin_name": "local_faiss", "kwargs": {}},
+            "retrieval": {"plugin_name": "dense", "collection": "test", "top_k": 5},
+            "rerank": {"enabled": False},
+        }
+        config_path.write_text(yaml.dump(config))
+
+        mock_answer = MagicMock()
+        mock_answer.text = "This is the answer"
+        mock_answer.chunks = []
+
+        mock_pipeline = MagicMock()
+        mock_pipeline.run.return_value = mock_answer
+
+        with (
+            patch("fitz_ai.cli.commands.query.FitzPaths.config", return_value=config_path),
+            patch("fitz_ai.cli.commands.query.RAGPipeline.from_config", return_value=mock_pipeline),
+            patch("fitz_ai.cli.commands.query._get_collections", return_value=["test"]),
+        ):
+            result = runner.invoke(app, ["query", "What is RAG?"])
+
+        # Should call pipeline with the question
+        mock_pipeline.run.assert_called_once()
+
+
+class TestQueryOptions:
+    """Tests for query command options."""
+
+    def test_query_with_collection_option(self, tmp_path):
+        """Test query with --collection option."""
+        import yaml
+
+        config_path = tmp_path / "fitz.yaml"
+        config = {
+            "chat": {"plugin_name": "cohere"},
+            "embedding": {"plugin_name": "cohere"},
+            "vector_db": {"plugin_name": "local_faiss"},
+            "retrieval": {"plugin_name": "dense", "collection": "default"},
+        }
+        config_path.write_text(yaml.dump(config))
+
+        mock_answer = MagicMock()
+        mock_answer.text = "Answer"
+        mock_answer.chunks = []
+
+        mock_pipeline = MagicMock()
+        mock_pipeline.run.return_value = mock_answer
+
+        with (
+            patch("fitz_ai.cli.commands.query.FitzPaths.config", return_value=config_path),
+            patch("fitz_ai.cli.commands.query.RAGPipeline.from_config", return_value=mock_pipeline),
+            patch("fitz_ai.cli.commands.query._get_collections", return_value=["custom"]),
+        ):
+            result = runner.invoke(app, ["query", "question", "-c", "custom"])
+
+        # Pipeline should be created (we can't easily verify the collection was set)
+        assert mock_pipeline.run.called
