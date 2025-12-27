@@ -22,6 +22,18 @@ That's it. Your documents are now searchable with AI.
 
 ---
 
+### About 🧑‍🌾
+
+  Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)).
+
+  - ~40k lines of Python
+  - 600+ tests, 100% coverage
+  - Zero LangChain/LlamaIndex dependencies — built from scratch
+
+![fitz-ai honest_rag](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/honest_rag.jpg)
+
+---
+
 <details>
 
 <summary><strong>📦 What is RAG?</strong></summary>
@@ -76,18 +88,6 @@ You can—but you'll hit walls fast.
 > Every conversation starts fresh. You re-upload, re-paste, re-explain. There's no knowledge base that accumulates and improves.
 
 </details>
-
----
-
-### About 🧑‍🌾
-
-  Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)).
-
-  - ~40k lines of Python
-  - 600+ tests, 100% coverage
-  - Zero LangChain/LlamaIndex dependencies — built from scratch
-
-![fitz-ai honest_rag](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/honest_rag.jpg)
 
 ---
 
