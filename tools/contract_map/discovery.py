@@ -220,28 +220,14 @@ def scan_all_discoveries() -> List[DiscoveryReport]:
 def render_discovery_section(reports: List[DiscoveryReport]) -> str:
     """Render the Discovery Report section."""
     lines = ["## Discovery Report"]
-
     for r in reports:
         lines.append(f"### `{r.namespace}`")
         if r.note:
             lines.append(f"- {r.note}")
         lines.append(f"- modules_scanned: `{r.modules_scanned}`")
-
-        if r.plugins_found:
-            lines.append("- plugins:")
-            for p in r.plugins_found:
-                lines.append(f"  - `{p}`")
-
-        if r.failures:
-            lines.append("- failures:")
-            for f in r.failures:
-                lines.append(f"  - `{f}`")
-
-        if r.duplicates:
-            lines.append("- duplicates:")
-            for d in r.duplicates:
-                lines.append(f"  - `{d}`")
-
+        for label, items in [("plugins", r.plugins_found), ("failures", r.failures), ("duplicates", r.duplicates)]:
+            if items:
+                lines.append(f"- {label}:")
+                lines.extend(f"  - `{item}`" for item in items)
         lines.append("")
-
     return "\n".join(lines)

@@ -276,14 +276,12 @@ def compute_invariants(cm: ContractMap) -> List[str]:
 
 def render_entrypoints_section(entrypoints: List[Entrypoint]) -> str:
     """Render the Entrypoints section."""
-    lines = ["## Entrypoints"]
-    if not entrypoints:
-        lines.append("- (none detected)")
-    else:
-        for ep in entrypoints:
-            lines.append(f"- `{ep.kind}`: `{ep.name}` -> `{ep.target}`")
-    lines.append("")
-    return "\n".join(lines)
+    from tools.contract_map.common import render_section
+    return render_section(
+        "Entrypoints", entrypoints,
+        fmt=lambda ep: f"- `{ep.kind}`: `{ep.name}` -> `{ep.target}`",
+        empty="- (none detected)",
+    )
 
 
 def render_hotspots_section(hotspots: List[Hotspot]) -> str:
@@ -291,74 +289,55 @@ def render_hotspots_section(hotspots: List[Hotspot]) -> str:
     lines = ["## Contract Hotspots"]
     for h in hotspots:
         lines.append(f"### `{h.interface}`")
+        impls = [f"  - `{i}`" for i in h.implementations] or ["  - (none)"]
         lines.append("- implementations:")
-        if h.implementations:
-            for i in h.implementations:
-                lines.append(f"  - `{i}`")
-        else:
-            lines.append("  - (none)")
+        lines.extend(impls)
+        consumers = [f"  - `{c}`" for c in h.consumers] or ["  - (none)"]
         lines.append("- consumers:")
-        if h.consumers:
-            for c in h.consumers:
-                lines.append(f"  - `{c}`")
-        else:
-            lines.append("  - (none)")
+        lines.extend(consumers)
         lines.append("")
     return "\n".join(lines)
 
 
 def render_config_surface_section(cs: ConfigSurface | None) -> str:
     """Render the Config Surface section."""
-    lines = ["## Config Surface"]
     if not cs:
-        lines.append("- (not computed)")
-        lines.append("")
-        return "\n".join(lines)
+        return "## Config Surface\n- (not computed)\n"
 
-    lines.append("- config models:")
-    for m in cs.config_models:
-        lines.append(f"  - `{m}`")
-    lines.append("- default yamls:")
-    for y in cs.default_yamls:
-        lines.append(f"  - `{y}`")
-    lines.append("- loaders:")
-    for loader in cs.loaders:
-        lines.append(f"  - `{loader}`")
-    lines.append("- load callsites:")
-    for c in cs.load_callsites:
-        lines.append(f"  - `{c}`")
+    lines = ["## Config Surface"]
+    for label, items in [
+        ("config models", cs.config_models),
+        ("default yamls", cs.default_yamls),
+        ("loaders", cs.loaders),
+        ("load callsites", cs.load_callsites),
+    ]:
+        lines.append(f"- {label}:")
+        lines.extend(f"  - `{item}`" for item in items)
     lines.append("")
     return "\n".join(lines)
 
 
 def render_invariants_section(invariants: List[str]) -> str:
     """Render the Runtime Invariants section."""
-    lines = ["## Runtime Invariants"]
-    if invariants:
-        for inv in invariants:
-            lines.append(f"- {inv}")
-    else:
-        lines.append("- (none)")
-    lines.append("")
-    return "\n".join(lines)
+    from tools.contract_map.common import render_section
+    return render_section("Runtime Invariants", invariants, fmt=lambda x: f"- {x}")
 
 
 def render_stats_section(stats: CodeStats | None) -> str:
     """Render the Code Stats section."""
-    lines = ["## Code Stats"]
     if not stats:
-        lines.append("- (not computed)")
-        lines.append("")
-        return "\n".join(lines)
+        return "## Code Stats\n- (not computed)\n"
 
-    lines.append(f"- python_files: `{stats.py_files}`")
-    lines.append(f"- total_lines: `{stats.total_lines}`")
-    lines.append(f"- TODO/FIXME lines: `{stats.todo_fixme}`")
-    lines.append(f"- 'Any' mentions: `{stats.any_mentions}`")
-    lines.append("- largest modules:")
-    for m in stats.largest_modules:
-        lines.append(f"  - {m}")
-    lines.append("")
+    lines = [
+        "## Code Stats",
+        f"- python_files: `{stats.py_files}`",
+        f"- total_lines: `{stats.total_lines}`",
+        f"- TODO/FIXME lines: `{stats.todo_fixme}`",
+        f"- 'Any' mentions: `{stats.any_mentions}`",
+        "- largest modules:",
+        *[f"  - {m}" for m in stats.largest_modules],
+        "",
+    ]
     return "\n".join(lines)
 
 

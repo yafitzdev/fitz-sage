@@ -226,6 +226,46 @@ class ContractMap:
 
 
 # ============================================================================
+# Rendering Utilities
+# ============================================================================
+
+
+def render_section(
+    title: str,
+    items: Iterable[Any],
+    *,
+    fmt: callable = lambda x: f"- `{x}`",
+    empty: str = "- (none)",
+    level: int = 2,
+) -> str:
+    """
+    Generic section renderer.
+
+    Args:
+        title: Section title (without ## prefix)
+        items: Items to render
+        fmt: Formatter function for each item
+        empty: Text to show if no items
+        level: Heading level (2 = ##, 3 = ###)
+    """
+    prefix = "#" * level
+    lines = [f"{prefix} {title}"]
+    items_list = list(items)
+    if items_list:
+        lines.extend(fmt(item) for item in items_list)
+    else:
+        lines.append(empty)
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_list(items: Iterable[str], *, indent: int = 0) -> List[str]:
+    """Render a list of items as markdown bullet points."""
+    prefix = "  " * indent
+    return [f"{prefix}- `{item}`" for item in items]
+
+
+# ============================================================================
 # Utility Functions
 # ============================================================================
 

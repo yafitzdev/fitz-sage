@@ -6,11 +6,17 @@ Combines all sections into a comprehensive report.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Ensure repo root is in path for direct execution
+_repo_root = Path(__file__).resolve().parents[2]
+if str(_repo_root) not in sys.path:
+    sys.path.insert(0, str(_repo_root))
+
 import argparse
 import json
-import sys
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from typing import Dict, List
 
 from tools.contract_map.analysis import (
@@ -233,38 +239,27 @@ def build_contract_map(*, verbose: bool, layout_depth: int | None) -> ContractMa
 
 def render_meta_section(cm: ContractMap) -> str:
     """Render the Meta section."""
-    lines = ["## Meta"]
-    for k in sorted(cm.meta.keys()):
-        lines.append(f"- `{k}`: `{cm.meta[k]}`")
-    lines.append("")
-    return "\n".join(lines)
+    from tools.contract_map.common import render_section
+    return render_section("Meta", sorted(cm.meta.items()), fmt=lambda kv: f"- `{kv[0]}`: `{kv[1]}`")
 
 
 def render_health_section(cm: ContractMap) -> str:
     """Render the Health section."""
     if not cm.health:
         return ""
-
-    lines = ["## Health"]
-    for h in cm.health:
-        lines.append(f"- **{h.level}**: {h.message}")
-    lines.append("")
-    return "\n".join(lines)
+    from tools.contract_map.common import render_section
+    return render_section("Health", cm.health, fmt=lambda h: f"- **{h.level}**: {h.message}")
 
 
 def render_import_failures_section(cm: ContractMap, *, verbose: bool) -> str:
     """Render the Import Failures section."""
     if not cm.import_failures:
         return ""
-
     lines = ["## Import Failures"]
     for f in cm.import_failures:
         lines.append(f"- `{f.module}`: {f.error}")
         if verbose and f.traceback:
-            lines.append("")
-            lines.append("```")
-            lines.append(f.traceback.rstrip())
-            lines.append("```")
+            lines.extend(["", "```", f.traceback.rstrip(), "```"])
     lines.append("")
     return "\n".join(lines)
 
@@ -452,13 +447,16 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
+    # Ensure UTF-8 output on Windows
+    if sys.stdout.encoding != "utf-8":
+        sys.stdout.reconfigure(encoding="utf-8")
+
     print("Building contract map...", file=sys.stderr)
     cm = build_contract_map(verbose=args.verbose, layout_depth=args.layout_depth)
 
     print("Rendering output...", file=sys.stderr)
     text = render_markdown(cm, verbose=args.verbose, layout_depth=args.layout_depth)
 
-    # Always print to stdout (original behavior)
     print(text)
 
     return 0
