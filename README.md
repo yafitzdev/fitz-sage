@@ -130,79 +130,160 @@ Fitz intentionally does less — so it can be trusted more.
 
 #### Actually admits when it doesn't know 📚
 
-When documents don't contain the answer, fitz says so:
+> When documents don't contain the answer, fitz says so:
+>
+> ```
+> Q: "What was our Q4 revenue?"
+> A: "I cannot find Q4 revenue figures in the provided documents.
+>     The available financial data covers Q1-Q3 only."
+>
+>    Mode: ABSTAIN
+>```
+>
+>Three constraint plugins run automatically:
+>- **📕 ConflictAwareConstraint**: Detects contradictions across sources
+>- **📗 InsufficientEvidenceConstraint**: Blocks answers without evidence
+>- **📘 CausalAttributionConstraint**: Prevents hallucinated cause-effect claims
 
-```
-Q: "What was our Q4 revenue?"
-A: "I cannot find Q4 revenue figures in the provided documents.
-    The available financial data covers Q1-Q3 only."
 
-    Mode: ABSTAIN
-```
-
-Three constraint plugins run automatically:
-- **📕 ConflictAwareConstraint**: Detects contradictions across sources
-- **📗 InsufficientEvidenceConstraint**: Blocks answers without evidence
-- **📘 CausalAttributionConstraint**: Prevents hallucinated cause-effect claims
 
 #### Full Provenance 🗂️
 
-Every answer traces back to its source:
+>Every answer traces back to its source:
+>
+>```
+>Answer: The refund policy allows returns within 30 days...
+>
+>Sources:
+>  [1] policies/refund.md [chunk 3] (score: 0.92)
+>  [2] faq/payments.md [chunk 1] (score: 0.87)
+>```
 
-```
-Answer: The refund policy allows returns within 30 days...
 
-Sources:
-  [1] policies/refund.md [chunk 3] (score: 0.92)
-  [2] faq/payments.md [chunk 1] (score: 0.87)
-```
+
+#### Incremental Ingestion ⚡
+
+>Fitz tracks file hashes and only re-ingests what changed:
+>
+>```
+>$ fitz ingest ./src
+>
+>Scanning... 847 files
+>  → 12 new files
+>  → 3 modified files
+>  → 832 unchanged (skipped)
+>
+>Ingesting 15 files...
+>```
+>
+>Re-running ingestion on a large codebase takes seconds, not minutes. Changed your chunking config? Fitz detects that too and re-processes affected files.
+
+
+
+#### Smart Chunking 🧠
+
+>Format-aware chunking that preserves structure:
+>
+>| Format | Strategy |
+>|--------|----------|
+>| **Python** | AST-aware: keeps classes, functions, imports intact. Large classes split by method. |
+>| **Markdown** | Header-aware: splits on `#` headers, preserves code blocks and lists. Extracts YAML frontmatter as metadata. |
+>| **PDF** | Section-aware: detects numbered headings (1.1, 2.3.1), roman numerals, and keywords (Abstract, Conclusion). |
+>
+>No more retrieving half a function or a code block split mid-syntax.
+
+---
 
 #### Swappable RAG Engines 🔄
 
-Your data stays. Your queries stay. Only the engine changes.
+>Your data stays. Your queries stay. Only the engine changes.
+>
+>```
+>        ┌─────────────────────────────────────┐
+>        │           Your Query                │
+>        │   "What are the payment terms?"     │
+>        └──────────────────┬──────────────────┘
+>                           │
+>                           ▼
+>        ┌─────────────────────────────────────┐
+>        │       engine="..."                  │
+>        │  ┌─────────┐ ┌───────┐ ┌─────────┐  │
+>        │  │ classic │ │ clara │ │ graph   │  │
+>        │  │  _rag   │ │       │ │  _rag   │  │
+>        │  └────┬────┘ └───┬───┘ └────┬────┘  │
+>        │       └──────────┼──────────┘       │
+>        └──────────────────┼──────────────────┘
+>                           │
+>                           ▼
+>        ┌─────────────────────────────────────┐
+>        │       Your Ingested Knowledge       │
+>        │      (unchanged across engines)     │
+>        └─────────────────────────────────────┘
+>```
+>
+>```python
+>answer = run("What are the payment terms?", engine="classic_rag")
+>answer = run("What are the payment terms?", engine="clara")
+>answer = run("What are the payment terms?", engine="graph_rag")  # future
+>```
+>
+>No migration. No re-ingestion. No new API to learn.
 
-```
-        ┌─────────────────────────────────────┐
-        │           Your Query                │
-        │   "What are the payment terms?"     │
-        └──────────────────┬──────────────────┘
-                           │
-                           ▼
-        ┌─────────────────────────────────────┐
-        │       engine="..."                  │
-        │  ┌─────────┐ ┌───────┐ ┌─────────┐  │
-        │  │ classic │ │ clara │ │ graph   │  │
-        │  │  _rag   │ │       │ │  _rag   │  │
-        │  └────┬────┘ └───┬───┘ └────┬────┘  │
-        │       └──────────┼──────────┘       │
-        └──────────────────┼──────────────────┘
-                           │
-                           ▼
-        ┌─────────────────────────────────────┐
-        │       Your Ingested Knowledge       │
-        │      (unchanged across engines)     │
-        └─────────────────────────────────────┘
-```
 
-```python
-answer = run("What are the payment terms?", engine="classic_rag")
-answer = run("What are the payment terms?", engine="clara")
-answer = run("What are the payment terms?", engine="graph_rag")  # future
-```
-
-No migration. No re-ingestion. No new API to learn.
 
 #### Enrichment ✨
 
-Opt-in enrichment plugins enhance your knowledge base:
+>Opt-in enrichment plugins enhance your knowledge base:
+>
+>- **Code-derived artifacts**: Navigation indexes, interface catalogs, dependency graphs—extracted directly from your codebase via AST analysis. No LLM required.
+>- **LLM-generated summaries**: Natural language descriptions for chunks, making code more discoverable via semantic search.
+>
+>Your question matches enriched context, not just raw text. Fully extensible—add your own enrichment plugins.
 
-- **Code-derived artifacts**: Navigation indexes, interface catalogs, dependency graphs—extracted directly from your codebase via AST analysis. No LLM required.
-- **LLM-generated summaries**: Natural language descriptions for chunks, making code more discoverable via semantic search.
 
-Your question matches enriched context, not just raw text. Fully extensible—add your own enrichment plugins.
+
+#### Hierarchical RAG 📊
+
+>Standard RAG struggles with analytical queries like "What are the trends?" because it retrieves random chunks instead of aggregated insights. Hierarchical RAG solves this.
+>
+>**The problem:**
+>```
+>Q: "What are the trends in my comments?"
+>Standard RAG: Returns random individual comments (not useful)
+>```
+>
+>**The solution:**
+>```yaml
+># .fitz/config.yaml
+>enrichment:
+>  hierarchy:
+>    enabled: true
+>    rules:
+>      - name: video_comments
+>        paths: ["comments/**"]
+>        group_by: video_id
+>        prompt: "Summarize sentiment and themes"
+>```
+>
+>Fitz generates multi-level summaries during ingestion:
+>- **Level 0**: Corpus summary ("Across all videos: 78% positive, top themes are...")
+>- **Level 1**: Group summaries ("Video ABC: mostly questions about pricing...")
+>- **Level 2**: Original chunks (unchanged)
+>
+>Now analytical queries retrieve summaries, while specific queries still retrieve details:
+>
+>```
+>Q: "What are the trends in my comments?"
+>→ Returns corpus + group summaries (aggregated insights)
+>
+>Q: "What did people say about my hair?"
+>→ Returns specific comments mentioning hair (detail chunks)
+>```
+>
+>No special query syntax. No retrieval config changes. Summaries match analytical queries naturally via vector similarity.
 </details>
 
----
+
 
 ## Quick Start 🚀
 
@@ -289,7 +370,7 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 │  dense.yaml | dense_rerank.yaml | custom...                   │
 ├───────────────────────────────────────────────────────────────┤
 │  Enrichment (opt-in)                                          │
-│  code artifacts | LLM summaries | custom plugins              │
+│  code artifacts | LLM summaries | hierarchical RAG | custom   │
 ├───────────────────────────────────────────────────────────────┤
 │  Constraints (epistemic safety)                               │
 │  ConflictAware | InsufficientEvidence | CausalAttribution     │
