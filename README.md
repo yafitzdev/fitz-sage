@@ -5,7 +5,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.4.1-green.svg)](CHANGELOG.md)
 
-**Honest RAG in 5 minutes. Says "I don't know" when it should. No infrastructure. No boilerplate.**
+---
+
+**Honest RAG in 5 minutes. No infrastructure. No boilerplate.**
 
 ```bash
 pip install fitz-ai
@@ -19,14 +21,61 @@ That's it. Your documents are now searchable with AI.
 
 ---
 
-## Why Fitz? 💡
+## What is RAG?
+
+Instead of sending all your documents to an AI, RAG:
+
+1.[X] **Indexes your documents once** — Splits them into chunks, converts to vectors, stores in a database
+2.[X] **Retrieves only what's relevant** — When you ask a question, finds the 5-10 most relevant chunks
+3.[X] **Sends just those chunks to the LLM** — The AI answers based on focused, relevant context
+
+Traditional approach:
+```
+  [All 10,000 documents] → LLM → Answer
+  ❌ Impossible (too large)
+  ❌ Expensive (if possible)
+  ❌ Unfocused
+```
+RAG approach:
+```
+  Question → [Search index] → [5 relevant chunks] → LLM → Answer
+  ✅ Works at any scale
+  ✅ Costs pennies per query
+  ✅ Focused context = better answers
+```
+
+RAG is how ChatGPT's "file search," Notion AI, and enterprise knowledge tools actually work under the hood.
+
+---
+
+## Why Can't I Just Send My Documents to ChatGPT directly?
+
+You can—but you'll hit walls fast.
+
+**Context window limits.** 
+> GPT-4 accepts ~128k tokens. That's roughly 300 pages. Your company wiki, codebase, or document archive is likely 10x-100x larger. You physically cannot paste it all.
+
+>**Cost explosion.** Even if you could fit everything, you'd pay for every token on every query. Sending 100k tokens costs ~\$1-3 per question. Ask 50 questions a day? That's $50-150 daily—for one user.
+
+>**No selective retrieval.** When you paste documents, the model reads everything equally. It can't focus on what's relevant. Ask about refund policies and it's also processing your hiring guidelines, engineering specs, and meeting notes—wasting context and degrading answers.
+
+>**No persistence.** Every conversation starts fresh. You re-upload, re-paste, re-explain. There's no knowledge base that accumulates and improves.
+
+---
+
+## Why Fitz?
+
+>**Honest answers.** Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."*
+
+>**Swap engines, keep everything else.** RAG is evolving fast—GraphRAG, HyDE, ColBERT, whatever's next. Fitz lets you switch engines in one line. Your ingested data stays. Your queries stay. No migration, no re-ingestion, no new API to learn. Frameworks lock you in; Fitz lets you move.
+
+>**Analytical queries that actually work.** Standard RAG fails on questions like "What are the trends?"—it retrieves random chunks instead of insights. Fitz's hierarchical RAG generates multi-level summaries during ingestion. Ask for trends, get aggregated analysis. Ask for specifics, get detail chunks. No special syntax required.
+
+---
+
+## Other Features at a Glance
 
 1. [x] **Point at a folder. Ask a question. Get an answer with sources.**
-####
-2. [x] **❗Swap RAG engines in one line, no migration needed.** Fitz is designed for users who anticipate RAG to evolve.
-3. [x] **❗Admits it doesn't know when the answer isn't there.** No hallucinations, no confident nonsense.
-4. [x] **❗Hierarchical RAG for analytical queries.** "What are the trends?" retrieves summaries, not random chunks.
-####
 5. [x] **Local execution possible.** FAISS and Ollama support, no API keys required to start.
 6. [x] **Plugin-based architecture.** Swap LLMs, vector databases, rerankers, and retrieval pipelines via YAML config.
 7. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
