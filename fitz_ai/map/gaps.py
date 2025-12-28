@@ -55,9 +55,7 @@ def detect_gaps(
     id_to_idx = {cid: i for i, cid in enumerate(chunk_id_order)}
 
     # 1. Detect cluster outliers (far from centroid)
-    centroid_lookup = {
-        ci.cluster_id: (ci.centroid_x, ci.centroid_y) for ci in cluster_info
-    }
+    centroid_lookup = {ci.cluster_id: (ci.centroid_x, ci.centroid_y) for ci in cluster_info}
 
     outlier_ids, outlier_coords = _detect_cluster_outliers(
         chunks, coordinates, chunk_id_order, centroid_lookup, isolation_percentile
@@ -69,12 +67,8 @@ def detect_gaps(
             GapInfo(
                 gap_id=gap_id,
                 description="Chunks far from cluster centers (potential outliers)",
-                x=float(np.mean([c[0] for c in outlier_coords]))
-                if outlier_coords
-                else 0,
-                y=float(np.mean([c[1] for c in outlier_coords]))
-                if outlier_coords
-                else 0,
+                x=float(np.mean([c[0] for c in outlier_coords])) if outlier_coords else 0,
+                y=float(np.mean([c[1] for c in outlier_coords])) if outlier_coords else 0,
                 severity="medium",
                 isolated_chunk_ids=list(outlier_ids),
             )
@@ -93,12 +87,8 @@ def detect_gaps(
             GapInfo(
                 gap_id=gap_id,
                 description="Isolated chunks with few neighbors",
-                x=float(
-                    np.mean([coordinates[id_to_idx[cid], 0] for cid in new_isolated])
-                ),
-                y=float(
-                    np.mean([coordinates[id_to_idx[cid], 1] for cid in new_isolated])
-                ),
+                x=float(np.mean([coordinates[id_to_idx[cid], 0] for cid in new_isolated])),
+                y=float(np.mean([coordinates[id_to_idx[cid], 1] for cid in new_isolated])),
                 severity="high",
                 isolated_chunk_ids=list(new_isolated),
             )
@@ -106,9 +96,7 @@ def detect_gaps(
         gap_id += 1
 
     # 3. Detect small clusters
-    small_cluster_ids = _detect_small_clusters(
-        chunks, cluster_info, small_cluster_threshold
-    )
+    small_cluster_ids = _detect_small_clusters(chunks, cluster_info, small_cluster_threshold)
     new_small = small_cluster_ids - gap_chunk_ids
     gap_chunk_ids.update(new_small)
 
@@ -119,20 +107,12 @@ def detect_gaps(
                 description="Sparse coverage areas (small clusters)",
                 x=float(
                     np.mean(
-                        [
-                            coordinates[id_to_idx[cid], 0]
-                            for cid in new_small
-                            if cid in id_to_idx
-                        ]
+                        [coordinates[id_to_idx[cid], 0] for cid in new_small if cid in id_to_idx]
                     )
                 ),
                 y=float(
                     np.mean(
-                        [
-                            coordinates[id_to_idx[cid], 1]
-                            for cid in new_small
-                            if cid in id_to_idx
-                        ]
+                        [coordinates[id_to_idx[cid], 1] for cid in new_small if cid in id_to_idx]
                     )
                 ),
                 severity="low",
@@ -141,9 +121,7 @@ def detect_gaps(
         )
         gap_id += 1
 
-    logger.info(
-        f"Detected {len(gaps)} gap regions with {len(gap_chunk_ids)} affected chunks"
-    )
+    logger.info(f"Detected {len(gaps)} gap regions with {len(gap_chunk_ids)} affected chunks")
     return gaps, gap_chunk_ids
 
 
@@ -232,17 +210,13 @@ def _detect_small_clusters(
     threshold: int,
 ) -> Set[str]:
     """Find chunks in clusters smaller than threshold."""
-    small_cluster_ids = {
-        ci.cluster_id for ci in cluster_info if ci.chunk_count < threshold
-    }
+    small_cluster_ids = {ci.cluster_id for ci in cluster_info if ci.chunk_count < threshold}
 
     if not small_cluster_ids:
         return set()
 
     return {
-        c.chunk_id
-        for c in chunks
-        if c.cluster_id is not None and c.cluster_id in small_cluster_ids
+        c.chunk_id for c in chunks if c.cluster_id is not None and c.cluster_id in small_cluster_ids
     }
 
 

@@ -47,8 +47,7 @@ def _load_schema(plugin_type: str) -> Dict[str, Any]:
     """Load and cache a schema file."""
     if plugin_type not in SCHEMA_FILES:
         raise ValueError(
-            f"Unknown plugin type: {plugin_type!r}. "
-            f"Must be one of: {sorted(SCHEMA_FILES.keys())}"
+            f"Unknown plugin type: {plugin_type!r}. Must be one of: {sorted(SCHEMA_FILES.keys())}"
         )
 
     schema_path = SCHEMAS_DIR / SCHEMA_FILES[plugin_type]

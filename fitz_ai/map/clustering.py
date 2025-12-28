@@ -56,8 +56,7 @@ def detect_clusters(
         from sklearn.cluster import KMeans
     except ImportError:
         raise ImportError(
-            "scikit-learn is required for knowledge map. "
-            "Install with: pip install fitz-ai[map]"
+            "scikit-learn is required for knowledge map. Install with: pip install fitz-ai[map]"
         )
 
     n_samples = len(chunk_ids)

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from fitz_ai.cli.cli import app
@@ -243,7 +242,10 @@ class TestChatExitCommands:
 
         with (
             patch("fitz_ai.cli.commands.chat.FitzPaths.config", return_value=config_path),
-            patch("fitz_ai.cli.commands.chat.RAGPipeline.from_config", return_value=mock_pipeline),
+            patch(
+                "fitz_ai.cli.commands.chat.RAGPipeline.from_config",
+                return_value=mock_pipeline,
+            ),
             patch("fitz_ai.cli.commands.chat._get_collections", return_value=["test"]),
             patch("fitz_ai.cli.commands.chat.RICH", False),
         ):
@@ -268,7 +270,10 @@ class TestChatExitCommands:
 
         with (
             patch("fitz_ai.cli.commands.chat.FitzPaths.config", return_value=config_path),
-            patch("fitz_ai.cli.commands.chat.RAGPipeline.from_config", return_value=mock_pipeline),
+            patch(
+                "fitz_ai.cli.commands.chat.RAGPipeline.from_config",
+                return_value=mock_pipeline,
+            ),
             patch("fitz_ai.cli.commands.chat._get_collections", return_value=["test"]),
             patch("fitz_ai.cli.commands.chat.RICH", False),
         ):

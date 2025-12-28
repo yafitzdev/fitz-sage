@@ -8,7 +8,6 @@ from __future__ import annotations
 import sys
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from fitz_ai.cli.cli import app
@@ -39,9 +38,18 @@ class TestDoctorCommand:
         mock_system.api_keys = {}
 
         with (
-            patch("fitz_ai.cli.commands.doctor.detect_system_status", return_value=mock_system),
-            patch("fitz_ai.cli.commands.doctor.FitzPaths.workspace", return_value=MagicMock(exists=lambda: False)),
-            patch("fitz_ai.cli.commands.doctor.FitzPaths.config", return_value=MagicMock(exists=lambda: False)),
+            patch(
+                "fitz_ai.cli.commands.doctor.detect_system_status",
+                return_value=mock_system,
+            ),
+            patch(
+                "fitz_ai.cli.commands.doctor.FitzPaths.workspace",
+                return_value=MagicMock(exists=lambda: False),
+            ),
+            patch(
+                "fitz_ai.cli.commands.doctor.FitzPaths.config",
+                return_value=MagicMock(exists=lambda: False),
+            ),
         ):
             result = runner.invoke(app, ["doctor"])
 
@@ -311,9 +319,18 @@ class TestDoctorVerboseMode:
         mock_system.api_keys = {}
 
         with (
-            patch("fitz_ai.cli.commands.doctor.detect_system_status", return_value=mock_system),
-            patch("fitz_ai.cli.commands.doctor.FitzPaths.workspace", return_value=MagicMock(exists=lambda: True)),
-            patch("fitz_ai.cli.commands.doctor.FitzPaths.config", return_value=MagicMock(exists=lambda: False)),
+            patch(
+                "fitz_ai.cli.commands.doctor.detect_system_status",
+                return_value=mock_system,
+            ),
+            patch(
+                "fitz_ai.cli.commands.doctor.FitzPaths.workspace",
+                return_value=MagicMock(exists=lambda: True),
+            ),
+            patch(
+                "fitz_ai.cli.commands.doctor.FitzPaths.config",
+                return_value=MagicMock(exists=lambda: False),
+            ),
         ):
             result = runner.invoke(app, ["doctor", "-v"])
 
@@ -351,11 +368,17 @@ class TestDoctorTestMode:
         mock_plugin.list_collections.return_value = []
 
         with (
-            patch("fitz_ai.cli.commands.doctor.detect_system_status", return_value=mock_system),
+            patch(
+                "fitz_ai.cli.commands.doctor.detect_system_status",
+                return_value=mock_system,
+            ),
             patch("fitz_ai.cli.commands.doctor.FitzPaths.workspace", return_value=tmp_path),
             patch("fitz_ai.cli.commands.doctor.FitzPaths.config", return_value=config_path),
             patch("fitz_ai.llm.registry.get_llm_plugin", return_value=mock_plugin),
-            patch("fitz_ai.vector_db.registry.get_vector_db_plugin", return_value=mock_plugin),
+            patch(
+                "fitz_ai.vector_db.registry.get_vector_db_plugin",
+                return_value=mock_plugin,
+            ),
         ):
             result = runner.invoke(app, ["doctor", "--test"])
 

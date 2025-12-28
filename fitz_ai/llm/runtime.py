@@ -139,16 +139,12 @@ class YAMLPluginBase:
 
     plugin_type: ClassVar[str] = ""
 
-    def __init__(
-        self, spec: PluginSpec, *, tier: ModelTier | None = None, **kwargs: Any
-    ) -> None:
+    def __init__(self, spec: PluginSpec, *, tier: ModelTier | None = None, **kwargs: Any) -> None:
         self.spec = spec
         self.tier = tier
 
         # Resolve model from tier (always called - defaults to "smart" if models exist)
-        tier_model = _resolve_model_from_tier(
-            spec.defaults, tier, kwargs, spec.plugin_name
-        )
+        tier_model = _resolve_model_from_tier(spec.defaults, tier, kwargs, spec.plugin_name)
         if tier_model:
             kwargs["model"] = tier_model
 

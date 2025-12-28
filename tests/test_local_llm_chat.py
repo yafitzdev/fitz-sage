@@ -80,7 +80,7 @@ class TestLocalChatLLM:
             {"role": "user", "content": "Hello"},
         ]
 
-        result = chat.chat(messages)
+        chat.chat(messages)
 
         mock_runtime.llama.assert_called_once()
         mock_adapter.chat.assert_called_once()

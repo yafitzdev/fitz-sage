@@ -178,11 +178,7 @@ class EnrichmentPipeline:
     @property
     def summaries_enabled(self) -> bool:
         """Check if chunk summaries are enabled."""
-        return (
-            self.config.enabled
-            and self.config.summary.enabled
-            and self._summarizer is not None
-        )
+        return self.config.enabled and self.config.summary.enabled and self._summarizer is not None
 
     @property
     def artifacts_enabled(self) -> bool:
@@ -232,9 +228,7 @@ class EnrichmentPipeline:
         if not self.summaries_enabled:
             return [None] * len(chunks)
 
-        chunk_infos = [
-            ChunkInfo(content=c, file_path=f, content_hash=h) for c, f, h in chunks
-        ]
+        chunk_infos = [ChunkInfo(content=c, file_path=f, content_hash=h) for c, f, h in chunks]
 
         return self._summarizer.summarize_batch(chunk_infos, batch_size=batch_size)
 
@@ -326,9 +320,7 @@ class EnrichmentPipeline:
             return []
 
         analysis = self.analyze_project()
-        plugins = [
-            p for p in self.get_applicable_artifact_plugins() if not p.requires_llm
-        ]
+        plugins = [p for p in self.get_applicable_artifact_plugins() if not p.requires_llm]
 
         artifacts: List[Artifact] = []
         for plugin in plugins:
@@ -375,9 +367,7 @@ class EnrichmentPipeline:
 
         # Generate summaries and attach to chunk metadata
         if self.summaries_enabled:
-            chunk_tuples = [
-                (c.content, c.metadata.get("file_path", ""), c.id) for c in chunks
-            ]
+            chunk_tuples = [(c.content, c.metadata.get("file_path", ""), c.id) for c in chunks]
             summaries = self.summarize_chunks_batch(chunk_tuples)
 
             for chunk, summary in zip(chunks, summaries):

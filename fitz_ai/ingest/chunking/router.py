@@ -176,9 +176,7 @@ class ChunkingRouter:
                     context=f"auto-discovered for '{normalized}'",
                 )
                 self._auto_chunkers[normalized] = chunker
-                logger.debug(
-                    f"Auto-selected chunker '{plugin_name}' for extension '{normalized}'"
-                )
+                logger.debug(f"Auto-selected chunker '{plugin_name}' for extension '{normalized}'")
                 return chunker
             except IngestionChunkingError:
                 # Failed to build, fall through to default
@@ -262,8 +260,7 @@ class ChunkingRouter:
 
         chunker = self.get_chunker(ext)
         logger.debug(
-            f"Chunking '{path.name}' with {chunker.plugin_name} "
-            f"(chunker_id: {chunker.chunker_id})"
+            f"Chunking '{path.name}' with {chunker.plugin_name} (chunker_id: {chunker.chunker_id})"
         )
 
         try:
@@ -286,8 +283,7 @@ class ChunkingRouter:
     def __repr__(self) -> str:
         ext_list = ", ".join(self.configured_extensions) or "(none)"
         return (
-            f"ChunkingRouter(default={self._default_chunker.plugin_name}, "
-            f"extensions=[{ext_list}])"
+            f"ChunkingRouter(default={self._default_chunker.plugin_name}, extensions=[{ext_list}])"
         )
 
 

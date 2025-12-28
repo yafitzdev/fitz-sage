@@ -75,8 +75,7 @@ class FaissLocalVectorDB:
             self._faiss = faiss
         except ImportError:
             raise ImportError(
-                "faiss is required for local-faiss plugin. "
-                "Install with: pip install faiss-cpu"
+                "faiss is required for local-faiss plugin. Install with: pip install faiss-cpu"
             )
 
         # Resolve path
@@ -465,9 +464,7 @@ class FaissLocalVectorDB:
 
         # Find indices to keep
         keep_indices = [
-            i
-            for i, p in enumerate(self._payloads)
-            if p.get("_collection") != collection
+            i for i, p in enumerate(self._payloads) if p.get("_collection") != collection
         ]
 
         deleted = self._index.ntotal - len(keep_indices)
@@ -501,9 +498,7 @@ class FaissLocalVectorDB:
         if self._persist:
             self._save()
 
-        logger.info(
-            f"{VECTOR_DB} Deleted {deleted} vectors from collection '{collection}'"
-        )
+        logger.info(f"{VECTOR_DB} Deleted {deleted} vectors from collection '{collection}'")
         return deleted
 
 

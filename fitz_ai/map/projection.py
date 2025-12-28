@@ -44,8 +44,7 @@ def run_umap_projection(
         import umap
     except ImportError:
         raise ImportError(
-            "umap-learn is required for knowledge map. "
-            "Install with: pip install fitz-ai[map]"
+            "umap-learn is required for knowledge map. Install with: pip install fitz-ai[map]"
         )
 
     if embeddings.size == 0:
@@ -63,9 +62,7 @@ def run_umap_projection(
     # Adjust n_neighbors if we have fewer samples
     effective_neighbors = min(n_neighbors, n_samples - 1)
 
-    logger.info(
-        f"Running UMAP on {n_samples} embeddings (n_neighbors={effective_neighbors})"
-    )
+    logger.info(f"Running UMAP on {n_samples} embeddings (n_neighbors={effective_neighbors})")
 
     reducer = umap.UMAP(
         n_components=2,

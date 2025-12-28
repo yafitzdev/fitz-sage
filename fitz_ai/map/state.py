@@ -110,10 +110,7 @@ class KnowledgeMapStateManager:
         """Check if cache should be invalidated due to config changes."""
         if self._state is None:
             return True
-        return (
-            self._state.collection != collection
-            or self._state.embedding_id != embedding_id
-        )
+        return self._state.collection != collection or self._state.embedding_id != embedding_id
 
     def save(self) -> None:
         """
@@ -152,9 +149,7 @@ class KnowledgeMapStateManager:
                 temp_path.unlink()
             raise
 
-    def _create_new_state(
-        self, collection: str, embedding_id: str
-    ) -> KnowledgeMapState:
+    def _create_new_state(self, collection: str, embedding_id: str) -> KnowledgeMapState:
         """Create a new empty state."""
         return KnowledgeMapState(
             collection=collection,

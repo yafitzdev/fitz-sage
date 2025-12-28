@@ -244,9 +244,9 @@ class DiffIngestExecutor:
 
         # Phase 1: Prepare all files (parse, chunk) - NO summarization yet
         all_prepared: List[tuple] = []  # (candidate, file_data)
-        all_chunk_info: List[tuple] = (
-            []
-        )  # (content, file_path, content_hash) for batch summarization
+        all_chunk_info: List[
+            tuple
+        ] = []  # (content, file_path, content_hash) for batch summarization
 
         for i, candidate in enumerate(diff.to_ingest):
             if on_progress:
@@ -309,9 +309,7 @@ class DiffIngestExecutor:
 
             if all_chunks:
                 t0 = time.perf_counter()
-                enriched_chunks = self._enrichment_pipeline._hierarchy_enricher.enrich(
-                    all_chunks
-                )
+                enriched_chunks = self._enrichment_pipeline._hierarchy_enricher.enrich(all_chunks)
                 hierarchy_time = time.perf_counter() - t0
 
                 # Extract only the new hierarchy summary chunks
@@ -394,12 +392,8 @@ class DiffIngestExecutor:
                         }
                     )
 
-                self._vdb_writer.upsert(
-                    self._collection, hierarchy_points, defer_persist=True
-                )
-                logger.info(
-                    f"Upserted {len(hierarchy_points)} hierarchy summary chunks"
-                )
+                self._vdb_writer.upsert(self._collection, hierarchy_points, defer_persist=True)
+                logger.info(f"Upserted {len(hierarchy_points)} hierarchy summary chunks")
                 summary.hierarchy_summaries = len(hierarchy_chunks)
             except Exception as e:
                 summary.errors += 1

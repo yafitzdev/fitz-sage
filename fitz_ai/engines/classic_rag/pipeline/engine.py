@@ -181,10 +181,15 @@ class RAGPipeline:
 
         # Chat LLM - use "smart" tier for user-facing query responses
         chat_plugin = get_llm_plugin(
-            plugin_type="chat", plugin_name=cfg.chat.plugin_name, tier="smart", **cfg.chat.kwargs
+            plugin_type="chat",
+            plugin_name=cfg.chat.plugin_name,
+            tier="smart",
+            **cfg.chat.kwargs,
         )
         model_name = getattr(chat_plugin, "params", {}).get("model", "unknown")
-        logger.info(f"{PIPELINE} Using chat plugin='{cfg.chat.plugin_name}' model='{model_name}' (smart tier)")
+        logger.info(
+            f"{PIPELINE} Using chat plugin='{cfg.chat.plugin_name}' model='{model_name}' (smart tier)"
+        )
 
         # Embedding
         embedder = get_llm_plugin(

@@ -277,8 +277,10 @@ def compute_invariants(cm: ContractMap) -> List[str]:
 def render_entrypoints_section(entrypoints: List[Entrypoint]) -> str:
     """Render the Entrypoints section."""
     from tools.contract_map.common import render_section
+
     return render_section(
-        "Entrypoints", entrypoints,
+        "Entrypoints",
+        entrypoints,
         fmt=lambda ep: f"- `{ep.kind}`: `{ep.name}` -> `{ep.target}`",
         empty="- (none detected)",
     )
@@ -320,6 +322,7 @@ def render_config_surface_section(cs: ConfigSurface | None) -> str:
 def render_invariants_section(invariants: List[str]) -> str:
     """Render the Runtime Invariants section."""
     from tools.contract_map.common import render_section
+
     return render_section("Runtime Invariants", invariants, fmt=lambda x: f"- {x}")
 
 

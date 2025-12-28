@@ -112,15 +112,12 @@ class HierarchyEnricher:
             )
         else:
             # Simple mode: use defaults, no path filtering
-            logger.info(
-                f"[HIERARCHY] Simple mode: grouping by '{self._config.group_by}'"
-            )
+            logger.info(f"[HIERARCHY] Simple mode: grouping by '{self._config.group_by}'")
             summary_chunks = self._process_simple_mode(chunks)
             all_summary_chunks.extend(summary_chunks)
 
             logger.info(
-                f"[HIERARCHY] Generated {len(all_summary_chunks)} summary chunks "
-                f"in simple mode"
+                f"[HIERARCHY] Generated {len(all_summary_chunks)} summary chunks in simple mode"
             )
 
         return chunks + all_summary_chunks
@@ -206,9 +203,7 @@ Write a comprehensive summary (2-4 paragraphs) that captures the key information
         messages = [{"role": "user", "content": llm_prompt}]
         summary_content = self._chat.chat(messages)
 
-        chunk_id = hashlib.sha256(f"hierarchy:simple:{group_key}".encode()).hexdigest()[
-            :16
-        ]
+        chunk_id = hashlib.sha256(f"hierarchy:simple:{group_key}".encode()).hexdigest()[:16]
 
         return Chunk(
             id=f"hierarchy_l1:{chunk_id}",
@@ -284,14 +279,10 @@ Write a high-level overview (3-5 paragraphs) synthesizing the key insights.
         filtered = matcher.filter_chunks(chunks)
 
         if not filtered:
-            logger.info(
-                f"[HIERARCHY] No chunks matched patterns for rule '{rule.name}'"
-            )
+            logger.info(f"[HIERARCHY] No chunks matched patterns for rule '{rule.name}'")
             return []
 
-        logger.info(
-            f"[HIERARCHY] Rule '{rule.name}': {len(filtered)}/{len(chunks)} chunks matched"
-        )
+        logger.info(f"[HIERARCHY] Rule '{rule.name}': {len(filtered)}/{len(chunks)} chunks matched")
 
         # Step 2: Group by metadata key
         grouper = ChunkGrouper(rule.group_by)
@@ -362,9 +353,7 @@ Write a comprehensive summary (2-4 paragraphs) that captures the key information
         summary_content = self._chat.chat(messages)
 
         # Create summary chunk
-        chunk_id = hashlib.sha256(
-            f"hierarchy:{rule.name}:{group_key}".encode()
-        ).hexdigest()[:16]
+        chunk_id = hashlib.sha256(f"hierarchy:{rule.name}:{group_key}".encode()).hexdigest()[:16]
 
         return Chunk(
             id=f"hierarchy_l1:{chunk_id}",
@@ -419,9 +408,7 @@ Write a high-level overview (3-5 paragraphs) synthesizing the key insights.
         messages = [{"role": "user", "content": prompt}]
         summary_content = self._chat.chat(messages)
 
-        chunk_id = hashlib.sha256(f"hierarchy:corpus:{rule.name}".encode()).hexdigest()[
-            :16
-        ]
+        chunk_id = hashlib.sha256(f"hierarchy:corpus:{rule.name}".encode()).hexdigest()[:16]
 
         return Chunk(
             id=f"hierarchy_l0:{chunk_id}",

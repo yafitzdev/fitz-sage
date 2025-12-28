@@ -121,7 +121,7 @@ def extract_llm_registry(
                         module=module_name,
                         name=f"LLM_REGISTRY[{plugin_type!r}]",
                         plugins=sorted(str(p) for p in plugins),
-                        note=f"YAML-based discovery (auto-discovered)",
+                        note="YAML-based discovery (auto-discovered)",
                     )
                 )
         except Exception as exc:
@@ -214,7 +214,11 @@ def extract_registries(cm: ContractMap, *, verbose: bool) -> None:
             continue
 
         # Check for list-function style registry
-        for fn_name in ("available_pipeline_plugins", "available_plugins", "list_plugins"):
+        for fn_name in (
+            "available_pipeline_plugins",
+            "available_plugins",
+            "list_plugins",
+        ):
             if hasattr(mod, fn_name):
                 pr = extract_pipeline_registry(
                     cm,

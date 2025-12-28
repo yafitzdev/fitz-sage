@@ -181,8 +181,7 @@ def _load_plugin_cached(plugin_type: str, plugin_name: str) -> PluginSpec:
     """Load and validate a plugin specification (cached)."""
     if plugin_type not in _SPEC_CLASSES:
         raise ValueError(
-            f"Invalid plugin type: {plugin_type!r}. "
-            f"Must be one of: {sorted(_SPEC_CLASSES.keys())}"
+            f"Invalid plugin type: {plugin_type!r}. Must be one of: {sorted(_SPEC_CLASSES.keys())}"
         )
 
     yaml_path = _get_yaml_path(plugin_type, plugin_name)

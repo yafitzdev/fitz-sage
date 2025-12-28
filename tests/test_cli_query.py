@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from fitz_ai.cli.cli import app
@@ -104,7 +103,10 @@ class TestQueryExecution:
         config_path = tmp_path / "fitz.yaml"
         config = {
             "chat": {"plugin_name": "cohere", "kwargs": {"model": "command"}},
-            "embedding": {"plugin_name": "cohere", "kwargs": {"model": "embed-english-v3.0"}},
+            "embedding": {
+                "plugin_name": "cohere",
+                "kwargs": {"model": "embed-english-v3.0"},
+            },
             "vector_db": {"plugin_name": "local_faiss", "kwargs": {}},
             "retrieval": {"plugin_name": "dense", "collection": "test", "top_k": 5},
             "rerank": {"enabled": False},
@@ -120,10 +122,13 @@ class TestQueryExecution:
 
         with (
             patch("fitz_ai.cli.commands.query.FitzPaths.config", return_value=config_path),
-            patch("fitz_ai.cli.commands.query.RAGPipeline.from_config", return_value=mock_pipeline),
+            patch(
+                "fitz_ai.cli.commands.query.RAGPipeline.from_config",
+                return_value=mock_pipeline,
+            ),
             patch("fitz_ai.cli.commands.query._get_collections", return_value=["test"]),
         ):
-            result = runner.invoke(app, ["query", "What is RAG?"])
+            runner.invoke(app, ["query", "What is RAG?"])
 
         # Should call pipeline with the question
         mock_pipeline.run.assert_called_once()
@@ -154,10 +159,13 @@ class TestQueryOptions:
 
         with (
             patch("fitz_ai.cli.commands.query.FitzPaths.config", return_value=config_path),
-            patch("fitz_ai.cli.commands.query.RAGPipeline.from_config", return_value=mock_pipeline),
+            patch(
+                "fitz_ai.cli.commands.query.RAGPipeline.from_config",
+                return_value=mock_pipeline,
+            ),
             patch("fitz_ai.cli.commands.query._get_collections", return_value=["custom"]),
         ):
-            result = runner.invoke(app, ["query", "question", "-c", "custom"])
+            runner.invoke(app, ["query", "question", "-c", "custom"])
 
         # Pipeline should be created (we can't easily verify the collection was set)
         assert mock_pipeline.run.called

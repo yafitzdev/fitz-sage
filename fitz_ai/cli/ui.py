@@ -349,7 +349,9 @@ class UI:
             console.print(f"{p_indent}[bold]{prompt}:[/bold]")
             for i, choice in enumerate(ordered_choices, 1):
                 if choice == default:
-                    console.print(f"{p_indent}{c_indent}[cyan][{i}][/cyan] {choice} [dim](default)[/dim]")
+                    console.print(
+                        f"{p_indent}{c_indent}[cyan][{i}][/cyan] {choice} [dim](default)[/dim]"
+                    )
                 else:
                     console.print(f"{p_indent}{c_indent}[cyan][{i}][/cyan] {choice}")
         else:

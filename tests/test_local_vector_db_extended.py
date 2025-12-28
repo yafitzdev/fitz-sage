@@ -13,7 +13,7 @@ Tests additional functionality not covered in test_local_faiss_vector_db.py:
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -25,7 +25,10 @@ class TestLocalVectorDBConfig:
 
     def test_default_path_uses_fitz_paths(self, tmp_path):
         """Test that default path comes from FitzPaths."""
-        with patch("fitz_ai.core.paths.FitzPaths.vector_db", return_value=tmp_path / "vector_db"):
+        with patch(
+            "fitz_ai.core.paths.FitzPaths.vector_db",
+            return_value=tmp_path / "vector_db",
+        ):
             from fitz_ai.backends.local_vector_db.config import LocalVectorDBConfig
 
             cfg = LocalVectorDBConfig()
@@ -188,10 +191,7 @@ class TestFaissScroll:
         db = FaissLocalVectorDB(path=tmp_path)
         db.upsert(
             "docs",
-            [
-                {"id": f"d{i}", "vector": [0.1 * i, 0.2 * i], "payload": {"i": i}}
-                for i in range(5)
-            ],
+            [{"id": f"d{i}", "vector": [0.1 * i, 0.2 * i], "payload": {"i": i}} for i in range(5)],
         )
 
         records, next_offset = db.scroll("docs", limit=2, offset=2)

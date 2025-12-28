@@ -28,16 +28,12 @@ class ChunkEmbedding(BaseModel):
     chunk_id: str = Field(..., description="Chunk ID (matches vector DB)")
     doc_id: str = Field(..., description="Parent document ID")
     label: str = Field(..., description="Display label (truncated content or title)")
-    embedding: List[float] = Field(
-        ..., description="Embedding vector (stored as float16)"
-    )
+    embedding: List[float] = Field(..., description="Embedding vector (stored as float16)")
 
     # Metadata for visualization
     chunk_index: int = Field(default=0, description="Position in document")
     content_preview: str = Field(default="", description="First 200 chars of content")
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
-    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
     # Computed fields (populated during projection, not stored)
     x: Optional[float] = Field(default=None, description="UMAP x coordinate")
@@ -74,9 +70,7 @@ class ClusterInfo(BaseModel):
     chunk_count: int = Field(default=0)
     centroid_x: float = Field(default=0.0)
     centroid_y: float = Field(default=0.0)
-    keywords: List[str] = Field(
-        default_factory=list, description="Top keywords in cluster"
-    )
+    keywords: List[str] = Field(default_factory=list, description="Top keywords in cluster")
     color: str = Field(default="#58a6ff", description="Display color for this cluster")
 
 
@@ -107,9 +101,7 @@ class MapStats(BaseModel):
     num_clusters: int = Field(default=0)
     num_gaps: int = Field(default=0)
     avg_cluster_size: float = Field(default=0.0)
-    coverage_score: float = Field(
-        default=1.0, description="1.0 = no gaps, 0.0 = all gaps"
-    )
+    coverage_score: float = Field(default=1.0, description="1.0 = no gaps, 0.0 = all gaps")
 
 
 class KnowledgeMapState(BaseModel):
@@ -124,9 +116,7 @@ class KnowledgeMapState(BaseModel):
 
     schema_version: int = Field(default=1)
     collection: str = Field(..., description="Vector DB collection name")
-    embedding_id: str = Field(
-        ..., description="Embedding config ID for cache invalidation"
-    )
+    embedding_id: str = Field(..., description="Embedding config ID for cache invalidation")
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Cached data (persisted)

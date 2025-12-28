@@ -43,9 +43,18 @@ class TestInitCommand:
                 "fitz_ai.cli.commands.init.available_llm_plugins",
                 side_effect=lambda t: ["cohere"] if t in ["chat", "embedding"] else [],
             ),
-            patch("fitz_ai.cli.commands.init.available_vector_db_plugins", return_value=["local_faiss"]),
-            patch("fitz_ai.cli.commands.init.available_retrieval_plugins", return_value=["dense"]),
-            patch("fitz_ai.cli.commands.init.available_chunking_plugins", return_value=["simple"]),
+            patch(
+                "fitz_ai.cli.commands.init.available_vector_db_plugins",
+                return_value=["local_faiss"],
+            ),
+            patch(
+                "fitz_ai.cli.commands.init.available_retrieval_plugins",
+                return_value=["dense"],
+            ),
+            patch(
+                "fitz_ai.cli.commands.init.available_chunking_plugins",
+                return_value=["simple"],
+            ),
             patch("fitz_ai.cli.commands.init._load_default_config", return_value={}),
         ):
             result = runner.invoke(app, ["init", "-y", "--show"])
@@ -305,9 +314,18 @@ class TestInitValidation:
         with (
             patch("fitz_ai.cli.commands.init.detect_system", return_value=mock_system),
             patch("fitz_ai.cli.commands.init.available_llm_plugins", return_value=[]),
-            patch("fitz_ai.cli.commands.init.available_vector_db_plugins", return_value=["local_faiss"]),
-            patch("fitz_ai.cli.commands.init.available_retrieval_plugins", return_value=["dense"]),
-            patch("fitz_ai.cli.commands.init.available_chunking_plugins", return_value=["simple"]),
+            patch(
+                "fitz_ai.cli.commands.init.available_vector_db_plugins",
+                return_value=["local_faiss"],
+            ),
+            patch(
+                "fitz_ai.cli.commands.init.available_retrieval_plugins",
+                return_value=["dense"],
+            ),
+            patch(
+                "fitz_ai.cli.commands.init.available_chunking_plugins",
+                return_value=["simple"],
+            ),
             patch("fitz_ai.cli.commands.init._load_default_config", return_value={}),
         ):
             result = runner.invoke(app, ["init", "-y"])
@@ -325,10 +343,19 @@ class TestInitValidation:
 
         with (
             patch("fitz_ai.cli.commands.init.detect_system", return_value=mock_system),
-            patch("fitz_ai.cli.commands.init.available_llm_plugins", return_value=["cohere"]),
+            patch(
+                "fitz_ai.cli.commands.init.available_llm_plugins",
+                return_value=["cohere"],
+            ),
             patch("fitz_ai.cli.commands.init.available_vector_db_plugins", return_value=[]),
-            patch("fitz_ai.cli.commands.init.available_retrieval_plugins", return_value=["dense"]),
-            patch("fitz_ai.cli.commands.init.available_chunking_plugins", return_value=["simple"]),
+            patch(
+                "fitz_ai.cli.commands.init.available_retrieval_plugins",
+                return_value=["dense"],
+            ),
+            patch(
+                "fitz_ai.cli.commands.init.available_chunking_plugins",
+                return_value=["simple"],
+            ),
             patch("fitz_ai.cli.commands.init._load_default_config", return_value={}),
         ):
             result = runner.invoke(app, ["init", "-y"])

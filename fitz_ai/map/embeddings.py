@@ -133,9 +133,7 @@ def fetch_chunk_embeddings(
             break
         offset = next_offset
 
-    logger.info(
-        f"Fetched {len(embeddings)} chunk embeddings from collection '{collection}'"
-    )
+    logger.info(f"Fetched {len(embeddings)} chunk embeddings from collection '{collection}'")
     return embeddings
 
 

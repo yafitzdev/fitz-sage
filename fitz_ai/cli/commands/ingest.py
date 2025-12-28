@@ -347,9 +347,7 @@ def command(
                         artifacts = ",".join(name for name, _ in available_artifacts)
                     else:
                         artifacts = ",".join(
-                            name
-                            for name, desc in available_artifacts
-                            if "requires LLM" not in desc
+                            name for name, desc in available_artifacts if "requires LLM" not in desc
                         )
                     ui.info("Auto-enabled: codebase analysis")
         else:
@@ -454,9 +452,7 @@ def command(
                     else:
                         # Only structural artifacts (no LLM required)
                         artifacts = ",".join(
-                            name
-                            for name, desc in available_artifacts
-                            if "requires LLM" not in desc
+                            name for name, desc in available_artifacts if "requires LLM" not in desc
                         )
                     ui.info("Auto-enabled: codebase analysis")
 
@@ -573,7 +569,10 @@ def command(
                 if chat_models:
                     chat_kwargs["models"] = chat_models
                 chat_client = get_llm_plugin(
-                    plugin_type="chat", plugin_name=chat_plugin, tier="fast", **chat_kwargs
+                    plugin_type="chat",
+                    plugin_name=chat_plugin,
+                    tier="fast",
+                    **chat_kwargs,
                 )
                 model_name = chat_client.params.get("model", "unknown")
                 if hierarchy:

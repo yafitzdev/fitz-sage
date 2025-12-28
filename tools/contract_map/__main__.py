@@ -240,6 +240,7 @@ def build_contract_map(*, verbose: bool, layout_depth: int | None) -> ContractMa
 def render_meta_section(cm: ContractMap) -> str:
     """Render the Meta section."""
     from tools.contract_map.common import render_section
+
     return render_section("Meta", sorted(cm.meta.items()), fmt=lambda kv: f"- `{kv[0]}`: `{kv[1]}`")
 
 
@@ -248,6 +249,7 @@ def render_health_section(cm: ContractMap) -> str:
     if not cm.health:
         return ""
     from tools.contract_map.common import render_section
+
     return render_section("Health", cm.health, fmt=lambda h: f"- **{h.level}**: {h.message}")
 
 
@@ -281,9 +283,7 @@ def render_architecture_section() -> str:
     try:
         import importlib
 
-        arch_module = importlib.import_module(
-            f"{PKG.name}.engines.classic_rag.config.architecture"
-        )
+        arch_module = importlib.import_module(f"{PKG.name}.engines.classic_rag.config.architecture")
         load_architecture_mapping = getattr(arch_module, "load_architecture_mapping")
 
         roles_module = importlib.import_module(f"{PKG.name}.engines.classic_rag.contracts.roles")

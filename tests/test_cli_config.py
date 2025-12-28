@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
 from typer.testing import CliRunner
 
 from fitz_ai.cli.cli import app
@@ -78,7 +77,6 @@ class TestConfigJsonOption:
 
     def test_config_json_output(self, tmp_path):
         """Test --json outputs valid JSON."""
-        import json
 
         import yaml
 
@@ -166,7 +164,10 @@ class TestConfigSummaryView:
         config_path = tmp_path / "fitz.yaml"
         config = {
             "chat": {"plugin_name": "cohere", "kwargs": {"model": "command"}},
-            "embedding": {"plugin_name": "cohere", "kwargs": {"model": "embed-english-v3.0"}},
+            "embedding": {
+                "plugin_name": "cohere",
+                "kwargs": {"model": "embed-english-v3.0"},
+            },
             "vector_db": {"plugin_name": "local_faiss", "kwargs": {}},
             "retrieval": {"plugin_name": "dense", "collection": "default", "top_k": 5},
             "rerank": {"enabled": False},

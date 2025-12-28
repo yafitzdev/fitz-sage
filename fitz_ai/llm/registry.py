@@ -40,8 +40,7 @@ def available_llm_plugins(plugin_type: str) -> List[str]:
     """
     if plugin_type not in VALID_LLM_TYPES:
         raise ValueError(
-            f"Invalid LLM plugin type: {plugin_type!r}. "
-            f"Must be one of: {sorted(VALID_LLM_TYPES)}"
+            f"Invalid LLM plugin type: {plugin_type!r}. Must be one of: {sorted(VALID_LLM_TYPES)}"
         )
 
     return sorted(list_plugins(plugin_type))
@@ -75,8 +74,7 @@ def get_llm_plugin(
     """
     if plugin_type not in VALID_LLM_TYPES:
         raise ValueError(
-            f"Invalid LLM plugin type: {plugin_type!r}. "
-            f"Must be one of: {sorted(VALID_LLM_TYPES)}"
+            f"Invalid LLM plugin type: {plugin_type!r}. Must be one of: {sorted(VALID_LLM_TYPES)}"
         )
 
     try:

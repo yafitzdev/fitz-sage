@@ -149,8 +149,7 @@ class PluginRegistry:
 
         self._discovered = True
         logger.debug(
-            f"Discovered {len(self._plugins)} {self.name} plugin(s): "
-            f"{sorted(self._plugins.keys())}"
+            f"Discovered {len(self._plugins)} {self.name} plugin(s): {sorted(self._plugins.keys())}"
         )
 
     def _scan_package(self, package: Any) -> None:

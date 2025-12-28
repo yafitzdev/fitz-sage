@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from fitz_ai.cli.cli import app
@@ -161,8 +160,14 @@ class TestCollectionsNoCollections:
         mock_client.list_collections.return_value = []
 
         with (
-            patch("fitz_ai.cli.commands.collections.FitzPaths.config", return_value=config_path),
-            patch("fitz_ai.vector_db.registry.get_vector_db_plugin", return_value=mock_client),
+            patch(
+                "fitz_ai.cli.commands.collections.FitzPaths.config",
+                return_value=config_path,
+            ),
+            patch(
+                "fitz_ai.vector_db.registry.get_vector_db_plugin",
+                return_value=mock_client,
+            ),
             patch(
                 "fitz_ai.vector_db.registry.available_vector_db_plugins",
                 return_value=["local_faiss"],
@@ -186,11 +191,20 @@ class TestCollectionsWithData:
 
         mock_client = MagicMock()
         mock_client.list_collections.return_value = ["docs", "code"]
-        mock_client.get_collection_stats.return_value = {"points_count": 100, "status": "ready"}
+        mock_client.get_collection_stats.return_value = {
+            "points_count": 100,
+            "status": "ready",
+        }
 
         with (
-            patch("fitz_ai.cli.commands.collections.FitzPaths.config", return_value=config_path),
-            patch("fitz_ai.vector_db.registry.get_vector_db_plugin", return_value=mock_client),
+            patch(
+                "fitz_ai.cli.commands.collections.FitzPaths.config",
+                return_value=config_path,
+            ),
+            patch(
+                "fitz_ai.vector_db.registry.get_vector_db_plugin",
+                return_value=mock_client,
+            ),
             patch(
                 "fitz_ai.vector_db.registry.available_vector_db_plugins",
                 return_value=["local_faiss"],
@@ -216,12 +230,21 @@ class TestCollectionsWithData:
 
         mock_client = MagicMock()
         mock_client.list_collections.return_value = ["docs"]
-        mock_client.get_collection_stats.return_value = {"points_count": 10, "status": "ready"}
+        mock_client.get_collection_stats.return_value = {
+            "points_count": 10,
+            "status": "ready",
+        }
         mock_client.scroll.return_value = ([mock_record], None)
 
         with (
-            patch("fitz_ai.cli.commands.collections.FitzPaths.config", return_value=config_path),
-            patch("fitz_ai.vector_db.registry.get_vector_db_plugin", return_value=mock_client),
+            patch(
+                "fitz_ai.cli.commands.collections.FitzPaths.config",
+                return_value=config_path,
+            ),
+            patch(
+                "fitz_ai.vector_db.registry.get_vector_db_plugin",
+                return_value=mock_client,
+            ),
             patch(
                 "fitz_ai.vector_db.registry.available_vector_db_plugins",
                 return_value=["local_faiss"],
@@ -250,8 +273,14 @@ class TestCollectionsDelete:
         mock_client.get_collection_stats.return_value = {"points_count": 10}
 
         with (
-            patch("fitz_ai.cli.commands.collections.FitzPaths.config", return_value=config_path),
-            patch("fitz_ai.vector_db.registry.get_vector_db_plugin", return_value=mock_client),
+            patch(
+                "fitz_ai.cli.commands.collections.FitzPaths.config",
+                return_value=config_path,
+            ),
+            patch(
+                "fitz_ai.vector_db.registry.get_vector_db_plugin",
+                return_value=mock_client,
+            ),
             patch(
                 "fitz_ai.vector_db.registry.available_vector_db_plugins",
                 return_value=["local_faiss"],

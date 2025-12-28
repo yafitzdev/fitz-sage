@@ -222,9 +222,7 @@ def command(
     current_chunk_ids = fetch_all_chunk_ids(vdb, collection)
 
     if not current_chunk_ids:
-        ui.error(
-            f"No chunks found in collection '{collection}'. Run 'fitz ingest' first."
-        )
+        ui.error(f"No chunks found in collection '{collection}'. Run 'fitz ingest' first.")
         raise typer.Exit(1)
 
     # Remove stale chunks from cache
@@ -298,17 +296,13 @@ def command(
 
     from fitz_ai.map.gaps import compute_coverage_score, detect_gaps, mark_gap_chunks
 
-    gap_info, gap_chunk_ids = detect_gaps(
-        all_chunks, cluster_info, coordinates, chunk_ids
-    )
+    gap_info, gap_chunk_ids = detect_gaps(all_chunks, cluster_info, coordinates, chunk_ids)
     all_chunks = mark_gap_chunks(all_chunks, gap_chunk_ids)
 
     coverage_score = compute_coverage_score(len(all_chunks), len(gap_chunk_ids))
 
     if gap_info:
-        ui.warning(
-            f"Found {len(gap_info)} gap regions with {len(gap_chunk_ids)} affected chunks"
-        )
+        ui.warning(f"Found {len(gap_info)} gap regions with {len(gap_chunk_ids)} affected chunks")
     else:
         ui.success("No significant gaps detected")
 

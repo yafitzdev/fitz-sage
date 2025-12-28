@@ -14,7 +14,6 @@ This module eliminates hardcoded paths by scanning the codebase to find:
 
 from __future__ import annotations
 
-import ast
 import re
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
@@ -344,9 +343,7 @@ def discover_consumer_patterns(
     return {k: tuple(sorted(v)) for k, v in patterns.items() if v}
 
 
-def discover_hotspot_namespaces(
-    repo_root: Path, pkg_name: str
-) -> List[Tuple[str, str]]:
+def discover_hotspot_namespaces(repo_root: Path, pkg_name: str) -> List[Tuple[str, str]]:
     """
     Discover plugin namespaces for hotspot detection.
 
@@ -447,30 +444,30 @@ if __name__ == "__main__":
     config = AutoDiscoveredConfig(repo)
 
     print(f"Package name: {config.name}")
-    print(f"\nYAML plugin dirs:")
+    print("\nYAML plugin dirs:")
     for path, ptype in config.yaml_plugin_dirs:
         print(f"  {path} ({ptype})")
 
-    print(f"\nPython plugin namespaces:")
+    print("\nPython plugin namespaces:")
     for ns, iface in config.python_plugin_namespaces:
         print(f"  {ns} -> {iface}")
 
-    print(f"\nRegistry modules:")
+    print("\nRegistry modules:")
     for reg in config.registry_modules:
         print(f"  {reg}")
 
-    print(f"\nModel modules:")
+    print("\nModel modules:")
     for mod in config.model_modules:
         print(f"  {mod}")
 
-    print(f"\nProtocol modules:")
+    print("\nProtocol modules:")
     for mod in config.protocol_modules:
         print(f"  {mod}")
 
-    print(f"\nConfig loaders:")
+    print("\nConfig loaders:")
     for pkg in config.config_loader_packages:
         print(f"  {pkg}")
 
-    print(f"\nConsumer patterns:")
+    print("\nConsumer patterns:")
     for iface, patterns in config.consumer_patterns.items():
         print(f"  {iface}: {patterns}")

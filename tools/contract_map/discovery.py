@@ -83,6 +83,7 @@ def scan_yaml_plugins(plugin_dir: str, plugin_type: str) -> DiscoveryReport:
 # Discovery Predicates (for Python-based plugins)
 # ---------------------------------------------------------------------------
 
+
 def _default_plugin_predicate(cls) -> bool:
     """Default predicate: class has plugin_name attribute."""
     return isinstance(getattr(cls, "plugin_name", None), str)
@@ -225,7 +226,11 @@ def render_discovery_section(reports: List[DiscoveryReport]) -> str:
         if r.note:
             lines.append(f"- {r.note}")
         lines.append(f"- modules_scanned: `{r.modules_scanned}`")
-        for label, items in [("plugins", r.plugins_found), ("failures", r.failures), ("duplicates", r.duplicates)]:
+        for label, items in [
+            ("plugins", r.plugins_found),
+            ("failures", r.failures),
+            ("duplicates", r.duplicates),
+        ]:
             if items:
                 lines.append(f"- {label}:")
                 lines.extend(f"  - `{item}`" for item in items)
