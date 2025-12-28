@@ -188,10 +188,16 @@ class ChunkingRouter:
         # Track extensions that use default chunker (for optional CLI summary)
         if normalized not in self._warned_extensions:
             self._warned_extensions.add(normalized)
-            logger.debug(
-                f"Extension '{normalized}' using default chunker "
-                f"'{self._default_chunker.plugin_name}'"
-            )
+            if self._warn_on_fallback:
+                logger.warning(
+                    f"No chunker configured for extension '{normalized}', "
+                    f"using default chunker '{self._default_chunker.plugin_name}'"
+                )
+            else:
+                logger.debug(
+                    f"Extension '{normalized}' using default chunker "
+                    f"'{self._default_chunker.plugin_name}'"
+                )
 
         return self._default_chunker
 

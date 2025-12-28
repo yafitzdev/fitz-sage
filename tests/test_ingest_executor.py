@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Set
 
 import pytest
 
-from fitz_ai.ingest.chunking.plugins.simple import SimpleChunker
+from fitz_ai.ingest.chunking.plugins.default.simple import SimpleChunker
 from fitz_ai.ingest.chunking.router import ChunkingRouter
 from fitz_ai.ingest.diff.executor import (
     DiffIngestExecutor,
@@ -159,6 +159,7 @@ class TestDiffIngestExecutor:
             chunker_id="simple:1000:0",
             parser_id="md.v1",
             embedding_id="test:embedding",
+            collection="test_collection",
         )
 
         executor = DiffIngestExecutor(**executor_deps)
@@ -234,6 +235,7 @@ class TestDiffIngestExecutor:
             chunker_id="simple:1000:0",
             parser_id="md.v1",
             embedding_id="test:embedding",
+            collection="test_collection",
         )
 
         executor = DiffIngestExecutor(**executor_deps)

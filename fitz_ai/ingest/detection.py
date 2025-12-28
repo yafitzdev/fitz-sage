@@ -106,7 +106,7 @@ def detect_content_type(source_path: Path) -> DetectionResult:
                     project_type=project_type,
                 )
 
-    # No markers found - default to documents
+    # No project markers found - default to documents
     return DetectionResult(
         content_type="documents",
         reason="No codebase markers found, treating as document corpus",

@@ -10,7 +10,7 @@ Verifies:
 
 import pytest
 
-from fitz_ai.ingest.chunking.plugins.simple import SimpleChunker
+from fitz_ai.ingest.chunking.plugins.default.simple import SimpleChunker
 
 
 class TestSimpleChunkerID:

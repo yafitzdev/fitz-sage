@@ -21,7 +21,7 @@ from fitz_ai.engines.classic_rag.config import (
 )
 from fitz_ai.engines.classic_rag.models.chunk import Chunk
 from fitz_ai.ingest.chunking.engine import ChunkingEngine
-from fitz_ai.ingest.chunking.plugins.simple import SimpleChunker
+from fitz_ai.ingest.chunking.plugins.default.simple import SimpleChunker
 from fitz_ai.ingest.chunking.router import ChunkingRouter
 
 # =============================================================================

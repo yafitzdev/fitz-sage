@@ -108,24 +108,16 @@ class TestIngestHelpers:
 
         assert name == "docs"
 
-    def test_is_code_project_detects_python(self, tmp_path):
-        """Test _is_code_project detects Python files."""
+    def test_is_code_project_detects_python_project(self, tmp_path):
+        """Test _is_code_project detects Python projects via pyproject.toml."""
         from fitz_ai.cli.commands.ingest import _is_code_project
 
-        (tmp_path / "main.py").write_text("print('hello')")
-
-        assert _is_code_project(str(tmp_path)) is True
-
-    def test_is_code_project_detects_javascript(self, tmp_path):
-        """Test _is_code_project detects JavaScript files."""
-        from fitz_ai.cli.commands.ingest import _is_code_project
-
-        (tmp_path / "index.js").write_text("console.log('hello')")
+        (tmp_path / "pyproject.toml").write_text("[project]\nname = 'test'")
 
         assert _is_code_project(str(tmp_path)) is True
 
     def test_is_code_project_returns_false_for_docs(self, tmp_path):
-        """Test _is_code_project returns False for docs-only projects."""
+        """Test _is_code_project returns False for docs-only folders."""
         from fitz_ai.cli.commands.ingest import _is_code_project
 
         (tmp_path / "readme.md").write_text("# Documentation")

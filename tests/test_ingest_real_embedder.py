@@ -64,7 +64,7 @@ def test_with_real_cohere_embedder(tmp_path: Path, test_files):
     """
     import os
 
-    from fitz_ai.ingest.chunking.plugins.simple import SimpleChunker
+    from fitz_ai.ingest.chunking.plugins.default.simple import SimpleChunker
     from fitz_ai.ingest.chunking.router import ChunkingRouter
     from fitz_ai.ingest.diff.executor import DiffIngestExecutor
     from fitz_ai.ingest.state import IngestStateManager
