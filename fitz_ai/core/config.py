@@ -1,10 +1,9 @@
 # fitz_ai/core/config.py
 """
-Centralized configuration loading for Fitz.
+Generic configuration loading utilities for Fitz.
 
-This module provides a SINGLE way to load configuration files across all
-components. Individual config schemas remain in their respective packages,
-but all loading logic is consolidated here.
+This module provides paradigm-agnostic YAML loading and validation utilities.
+Engine-specific config loading lives in each engine's package.
 
 Usage:
     from fitz_ai.core.config import load_yaml, load_config, ConfigError
@@ -16,14 +15,14 @@ Usage:
     from fitz_ai.engines.classic_rag.config.schema import ClassicRagConfig
     config = load_config("config.yaml", ClassicRagConfig)
 
-    # Auto-detect config type
-    config = load_config("config.yaml")  # Returns appropriate type
+    # For engine-specific loading, use the engine's loader:
+    from fitz_ai.engines.classic_rag.config.loader import load_config as load_rag_config
+    from fitz_ai.engines.clara.config.loader import load_clara_config
 
 Design principles:
-    - Single source of truth for config loading
+    - Generic utilities only - no engine imports
     - Schema validation is separate from loading
     - Clear error messages with file paths
-    - Support for default configs
     - FitzPaths integration for standard locations
 """
 
@@ -122,19 +121,15 @@ def load_yaml(path: Union[str, Path]) -> Dict[str, Any]:
 
 
 def load_config(
-    path: Optional[Union[str, Path]] = None,
-    schema: Optional[Type[T]] = None,
-    config_type: Optional[str] = None,
+    path: Union[str, Path],
+    schema: Type[T],
 ) -> T:
     """
     Load and validate a configuration file.
 
     Args:
-        path: Path to config file. If None, uses default based on config_type.
-        schema: Pydantic model or dataclass to validate against.
-               If None, auto-detects based on config_type or file content.
-        config_type: Type of config ("rag", "ingest", "clara").
-                    Used to find defaults and auto-detect schema.
+        path: Path to config file (required).
+        schema: Pydantic model or dataclass to validate against (required).
 
     Returns:
         Validated config object
@@ -149,25 +144,14 @@ def load_config(
         from fitz_ai.engines.classic_rag.config.schema import ClassicRagConfig
         config = load_config("config.yaml", ClassicRagConfig)
 
-        # Load default RAG config
-        config = load_config(config_type="rag")
-
-        # Load ingest config
-        config = load_config("ingest.yaml", config_type="ingest")
+        # For engine-specific defaults, use the engine's loader:
+        from fitz_ai.engines.classic_rag.config.loader import load_config as load_rag_config
+        config = load_rag_config()  # Loads default.yaml
     """
-    # Resolve path
-    resolved_path = _resolve_config_path(path, config_type)
+    resolved_path = Path(path)
 
     # Load raw YAML
     data = load_yaml(resolved_path)
-
-    # Determine schema
-    if schema is None:
-        schema = _detect_schema(data, config_type)
-
-    if schema is None:
-        # No schema - return raw dict
-        return data  # type: ignore
 
     # Validate with schema
     return _validate_config(data, schema, resolved_path)
@@ -194,119 +178,8 @@ def load_config_dict(path: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
 
 
 # =============================================================================
-# Default Config Paths
+# Schema Validation
 # =============================================================================
-
-
-def get_default_config_path(config_type: str) -> Path:
-    """
-    Get the default config path for a given config type.
-
-    Args:
-        config_type: One of "rag", "ingest", "clara"
-
-    Returns:
-        Path to the default config file
-
-    Raises:
-        ValueError: If config_type is unknown
-    """
-    if config_type == "rag" or config_type == "classic_rag":
-        # Classic RAG default is bundled with the engine
-        from fitz_ai.engines.classic_rag.config.loader import DEFAULT_CONFIG_PATH
-
-        return DEFAULT_CONFIG_PATH
-
-    elif config_type == "ingest":
-        # Ingest doesn't have a bundled default - use workspace
-        return FitzPaths.config_dir() / "ingest.yaml"
-
-    elif config_type == "clara":
-        # CLaRa default
-        return FitzPaths.config_dir() / "clara.yaml"
-
-    else:
-        raise ValueError(f"Unknown config type: {config_type!r}")
-
-
-def _resolve_config_path(
-    path: Optional[Union[str, Path]],
-    config_type: Optional[str],
-) -> Path:
-    """Resolve the actual config path to load."""
-    if path is not None:
-        return Path(path)
-
-    if config_type is not None:
-        return get_default_config_path(config_type)
-
-    # Fall back to workspace config
-    workspace_config = FitzPaths.config()
-    if workspace_config.exists():
-        return workspace_config
-
-    # Try the bundled RAG default
-    try:
-        from fitz_ai.engines.classic_rag.config.loader import DEFAULT_CONFIG_PATH
-
-        if DEFAULT_CONFIG_PATH.exists():
-            return DEFAULT_CONFIG_PATH
-    except ImportError:
-        pass
-
-    raise ConfigNotFoundError(
-        "No config file specified and no default found. Run 'fitz init' to create one."
-    )
-
-
-# =============================================================================
-# Schema Detection and Validation
-# =============================================================================
-
-
-def _detect_schema(data: Dict[str, Any], config_type: Optional[str]) -> Optional[Type]:
-    """
-    Auto-detect the appropriate schema for config data.
-
-    Uses config_type hint if provided, otherwise inspects data keys.
-
-    Note: All imports are lazy to avoid circular dependencies and
-    architecture violations (core should not import from engines/ingest at module level).
-    """
-    # Use explicit type hint
-    if config_type == "rag" or config_type == "classic_rag":
-        from fitz_ai.engines.classic_rag.config.schema import ClassicRagConfig
-
-        return ClassicRagConfig
-
-    if config_type == "ingest":
-        from fitz_ai.engines.classic_rag.config import IngestConfig
-
-        return IngestConfig
-
-    if config_type == "clara":
-        from fitz_ai.engines.clara.config.schema import ClaraConfig
-
-        return ClaraConfig
-
-    # Auto-detect from content (lazy imports to avoid architecture violations)
-    if "ingester" in data and "chunking" in data:
-        from fitz_ai.engines.classic_rag.config import IngestConfig
-
-        return IngestConfig
-
-    if "chat" in data or "retriever" in data or "vector_db" in data:
-        from fitz_ai.engines.classic_rag.config.schema import ClassicRagConfig
-
-        return ClassicRagConfig
-
-    if "model" in data and "compression" in data:
-        from fitz_ai.engines.clara.config.schema import ClaraConfig
-
-        return ClaraConfig
-
-    # Unknown - return None to get raw dict
-    return None
 
 
 def _validate_config(
@@ -336,46 +209,6 @@ def _validate_config(
             f"Config validation failed: {e}",
             path=path,
         ) from e
-
-
-# =============================================================================
-# Convenience Functions
-# =============================================================================
-
-
-def load_rag_config(path: Optional[Union[str, Path]] = None):
-    """
-    Load Classic RAG configuration.
-
-    Convenience wrapper for load_config(path, config_type="rag").
-    """
-    # Lazy import to avoid architecture violation
-    from fitz_ai.engines.classic_rag.config.schema import ClassicRagConfig
-
-    return load_config(path, schema=ClassicRagConfig, config_type="rag")
-
-
-def load_ingest_config(path: Union[str, Path]):
-    """
-    Load ingestion configuration.
-
-    Convenience wrapper for load_config(path, config_type="ingest").
-    """
-    from fitz_ai.engines.classic_rag.config import IngestConfig
-
-    return load_config(path, schema=IngestConfig, config_type="ingest")
-
-
-def load_clara_config(path: Optional[Union[str, Path]] = None):
-    """
-    Load CLaRa configuration.
-
-    Convenience wrapper for load_config(path, config_type="clara").
-    """
-    # Lazy import to avoid architecture violation
-    from fitz_ai.engines.clara.config.schema import ClaraConfig
-
-    return load_config(path, schema=ClaraConfig, config_type="clara")
 
 
 # =============================================================================

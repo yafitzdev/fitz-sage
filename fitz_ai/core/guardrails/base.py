@@ -1,8 +1,10 @@
-# fitz_ai/engines/classic_rag/constraints/base.py
+# fitz_ai/core/guardrails/base.py
 """
-Constraint Plugin Base - Protocol and result types.
+Constraint Plugin Base - Protocol and result types for epistemic guardrails.
 
 Constraints answer: "Given this context, what conclusions are allowed?"
+
+This is a core platform capability supporting epistemic honesty.
 """
 
 from __future__ import annotations
@@ -11,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, Protocol, Sequence, runtime_checkable
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.classic_rag.models.chunk import Chunk
+    from fitz_ai.core.conflicts import ChunkLike
 
 
 @dataclass(frozen=True)
@@ -69,7 +71,7 @@ class ConstraintPlugin(Protocol):
     def apply(
         self,
         query: str,
-        chunks: Sequence["Chunk"],
+        chunks: Sequence["ChunkLike"],
     ) -> ConstraintResult:
         """
         Apply the constraint to retrieved context.
@@ -82,3 +84,6 @@ class ConstraintPlugin(Protocol):
             ConstraintResult indicating whether decisive answers are allowed
         """
         ...
+
+
+__all__ = ["ConstraintResult", "ConstraintPlugin"]

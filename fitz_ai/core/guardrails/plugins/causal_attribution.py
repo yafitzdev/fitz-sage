@@ -1,4 +1,4 @@
-# fitz_ai/engines/classic_rag/constraints/plugins/causal_attribution.py
+# fitz_ai/core/guardrails/plugins/causal_attribution.py
 """
 Causal Attribution Constraint - Prevents implicit causality claims.
 
@@ -22,7 +22,7 @@ from fitz_ai.logging.tags import PIPELINE
 from ..base import ConstraintResult
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.classic_rag.models.chunk import Chunk
+    from fitz_ai.core.conflicts import ChunkLike
 
 logger = get_logger(__name__)
 
@@ -77,7 +77,7 @@ def _is_causal_query(query: str) -> bool:
     return False
 
 
-def _has_causal_evidence(chunks: Sequence["Chunk"]) -> bool:
+def _has_causal_evidence(chunks: Sequence["ChunkLike"]) -> bool:
     """Check if any chunk contains explicit causal language."""
     for chunk in chunks:
         content_lower = chunk.content.lower()
@@ -87,7 +87,7 @@ def _has_causal_evidence(chunks: Sequence["Chunk"]) -> bool:
     return False
 
 
-def _count_causal_chunks(chunks: Sequence["Chunk"]) -> int:
+def _count_causal_chunks(chunks: Sequence["ChunkLike"]) -> int:
     """Count chunks containing explicit causal language."""
     count = 0
     for chunk in chunks:
@@ -129,7 +129,7 @@ class CausalAttributionConstraint:
     def apply(
         self,
         query: str,
-        chunks: Sequence["Chunk"],
+        chunks: Sequence["ChunkLike"],
     ) -> ConstraintResult:
         """
         Check if causal queries have explicit causal evidence.
@@ -170,3 +170,6 @@ class CausalAttributionConstraint:
             causal_chunks=causal_count,
             total_chunks=len(chunks),
         )
+
+
+__all__ = ["CausalAttributionConstraint"]

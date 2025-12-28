@@ -2,11 +2,10 @@
 """
 Configuration loader for CLaRa engine.
 
-This is a thin wrapper around fitz_ai.core.config.
-All the actual loading logic lives there.
-
-For new code, prefer importing directly from fitz_ai.core.config:
-    from fitz_ai.core.config import load_config, load_clara_config
+Usage:
+    from fitz_ai.engines.clara.config.loader import load_clara_config
+    config = load_clara_config()  # Returns defaults
+    config = load_clara_config("my_config.yaml")  # Loads from file
 """
 
 from __future__ import annotations
@@ -17,8 +16,8 @@ from typing import Optional, Union
 from fitz_ai.core.config import (
     ConfigError,
     ConfigNotFoundError,
+    load_config,
 )
-from fitz_ai.core.config import load_config as _load_config_core
 from fitz_ai.engines.clara.config.schema import ClaraConfig
 
 
@@ -39,7 +38,7 @@ def load_clara_config(config_path: Optional[Union[str, Path]] = None) -> ClaraCo
         return ClaraConfig()
 
     try:
-        return _load_config_core(config_path, schema=ClaraConfig)
+        return load_config(config_path, schema=ClaraConfig)
     except ConfigNotFoundError:
         raise FileNotFoundError(f"Config file not found: {config_path}")
     except ConfigError as e:

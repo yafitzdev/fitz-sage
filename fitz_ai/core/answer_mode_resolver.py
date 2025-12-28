@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Sequence
 from fitz_ai.core.answer_mode import AnswerMode
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.classic_rag.constraints.base import ConstraintResult
+    from fitz_ai.core.guardrails import ConstraintResult
 
 
 def resolve_answer_mode(

@@ -10,7 +10,7 @@ Simple mode groups chunks by source file and generates summaries
 using prompts from the centralized prompt library.
 
 Epistemic features:
-- Detects conflicts within chunk groups before summarization
+- Detects conflicts using core/conflicts.py (platform-wide capability)
 - Adapts prompts to acknowledge uncertainty and disagreement
 - Propagates epistemic metadata up the hierarchy
 """
@@ -19,16 +19,14 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, List, Protocol, runtime_checkable
 
+from fitz_ai.core.conflicts import find_conflicts
 from fitz_ai.engines.classic_rag.models.chunk import Chunk
 from fitz_ai.ingest.enrichment.config import (
     HierarchyConfig,
     HierarchyRule,
-)
-from fitz_ai.ingest.enrichment.hierarchy.epistemic import (
-    EpistemicAssessment,
-    assess_chunk_group,
 )
 from fitz_ai.ingest.enrichment.hierarchy.grouper import ChunkGrouper
 from fitz_ai.ingest.enrichment.hierarchy.matcher import ChunkMatcher
@@ -47,6 +45,85 @@ class ChatClient(Protocol):
     def chat(self, messages: list[dict[str, str]]) -> str: ...
 
 
+# =============================================================================
+# Epistemic Assessment (inlined from epistemic.py)
+# =============================================================================
+
+
+@dataclass
+class EpistemicAssessment:
+    """
+    Epistemic status of a chunk group.
+
+    Attributes:
+        has_conflicts: Whether contradictory claims were detected
+        conflict_topics: High-level topics where disagreement exists
+        agreement_ratio: Fraction of chunks that agree (0.0-1.0)
+        evidence_density: How much evidence backs the summary
+        chunk_count: Number of source chunks
+    """
+
+    has_conflicts: bool = False
+    conflict_topics: list[str] = field(default_factory=list)
+    agreement_ratio: float = 1.0
+    evidence_density: str = "moderate"  # "sparse" | "moderate" | "dense"
+    chunk_count: int = 0
+
+    def to_metadata(self) -> dict:
+        """Convert to metadata dict for chunk storage."""
+        return {
+            "epistemic_has_conflicts": self.has_conflicts,
+            "epistemic_conflict_topics": self.conflict_topics,
+            "epistemic_agreement_ratio": self.agreement_ratio,
+            "epistemic_evidence_density": self.evidence_density,
+            "epistemic_chunk_count": self.chunk_count,
+        }
+
+
+def assess_chunk_group(chunks: List[Chunk]) -> EpistemicAssessment:
+    """
+    Assess the epistemic status of a chunk group before summarization.
+
+    Uses core/conflicts.py for conflict detection.
+    """
+    if not chunks:
+        return EpistemicAssessment(evidence_density="sparse", chunk_count=0)
+
+    chunk_count = len(chunks)
+    total_chars = sum(len(c.content) for c in chunks)
+
+    # Find conflicts using core logic
+    conflicts = find_conflicts(chunks)
+
+    # Calculate agreement ratio
+    if chunk_count > 1 and conflicts:
+        conflict_ratio = min(len(conflicts) / chunk_count, 1.0)
+        agreement_ratio = round(1.0 - conflict_ratio, 2)
+    else:
+        agreement_ratio = 1.0
+
+    # Determine evidence density
+    if chunk_count < 3 or total_chars < 500:
+        evidence_density = "sparse"
+    elif chunk_count < 10 or total_chars < 3000:
+        evidence_density = "moderate"
+    else:
+        evidence_density = "dense"
+
+    return EpistemicAssessment(
+        has_conflicts=len(conflicts) > 0,
+        conflict_topics=["claims"] if conflicts else [],
+        agreement_ratio=agreement_ratio,
+        evidence_density=evidence_density,
+        chunk_count=chunk_count,
+    )
+
+
+# =============================================================================
+# Hierarchy Enricher
+# =============================================================================
+
+
 class HierarchyEnricher:
     """
     Generates hierarchical summaries from chunks.
@@ -55,7 +132,7 @@ class HierarchyEnricher:
     1. Filters chunks by path patterns
     2. Groups by metadata key
     3. Generates level-1 summaries for each group
-    4. Generates level-0 corpus summary
+    4. Generates level-2 corpus summary
 
     All summary chunks are returned alongside original chunks with
     `hierarchy_level` metadata marking their position in the hierarchy.
@@ -550,4 +627,4 @@ Write a high-level overview (3-5 paragraphs) synthesizing the key insights.
         )
 
 
-__all__ = ["HierarchyEnricher", "ChatClient"]
+__all__ = ["HierarchyEnricher", "ChatClient", "EpistemicAssessment", "assess_chunk_group"]

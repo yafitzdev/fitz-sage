@@ -22,11 +22,10 @@ Usage:
             prompt: "Summarize sentiment and themes"
 """
 
-from fitz_ai.ingest.enrichment.hierarchy.enricher import HierarchyEnricher
-from fitz_ai.ingest.enrichment.hierarchy.epistemic import (
+from fitz_ai.ingest.enrichment.hierarchy.enricher import (
     EpistemicAssessment,
+    HierarchyEnricher,
     assess_chunk_group,
-    assess_chunk_group_with_llm,
 )
 from fitz_ai.ingest.enrichment.hierarchy.grouper import ChunkGrouper
 from fitz_ai.ingest.enrichment.hierarchy.matcher import ChunkMatcher
@@ -37,5 +36,4 @@ __all__ = [
     "ChunkGrouper",
     "EpistemicAssessment",
     "assess_chunk_group",
-    "assess_chunk_group_with_llm",
 ]

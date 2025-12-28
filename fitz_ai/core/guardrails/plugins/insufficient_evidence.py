@@ -1,4 +1,4 @@
-# fitz_ai/engines/classic_rag/constraints/plugins/insufficient_evidence.py
+# fitz_ai/core/guardrails/plugins/insufficient_evidence.py
 """
 Insufficient Evidence Constraint - Default guardrail for evidence coverage.
 
@@ -26,7 +26,7 @@ from fitz_ai.logging.tags import PIPELINE
 from ..base import ConstraintResult
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.classic_rag.models.chunk import Chunk
+    from fitz_ai.core.conflicts import ChunkLike
 
 logger = get_logger(__name__)
 
@@ -199,7 +199,7 @@ def _chunk_has_assertion(chunk_content: str, query_keywords: set[str]) -> bool:
 
 
 def _count_relevant_chunks(
-    chunks: Sequence["Chunk"],
+    chunks: Sequence["ChunkLike"],
     query_keywords: set[str],
     require_causal: bool,
 ) -> int:
@@ -249,7 +249,7 @@ class InsufficientEvidenceConstraint:
     def apply(
         self,
         query: str,
-        chunks: Sequence["Chunk"],
+        chunks: Sequence["ChunkLike"],
     ) -> ConstraintResult:
         """
         Check if there is sufficient evidence to answer the query.
@@ -314,3 +314,6 @@ class InsufficientEvidenceConstraint:
         # For other query types (or if evidence found), allow
         logger.debug(f"{PIPELINE} InsufficientEvidenceConstraint: sufficient evidence")
         return ConstraintResult.allow()
+
+
+__all__ = ["InsufficientEvidenceConstraint"]

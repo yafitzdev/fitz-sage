@@ -2,9 +2,9 @@
 """Tests for epistemic-aware hierarchical summarization.
 
 Note: Conflict detection tests are minimal here because the actual logic
-lives in fitz_ai/engines/classic_rag/constraints/plugins/conflict_aware.py
-and is tested in test_constraints.py. This file tests the integration
-of that logic with the hierarchy enricher.
+lives in fitz_ai/core/guardrails/plugins/conflict_aware.py and is tested
+in test_constraints.py. This file tests the integration of that logic
+with the hierarchy enricher.
 """
 
 from __future__ import annotations
@@ -346,7 +346,7 @@ class TestSingleSourceOfTruth:
 
     def test_uses_conflict_aware_constraint_patterns(self):
         """Verify that the same patterns detected by ConflictAwareConstraint are detected here."""
-        from fitz_ai.engines.classic_rag.constraints import ConflictAwareConstraint
+        from fitz_ai.core.guardrails import ConflictAwareConstraint
 
         # Create chunks with a known conflict pattern
         chunks = [

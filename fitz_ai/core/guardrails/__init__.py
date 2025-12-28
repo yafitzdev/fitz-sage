@@ -1,17 +1,19 @@
-# fitz_ai/engines/classic_rag/constraints/__init__.py
+# fitz_ai/core/guardrails/__init__.py
 """
-Constraint Plugins - Guardrails for epistemic correctness.
+Epistemic Guardrails - Constraint system for epistemic correctness.
 
-Constraints inspect retrieved context and determine what conclusions are allowed.
+Guardrails inspect retrieved context and determine what conclusions are allowed.
 They are orthogonal to retrieval (what's relevant) and generation (how to answer).
 
-Default constraints (all enabled by default):
+This is a core platform capability supporting epistemic honesty across all engines.
+
+Default guardrails (all enabled by default):
 - ConflictAwareConstraint: blocks confident answers when sources contradict
 - InsufficientEvidenceConstraint: blocks confident answers without explicit evidence
 - CausalAttributionConstraint: prevents implicit causality claims
 
 Usage:
-    from fitz_ai.engines.classic_rag.constraints import (
+    from fitz_ai.core.guardrails import (
         ConstraintResult,
         ConstraintPlugin,
         ConflictAwareConstraint,

@@ -1,4 +1,4 @@
-# fitz_ai/engines/classic_rag/constraints/runner.py
+# fitz_ai/core/guardrails/runner.py
 """
 Constraint Runner - Applies constraint plugins to retrieved context.
 
@@ -15,14 +15,14 @@ from fitz_ai.logging.tags import PIPELINE
 from .base import ConstraintPlugin, ConstraintResult
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.classic_rag.models.chunk import Chunk
+    from fitz_ai.core.conflicts import ChunkLike
 
 logger = get_logger(__name__)
 
 
 def apply_constraints(
     query: str,
-    chunks: Sequence["Chunk"],
+    chunks: Sequence["ChunkLike"],
     constraints: Sequence[ConstraintPlugin],
 ) -> ConstraintResult:
     """
@@ -72,3 +72,6 @@ def apply_constraints(
 
     logger.debug(f"{PIPELINE} All constraints passed")
     return ConstraintResult.allow()
+
+
+__all__ = ["apply_constraints"]

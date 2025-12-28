@@ -1,4 +1,4 @@
-# fitz_ai/engines/classic_rag/constraints/plugins/__init__.py
+# fitz_ai/core/guardrails/plugins/__init__.py
 """
 Constraint Plugins - Individual guardrail implementations.
 
