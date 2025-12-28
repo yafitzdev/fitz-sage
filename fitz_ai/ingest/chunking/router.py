@@ -199,6 +199,22 @@ class ChunkingRouter:
         """Get extensions that fell back to the default chunker."""
         return self._warned_extensions.copy()
 
+    def get_auto_discovered_chunkers(self) -> Dict[str, list[str]]:
+        """
+        Get auto-discovered chunkers and their extensions.
+
+        Returns:
+            Dict mapping plugin names to list of extensions using that plugin.
+            Example: {"markdown": [".md"], "python_code": [".py"]}
+        """
+        result: Dict[str, list[str]] = {}
+        for ext, chunker in self._auto_chunkers.items():
+            plugin_name = chunker.plugin_name
+            if plugin_name not in result:
+                result[plugin_name] = []
+            result[plugin_name].append(ext)
+        return result
+
     def get_chunker_id(self, ext: str) -> str:
         """Get the chunker_id for a file extension."""
         return self.get_chunker(ext).chunker_id

@@ -371,16 +371,66 @@ def command(
 
             if existing_collections:
                 # Collections exist - let user choose or create new
+                # Show [0] Create new, then [1]+ for existing collections
                 print()
-                choices = existing_collections + ["+ Create new"]
-                selected = ui.prompt_numbered_choice(
-                    "Collection", choices, default_collection, indent=False
-                )
-                if selected == "+ Create new":
-                    suggested = _suggest_collection_name(source)
-                    collection = ui.prompt_text("Collection name", suggested)
+                if RICH:
+                    from rich.prompt import Prompt
+
+                    console.print("[bold]Collection:[/bold]")
+                    console.print("[cyan][0][/cyan] + Create new")
                 else:
-                    collection = selected
+                    print("Collection:")
+                    print("[0] + Create new")
+
+                # Reorder: default first, then rest
+                if default_collection in existing_collections:
+                    ordered = [default_collection] + [
+                        c for c in existing_collections if c != default_collection
+                    ]
+                else:
+                    ordered = existing_collections
+
+                for i, coll in enumerate(ordered, 1):
+                    if coll == default_collection:
+                        if RICH:
+                            console.print(f"[cyan][{i}][/cyan] {coll} [dim](default)[/dim]")
+                        else:
+                            print(f"[{i}] {coll} (default)")
+                    else:
+                        if RICH:
+                            console.print(f"[cyan][{i}][/cyan] {coll}")
+                        else:
+                            print(f"[{i}] {coll}")
+
+                # Get choice
+                while True:
+                    if RICH:
+                        response = Prompt.ask("Choice", default="1")
+                    else:
+                        response = input("Choice (1): ").strip() or "1"
+
+                    try:
+                        idx = int(response)
+                        if idx == 0:
+                            # Create new
+                            suggested = _suggest_collection_name(source)
+                            collection = ui.prompt_text("Collection name", suggested)
+                            break
+                        elif 1 <= idx <= len(ordered):
+                            collection = ordered[idx - 1]
+                            if RICH:
+                                console.print(f"[dim]→ {collection}[/dim]")
+                            break
+                        else:
+                            if RICH:
+                                console.print(f"[red]Please enter 0-{len(ordered)}[/red]")
+                            else:
+                                print(f"Please enter 0-{len(ordered)}")
+                    except ValueError:
+                        if RICH:
+                            console.print("[red]Please enter a number[/red]")
+                        else:
+                            print("Please enter a number")
             else:
                 # No collections exist - prompt for name
                 suggested = _suggest_collection_name(source)
@@ -543,6 +593,10 @@ def command(
                 plugin_names = [p.name for p in plugins]
                 if plugin_names:
                     ui.info(f"Codebase analysis: {', '.join(plugin_names)}")
+
+        # Show chunking configuration
+        default_chunker = chunking_router.default_chunker.plugin_name
+        ui.info(f"Chunking: auto-select by extension, default: {default_chunker}")
 
     except Exception as e:
         ui.error(f"Failed to initialize: {e}")
@@ -759,10 +813,3 @@ def command(
 
     print()
     ui.success(f"Documents ingested into collection '{collection}'")
-
-    # Show which extensions used the default chunker (grey/dim text)
-    exts_using_default = chunking_router.get_extensions_using_default()
-    if exts_using_default:
-        default_name = chunking_router._default_chunker.plugin_name
-        ext_list = ", ".join(sorted(exts_using_default))
-        ui.info(f"Chunker '{default_name}' used for: {ext_list}")
