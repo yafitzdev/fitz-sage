@@ -111,6 +111,7 @@ __all__ = [
 
 def _register_clara_engine():
     """Register CLaRa with the engine registry."""
+    from fitz_ai.engines.clara.config.schema import get_default_config_path
     from fitz_ai.runtime import EngineCapabilities, EngineRegistry
 
     def _create_clara_engine_factory(config) -> ClaraEngine:
@@ -165,6 +166,7 @@ def _register_clara_engine():
             description="CLaRa: Continuous Latent Reasoning - Compression-native RAG with 16x-128x document compression",
             config_type=ClaraConfig,
             config_loader=_clara_config_loader,
+            default_config_path=get_default_config_path,
             capabilities=capabilities,
         )
 

@@ -1,5 +1,5 @@
-# clara_config.yaml
-# Example configuration file for CLaRa engine
+# fitz_ai/engines/clara/config/default.yaml
+# Default configuration file for CLaRa engine
 #
 # Place this file in your project root or specify path when creating engine.
 # All values shown are defaults - only override what you need to change.
@@ -51,7 +51,7 @@ clara:
     candidate_pool_size: 20
     
     # Use differentiable top-k (for training, disable for inference)
-    use_differentiable_topk: false
+    differentiable_topk: false
 
   # Generation configuration
   generation:

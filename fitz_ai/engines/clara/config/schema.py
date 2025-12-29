@@ -52,6 +52,9 @@ class ClaraCompressionConfig:
     # Batch size for compression
     compression_batch_size: int = 4
 
+    # Number of memory tokens per document (auto-calculated if None)
+    num_memory_tokens: Optional[int] = None
+
 
 @dataclass
 class ClaraRetrievalConfig:
@@ -116,21 +119,50 @@ class ClaraConfig:
     cache_compressed_docs: bool = True
 
 
+def get_default_config_path() -> Path:
+    """Get path to the package default Clara config file."""
+    return Path(__file__).parent / "default.yaml"
+
+
+def get_user_config_path() -> Path:
+    """Get path to user's Clara config file (.fitz/config/clara.yaml)."""
+    from fitz_ai.core.paths import FitzPaths
+
+    return FitzPaths.engine_config("clara")
+
+
 def load_clara_config(config_path: Optional[str] = None) -> ClaraConfig:
     """
     Load CLaRa configuration from a YAML file.
 
+    Resolution order:
+    1. Explicit config_path if provided
+    2. User config at .fitz/config/clara.yaml
+    3. Package default at fitz_ai/engines/clara/config/clara_config.yaml
+    4. If no config file exists, returns ClaraConfig() with code defaults
+
     Args:
-        config_path: Path to YAML config file. If None, returns defaults.
+        config_path: Path to YAML config file. If None, uses resolution order.
 
     Returns:
         ClaraConfig object
 
     Raises:
-        FileNotFoundError: If config file doesn't exist
+        FileNotFoundError: If explicit config file doesn't exist
     """
     if config_path is None:
-        return ClaraConfig()
+        # Check for user config first
+        user_config = get_user_config_path()
+        if user_config.exists():
+            config_path = str(user_config)
+        else:
+            # Check for package default
+            default_config = get_default_config_path()
+            if default_config.exists():
+                config_path = str(default_config)
+            else:
+                # Fall back to code defaults
+                return ClaraConfig()
 
     path = Path(config_path)
     if not path.exists():

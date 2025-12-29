@@ -14,6 +14,8 @@ Usage:
 
 from .loader import (
     DEFAULT_CONFIG_PATH,
+    get_default_config_path,
+    get_user_config_path,
     load_config,
     load_config_dict,
 )
@@ -35,6 +37,8 @@ __all__ = [
     "ClassicRagConfig",
     "load_config",
     "load_config_dict",
+    "get_default_config_path",
+    "get_user_config_path",
     # RAG sub-configs
     "PluginConfig",
     "RetrievalConfig",

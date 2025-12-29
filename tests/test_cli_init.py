@@ -151,16 +151,26 @@ class TestInitHelpers:
 
 
 class TestGenerateConfig:
-    """Tests for _generate_config."""
+    """Tests for config generation functions."""
 
-    def test_generate_config_basic(self):
-        """Test _generate_config produces valid YAML."""
+    def test_generate_global_config(self):
+        """Test _generate_global_config produces valid YAML."""
         import yaml
 
-        from fitz_ai.cli.commands.init import _generate_config
+        from fitz_ai.cli.commands.init import _generate_global_config
 
-        config_str = _generate_config(
-            default_engine="classic_rag",
+        config_str = _generate_global_config("classic_rag")
+        config = yaml.safe_load(config_str)
+
+        assert config["default_engine"] == "classic_rag"
+
+    def test_generate_classic_rag_config_basic(self):
+        """Test _generate_classic_rag_config produces valid YAML."""
+        import yaml
+
+        from fitz_ai.cli.commands.init import _generate_classic_rag_config
+
+        config_str = _generate_classic_rag_config(
             chat="cohere",
             chat_model_smart="command-a-03-2025",
             chat_model_fast="command-r7b-12-2024",
@@ -180,7 +190,6 @@ class TestGenerateConfig:
         # Should be valid YAML
         config = yaml.safe_load(config_str)
 
-        assert config["default_engine"] == "classic_rag"
         assert config["chat"]["plugin_name"] == "cohere"
         assert config["chat"]["kwargs"]["models"]["smart"] == "command-a-03-2025"
         assert config["chat"]["kwargs"]["models"]["fast"] == "command-r7b-12-2024"
@@ -188,14 +197,13 @@ class TestGenerateConfig:
         assert config["vector_db"]["plugin_name"] == "local_faiss"
         assert config["retrieval"]["plugin_name"] == "dense"
 
-    def test_generate_config_with_rerank(self):
-        """Test _generate_config includes rerank when provided."""
+    def test_generate_classic_rag_config_with_rerank(self):
+        """Test _generate_classic_rag_config includes rerank when provided."""
         import yaml
 
-        from fitz_ai.cli.commands.init import _generate_config
+        from fitz_ai.cli.commands.init import _generate_classic_rag_config
 
-        config_str = _generate_config(
-            default_engine="classic_rag",
+        config_str = _generate_classic_rag_config(
             chat="cohere",
             chat_model_smart="command-a-03-2025",
             chat_model_fast="command-r7b-12-2024",
@@ -217,14 +225,13 @@ class TestGenerateConfig:
         assert config["rerank"]["enabled"] is True
         assert config["rerank"]["plugin_name"] == "cohere"
 
-    def test_generate_config_without_rerank(self):
-        """Test _generate_config disables rerank when not provided."""
+    def test_generate_classic_rag_config_without_rerank(self):
+        """Test _generate_classic_rag_config disables rerank when not provided."""
         import yaml
 
-        from fitz_ai.cli.commands.init import _generate_config
+        from fitz_ai.cli.commands.init import _generate_classic_rag_config
 
-        config_str = _generate_config(
-            default_engine="classic_rag",
+        config_str = _generate_classic_rag_config(
             chat="cohere",
             chat_model_smart="",
             chat_model_fast="",
@@ -245,14 +252,13 @@ class TestGenerateConfig:
 
         assert config["rerank"]["enabled"] is False
 
-    def test_generate_config_qdrant(self):
-        """Test _generate_config includes Qdrant settings."""
+    def test_generate_classic_rag_config_qdrant(self):
+        """Test _generate_classic_rag_config includes Qdrant settings."""
         import yaml
 
-        from fitz_ai.cli.commands.init import _generate_config
+        from fitz_ai.cli.commands.init import _generate_classic_rag_config
 
-        config_str = _generate_config(
-            default_engine="classic_rag",
+        config_str = _generate_classic_rag_config(
             chat="cohere",
             chat_model_smart="",
             chat_model_fast="",
@@ -275,14 +281,13 @@ class TestGenerateConfig:
         assert config["vector_db"]["kwargs"]["host"] == "192.168.1.100"
         assert config["vector_db"]["kwargs"]["port"] == 6334
 
-    def test_generate_config_chunking(self):
-        """Test _generate_config includes chunking settings."""
+    def test_generate_classic_rag_config_chunking(self):
+        """Test _generate_classic_rag_config includes chunking settings."""
         import yaml
 
-        from fitz_ai.cli.commands.init import _generate_config
+        from fitz_ai.cli.commands.init import _generate_classic_rag_config
 
-        config_str = _generate_config(
-            default_engine="classic_rag",
+        config_str = _generate_classic_rag_config(
             chat="cohere",
             chat_model_smart="",
             chat_model_fast="",
@@ -304,6 +309,49 @@ class TestGenerateConfig:
         assert config["chunking"]["default"]["plugin_name"] == "recursive"
         assert config["chunking"]["default"]["kwargs"]["chunk_size"] == 500
         assert config["chunking"]["default"]["kwargs"]["chunk_overlap"] == 100
+
+    def test_copy_engine_default_config_graphrag(self):
+        """Test _copy_engine_default_config returns graphrag default config."""
+        import yaml
+
+        from fitz_ai.cli.commands.init import _copy_engine_default_config
+        from fitz_ai.runtime import get_engine_registry
+
+        # Ensure graphrag is registered
+        import fitz_ai.engines.graphrag  # noqa: F401
+
+        registry = get_engine_registry()
+        config_str = _copy_engine_default_config("graphrag", registry)
+
+        assert config_str is not None
+        config = yaml.safe_load(config_str)
+
+        assert "graphrag" in config
+        assert "extraction" in config["graphrag"]
+        assert "community" in config["graphrag"]
+        assert "search" in config["graphrag"]
+
+    def test_copy_engine_default_config_clara(self):
+        """Test _copy_engine_default_config returns clara default config."""
+        import yaml
+
+        from fitz_ai.cli.commands.init import _copy_engine_default_config
+        from fitz_ai.runtime import get_engine_registry
+
+        # Ensure clara is registered
+        import fitz_ai.engines.clara  # noqa: F401
+
+        registry = get_engine_registry()
+        config_str = _copy_engine_default_config("clara", registry)
+
+        assert config_str is not None
+        config = yaml.safe_load(config_str)
+
+        assert "clara" in config
+        assert "model" in config["clara"]
+        assert "compression" in config["clara"]
+        assert "retrieval" in config["clara"]
+        assert "generation" in config["clara"]
 
 
 class TestInitValidation:

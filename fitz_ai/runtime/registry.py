@@ -91,6 +91,14 @@ class EngineRegistration:
     If None, engine doesn't need config loading.
     """
 
+    default_config_path: Optional[Callable[[], Any]] = None
+    """
+    Function that returns the path to the engine's default config file.
+
+    Signature: () -> Path
+    Used by fitz init to copy default config to user config directory.
+    """
+
     capabilities: EngineCapabilities = field(default_factory=EngineCapabilities)
     """Engine capabilities for CLI/API adaptation."""
 
@@ -150,6 +158,7 @@ class EngineRegistry:
         description: str = "",
         config_type: Optional[Type] = None,
         config_loader: Optional[Callable[[Optional[str]], Any]] = None,
+        default_config_path: Optional[Callable[[], Any]] = None,
         capabilities: Optional[EngineCapabilities] = None,
     ) -> None:
         """
@@ -161,6 +170,7 @@ class EngineRegistry:
             description: Human-readable description
             config_type: Expected config type (optional, for validation)
             config_loader: Function to load config (config_path -> config)
+            default_config_path: Function that returns path to default config file
             capabilities: Engine capabilities for CLI/API adaptation
 
         Raises:
@@ -175,6 +185,7 @@ class EngineRegistry:
             description=description,
             config_type=config_type,
             config_loader=config_loader,
+            default_config_path=default_config_path,
             capabilities=capabilities or EngineCapabilities(),
         )
         self._engines[name] = registration
@@ -266,12 +277,33 @@ class EngineRegistry:
         """List all engines with their capabilities."""
         return {name: reg.capabilities for name, reg in self._engines.items()}
 
+    def get_default_config_path(self, name: str) -> Optional[Any]:
+        """
+        Get the path to an engine's default config file.
+
+        Args:
+            name: Name of the engine
+
+        Returns:
+            Path to default config file, or None if not available
+
+        Raises:
+            ConfigurationError: If engine not found
+        """
+        info = self.get_info(name)
+
+        if info.default_config_path is None:
+            return None
+
+        return info.default_config_path()
+
     @staticmethod
     def register_engine(
         name: str,
         description: str = "",
         config_type: Optional[Type] = None,
         config_loader: Optional[Callable[[Optional[str]], Any]] = None,
+        default_config_path: Optional[Callable[[], Any]] = None,
         capabilities: Optional[EngineCapabilities] = None,
     ) -> Callable:
         """
@@ -285,6 +317,7 @@ class EngineRegistry:
             description: Human-readable description
             config_type: Expected config type (optional)
             config_loader: Function to load config
+            default_config_path: Function that returns path to default config file
             capabilities: Engine capabilities
 
         Returns:
@@ -311,6 +344,7 @@ class EngineRegistry:
                 description=description,
                 config_type=config_type,
                 config_loader=config_loader,
+                default_config_path=default_config_path,
                 capabilities=capabilities,
             )
             return factory

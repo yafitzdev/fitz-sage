@@ -1,0 +1,98 @@
+# fitz_ai/engines/graphrag/config/default.yaml
+#
+# Default configuration for GraphRAG engine.
+#
+# This is the package fallback used when no user config exists.
+# Users can override these settings in their .fitz/config.yaml
+#
+# GraphRAG uses:
+# - LLM for entity extraction and answer generation
+# - Embeddings for semantic search over entities/communities
+# - NetworkX for knowledge graph storage (local, no external service)
+
+graphrag:
+  # ===========================================================================
+  # LLM Provider (for extraction, summarization, and answers)
+  # ===========================================================================
+  # Uses tier system: "fast" for extraction/summarization, "smart" for answers
+  llm_provider: cohere
+
+  # ===========================================================================
+  # Embedding Provider (for entity and community search)
+  # ===========================================================================
+  embedding_provider: cohere
+
+  # ===========================================================================
+  # Entity/Relationship Extraction
+  # ===========================================================================
+  extraction:
+    # Maximum entities to extract per chunk
+    max_entities_per_chunk: 20
+
+    # Maximum relationships to extract per chunk
+    max_relationships_per_chunk: 30
+
+    # Entity types to extract (empty list = extract all types)
+    entity_types:
+      - person
+      - organization
+      - location
+      - event
+      - concept
+      - technology
+      - product
+      - date
+
+    # Relationship types to extract (empty list = extract all types)
+    relationship_types: []
+
+    # Whether to include entity descriptions
+    include_descriptions: true
+
+  # ===========================================================================
+  # Community Detection
+  # ===========================================================================
+  community:
+    # Algorithm: "louvain" (fast, good quality) or "leiden" (requires leidenalg)
+    algorithm: louvain
+
+    # Resolution parameter (higher = more, smaller communities)
+    resolution: 1.0
+
+    # Minimum community size (smaller communities are filtered out)
+    min_community_size: 2
+
+    # Maximum hierarchy levels for community summaries
+    max_hierarchy_levels: 2
+
+  # ===========================================================================
+  # Search Configuration
+  # ===========================================================================
+  search:
+    # Default search mode: "local", "global", or "hybrid"
+    #   - local: Entity-focused, best for specific questions
+    #   - global: Community-based, best for thematic/broad questions
+    #   - hybrid: Combines both approaches
+    default_mode: local
+
+    # Number of entities to retrieve in local search
+    local_top_k: 10
+
+    # Number of communities to retrieve in global search
+    global_top_k: 5
+
+    # Whether to include entity relationships in context
+    include_relationships: true
+
+    # Maximum context tokens for generation
+    max_context_tokens: 4000
+
+  # ===========================================================================
+  # Storage Configuration
+  # ===========================================================================
+  storage:
+    # Storage backend: "memory" (default) or "file"
+    backend: memory
+
+    # Path for file-based storage (only used if backend: file)
+    storage_path: null

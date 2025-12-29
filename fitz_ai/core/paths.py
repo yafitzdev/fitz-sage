@@ -101,11 +101,30 @@ class FitzPaths:
     @classmethod
     def config_dir(cls) -> Path:
         """
-        Config directory for multiple config files.
+        Config directory for engine-specific config files.
 
         Location: {workspace}/config/
         """
         return cls.workspace() / "config"
+
+    @classmethod
+    def engine_config(cls, engine_name: str) -> Path:
+        """
+        Engine-specific config file path.
+
+        Location: {workspace}/config/{engine_name}.yaml
+
+        Args:
+            engine_name: Name of the engine (classic_rag, graphrag, clara)
+        """
+        return cls.config_dir() / f"{engine_name}.yaml"
+
+    @classmethod
+    def ensure_config_dir(cls) -> Path:
+        """Get config directory and create it if it doesn't exist."""
+        path = cls.config_dir()
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
     # =========================================================================
     # Ingestion State

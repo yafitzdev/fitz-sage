@@ -98,6 +98,7 @@ run = run_classic_rag
 
 def _register_classic_rag_engine():
     """Register Classic RAG engine with the global registry."""
+    from fitz_ai.engines.classic_rag.config import get_default_config_path
     from fitz_ai.engines.classic_rag.engine import ClassicRagEngine
     from fitz_ai.runtime.registry import EngineCapabilities, EngineRegistry
 
@@ -134,6 +135,7 @@ def _register_classic_rag_engine():
             description="Retrieval-augmented generation using vector search and LLM synthesis",
             config_type=ClassicRagConfig,
             config_loader=classic_rag_config_loader,
+            default_config_path=get_default_config_path,
             capabilities=capabilities,
         )
     except ValueError:
