@@ -5,12 +5,12 @@ End-to-end test of RAGPipeline using mock retrieval and LLM.
 
 from dataclasses import dataclass
 
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import (
     RGS,
     RGSAnswer,
     RGSConfig,
 )
-from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.classic_rag.pipeline.engine import RAGPipeline
 
 # =============================================================================

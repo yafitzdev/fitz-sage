@@ -321,9 +321,7 @@ logging:
             ChunkingRouterConfig,
             ExtensionChunkerConfig,
         )
-        from fitz_ai.engines.classic_rag.config import (
-            load_config_dict as load_default_config_dict,
-        )
+        from fitz_ai.engines.classic_rag.config import load_config_dict as load_default_config_dict
 
         chunking_cfg = config.get("chunking") or config.get("ingest", {}).get("chunking")
 

@@ -25,7 +25,6 @@ from typing import Sequence
 
 from fitz_ai.core.chunk import ChunkLike
 
-
 # =============================================================================
 # Conflict Detection Patterns
 # =============================================================================
@@ -50,8 +49,12 @@ CLAIM_PATTERNS: tuple[re.Pattern, ...] = (
     re.compile(r"\b(stable|unchanged|flat|steady|consistent)\b", re.I),
     # Sentiment indicators
     re.compile(r"\b(?:was|is|were|are)\s+(positive|negative|neutral)\b", re.I),
-    re.compile(r"\b(?:response|feedback|sentiment)\s+(?:was|is)\s+(positive|negative|neutral)\b", re.I),
-    re.compile(r"\b(good|bad|excellent|poor|great|terrible)\s+(?:results?|performance|outcome)\b", re.I),
+    re.compile(
+        r"\b(?:response|feedback|sentiment)\s+(?:was|is)\s+(positive|negative|neutral)\b", re.I
+    ),
+    re.compile(
+        r"\b(good|bad|excellent|poor|great|terrible)\s+(?:results?|performance|outcome)\b", re.I
+    ),
     # State indicators (both "was successful" and standalone "failed")
     re.compile(r"\b(?:was|is|were|are)\s+(successful|failed|completed|pending)\b", re.I),
     re.compile(r"\b(successful(?:ly)?|failed|completed|pending)\b", re.I),

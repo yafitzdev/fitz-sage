@@ -22,8 +22,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, List, Protocol, runtime_checkable
 
-from fitz_ai.core.conflicts import find_conflicts
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.core.conflicts import find_conflicts
 from fitz_ai.ingestion.enrichment.config import (
     HierarchyConfig,
     HierarchyRule,

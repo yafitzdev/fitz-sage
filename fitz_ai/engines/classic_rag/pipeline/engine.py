@@ -11,12 +11,12 @@ from typing import Sequence
 
 from fitz_ai.core.answer_mode import AnswerMode
 from fitz_ai.core.answer_mode_resolver import resolve_answer_mode
-from fitz_ai.engines.classic_rag.config import ClassicRagConfig, load_config
 from fitz_ai.core.guardrails import (
     ConstraintPlugin,
     ConstraintResult,
     get_default_constraints,
 )
+from fitz_ai.engines.classic_rag.config import ClassicRagConfig, load_config
 from fitz_ai.engines.classic_rag.exceptions import (
     LLMError,
     PipelineError,

@@ -511,11 +511,11 @@ def rgs_prompt_building(chunks: list[dict], config: TestConfig) -> tuple[dict, b
     print("TEST 7: RGS PROMPT BUILDING")
     print("=" * 60)
 
+    from fitz_ai.core.chunk import Chunk
     from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import (
         RGS,
         RGSConfig,
     )
-    from fitz_ai.core.chunk import Chunk
 
     query = "What is RAG and how does it work?"
 

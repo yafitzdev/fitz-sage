@@ -103,7 +103,9 @@ def build_epistemic_corpus_prompt(
 
     # Add conflict propagation guidance if needed
     if conflict_count > 0:
-        topics_str = ", ".join(sorted(all_conflict_topics)) if all_conflict_topics else "various topics"
+        topics_str = (
+            ", ".join(sorted(all_conflict_topics)) if all_conflict_topics else "various topics"
+        )
         prompt_parts.append(
             GROUPS_WITH_CONFLICTS_ADDENDUM.format(
                 conflict_count=conflict_count,

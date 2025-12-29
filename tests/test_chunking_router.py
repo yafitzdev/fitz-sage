@@ -15,11 +15,11 @@ from typing import Any, Dict, List
 
 import pytest
 
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.classic_rag.config import (
     ChunkingRouterConfig,
     ExtensionChunkerConfig,
 )
-from fitz_ai.core.chunk import Chunk
 from fitz_ai.ingestion.chunking.engine import ChunkingEngine
 from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
 from fitz_ai.ingestion.chunking.router import ChunkingRouter

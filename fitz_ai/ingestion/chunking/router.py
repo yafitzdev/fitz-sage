@@ -25,8 +25,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from fitz_ai.engines.classic_rag.config import ChunkingRouterConfig
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.engines.classic_rag.config import ChunkingRouterConfig
 from fitz_ai.ingestion.chunking.base import ChunkerPlugin
 from fitz_ai.ingestion.chunking.registry import (
     get_chunker_for_extension,

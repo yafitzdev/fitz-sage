@@ -58,17 +58,6 @@ from .conflicts import are_conflicting, extract_claims, find_conflicts
 # Query constraints
 from .constraints import Constraints
 
-# Epistemic guardrails (constraint plugins)
-from .guardrails import ConstraintPlugin as ConstraintPluginProtocol
-from .guardrails import ConstraintResult
-from .guardrails import apply_constraints as apply_constraint_plugins
-from .guardrails import get_default_constraints
-from .guardrails.plugins import (
-    CausalAttributionConstraint,
-    ConflictAwareConstraint,
-    InsufficientEvidenceConstraint,
-)
-
 # Core protocol
 from .engine import KnowledgeEngine
 
@@ -81,6 +70,17 @@ from .exceptions import (
     QueryError,
     TimeoutError,
     UnsupportedOperationError,
+)
+
+# Epistemic guardrails (constraint plugins)
+from .guardrails import ConstraintPlugin as ConstraintPluginProtocol
+from .guardrails import ConstraintResult
+from .guardrails import apply_constraints as apply_constraint_plugins
+from .guardrails import get_default_constraints
+from .guardrails.plugins import (
+    CausalAttributionConstraint,
+    ConflictAwareConstraint,
+    InsufficientEvidenceConstraint,
 )
 
 # Path management

@@ -10,12 +10,12 @@ These tests verify:
 
 from __future__ import annotations
 
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.core.guardrails import (
     ConflictAwareConstraint,
     ConstraintResult,
     apply_constraints,
 )
-from fitz_ai.core.chunk import Chunk
 
 # =============================================================================
 # Test Data
