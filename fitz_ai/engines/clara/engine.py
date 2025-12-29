@@ -451,19 +451,43 @@ class ClaraEngine:
             # Retrieve via latent space similarity
             retrieved_indices, similarities = self._retrieve_top_k(query.text, top_k)
 
-            # Generate answer using retrieved documents
-            # Note: We use generate_from_text which handles compression internally.
-            # The pre-compression was for RETRIEVAL efficiency (semantic search),
-            # generation still processes the raw text through Clara's pipeline.
-            gen_config = self._config.generation
-            retrieved_texts = [self._doc_texts[i] for i in retrieved_indices]
+            # Get pre-compressed representations for retrieved docs
+            retrieved_compressed = self._compressed_docs[retrieved_indices]
+            # Shape: [num_retrieved, num_mem_tokens, hidden_dim]
 
-            answers = self._model.generate_from_text(
-                questions=[query.text],
-                documents=[retrieved_texts],
-                max_new_tokens=gen_config.max_new_tokens,
-            )
-            answer_text = answers[0] if answers else ""
+            gen_config = self._config.generation
+
+            # Try to use pre-compressed generation (compress once, generate many)
+            if hasattr(self._model, 'generate_from_compressed_documents_and_questions'):
+                try:
+                    # Set generation_top_k to match retrieved docs
+                    self._model.generation_top_k = len(retrieved_indices)
+
+                    answers = self._model.generate_from_compressed_documents_and_questions(
+                        questions=[query.text],
+                        compressed_documents=retrieved_compressed,  # 3D tensor, no unsqueeze
+                        max_new_tokens=gen_config.max_new_tokens,
+                    )
+                    answer_text = answers[0] if answers else ""
+                except Exception as e:
+                    # Fallback to generate_from_text if compressed generation fails
+                    logger.warning(f"Compressed generation failed, falling back: {e}")
+                    retrieved_texts = [self._doc_texts[i] for i in retrieved_indices]
+                    answers = self._model.generate_from_text(
+                        questions=[query.text],
+                        documents=[retrieved_texts],
+                        max_new_tokens=gen_config.max_new_tokens,
+                    )
+                    answer_text = answers[0] if answers else ""
+            else:
+                # Fallback: use generate_from_text
+                retrieved_texts = [self._doc_texts[i] for i in retrieved_indices]
+                answers = self._model.generate_from_text(
+                    questions=[query.text],
+                    documents=[retrieved_texts],
+                    max_new_tokens=gen_config.max_new_tokens,
+                )
+                answer_text = answers[0] if answers else ""
 
             # Build provenance with retrieval scores
             provenance = []
