@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import NoReturn
 
 from fitz_ai.engines.classic_rag.errors.llm import LLMError
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.llm.chat.plugins.local import LocalChatClient
 from fitz_ai.llm.embedding.plugins.local import LocalEmbeddingClient
 from fitz_ai.llm.rerank.plugins.local import LocalRerankClient

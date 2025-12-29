@@ -15,7 +15,7 @@ from fitz_ai.core.guardrails import (
     ConstraintResult,
     apply_constraints,
 )
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.core.chunk import Chunk
 
 # =============================================================================
 # Test Data

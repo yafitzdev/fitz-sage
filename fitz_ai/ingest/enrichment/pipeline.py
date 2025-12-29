@@ -48,7 +48,7 @@ from fitz_ai.ingest.enrichment.summary.cache import SummaryCache
 from fitz_ai.ingest.enrichment.summary.summarizer import ChunkInfo, ChunkSummarizer
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.classic_rag.models.chunk import Chunk
+    from fitz_ai.core.chunk import Chunk
 
 logger = logging.getLogger(__name__)
 

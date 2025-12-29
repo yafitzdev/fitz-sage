@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Protocol, runtime_checkable
 
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.core.chunk import Chunk
 
 
 @runtime_checkable

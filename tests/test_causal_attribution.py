@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 
 from fitz_ai.core.guardrails import CausalAttributionConstraint
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.core.chunk import Chunk
 
 # =============================================================================
 # Test Data

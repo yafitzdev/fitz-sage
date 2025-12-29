@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, List
 
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.classic_rag.retrieval.base import RetrievalPlugin
 from fitz_ai.engines.classic_rag.retrieval.registry import get_retrieval_plugin
 

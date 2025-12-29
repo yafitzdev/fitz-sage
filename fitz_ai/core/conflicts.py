@@ -21,18 +21,9 @@ Detects conflicts in:
 from __future__ import annotations
 
 import re
-from typing import Protocol, Sequence, runtime_checkable
+from typing import Sequence
 
-
-@runtime_checkable
-class ChunkLike(Protocol):
-    """Protocol for objects that have id and content."""
-
-    @property
-    def id(self) -> str: ...
-
-    @property
-    def content(self) -> str: ...
+from fitz_ai.core.chunk import ChunkLike
 
 
 # =============================================================================
@@ -208,7 +199,6 @@ def find_conflicts(chunks: Sequence[ChunkLike]) -> list[tuple[str, str, str, str
 
 
 __all__ = [
-    "ChunkLike",
     "CLAIM_PATTERNS",
     "CONFLICTING_PAIRS",
     "extract_claims",

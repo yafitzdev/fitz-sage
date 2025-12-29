@@ -12,6 +12,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Protocol, runtime_checkable
 
+from fitz_ai.core.chunk import ChunkLike
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import VECTOR_DB
 
@@ -21,17 +22,6 @@ logger = get_logger(__name__)
 # =============================================================================
 # Protocols
 # =============================================================================
-
-
-@runtime_checkable
-class ChunkLike(Protocol):
-    """Protocol for chunk-like objects."""
-
-    id: str
-    doc_id: str
-    chunk_index: int
-    content: str
-    metadata: Dict[str, Any] | None
 
 
 @runtime_checkable

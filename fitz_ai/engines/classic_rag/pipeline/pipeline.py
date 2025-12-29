@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from fitz_ai.engines.classic_rag.exceptions import PipelineError
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.core.chunk import Chunk
 
 from .steps.dedupe import DedupeStep
 from .steps.group import GroupByDocumentStep

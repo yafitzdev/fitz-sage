@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Protocol, Set, runtime_checka
 from fitz_ai.ingest.enrichment.base import ContentType
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.classic_rag.models.chunk import Chunk
+    from fitz_ai.core.chunk import Chunk
 
 
 class ArtifactType(str, Enum):
@@ -81,7 +81,7 @@ class Artifact:
         Returns:
             Chunk instance with artifact metadata
         """
-        from fitz_ai.engines.classic_rag.models.chunk import Chunk
+        from fitz_ai.core.chunk import Chunk
 
         artifact_id = hashlib.sha256(
             f"{self.artifact_type.value}:{self.title}".encode()

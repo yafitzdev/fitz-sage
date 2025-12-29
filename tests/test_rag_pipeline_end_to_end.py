@@ -10,7 +10,7 @@ from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import (
     RGSAnswer,
     RGSConfig,
 )
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.classic_rag.pipeline.engine import RAGPipeline
 
 # =============================================================================

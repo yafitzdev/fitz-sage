@@ -286,7 +286,7 @@ class RetrievalPipelineFromYaml:
 
     def retrieve(self, query: str) -> list:
         """Execute the retrieval pipeline."""
-        from fitz_ai.engines.classic_rag.models.chunk import Chunk
+        from fitz_ai.core.chunk import Chunk
 
         logger.info(f"{RETRIEVER} Running {self.plugin_name} pipeline ({len(self.steps)} steps)")
 

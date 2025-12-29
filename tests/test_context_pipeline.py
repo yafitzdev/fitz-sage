@@ -1,5 +1,5 @@
 # tests/test_context_pipeline.py
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.classic_rag.pipeline.pipeline import ContextPipeline
 
 

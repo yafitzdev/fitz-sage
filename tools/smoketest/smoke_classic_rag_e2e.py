@@ -469,7 +469,7 @@ def reranking(
     print("TEST 6: RERANKING")
     print("=" * 60)
 
-    from fitz_ai.engines.classic_rag.models.chunk import Chunk
+    from fitz_ai.core.chunk import Chunk
 
     query = "What is RAG and how does it work with vector databases?"
 
@@ -515,7 +515,7 @@ def rgs_prompt_building(chunks: list[dict], config: TestConfig) -> tuple[dict, b
         RGS,
         RGSConfig,
     )
-    from fitz_ai.engines.classic_rag.models.chunk import Chunk
+    from fitz_ai.core.chunk import Chunk
 
     query = "What is RAG and how does it work?"
 

@@ -19,7 +19,7 @@ from fitz_ai.engines.classic_rag.config import (
     ChunkingRouterConfig,
     ExtensionChunkerConfig,
 )
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.ingest.chunking.engine import ChunkingEngine
 from fitz_ai.ingest.chunking.plugins.default.simple import SimpleChunker
 from fitz_ai.ingest.chunking.router import ChunkingRouter

@@ -12,7 +12,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Dict, List
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.classic_rag.models.chunk import Chunk
+    from fitz_ai.core.chunk import Chunk
 
 logger = logging.getLogger(__name__)
 

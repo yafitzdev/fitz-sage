@@ -49,8 +49,11 @@ Examples:
 
 from .answer import Answer
 
+# Core data models
+from .chunk import Chunk, ChunkLike
+
 # Conflict detection (epistemic honesty)
-from .conflicts import ChunkLike, are_conflicting, extract_claims, find_conflicts
+from .conflicts import are_conflicting, extract_claims, find_conflicts
 
 # Query constraints
 from .constraints import Constraints
@@ -98,6 +101,7 @@ __all__ = [
     "Answer",
     "Provenance",
     "Constraints",
+    "Chunk",
     "ChunkLike",
     # Conflict Detection (epistemic honesty)
     "find_conflicts",

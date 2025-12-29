@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.core.chunk import Chunk
 
 logger = logging.getLogger(__name__)
 

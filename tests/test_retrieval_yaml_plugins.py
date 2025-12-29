@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.classic_rag.retrieval.loader import (
     RetrievalDependencies,
     StepSpec,

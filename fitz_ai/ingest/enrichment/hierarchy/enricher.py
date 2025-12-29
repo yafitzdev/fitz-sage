@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, List, Protocol, runtime_checkable
 
 from fitz_ai.core.conflicts import find_conflicts
-from fitz_ai.engines.classic_rag.models.chunk import Chunk
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.ingest.enrichment.config import (
     HierarchyConfig,
     HierarchyRule,
