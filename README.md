@@ -12,14 +12,14 @@
 
 ```bash
 pip install fitz-ai
-```
-**CLI:**
 
-<br>
-
-```bash
 fitz quickstart ./docs "What is our refund policy?"
 ```
+
+That's it. Your documents are now searchable with AI.
+
+![fitz-ai quickstart demo](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/quickstart_demo.gif)
+
 
 <details>
 
@@ -51,12 +51,6 @@ fitz serve  # http://localhost:8000/docs for interactive API
 ```
 
 </details>
-
-<br>
-
-That's it. Your documents are now searchable with AI.
-
-![fitz-ai quickstart demo](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/quickstart_demo.gif)
 
 ---
 
