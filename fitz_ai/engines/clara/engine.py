@@ -1,18 +1,24 @@
 # fitz_ai/engines/clara/engine.py
 """
-ClaraEngine - Actual CLaRa implementation with pre-compression and latent retrieval.
+ClaraEngine - Apple's CLaRa (Continuous Latent Reasoning) implementation.
 
-This engine implements Apple's CLaRa (Continuous Latent Reasoning) paradigm:
+This engine implements the CLaRa paradigm from Apple Research:
 1. Documents are pre-compressed into continuous memory tokens at ingestion time
 2. Compressed representations are stored for fast retrieval
 3. Retrieval happens via cosine similarity in the latent space
-4. Generation uses pre-compressed documents (not raw text)
+4. Generation uses pre-compressed documents (compress once, query many)
 
-This is the actual Clara architecture, not just a wrapper around generate_from_text().
+Hardware Requirements:
+    - VRAM: 16GB+ recommended (RTX 4090, A100, etc.)
+    - 4-bit quantization reduces to ~12GB minimum
+    - NOT suitable for consumer GPUs with 8GB VRAM
 
-Requirements:
+Software Requirements:
     pip install torch transformers accelerate bitsandbytes peft
     # Or: pip install fitz-ai[clara]
+
+Note: CLaRa is a research model optimized for quality over speed.
+For consumer hardware, use Classic RAG instead.
 """
 
 import logging
@@ -88,32 +94,31 @@ def _ensure_clara_model_available(model_path: str, quiet: bool = True) -> Path:
 
 class ClaraEngine:
     """
-    CLaRa (Continuous Latent Reasoning) engine - actual implementation.
+    CLaRa (Continuous Latent Reasoning) engine.
 
-    This implements the true CLaRa paradigm:
-    1. Pre-compress documents at ingestion time (not query time)
-    2. Store compressed latent representations
-    3. Retrieve via cosine similarity in latent space
-    4. Generate from compressed representations
+    Implements Apple's CLaRa paradigm - a unified model for compression,
+    retrieval, and generation in a shared latent space.
 
-    Key differences from naive wrapper:
-    - Documents are compressed ONCE at add_documents() time
-    - Retrieval is semantic (cosine similarity), not positional (first N)
-    - Query time only does retrieval + generation, no compression
-    - Supports 4-bit quantization by default for practical VRAM usage
+    Architecture:
+        1. Ingestion: Documents compressed into memory tokens (16x-128x compression)
+        2. Retrieval: Cosine similarity in latent space (no separate embedding model)
+        3. Generation: Uses pre-compressed representations (compress once, query many)
+
+    Requirements:
+        - VRAM: 16GB+ (12GB minimum with 4-bit quantization)
+        - Model: apple/CLaRa-7B-Instruct (7B parameters)
+
+    When to use Clara vs Classic RAG:
+        - Clara: Research/quality focus, high-end GPU available
+        - Classic RAG: Production use, consumer hardware, speed priority
 
     Examples:
         >>> from fitz_ai.engines.clara import ClaraEngine
         >>> from fitz_ai.engines.clara.config.schema import ClaraConfig
         >>>
-        >>> # Default uses 4-bit quantization
         >>> engine = ClaraEngine(ClaraConfig())
-        >>>
-        >>> # Add documents (compressed at ingestion time)
-        >>> engine.add_documents(["Doc 1 content...", "Doc 2 content..."])
-        >>>
-        >>> # Query (retrieval + generation, no compression)
-        >>> answer = engine.answer(Query(text="What is X?"))
+        >>> engine.add_documents(["Doc 1...", "Doc 2..."])  # Compressed once
+        >>> answer = engine.answer(Query(text="Question?"))  # Fast - no recompression
     """
 
     def __init__(self, config: ClaraConfig):
@@ -308,33 +313,30 @@ class ClaraEngine:
             all_compressed = []
             all_embeddings = []
 
-            # Compress documents in batches
-            for i in range(0, len(documents), batch_size):
-                batch_docs = documents[i:i + batch_size]
+            # Compress documents in batches (no gradients needed for inference)
+            with torch.no_grad():
+                for i in range(0, len(documents), batch_size):
+                    batch_docs = documents[i:i + batch_size]
 
-                if hasattr(self._model, 'compress_documents'):
-                    # Use model's native compression
-                    result = self._model.compress_documents(batch_docs)
-                    # compress_documents returns (compressed_tensor, loss) tuple
-                    if isinstance(result, tuple):
-                        compressed = result[0]  # Extract tensor from tuple
+                    if hasattr(self._model, 'compress_documents'):
+                        result = self._model.compress_documents(batch_docs)
+                        # compress_documents returns (compressed_tensor, loss) tuple
+                        compressed = result[0] if isinstance(result, tuple) else result
+                        # compressed: [batch, num_mem_tokens, hidden_dim]
+                        retrieval_embs = compressed.mean(dim=1)  # [batch, hidden_dim]
                     else:
-                        compressed = result
-                    # compressed: [batch, num_mem_tokens, hidden_dim]
-                    retrieval_embs = compressed.mean(dim=1)  # [batch, hidden_dim]
-                else:
-                    # Fallback: compress individually
-                    batch_compressed = []
-                    batch_embs = []
-                    for doc in batch_docs:
-                        comp, emb = self._compress_document(doc)
-                        batch_compressed.append(comp)
-                        batch_embs.append(emb)
-                    compressed = torch.cat(batch_compressed, dim=0)
-                    retrieval_embs = torch.cat(batch_embs, dim=0)
+                        # Fallback: compress individually
+                        batch_compressed = []
+                        batch_embs = []
+                        for doc in batch_docs:
+                            comp, emb = self._compress_document(doc)
+                            batch_compressed.append(comp)
+                            batch_embs.append(emb)
+                        compressed = torch.cat(batch_compressed, dim=0)
+                        retrieval_embs = torch.cat(batch_embs, dim=0)
 
-                all_compressed.append(compressed.detach())
-                all_embeddings.append(retrieval_embs.detach())
+                    all_compressed.append(compressed.detach())
+                    all_embeddings.append(retrieval_embs.detach())
 
             # Concatenate with existing documents
             new_compressed = torch.cat(all_compressed, dim=0)
@@ -378,22 +380,20 @@ class ClaraEngine:
         device = self._doc_embeddings.device
 
         # Encode query into same latent space
-        if hasattr(self._model, 'encode_query'):
-            # Use model's query encoder if available
-            query_emb = self._model.encode_query(query)
-        else:
-            # Fallback: use same compression for query
-            # CLaRa stores tokenizer as decoder_tokenizer
-            tokenizer = getattr(self._model, 'decoder_tokenizer', None) or self._model.tokenizer
-            inputs = tokenizer(
-                query,
-                return_tensors="pt",
-                truncation=True,
-                max_length=512,
-                padding=True,
-            ).to(device)
+        with torch.no_grad():
+            if hasattr(self._model, 'encode_query'):
+                query_emb = self._model.encode_query(query)
+            else:
+                # Fallback: use decoder hidden states for query embedding
+                tokenizer = getattr(self._model, 'decoder_tokenizer', None) or self._model.tokenizer
+                inputs = tokenizer(
+                    query,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=512,
+                    padding=True,
+                ).to(device)
 
-            with torch.no_grad():
                 outputs = self._model.decoder(
                     input_ids=inputs["input_ids"],
                     attention_mask=inputs["attention_mask"],
@@ -404,7 +404,7 @@ class ClaraEngine:
                 query_emb = (hidden * mask).sum(dim=1) / mask.sum(dim=1)
 
         # Normalize for cosine similarity
-        query_emb = F.normalize(query_emb, p=2, dim=-1)
+        query_emb = F.normalize(query_emb.to(device), p=2, dim=-1)
         doc_embs = F.normalize(self._doc_embeddings, p=2, dim=-1)
 
         # Compute similarities
@@ -463,30 +463,35 @@ class ClaraEngine:
                     # Set generation_top_k to match retrieved docs
                     self._model.generation_top_k = len(retrieved_indices)
 
-                    answers = self._model.generate_from_compressed_documents_and_questions(
-                        questions=[query.text],
-                        compressed_documents=retrieved_compressed,  # 3D tensor, no unsqueeze
-                        max_new_tokens=gen_config.max_new_tokens,
-                    )
+                    logger.info(f"Using pre-compressed generation with {len(retrieved_indices)} docs")
+                    with torch.no_grad():
+                        answers = self._model.generate_from_compressed_documents_and_questions(
+                            questions=[query.text],
+                            compressed_documents=retrieved_compressed,  # 3D tensor, no unsqueeze
+                            max_new_tokens=gen_config.max_new_tokens,
+                        )
                     answer_text = answers[0] if answers else ""
+                    logger.info("Pre-compressed generation succeeded")
                 except Exception as e:
                     # Fallback to generate_from_text if compressed generation fails
-                    logger.warning(f"Compressed generation failed, falling back: {e}")
+                    logger.warning(f"Compressed generation failed ({e}), falling back to generate_from_text")
                     retrieved_texts = [self._doc_texts[i] for i in retrieved_indices]
+                    with torch.no_grad():
+                        answers = self._model.generate_from_text(
+                            questions=[query.text],
+                            documents=[retrieved_texts],
+                            max_new_tokens=gen_config.max_new_tokens,
+                        )
+                    answer_text = answers[0] if answers else ""
+            else:
+                # Fallback: use generate_from_text
+                retrieved_texts = [self._doc_texts[i] for i in retrieved_indices]
+                with torch.no_grad():
                     answers = self._model.generate_from_text(
                         questions=[query.text],
                         documents=[retrieved_texts],
                         max_new_tokens=gen_config.max_new_tokens,
                     )
-                    answer_text = answers[0] if answers else ""
-            else:
-                # Fallback: use generate_from_text
-                retrieved_texts = [self._doc_texts[i] for i in retrieved_indices]
-                answers = self._model.generate_from_text(
-                    questions=[query.text],
-                    documents=[retrieved_texts],
-                    max_new_tokens=gen_config.max_new_tokens,
-                )
                 answer_text = answers[0] if answers else ""
 
             # Build provenance with retrieval scores
