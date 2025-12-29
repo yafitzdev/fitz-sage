@@ -10,11 +10,15 @@
 
 **Honest RAG in 5 minutes. No infrastructure. No boilerplate.**
 
+<br>
+
 ```bash
 pip install fitz-ai
 
 fitz quickstart ./docs "What is our refund policy?"
 ```
+
+<br>
 
 That's it. Your documents are now searchable with AI.
 
@@ -23,7 +27,7 @@ That's it. Your documents are now searchable with AI.
 
 <details>
 
-<summary><strong>Python SDK:</strong></summary>
+<summary><strong>Python SDK</strong></summary>
 
 <br>
 
@@ -40,7 +44,7 @@ answer = fitz_ai.query("What is our refund policy?")
 
 <details>
 
-<summary><strong>REST API:</strong></summary>
+<summary><strong>REST API</strong></summary>
 
 <br>
 
