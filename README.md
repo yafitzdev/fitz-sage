@@ -10,22 +10,18 @@
 
 **Honest RAG in 5 minutes. No infrastructure. No boilerplate.**
 
-<br>
-
 ```bash
 pip install fitz-ai
 
 fitz quickstart ./docs "What is our refund policy?"
 ```
 
-<br>
-
 That's it. Your documents are now searchable with AI.
 
-<br>
 
 ![fitz-ai quickstart demo](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/quickstart_demo.gif)
 
+<br>
 
 <details>
 
