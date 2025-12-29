@@ -40,6 +40,7 @@ That's it. Your documents are now searchable with AI.
 
 <br>
 
+RAG is how ChatGPT's "file search," Notion AI, and enterprise knowledge tools actually work under the hood.
 Instead of sending all your documents to an AI, RAG:
 
 1. [X] **Indexes your documents once** — Splits them into chunks, converts to vectors, stores in a database
@@ -61,8 +62,6 @@ RAG approach:
   ✅ Focused context = better answers
 ```
 
-RAG is how ChatGPT's "file search," Notion AI, and enterprise knowledge tools actually work under the hood.
-
 </details>
 
 ---
@@ -75,13 +74,13 @@ RAG is how ChatGPT's "file search," Notion AI, and enterprise knowledge tools ac
 
 You can—but you'll hit walls fast.
 
-**Context window limits ❌** 
+**Context window limits 🚨** 
 > GPT-4 accepts ~128k tokens. That's roughly 300 pages. Your company wiki, codebase, or document archive is likely 10x-100x larger. You physically cannot paste it all.
 
 **Cost explosion 💥**
 > Even if you could fit everything, you'd pay for every token on every query. Sending 100k tokens costs ~\$1-3 per question. Ask 50 questions a day? That's $50-150 daily—for one user.
 
-**No selective retrieval 🚨**
+**No selective retrieval ❌**
 > When you paste documents, the model reads everything equally. It can't focus on what's relevant. Ask about refund policies and it's also processing your hiring guidelines, engineering specs, and meeting notes—wasting context and degrading answers.
 
 **No persistence 💢**
@@ -433,7 +432,7 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 
 <strong>Codebase Search 🐍</strong>
 
-> Fitz includes built-in AST-aware chunking for Python. Functions, classes, and modules become individual searchable units with docstrings and imports preserved. Ask questions in natural language; get answers pointing to specific code.
+> Fitz includes built-in AST-aware chunking for code bases. Functions, classes, and modules become individual searchable units with docstrings and imports preserved. Ask questions in natural language; get answers pointing to specific code.
 >
 > *Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They ingest the codebase and ask "Where is user authentication handled?" or "What API endpoints modify the billing table?" New developers onboard in days instead of weeks.
 
