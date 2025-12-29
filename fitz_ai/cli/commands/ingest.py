@@ -69,7 +69,7 @@ def _detect_content_type(source: str) -> tuple[str, str]:
     """
     from pathlib import Path
 
-    from fitz_ai.ingest.detection import detect_content_type
+    from fitz_ai.ingestion.detection import detect_content_type
 
     result = detect_content_type(Path(source))
     return result.content_type, result.reason
@@ -91,7 +91,7 @@ def _get_available_artifacts(has_llm: bool = False) -> List[tuple]:
     Returns:
         List of (name, description) tuples for available artifacts
     """
-    from fitz_ai.ingest.enrichment.artifacts.registry import get_artifact_registry
+    from fitz_ai.ingestion.enrichment.artifacts.registry import get_artifact_registry
 
     registry = get_artifact_registry()
     result = []
@@ -285,10 +285,10 @@ def command(
         fitz ingest ./src -a all -y  # Non-interactive with all artifacts
         fitz ingest ./docs --hierarchy  # Enable hierarchical summaries (zero-config)
     """
-    from fitz_ai.ingest.chunking.router import ChunkingRouter
-    from fitz_ai.ingest.diff import run_diff_ingest
-    from fitz_ai.ingest.ingestion.registry import get_ingest_plugin
-    from fitz_ai.ingest.state import IngestStateManager
+    from fitz_ai.ingestion.chunking.router import ChunkingRouter
+    from fitz_ai.ingestion.diff import run_diff_ingest
+    from fitz_ai.ingestion.ingestion.registry import get_ingest_plugin
+    from fitz_ai.ingestion.state import IngestStateManager
     from fitz_ai.llm.registry import get_llm_plugin
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
@@ -537,8 +537,8 @@ def command(
         if enrichment_cfg.get("enabled", False):
             from pathlib import Path
 
-            from fitz_ai.ingest.enrichment import EnrichmentConfig, EnrichmentPipeline
-            from fitz_ai.ingest.enrichment.artifacts.registry import (
+            from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
+            from fitz_ai.ingestion.enrichment.artifacts.registry import (
                 get_artifact_registry,
             )
 
@@ -615,7 +615,7 @@ def command(
         current_step += 1
         ui.step(current_step, total_steps, "Generating artifacts...")
 
-        from fitz_ai.ingest.diff.executor import DiffIngestExecutor
+        from fitz_ai.ingestion.diff.executor import DiffIngestExecutor
 
         # Create executor for artifact generation
         executor = DiffIngestExecutor(

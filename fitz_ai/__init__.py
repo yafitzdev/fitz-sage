@@ -96,13 +96,68 @@ from fitz_ai.runtime import (
 from fitz_ai.sdk import IngestStats, fitz
 
 # =============================================================================
-# RUNTIME (UNIVERSAL)
+# MODULE-LEVEL SDK (matches CLI: fitz ingest, fitz query)
 # =============================================================================
 
+_default_fitz: "fitz | None" = None
 
-# =============================================================================
-# CLASSIC RAG (CONVENIENCE)
-# =============================================================================
+
+def _get_default_fitz() -> fitz:
+    """Get or create the default fitz instance."""
+    global _default_fitz
+    if _default_fitz is None:
+        _default_fitz = fitz()
+    return _default_fitz
+
+
+def ingest(source, collection: str = None, clear_existing: bool = False) -> IngestStats:
+    """
+    Ingest documents into the knowledge base.
+
+    Module-level convenience function matching `fitz ingest` CLI.
+
+    Args:
+        source: Path to file or directory to ingest.
+        collection: Collection name (uses default if not specified).
+        clear_existing: If True, clear collection before ingesting.
+
+    Returns:
+        IngestStats with document and chunk counts.
+
+    Examples:
+        >>> import fitz_ai
+        >>> fitz_ai.ingest("./docs")
+        >>> answer = fitz_ai.query("What is X?")
+    """
+    global _default_fitz
+    if collection is not None:
+        # Create new instance with specified collection
+        _default_fitz = fitz(collection=collection)
+    f = _get_default_fitz()
+    return f.ingest(source, clear_existing=clear_existing)
+
+
+def query(question: str, top_k: int = None) -> Answer:
+    """
+    Query the knowledge base.
+
+    Module-level convenience function matching `fitz query` CLI.
+
+    Args:
+        question: The question to ask.
+        top_k: Number of chunks to retrieve (uses config default if not specified).
+
+    Returns:
+        Answer with text and provenance.
+
+    Examples:
+        >>> import fitz_ai
+        >>> fitz_ai.ingest("./docs")
+        >>> answer = fitz_ai.query("What is the refund policy?")
+        >>> print(answer.text)
+    """
+    f = _get_default_fitz()
+    return f.ask(question, top_k=top_k)
 
 
 # =============================================================================
@@ -140,4 +195,6 @@ __all__ = [
     # SDK
     "fitz",
     "IngestStats",
+    "ingest",
+    "query",
 ]

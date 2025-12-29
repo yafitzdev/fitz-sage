@@ -64,10 +64,10 @@ def test_with_real_cohere_embedder(tmp_path: Path, test_files):
     """
     import os
 
-    from fitz_ai.ingest.chunking.plugins.default.simple import SimpleChunker
-    from fitz_ai.ingest.chunking.router import ChunkingRouter
-    from fitz_ai.ingest.diff.executor import DiffIngestExecutor
-    from fitz_ai.ingest.state import IngestStateManager
+    from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
+    from fitz_ai.ingestion.chunking.router import ChunkingRouter
+    from fitz_ai.ingestion.diff.executor import DiffIngestExecutor
+    from fitz_ai.ingestion.state import IngestStateManager
 
     # Check for API key
     if not os.environ.get("COHERE_API_KEY"):

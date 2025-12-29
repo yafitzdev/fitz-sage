@@ -10,9 +10,9 @@ Tests:
 
 import pytest
 
-from fitz_ai.ingest.chunking.plugins.markdown import MarkdownChunker
-from fitz_ai.ingest.chunking.plugins.pdf_sections import PdfSectionChunker
-from fitz_ai.ingest.chunking.plugins.python_code import PythonCodeChunker
+from fitz_ai.ingestion.chunking.plugins.markdown import MarkdownChunker
+from fitz_ai.ingestion.chunking.plugins.pdf_sections import PdfSectionChunker
+from fitz_ai.ingestion.chunking.plugins.python_code import PythonCodeChunker
 
 
 class TestMarkdownChunker:

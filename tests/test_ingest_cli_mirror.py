@@ -81,7 +81,7 @@ def test_ingest_cli_mirror():
 
     # State manager
     t = time.perf_counter()
-    from fitz_ai.ingest.state import IngestStateManager
+    from fitz_ai.ingestion.state import IngestStateManager
 
     state_manager = IngestStateManager()
     state_manager.load()
@@ -89,7 +89,7 @@ def test_ingest_cli_mirror():
 
     # Parser
     t = time.perf_counter()
-    from fitz_ai.ingest.ingestion.registry import get_ingest_plugin
+    from fitz_ai.ingestion.ingestion.registry import get_ingest_plugin
 
     IngestPluginCls = get_ingest_plugin("local")
     ingest_plugin = IngestPluginCls()
@@ -120,7 +120,7 @@ def test_ingest_cli_mirror():
         ChunkingRouterConfig,
         ExtensionChunkerConfig,
     )
-    from fitz_ai.ingest.chunking.router import ChunkingRouter
+    from fitz_ai.ingestion.chunking.router import ChunkingRouter
 
     chunking = config.get("chunking", {})
     default_cfg = chunking.get("default", {})
@@ -224,7 +224,7 @@ def test_ingest_cli_mirror():
     # =========================================================================
     print("\n[PHASE 4] Running ingestion...")
 
-    from fitz_ai.ingest.diff.executor import DiffIngestExecutor
+    from fitz_ai.ingestion.diff.executor import DiffIngestExecutor
 
     t = time.perf_counter()
     executor = DiffIngestExecutor(

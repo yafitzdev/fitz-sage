@@ -2,7 +2,22 @@
 
 This directory contains example scripts demonstrating fitz usage.
 
-## Examples 
+## Python SDK (Recommended)
+
+The simplest way to use fitz programmatically:
+
+```python
+import fitz_ai
+
+fitz_ai.ingest("./docs")
+answer = fitz_ai.query("What is the refund policy?")
+
+print(answer.text)
+for source in answer.provenance:
+    print(f"  - {source.source_id}")
+```
+
+## Examples
 
 | File | Description |
 |------|-------------|

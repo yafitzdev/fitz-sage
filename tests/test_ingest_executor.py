@@ -1,6 +1,6 @@
 # tests/test_ingest_executor.py
 """
-Tests for fitz_ai.ingest.diff.executor module.
+Tests for fitz_ai.ingestion.diff.executor module.
 
 Key tests verify that:
 1. State is updated only on successful ingestion
@@ -15,14 +15,14 @@ from typing import Any, Dict, List, Set
 
 import pytest
 
-from fitz_ai.ingest.chunking.plugins.default.simple import SimpleChunker
-from fitz_ai.ingest.chunking.router import ChunkingRouter
-from fitz_ai.ingest.diff.executor import (
+from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
+from fitz_ai.ingestion.chunking.router import ChunkingRouter
+from fitz_ai.ingestion.diff.executor import (
     DiffIngestExecutor,
     IngestSummary,
     run_diff_ingest,
 )
-from fitz_ai.ingest.state import IngestStateManager
+from fitz_ai.ingestion.state import IngestStateManager
 
 
 class MockVectorDBWriter:
@@ -144,7 +144,7 @@ class TestDiffIngestExecutor:
         test_file = tmp_path / "existing.md"
         test_file.write_text("# Already indexed")
 
-        from fitz_ai.ingest.hashing import compute_content_hash
+        from fitz_ai.ingestion.hashing import compute_content_hash
 
         content_hash = compute_content_hash(test_file)
 
@@ -220,7 +220,7 @@ class TestDiffIngestExecutor:
         test_file = tmp_path / "existing.md"
         test_file.write_text("# Already indexed")
 
-        from fitz_ai.ingest.hashing import compute_content_hash
+        from fitz_ai.ingestion.hashing import compute_content_hash
 
         content_hash = compute_content_hash(test_file)
 

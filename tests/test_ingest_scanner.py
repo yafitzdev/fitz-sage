@@ -1,11 +1,11 @@
 # tests/test_ingest_scanner.py
 """
-Tests for fitz_ai.ingest.diff.scanner module.
+Tests for fitz_ai.ingestion.diff.scanner module.
 """
 
 from pathlib import Path
 
-from fitz_ai.ingest.diff.scanner import (
+from fitz_ai.ingestion.diff.scanner import (
     SUPPORTED_EXTENSIONS,
     FileScanner,
     ScannedFile,

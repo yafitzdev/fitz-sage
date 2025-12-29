@@ -1,12 +1,12 @@
 # tests/test_ingest_state.py
 """
-Tests for fitz_ai.ingest.state module.
+Tests for fitz_ai.ingestion.state module.
 """
 
 import json
 from pathlib import Path
 
-from fitz_ai.ingest.state import (
+from fitz_ai.ingestion.state import (
     EmbeddingConfig,
     FileEntry,
     FileStatus,

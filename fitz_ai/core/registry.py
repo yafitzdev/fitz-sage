@@ -212,14 +212,14 @@ class PluginRegistry:
 
 INGEST_REGISTRY = PluginRegistry(
     name="ingest",
-    scan_packages=["fitz_ai.ingest.ingestion.plugins"],
+    scan_packages=["fitz_ai.ingestion.ingestion.plugins"],
     required_method="ingest",
 )
 
 # Default chunkers (simple, recursive) - shown in fitz init
 CHUNKING_REGISTRY = PluginRegistry(
     name="chunking",
-    scan_packages=["fitz_ai.ingest.chunking.plugins.default"],
+    scan_packages=["fitz_ai.ingestion.chunking.plugins.default"],
     required_method="chunk_text",
 )
 
@@ -228,7 +228,7 @@ CHUNKING_REGISTRY = PluginRegistry(
 # Used via by_extension config for file-type-specific chunking.
 TYPED_CHUNKING_REGISTRY = PluginRegistry(
     name="typed_chunking",
-    scan_packages=["fitz_ai.ingest.chunking.plugins"],
+    scan_packages=["fitz_ai.ingestion.chunking.plugins"],
     required_method="chunk_text",
 )
 

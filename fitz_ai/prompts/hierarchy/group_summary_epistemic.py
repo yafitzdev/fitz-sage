@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from fitz_ai.ingest.enrichment.hierarchy.epistemic import EpistemicAssessment
+    from fitz_ai.ingestion.enrichment.hierarchy.epistemic import EpistemicAssessment
 
 
 # Base prompt for all summaries

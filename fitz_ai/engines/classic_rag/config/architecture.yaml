@@ -11,7 +11,7 @@
 mapping:
   fitz_ai.core: foundation
 
-  fitz_ai.ingest: domain
+  fitz_ai.ingestion: domain
   fitz_ai.engines.classic_rag.retrieval: domain
   fitz_ai.generation: domain
 

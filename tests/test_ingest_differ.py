@@ -1,6 +1,6 @@
 # tests/test_ingest_differ.py
 """
-Tests for fitz_ai.ingest.diff.differ module.
+Tests for fitz_ai.ingestion.diff.differ module.
 
 Key tests verify that:
 1. State file is used for skip decisions (authoritative source)
@@ -11,7 +11,7 @@ Key tests verify that:
 
 from typing import Dict, Optional, Set
 
-from fitz_ai.ingest.diff.differ import (
+from fitz_ai.ingestion.diff.differ import (
     ConfigProvider,
     Differ,
     DiffResult,
@@ -20,7 +20,7 @@ from fitz_ai.ingest.diff.differ import (
     StateReader,
     compute_diff,
 )
-from fitz_ai.ingest.diff.scanner import ScannedFile
+from fitz_ai.ingestion.diff.scanner import ScannedFile
 
 
 class MockFileEntry:

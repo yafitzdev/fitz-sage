@@ -33,9 +33,9 @@ if not os.getenv("COHERE_API_KEY"):
 from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
 from fitz_ai.engines.classic_rag.pipeline.pipeline import ContextPipeline
 from fitz_ai.engines.classic_rag.retrieval.runtime.plugins.dense import DenseRetrievalPlugin
-from fitz_ai.ingest.chunking.plugins.default.simple import SimpleChunker
-from fitz_ai.ingest.ingestion.registry import get_ingest_plugin
-from fitz_ai.ingest.validation.documents import ValidationConfig, validate
+from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
+from fitz_ai.ingestion.ingestion.registry import get_ingest_plugin
+from fitz_ai.ingestion.validation.documents import ValidationConfig, validate
 from fitz_ai.llm.registry import get_llm_plugin
 from fitz_ai.vector_db.registry import get_vector_db_plugin  # Correct registry!
 from fitz_ai.vector_db.writer import VectorDBWriter

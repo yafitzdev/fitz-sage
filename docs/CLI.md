@@ -4,6 +4,13 @@
 
 Fitz provides a clean, minimal command-line interface for local-first RAG (Retrieval-Augmented Generation).
 
+> **Prefer Python?** Fitz also offers a Python SDK with the same capabilities:
+> ```python
+> import fitz_ai
+> fitz_ai.ingest("./docs")
+> answer = fitz_ai.query("Your question")
+> ```
+
 ---
 
 ## Core Commands

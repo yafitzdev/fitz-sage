@@ -12,8 +12,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.ingest.enrichment.config import HierarchyConfig
-from fitz_ai.ingest.enrichment.hierarchy import (
+from fitz_ai.ingestion.enrichment.config import HierarchyConfig
+from fitz_ai.ingestion.enrichment.hierarchy import (
     EpistemicAssessment,
     HierarchyEnricher,
     assess_chunk_group,

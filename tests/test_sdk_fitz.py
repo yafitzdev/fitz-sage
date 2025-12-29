@@ -134,13 +134,13 @@ class TestFitzIngest:
         # Create config first
         f._create_default_config(config_path)
 
-        with patch("fitz_ai.ingest.ingestion.registry.get_ingest_plugin") as mock_ingest:
+        with patch("fitz_ai.ingestion.ingestion.registry.get_ingest_plugin") as mock_ingest:
             mock_plugin_cls = MagicMock()
             mock_plugin_instance = MagicMock()
             mock_plugin_cls.return_value = mock_plugin_instance
             mock_ingest.return_value = mock_plugin_cls
 
-            with patch("fitz_ai.ingest.ingestion.engine.IngestionEngine") as mock_engine:
+            with patch("fitz_ai.ingestion.ingestion.engine.IngestionEngine") as mock_engine:
                 mock_engine_instance = MagicMock()
                 mock_engine_instance.run.return_value = []  # No documents
                 mock_engine.return_value = mock_engine_instance
@@ -219,3 +219,17 @@ class TestFitzExports:
         from fitz_ai import IngestStats
 
         assert IngestStats is not None
+
+    def test_module_level_ingest_exported(self):
+        """Test module-level ingest() is exported."""
+        import fitz_ai
+
+        assert hasattr(fitz_ai, "ingest")
+        assert callable(fitz_ai.ingest)
+
+    def test_module_level_query_exported(self):
+        """Test module-level query() is exported."""
+        import fitz_ai
+
+        assert hasattr(fitz_ai, "query")
+        assert callable(fitz_ai.query)

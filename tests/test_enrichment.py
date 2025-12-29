@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from fitz_ai.ingest.enrichment import (
+from fitz_ai.ingestion.enrichment import (
     ChunkSummarizer,
     CodeEnrichmentContext,
     ContentType,
@@ -14,8 +14,8 @@ from fitz_ai.ingest.enrichment import (
     EnrichmentPipeline,
     SummaryCache,
 )
-from fitz_ai.ingest.enrichment.context.plugins.python import Builder as PythonContextBuilder
-from fitz_ai.ingest.enrichment.context.plugins.python import (
+from fitz_ai.ingestion.enrichment.context.plugins.python import Builder as PythonContextBuilder
+from fitz_ai.ingestion.enrichment.context.plugins.python import (
     PythonProjectAnalyzer,
 )
 
@@ -310,7 +310,7 @@ class TestArtifactPluginDiscovery:
 
     def test_plugins_discovered(self):
         """Test that all expected plugins are discovered."""
-        from fitz_ai.ingest.enrichment.artifacts.registry import get_artifact_registry
+        from fitz_ai.ingestion.enrichment.artifacts.registry import get_artifact_registry
 
         registry = get_artifact_registry()
         plugin_names = registry.list_plugin_names()
@@ -327,7 +327,7 @@ class TestContextPluginDiscovery:
 
     def test_plugins_discovered(self):
         """Test that all expected plugins are discovered."""
-        from fitz_ai.ingest.enrichment.context.registry import get_context_registry
+        from fitz_ai.ingestion.enrichment.context.registry import get_context_registry
 
         registry = get_context_registry()
         plugin_names = registry.list_plugin_names()
@@ -337,7 +337,7 @@ class TestContextPluginDiscovery:
 
     def test_python_extension_mapped(self):
         """Test that .py files are mapped to Python plugin."""
-        from fitz_ai.ingest.enrichment.context.registry import get_context_registry
+        from fitz_ai.ingestion.enrichment.context.registry import get_context_registry
 
         registry = get_context_registry()
         plugin = registry.get_plugin_for_extension(".py")

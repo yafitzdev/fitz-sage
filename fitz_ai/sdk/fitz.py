@@ -113,9 +113,9 @@ class fitz:
             ValueError: If source path doesn't exist or no documents found.
         """
         from fitz_ai.core.config import load_config_dict
-        from fitz_ai.ingest.chunking.engine import ChunkingEngine
-        from fitz_ai.ingest.ingestion.engine import IngestionEngine
-        from fitz_ai.ingest.ingestion.registry import get_ingest_plugin
+        from fitz_ai.ingestion.chunking.engine import ChunkingEngine
+        from fitz_ai.ingestion.ingestion.engine import IngestionEngine
+        from fitz_ai.ingestion.ingestion.registry import get_ingest_plugin
         from fitz_ai.llm.registry import get_llm_plugin
         from fitz_ai.vector_db.registry import get_vector_db_plugin
         from fitz_ai.vector_db.writer import VectorDBWriter

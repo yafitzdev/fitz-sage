@@ -1,0 +1,165 @@
+# fitz_ai/ingestion/enrichment/__init__.py
+"""
+Enrichment module for enhancing document ingestion.
+
+This module provides:
+- EnrichmentPipeline: Unified entry point for all enrichment operations
+- EnrichmentConfig: Configuration for enrichment behavior
+- Chunk summaries: LLM-generated descriptions for better search
+- Artifacts: Project-level insights (navigation index, interface catalog, etc.)
+
+Architecture:
+    ┌─────────────────────────────────────────────────────────────┐
+    │                    EnrichmentPipeline                        │
+    │            (single entry point for all enrichment)           │
+    └─────────────────────────────────────────────────────────────┘
+                               │
+           ┌───────────────────┴───────────────────┐
+           │                                       │
+           ▼                                       ▼
+    ┌──────────────┐                       ┌──────────────┐
+    │   Summary    │                       │  Artifacts   │
+    │  (chunks)    │                       │  (project)   │
+    └──────────────┘                       └──────────────┘
+           │                                       │
+           ▼                                       ▼
+    ┌──────────────┐                       ┌──────────────┐
+    │   Context    │                       │   Plugins    │
+    │   Builders   │                       │ (per type)   │
+    └──────────────┘                       └──────────────┘
+
+Usage:
+    from fitz_ai.ingestion.enrichment import EnrichmentPipeline, EnrichmentConfig
+
+    # Create pipeline
+    pipeline = EnrichmentPipeline.from_config(
+        config=config.get("enrichment"),
+        project_root=Path("./src"),
+        chat_client=my_llm,
+    )
+
+    # Unified enrichment (preferred - the "box" interface)
+    result = pipeline.enrich(chunks)
+    enriched_chunks = result.chunks    # Chunks with summaries in metadata
+    artifacts = result.artifacts        # Corpus-level artifacts
+
+    # Or use individual methods if needed
+    artifacts = pipeline.generate_artifacts()
+    description = pipeline.summarize_chunk(content, file_path, content_hash)
+
+Plugin System:
+    - Artifact plugins: fitz_ai/ingestion/enrichment/artifacts/plugins/
+    - Context plugins: fitz_ai/ingestion/enrichment/context/plugins/
+
+    Each plugin is auto-discovered and must define:
+    - plugin_name: str
+    - plugin_type: str ("artifact" or "context")
+    - supported_types or supported_extensions
+"""
+
+# Artifact components
+from fitz_ai.ingestion.enrichment.artifacts import (
+    Artifact,
+    ArtifactGenerator,
+    ArtifactType,
+    ProjectAnalysis,
+    ProjectAnalyzer,
+)
+
+# Registries
+from fitz_ai.ingestion.enrichment.artifacts.registry import (
+    ArtifactRegistry,
+    get_artifact_plugin,
+    get_artifact_registry,
+    list_artifact_plugins,
+)
+
+# Base types
+from fitz_ai.ingestion.enrichment.base import (
+    CodeEnrichmentContext,
+    ContentType,
+    ContextBuilder,
+    DocumentEnrichmentContext,
+    Enricher,
+    EnrichmentContext,
+)
+
+# Configuration
+from fitz_ai.ingestion.enrichment.config import (
+    ArtifactConfig,
+    EnrichmentConfig,
+    HierarchyConfig,
+    HierarchyRule,
+    SummaryConfig,
+)
+from fitz_ai.ingestion.enrichment.context.registry import (
+    ContextRegistry,
+    get_context_plugin,
+    get_context_registry,
+    list_context_plugins,
+)
+
+# Hierarchy components
+from fitz_ai.ingestion.enrichment.hierarchy import (
+    ChunkGrouper,
+    ChunkMatcher,
+    HierarchyEnricher,
+)
+
+# Models
+from fitz_ai.ingestion.enrichment.models import (
+    EnrichmentResult,
+)
+
+# Pipeline (main entry point)
+from fitz_ai.ingestion.enrichment.pipeline import (
+    EnrichmentPipeline,
+)
+
+# Summary components
+from fitz_ai.ingestion.enrichment.summary import (
+    ChunkSummarizer,
+    SummaryCache,
+)
+
+__all__ = [
+    # Configuration
+    "EnrichmentConfig",
+    "SummaryConfig",
+    "ArtifactConfig",
+    "HierarchyConfig",
+    "HierarchyRule",
+    # Pipeline
+    "EnrichmentPipeline",
+    # Models
+    "EnrichmentResult",
+    # Base types
+    "ContentType",
+    "EnrichmentContext",
+    "CodeEnrichmentContext",
+    "DocumentEnrichmentContext",
+    "ContextBuilder",
+    "Enricher",
+    # Summary
+    "ChunkSummarizer",
+    "SummaryCache",
+    # Hierarchy
+    "HierarchyEnricher",
+    "ChunkMatcher",
+    "ChunkGrouper",
+    # Artifacts
+    "Artifact",
+    "ArtifactType",
+    "ArtifactGenerator",
+    "ProjectAnalysis",
+    "ProjectAnalyzer",
+    # Registries
+    "ArtifactRegistry",
+    "get_artifact_registry",
+    "get_artifact_plugin",
+    "list_artifact_plugins",
+    "ContextRegistry",
+    "get_context_registry",
+    "get_context_plugin",
+    "list_context_plugins",
+]

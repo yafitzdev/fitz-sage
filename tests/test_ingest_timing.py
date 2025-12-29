@@ -145,10 +145,10 @@ def test_ingest_timing_detailed(tmp_path: Path, timing_tracker: TimingTracker, t
 
     Run with: pytest tests/test_ingest_timing.py::test_ingest_timing_detailed -v -s
     """
-    from fitz_ai.ingest.chunking.plugins.default.simple import SimpleChunker
-    from fitz_ai.ingest.chunking.router import ChunkingRouter
-    from fitz_ai.ingest.diff.executor import DiffIngestExecutor
-    from fitz_ai.ingest.state import IngestStateManager
+    from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
+    from fitz_ai.ingestion.chunking.router import ChunkingRouter
+    from fitz_ai.ingestion.diff.executor import DiffIngestExecutor
+    from fitz_ai.ingestion.state import IngestStateManager
 
     source_path, files = test_files
 
@@ -231,10 +231,10 @@ def test_ingest_with_real_embedder_mock(tmp_path: Path, timing_tracker: TimingTr
 
     Run with: pytest tests/test_ingest_timing.py::test_ingest_with_real_embedder_mock -v -s
     """
-    from fitz_ai.ingest.chunking.plugins.default.simple import SimpleChunker
-    from fitz_ai.ingest.chunking.router import ChunkingRouter
-    from fitz_ai.ingest.diff.executor import DiffIngestExecutor
-    from fitz_ai.ingest.state import IngestStateManager
+    from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
+    from fitz_ai.ingestion.chunking.router import ChunkingRouter
+    from fitz_ai.ingestion.diff.executor import DiffIngestExecutor
+    from fitz_ai.ingestion.state import IngestStateManager
 
     source_path, files = test_files
 

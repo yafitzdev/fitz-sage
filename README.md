@@ -10,10 +10,19 @@
 
 **Honest RAG in 5 minutes. No infrastructure. No boilerplate.**
 
+**CLI:**
 ```bash
 pip install fitz-ai
 
 fitz quickstart ./docs "What is our refund policy?"
+```
+
+**Python SDK:**
+```python
+import fitz_ai
+
+fitz_ai.ingest("./docs")
+answer = fitz_ai.query("What is our refund policy?")
 ```
 
 That's it. Your documents are now searchable with AI.
@@ -361,6 +370,8 @@ The codebase speaks for itself.
 
 <br>
 
+#### CLI
+
 ```bash
 pip install fitz-ai
 
@@ -371,7 +382,37 @@ That's it. Fitz will prompt you for anything it needs.
 
 <br>
 
-Want to go fully local with Ollama? No problem:
+#### Python SDK
+
+```python
+import fitz_ai
+
+fitz_ai.ingest("./docs")
+answer = fitz_ai.query("Your question here")
+
+print(answer.text)
+for source in answer.provenance:
+    print(f"  - {source.source_id}: {source.excerpt[:50]}...")
+```
+
+The SDK provides:
+- Module-level functions matching CLI (`ingest`, `query`)
+- Auto-config creation (no setup required)
+- Full provenance tracking
+- Same honest RAG as the CLI
+
+For advanced use (multiple collections), use the `fitz` class directly:
+```python
+from fitz_ai import fitz
+
+physics = fitz(collection="physics")
+physics.ingest("./physics_papers")
+answer = physics.query("Explain entanglement")
+```
+
+<br>
+
+#### Fully Local (Ollama)
 
 ```bash
 pip install fitz-ai[local]
@@ -450,8 +491,9 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 ┌───────────────────────────────────────────────────────────────┐
 │                         fitz-ai                               │
 ├───────────────────────────────────────────────────────────────┤
-│  CLI Layer                                                    │
-│  quickstart | init | ingest | query | chat | config | doctor  │
+│  User Interfaces                                              │
+│  CLI: quickstart | init | ingest | query | chat | doctor      │
+│  SDK: fitz_ai.fitz() → ingest() → ask()                       │
 ├───────────────────────────────────────────────────────────────┤
 │  Engines                                                      │
 │  ┌───────────────┐  ┌───────────┐                             │
@@ -494,6 +536,53 @@ fitz chat                            # Multi-turn conversation with your knowled
 fitz collections                     # List and delete knowledge collections
 fitz config                          # View/edit configuration
 fitz doctor                          # System diagnostics
+```
+
+</details>
+
+---
+
+<details>
+
+<summary><strong>📦 Python SDK Reference</strong></summary>
+
+<br>
+
+**Simple usage (module-level, matches CLI):**
+```python
+import fitz_ai
+
+fitz_ai.ingest("./docs")
+answer = fitz_ai.query("What is the refund policy?")
+print(answer.text)
+```
+
+**Advanced usage (multiple collections):**
+```python
+from fitz_ai import fitz
+
+# Create separate instances for different collections
+physics = fitz(collection="physics")
+physics.ingest("./physics_papers")
+
+legal = fitz(collection="legal")
+legal.ingest("./contracts")
+
+# Query each collection
+physics_answer = physics.query("Explain entanglement")
+legal_answer = legal.query("What are the payment terms?")
+```
+
+**Working with answers:**
+```python
+answer = fitz_ai.query("What is the refund policy?")
+
+print(answer.text)
+print(answer.mode)  # CONFIDENT, QUALIFIED, DISPUTED, or ABSTAIN
+
+for source in answer.provenance:
+    print(f"Source: {source.source_id}")
+    print(f"Excerpt: {source.excerpt}")
 ```
 
 </details>

@@ -1,13 +1,13 @@
 # tests/test_ingest_hashing.py
 """
-Tests for fitz_ai.ingest.hashing module.
+Tests for fitz_ai.ingestion.hashing module.
 """
 
 from pathlib import Path
 
 import pytest
 
-from fitz_ai.ingest.hashing import (
+from fitz_ai.ingestion.hashing import (
     compute_bytes_hash,
     compute_chunk_id,
     compute_content_hash,
