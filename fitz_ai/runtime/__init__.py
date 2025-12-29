@@ -41,6 +41,7 @@ from .registry import (
     EngineCapabilities,
     EngineRegistration,
     EngineRegistry,
+    get_default_engine,
     get_engine_registry,
 )
 from .runner import (
@@ -56,6 +57,7 @@ __all__ = [
     "EngineRegistration",
     "EngineCapabilities",
     "get_engine_registry",
+    "get_default_engine",
     # Runner
     "run",
     "create_engine",

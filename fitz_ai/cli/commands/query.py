@@ -21,7 +21,7 @@ from fitz_ai.core import Query
 from fitz_ai.core.config import ConfigNotFoundError, load_config_dict
 from fitz_ai.core.paths import FitzPaths
 from fitz_ai.logging.logger import get_logger
-from fitz_ai.runtime import create_engine, get_engine_registry, list_engines
+from fitz_ai.runtime import create_engine, get_default_engine, get_engine_registry, list_engines
 from fitz_ai.vector_db.registry import get_vector_db_plugin
 
 logger = get_logger(__name__)
@@ -74,11 +74,11 @@ def command(
         "-c",
         help="Collection to query (classic_rag only).",
     ),
-    engine: str = typer.Option(
-        "classic_rag",
+    engine: Optional[str] = typer.Option(
+        None,
         "--engine",
         "-e",
-        help="Engine to use (classic_rag, clara).",
+        help="Engine to use. Will prompt if not specified.",
     ),
 ) -> None:
     """
@@ -97,16 +97,38 @@ def command(
         fitz query "question" -c my_collection
     """
     # =========================================================================
-    # Validate engine
+    # Engine selection
     # =========================================================================
 
     available_engines = list_engines()
-    if engine not in available_engines:
+    registry = get_engine_registry()
+
+    if engine is None:
+        # Prompt for engine selection
+        ui.header("Fitz Query")
+        print()
+
+        # Build choices with descriptions
+        engine_info = registry.list_with_descriptions()
+        choices = []
+        for name in available_engines:
+            desc = engine_info.get(name, "")
+            if len(desc) > 60:
+                desc = desc[:57] + "..."
+            choices.append(f"{name} - {desc}" if desc else name)
+
+        # Get default engine from config (prompt_numbered_choice puts default at position 1)
+        default_engine_name = get_default_engine()
+        default_choice = next((c for c in choices if c.startswith(default_engine_name)), choices[0])
+        selected = ui.prompt_numbered_choice("Engine", choices, default_choice)
+        engine = selected.split(" - ")[0]
+        print()
+    elif engine not in available_engines:
         ui.error(f"Unknown engine: '{engine}'. Available: {', '.join(available_engines)}")
         raise typer.Exit(1)
 
     # =========================================================================
-    # Header
+    # Header (with engine)
     # =========================================================================
 
     ui.header("Fitz Query", f"Engine: {engine}")

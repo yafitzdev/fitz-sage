@@ -29,7 +29,7 @@ from fitz_ai.cli.ui_display import display_answer
 from fitz_ai.core import Query
 from fitz_ai.core.paths import FitzPaths
 from fitz_ai.logging.logger import get_logger
-from fitz_ai.runtime import get_engine_registry, list_engines
+from fitz_ai.runtime import get_default_engine, get_engine_registry, list_engines
 
 logger = get_logger(__name__)
 
@@ -54,11 +54,11 @@ def command(
         "-c",
         help="Collection name for vector storage (classic_rag only)",
     ),
-    engine: str = typer.Option(
-        "classic_rag",
+    engine: Optional[str] = typer.Option(
+        None,
         "--engine",
         "-e",
-        help="Engine to use (classic_rag, clara)",
+        help="Engine to use. Will prompt if not specified.",
     ),
     verbose: bool = typer.Option(
         False,
@@ -79,19 +79,38 @@ def command(
         fitz quickstart ./docs "question" --engine clara     # Use CLaRa
     """
     # =========================================================================
-    # Validate engine
+    # Engine selection
     # =========================================================================
 
     available_engines = list_engines()
-    if engine not in available_engines:
+    registry = get_engine_registry()
+
+    if engine is None:
+        # Prompt for engine selection
+        ui.header("Fitz Quickstart", "Zero-friction RAG")
+        print()
+
+        # Build choices with descriptions
+        engine_info = registry.list_with_descriptions()
+        choices = []
+        for name in available_engines:
+            desc = engine_info.get(name, "")
+            # Truncate long descriptions
+            if len(desc) > 60:
+                desc = desc[:57] + "..."
+            choices.append(f"{name} - {desc}" if desc else name)
+
+        # Get default engine from config (prompt_numbered_choice puts default at position 1)
+        default_engine_name = get_default_engine()
+        default_choice = next((c for c in choices if c.startswith(default_engine_name)), choices[0])
+        selected = ui.prompt_numbered_choice("Engine", choices, default_choice)
+        engine = selected.split(" - ")[0]  # Extract engine name
+        print()
+    elif engine not in available_engines:
         ui.error(f"Unknown engine: '{engine}'. Available: {', '.join(available_engines)}")
         raise typer.Exit(1)
-
-    # =========================================================================
-    # Header
-    # =========================================================================
-
-    ui.header("Fitz Quickstart", f"Zero-friction RAG (engine: {engine})")
+    else:
+        ui.header("Fitz Quickstart", f"Zero-friction RAG (engine: {engine})")
 
     # =========================================================================
     # Prompt for source if not provided
@@ -143,7 +162,7 @@ def _run_document_loading_quickstart(
     source: Path, question: str, engine_name: str, verbose: bool
 ) -> None:
     """Run quickstart for engines that load documents directly (no persistent storage)."""
-    from fitz_ai.runtime import create_engine
+    from fitz_ai.runtime import create_engine  # noqa: F811 - local import for lazy loading
 
     # Step 1: Read documents
     ui.step(1, 3, f"Reading documents from {source}...")

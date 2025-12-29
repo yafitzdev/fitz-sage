@@ -32,7 +32,7 @@ class TestChatCommand:
             lambda: tmp_path / "nonexistent" / "fitz.yaml",
         )
 
-        result = runner.invoke(app, ["chat"], input="exit\n")
+        result = runner.invoke(app, ["chat", "--engine", "classic_rag"], input="exit\n")
 
         assert result.exit_code != 0
         assert "init" in result.output.lower() or "config" in result.output.lower()
@@ -250,7 +250,7 @@ class TestChatExitCommands:
             patch("fitz_ai.cli.commands.chat._get_collections", return_value=["test"]),
             patch("fitz_ai.cli.commands.chat.RICH", False),
         ):
-            result = runner.invoke(app, ["chat"], input="exit\n")
+            result = runner.invoke(app, ["chat", "--engine", "classic_rag"], input="exit\n")
 
         assert "goodbye" in result.output.lower() or "ended" in result.output.lower()
 
@@ -278,6 +278,6 @@ class TestChatExitCommands:
             patch("fitz_ai.cli.commands.chat._get_collections", return_value=["test"]),
             patch("fitz_ai.cli.commands.chat.RICH", False),
         ):
-            result = runner.invoke(app, ["chat"], input="quit\n")
+            result = runner.invoke(app, ["chat", "--engine", "classic_rag"], input="quit\n")
 
         assert "goodbye" in result.output.lower() or "ended" in result.output.lower()

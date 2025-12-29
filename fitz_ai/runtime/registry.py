@@ -322,3 +322,43 @@ class EngineRegistry:
 def get_engine_registry() -> EngineRegistry:
     """Get the global engine registry."""
     return EngineRegistry.get_global()
+
+
+def get_default_engine() -> str:
+    """
+    Get the default engine name.
+
+    Checks (in order):
+    1. User's config file (.fitz/config.yaml) for 'default_engine'
+    2. Package default (default.yaml) for 'default_engine'
+
+    The single source of truth is default.yaml.
+
+    Returns:
+        Engine name (e.g., 'classic_rag')
+    """
+    # Check user config first
+    try:
+        from fitz_ai.core.config import load_config_dict
+        from fitz_ai.core.paths import FitzPaths
+
+        config_path = FitzPaths.config()
+        if config_path.exists():
+            config = load_config_dict(config_path)
+            if "default_engine" in config:
+                return config["default_engine"]
+    except Exception:
+        pass
+
+    # Fall back to package default (single source of truth)
+    try:
+        from fitz_ai.engines.classic_rag.config import load_config_dict as load_default_config
+
+        default_config = load_default_config()
+        if "default_engine" in default_config:
+            return default_config["default_engine"]
+    except Exception:
+        pass
+
+    # Last resort fallback (should never reach here if default.yaml is valid)
+    return "classic_rag"

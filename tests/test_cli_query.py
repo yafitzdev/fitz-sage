@@ -32,7 +32,7 @@ class TestQueryCommand:
             lambda: tmp_path / "nonexistent" / "fitz.yaml",
         )
 
-        result = runner.invoke(app, ["query", "test question"])
+        result = runner.invoke(app, ["query", "test question", "--engine", "classic_rag"])
 
         assert result.exit_code != 0
         assert "init" in result.output.lower() or "config" in result.output.lower()
@@ -128,7 +128,7 @@ class TestQueryExecution:
             ),
             patch("fitz_ai.cli.commands.query._get_collections", return_value=["test"]),
         ):
-            runner.invoke(app, ["query", "What is RAG?"])
+            runner.invoke(app, ["query", "What is RAG?", "--engine", "classic_rag"])
 
         # Should call engine.answer with the question
         mock_engine.answer.assert_called_once()
@@ -165,7 +165,7 @@ class TestQueryOptions:
             ),
             patch("fitz_ai.cli.commands.query._get_collections", return_value=["custom"]),
         ):
-            runner.invoke(app, ["query", "question", "-c", "custom"])
+            runner.invoke(app, ["query", "question", "-c", "custom", "--engine", "classic_rag"])
 
         # Engine should be created (we can't easily verify the collection was set)
         assert mock_engine.answer.called

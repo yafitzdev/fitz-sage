@@ -12,6 +12,11 @@
 # - Local FAISS for vector storage (no external service needed)
 
 # =============================================================================
+# Default Engine (used by CLI commands when not specified)
+# =============================================================================
+default_engine: classic_rag
+
+# =============================================================================
 # Chat (LLM for answering questions)
 # =============================================================================
 chat:
