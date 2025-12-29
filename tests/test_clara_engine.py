@@ -9,6 +9,7 @@ and integrates properly with the Fitz platform.
 from unittest.mock import MagicMock, patch
 
 import pytest
+import torch
 
 # Core imports
 from fitz_ai.core import (
@@ -33,6 +34,7 @@ class TestClaraConfig:
 
         assert config.model.model_name_or_path == "apple/CLaRa-7B-Instruct/compression-16"
         assert config.model.variant == "instruct"
+        assert config.model.load_in_4bit is True  # 4-bit enabled by default
         assert config.compression.compression_rate == 16
         assert config.retrieval.top_k == 5
         assert config.generation.max_new_tokens == 256
@@ -49,6 +51,7 @@ class TestClaraConfig:
             model=ClaraModelConfig(
                 model_name_or_path="apple/CLaRa-7B-Instruct",
                 variant="instruct",
+                load_in_4bit=False,  # Override default
             ),
             compression=ClaraCompressionConfig(
                 compression_rate=32,
@@ -57,6 +60,7 @@ class TestClaraConfig:
 
         assert config.model.model_name_or_path == "apple/CLaRa-7B-Instruct"
         assert config.model.variant == "instruct"
+        assert config.model.load_in_4bit is False
         assert config.compression.compression_rate == 32
 
     def test_load_config_from_yaml(self, tmp_path):
@@ -106,8 +110,23 @@ class TestClaraEngine:
         with patch.object(ClaraEngine, "_initialize_model"):
             engine = ClaraEngine(config)
 
-        # Initialize internal state that would be set by _initialize_model
-        engine._model = MagicMock()
+        # Create mock model with required methods
+        mock_model = MagicMock()
+        mock_model.tokenizer = MagicMock()
+
+        # Mock compress_documents to return proper tensor
+        # Shape: [batch, num_mem_tokens, hidden_dim]
+        def mock_compress(docs):
+            batch = len(docs)
+            return torch.randn(batch, 128, 4096)
+
+        mock_model.compress_documents = mock_compress
+
+        # Mock parameters() for device detection
+        mock_param = torch.nn.Parameter(torch.zeros(1))
+        mock_model.parameters = lambda: iter([mock_param])
+
+        engine._model = mock_model
 
         return engine
 
@@ -116,8 +135,8 @@ class TestClaraEngine:
         assert hasattr(mock_engine, "answer")
         assert callable(mock_engine.answer)
 
-    def test_add_documents(self, mock_engine):
-        """Test adding documents to knowledge base."""
+    def test_add_documents_compresses(self, mock_engine):
+        """Test adding documents triggers pre-compression."""
         doc_ids = mock_engine.add_documents(
             [
                 "Document 1",
@@ -129,8 +148,12 @@ class TestClaraEngine:
         assert len(doc_ids) == 3
         assert len(mock_engine._doc_texts) == 3
         assert mock_engine._doc_texts[0] == "Document 1"
-        assert mock_engine._doc_texts[1] == "Document 2"
-        assert mock_engine._doc_texts[2] == "Document 3"
+
+        # Verify compressed representations were created
+        assert mock_engine._compressed_docs is not None
+        assert mock_engine._compressed_docs.shape[0] == 3  # 3 docs
+        assert mock_engine._doc_embeddings is not None
+        assert mock_engine._doc_embeddings.shape[0] == 3
 
     def test_add_documents_with_ids(self, mock_engine):
         """Test adding documents with custom IDs."""
@@ -140,33 +163,42 @@ class TestClaraEngine:
 
         assert doc_ids == ["custom_1", "custom_2"]
         assert len(mock_engine._doc_texts) == 2
-        assert mock_engine._doc_texts[0] == "Doc 1"
-        assert mock_engine._doc_texts[1] == "Doc 2"
+        assert mock_engine._doc_ids == ["custom_1", "custom_2"]
 
     def test_empty_query_raises_error(self):
         """Test that empty query raises ValueError during Query creation."""
-        # Query validates in __post_init__, so this should raise ValueError
         with pytest.raises(ValueError, match="cannot be empty"):
             Query(text="   ")
 
     def test_answer_no_documents_raises_error(self, mock_engine):
         """Test that query without documents raises KnowledgeError."""
-        # _doc_texts is an empty list by default
         assert mock_engine._doc_texts == []
+        assert mock_engine._compressed_docs is None
 
         with pytest.raises(KnowledgeError, match="No documents"):
             mock_engine.answer(Query(text="What is X?"))
 
     def test_answer_success(self, mock_engine):
-        """Test successful answer generation."""
-        # Add documents to knowledge base
-        mock_engine._doc_texts = [
+        """Test successful answer generation with latent retrieval."""
+        # Add documents (this also creates compressed representations)
+        mock_engine.add_documents([
             "Document 1 content about quantum computing...",
             "Document 2 content about machine learning...",
-        ]
+        ])
 
-        # Mock model's generate_from_text method
-        mock_engine._model.generate_from_text.return_value = ["Quantum computing uses qubits."]
+        # Mock model's generate methods
+        # MagicMock auto-creates attributes, so we need to mock the compressed method too
+        mock_engine._model.generate_from_compressed_documents_and_questions = MagicMock(
+            return_value=["Quantum computing uses qubits."]
+        )
+        mock_engine._model.generate_from_text = MagicMock(
+            return_value=["Quantum computing uses qubits."]
+        )
+
+        # Mock _retrieve_top_k to return known indices and similarities
+        mock_engine._retrieve_top_k = MagicMock(
+            return_value=([0, 1], torch.tensor([0.95, 0.85]))
+        )
 
         query = Query(text="What is quantum computing?")
         answer = mock_engine.answer(query)
@@ -175,39 +207,81 @@ class TestClaraEngine:
         assert answer.text == "Quantum computing uses qubits."
         assert len(answer.provenance) == 2
         assert answer.metadata["engine"] == "clara"
+        assert answer.metadata["retrieval_method"] == "cosine_similarity_latent"
 
     def test_answer_respects_constraints(self, mock_engine):
         """Test that answer respects query constraints."""
         # Add 10 documents
-        mock_engine._doc_texts = [f"Content {i}" for i in range(10)]
+        mock_engine.add_documents([f"Content {i}" for i in range(10)])
 
-        # Mock model's generate_from_text method
-        mock_engine._model.generate_from_text.return_value = ["Answer"]
+        # Mock model methods (need both due to MagicMock auto-attribute creation)
+        mock_engine._model.generate_from_compressed_documents_and_questions = MagicMock(
+            return_value=["Answer"]
+        )
+        mock_engine._model.generate_from_text = MagicMock(return_value=["Answer"])
+
+        # Mock _retrieve_top_k to return 3 results (respecting constraint)
+        mock_engine._retrieve_top_k = MagicMock(
+            return_value=([0, 1, 2], torch.tensor([0.9, 0.8, 0.7]))
+        )
 
         query = Query(text="Question?", constraints=Constraints(max_sources=3))
         answer = mock_engine.answer(query)
 
         # Verify only 3 sources in provenance (respecting constraint)
         assert len(answer.provenance) == 3
-        assert answer.metadata["num_docs_used"] == 3
+        assert answer.metadata["num_docs_retrieved"] == 3
+        # Verify _retrieve_top_k was called with correct top_k
+        mock_engine._retrieve_top_k.assert_called_once_with("Question?", 3)
+
+    def test_retrieval_uses_cosine_similarity(self, mock_engine):
+        """Test that retrieval returns semantically similar docs."""
+        # Add documents with distinct embeddings
+        mock_engine.add_documents(["Doc A", "Doc B", "Doc C"])
+
+        # Manually set embeddings to test retrieval logic
+        # Make Doc B most similar to query
+        mock_engine._doc_embeddings = torch.tensor([
+            [0.1, 0.0, 0.0],  # Doc A
+            [0.9, 0.1, 0.0],  # Doc B - most similar to query
+            [0.2, 0.1, 0.0],  # Doc C
+        ])
+
+        # Mock encode_query to return embedding similar to Doc B
+        mock_engine._model.encode_query = MagicMock(
+            return_value=torch.tensor([[0.9, 0.1, 0.0]])
+        )
+
+        indices, similarities = mock_engine._retrieve_top_k("test query", top_k=2)
+
+        # Doc B (index 1) should be first due to highest similarity
+        assert indices[0] == 1
 
     def test_get_knowledge_stats(self, mock_engine):
         """Test knowledge base statistics."""
-        mock_engine._doc_texts = ["Doc 1", "Doc 2"]
+        mock_engine.add_documents(["Doc 1", "Doc 2"])
 
         stats = mock_engine.get_knowledge_stats()
 
         assert stats["num_documents"] == 2
         assert "compression_rate" in stats
         assert "model_variant" in stats
+        assert "quantization" in stats
+        assert stats["quantization"] == "4-bit"  # Default
+        assert "compressed_shape" in stats
+        assert "compressed_memory_mb" in stats
 
     def test_clear_knowledge_base(self, mock_engine):
         """Test clearing knowledge base."""
-        mock_engine._doc_texts = ["Doc 1", "Doc 2"]
+        mock_engine.add_documents(["Doc 1", "Doc 2"])
+        assert mock_engine._compressed_docs is not None
 
         mock_engine.clear_knowledge_base()
 
         assert len(mock_engine._doc_texts) == 0
+        assert len(mock_engine._doc_ids) == 0
+        assert mock_engine._compressed_docs is None
+        assert mock_engine._doc_embeddings is None
 
 
 class TestClaraRuntime:

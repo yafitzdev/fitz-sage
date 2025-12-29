@@ -34,9 +34,9 @@ class ClaraModelConfig:
     # Whether to trust remote code (required for CLaRa)
     trust_remote_code: bool = True
 
-    # Quantization options
+    # Quantization options (4-bit enabled by default for practical VRAM usage)
     load_in_8bit: bool = False
-    load_in_4bit: bool = False
+    load_in_4bit: bool = True
 
 
 @dataclass
