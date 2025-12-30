@@ -558,7 +558,9 @@ def command(
     if non_interactive:
         default_engine = configured_default
     else:
-        ui.section("Default Engine")
+        ui.section("Engine Setup")
+        ui.info("Select which engine to configure and set as default.")
+        print()
 
         # Build choices with descriptions
         engine_info = registry.list_with_descriptions()
@@ -571,7 +573,7 @@ def command(
 
         # Get default engine from config (prompt_numbered_choice puts default at position 1)
         default_choice = next((c for c in choices if c.startswith(configured_default)), choices[0])
-        selected = ui.prompt_numbered_choice("Default engine", choices, default_choice)
+        selected = ui.prompt_numbered_choice("Engine to configure", choices, default_choice)
         default_engine = selected.split(" - ")[0]
 
     # If user selected a non-collection engine, handle engine-specific config
@@ -662,7 +664,9 @@ def command(
                     "instruct - Instruction-tuned",
                     "base - Compression only",
                 ]
-                selected = ui.prompt_numbered_choice("Model variant", variant_descs, variant_descs[0])
+                selected = ui.prompt_numbered_choice(
+                    "Model variant", variant_descs, variant_descs[0]
+                )
                 variant_choice = selected.split(" - ")[0]
 
                 # Device
@@ -720,7 +724,9 @@ def command(
             ui.success(f"Saved engine config to {engine_config_path}")
 
         ui.section("Done!")
-        ui.info(f"Use 'fitz quickstart <folder> \"question\" --engine {default_engine}' to get started.")
+        ui.info(
+            f"Use 'fitz quickstart <folder> \"question\" --engine {default_engine}' to get started."
+        )
         return
 
     # =========================================================================

@@ -15,26 +15,16 @@ from typing import Any, Dict, List, Optional
 import typer
 
 from fitz_ai.cli.ui import RICH, console, ui
-from fitz_ai.cli.utils import get_collections
-from fitz_ai.core.config import ConfigNotFoundError, load_config_dict
-from fitz_ai.core.paths import FitzPaths
+from fitz_ai.cli.utils import get_collections, load_classic_rag_config
 from fitz_ai.logging.logger import get_logger
+from fitz_ai.runtime import get_default_engine
 
 logger = get_logger(__name__)
 
 
 # =============================================================================
-# Config Loading
+# Helpers
 # =============================================================================
-
-
-def _load_config() -> dict:
-    """Load config or exit with helpful message."""
-    try:
-        return load_config_dict(FitzPaths.config())
-    except ConfigNotFoundError:
-        ui.error("No config found. Run 'fitz init' first.")
-        raise typer.Exit(1)
 
 
 def _suggest_collection_name(source: str) -> str:
@@ -302,7 +292,9 @@ def _run_engine_specific_ingest(
                     print(f"  {key.replace('_', ' ').title()}: {value}")
 
         print()
-        ui.success(f"Collection '{collection}' saved to {result.get('storage_path', 'persistent storage')}")
+        ui.success(
+            f"Collection '{collection}' saved to {result.get('storage_path', 'persistent storage')}"
+        )
 
     except Exception as e:
         ui.error(f"Ingestion failed: {e}")
@@ -401,14 +393,15 @@ def command(
                 desc = desc[:47] + "..."
             choices.append(f"{name} - {desc}" if desc else name)
 
-        # Default to classic_rag
-        default_choice = next((c for c in choices if c.startswith("classic_rag")), choices[0])
+        # Use default engine from config
+        default_engine_name = get_default_engine()
+        default_choice = next((c for c in choices if c.startswith(default_engine_name)), choices[0])
         selected = ui.prompt_numbered_choice("Ingestion strategy", choices, default_choice)
         engine = selected.split(" - ")[0]
 
-    # Default to classic_rag in non-interactive mode
+    # Use default engine from config in non-interactive mode
     if engine is None:
-        engine = "classic_rag"
+        engine = get_default_engine()
 
     # Route to engine-specific ingest if not classic_rag
     if engine != "classic_rag":
@@ -423,15 +416,19 @@ def command(
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     # =========================================================================
-    # Load config
+    # Load config (engine-specific for classic_rag)
     # =========================================================================
 
-    config = _load_config()
+    raw_config, _ = load_classic_rag_config()
+    if raw_config is None:
+        ui.error("No config found. Run 'fitz init' first.")
+        raise typer.Exit(1)
+    config = raw_config
 
     embedding_plugin = config.get("embedding", {}).get("plugin_name", "cohere")
     embedding_model = config.get("embedding", {}).get("kwargs", {}).get("model", "")
     embedding_id = f"{embedding_plugin}:{embedding_model}" if embedding_model else embedding_plugin
-    vector_db_plugin = config.get("vector_db", {}).get("plugin_name", "qdrant")
+    vector_db_plugin = config.get("vector_db", {}).get("plugin_name", "local_faiss")
     default_collection = config.get("retrieval", {}).get("collection", "default")
 
     # Show force warning if applicable

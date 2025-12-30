@@ -27,32 +27,28 @@ class TestIngestCommand:
 
     def test_ingest_requires_config(self, tmp_path, monkeypatch):
         """Test that ingest requires a config file."""
-        monkeypatch.setattr(
-            "fitz_ai.cli.commands.ingest.FitzPaths.config",
-            lambda: tmp_path / "nonexistent" / "fitz.yaml",
-        )
-
-        result = runner.invoke(app, ["ingest", str(tmp_path), "-y"])
+        # Mock load_classic_rag_config to return None (no config)
+        with patch(
+            "fitz_ai.cli.commands.ingest.load_classic_rag_config",
+            return_value=(None, None),
+        ):
+            result = runner.invoke(app, ["ingest", str(tmp_path), "-y"])
 
         assert result.exit_code != 0
         assert "init" in result.output.lower() or "config" in result.output.lower()
 
     def test_ingest_non_interactive_requires_source(self, tmp_path):
         """Test that non-interactive mode requires source."""
-        import yaml
-
-        config_path = tmp_path / "fitz.yaml"
         config = {
             "embedding": {"plugin_name": "cohere"},
             "vector_db": {"plugin_name": "local_faiss"},
             "retrieval": {"collection": "default"},
             "chunking": {"default": {"plugin_name": "simple", "kwargs": {"chunk_size": 1000}}},
         }
-        config_path.write_text(yaml.dump(config))
 
         with patch(
-            "fitz_ai.cli.commands.ingest.FitzPaths.config",
-            return_value=config_path,
+            "fitz_ai.cli.commands.ingest.load_classic_rag_config",
+            return_value=(config, None),
         ):
             result = runner.invoke(app, ["ingest", "-y"])
 
@@ -62,27 +58,6 @@ class TestIngestCommand:
 
 class TestIngestHelpers:
     """Tests for ingest helper functions."""
-
-    def test_load_config_returns_dict(self, tmp_path):
-        """Test _load_config returns config dict."""
-        import yaml
-
-        config_path = tmp_path / "fitz.yaml"
-        config = {
-            "embedding": {"plugin_name": "cohere"},
-            "vector_db": {"plugin_name": "local_faiss"},
-        }
-        config_path.write_text(yaml.dump(config))
-
-        with patch(
-            "fitz_ai.cli.commands.ingest.FitzPaths.config",
-            return_value=config_path,
-        ):
-            from fitz_ai.cli.commands.ingest import _load_config
-
-            result = _load_config()
-
-        assert result["embedding"]["plugin_name"] == "cohere"
 
     def test_suggest_collection_name_from_dir(self, tmp_path):
         """Test _suggest_collection_name suggests name from directory."""
