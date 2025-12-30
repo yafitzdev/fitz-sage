@@ -10,6 +10,7 @@ This engine implements Microsoft's GraphRAG paradigm:
 5. Generate answers with graph context
 """
 
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 from fitz_ai.core import Answer, KnowledgeError, Provenance, Query
@@ -259,7 +260,7 @@ class GraphRAGEngine:
         Raises:
             KnowledgeError: If no documents or graph not built
         """
-        if not self._doc_texts:
+        if not self._chunks:
             raise KnowledgeError("No documents in knowledge base")
 
         # Ensure graph and indices are built
@@ -363,7 +364,7 @@ class GraphRAGEngine:
     def get_knowledge_stats(self) -> Dict[str, Any]:
         """Get statistics about the knowledge graph."""
         return {
-            "num_documents": len(self._doc_texts),
+            "num_documents": len(self._chunks),
             "num_chunks": len(self._chunks),
             "num_entities": self._graph.num_entities,
             "num_relationships": self._graph.num_relationships,
@@ -418,3 +419,109 @@ class GraphRAGEngine:
             f"Graph loaded: {self._graph.num_entities} entities, "
             f"{self._graph.num_communities} communities"
         )
+
+    def ingest(self, source: Path, collection: str) -> Dict[str, Any]:
+        """
+        Ingest documents from source, build graph, and save to persistent storage.
+
+        Args:
+            source: Path to documents (file or directory)
+            collection: Collection name for storage
+
+        Returns:
+            Dict with ingestion stats
+        """
+        import json
+
+        from fitz_ai.core.paths import FitzPaths
+        from fitz_ai.ingestion.reader.engine import IngestionEngine
+        from fitz_ai.ingestion.reader.registry import get_ingest_plugin
+
+        # Read documents
+        IngestPluginCls = get_ingest_plugin("local")
+        ingest_plugin = IngestPluginCls()
+        ingest_engine = IngestionEngine(plugin=ingest_plugin, kwargs={})
+        raw_docs = list(ingest_engine.run(str(source)))
+
+        if not raw_docs:
+            raise KnowledgeError(f"No documents found in {source}")
+
+        # Add documents
+        doc_texts = [doc.content for doc in raw_docs]
+        doc_ids = [str(doc.path) for doc in raw_docs]
+        self.add_documents(doc_texts, doc_ids=doc_ids)
+
+        # Build graph
+        self.build_graph()
+
+        # Build communities
+        self.build_communities()
+
+        # Save graph and chunks
+        FitzPaths.ensure_graphrag_storage()
+        storage_path = FitzPaths.graphrag_storage(collection)
+
+        # Save everything in one JSON
+        data = {
+            "graph": self._graph.to_dict(),
+            "chunks": self._chunks,
+            "doc_ids": self._doc_ids,
+        }
+        storage_path.write_text(json.dumps(data, indent=2))
+
+        logger.info(f"GraphRAG collection '{collection}' saved to {storage_path}")
+
+        return {
+            "documents": len(raw_docs),
+            "entities": self._graph.num_entities,
+            "relationships": self._graph.num_relationships,
+            "communities": self._graph.num_communities,
+            "storage_path": str(storage_path),
+        }
+
+    def load(self, collection: str) -> None:
+        """
+        Load graph and chunks from persistent storage.
+
+        Args:
+            collection: Collection name to load
+        """
+        import json
+
+        from fitz_ai.core.paths import FitzPaths
+
+        storage_path = FitzPaths.graphrag_storage(collection)
+        if not storage_path.exists():
+            raise KnowledgeError(f"Collection '{collection}' not found at {storage_path}")
+
+        data = json.loads(storage_path.read_text())
+
+        # Load graph
+        self._graph = KnowledgeGraph.from_dict(data["graph"])
+        self._graph_built = True
+        self._communities_built = self._graph.num_communities > 0
+
+        # Load chunks and doc_ids
+        self._chunks = data["chunks"]
+        self._doc_ids = data["doc_ids"]
+
+        # Reset search components
+        self._indexed = False
+        self._local_search = None
+        self._global_search = None
+        self._hybrid_search = None
+
+        logger.info(
+            f"Loaded collection '{collection}': {self._graph.num_entities} entities, "
+            f"{self._graph.num_communities} communities, {len(self._chunks)} chunks"
+        )
+
+    @staticmethod
+    def list_collections() -> List[str]:
+        """List available GraphRAG collections."""
+        from fitz_ai.core.paths import FitzPaths
+
+        graphrag_dir = FitzPaths.workspace() / "graphrag"
+        if not graphrag_dir.exists():
+            return []
+        return [p.stem for p in graphrag_dir.glob("*.json")]

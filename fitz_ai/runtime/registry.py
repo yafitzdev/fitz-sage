@@ -35,6 +35,9 @@ class EngineCapabilities:
     requires_documents_at_query: bool = False
     """Engine needs documents added before querying (no persistent storage)"""
 
+    supports_persistent_ingest: bool = False
+    """Engine has ingest()/load() methods for persistent storage"""
+
     # Feature capabilities
     supports_chat: bool = True
     """Engine supports multi-turn conversation"""
@@ -99,6 +102,14 @@ class EngineRegistration:
     Used by fitz init to copy default config to user config directory.
     """
 
+    list_collections: Optional[Callable[[], List[str]]] = None
+    """
+    Function that lists available collections for this engine.
+
+    Signature: () -> List[str]
+    Required for engines with supports_persistent_ingest=True.
+    """
+
     capabilities: EngineCapabilities = field(default_factory=EngineCapabilities)
     """Engine capabilities for CLI/API adaptation."""
 
@@ -159,6 +170,7 @@ class EngineRegistry:
         config_type: Optional[Type] = None,
         config_loader: Optional[Callable[[Optional[str]], Any]] = None,
         default_config_path: Optional[Callable[[], Any]] = None,
+        list_collections: Optional[Callable[[], List[str]]] = None,
         capabilities: Optional[EngineCapabilities] = None,
     ) -> None:
         """
@@ -171,6 +183,7 @@ class EngineRegistry:
             config_type: Expected config type (optional, for validation)
             config_loader: Function to load config (config_path -> config)
             default_config_path: Function that returns path to default config file
+            list_collections: Function to list available collections (for persistent ingest)
             capabilities: Engine capabilities for CLI/API adaptation
 
         Raises:
@@ -186,6 +199,7 @@ class EngineRegistry:
             config_type=config_type,
             config_loader=config_loader,
             default_config_path=default_config_path,
+            list_collections=list_collections,
             capabilities=capabilities or EngineCapabilities(),
         )
         self._engines[name] = registration
@@ -297,6 +311,26 @@ class EngineRegistry:
 
         return info.default_config_path()
 
+    def get_list_collections(self, name: str) -> List[str]:
+        """
+        Get list of available collections for an engine.
+
+        Args:
+            name: Name of the engine
+
+        Returns:
+            List of collection names, or empty list if not supported
+
+        Raises:
+            ConfigurationError: If engine not found
+        """
+        info = self.get_info(name)
+
+        if info.list_collections is None:
+            return []
+
+        return info.list_collections()
+
     @staticmethod
     def register_engine(
         name: str,
@@ -304,6 +338,7 @@ class EngineRegistry:
         config_type: Optional[Type] = None,
         config_loader: Optional[Callable[[Optional[str]], Any]] = None,
         default_config_path: Optional[Callable[[], Any]] = None,
+        list_collections: Optional[Callable[[], List[str]]] = None,
         capabilities: Optional[EngineCapabilities] = None,
     ) -> Callable:
         """
@@ -318,6 +353,7 @@ class EngineRegistry:
             config_type: Expected config type (optional)
             config_loader: Function to load config
             default_config_path: Function that returns path to default config file
+            list_collections: Function to list available collections (for persistent ingest)
             capabilities: Engine capabilities
 
         Returns:
@@ -345,6 +381,7 @@ class EngineRegistry:
                 config_type=config_type,
                 config_loader=config_loader,
                 default_config_path=default_config_path,
+                list_collections=list_collections,
                 capabilities=capabilities,
             )
             return factory

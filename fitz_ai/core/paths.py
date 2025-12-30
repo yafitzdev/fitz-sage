@@ -172,6 +172,46 @@ class FitzPaths:
         return path
 
     # =========================================================================
+    # GraphRAG Storage
+    # =========================================================================
+
+    @classmethod
+    def graphrag_storage(cls, collection: str) -> Path:
+        """
+        GraphRAG knowledge graph storage path.
+
+        Location: {workspace}/graphrag/{collection}.json
+        """
+        return cls.workspace() / "graphrag" / f"{collection}.json"
+
+    @classmethod
+    def ensure_graphrag_storage(cls) -> Path:
+        """Get graphrag directory and create it if it doesn't exist."""
+        path = cls.workspace() / "graphrag"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    # =========================================================================
+    # CLaRA Storage
+    # =========================================================================
+
+    @classmethod
+    def clara_storage(cls, collection: str) -> Path:
+        """
+        CLaRA compressed representations storage path.
+
+        Location: {workspace}/clara/{collection}/
+        """
+        return cls.workspace() / "clara" / collection
+
+    @classmethod
+    def ensure_clara_storage(cls, collection: str) -> Path:
+        """Get clara collection directory and create it if it doesn't exist."""
+        path = cls.clara_storage(collection)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    # =========================================================================
     # Cache Paths
     # =========================================================================
 

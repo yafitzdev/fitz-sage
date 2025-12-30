@@ -153,16 +153,13 @@ def _register_graphrag_engine():
 
     # Define capabilities
     capabilities = EngineCapabilities(
-        supports_collections=False,  # Uses in-memory graph
-        requires_documents_at_query=True,  # Must add docs before query
+        supports_collections=False,  # Uses own storage format
+        requires_documents_at_query=False,  # Has persistent storage via ingest/load
+        supports_persistent_ingest=True,  # Has ingest()/load() methods
         supports_chat=False,  # No multi-turn yet
         supports_streaming=False,
         requires_config=False,  # Works with defaults
         requires_api_key=False,  # Uses configured LLM/embedding providers
-        cli_query_message=(
-            "GraphRAG requires documents to be loaded and graph to be built first.\n"
-            "Use 'fitz quickstart <folder> \"question\" --engine graphrag' for one-off queries."
-        ),
     )
 
     # Register with global registry
@@ -176,6 +173,7 @@ def _register_graphrag_engine():
             config_type=GraphRAGConfig,
             config_loader=_graphrag_config_loader,
             default_config_path=get_default_config_path,
+            list_collections=GraphRAGEngine.list_collections,
             capabilities=capabilities,
         )
 

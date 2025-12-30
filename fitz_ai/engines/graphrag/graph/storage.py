@@ -315,16 +315,9 @@ class KnowledgeGraph:
         self._communities.clear()
         self._entity_to_community.clear()
 
-    def save(self, path: str) -> None:
-        """
-        Save graph to file.
-
-        Args:
-            path: File path to save to
-        """
-        import json
-
-        data = {
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize graph to dictionary."""
+        return {
             "entities": [
                 {
                     "id": e.id,
@@ -360,7 +353,58 @@ class KnowledgeGraph:
             ],
         }
 
-        Path(path).write_text(json.dumps(data, indent=2))
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "KnowledgeGraph":
+        """Deserialize graph from dictionary."""
+        graph = cls()
+
+        for e_data in data.get("entities", []):
+            entity = Entity(
+                id=e_data["id"],
+                name=e_data["name"],
+                type=e_data["type"],
+                description=e_data.get("description", ""),
+                source_chunks=e_data.get("source_chunks", []),
+                attributes=e_data.get("attributes", {}),
+            )
+            graph.add_entity(entity)
+
+        for r_data in data.get("relationships", []):
+            rel = Relationship(
+                source_id=r_data["source_id"],
+                target_id=r_data["target_id"],
+                type=r_data["type"],
+                description=r_data.get("description", ""),
+                weight=r_data.get("weight", 1.0),
+                source_chunks=r_data.get("source_chunks", []),
+            )
+            graph.add_relationship(rel)
+
+        communities = []
+        for c_data in data.get("communities", []):
+            community = Community(
+                id=c_data["id"],
+                level=c_data["level"],
+                entity_ids=c_data["entity_ids"],
+                summary=c_data.get("summary", ""),
+                parent_id=c_data.get("parent_id"),
+                child_ids=c_data.get("child_ids", []),
+            )
+            communities.append(community)
+        graph.set_communities(communities)
+
+        return graph
+
+    def save(self, path: str) -> None:
+        """
+        Save graph to file.
+
+        Args:
+            path: File path to save to
+        """
+        import json
+
+        Path(path).write_text(json.dumps(self.to_dict(), indent=2))
 
     @classmethod
     def load(cls, path: str) -> "KnowledgeGraph":
@@ -376,44 +420,4 @@ class KnowledgeGraph:
         import json
 
         data = json.loads(Path(path).read_text())
-        graph = cls()
-
-        # Load entities
-        for e_data in data.get("entities", []):
-            entity = Entity(
-                id=e_data["id"],
-                name=e_data["name"],
-                type=e_data["type"],
-                description=e_data.get("description", ""),
-                source_chunks=e_data.get("source_chunks", []),
-                attributes=e_data.get("attributes", {}),
-            )
-            graph.add_entity(entity)
-
-        # Load relationships
-        for r_data in data.get("relationships", []):
-            rel = Relationship(
-                source_id=r_data["source_id"],
-                target_id=r_data["target_id"],
-                type=r_data["type"],
-                description=r_data.get("description", ""),
-                weight=r_data.get("weight", 1.0),
-                source_chunks=r_data.get("source_chunks", []),
-            )
-            graph.add_relationship(rel)
-
-        # Load communities
-        communities = []
-        for c_data in data.get("communities", []):
-            community = Community(
-                id=c_data["id"],
-                level=c_data["level"],
-                entity_ids=c_data["entity_ids"],
-                summary=c_data.get("summary", ""),
-                parent_id=c_data.get("parent_id"),
-                child_ids=c_data.get("child_ids", []),
-            )
-            communities.append(community)
-        graph.set_communities(communities)
-
-        return graph
+        return cls.from_dict(data)

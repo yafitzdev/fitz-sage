@@ -559,3 +559,111 @@ class ClaraEngine:
         self._compressed_docs = None
         self._doc_embeddings = None
         logger.info("CLaRa knowledge base cleared")
+
+    def ingest(self, source: Path, collection: str) -> Dict[str, Any]:
+        """
+        Ingest documents from source, compress, and save to persistent storage.
+
+        Args:
+            source: Path to documents (file or directory)
+            collection: Collection name for storage
+
+        Returns:
+            Dict with ingestion stats
+        """
+        import json
+
+        from fitz_ai.core.paths import FitzPaths
+        from fitz_ai.ingestion.reader.engine import IngestionEngine
+        from fitz_ai.ingestion.reader.registry import get_ingest_plugin
+
+        # Read documents
+        IngestPluginCls = get_ingest_plugin("local")
+        ingest_plugin = IngestPluginCls()
+        ingest_engine = IngestionEngine(plugin=ingest_plugin, kwargs={})
+        raw_docs = list(ingest_engine.run(str(source)))
+
+        if not raw_docs:
+            raise KnowledgeError(f"No documents found in {source}")
+
+        # Add documents (this compresses them)
+        doc_texts = [doc.content for doc in raw_docs]
+        doc_ids = [str(doc.path) for doc in raw_docs]
+        self.add_documents(doc_texts, doc_ids=doc_ids)
+
+        # Save to persistent storage
+        storage_dir = FitzPaths.ensure_clara_storage(collection)
+
+        # Save metadata as JSON
+        metadata = {
+            "doc_texts": self._doc_texts,
+            "doc_ids": self._doc_ids,
+            "compression_rate": self._config.compression.compression_rate,
+            "model_variant": self._config.model.variant,
+        }
+        metadata_path = storage_dir / "metadata.json"
+        metadata_path.write_text(json.dumps(metadata, indent=2))
+
+        # Save tensors
+        torch.save(self._compressed_docs, storage_dir / "compressed_docs.pt")
+        torch.save(self._doc_embeddings, storage_dir / "doc_embeddings.pt")
+
+        logger.info(f"CLaRa collection '{collection}' saved to {storage_dir}")
+
+        return {
+            "documents": len(raw_docs),
+            "compressed_shape": list(self._compressed_docs.shape),
+            "memory_tokens_per_doc": self._compressed_docs.shape[1],
+            "storage_path": str(storage_dir),
+        }
+
+    def load(self, collection: str) -> None:
+        """
+        Load compressed documents from persistent storage.
+
+        Args:
+            collection: Collection name to load
+        """
+        import json
+
+        from fitz_ai.core.paths import FitzPaths
+
+        storage_dir = FitzPaths.clara_storage(collection)
+        if not storage_dir.exists():
+            raise KnowledgeError(f"Collection '{collection}' not found at {storage_dir}")
+
+        # Load metadata
+        metadata_path = storage_dir / "metadata.json"
+        if not metadata_path.exists():
+            raise KnowledgeError(f"Metadata file not found in {storage_dir}")
+
+        metadata = json.loads(metadata_path.read_text())
+        self._doc_texts = metadata["doc_texts"]
+        self._doc_ids = metadata["doc_ids"]
+
+        # Load tensors
+        device = next(self._model.parameters()).device
+        self._compressed_docs = torch.load(
+            storage_dir / "compressed_docs.pt", map_location=device
+        )
+        self._doc_embeddings = torch.load(
+            storage_dir / "doc_embeddings.pt", map_location=device
+        )
+
+        logger.info(
+            f"Loaded collection '{collection}': {len(self._doc_texts)} docs, "
+            f"compressed shape {list(self._compressed_docs.shape)}"
+        )
+
+    @staticmethod
+    def list_collections() -> List[str]:
+        """List available CLaRa collections."""
+        from fitz_ai.core.paths import FitzPaths
+
+        clara_dir = FitzPaths.workspace() / "clara"
+        if not clara_dir.exists():
+            return []
+        return [
+            p.name for p in clara_dir.iterdir()
+            if p.is_dir() and (p / "metadata.json").exists()
+        ]

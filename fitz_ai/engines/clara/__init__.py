@@ -143,16 +143,13 @@ def _register_clara_engine():
 
     # Define capabilities - CLaRa is fundamentally different from classic RAG
     capabilities = EngineCapabilities(
-        supports_collections=False,  # No persistent storage
-        requires_documents_at_query=True,  # Must add docs before query
+        supports_collections=False,  # Uses own storage format
+        requires_documents_at_query=False,  # Has persistent storage via ingest/load
+        supports_persistent_ingest=True,  # Has ingest()/load() methods
         supports_chat=False,  # No multi-turn yet
         supports_streaming=False,
         requires_config=False,  # Works with defaults
         requires_api_key=False,  # Local GPU model
-        cli_query_message=(
-            "CLaRa requires documents to be loaded first.\n"
-            "Use 'fitz quickstart <folder> \"question\" --engine clara' for one-off queries."
-        ),
     )
 
     # Register with global registry
@@ -167,6 +164,7 @@ def _register_clara_engine():
             config_type=ClaraConfig,
             config_loader=_clara_config_loader,
             default_config_path=get_default_config_path,
+            list_collections=ClaraEngine.list_collections,
             capabilities=capabilities,
         )
 

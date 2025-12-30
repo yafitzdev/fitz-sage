@@ -6,6 +6,7 @@ Uses LLM to extract entities and relationships from text chunks.
 """
 
 import json
+import os
 import re
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
@@ -17,30 +18,30 @@ from fitz_ai.logging.logger import get_logger
 logger = get_logger(__name__)
 
 
-EXTRACTION_PROMPT = """Extract entities and relationships from the following text.
+EXTRACTION_PROMPT = """Extract entities and relationships from the following documents.
 
 ## Entity Types to Extract
 {entity_types}
 
 ## Instructions
 1. Identify all important entities (people, organizations, locations, concepts, etc.)
-2. For each entity, provide: name, type, and a brief description
+2. For each entity, provide: name, type, description, and which document(s) it appears in
 3. Identify relationships between entities
-4. For each relationship, provide: source entity, target entity, relationship type, and description
+4. For each relationship, provide: source entity, target entity, relationship type, description, and which document(s) it appears in
 
 ## Output Format
 Return a JSON object with this exact structure:
 {{
   "entities": [
-    {{"name": "Entity Name", "type": "entity_type", "description": "Brief description"}}
+    {{"name": "Entity Name", "type": "entity_type", "description": "Brief description", "docs": ["doc_id1", "doc_id2"]}}
   ],
   "relationships": [
-    {{"source": "Source Entity Name", "target": "Target Entity Name", "type": "relationship_type", "description": "Brief description"}}
+    {{"source": "Source Entity Name", "target": "Target Entity Name", "type": "relationship_type", "description": "Brief description", "docs": ["doc_id1"]}}
   ]
 }}
 
-## Text to Analyze
-{text}
+## Documents to Analyze
+{documents}
 
 ## Output (JSON only, no other text):"""
 
@@ -84,54 +85,102 @@ class EntityRelationshipExtractor:
             )
         return self._chat_client
 
-    def extract_from_text(
-        self, text: str, chunk_id: Optional[str] = None
-    ) -> Tuple[List[Entity], List[Relationship]]:
+    def extract_from_chunks(
+        self,
+        chunks: List[Dict[str, Any]],
+        graph: Optional[KnowledgeGraph] = None,
+        batch_size: int = 5,
+    ) -> KnowledgeGraph:
         """
-        Extract entities and relationships from a single text chunk.
+        Extract entities and relationships from multiple chunks in batched LLM calls.
 
         Args:
-            text: Text to extract from
-            chunk_id: Optional chunk ID for provenance
+            chunks: List of chunk dicts with 'text' and optionally 'id' keys
+            graph: Optional existing graph to add to
+            batch_size: Number of chunks per LLM call
+
+        Returns:
+            KnowledgeGraph with extracted entities and relationships
+        """
+        if graph is None:
+            graph = KnowledgeGraph()
+
+        # Filter empty chunks and assign IDs
+        valid_chunks = []
+        for chunk in chunks:
+            text = chunk.get("text", "")
+            if text.strip():
+                chunk_id = chunk.get("id", str(uuid.uuid4())[:8])
+                valid_chunks.append({"id": chunk_id, "text": text})
+
+        if not valid_chunks:
+            return graph
+
+        # Process in batches
+        for i in range(0, len(valid_chunks), batch_size):
+            batch = valid_chunks[i : i + batch_size]
+            try:
+                entities, relationships = self._extract_batch(batch)
+                for entity in entities:
+                    graph.add_entity(entity)
+                for rel in relationships:
+                    graph.add_relationship(rel)
+            except Exception as e:
+                logger.warning(f"Batch extraction failed: {e}")
+                continue
+
+        logger.info(
+            f"Extracted {graph.num_entities} entities and "
+            f"{graph.num_relationships} relationships from {len(valid_chunks)} chunks"
+        )
+
+        return graph
+
+    def _extract_batch(
+        self, chunks: List[Dict[str, str]]
+    ) -> Tuple[List[Entity], List[Relationship]]:
+        """
+        Extract from multiple chunks in a single LLM call.
+
+        Args:
+            chunks: List of {"id": str, "text": str} dicts
 
         Returns:
             Tuple of (entities, relationships)
         """
+        # Build documents section using basenames for simpler LLM output
+        # Map basenames back to full IDs
+        basename_to_full_id = {}
+        docs_parts = []
+        for chunk in chunks:
+            full_id = chunk["id"]
+            basename = os.path.basename(full_id)
+            basename_to_full_id[basename] = full_id
+            # Truncate long texts (2000 chars per doc to keep total reasonable)
+            text = chunk["text"][:2000]
+            docs_parts.append(f"### Document: {basename}\n{text}")
+        documents = "\n\n".join(docs_parts)
+
         # Build prompt
         entity_types_str = (
             ", ".join(self.config.entity_types) if self.config.entity_types else "any"
         )
         prompt = EXTRACTION_PROMPT.format(
             entity_types=entity_types_str,
-            text=text[:8000],  # Truncate very long texts
+            documents=documents,
         )
 
         # Call LLM
         chat_client = self._get_chat_client()
         response = chat_client.chat([{"role": "user", "content": prompt}])
 
-        # Parse response
-        entities, relationships = self._parse_extraction_response(response, chunk_id)
+        # Parse response and map basenames back to full IDs
+        return self._parse_batch_response(response, basename_to_full_id)
 
-        # Apply limits
-        entities = entities[: self.config.max_entities_per_chunk]
-        relationships = relationships[: self.config.max_relationships_per_chunk]
-
-        return entities, relationships
-
-    def _parse_extraction_response(
-        self, response: str, chunk_id: Optional[str] = None
+    def _parse_batch_response(
+        self, response: str, basename_to_full_id: Dict[str, str]
     ) -> Tuple[List[Entity], List[Relationship]]:
-        """
-        Parse LLM response into entities and relationships.
-
-        Args:
-            response: LLM response text
-            chunk_id: Optional chunk ID for provenance
-
-        Returns:
-            Tuple of (entities, relationships)
-        """
+        """Parse LLM response from batched extraction."""
         entities = []
         relationships = []
 
@@ -160,12 +209,16 @@ class EntityRelationshipExtractor:
             entity_id = str(uuid.uuid4())[:8]
             entity_name_to_id[name.lower()] = entity_id
 
+            # Get source docs and map basenames to full IDs
+            source_docs = e_data.get("docs", [])
+            source_chunks = [basename_to_full_id[d] for d in source_docs if d in basename_to_full_id]
+
             entity = Entity(
                 id=entity_id,
                 name=name,
                 type=e_data.get("type", "unknown").lower(),
                 description=e_data.get("description", ""),
-                source_chunks=[chunk_id] if chunk_id else [],
+                source_chunks=source_chunks,
             )
             entities.append(entity)
 
@@ -183,85 +236,17 @@ class EntityRelationshipExtractor:
             if not source_id or not target_id:
                 continue
 
+            # Get source docs and map basenames to full IDs
+            source_docs = r_data.get("docs", [])
+            source_chunks = [basename_to_full_id[d] for d in source_docs if d in basename_to_full_id]
+
             rel = Relationship(
                 source_id=source_id,
                 target_id=target_id,
                 type=r_data.get("type", "related_to").lower().replace(" ", "_"),
                 description=r_data.get("description", ""),
-                source_chunks=[chunk_id] if chunk_id else [],
+                source_chunks=source_chunks,
             )
             relationships.append(rel)
 
         return entities, relationships
-
-    def extract_from_chunks(
-        self,
-        chunks: List[Dict[str, Any]],
-        graph: Optional[KnowledgeGraph] = None,
-    ) -> KnowledgeGraph:
-        """
-        Extract entities and relationships from multiple chunks.
-
-        Args:
-            chunks: List of chunk dicts with 'text' and optionally 'id' keys
-            graph: Optional existing graph to add to
-
-        Returns:
-            KnowledgeGraph with extracted entities and relationships
-        """
-        if graph is None:
-            graph = KnowledgeGraph()
-
-        # Track entity names to merge duplicates
-        name_to_entity: Dict[str, Entity] = {}
-
-        for chunk in chunks:
-            text = chunk.get("text", "")
-            chunk_id = chunk.get("id", str(uuid.uuid4())[:8])
-
-            if not text.strip():
-                continue
-
-            try:
-                entities, relationships = self.extract_from_text(text, chunk_id)
-            except Exception as e:
-                logger.warning(f"Extraction failed for chunk {chunk_id}: {e}")
-                continue
-
-            # Merge entities by name
-            for entity in entities:
-                name_key = entity.name.lower()
-                if name_key in name_to_entity:
-                    # Merge source chunks
-                    existing = name_to_entity[name_key]
-                    existing.source_chunks.extend(entity.source_chunks)
-                    # Update description if new one is longer
-                    if len(entity.description) > len(existing.description):
-                        existing.description = entity.description
-                else:
-                    name_to_entity[name_key] = entity
-                    graph.add_entity(entity)
-
-            # Add relationships (map to merged entity IDs)
-            for rel in relationships:
-                # Find actual entity IDs after merging
-                source_entity = None
-                target_entity = None
-
-                for entity in entities:
-                    if entity.id == rel.source_id:
-                        source_entity = name_to_entity.get(entity.name.lower())
-                    if entity.id == rel.target_id:
-                        target_entity = name_to_entity.get(entity.name.lower())
-
-                if source_entity and target_entity:
-                    rel.source_id = source_entity.id
-                    rel.target_id = target_entity.id
-                    graph.add_relationship(rel)
-
-        logger.info(
-            f"Extracted {graph.num_entities} entities and "
-            f"{graph.num_relationships} relationships from {len(chunks)} chunks"
-        )
-
-        return graph

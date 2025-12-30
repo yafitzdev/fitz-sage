@@ -213,6 +213,104 @@ class VectorDBWriterAdapter:
 
 
 # =============================================================================
+# Engine-Specific Ingest
+# =============================================================================
+
+
+def _run_engine_specific_ingest(
+    source: Optional[str],
+    collection: Optional[str],
+    engine_name: str,
+    non_interactive: bool,
+) -> None:
+    """Run ingest for engines with supports_persistent_ingest capability."""
+    from pathlib import Path
+
+    from fitz_ai.runtime import create_engine, get_engine_registry
+
+    # Validate engine
+    registry = get_engine_registry()
+    available = registry.list()
+    if engine_name not in available:
+        ui.error(f"Unknown engine: '{engine_name}'. Available: {', '.join(available)}")
+        raise typer.Exit(1)
+
+    # Check if engine supports persistent ingest
+    caps = registry.get_capabilities(engine_name)
+    if not caps.supports_persistent_ingest:
+        ui.error(f"Engine '{engine_name}' does not support persistent ingestion.")
+        ui.info("Use 'fitz ingest' without --engine for classic_rag ingestion.")
+        raise typer.Exit(1)
+
+    # Get source path
+    if source is None:
+        if non_interactive:
+            ui.error("Source path required in non-interactive mode.")
+            raise typer.Exit(1)
+        source = ui.prompt_path("Source path", ".")
+
+    source_path = Path(source).resolve()
+    if not source_path.exists():
+        ui.error(f"Source path not found: {source_path}")
+        raise typer.Exit(1)
+
+    # Get collection name
+    if collection is None:
+        collection = _suggest_collection_name(source)
+        if not non_interactive:
+            collection = ui.prompt_text("Collection name", collection)
+
+    ui.info(f"Source: {source_path}")
+    ui.info(f"Collection: {collection}")
+    ui.info(f"Engine: {engine_name}")
+    print()
+
+    # Create engine and run ingest
+    ui.step(1, 2, f"Initializing {engine_name} engine...")
+
+    try:
+        engine = create_engine(engine_name)
+        ui.success("Engine initialized")
+    except Exception as e:
+        ui.error(f"Failed to initialize engine: {e}")
+        logger.exception("Engine init error")
+        raise typer.Exit(1)
+
+    ui.step(2, 2, "Ingesting documents...")
+
+    try:
+        result = engine.ingest(source_path, collection)
+        ui.success("Ingestion complete")
+        print()
+
+        # Display results
+        if RICH:
+            from rich.table import Table
+
+            table = Table(show_header=False, box=None, padding=(0, 2))
+            table.add_column("Metric", style="bold")
+            table.add_column("Value", style="cyan")
+
+            for key, value in result.items():
+                if key != "storage_path":
+                    table.add_row(key.replace("_", " ").title(), str(value))
+
+            console.print(table)
+        else:
+            for key, value in result.items():
+                if key != "storage_path":
+                    print(f"  {key.replace('_', ' ').title()}: {value}")
+
+        print()
+        ui.success(f"Collection '{collection}' saved to {result.get('storage_path', 'persistent storage')}")
+
+    except Exception as e:
+        ui.error(f"Ingestion failed: {e}")
+        logger.exception("Ingestion error")
+        raise typer.Exit(1)
+
+
+# =============================================================================
 # Main Command
 # =============================================================================
 
@@ -227,6 +325,12 @@ def command(
         "--collection",
         "-c",
         help="Collection name. Uses config default if not provided.",
+    ),
+    engine: Optional[str] = typer.Option(
+        None,
+        "--engine",
+        "-e",
+        help="Engine to use (classic_rag, graphrag, clara). Defaults to classic_rag.",
     ),
     non_interactive: bool = typer.Option(
         False,
@@ -260,15 +364,57 @@ def command(
     Incremental by default - only processes new/changed files.
 
     Examples:
-        fitz ingest                  # Interactive mode (prompts for artifacts)
-        fitz ingest ./src            # Specify source, interactive artifacts
+        fitz ingest                  # Interactive mode (prompts for engine)
+        fitz ingest ./src            # Specify source, interactive engine/artifacts
         fitz ingest ./src -a all     # All applicable artifacts
         fitz ingest ./src -a none    # No artifacts
         fitz ingest ./src -a navigation_index,interface_catalog  # Specific artifacts
         fitz ingest ./src -f         # Force re-ingest
         fitz ingest ./src -a all -y  # Non-interactive with all artifacts
         fitz ingest ./docs --hierarchy  # Enable hierarchical summaries (zero-config)
+        fitz ingest ./docs -e graphrag  # Use GraphRAG engine
+        fitz ingest ./docs -e clara     # Use CLaRa engine
     """
+    from fitz_ai.runtime import get_engine_registry, list_engines
+
+    # =========================================================================
+    # Header
+    # =========================================================================
+
+    ui.header("Fitz Ingest", "Feed your documents into the knowledge base")
+    print()
+
+    # =========================================================================
+    # Engine Selection (interactive)
+    # =========================================================================
+
+    if engine is None and not non_interactive:
+        # Build engine choices with descriptions
+        registry = get_engine_registry()
+        available_engines = list_engines()
+        engine_info = registry.list_with_descriptions()
+
+        choices = []
+        for name in available_engines:
+            desc = engine_info.get(name, "")
+            if len(desc) > 50:
+                desc = desc[:47] + "..."
+            choices.append(f"{name} - {desc}" if desc else name)
+
+        # Default to classic_rag
+        default_choice = next((c for c in choices if c.startswith("classic_rag")), choices[0])
+        selected = ui.prompt_numbered_choice("Ingestion strategy", choices, default_choice)
+        engine = selected.split(" - ")[0]
+
+    # Default to classic_rag in non-interactive mode
+    if engine is None:
+        engine = "classic_rag"
+
+    # Route to engine-specific ingest if not classic_rag
+    if engine != "classic_rag":
+        _run_engine_specific_ingest(source, collection, engine, non_interactive)
+        return
+
     from fitz_ai.ingestion.chunking.router import ChunkingRouter
     from fitz_ai.ingestion.diff import run_diff_ingest
     from fitz_ai.ingestion.reader.registry import get_ingest_plugin
@@ -288,18 +434,13 @@ def command(
     vector_db_plugin = config.get("vector_db", {}).get("plugin_name", "qdrant")
     default_collection = config.get("retrieval", {}).get("collection", "default")
 
-    # =========================================================================
-    # Header
-    # =========================================================================
-
-    ui.header("Fitz Ingest", "Feed your documents into the vector database")
+    # Show force warning if applicable
     if force:
         ui.warning("Force mode: will re-ingest all files")
-
-    print()
+        print()
 
     # =========================================================================
-    # Interactive Prompts
+    # Interactive Prompts (classic_rag)
     # =========================================================================
 
     # Will be set after source is determined

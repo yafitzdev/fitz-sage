@@ -110,8 +110,11 @@ def command(
         _show_documents_required_message(engine, caps)
         raise typer.Exit(0)
 
+    # Engines with persistent ingest support (graphrag, clara)
+    if caps.supports_persistent_ingest:
+        _run_persistent_ingest_query(question, collection, engine)
     # Engines with collection support use collection-based query
-    if caps.supports_collections:
+    elif caps.supports_collections:
         _run_collection_query(question, collection, engine)
     else:
         # Engines without collections use generic runtime path
@@ -135,6 +138,59 @@ def _show_documents_required_message(engine_name: str, caps) -> None:
     print("  engine.add_documents(['doc1...', 'doc2...'])")
     print("  answer = engine.answer(Query(text='your question'))")
     print()
+
+
+def _run_persistent_ingest_query(
+    question: Optional[str], collection: Optional[str], engine_name: str
+) -> None:
+    """Run query using an engine with persistent ingest support (graphrag, clara)."""
+
+    # Get list of available collections via registry (no hardcoded imports)
+    registry = get_engine_registry()
+    collections = registry.get_list_collections(engine_name)
+
+    if not collections:
+        ui.warning(f"No {engine_name} collections found.")
+        ui.info(f"Run 'fitz ingest ./docs -e {engine_name}' first to ingest documents.")
+        raise typer.Exit(0)
+
+    # Collection selection
+    if collection is None:
+        if len(collections) == 1:
+            collection = collections[0]
+            ui.info(f"Using collection: {collection}")
+        else:
+            print()
+            collection = ui.prompt_numbered_choice("Collection", collections, collections[0])
+    elif collection not in collections:
+        ui.error(f"Collection '{collection}' not found. Available: {', '.join(collections)}")
+        raise typer.Exit(1)
+
+    # Prompt for question if not provided
+    if question is None:
+        question_text = ui.prompt_text("Question")
+    else:
+        question_text = question
+
+    print()
+    ui.info(f"Engine: {engine_name} | Collection: {collection}")
+    print()
+
+    # Create engine, load collection, and query
+    try:
+        engine_instance = create_engine(engine_name)
+
+        ui.info("Loading collection...")
+        engine_instance.load(collection)
+
+        ui.info("Querying...")
+        query = Query(text=question_text)
+        answer = engine_instance.answer(query)
+        display_answer(answer)
+    except Exception as e:
+        ui.error(f"Query failed: {e}")
+        logger.exception("Query error")
+        raise typer.Exit(1)
 
 
 def _run_collection_query(
