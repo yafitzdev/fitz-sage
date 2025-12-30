@@ -14,7 +14,8 @@ from fitz_ai.core.answer_mode_resolver import resolve_answer_mode
 from fitz_ai.core.guardrails import (
     ConstraintPlugin,
     ConstraintResult,
-    get_default_constraints,
+    SemanticMatcher,
+    create_default_constraints,
 )
 from fitz_ai.engines.classic_rag.config import ClassicRagConfig, load_config
 from fitz_ai.engines.classic_rag.exceptions import (
@@ -61,16 +62,27 @@ class RAGPipeline:
         rgs: RGS,
         context: ContextPipeline | None = None,
         constraints: Sequence[ConstraintPlugin] | None = None,
+        semantic_matcher: SemanticMatcher | None = None,
     ):
         self.retrieval = retrieval
         self.chat = chat
         self.rgs = rgs
         self.context = context or ContextPipeline()
 
-        # Default constraints: ConflictAware + InsufficientEvidence
+        # Default constraints: ConflictAware + InsufficientEvidence + CausalAttribution
+        # Uses semantic embedding similarity for language-agnostic detection.
         # Users can override by passing constraints=[] to disable
         if constraints is None:
-            self.constraints: list[ConstraintPlugin] = get_default_constraints()
+            if semantic_matcher is None:
+                # No constraints if no semantic matcher provided
+                # (caller should use from_config which provides embedder)
+                self.constraints: list[ConstraintPlugin] = []
+                logger.warning(
+                    f"{PIPELINE} No semantic_matcher provided, constraints disabled. "
+                    "Use RAGPipeline.from_config() for full constraint support."
+                )
+            else:
+                self.constraints = create_default_constraints(semantic_matcher)
         else:
             self.constraints = list(constraints)
 
@@ -233,6 +245,9 @@ class RAGPipeline:
         )
         rgs = RGS(config=rgs_cfg)
 
+        # Create semantic matcher for constraints using the embedder
+        semantic_matcher = SemanticMatcher(embedder=embedder.embed)
+
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
         return cls(
             retrieval=retrieval,
@@ -240,6 +255,7 @@ class RAGPipeline:
             rgs=rgs,
             context=ContextPipeline(),
             constraints=constraints,
+            semantic_matcher=semantic_matcher,
         )
 
     @classmethod

@@ -52,9 +52,6 @@ from .answer import Answer
 # Core data models
 from .chunk import Chunk, ChunkLike
 
-# Conflict detection (epistemic honesty)
-from .conflicts import are_conflicting, extract_claims, find_conflicts
-
 # Query constraints
 from .constraints import Constraints
 
@@ -74,9 +71,9 @@ from .exceptions import (
 
 # Epistemic guardrails (constraint plugins)
 from .guardrails import ConstraintPlugin as ConstraintPluginProtocol
-from .guardrails import ConstraintResult
+from .guardrails import ConstraintResult, SemanticMatcher
 from .guardrails import apply_constraints as apply_constraint_plugins
-from .guardrails import get_default_constraints
+from .guardrails import create_default_constraints, create_semantic_matcher
 from .guardrails.plugins import (
     CausalAttributionConstraint,
     ConflictAwareConstraint,
@@ -103,18 +100,16 @@ __all__ = [
     "Constraints",
     "Chunk",
     "ChunkLike",
-    # Conflict Detection (epistemic honesty)
-    "find_conflicts",
-    "extract_claims",
-    "are_conflicting",
     # Epistemic Guardrails
     "ConstraintResult",
     "ConstraintPluginProtocol",
+    "SemanticMatcher",
     "ConflictAwareConstraint",
     "InsufficientEvidenceConstraint",
     "CausalAttributionConstraint",
     "apply_constraint_plugins",
-    "get_default_constraints",
+    "create_default_constraints",
+    "create_semantic_matcher",
     # Path Management
     "FitzPaths",
     "get_workspace",

@@ -15,7 +15,7 @@ from fitz_ai.logging.tags import PIPELINE
 from .base import ConstraintPlugin, ConstraintResult
 
 if TYPE_CHECKING:
-    from fitz_ai.core.conflicts import ChunkLike
+    from fitz_ai.core.chunk import ChunkLike
 
 logger = get_logger(__name__)
 

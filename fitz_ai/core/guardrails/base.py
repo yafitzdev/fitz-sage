@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, Protocol, Sequence, runtime_checkable
 
 if TYPE_CHECKING:
-    from fitz_ai.core.conflicts import ChunkLike
+    from fitz_ai.core.chunk import ChunkLike
 
 
 @dataclass(frozen=True)

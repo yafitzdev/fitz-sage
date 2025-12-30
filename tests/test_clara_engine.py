@@ -332,7 +332,7 @@ class TestClaraRegistration:
         caps = registry.get_capabilities("clara")
 
         assert caps.supports_collections is False
-        assert caps.requires_documents_at_query is True
+        assert caps.requires_documents_at_query is False  # Has persistent storage
         assert caps.supports_chat is False
         assert caps.requires_api_key is False
 

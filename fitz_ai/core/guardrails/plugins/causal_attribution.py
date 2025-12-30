@@ -5,6 +5,8 @@ Causal Attribution Constraint - Prevents implicit causality claims.
 This constraint prevents the system from synthesizing causal explanations
 when documents only describe outcomes without explicit causal language.
 
+Uses semantic matching for language-agnostic causal detection.
+
 It enforces: "Don't invent causality that isn't explicitly stated."
 
 This is NOT reasoning suppression. It's epistemic honesty enforcement.
@@ -12,7 +14,6 @@ This is NOT reasoning suppression. It's epistemic honesty enforcement.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Sequence
 
@@ -20,83 +21,12 @@ from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
 from ..base import ConstraintResult
+from ..semantic import SemanticMatcher
 
 if TYPE_CHECKING:
-    from fitz_ai.core.conflicts import ChunkLike
+    from fitz_ai.core.chunk import ChunkLike
 
 logger = get_logger(__name__)
-
-
-# =============================================================================
-# Causal Language Detection
-# =============================================================================
-
-# Query patterns that request causal explanation
-CAUSAL_QUERY_PATTERNS: tuple[re.Pattern, ...] = (
-    re.compile(r"\bwhy\b", re.I),
-    re.compile(r"\bhow\s+come\b", re.I),
-    re.compile(r"\bwhat\s+caused\b", re.I),
-    re.compile(r"\bwhat\s+led\s+to\b", re.I),
-    re.compile(r"\breason\s+for\b", re.I),
-    re.compile(r"\bexplain\b", re.I),
-)
-
-# Explicit causal markers in evidence
-CAUSAL_EVIDENCE_MARKERS: tuple[str, ...] = (
-    "because",
-    "due to",
-    "caused by",
-    "led to",
-    "resulted in",
-    "resulted from",
-    "as a result",
-    "consequence of",
-    "owing to",
-    "on account of",
-    "reason is",
-    "reason was",
-    "reason being",
-    "therefore",
-    "thus",
-    "hence",
-    "so that",
-    "in order to",
-    "stems from",
-    "attributed to",
-    "triggered by",
-    "brought about",
-    "gave rise to",
-)
-
-
-def _is_causal_query(query: str) -> bool:
-    """Detect if query requests causal explanation."""
-    for pattern in CAUSAL_QUERY_PATTERNS:
-        if pattern.search(query):
-            return True
-    return False
-
-
-def _has_causal_evidence(chunks: Sequence["ChunkLike"]) -> bool:
-    """Check if any chunk contains explicit causal language."""
-    for chunk in chunks:
-        content_lower = chunk.content.lower()
-        for marker in CAUSAL_EVIDENCE_MARKERS:
-            if marker in content_lower:
-                return True
-    return False
-
-
-def _count_causal_chunks(chunks: Sequence["ChunkLike"]) -> int:
-    """Count chunks containing explicit causal language."""
-    count = 0
-    for chunk in chunks:
-        content_lower = chunk.content.lower()
-        for marker in CAUSAL_EVIDENCE_MARKERS:
-            if marker in content_lower:
-                count += 1
-                break  # Count each chunk only once
-    return count
 
 
 # =============================================================================
@@ -113,13 +43,17 @@ class CausalAttributionConstraint:
     this constraint verifies that retrieved documents contain explicit
     causal language before allowing a causal answer.
 
+    Uses semantic embedding similarity for language-agnostic detection.
+
     This prevents the LLM from inventing causal relationships that
     aren't explicitly stated in the evidence.
 
     Attributes:
+        semantic_matcher: SemanticMatcher instance for embedding-based detection
         enabled: Whether this constraint is active (default: True)
     """
 
+    semantic_matcher: SemanticMatcher
     enabled: bool = True
 
     @property
@@ -145,20 +79,21 @@ class CausalAttributionConstraint:
             return ConstraintResult.allow()
 
         # Only applies to causal queries
-        if not _is_causal_query(query):
+        if not self.semantic_matcher.is_causal_query(query):
             return ConstraintResult.allow()
 
         # Empty chunks - defer to InsufficientEvidenceConstraint
         if not chunks:
             return ConstraintResult.allow()
 
-        # Check for explicit causal language
-        if _has_causal_evidence(chunks):
+        # Check for explicit causal language using semantic matching
+        causal_count = self.semantic_matcher.count_causal_chunks(chunks)
+
+        if causal_count > 0:
             logger.debug(f"{PIPELINE} CausalAttributionConstraint: causal evidence found")
             return ConstraintResult.allow()
 
         # Causal query but no explicit causal language in evidence
-        causal_count = _count_causal_chunks(chunks)
         logger.info(
             f"{PIPELINE} CausalAttributionConstraint: causal query but no explicit "
             f"causal language in {len(chunks)} chunks"
