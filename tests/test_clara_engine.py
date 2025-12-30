@@ -4,14 +4,15 @@ Tests for CLaRa Engine.
 
 These tests verify the CLaRa engine implementation works correctly
 and integrates properly with the Fitz platform.
+
+Requires torch to be installed.
 """
 
 from unittest.mock import MagicMock, patch
 
 import pytest
-import torch
 
-# Core imports
+# Core imports (torch-independent)
 from fitz_ai.core import (
     Answer,
     Constraints,
@@ -19,6 +20,9 @@ from fitz_ai.core import (
     Provenance,
     Query,
 )
+
+# Skip entire module if torch not available
+torch = pytest.importorskip("torch", reason="torch not installed")
 
 
 class TestClaraConfig:

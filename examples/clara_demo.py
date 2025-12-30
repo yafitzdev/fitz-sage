@@ -52,9 +52,9 @@ def run_clara_demo():
 
     # Import CLaRa engine
     print("Loading CLaRa engine...")
+    from fitz_ai.core import Query
     from fitz_ai.engines.clara import ClaraEngine
     from fitz_ai.engines.clara.config.schema import ClaraConfig, ClaraModelConfig
-    from fitz_ai.core import Query
 
     # Configure with 4-bit quantization for lower VRAM usage
     config = ClaraConfig(
@@ -152,8 +152,9 @@ def run_clara_direct():
     print()
 
     # Download model if needed
-    from huggingface_hub import snapshot_download
     from pathlib import Path
+
+    from huggingface_hub import snapshot_download
 
     cache_dir = Path.home() / ".cache" / "fitz" / "clara"
     model_dir = cache_dir / "apple_CLaRa-7B-Instruct" / "compression-16"
