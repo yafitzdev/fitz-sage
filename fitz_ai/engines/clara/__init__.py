@@ -160,7 +160,7 @@ def _register_clara_engine():
         registry.register(
             name="clara",
             factory=_create_clara_engine_factory,
-            description="CLaRa: Continuous Latent Reasoning - Compression-native RAG with 16x-128x document compression",
+            description="Compression-native RAG",
             config_type=ClaraConfig,
             config_loader=_clara_config_loader,
             default_config_path=get_default_config_path,

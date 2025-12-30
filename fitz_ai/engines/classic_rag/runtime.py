@@ -132,7 +132,7 @@ def _register_classic_rag_engine():
         registry.register(
             name="classic_rag",
             factory=classic_rag_factory,
-            description="Retrieval-augmented generation using vector search and LLM synthesis",
+            description="Vector search and LLM synthesis RAG",
             config_type=ClassicRagConfig,
             config_loader=classic_rag_config_loader,
             default_config_path=get_default_config_path,

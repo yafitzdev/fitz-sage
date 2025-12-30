@@ -169,7 +169,7 @@ def _register_graphrag_engine():
         registry.register(
             name="graphrag",
             factory=_create_graphrag_engine_factory,
-            description="GraphRAG: Knowledge graph-based RAG with entity extraction and community detection",
+            description="Knowledge graph-based RAG",
             config_type=GraphRAGConfig,
             config_loader=_graphrag_config_loader,
             default_config_path=get_default_config_path,
