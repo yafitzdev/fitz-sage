@@ -21,9 +21,17 @@ from __future__ import annotations
 
 from typing import Any, List
 
+from fitz_ai.core.instrumentation import maybe_wrap
 from fitz_ai.core.registry import LLMRegistryError
 from fitz_ai.llm.loader import YAMLPluginNotFoundError, list_plugins
 from fitz_ai.llm.runtime import ModelTier, create_yaml_client
+
+# Methods to track per LLM plugin type
+_LLM_METHODS_TO_TRACK = {
+    "chat": {"chat"},
+    "embedding": {"embed", "embed_batch"},
+    "rerank": {"rerank"},
+}
 
 VALID_LLM_TYPES = frozenset({"chat", "embedding", "rerank"})
 
@@ -78,7 +86,14 @@ def get_llm_plugin(
         )
 
     try:
-        return create_yaml_client(plugin_type, plugin_name, tier=tier, **kwargs)
+        plugin = create_yaml_client(plugin_type, plugin_name, tier=tier, **kwargs)
+        # Wrap for instrumentation (only if hooks registered)
+        return maybe_wrap(
+            plugin,
+            layer=f"llm.{plugin_type}",
+            plugin_name=plugin_name,
+            methods_to_track=_LLM_METHODS_TO_TRACK.get(plugin_type),
+        )
     except YAMLPluginNotFoundError:
         available = available_llm_plugins(plugin_type)
         raise LLMRegistryError(

@@ -17,6 +17,10 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Type
 
 from fitz_ai.core import ConfigurationError, KnowledgeEngine
+from fitz_ai.core.instrumentation import maybe_wrap
+
+# Methods to track for engine plugins
+_ENGINE_METHODS_TO_TRACK = {"answer"}
 
 
 @dataclass
@@ -208,6 +212,9 @@ class EngineRegistry:
         """
         Get the factory function for an engine.
 
+        The returned factory wraps created engines for instrumentation
+        when benchmark hooks are registered.
+
         Args:
             name: Name of the engine to retrieve
 
@@ -221,7 +228,19 @@ class EngineRegistry:
             available = ", ".join(self.list())
             raise ConfigurationError(f"Unknown engine: '{name}'. Available engines: {available}")
 
-        return self._engines[name].factory
+        original_factory = self._engines[name].factory
+
+        # Return a wrapper factory that instruments the created engine
+        def instrumented_factory(config: Any) -> KnowledgeEngine:
+            engine = original_factory(config)
+            return maybe_wrap(
+                engine,
+                layer="engine",
+                plugin_name=name,
+                methods_to_track=_ENGINE_METHODS_TO_TRACK,
+            )
+
+        return instrumented_factory
 
     def get_info(self, name: str) -> EngineRegistration:
         """

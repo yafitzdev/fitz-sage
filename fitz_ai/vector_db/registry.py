@@ -10,7 +10,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, List
 
+from fitz_ai.core.instrumentation import maybe_wrap
 from fitz_ai.vector_db.loader import create_vector_db_plugin
+
+# Methods to track for vector DB plugins
+_VECTOR_DB_METHODS_TO_TRACK = {"search", "upsert", "delete", "count", "list_collections"}
 
 
 def get_vector_db_plugin(plugin_name: str, **kwargs: Any) -> Any:
@@ -24,7 +28,14 @@ def get_vector_db_plugin(plugin_name: str, **kwargs: Any) -> Any:
     Returns:
         Vector DB plugin instance
     """
-    return create_vector_db_plugin(plugin_name, **kwargs)
+    plugin = create_vector_db_plugin(plugin_name, **kwargs)
+    # Wrap for instrumentation (only if hooks registered)
+    return maybe_wrap(
+        plugin,
+        layer="vector_db",
+        plugin_name=plugin_name,
+        methods_to_track=_VECTOR_DB_METHODS_TO_TRACK,
+    )
 
 
 def available_vector_db_plugins() -> List[str]:
