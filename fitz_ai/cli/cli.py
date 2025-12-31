@@ -162,5 +162,17 @@ def doctor(
     mod.command(verbose=verbose, test=test)
 
 
+# =============================================================================
+# ENTERPRISE PLUGIN DISCOVERY
+# =============================================================================
+# If fitz-ai-enterprise is installed, add its commands to the main CLI.
+
+try:
+    from fitz_ai_enterprise.cli import benchmark_app
+    app.add_typer(benchmark_app, name="benchmark")
+except ImportError:
+    pass  # Enterprise not installed
+
+
 if __name__ == "__main__":
     app()
