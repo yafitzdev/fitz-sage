@@ -5,18 +5,21 @@ Central CLI context - single source of truth for all CLI commands.
 All configuration reading happens here. Commands import CLIContext and use it.
 No more scattered dict.get() chains across every command file.
 
+Config Loading Strategy:
+    1. Engine defaults (fitz_ai/engines/<engine>/config/default.yaml) - always loaded
+    2. User config (.fitz/config/<engine>.yaml) - overrides defaults
+    3. Plugin defaults (fitz_ai/llm/<type>/<plugin>.yaml) - for model info
+
+Values are ALWAYS guaranteed to exist. No fallback logic needed in CLI code.
+
 Usage:
     from fitz_ai.cli.context import CLIContext
 
-    # Load (raises with helpful message if no config)
+    # Load merged config (defaults + user overrides)
     ctx = CLIContext.load()
-    print(ctx.chat_plugin)
-    print(ctx.chat_display)  # "cohere (command-r-plus)"
-
-    # Or load with fallback
-    ctx = CLIContext.load_or_none()
-    if ctx is None:
-        ui.error("No config found. Run 'fitz init' first.")
+    print(ctx.chat_plugin)        # always exists
+    print(ctx.chat_display)       # "cohere (command-r-plus)"
+    print(ctx.retrieval_top_k)    # always exists
 """
 
 from __future__ import annotations
@@ -25,11 +28,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-from fitz_ai.core.config import ConfigNotFoundError, load_config_dict
+from fitz_ai.config.loader import get_config_source, load_engine_config
 from fitz_ai.core.paths import FitzPaths
 from fitz_ai.logging.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Default engine for CLI operations
+DEFAULT_ENGINE = "fitz_rag"
 
 
 @dataclass
@@ -133,129 +139,131 @@ class CLIContext:
     # -------------------------------------------------------------------------
 
     @classmethod
-    def load(cls) -> "CLIContext":
+    def load(cls, engine: str = DEFAULT_ENGINE) -> "CLIContext":
         """
-        Load CLI context from config.
+        Load CLI context with merged config (defaults + user overrides).
 
-        Raises:
-            ConfigNotFoundError: If no config file exists.
+        This ALWAYS succeeds because package defaults always exist.
+        Values are guaranteed to be present - no fallback logic needed.
+
+        Args:
+            engine: Engine name (default: "fitz_rag")
 
         Returns:
-            CLIContext with all values populated.
+            CLIContext with all values populated from merged config.
         """
-        ctx = cls.load_or_none()
-        if ctx is None:
-            raise ConfigNotFoundError(
-                "No configuration found. Run 'fitz init' or 'fitz quickstart' first."
-            )
-        return ctx
-
-    @classmethod
-    def load_or_none(cls) -> Optional["CLIContext"]:
-        """
-        Load CLI context, returning None if no config exists.
-
-        This is useful for commands that can work without config or want
-        custom error handling.
-
-        Returns:
-            CLIContext or None if no config found.
-        """
-        # Find config path (engine-specific first, then global)
-        config_path = cls._find_config_path()
-        if config_path is None:
-            return None
-
         try:
-            raw_config = load_config_dict(config_path)
-        except Exception as e:
-            logger.warning(f"Failed to load config from {config_path}: {e}")
-            return None
+            # Load merged config (defaults + user overrides)
+            merged_config = load_engine_config(engine)
 
-        # Load typed config if available
-        typed_config = cls._load_typed_config(config_path, raw_config)
+            # Get config source for display
+            source = get_config_source(engine)
+            config_path = FitzPaths.engine_config(engine)
 
-        # Extract all values
-        return cls._from_config(raw_config, typed_config, config_path)
+            # Load typed config if user config exists
+            typed_config = cls._load_typed_config(config_path, merged_config)
+
+            # Extract all values - no .get() fallbacks needed!
+            return cls._from_merged_config(merged_config, typed_config, config_path, source)
+
+        except FileNotFoundError as e:
+            # This should only happen if package defaults are missing (bug)
+            logger.error(f"Package defaults missing: {e}")
+            raise
 
     @classmethod
-    def _find_config_path(cls) -> Optional[Path]:
-        """Find config file path, checking engine-specific first."""
-        # Engine-specific config (created by quickstart)
-        engine_config = FitzPaths.engine_config("fitz_rag")
-        if engine_config.exists():
-            return engine_config
+    def load_or_none(cls, engine: str = DEFAULT_ENGINE) -> Optional["CLIContext"]:
+        """
+        Load CLI context, returning None only if loading fails.
 
-        # Global config (legacy)
-        global_config = FitzPaths.config()
-        if global_config.exists():
-            return global_config
+        Note: With the layered config system, this almost always succeeds
+        because package defaults are always available. It only returns None
+        if there's an actual loading error.
 
-        return None
+        Returns:
+            CLIContext or None if loading failed.
+        """
+        try:
+            return cls.load(engine)
+        except Exception as e:
+            logger.warning(f"Failed to load config: {e}")
+            return None
 
     @classmethod
     def _load_typed_config(cls, config_path: Path, raw_config: dict) -> Any:
-        """Load typed FitzRagConfig if possible."""
-        try:
-            from fitz_ai.engines.fitz_rag.config import load_config
+        """Load typed FitzRagConfig if user config exists.
 
-            # Only load if it has fitz_rag settings
-            if "chat" in raw_config or "embedding" in raw_config:
-                return load_config(str(config_path))
-        except Exception as e:
-            logger.debug(f"Could not load typed config: {e}")
+        Currently disabled - importing the engine config schema triggers
+        the engine package __init__, which does heavy initialization.
+        CLIContext works fine with raw config, so typed config is unnecessary.
+        """
         return None
 
     @classmethod
-    def _from_config(cls, raw: dict, typed: Any, path: Path) -> "CLIContext":
-        """Extract all values from config dicts."""
-        # Chat
-        chat = raw.get("chat", {})
+    def _from_merged_config(
+        cls, config: dict, typed: Any, path: Path, source: str
+    ) -> "CLIContext":
+        """
+        Extract all values from merged config + plugin defaults.
+
+        Config provides plugin names. Plugin YAMLs provide model defaults.
+        User kwargs override plugin defaults.
+        """
+        from fitz_ai.llm.loader import load_plugin
+
+        # Get config sections
+        chat = config["chat"]
+        emb = config["embedding"]
+        vdb = config["vector_db"]
+        ret = config["retrieval"]
+        rerank = config["rerank"]
+        rgs = config["rgs"]
+
+        # Load plugin specs to get model defaults
+        chat_spec = load_plugin("chat", chat["plugin_name"])
+        emb_spec = load_plugin("embedding", emb["plugin_name"])
+
+        # User kwargs override plugin defaults
         chat_kwargs = chat.get("kwargs", {})
-        chat_models = chat_kwargs.get("models", {})
+        chat_models = chat_kwargs.get("models", chat_spec.defaults.get("models", {}))
 
-        # Embedding
-        emb = raw.get("embedding", {})
         emb_kwargs = emb.get("kwargs", {})
+        emb_model = emb_kwargs.get("model", emb_spec.defaults.get("model", ""))
 
-        # Vector DB
-        vdb = raw.get("vector_db", {})
         vdb_kwargs = vdb.get("kwargs", {})
 
-        # Retrieval
-        ret = raw.get("retrieval", {})
-
-        # Rerank
-        rerank = raw.get("rerank", {})
-
-        # RGS
-        rgs = raw.get("rgs", {})
+        # Rerank is optional - only load spec if enabled
+        rerank_model = ""
+        if rerank["enabled"]:
+            rerank_spec = load_plugin("rerank", rerank["plugin_name"])
+            rerank_kwargs = rerank.get("kwargs", {})
+            rerank_model = rerank_kwargs.get("model", rerank_spec.defaults.get("model", ""))
 
         return cls(
-            raw_config=raw,
+            raw_config=config,
             typed_config=typed,
             config_path=path,
             # Chat
-            chat_plugin=chat.get("plugin_name", ""),
-            chat_model_smart=chat_models.get("smart", "") or chat_kwargs.get("model", ""),
+            chat_plugin=chat["plugin_name"],
+            chat_model_smart=chat_models.get("smart", ""),
             chat_model_fast=chat_models.get("fast", ""),
             # Embedding
-            embedding_plugin=emb.get("plugin_name", ""),
-            embedding_model=emb_kwargs.get("model", ""),
+            embedding_plugin=emb["plugin_name"],
+            embedding_model=emb_model,
             # Vector DB
-            vector_db_plugin=vdb.get("plugin_name", "local_faiss"),
+            vector_db_plugin=vdb["plugin_name"],
             vector_db_kwargs=vdb_kwargs,
             # Retrieval
-            retrieval_plugin=ret.get("plugin_name", "dense"),
-            retrieval_collection=ret.get("collection", "default"),
-            retrieval_top_k=ret.get("top_k", 5),
+            retrieval_plugin=ret["plugin_name"],
+            retrieval_collection=ret["collection"],
+            retrieval_top_k=ret["top_k"],
             # Rerank
-            rerank_enabled=rerank.get("enabled", False),
-            rerank_plugin=rerank.get("plugin_name", ""),
-            rerank_model=rerank.get("kwargs", {}).get("model", ""),
+            rerank_enabled=rerank["enabled"],
+            rerank_plugin=rerank["plugin_name"],
+            rerank_model=rerank_model,
             # RGS
-            rgs_citations=rgs.get("enable_citations", True),
-            rgs_strict_grounding=rgs.get("strict_grounding", True),
+            rgs_citations=rgs["enable_citations"],
+            rgs_strict_grounding=rgs["strict_grounding"],
         )
 
     # -------------------------------------------------------------------------
