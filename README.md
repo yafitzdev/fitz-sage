@@ -142,7 +142,7 @@ You can—but you'll hit walls fast.
 >
 >1. [x] **Local execution possible.** FAISS and Ollama support, no API keys required to start.
 >2. [x] **Plugin-based architecture.** Swap LLMs, vector databases, rerankers, and retrieval pipelines via YAML config.
->3. [x] **Multiple engines.** Supports ClassicRAG, GraphRAG and CLaRa out of the box—swap engines in one line.
+>3. [x] **Multiple engines.** Supports FitzRAG, GraphRAG and CLaRa out of the box—swap engines in one line.
 >4. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
 >5. [x] **Full provenance.** Every answer traces back to the exact chunk and document.
 >6. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.

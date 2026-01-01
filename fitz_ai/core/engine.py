@@ -1,7 +1,7 @@
 """
 KnowledgeEngine Protocol - Core abstraction for all knowledge engines.
 
-This is the single stable contract that all engines (ClassicRAG, CLaRa, etc.) must implement.
+This is the single stable contract that all engines (Fitz RAG, CLaRa, etc.) must implement.
 The platform architecture is: Knowledge → Engine → Answer.
 """
 
