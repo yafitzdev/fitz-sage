@@ -51,10 +51,12 @@ endpoint:
 # Models are split by tier:
 #   smart: Best quality for user-facing responses (queries)
 #   fast: Best speed for background tasks (enrichment, summaries)
+#   balanced: Cost-effective with good quality (evaluation, bulk tasks)
 defaults:
   models:
     smart: "claude-sonnet-4-20250514"
     fast: "claude-3-5-haiku-latest"
+    balanced: "claude-3-5-haiku-latest"
   temperature: 0.2
   max_tokens: 4096
 

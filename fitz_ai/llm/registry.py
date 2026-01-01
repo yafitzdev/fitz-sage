@@ -12,9 +12,15 @@ Design principle: NO SILENT FALLBACK
 - Plugins are YAML files, not Python modules
 
 Model Tiers:
-- Chat plugins support two model tiers: "smart" and "fast"
+- Chat plugins support three model tiers: "smart", "fast", and "balanced"
 - Use tier="smart" for user-facing responses (queries)
 - Use tier="fast" for background tasks (enrichment, summaries)
+- Use tier="balanced" for cost-effective tasks with good quality (evaluation, bulk)
+
+Fallback Priority (when requested tier not configured):
+- fast → balanced → smart
+- balanced → fast → smart
+- smart → balanced → fast
 """
 
 from __future__ import annotations
@@ -67,9 +73,10 @@ def get_llm_plugin(
     Args:
         plugin_name: Name of the plugin (e.g., "cohere", "openai")
         plugin_type: Type of plugin ("chat", "embedding", "rerank")
-        tier: Model tier for chat plugins ("smart" or "fast").
+        tier: Model tier for chat plugins ("smart", "fast", or "balanced").
               - "smart": Best quality for user-facing responses (queries)
               - "fast": Best speed for background tasks (enrichment)
+              - "balanced": Cost-effective with good quality (evaluation, bulk)
               Defaults to "smart" if not specified.
         **kwargs: Plugin initialization parameters
 

@@ -101,6 +101,81 @@ class BenchmarkHook(Protocol):
         ...
 
 
+# Sentinel value to indicate no cached result
+_NO_CACHE = object()
+
+
+class CachingHook(Protocol):
+    """
+    Extended hook protocol that supports result caching.
+
+    CachingHooks can intercept method calls and return cached results,
+    bypassing the actual method execution. This is useful for caching
+    expensive operations like embeddings during benchmarks.
+
+    Example:
+        class EmbeddingCacheHook:
+            def __init__(self):
+                self._cache = {}
+
+            def get_cached_result(self, layer, plugin_name, method, args, kwargs):
+                if layer == "llm.embedding" and method == "embed":
+                    key = (plugin_name, args[0])  # (plugin, text)
+                    return self._cache.get(key, _NO_CACHE)
+                return _NO_CACHE
+
+            def cache_result(self, layer, plugin_name, method, args, kwargs, result):
+                if layer == "llm.embedding" and method == "embed":
+                    key = (plugin_name, args[0])
+                    self._cache[key] = result
+    """
+
+    def get_cached_result(
+        self,
+        layer: str,
+        plugin_name: str,
+        method: str,
+        args: tuple,
+        kwargs: dict,
+    ) -> Any:
+        """
+        Check if a cached result is available.
+
+        Args:
+            layer: Plugin layer
+            plugin_name: Plugin name
+            method: Method being called
+            args: Positional arguments
+            kwargs: Keyword arguments
+
+        Returns:
+            Cached result if available, or _NO_CACHE sentinel if not cached
+        """
+        ...
+
+    def cache_result(
+        self,
+        layer: str,
+        plugin_name: str,
+        method: str,
+        args: tuple,
+        kwargs: dict,
+        result: Any,
+    ) -> None:
+        """
+        Store a result in the cache.
+
+        Args:
+            layer: Plugin layer
+            plugin_name: Plugin name
+            method: Method being called
+            args: Positional arguments
+            kwargs: Keyword arguments
+            result: Result to cache
+        """
+        ...
+
+
 # =============================================================================
 # Global Hook Registry
 # =============================================================================
@@ -227,6 +302,23 @@ class InstrumentedProxy:
             if not _hooks:
                 return method(*args, **kwargs)
 
+            # Check caching hooks first - if any returns a cached result, use it
+            for hook in _hooks:
+                if hasattr(hook, "get_cached_result"):
+                    try:
+                        cached = hook.get_cached_result(
+                            layer=self._layer,
+                            plugin_name=self._plugin_name,
+                            method=method_name,
+                            args=args,
+                            kwargs=kwargs,
+                        )
+                        if cached is not _NO_CACHE:
+                            # Cache hit - return without calling actual method
+                            return cached
+                    except Exception:
+                        pass
+
             # Notify all hooks: start
             contexts: list[tuple[BenchmarkHook, Any]] = []
             for hook in _hooks:
@@ -248,6 +340,22 @@ class InstrumentedProxy:
             result: Any = None
             try:
                 result = method(*args, **kwargs)
+
+                # Store result in caching hooks
+                for hook in _hooks:
+                    if hasattr(hook, "cache_result"):
+                        try:
+                            hook.cache_result(
+                                layer=self._layer,
+                                plugin_name=self._plugin_name,
+                                method=method_name,
+                                args=args,
+                                kwargs=kwargs,
+                                result=result,
+                            )
+                        except Exception:
+                            pass
+
                 return result
             except Exception as e:
                 error = e
@@ -334,8 +442,10 @@ def wrap(
 # =============================================================================
 
 __all__ = [
-    # Hook protocol
+    # Hook protocols
     "BenchmarkHook",
+    "CachingHook",
+    "_NO_CACHE",
     # Hook management
     "register_hook",
     "unregister_hook",

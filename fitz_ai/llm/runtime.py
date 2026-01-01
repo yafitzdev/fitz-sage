@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 # Model Tier Resolution
 # =============================================================================
 
-ModelTier = Literal["smart", "fast"]
+ModelTier = Literal["smart", "fast", "balanced"]
 
 
 def _resolve_model_from_tier(
@@ -65,9 +65,19 @@ def _resolve_model_from_tier(
     2. Look up models.{tier} from user config or defaults
     3. If no tier specified, default to "smart"
 
+    Model Tiers:
+        - smart: Best quality for user-facing responses (queries)
+        - fast: Best speed for background tasks (enrichment, summaries)
+        - balanced: Cost-effective with good quality (evaluation, bulk tasks)
+
+    Fallback Priority (when requested tier not configured):
+        - fast → balanced → smart
+        - balanced → fast → smart
+        - smart → balanced → fast
+
     Args:
         defaults: Plugin defaults from YAML spec
-        tier: Requested tier ("smart" or "fast"), defaults to "smart"
+        tier: Requested tier ("smart", "fast", or "balanced"), defaults to "smart"
         user_kwargs: User-provided kwargs (may contain models override)
         plugin_name: Plugin name for warnings
 
@@ -91,16 +101,28 @@ def _resolve_model_from_tier(
 
     smart_model = models.get("smart")
     fast_model = models.get("fast")
+    balanced_model = models.get("balanced")
 
     # Default to "smart" tier if not specified
     effective_tier = tier or "smart"
 
-    # Resolve based on tier
+    # Resolve based on tier with fallback chains
+    # Fallback priority: fast → balanced → smart
     if effective_tier == "smart":
         if smart_model:
             return smart_model
-        elif fast_model:
-            if tier is not None:  # Only warn if user explicitly requested smart
+        # Fallback: balanced → fast
+        if balanced_model:
+            if tier is not None:
+                warnings.warn(
+                    f"[{plugin_name}] No 'smart' model configured, using 'balanced' model. "
+                    f"Query responses may be lower quality.",
+                    UserWarning,
+                    stacklevel=4,
+                )
+            return balanced_model
+        if fast_model:
+            if tier is not None:
                 warnings.warn(
                     f"[{plugin_name}] No 'smart' model configured, using 'fast' model. "
                     f"Query responses may be lower quality.",
@@ -108,10 +130,39 @@ def _resolve_model_from_tier(
                     stacklevel=4,
                 )
             return fast_model
+
+    elif effective_tier == "balanced":
+        if balanced_model:
+            return balanced_model
+        # Fallback: fast → smart
+        if fast_model:
+            warnings.warn(
+                f"[{plugin_name}] No 'balanced' model configured, using 'fast' model.",
+                UserWarning,
+                stacklevel=4,
+            )
+            return fast_model
+        if smart_model:
+            warnings.warn(
+                f"[{plugin_name}] No 'balanced' model configured, using 'smart' model. "
+                f"This may be costlier than intended.",
+                UserWarning,
+                stacklevel=4,
+            )
+            return smart_model
+
     elif effective_tier == "fast":
         if fast_model:
             return fast_model
-        elif smart_model:
+        # Fallback: balanced → smart
+        if balanced_model:
+            warnings.warn(
+                f"[{plugin_name}] No 'fast' model configured, using 'balanced' model.",
+                UserWarning,
+                stacklevel=4,
+            )
+            return balanced_model
+        if smart_model:
             warnings.warn(
                 f"[{plugin_name}] No 'fast' model configured, using 'smart' model. "
                 f"Enrichment may be slower and costlier.",
