@@ -26,14 +26,21 @@ class TestConfigCommand:
         assert "json" in result.output.lower()
         assert "path" in result.output.lower()
 
-    def test_config_requires_config_file(self, tmp_path, monkeypatch):
+    def test_config_requires_config_file(self, tmp_path):
         """Test that config requires a config file to exist."""
-        monkeypatch.setattr(
-            "fitz_ai.cli.commands.config.FitzPaths.config",
-            lambda: tmp_path / "nonexistent" / "fitz.yaml",
-        )
+        nonexistent = tmp_path / "nonexistent"
 
-        result = runner.invoke(app, ["config"])
+        with (
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.config",
+                return_value=nonexistent / "fitz.yaml",
+            ),
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.engine_config",
+                return_value=nonexistent / "fitz_rag.yaml",
+            ),
+        ):
+            result = runner.invoke(app, ["config"])
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower() or "init" in result.output.lower()
@@ -46,27 +53,36 @@ class TestConfigPathOption:
         """Test --path shows config file path."""
         import yaml
 
-        config_path = tmp_path / "fitz.yaml"
+        config_path = tmp_path / "fitz_rag.yaml"
         config = {"chat": {"plugin_name": "cohere"}}
         config_path.write_text(yaml.dump(config))
 
-        with patch(
-            "fitz_ai.cli.commands.config.FitzPaths.config",
-            return_value=config_path,
+        with (
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.config", return_value=tmp_path / "fitz.yaml"
+            ),
+            patch("fitz_ai.cli.commands.config.FitzPaths.engine_config", return_value=config_path),
         ):
             result = runner.invoke(app, ["config", "--path"])
 
         assert result.exit_code == 0
         assert str(config_path) in result.output
 
-    def test_config_path_missing_file(self, tmp_path, monkeypatch):
+    def test_config_path_missing_file(self, tmp_path):
         """Test --path with missing config shows error."""
-        monkeypatch.setattr(
-            "fitz_ai.cli.commands.config.FitzPaths.config",
-            lambda: tmp_path / "missing.yaml",
-        )
+        nonexistent = tmp_path / "nonexistent"
 
-        result = runner.invoke(app, ["config", "--path"])
+        with (
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.config",
+                return_value=nonexistent / "missing.yaml",
+            ),
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.engine_config",
+                return_value=nonexistent / "fitz_rag.yaml",
+            ),
+        ):
+            result = runner.invoke(app, ["config", "--path"])
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
@@ -77,19 +93,20 @@ class TestConfigJsonOption:
 
     def test_config_json_output(self, tmp_path):
         """Test --json outputs valid JSON."""
-
         import yaml
 
-        config_path = tmp_path / "fitz.yaml"
+        config_path = tmp_path / "fitz_rag.yaml"
         config = {
             "chat": {"plugin_name": "cohere"},
             "embedding": {"plugin_name": "cohere"},
         }
         config_path.write_text(yaml.dump(config))
 
-        with patch(
-            "fitz_ai.cli.commands.config.FitzPaths.config",
-            return_value=config_path,
+        with (
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.config", return_value=tmp_path / "fitz.yaml"
+            ),
+            patch("fitz_ai.cli.commands.config.FitzPaths.engine_config", return_value=config_path),
         ):
             result = runner.invoke(app, ["config", "--json"])
 
@@ -107,12 +124,14 @@ class TestConfigRawOption:
 chat:
   plugin_name: cohere
 """
-        config_path = tmp_path / "fitz.yaml"
+        config_path = tmp_path / "fitz_rag.yaml"
         config_path.write_text(config_content)
 
-        with patch(
-            "fitz_ai.cli.commands.config.FitzPaths.config",
-            return_value=config_path,
+        with (
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.config", return_value=tmp_path / "fitz.yaml"
+            ),
+            patch("fitz_ai.cli.commands.config.FitzPaths.engine_config", return_value=config_path),
         ):
             result = runner.invoke(app, ["config", "--raw"])
 
@@ -123,28 +142,38 @@ chat:
 class TestConfigEditOption:
     """Tests for --edit option."""
 
-    def test_config_edit_missing_file(self, tmp_path, monkeypatch):
+    def test_config_edit_missing_file(self, tmp_path):
         """Test --edit with missing config shows error."""
-        monkeypatch.setattr(
-            "fitz_ai.cli.commands.config.FitzPaths.config",
-            lambda: tmp_path / "missing.yaml",
-        )
+        nonexistent = tmp_path / "nonexistent"
 
-        result = runner.invoke(app, ["config", "--edit"])
+        with (
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.config",
+                return_value=nonexistent / "missing.yaml",
+            ),
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.engine_config",
+                return_value=nonexistent / "fitz_rag.yaml",
+            ),
+        ):
+            result = runner.invoke(app, ["config", "--edit"])
 
         assert result.exit_code != 0
         assert "no config" in result.output.lower() or "init" in result.output.lower()
 
-    def test_config_edit_no_editor(self, tmp_path, monkeypatch):
+    def test_config_edit_no_editor(self, tmp_path):
         """Test --edit with no editor available."""
         import yaml
 
-        config_path = tmp_path / "fitz.yaml"
+        config_path = tmp_path / "fitz_rag.yaml"
         config = {"chat": {"plugin_name": "cohere"}}
         config_path.write_text(yaml.dump(config))
 
         with (
-            patch("fitz_ai.cli.commands.config.FitzPaths.config", return_value=config_path),
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.config", return_value=tmp_path / "fitz.yaml"
+            ),
+            patch("fitz_ai.cli.commands.config.FitzPaths.engine_config", return_value=config_path),
             patch.dict("os.environ", {}, clear=True),
             patch("subprocess.run", side_effect=Exception("not found")),
         ):
@@ -161,7 +190,7 @@ class TestConfigSummaryView:
         """Test default view shows all components."""
         import yaml
 
-        config_path = tmp_path / "fitz.yaml"
+        config_path = tmp_path / "fitz_rag.yaml"
         config = {
             "chat": {"plugin_name": "cohere", "kwargs": {"model": "command"}},
             "embedding": {
@@ -176,7 +205,10 @@ class TestConfigSummaryView:
         config_path.write_text(yaml.dump(config))
 
         with (
-            patch("fitz_ai.cli.commands.config.FitzPaths.config", return_value=config_path),
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.config", return_value=tmp_path / "fitz.yaml"
+            ),
+            patch("fitz_ai.cli.commands.config.FitzPaths.engine_config", return_value=config_path),
             patch("fitz_ai.cli.commands.config.RICH", False),
         ):
             result = runner.invoke(app, ["config"])
@@ -189,7 +221,7 @@ class TestConfigSummaryView:
         """Test summary shows rerank when enabled."""
         import yaml
 
-        config_path = tmp_path / "fitz.yaml"
+        config_path = tmp_path / "fitz_rag.yaml"
         config = {
             "chat": {"plugin_name": "cohere"},
             "embedding": {"plugin_name": "cohere"},
@@ -200,7 +232,10 @@ class TestConfigSummaryView:
         config_path.write_text(yaml.dump(config))
 
         with (
-            patch("fitz_ai.cli.commands.config.FitzPaths.config", return_value=config_path),
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.config", return_value=tmp_path / "fitz.yaml"
+            ),
+            patch("fitz_ai.cli.commands.config.FitzPaths.engine_config", return_value=config_path),
             patch("fitz_ai.cli.commands.config.RICH", False),
         ):
             result = runner.invoke(app, ["config"])
