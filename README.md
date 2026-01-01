@@ -236,6 +236,110 @@ The codebase speaks for itself.
 </details>
 
 ---
+
+<details>
+
+<summary><strong>📦 Fitz RAG vs GraphRAG</strong></summary>
+
+<br>
+
+> **"RAG is dead"** posts flood the AI scene. The argument: traditional RAG can't handle relationships or trends. GraphRAG is the new hotness.
+>
+> **Traditional RAG has two problems—it can't see the forest for the trees, and it lies about what it sees.**
+>
+> Fitz RAG solves both: **hierarchical summaries** for the big picture, **epistemic guardrails** for honesty.
+
+<br>
+
+#### The real problem with RAG isn't retrieval—it's confidence
+
+>Most RAG failures aren't "couldn't find the relationship." They're:
+>- Hallucinated answers presented confidently
+>- Conflicting sources silently collapsed into one answer
+>- Causality invented from correlation
+>
+>**GraphRAG doesn't solve any of these.** It just finds relationships better.
+>
+>Fitz RAG solves them with **epistemic guardrails**:
+>
+>| Problem | GraphRAG | Fitz RAG |
+>|---------|----------|----------|
+>| Sources disagree | Picks one silently | **DISPUTED mode** — surfaces the conflict |
+>| No evidence for claim | Answers anyway | **ABSTAIN mode** — refuses to guess |
+>| Correlation ≠ causation | Invents "why" | **Blocks causal hallucination** |
+>| Uncertain answer | Sounds confident | **QUALIFIED mode** — notes limitations |
+
+<br>
+
+#### When GraphRAG wins
+
+>GraphRAG excels at **relationship exploration**:
+>
+>| Use Case | Why GraphRAG |
+>|----------|--------------|
+>| "How does X relate to Y?" | Explicit entity connections |
+>| "What are the main themes?" | Community summaries |
+>| "Who founded the company that acquired Z?" | Multi-hop traversal |
+>| Visual knowledge exploration | Graph visualization |
+>
+>If you need to traverse relationships or discover entity connections, GraphRAG is the right tool.
+
+<br>
+
+#### When Fitz RAG wins
+
+>Fitz RAG excels at **trusted answers AND analytical queries**:
+>
+>| Use Case | Why Fitz RAG |
+>|----------|--------------|
+>| Q&A where trust matters | Epistemic guardrails |
+>| "What are the trends?" | **Hierarchical summaries** (L0→L1→L2) |
+>| "Summarize this corpus" | **Corpus-level summaries** auto-generated |
+>| Conflicting sources | Conflict detection |
+>| Compliance/legal queries | Admits uncertainty |
+>| Fast, cheap retrieval | No graph construction |
+>| Incremental updates | Just add new chunks |
+>
+>**Fitz RAG isn't just honest—it's also analytical.** During ingestion, it generates:
+>- **Level 0**: Original chunks
+>- **Level 1**: Group summaries (per document/source)
+>- **Level 2**: Corpus summary (aggregates everything)
+>
+>Ask "What are the main themes?" and Fitz retrieves the corpus summary—not random chunks. This covers 80% of GraphRAG's "global search" use cases without building a graph.
+
+<br>
+
+#### The cost difference
+
+>| Aspect | GraphRAG | Fitz RAG |
+>|--------|----------|----------|
+>| Ingest cost | **High** — LLM extracts entities per batch | **Low** — optional summaries only |
+>| Ingest speed | Slow — graph construction | Fast — direct chunking |
+>| Query latency | Higher — graph traversal | Lower — vector search |
+>| Error propagation | Bad extraction = bad graph | No extraction = no propagation |
+>| Schema dependency | Must define entity types | Schema-free |
+>| Incremental updates | Rebuild graph sections | Just add chunks |
+
+<br>
+
+#### The bottom line
+
+>| Capability | GraphRAG | Fitz RAG |
+>|------------|----------|----------|
+>| Entity relationships | Explicit graph | Implicit (chunk proximity) |
+>| Trend analysis | Community summaries | **Hierarchical summaries** |
+>| Corpus overview | Global search | **L2 corpus summary** |
+>| Epistemic safety | None | **Guardrails built-in** |
+>
+>**GraphRAG wins on relationship traversal. Fitz RAG wins on trusted answers + trends.**
+>
+>For most enterprise use cases—support, compliance, internal knowledge, trend analysis—Fitz RAG delivers 80% of GraphRAG's analytical power at 20% of the cost, plus epistemic guarantees GraphRAG simply doesn't have.
+>
+>Need explicit entity graphs? Fitz gives you both engines. Same data. Same API. Choose per query.
+
+</details>
+
+---
 <details>
 
 <summary><strong>📦 Features</strong></summary>
