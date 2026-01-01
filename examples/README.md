@@ -1,16 +1,22 @@
-# fitz Examples
+# Fitz Examples
 
-This directory contains example scripts demonstrating fitz usage.
+This directory contains example scripts demonstrating Fitz usage.
 
-## Python SDK (Recommended)
+## Python SDK
 
-The simplest way to use fitz programmatically:
+The simplest way to use Fitz programmatically:
 
 ```python
-import fitz_ai
+from fitz_ai.sdk import fitz
 
-fitz_ai.ingest("./docs")
-answer = fitz_ai.query("What is the refund policy?")
+# Create a Fitz instance
+f = fitz(collection="my_docs")
+
+# Ingest documents
+f.ingest("./docs")
+
+# Ask questions
+answer = f.ask("What is the refund policy?")
 
 print(answer.text)
 for source in answer.provenance:
@@ -21,69 +27,92 @@ for source in answer.provenance:
 
 | File | Description |
 |------|-------------|
-| `quickstart.py` | Basic RAG pipeline flow without external dependencies |
-| `ingestion_example.py` | Document ingestion and chunking example |
-| `full_pipeline.py` | End-to-end RAG with vector DB (requires Qdrant) |
+| `quickstart.py` | Engine API usage with `run_fitz_rag` and `Query` objects |
+| `ingestion_example.py` | Document ingestion and chunking flow |
+| `universal_cli.py` | Building a CLI with the universal runtime API |
 
 ## Running Examples
 
-### Quickstart (No External Dependencies)
+### Quickstart
 
 ```bash
+# Requires: fitz init (or existing config)
 python examples/quickstart.py
 ```
 
-This demonstrates:
-- Context pipeline processing
-- RGS prompt building
-- Answer structuring with citations
+Demonstrates:
+- Simple one-off queries with `run_fitz_rag()`
+- Query constraints
+- Reusable engine instances
+- Error handling
+- Working with Answer objects
 
 ### Ingestion Example
 
 ```bash
-# Create some test documents first
+# Create test documents first
 mkdir -p test_docs
-echo "This is a test document about RAG systems." > test_docs/doc1.txt
-echo "Vector databases store embeddings for similarity search." > test_docs/doc2.txt
+echo "RAG systems combine retrieval with generation." > test_docs/pipeline.txt
+echo "Vector databases enable semantic search." > test_docs/vectors.txt
 
 # Run the example
 python examples/ingestion_example.py
 ```
 
-### Full Pipeline (Requires Setup)
+Demonstrates:
+- Reading documents from filesystem
+- Validating documents
+- Chunking strategies
 
-1. Start Qdrant:
-   ```bash
-   docker run -p 6333:6333 qdrant/qdrant
-   ```
+### Universal CLI
 
-2. Set API keys:
-   ```bash
-   export COHERE_API_KEY="your-key"
-   ```
+```bash
+python examples/universal_cli.py --help
+python examples/universal_cli.py query "What is RAG?"
+python examples/universal_cli.py engines --verbose
+```
 
-3. Run:
-   ```bash
-   python examples/full_pipeline.py
-   ```
+Demonstrates:
+- Building CLI tools with `fitz_ai.runtime`
+- Listing available engines
+- Running queries with different engines
 
-## Creating Your Own Examples
+## Quick Patterns
 
-Use the examples as templates. Key patterns:
+### Using the Runtime API
 
 ```python
-# Config-driven pipeline creation
-from fitz_ai.engines.fitz_rag.pipeline.engine import create_pipeline_from_yaml
+from fitz_ai.runtime import run, list_engines
 
-pipeline = create_pipeline_from_yaml("my_config.yaml")
+# List available engines
+print(list_engines())  # ['fitz_rag', 'clara', 'graphrag']
 
-# Direct component usage
-from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
+# Run a query
+answer = run("What is quantum computing?", engine="fitz_rag")
+print(answer.text)
+```
 
-rgs = RGS(RGSConfig(enable_citations=True))
+### Using the Engine Directly
 
-# Plugin selection via registry
-from fitz_ai.llm import get_llm_plugin
+```python
+from fitz_ai.engines.fitz_rag import run_fitz_rag, create_fitz_rag_engine
+from fitz_ai.core import Query, Constraints
 
-ChatPlugin = get_llm_plugin(plugin_name="cohere", plugin_type="chat")
+# One-off query
+answer = run_fitz_rag("What is X?")
+
+# Reusable engine
+engine = create_fitz_rag_engine("config.yaml")
+query = Query(text="Explain Y", constraints=Constraints(max_sources=5))
+answer = engine.answer(query)
+```
+
+### Using the SDK
+
+```python
+from fitz_ai.sdk import fitz
+
+f = fitz(collection="my_knowledge")
+f.ingest("./documents")
+answer = f.ask("What are the key findings?")
 ```
