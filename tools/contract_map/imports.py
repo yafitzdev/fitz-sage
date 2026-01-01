@@ -47,8 +47,8 @@ def normalize_root(name: str | None) -> str | None:
     Normalize a module name to its architectural domain root.
 
     Example:
-    - fitz_ai.engines.classic_rag.retrieval.engine -> retrieval
-    - fitz_ai.engines.classic_rag.pipeline.pipeline.engine -> pipeline
+    - fitz_ai.engines.fitz_rag.retrieval.engine -> retrieval
+    - fitz_ai.engines.fitz_rag.pipeline.pipeline.engine -> pipeline
     """
     if not name:
         return None

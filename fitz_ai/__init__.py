@@ -2,7 +2,7 @@
 Fitz - Local-First RAG Framework & Engine Platform
 
 Fitz is a paradigm-agnostic knowledge engine platform that supports multiple
-approaches to knowledge retrieval and synthesis (Classic RAG, CLaRa, custom engines).
+approaches to knowledge retrieval and synthesis (Fitz RAG, CLaRa, custom engines).
 
 Quick Start:
     >>> from fitz import run
@@ -21,15 +21,15 @@ Public API:
         - create_engine: Factory for creating engines
         - list_engines: List available engines
 
-    Classic RAG:
-        - run_classic_rag: RAG-specific entry point
-        - create_classic_rag_engine: RAG engine factory
+    Fitz RAG:
+        - run_fitz_rag: RAG-specific entry point
+        - create_fitz_rag_engine: RAG engine factory
 
 Architecture:
     fitz_ai/
     ├── core/              # Paradigm-agnostic contracts
     ├── engines/           # Engine implementations
-    │   └── classic_rag/   # Retrieval-augmented generation
+    │   └── fitz_rag/   # Retrieval-augmented generation
     ├── runtime/           # Multi-engine orchestration
     ├── llm/               # LLM service (chat, embedding, rerank)
     ├── vector_db/         # Vector database service
@@ -52,11 +52,11 @@ Examples:
     >>> answer = run("Explain entanglement", constraints=constraints)
 
     Specific engine:
-    >>> answer = run("What is X?", engine="classic_rag")
+    >>> answer = run("What is X?", engine="fitz_rag")
 
     Reusable engine:
     >>> from fitz import create_engine, Query
-    >>> engine = create_engine("classic_rag")
+    >>> engine = create_engine("fitz_rag")
     >>> query = Query(text="What is Y?")
     >>> answer = engine.answer(query)
 """
@@ -91,11 +91,11 @@ def __getattr__(name: str):
 
         return getattr(core, name)
 
-    # Classic RAG engine (heavy - loads config, plugins)
-    if name in ("ClassicRagEngine", "create_classic_rag_engine", "run_classic_rag"):
-        from fitz_ai.engines import classic_rag
+    # Fitz RAG engine (heavy - loads config, plugins)
+    if name in ("FitzRagEngine", "create_fitz_rag_engine", "run_fitz_rag"):
+        from fitz_ai.engines import fitz_rag
 
-        return getattr(classic_rag, name)
+        return getattr(fitz_rag, name)
 
     # Runtime (heavy - discovers all engines)
     if name in ("create_engine", "get_engine_registry", "list_engines", "list_engines_with_info", "run"):
@@ -207,10 +207,10 @@ __all__ = [
     "list_engines",
     "list_engines_with_info",
     "get_engine_registry",
-    # Classic RAG
-    "run_classic_rag",
-    "create_classic_rag_engine",
-    "ClassicRagEngine",
+    # Fitz RAG
+    "run_fitz_rag",
+    "create_fitz_rag_engine",
+    "FitzRagEngine",
     # SDK
     "fitz",
     "IngestStats",

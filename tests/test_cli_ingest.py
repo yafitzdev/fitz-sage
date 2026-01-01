@@ -27,9 +27,9 @@ class TestIngestCommand:
 
     def test_ingest_requires_config(self, tmp_path, monkeypatch):
         """Test that ingest requires a config file."""
-        # Mock load_classic_rag_config to return None (no config)
+        # Mock load_fitz_rag_config to return None (no config)
         with patch(
-            "fitz_ai.cli.commands.ingest.load_classic_rag_config",
+            "fitz_ai.cli.commands.ingest.load_fitz_rag_config",
             return_value=(None, None),
         ):
             result = runner.invoke(app, ["ingest", str(tmp_path), "-y"])
@@ -47,7 +47,7 @@ class TestIngestCommand:
         }
 
         with patch(
-            "fitz_ai.cli.commands.ingest.load_classic_rag_config",
+            "fitz_ai.cli.commands.ingest.load_fitz_rag_config",
             return_value=(config, None),
         ):
             result = runner.invoke(app, ["ingest", "-y"])

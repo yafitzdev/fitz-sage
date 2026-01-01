@@ -18,7 +18,7 @@ Software Requirements:
     # Or: pip install fitz-ai[clara]
 
 Note: CLaRa is a research model optimized for quality over speed.
-For consumer hardware, use Classic RAG instead.
+For consumer hardware, use Fitz RAG instead.
 """
 
 import logging
@@ -108,9 +108,9 @@ class ClaraEngine:
         - VRAM: 16GB+ (12GB minimum with 4-bit quantization)
         - Model: apple/CLaRa-7B-Instruct (7B parameters)
 
-    When to use Clara vs Classic RAG:
+    When to use Clara vs Fitz RAG:
         - Clara: Research/quality focus, high-end GPU available
-        - Classic RAG: Production use, consumer hardware, speed priority
+        - Fitz RAG: Production use, consumer hardware, speed priority
 
     Examples:
         >>> from fitz_ai.engines.clara import ClaraEngine

@@ -27,8 +27,8 @@ Find and replace these patterns:
 
 | Find | Replace |
 |------|---------|
-| `from fitz_ai.pipeline.pipeline.engine import RAGPipeline` | `from fitz_ai.engines.classic_rag import run_classic_rag` |
-| `from fitz_ai.pipeline.config.loader import load_config` | `from fitz_ai.engines.classic_rag.config import load_config` |
+| `from fitz_ai.pipeline.pipeline.engine import RAGPipeline` | `from fitz_ai.engines.fitz_rag import run_fitz_rag` |
+| `from fitz_ai.pipeline.config.loader import load_config` | `from fitz_ai.engines.fitz_rag.config import load_config` |
 | `from fitz_ai.core.llm` | `from fitz_ai.llm` |
 | `from fitz_ai.core.embedding` | `from fitz_ai.llm.embedding` |
 | `from fitz_ai.core.vector_db` | `from fitz_ai.vector_db` |
@@ -43,8 +43,8 @@ result = pipeline.run("What is X?")
 print(result.answer)
 
 # NEW
-from fitz_ai.engines.classic_rag import run_classic_rag
-answer = run_classic_rag("What is X?")
+from fitz_ai.engines.fitz_rag import run_fitz_rag
+answer = run_fitz_rag("What is X?")
 print(answer.text)
 ```
 
@@ -119,10 +119,10 @@ from fitz_ai.pipeline.config.loader import load_config
 from fitz_ai.pipeline.config.schema import FitzConfig
 
 # NEW
-from fitz_ai.engines.classic_rag.config import load_config
-from fitz_ai.engines.classic_rag.config.schema import FitzConfig
-# Or use the new ClassicRagConfig alias
-from fitz_ai.engines.classic_rag.config import ClassicRagConfig
+from fitz_ai.engines.fitz_rag.config import load_config
+from fitz_ai.engines.fitz_rag.config.schema import FitzConfig
+# Or use the new FitzRagConfig alias
+from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 ```
 
 ---
@@ -152,9 +152,9 @@ print(result.metadata)
 **New API (v0.3.0)**:
 ```python
 # Option 1: Simple function (recommended for most cases)
-from fitz_ai.engines.classic_rag import run_classic_rag
+from fitz_ai.engines.fitz_rag import run_fitz_rag
 
-answer = run_classic_rag("What is quantum computing?")
+answer = run_fitz_rag("What is quantum computing?")
 print(answer.text)
 print(answer.provenance)
 print(answer.metadata)
@@ -162,13 +162,13 @@ print(answer.metadata)
 # Option 2: Universal runtime (for multi-engine apps)
 from fitz import run
 
-answer = run("What is quantum computing?", engine="classic_rag")
+answer = run("What is quantum computing?", engine="fitz_rag")
 
 # Option 3: Reusable engine (for repeated queries)
-from fitz_ai.engines.classic_rag import create_classic_rag_engine
+from fitz_ai.engines.fitz_rag import create_fitz_rag_engine
 from fitz_ai.core import Query
 
-engine = create_classic_rag_engine("config.yaml")
+engine = create_fitz_rag_engine("config.yaml")
 query = Query(text="What is quantum computing?")
 answer = engine.answer(query)
 ```
@@ -249,7 +249,7 @@ fitz-pipeline query "What is X?"
 fitz-pipeline query "What is X?"
 
 # v0.3.0 (new: specify engine)
-fitz query "What is X?" --engine classic_rag
+fitz query "What is X?" --engine fitz_rag
 fitz query "What is X?" --engine clara
 ```
 
@@ -278,10 +278,10 @@ def answer_question(question: str) -> str:
     return result.answer
 
 # ============= NEW (v0.3.0) =============
-from fitz_ai.engines.classic_rag import run_classic_rag
+from fitz_ai.engines.fitz_rag import run_fitz_rag
 
 def answer_question(question: str) -> str:
-    answer = run_classic_rag(question)
+    answer = run_fitz_rag(question)
     return answer.text
 ```
 
@@ -302,7 +302,7 @@ def get_answer_with_sources(question):
 
 # ============= NEW (v0.3.0) =============
 def get_answer_with_sources(question):
-    answer = run_classic_rag(question)
+    answer = run_fitz_rag(question)
     sources = []
     for prov in answer.provenance:
         sources.append({
@@ -326,12 +326,12 @@ class RAGService:
         return self.pipeline.run(question)
 
 # ============= NEW (v0.3.0) =============
-from fitz_ai.engines.classic_rag import create_classic_rag_engine
+from fitz_ai.engines.fitz_rag import create_fitz_rag_engine
 from fitz_ai.core import Query
 
 class RAGService:
     def __init__(self, config_path: str):
-        self.engine = create_classic_rag_engine(config_path)
+        self.engine = create_fitz_rag_engine(config_path)
     
     def query(self, question: str):
         return self.engine.answer(Query(text=question))
@@ -345,7 +345,7 @@ from fitz import run
 from fitz_ai.runtime import list_engines
 
 class KnowledgeService:
-    def query(self, question: str, engine: str = "classic_rag"):
+    def query(self, question: str, engine: str = "fitz_rag"):
         return run(question, engine=engine)
     
     def available_engines(self):
@@ -354,8 +354,8 @@ class KnowledgeService:
 # Usage
 service = KnowledgeService()
 
-# Use Classic RAG for general queries
-answer = service.query("What is machine learning?", engine="classic_rag")
+# Use Fitz RAG for general queries
+answer = service.query("What is machine learning?", engine="fitz_rag")
 
 # Use CLaRa for complex multi-hop queries
 answer = service.query("How do X, Y, and Z relate?", engine="clara")
@@ -374,7 +374,7 @@ The `fitz_ai.pipeline` module has been moved. Update your imports:
 from fitz_ai.pipeline.pipeline.engine import RAGPipeline
 
 # NEW
-from fitz_ai.engines.classic_rag import run_classic_rag
+from fitz_ai.engines.fitz_rag import run_fitz_rag
 ```
 
 ### AttributeError: 'Answer' object has no attribute 'answer'
@@ -428,7 +428,7 @@ python -m tools.contract_map --fail-on-errors
 
 # 3. Verify imports
 python -c "from fitz import run; print('✓ Universal runtime')"
-python -c "from fitz_ai.engines.classic_rag import run_classic_rag; print('✓ Classic RAG')"
+python -c "from fitz_ai.engines.fitz_rag import run_fitz_rag; print('✓ Fitz RAG')"
 python -c "from fitz_ai.core import Query, Answer, Provenance; print('✓ Core types')"
 ```
 

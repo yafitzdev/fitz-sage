@@ -66,7 +66,7 @@ Fitz follows strict architectural principles. Please respect these when contribu
 fitz_ai/
 ├── core/              # Paradigm-agnostic contracts (Query, Answer, Provenance)
 ├── engines/           # Engine implementations
-│   ├── classic_rag/   # Traditional RAG engine
+│   ├── fitz_rag/   # Traditional RAG engine
 │   └── clara/         # CLaRa compression-native engine
 ├── runtime/           # Multi-engine orchestration
 ├── llm/               # Shared LLM service (chat, embedding, rerank)
@@ -179,7 +179,7 @@ Open an issue with:
 
 4. **Commit with clear messages**
    ```bash
-   git commit -m "feat(engines): add hybrid retrieval to classic_rag"
+   git commit -m "feat(engines): add hybrid retrieval to fitz_rag"
    git commit -m "fix(core): handle empty embedding response"
    git commit -m "docs: update engine development guide"
    ```
@@ -336,7 +336,7 @@ pytest
 pytest --cov=fitz
 
 # Specific module
-pytest tests/engines/test_classic_rag.py
+pytest tests/engines/test_fitz_rag.py
 
 # Verbose output
 pytest -v
@@ -355,9 +355,9 @@ pytest -x
 
 ```python
 # Good test example
-def test_classic_rag_preserves_metadata():
-    """Classic RAG should preserve document metadata in provenance."""
-    engine = create_classic_rag_engine(config)
+def test_fitz_rag_preserves_metadata():
+    """Fitz RAG should preserve document metadata in provenance."""
+    engine = create_fitz_rag_engine(config)
     answer = engine.answer(Query(text="test query"))
     
     assert answer.provenance
@@ -379,12 +379,12 @@ def test_classic_rag_preserves_metadata():
 
 | Item | Convention | Example |
 |------|------------|---------|
-| Modules | `snake_case` | `classic_rag.py` |
-| Classes | `PascalCase` | `ClassicRagEngine` |
-| Functions | `snake_case` | `run_classic_rag()` |
+| Modules | `snake_case` | `fitz_rag.py` |
+| Classes | `PascalCase` | `FitzRagEngine` |
+| Functions | `snake_case` | `run_fitz_rag()` |
 | Constants | `UPPER_SNAKE` | `DEFAULT_TOP_K` |
 | Plugin names | `snake_case` | `plugin_name = "my_provider"` |
-| Engine names | `snake_case` | `engine="classic_rag"` |
+| Engine names | `snake_case` | `engine="fitz_rag"` |
 
 ### Code Organization
 

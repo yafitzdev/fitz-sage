@@ -219,8 +219,8 @@ class fitz:
             ConfigurationError: If not configured.
             ValueError: If question is empty.
         """
-        from fitz_ai.engines.classic_rag.config import load_config
-        from fitz_ai.engines.classic_rag.pipeline.engine import RAGPipeline
+        from fitz_ai.engines.fitz_rag.config import load_config
+        from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 
         if not question or not question.strip():
             raise ValueError("Question cannot be empty")
@@ -317,11 +317,11 @@ logging:
 
     def _build_chunking_config(self, config: Dict[str, Any]):
         """Build ChunkingRouterConfig from config dict."""
-        from fitz_ai.engines.classic_rag.config import (
+        from fitz_ai.engines.fitz_rag.config import (
             ChunkingRouterConfig,
             ExtensionChunkerConfig,
         )
-        from fitz_ai.engines.classic_rag.config import load_config_dict as load_default_config_dict
+        from fitz_ai.engines.fitz_rag.config import load_config_dict as load_default_config_dict
 
         chunking_cfg = config.get("chunking") or config.get("ingest", {}).get("chunking")
 
@@ -374,5 +374,5 @@ logging:
             text=rgs_answer.answer,
             provenance=provenance,
             mode=rgs_answer.mode,
-            metadata={"engine": "classic_rag"},
+            metadata={"engine": "fitz_rag"},
         )

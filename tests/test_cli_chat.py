@@ -36,7 +36,7 @@ class TestChatCommand:
             lambda name: tmp_path / "nonexistent" / f"{name}.yaml",
         )
 
-        result = runner.invoke(app, ["chat", "--engine", "classic_rag"], input="exit\n")
+        result = runner.invoke(app, ["chat", "--engine", "fitz_rag"], input="exit\n")
 
         assert result.exit_code != 0
         assert "init" in result.output.lower() or "config" in result.output.lower()
@@ -45,14 +45,14 @@ class TestChatCommand:
 class TestChatHelpers:
     """Tests for chat helper functions."""
 
-    def test_load_classic_rag_config_returns_tuple(self, tmp_path):
-        """Test load_classic_rag_config returns raw and typed config."""
+    def test_load_fitz_rag_config_returns_tuple(self, tmp_path):
+        """Test load_fitz_rag_config returns raw and typed config."""
         import yaml
 
         # Create engine-specific config file
         config_dir = tmp_path / "config"
         config_dir.mkdir()
-        config_path = config_dir / "classic_rag.yaml"
+        config_path = config_dir / "fitz_rag.yaml"
         config = {
             "chat": {"plugin_name": "cohere"},
             "embedding": {"plugin_name": "cohere"},
@@ -65,9 +65,9 @@ class TestChatHelpers:
             "fitz_ai.cli.utils.FitzPaths.engine_config",
             return_value=config_path,
         ):
-            from fitz_ai.cli.utils import load_classic_rag_config
+            from fitz_ai.cli.utils import load_fitz_rag_config
 
-            raw, typed = load_classic_rag_config()
+            raw, typed = load_fitz_rag_config()
 
         assert raw["chat"]["plugin_name"] == "cohere"
         assert typed.retrieval.collection == "test"
@@ -213,11 +213,11 @@ class TestChatDisplay:
         with patch("fitz_ai.cli.commands.chat.RICH", False):
             from fitz_ai.cli.commands.chat import _display_welcome
 
-            _display_welcome("my_collection", "classic_rag")
+            _display_welcome("my_collection", "fitz_rag")
 
         captured = capsys.readouterr()
         assert "my_collection" in captured.out
-        assert "classic_rag" in captured.out
+        assert "fitz_rag" in captured.out
 
     def test_display_goodbye(self, capsys):
         """Test _display_goodbye shows farewell."""
@@ -251,13 +251,13 @@ class TestChatExitCommands:
         with (
             patch("fitz_ai.core.paths.FitzPaths.config", return_value=config_path),
             patch(
-                "fitz_ai.engines.classic_rag.pipeline.engine.RAGPipeline.from_config",
+                "fitz_ai.engines.fitz_rag.pipeline.engine.RAGPipeline.from_config",
                 return_value=mock_pipeline,
             ),
             patch("fitz_ai.cli.commands.chat.get_collections", return_value=["test"]),
             patch("fitz_ai.cli.commands.chat.RICH", False),
         ):
-            result = runner.invoke(app, ["chat", "--engine", "classic_rag"], input="exit\n")
+            result = runner.invoke(app, ["chat", "--engine", "fitz_rag"], input="exit\n")
 
         assert "goodbye" in result.output.lower() or "ended" in result.output.lower()
 
@@ -279,12 +279,12 @@ class TestChatExitCommands:
         with (
             patch("fitz_ai.core.paths.FitzPaths.config", return_value=config_path),
             patch(
-                "fitz_ai.engines.classic_rag.pipeline.engine.RAGPipeline.from_config",
+                "fitz_ai.engines.fitz_rag.pipeline.engine.RAGPipeline.from_config",
                 return_value=mock_pipeline,
             ),
             patch("fitz_ai.cli.commands.chat.get_collections", return_value=["test"]),
             patch("fitz_ai.cli.commands.chat.RICH", False),
         ):
-            result = runner.invoke(app, ["chat", "--engine", "classic_rag"], input="quit\n")
+            result = runner.invoke(app, ["chat", "--engine", "fitz_rag"], input="quit\n")
 
         assert "goodbye" in result.output.lower() or "ended" in result.output.lower()

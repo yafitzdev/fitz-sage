@@ -116,7 +116,7 @@ def test_ingest_cli_mirror():
 
     # Chunking router
     t = time.perf_counter()
-    from fitz_ai.engines.classic_rag.config import (
+    from fitz_ai.engines.fitz_rag.config import (
         ChunkingRouterConfig,
         ExtensionChunkerConfig,
     )

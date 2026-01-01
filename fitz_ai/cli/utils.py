@@ -16,22 +16,22 @@ from fitz_ai.logging.logger import get_logger
 logger = get_logger(__name__)
 
 
-def load_classic_rag_config() -> Tuple[Optional[dict], Optional[Any]]:
+def load_fitz_rag_config() -> Tuple[Optional[dict], Optional[Any]]:
     """
-    Load classic_rag config.
+    Load fitz_rag config.
 
     Looks for config in:
-    1. Engine-specific config: .fitz/config/classic_rag.yaml
+    1. Engine-specific config: .fitz/config/fitz_rag.yaml
     2. Global config (legacy): .fitz/config.yaml
 
     Returns:
         Tuple of (raw_config_dict, typed_config) or (None, None) if config not found.
     """
     try:
-        from fitz_ai.engines.classic_rag.config import load_config
+        from fitz_ai.engines.fitz_rag.config import load_config
 
         # Try engine-specific config first
-        engine_config_path = FitzPaths.engine_config("classic_rag")
+        engine_config_path = FitzPaths.engine_config("fitz_rag")
         if engine_config_path.exists():
             raw_config = load_config_dict(engine_config_path)
             typed_config = load_config(str(engine_config_path))
@@ -41,7 +41,7 @@ def load_classic_rag_config() -> Tuple[Optional[dict], Optional[Any]]:
         global_config_path = FitzPaths.config()
         if global_config_path.exists():
             raw_config = load_config_dict(global_config_path)
-            # Check if it has classic_rag settings
+            # Check if it has fitz_rag settings
             if "chat" in raw_config or "embedding" in raw_config:
                 typed_config = load_config(str(global_config_path))
                 return raw_config, typed_config
@@ -92,7 +92,7 @@ def get_vector_db_client(config: dict):
 
 
 __all__ = [
-    "load_classic_rag_config",
+    "load_fitz_rag_config",
     "get_collections",
     "get_vector_db_client",
 ]

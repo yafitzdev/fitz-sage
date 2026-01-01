@@ -283,10 +283,10 @@ def render_architecture_section() -> str:
     try:
         import importlib
 
-        arch_module = importlib.import_module(f"{PKG.name}.engines.classic_rag.config.architecture")
+        arch_module = importlib.import_module(f"{PKG.name}.engines.fitz_rag.config.architecture")
         load_architecture_mapping = getattr(arch_module, "load_architecture_mapping")
 
-        roles_module = importlib.import_module(f"{PKG.name}.engines.classic_rag.contracts.roles")
+        roles_module = importlib.import_module(f"{PKG.name}.engines.fitz_rag.contracts.roles")
         ROLES = getattr(roles_module, "ROLES")
 
         # Show role mappings

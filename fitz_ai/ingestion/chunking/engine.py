@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.engines.classic_rag.config import ChunkingRouterConfig
+from fitz_ai.engines.fitz_rag.config import ChunkingRouterConfig
 from fitz_ai.ingestion.chunking.router import ChunkingRouter
 from fitz_ai.ingestion.exceptions.chunking import IngestionChunkingError
 from fitz_ai.ingestion.exceptions.config import IngestionConfigError

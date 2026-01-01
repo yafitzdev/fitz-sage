@@ -8,12 +8,12 @@ from dataclasses import dataclass
 import pytest
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.engines.classic_rag.exceptions import LLMError
-from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import (
+from fitz_ai.engines.fitz_rag.exceptions import LLMError
+from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
     RGS,
     RGSConfig,
 )
-from fitz_ai.engines.classic_rag.pipeline.engine import RAGPipeline
+from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 
 
 @dataclass

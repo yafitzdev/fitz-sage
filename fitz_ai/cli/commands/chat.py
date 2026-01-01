@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 import typer
 
 from fitz_ai.cli.ui import RICH, console, display_sources, ui
-from fitz_ai.cli.utils import get_collections, load_classic_rag_config
+from fitz_ai.cli.utils import get_collections, load_fitz_rag_config
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.runtime import get_default_engine, get_engine_registry, list_engines
@@ -241,10 +241,10 @@ def command(
 
 def _run_collection_chat(collection: Optional[str], engine_name: str) -> None:
     """Run chat using an engine with collection support."""
-    from fitz_ai.engines.classic_rag.pipeline.engine import RAGPipeline
+    from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 
     # Load config
-    raw_config, typed_config = load_classic_rag_config()
+    raw_config, typed_config = load_fitz_rag_config()
     if typed_config is None:
         ui.error("No config found. Run 'fitz init' first.")
         raise typer.Exit(1)

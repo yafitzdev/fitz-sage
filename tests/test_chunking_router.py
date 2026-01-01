@@ -16,7 +16,7 @@ from typing import Any, Dict, List
 import pytest
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.engines.classic_rag.config import (
+from fitz_ai.engines.fitz_rag.config import (
     ChunkingRouterConfig,
     ExtensionChunkerConfig,
 )

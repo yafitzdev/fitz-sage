@@ -115,7 +115,7 @@ class FitzPaths:
         Location: {workspace}/config/{engine_name}.yaml
 
         Args:
-            engine_name: Name of the engine (classic_rag, graphrag, clara)
+            engine_name: Name of the engine (fitz_rag, graphrag, clara)
         """
         return cls.config_dir() / f"{engine_name}.yaml"
 

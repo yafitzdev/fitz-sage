@@ -3,7 +3,7 @@
 CLaRa Engine Runtime - Convenience functions for CLaRa engine.
 
 This module provides simple entry points for using CLaRa, following
-the same pattern as classic_rag/runtime.py.
+the same pattern as fitz_rag/runtime.py.
 """
 
 from pathlib import Path

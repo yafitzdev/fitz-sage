@@ -47,7 +47,7 @@ class Query:
 
     This allows passing engine-specific parameters without breaking the
     paradigm-agnostic interface. For example:
-    - Classic RAG might use: {"rerank": True, "top_k": 10}
+    - Fitz RAG might use: {"rerank": True, "top_k": 10}
     - CLaRa might use: {"uncertainty_threshold": 0.3}
     - Future engines can define their own metadata keys
 

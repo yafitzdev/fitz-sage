@@ -23,11 +23,11 @@ Examples:
     List engines:
     >>> from fitz_ai.runtime import list_engines
     >>> print(list_engines())
-    ['classic_rag', 'clara']
+    ['fitz_rag', 'clara']
 
     Create reusable engine:
     >>> from fitz_ai.runtime import create_engine
-    >>> engine = create_engine("classic_rag")
+    >>> engine = create_engine("fitz_rag")
     >>> answer = engine.answer(query)
 
     Check capabilities:

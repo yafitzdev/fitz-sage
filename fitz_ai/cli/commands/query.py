@@ -3,7 +3,7 @@
 Query command - Engine-agnostic query interface.
 
 Usage:
-    fitz query                          # Interactive mode (classic_rag)
+    fitz query                          # Interactive mode (fitz_rag)
     fitz query "What is RAG?"           # Direct query
     fitz query -c my_collection         # Specify collection
     fitz query --engine clara           # Use CLaRa engine
@@ -16,7 +16,7 @@ from typing import Optional
 import typer
 
 from fitz_ai.cli.ui import display_answer, ui
-from fitz_ai.cli.utils import get_collections, load_classic_rag_config
+from fitz_ai.cli.utils import get_collections, load_fitz_rag_config
 from fitz_ai.core import Query
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.runtime import create_engine, get_default_engine, get_engine_registry, list_engines
@@ -38,7 +38,7 @@ def command(
         None,
         "--collection",
         "-c",
-        help="Collection to query (classic_rag only).",
+        help="Collection to query (fitz_rag only).",
     ),
     engine: Optional[str] = typer.Option(
         None,
@@ -59,7 +59,7 @@ def command(
     Specify engine:
         fitz query "question" --engine clara
 
-    Specify a collection (classic_rag only):
+    Specify a collection (fitz_rag only):
         fitz query "question" -c my_collection
     """
     # =========================================================================
@@ -192,7 +192,7 @@ def _run_collection_query(
     """Run query using an engine with collection support."""
 
     # Load config
-    raw_config, typed_config = load_classic_rag_config()
+    raw_config, typed_config = load_fitz_rag_config()
     if typed_config is None:
         ui.error("No config found. Run 'fitz init' first.")
         raise typer.Exit(1)

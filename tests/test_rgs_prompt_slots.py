@@ -1,6 +1,6 @@
 # tests/test_rgs_prompt_slots.py
-from fitz_ai.engines.classic_rag.generation.prompting import PromptConfig
-from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import (
+from fitz_ai.engines.fitz_rag.generation.prompting import PromptConfig
+from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
     RGS,
     RGSConfig,
 )

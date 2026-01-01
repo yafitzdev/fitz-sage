@@ -13,7 +13,7 @@ from __future__ import annotations
 from fitz_ai.core.answer_mode import AnswerMode
 from fitz_ai.core.answer_mode_resolver import resolve_answer_mode
 from fitz_ai.core.guardrails import ConstraintResult
-from fitz_ai.engines.classic_rag.generation.answer_mode.instructions import (
+from fitz_ai.engines.fitz_rag.generation.answer_mode.instructions import (
     MODE_INSTRUCTIONS,
     get_mode_instruction,
 )

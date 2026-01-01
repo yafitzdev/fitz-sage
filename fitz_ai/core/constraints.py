@@ -38,7 +38,7 @@ class Constraints:
     """
     Maximum number of sources to use for answer generation.
 
-    For Classic RAG: limits number of chunks retrieved
+    For Fitz RAG: limits number of chunks retrieved
     For CLaRa: might limit number of documents consulted
     For other engines: interpret as makes sense
 
@@ -56,7 +56,7 @@ class Constraints:
     - {"author": "Smith", "reviewed": True} - AND conditions
 
     The exact semantics are engine-specific:
-    - Classic RAG: applies as vector DB metadata filters
+    - Fitz RAG: applies as vector DB metadata filters
     - CLaRa: might filter document corpus
     - Custom engines: define their own filter logic
 
@@ -71,7 +71,7 @@ class Constraints:
     Examples:
     - {"timeout_seconds": 30} - execution timeout
     - {"temperature": 0.3} - LLM sampling temperature
-    - {"rerank": False} - disable reranking in Classic RAG
+    - {"rerank": False} - disable reranking in Fitz RAG
 
     Engines should ignore unknown metadata keys gracefully.
     """

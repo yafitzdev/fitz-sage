@@ -30,9 +30,9 @@ if not os.getenv("COHERE_API_KEY"):
     print("Run: export COHERE_API_KEY='your-key'")
     sys.exit(1)
 
-from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
-from fitz_ai.engines.classic_rag.pipeline.pipeline import ContextPipeline
-from fitz_ai.engines.classic_rag.retrieval.runtime.plugins.dense import DenseRetrievalPlugin
+from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import RGS, RGSConfig
+from fitz_ai.engines.fitz_rag.pipeline.pipeline import ContextPipeline
+from fitz_ai.engines.fitz_rag.retrieval.runtime.plugins.dense import DenseRetrievalPlugin
 from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
 from fitz_ai.ingestion.reader.registry import get_ingest_plugin
 from fitz_ai.ingestion.validation.documents import ValidationConfig, validate

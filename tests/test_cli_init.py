@@ -160,18 +160,18 @@ class TestGenerateConfig:
 
         from fitz_ai.cli.commands.init import _generate_global_config
 
-        config_str = _generate_global_config("classic_rag")
+        config_str = _generate_global_config("fitz_rag")
         config = yaml.safe_load(config_str)
 
-        assert config["default_engine"] == "classic_rag"
+        assert config["default_engine"] == "fitz_rag"
 
-    def test_generate_classic_rag_config_basic(self):
-        """Test _generate_classic_rag_config produces valid YAML."""
+    def test_generate_fitz_rag_config_basic(self):
+        """Test _generate_fitz_rag_config produces valid YAML."""
         import yaml
 
-        from fitz_ai.cli.commands.init import _generate_classic_rag_config
+        from fitz_ai.cli.commands.init import _generate_fitz_rag_config
 
-        config_str = _generate_classic_rag_config(
+        config_str = _generate_fitz_rag_config(
             chat="cohere",
             chat_model_smart="command-a-03-2025",
             chat_model_fast="command-r7b-12-2024",
@@ -198,13 +198,13 @@ class TestGenerateConfig:
         assert config["vector_db"]["plugin_name"] == "local_faiss"
         assert config["retrieval"]["plugin_name"] == "dense"
 
-    def test_generate_classic_rag_config_with_rerank(self):
-        """Test _generate_classic_rag_config includes rerank when provided."""
+    def test_generate_fitz_rag_config_with_rerank(self):
+        """Test _generate_fitz_rag_config includes rerank when provided."""
         import yaml
 
-        from fitz_ai.cli.commands.init import _generate_classic_rag_config
+        from fitz_ai.cli.commands.init import _generate_fitz_rag_config
 
-        config_str = _generate_classic_rag_config(
+        config_str = _generate_fitz_rag_config(
             chat="cohere",
             chat_model_smart="command-a-03-2025",
             chat_model_fast="command-r7b-12-2024",
@@ -226,13 +226,13 @@ class TestGenerateConfig:
         assert config["rerank"]["enabled"] is True
         assert config["rerank"]["plugin_name"] == "cohere"
 
-    def test_generate_classic_rag_config_without_rerank(self):
-        """Test _generate_classic_rag_config disables rerank when not provided."""
+    def test_generate_fitz_rag_config_without_rerank(self):
+        """Test _generate_fitz_rag_config disables rerank when not provided."""
         import yaml
 
-        from fitz_ai.cli.commands.init import _generate_classic_rag_config
+        from fitz_ai.cli.commands.init import _generate_fitz_rag_config
 
-        config_str = _generate_classic_rag_config(
+        config_str = _generate_fitz_rag_config(
             chat="cohere",
             chat_model_smart="",
             chat_model_fast="",
@@ -253,13 +253,13 @@ class TestGenerateConfig:
 
         assert config["rerank"]["enabled"] is False
 
-    def test_generate_classic_rag_config_qdrant(self):
-        """Test _generate_classic_rag_config includes Qdrant settings."""
+    def test_generate_fitz_rag_config_qdrant(self):
+        """Test _generate_fitz_rag_config includes Qdrant settings."""
         import yaml
 
-        from fitz_ai.cli.commands.init import _generate_classic_rag_config
+        from fitz_ai.cli.commands.init import _generate_fitz_rag_config
 
-        config_str = _generate_classic_rag_config(
+        config_str = _generate_fitz_rag_config(
             chat="cohere",
             chat_model_smart="",
             chat_model_fast="",
@@ -282,13 +282,13 @@ class TestGenerateConfig:
         assert config["vector_db"]["kwargs"]["host"] == "192.168.1.100"
         assert config["vector_db"]["kwargs"]["port"] == 6334
 
-    def test_generate_classic_rag_config_chunking(self):
-        """Test _generate_classic_rag_config includes chunking settings."""
+    def test_generate_fitz_rag_config_chunking(self):
+        """Test _generate_fitz_rag_config includes chunking settings."""
         import yaml
 
-        from fitz_ai.cli.commands.init import _generate_classic_rag_config
+        from fitz_ai.cli.commands.init import _generate_fitz_rag_config
 
-        config_str = _generate_classic_rag_config(
+        config_str = _generate_fitz_rag_config(
             chat="cohere",
             chat_model_smart="",
             chat_model_fast="",
@@ -359,7 +359,7 @@ class TestInitValidation:
     """Tests for init validation logic."""
 
     def test_init_fails_without_chat_plugins(self):
-        """Test init fails when no chat plugins available (classic_rag)."""
+        """Test init fails when no chat plugins available (fitz_rag)."""
         mock_system = MagicMock()
         mock_system.ollama.available = False
         mock_system.qdrant.available = False
@@ -368,7 +368,7 @@ class TestInitValidation:
 
         with (
             patch("fitz_ai.cli.commands.init.detect_system", return_value=mock_system),
-            patch("fitz_ai.cli.commands.init.get_default_engine", return_value="classic_rag"),
+            patch("fitz_ai.cli.commands.init.get_default_engine", return_value="fitz_rag"),
             patch("fitz_ai.cli.commands.init.available_llm_plugins", return_value=[]),
             patch(
                 "fitz_ai.cli.commands.init.available_vector_db_plugins",
@@ -390,7 +390,7 @@ class TestInitValidation:
         assert "chat" in result.output.lower() or "api key" in result.output.lower()
 
     def test_init_fails_without_vector_db(self):
-        """Test init fails when no vector DB available (classic_rag)."""
+        """Test init fails when no vector DB available (fitz_rag)."""
         mock_system = MagicMock()
         mock_system.ollama.available = False
         mock_system.qdrant.available = False
@@ -399,7 +399,7 @@ class TestInitValidation:
 
         with (
             patch("fitz_ai.cli.commands.init.detect_system", return_value=mock_system),
-            patch("fitz_ai.cli.commands.init.get_default_engine", return_value="classic_rag"),
+            patch("fitz_ai.cli.commands.init.get_default_engine", return_value="fitz_rag"),
             patch(
                 "fitz_ai.cli.commands.init.available_llm_plugins",
                 return_value=["cohere"],

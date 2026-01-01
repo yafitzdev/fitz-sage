@@ -6,7 +6,7 @@ The code is cleaner and more forward-compatible with future engines (CLaRa, etc.
 """
 
 from fitz_ai.core import Constraints, Query
-from fitz_ai.engines.classic_rag import create_classic_rag_engine, run_classic_rag
+from fitz_ai.engines.fitz_rag import create_fitz_rag_engine, run_fitz_rag
 
 # ============================================================================
 # OPTION 1: Simple one-off query (easiest)
@@ -19,7 +19,7 @@ def simple_query():
     print("SIMPLE QUERY")
     print("=" * 60)
 
-    answer = run_classic_rag("What is quantum computing?")
+    answer = run_fitz_rag("What is quantum computing?")
 
     print(f"\nAnswer: {answer.text}\n")
     print(f"Sources used: {len(answer.provenance)}")
@@ -44,7 +44,7 @@ def query_with_constraints():
         filters={"topic": "quantum_physics"},  # Filter by topic
     )
 
-    answer = run_classic_rag(query="Explain quantum entanglement", constraints=constraints)
+    answer = run_fitz_rag(query="Explain quantum entanglement", constraints=constraints)
 
     print(f"\nAnswer: {answer.text}\n")
     print(f"Sources (max {constraints.max_sources}): {len(answer.provenance)}")
@@ -62,7 +62,7 @@ def reusable_engine():
     print("=" * 60)
 
     # Create engine once
-    engine = create_classic_rag_engine("config.yaml")
+    engine = create_fitz_rag_engine("config.yaml")
 
     # Use for multiple queries (more efficient)
     questions = ["What is a qubit?", "How does superposition work?", "What is quantum decoherence?"]
@@ -86,7 +86,7 @@ def advanced_query():
     print("=" * 60)
 
     # Pass engine-specific hints via metadata
-    answer = run_classic_rag(
+    answer = run_fitz_rag(
         query="Provide a detailed explanation of quantum tunneling",
         metadata={
             "temperature": 0.3,  # Lower temperature for more focused answers
@@ -116,14 +116,14 @@ def error_handling():
 
     try:
         # Empty query will raise QueryError
-        _answer = run_classic_rag("")  # noqa: F841
+        _answer = run_fitz_rag("")  # noqa: F841
     except QueryError as e:
         print(f"Query error: {e}")
 
     try:
         # Simulate knowledge error (this might not actually fail in practice)
         constraints = Constraints(filters={"nonexistent_field": "value"})
-        _answer = run_classic_rag("Some question", constraints=constraints)  # noqa: F841
+        _answer = run_fitz_rag("Some question", constraints=constraints)  # noqa: F841
     except KnowledgeError as e:
         print(f"Knowledge error: {e}")
     except Exception as e:
@@ -141,7 +141,7 @@ def working_with_answers():
     print("WORKING WITH ANSWERS")
     print("=" * 60)
 
-    answer = run_classic_rag("What is quantum superposition?")
+    answer = run_fitz_rag("What is quantum superposition?")
 
     # Access answer text
     print(f"\nAnswer text ({len(answer.text)} chars):")

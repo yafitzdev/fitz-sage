@@ -110,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🔄 Changed
 
 - **Package rename**: `fitz_ai/ingest/` → `fitz_ai/ingestion/`
-- **Chunk model**: Moved from `fitz_ai/engines/classic_rag/models/chunk.py` to `fitz_ai/core/chunk.py` for shared use across engines
+- **Chunk model**: Moved from `fitz_ai/engines/fitz_rag/models/chunk.py` to `fitz_ai/core/chunk.py` for shared use across engines
 - **Core exports**: `Chunk` now exported from `fitz_ai.core`
 
 ---
@@ -520,16 +520,16 @@ Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine kn
 - Auto-registration with global engine registry
 - 17 passing tests covering all functionality
 
-#### Classic RAG Engine (`fitz_ai/engines/classic_rag/`)
-- `ClassicRagEngine` wrapper implementing `KnowledgeEngine`
-- `run_classic_rag()` convenience function
-- `create_classic_rag_engine()` factory function
+#### Fitz RAG Engine (`fitz_ai/engines/fitz_rag/`)
+- `FitzRagEngine` wrapper implementing `KnowledgeEngine`
+- `run_fitz_rag()` convenience function
+- `create_fitz_rag_engine()` factory function
 - Auto-registration with global engine registry
 
 ### 🔄 Changed
 
 #### Public API (BREAKING)
-- Entry points: `RAGPipeline.from_config(config).run()` → `run_classic_rag()`
+- Entry points: `RAGPipeline.from_config(config).run()` → `run_fitz_rag()`
 - Answer format: `RGSAnswer.answer` → `Answer.text`
 - Source format: `RGSAnswer.sources` → `Answer.provenance`
 - Chunk ID: `source.chunk_id` → `provenance.source_id`
@@ -548,7 +548,7 @@ NEW (v0.3.0):
 fitz_ai/
 ├── core/              # Paradigm-agnostic contracts
 ├── engines/
-│   ├── classic_rag/   # Traditional RAG
+│   ├── fitz_rag/   # Traditional RAG
 │   └── clara/         # CLaRa engine
 ├── runtime/           # Multi-engine orchestration
 ├── llm/               # Shared LLM service
@@ -581,7 +581,7 @@ fitz_ai/
 ### ⚠️ Breaking Changes
 
 1. **Import paths changed**: Update all imports (see Migration Guide)
-2. **Public API changed**: Use `run_classic_rag()` or engine-specific functions
+2. **Public API changed**: Use `run_fitz_rag()` or engine-specific functions
 3. **Answer format changed**: `Answer.text` and `Answer.provenance`
 4. **No backwards compatibility layer**: Clean break for cleaner codebase
 

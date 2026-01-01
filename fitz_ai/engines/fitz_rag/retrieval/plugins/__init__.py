@@ -1,0 +1,7 @@
+# fitz_ai/engines/fitz_rag/retrieval/plugins/__init__.py
+"""
+YAML-based retrieval plugins.
+
+Plugin definitions live in *.yaml files in this directory.
+The Python step logic lives in fitz_ai/engines/fitz_rag/retrieval/steps.py
+"""

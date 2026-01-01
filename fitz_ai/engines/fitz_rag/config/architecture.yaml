@@ -1,0 +1,21 @@
+# Internal architecture mapping for Fitz.
+#
+# This file maps Python package prefixes to abstract architectural roles.
+# It is the ONLY place that needs updating when the project structure changes.
+#
+# Roles themselves are defined in:
+#   fitz_ai/core/_contracts/roles.py
+#
+# This file is intentionally not user-facing.
+
+mapping:
+  fitz_ai.core: foundation
+
+  fitz_ai.ingestion: domain
+  fitz_ai.engines.fitz_rag.retrieval: domain
+  fitz_ai.generation: domain
+
+  fitz_ai.engines.fitz_rag.pipeline: orchestration
+
+  tools: tooling
+  tests: tests

@@ -3,7 +3,7 @@
 Test that default.yaml has the correct structure.
 """
 
-from fitz_ai.engines.classic_rag.config.loader import DEFAULT_CONFIG_PATH, _load_yaml
+from fitz_ai.engines.fitz_rag.config.loader import DEFAULT_CONFIG_PATH, _load_yaml
 
 
 def test_default_yaml_has_correct_structure():

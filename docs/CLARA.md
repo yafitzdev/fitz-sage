@@ -24,7 +24,7 @@ Unlike traditional RAG which retrieves text chunks, CLaRa:
 **Without adequate hardware**, the engine will fail to load the 7B parameter model.
 
 For development and testing without a powerful GPU:
-- Use the **Classic RAG engine** instead
+- Use the **Fitz RAG engine** instead
 - Run unit tests (they use mocked models)
 - Wait for smaller CLaRa variants (MLX support planned)
 
@@ -176,9 +176,9 @@ from fitz_ai.engines.clara import (
 )
 ```
 
-## Comparison with Classic RAG
+## Comparison with Fitz RAG
 
-| Feature | Classic RAG | CLaRa |
+| Feature | Fitz RAG | CLaRa |
 |---------|-------------|-------|
 | **Storage** | Vector embeddings | Compressed memory tokens |
 | **Compression** | None | 16x-128x |
@@ -197,7 +197,7 @@ from fitz_ai.engines.clara import (
 - When you have GPU resources
 
 ❌ **Not recommended:**
-- Production deployments (use Classic RAG)
+- Production deployments (use Fitz RAG)
 - Limited hardware
 - Simple single-hop queries
 - Real-time/low-latency requirements

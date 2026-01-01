@@ -4,7 +4,7 @@ Engine Registry - Central registry for all knowledge engines.
 
 This module provides a registry pattern for discovering and instantiating
 knowledge engines. It enables the platform to support multiple engines
-(Classic RAG, CLaRa, custom engines) without hardcoding engine names.
+(Fitz RAG, CLaRa, custom engines) without hardcoding engine names.
 
 Philosophy:
     - Engines register themselves on import
@@ -74,7 +74,7 @@ class EngineRegistration:
     """
 
     name: str
-    """Unique name for this engine (e.g., 'classic_rag', 'clara')."""
+    """Unique name for this engine (e.g., 'fitz_rag', 'clara')."""
 
     factory: Callable[[Any], KnowledgeEngine]
     """
@@ -425,7 +425,7 @@ def get_default_engine() -> str:
     The single source of truth is default.yaml.
 
     Returns:
-        Engine name (e.g., 'classic_rag')
+        Engine name (e.g., 'fitz_rag')
     """
     # Check user config first
     try:
@@ -442,7 +442,7 @@ def get_default_engine() -> str:
 
     # Fall back to package default (single source of truth)
     try:
-        from fitz_ai.engines.classic_rag.config import load_config_dict as load_default_config
+        from fitz_ai.engines.fitz_rag.config import load_config_dict as load_default_config
 
         default_config = load_default_config()
         if "default_engine" in default_config:
@@ -451,4 +451,4 @@ def get_default_engine() -> str:
         pass
 
     # Last resort fallback (should never reach here if default.yaml is valid)
-    return "classic_rag"
+    return "fitz_rag"

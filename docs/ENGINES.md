@@ -88,9 +88,9 @@ class Provenance:
 
 ## Built-in Engines
 
-### Classic RAG
+### Fitz RAG
 
-**Location**: `fitz_ai/engines/classic_rag/`
+**Location**: `fitz_ai/engines/fitz_rag/`
 
 Traditional Retrieval-Augmented Generation:
 
@@ -112,9 +112,9 @@ Query → Embed → Vector Search → Rerank → Context Build → LLM → Answe
 
 **Usage**:
 ```python
-from fitz_ai.engines.classic_rag import run_classic_rag
+from fitz_ai.engines.fitz_rag import run_fitz_rag
 
-answer = run_classic_rag("What is quantum computing?")
+answer = run_fitz_rag("What is quantum computing?")
 ```
 
 **Configuration**:
@@ -209,7 +209,7 @@ clara:
 
 ## Engine Comparison
 
-| Feature | Classic RAG | CLaRa |
+| Feature | Fitz RAG | CLaRa |
 |---------|-------------|-------|
 | **Document Storage** | Vector embeddings | Compressed memory tokens |
 | **Compression** | None (full text) | 16x-128x |
@@ -233,12 +233,12 @@ from fitz_ai.runtime import list_engines, list_engines_with_info
 
 # Simple list
 engines = list_engines()
-# ['classic_rag', 'clara']
+# ['fitz_rag', 'clara']
 
 # With descriptions
 info = list_engines_with_info()
 # {
-#     'classic_rag': 'Traditional RAG with vector retrieval',
+#     'fitz_rag': 'Traditional RAG with vector retrieval',
 #     'clara': 'CLaRa: Compression-native RAG with 16x-128x compression'
 # }
 ```
@@ -281,7 +281,7 @@ _register_clara_engine()
 
 ## Choosing an Engine
 
-### Use Classic RAG When:
+### Use Fitz RAG When:
 - ✅ You have a production deployment
 - ✅ You need fine-grained retrieval control
 - ✅ Your documents are moderate size
@@ -310,14 +310,14 @@ _register_clara_engine()
               │ Yes                         │ No
               ▼                             ▼
     ┌─────────────────┐           ┌─────────────────┐
-    │  Classic RAG    │           │ Large Doc Set?  │
+    │  Fitz RAG    │           │ Large Doc Set?  │
     └─────────────────┘           └────────┬────────┘
                                            │
                                 ┌──────────┼──────────┐
                                 │ Yes                 │ No
                                 ▼                     ▼
                       ┌─────────────────┐   ┌─────────────────┐
-                      │     CLaRa       │   │  Classic RAG    │
+                      │     CLaRa       │   │  Fitz RAG    │
                       └─────────────────┘   └─────────────────┘
 ```
 
@@ -394,7 +394,7 @@ Query → Graph Traversal → Subgraph → Generate
 Combine multiple engines:
 ```python
 answer = run("Question?", engine="ensemble", 
-             engines=["classic_rag", "clara"])
+             engines=["fitz_rag", "clara"])
 ```
 
 ### Custom Engines

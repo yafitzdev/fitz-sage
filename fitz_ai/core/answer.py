@@ -50,7 +50,7 @@ class Answer:
         >>> answer = Answer(
         ...     text="The answer is 42",
         ...     metadata={
-        ...         "engine": "classic_rag",
+        ...         "engine": "fitz_rag",
         ...         "tokens_used": 1523,
         ...         "confidence": 0.95
         ...     }
@@ -67,7 +67,7 @@ class Answer:
     Provenance provides attribution and allows users to verify the answer
     against source material. Different engines may provide different levels
     of provenance:
-    - Classic RAG: chunks retrieved from vector DB
+    - Fitz RAG: chunks retrieved from vector DB
     - CLaRa: documents consulted during reasoning
     - Future engines: whatever makes sense for their paradigm
     """

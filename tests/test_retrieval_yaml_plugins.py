@@ -1,4 +1,4 @@
-# tests/engines/classic_rag/retrieval/test_yaml_plugins.py
+# tests/engines/fitz_rag/retrieval/test_yaml_plugins.py
 """
 Tests for YAML-based retrieval plugins.
 
@@ -17,7 +17,7 @@ from typing import Any
 import pytest
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.engines.classic_rag.retrieval.loader import (
+from fitz_ai.engines.fitz_rag.retrieval.loader import (
     RetrievalDependencies,
     StepSpec,
     build_pipeline_from_spec,
@@ -25,7 +25,7 @@ from fitz_ai.engines.classic_rag.retrieval.loader import (
     list_available_plugins,
     load_plugin_spec,
 )
-from fitz_ai.engines.classic_rag.retrieval.registry import (
+from fitz_ai.engines.fitz_rag.retrieval.registry import (
     available_retrieval_plugins,
     get_retrieval_plugin,
 )
@@ -294,7 +294,7 @@ class TestRegistry:
 
     def test_get_nonexistent_plugin_raises(self):
         """Should raise PluginNotFoundError for missing plugin."""
-        from fitz_ai.engines.classic_rag.retrieval.registry import (
+        from fitz_ai.engines.fitz_rag.retrieval.registry import (
             PluginNotFoundError,
         )
 

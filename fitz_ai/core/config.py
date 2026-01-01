@@ -12,11 +12,11 @@ Usage:
     data = load_yaml("config.yaml")
 
     # Load and validate with a schema
-    from fitz_ai.engines.classic_rag.config.schema import ClassicRagConfig
-    config = load_config("config.yaml", ClassicRagConfig)
+    from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
+    config = load_config("config.yaml", FitzRagConfig)
 
     # For engine-specific loading, use the engine's loader:
-    from fitz_ai.engines.classic_rag.config.loader import load_config as load_rag_config
+    from fitz_ai.engines.fitz_rag.config.loader import load_config as load_rag_config
     from fitz_ai.engines.clara.config.loader import load_clara_config
 
 Design principles:
@@ -141,11 +141,11 @@ def load_config(
 
     Examples:
         # Load RAG config with explicit schema
-        from fitz_ai.engines.classic_rag.config.schema import ClassicRagConfig
-        config = load_config("config.yaml", ClassicRagConfig)
+        from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
+        config = load_config("config.yaml", FitzRagConfig)
 
         # For engine-specific defaults, use the engine's loader:
-        from fitz_ai.engines.classic_rag.config.loader import load_config as load_rag_config
+        from fitz_ai.engines.fitz_rag.config.loader import load_config as load_rag_config
         config = load_rag_config()  # Loads default.yaml
     """
     resolved_path = Path(path)

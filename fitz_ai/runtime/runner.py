@@ -20,7 +20,7 @@ from fitz_ai.runtime.registry import get_engine_registry
 
 def run(
     query: Union[str, Query],
-    engine: str = "classic_rag",
+    engine: str = "fitz_rag",
     config: Optional[Any] = None,
     config_path: Optional[Union[str, Path]] = None,
     constraints: Optional[Constraints] = None,
@@ -38,7 +38,7 @@ def run(
 
     Args:
         query: Question text or Query object
-        engine: Engine name to use (default: "classic_rag")
+        engine: Engine name to use (default: "fitz_rag")
         config: Pre-loaded config object (engine-specific type)
         config_path: Path to config file (ignored if config provided)
         constraints: Optional query-time constraints
@@ -67,7 +67,7 @@ def run(
         >>> answer = run("What is Y?", constraints=constraints)
 
         With config:
-        >>> from fitz_ai.engines.classic_rag.config.loader import load_config
+        >>> from fitz_ai.engines.fitz_rag.config.loader import load_config
         >>> config = load_config("my_config.yaml")
         >>> answer = run("Question?", config=config)
     """
@@ -104,7 +104,7 @@ def run(
 
 
 def create_engine(
-    engine: str = "classic_rag",
+    engine: str = "fitz_rag",
     config: Optional[Any] = None,
     config_path: Optional[Union[str, Path]] = None,
 ):
@@ -131,7 +131,7 @@ def create_engine(
 
     Examples:
         Create and reuse engine:
-        >>> engine = create_engine("classic_rag", config_path="config.yaml")
+        >>> engine = create_engine("fitz_rag", config_path="config.yaml")
         >>>
         >>> q1 = Query(text="What is quantum computing?")
         >>> answer1 = engine.answer(q1)
@@ -167,7 +167,7 @@ def list_engines() -> list[str]:
     Examples:
         >>> engines = list_engines()
         >>> print(f"Available: {', '.join(engines)}")
-        ['classic_rag', 'clara', 'custom']
+        ['fitz_rag', 'clara', 'custom']
     """
     registry = get_engine_registry()
     return registry.list()
@@ -183,7 +183,7 @@ def list_engines_with_info() -> Dict[str, str]:
     Examples:
         >>> for name, desc in list_engines_with_info().items():
         ...     print(f"{name}: {desc}")
-        classic_rag: Retrieval-augmented generation
+        fitz_rag: Retrieval-augmented generation
         clara: Citation-attributed reasoning
     """
     registry = get_engine_registry()

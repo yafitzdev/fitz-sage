@@ -25,7 +25,7 @@ class KnowledgeEngine(Protocol):
         - The platform only cares about: Query in → Answer out
 
     Examples:
-        >>> engine = ClassicRagEngine(config)
+        >>> engine = FitzRagEngine(config)
         >>> query = Query(text="What is quantum computing?")
         >>> answer = engine.answer(query)
         >>> print(answer.text)
@@ -36,7 +36,7 @@ class KnowledgeEngine(Protocol):
         Execute a query against knowledge and return an answer.
 
         This is the only required method. How the engine generates the answer
-        is entirely up to the implementation. Classic RAG uses retrieval + generation,
+        is entirely up to the implementation. Fitz RAG uses retrieval + generation,
         CLaRa might use uncertainty-guided reasoning, future engines might use
         completely different approaches.
 

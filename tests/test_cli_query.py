@@ -36,7 +36,7 @@ class TestQueryCommand:
             lambda name: tmp_path / "nonexistent" / f"{name}.yaml",
         )
 
-        result = runner.invoke(app, ["query", "test question", "--engine", "classic_rag"])
+        result = runner.invoke(app, ["query", "test question", "--engine", "fitz_rag"])
 
         assert result.exit_code != 0
         assert "init" in result.output.lower() or "config" in result.output.lower()
@@ -45,14 +45,14 @@ class TestQueryCommand:
 class TestQueryHelpers:
     """Tests for query helper functions."""
 
-    def test_load_classic_rag_config_returns_config(self, tmp_path):
-        """Test load_classic_rag_config loads valid config."""
+    def test_load_fitz_rag_config_returns_config(self, tmp_path):
+        """Test load_fitz_rag_config loads valid config."""
         import yaml
 
         # Create engine-specific config file
         config_dir = tmp_path / "config"
         config_dir.mkdir()
-        config_path = config_dir / "classic_rag.yaml"
+        config_path = config_dir / "fitz_rag.yaml"
         config = {
             "chat": {"plugin_name": "cohere"},
             "embedding": {"plugin_name": "cohere"},
@@ -65,9 +65,9 @@ class TestQueryHelpers:
             "fitz_ai.cli.utils.FitzPaths.engine_config",
             return_value=config_path,
         ):
-            from fitz_ai.cli.utils import load_classic_rag_config
+            from fitz_ai.cli.utils import load_fitz_rag_config
 
-            raw, typed = load_classic_rag_config()
+            raw, typed = load_fitz_rag_config()
 
         assert raw["chat"]["plugin_name"] == "cohere"
         assert typed.retrieval.collection == "test"
@@ -135,7 +135,7 @@ class TestQueryExecution:
             ),
             patch("fitz_ai.cli.commands.query.get_collections", return_value=["test"]),
         ):
-            runner.invoke(app, ["query", "What is RAG?", "--engine", "classic_rag"])
+            runner.invoke(app, ["query", "What is RAG?", "--engine", "fitz_rag"])
 
         # Should call engine.answer with the question
         mock_engine.answer.assert_called_once()
@@ -172,7 +172,7 @@ class TestQueryOptions:
             ),
             patch("fitz_ai.cli.commands.query.get_collections", return_value=["custom"]),
         ):
-            runner.invoke(app, ["query", "question", "-c", "custom", "--engine", "classic_rag"])
+            runner.invoke(app, ["query", "question", "-c", "custom", "--engine", "fitz_rag"])
 
         # Engine should be created (we can't easily verify the collection was set)
         assert mock_engine.answer.called

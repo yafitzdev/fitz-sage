@@ -60,8 +60,8 @@ fitz serve  # http://localhost:8000/docs for interactive API
 
   Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)).
 
-  - ~40k lines of Python
-  - 600+ tests, 100% coverage
+  - ~45k lines of Python
+  - 700+ tests, 100% coverage
   - Zero LangChain/LlamaIndex dependencies — built from scratch
 
 ![fitz-ai honest_rag](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/honest_rag.jpg)
@@ -318,7 +318,7 @@ The codebase speaks for itself.
 >        ┌─────────────────────────────────────┐
 >        │       engine="..."                  │
 >        │  ┌─────────┐ ┌───────┐ ┌─────────┐  │
->        │  │ classic │ │ clara │ │ graph   │  │
+>        │  │ fitz    │ │ clara │ │ graph   │  │
 >        │  │  _rag   │ │       │ │  _rag   │  │
 >        │  └────┬────┘ └───┬───┘ └────┬────┘  │
 >        │       └──────────┼──────────┘       │
@@ -332,7 +332,7 @@ The codebase speaks for itself.
 >```
 >
 >```python
->answer = run("What are the payment terms?", engine="classic_rag")
+>answer = run("What are the payment terms?", engine="fitz_rag")
 >answer = run("What are the payment terms?", engine="clara")
 >answer = run("What are the payment terms?", engine="graph_rag")  # future
 >```
@@ -524,7 +524,7 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 ├─────────────────────────────────────────────────────────────────┤
 │  Engines                                                        │
 │  ┌───────────────┐  ┌───────────┐  ┌────────────┐               │
-│  │  Classic RAG  │  │   CLaRa   │  │  GraphRAG  │  (pluggable)  │
+│  │  Fitz RAG  │  │   CLaRa   │  │  GraphRAG  │  (pluggable)  │
 │  └───────────────┘  └───────────┘  └────────────┘               │
 ├─────────────────────────────────────────────────────────────────┤
 │  Plugin System (all YAML-defined)                               │
@@ -697,8 +697,8 @@ Fitz is not a RAG framework. It's a knowledge platform that *currently* uses RAG
 ```python
 from fitz_ai import run
 
-# Classic RAG - fast, reliable vector search
-answer = run("What are the payment terms?", engine="classic_rag")
+# Fitz RAG - fast, reliable vector search
+answer = run("What are the payment terms?", engine="fitz_rag")
 
 # CLaRa - compressed RAG, 16x smaller context
 answer = run("What are the payment terms?", engine="clara")

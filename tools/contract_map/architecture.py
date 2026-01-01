@@ -8,8 +8,8 @@ from .common import PKG
 
 def _get_architecture_functions():
     """Dynamically import architecture functions based on PKG config."""
-    arch_module = importlib.import_module(f"{PKG.name}.engines.classic_rag.config.architecture")
-    rules_module = importlib.import_module(f"{PKG.name}.engines.classic_rag.contracts.rules")
+    arch_module = importlib.import_module(f"{PKG.name}.engines.fitz_rag.config.architecture")
+    rules_module = importlib.import_module(f"{PKG.name}.engines.fitz_rag.contracts.rules")
     return (
         getattr(arch_module, "load_architecture_mapping"),
         getattr(rules_module, "allowed_importers"),

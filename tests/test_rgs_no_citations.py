@@ -1,5 +1,5 @@
 # tests/test_rgs_no_citations.py
-from fitz_ai.engines.classic_rag.generation.retrieval_guided.synthesis import (
+from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
     RGS,
     RGSConfig,
 )

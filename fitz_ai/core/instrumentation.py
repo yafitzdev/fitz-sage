@@ -74,7 +74,7 @@ class BenchmarkHook(Protocol):
 
         Args:
             layer: Plugin layer (e.g., "engine", "llm.chat", "vector_db", "chunking")
-            plugin_name: Name of the plugin (e.g., "classic_rag", "openai", "pinecone")
+            plugin_name: Name of the plugin (e.g., "fitz_rag", "openai", "pinecone")
             method: Method being called (e.g., "answer", "chat", "search")
             args: Positional arguments to the method
             kwargs: Keyword arguments to the method
@@ -252,7 +252,7 @@ class InstrumentedProxy:
     Args:
         target: Object to wrap
         layer: Plugin layer name (e.g., "engine", "llm.chat")
-        plugin_name: Plugin name (e.g., "classic_rag", "openai")
+        plugin_name: Plugin name (e.g., "fitz_rag", "openai")
         methods_to_track: If provided, only these methods are instrumented.
                          If None, all public methods are instrumented.
 
@@ -398,7 +398,7 @@ def maybe_wrap(
     Args:
         target: Plugin instance to potentially wrap
         layer: Plugin layer (e.g., "engine", "llm.chat", "vector_db")
-        plugin_name: Plugin name (e.g., "classic_rag", "openai")
+        plugin_name: Plugin name (e.g., "fitz_rag", "openai")
         methods_to_track: If provided, only these methods are instrumented
 
     Returns:

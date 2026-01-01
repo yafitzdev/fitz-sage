@@ -234,13 +234,13 @@ TYPED_CHUNKING_REGISTRY = PluginRegistry(
 
 RETRIEVER_REGISTRY = PluginRegistry(
     name="retriever",
-    scan_packages=["fitz_ai.engines.classic_rag.retrieval.plugins"],
+    scan_packages=["fitz_ai.engines.fitz_rag.retrieval.plugins"],
     required_method="retrieve",
 )
 
 PIPELINE_REGISTRY = PluginRegistry(
     name="pipeline",
-    scan_packages=["fitz_ai.engines.classic_rag.pipeline.pipeline.plugins"],
+    scan_packages=["fitz_ai.engines.fitz_rag.pipeline.pipeline.plugins"],
     required_method="build",
 )
 

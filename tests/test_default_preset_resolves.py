@@ -1,14 +1,14 @@
 # tests/test_default_preset_resolves.py
 """Test that default config loads and resolves correctly."""
 
-from fitz_ai.engines.classic_rag.config import ClassicRagConfig, load_config
+from fitz_ai.engines.fitz_rag.config import FitzRagConfig, load_config
 
 
 def test_default_preset_resolves_to_runtime_config():
     """Test that default config loads and has all required fields."""
     cfg = load_config()
 
-    assert isinstance(cfg, ClassicRagConfig)
+    assert isinstance(cfg, FitzRagConfig)
 
     # Required plugin configs - uses 'chat' not 'llm'
     assert cfg.chat.plugin_name

@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 import typer
 
 from fitz_ai.cli.ui import RICH, console, ui
-from fitz_ai.cli.utils import get_collections, load_classic_rag_config
+from fitz_ai.cli.utils import get_collections, load_fitz_rag_config
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.runtime import get_default_engine
 
@@ -136,7 +136,7 @@ def _build_chunking_router_config(config: dict):
               kwargs: {...}
           warn_on_fallback: true
     """
-    from fitz_ai.engines.classic_rag.config import (
+    from fitz_ai.engines.fitz_rag.config import (
         ChunkingRouterConfig,
         ExtensionChunkerConfig,
     )
@@ -229,7 +229,7 @@ def _run_engine_specific_ingest(
     caps = registry.get_capabilities(engine_name)
     if not caps.supports_persistent_ingest:
         ui.error(f"Engine '{engine_name}' does not support persistent ingestion.")
-        ui.info("Use 'fitz ingest' without --engine for classic_rag ingestion.")
+        ui.info("Use 'fitz ingest' without --engine for fitz_rag ingestion.")
         raise typer.Exit(1)
 
     # Get source path
@@ -322,7 +322,7 @@ def command(
         None,
         "--engine",
         "-e",
-        help="Engine to use (classic_rag, graphrag, clara). Defaults to classic_rag.",
+        help="Engine to use (fitz_rag, graphrag, clara). Defaults to fitz_rag.",
     ),
     non_interactive: bool = typer.Option(
         False,
@@ -397,8 +397,8 @@ def command(
     if engine is None:
         engine = get_default_engine()
 
-    # Route to engine-specific ingest if not classic_rag
-    if engine != "classic_rag":
+    # Route to engine-specific ingest if not fitz_rag
+    if engine != "fitz_rag":
         _run_engine_specific_ingest(source, collection, engine, non_interactive)
         return
 
@@ -410,10 +410,10 @@ def command(
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     # =========================================================================
-    # Load config (engine-specific for classic_rag)
+    # Load config (engine-specific for fitz_rag)
     # =========================================================================
 
-    raw_config, _ = load_classic_rag_config()
+    raw_config, _ = load_fitz_rag_config()
     if raw_config is None:
         ui.error("No config found. Run 'fitz init' first.")
         raise typer.Exit(1)
@@ -431,7 +431,7 @@ def command(
         print()
 
     # =========================================================================
-    # Interactive Prompts (classic_rag)
+    # Interactive Prompts (fitz_rag)
     # =========================================================================
 
     # Will be set after source is determined

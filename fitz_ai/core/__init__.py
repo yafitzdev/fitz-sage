@@ -18,10 +18,10 @@ Public API:
 Examples:
     Using the core abstractions:
     >>> from fitz_ai.core import Query, Constraints
-    >>> from fitz_ai.engines.classic_rag import ClassicRagEngine
+    >>> from fitz_ai.engines.fitz_rag import FitzRagEngine
     >>>
     >>> # Create an engine (engine-specific)
-    >>> engine = ClassicRagEngine(config)
+    >>> engine = FitzRagEngine(config)
     >>>
     >>> # Use core abstractions (paradigm-agnostic)
     >>> query = Query(

@@ -102,7 +102,7 @@ class ConfigurationError(EngineError):
 
     Examples:
         >>> try:
-        ...     engine = ClassicRagEngine(invalid_config)
+        ...     engine = FitzRagEngine(invalid_config)
         ... except ConfigurationError as e:
         ...     print(f"Engine misconfigured: {e}")
     """
