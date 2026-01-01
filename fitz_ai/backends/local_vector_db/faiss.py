@@ -191,6 +191,66 @@ class FaissLocalVectorDB:
         logger.debug(f"{VECTOR_DB} Persisted FAISS index to {self._base_path}")
 
     # =========================================================================
+    # Private Helpers
+    # =========================================================================
+
+    def _matches_filter(self, payload: Dict[str, Any], filter_cond: Dict[str, Any]) -> bool:
+        """
+        Check if payload matches Qdrant-style filter conditions.
+
+        Supports:
+        - {"must": [conditions]} - All conditions must match
+        - {"should": [conditions]} - At least one condition must match
+        - {"key": "field", "match": {"value": x}} - Exact match
+        - {"key": "field", "range": {"gte": x, "lte": y}} - Range filter
+        """
+        if not filter_cond:
+            return True
+
+        # Handle "must" conditions (AND)
+        if "must" in filter_cond:
+            for cond in filter_cond["must"]:
+                if not self._matches_filter(payload, cond):
+                    return False
+            return True
+
+        # Handle "should" conditions (OR)
+        if "should" in filter_cond:
+            for cond in filter_cond["should"]:
+                if self._matches_filter(payload, cond):
+                    return True
+            return False
+
+        # Handle direct field conditions
+        key = filter_cond.get("key")
+        if key is None:
+            return True
+
+        value = payload.get(key)
+
+        # Match condition (exact equality)
+        if "match" in filter_cond:
+            match_value = filter_cond["match"].get("value")
+            return value == match_value
+
+        # Range condition
+        if "range" in filter_cond:
+            range_cond = filter_cond["range"]
+            if value is None:
+                return False
+            if "gte" in range_cond and value < range_cond["gte"]:
+                return False
+            if "gt" in range_cond and value <= range_cond["gt"]:
+                return False
+            if "lte" in range_cond and value > range_cond["lte"]:
+                return False
+            if "lt" in range_cond and value >= range_cond["lt"]:
+                return False
+            return True
+
+        return True
+
+    # =========================================================================
     # Public API - Standard VectorDBPlugin Contract
     # =========================================================================
 
@@ -254,6 +314,7 @@ class FaissLocalVectorDB:
         query_vector: List[float],
         limit: int,
         with_payload: bool = True,
+        query_filter: Optional[Dict[str, Any]] = None,
     ) -> List[SearchResult]:
         """
         Search for similar vectors.
@@ -263,6 +324,7 @@ class FaissLocalVectorDB:
             query_vector: Query vector
             limit: Maximum number of results
             with_payload: Whether to include payload in results
+            query_filter: Optional metadata filter conditions (Qdrant-style)
 
         Returns:
             List of SearchResult objects
@@ -286,6 +348,10 @@ class FaissLocalVectorDB:
 
             # Filter by collection
             if payload.get("_collection") != collection_name:
+                continue
+
+            # Apply metadata filter if provided
+            if query_filter and not self._matches_filter(payload, query_filter):
                 continue
 
             # Convert L2 distance to similarity score (lower distance = higher score)

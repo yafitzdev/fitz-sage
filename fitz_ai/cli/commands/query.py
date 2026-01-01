@@ -222,7 +222,7 @@ def _run_collection_query(
     display_retrieval = typed_config.retrieval.plugin_name
 
     chat_plugin = raw_config.get("chat", {}).get("plugin_name", "?")
-    chat_model = raw_config.get("chat", {}).get("kwargs", {}).get("model", "")
+    chat_model = raw_config.get("chat", {}).get("kwargs", {}).get("models", {}).get("smart", "")
     display_chat = f"{chat_plugin} ({chat_model})" if chat_model else chat_plugin
 
     embedding_plugin = raw_config.get("embedding", {}).get("plugin_name", "?")
@@ -230,6 +230,8 @@ def _run_collection_query(
     display_embedding = (
         f"{embedding_plugin} ({embedding_model})" if embedding_model else embedding_plugin
     )
+
+    vector_db_plugin = raw_config.get("vector_db", {}).get("plugin_name", "?")
 
     display_rerank = None
     if raw_config.get("rerank", {}).get("enabled"):
@@ -240,6 +242,7 @@ def _run_collection_query(
     print()
     info_parts = [
         f"Collection: {display_collection}",
+        f"VectorDB: {vector_db_plugin}",
         f"Retrieval: {display_retrieval}",
         f"Chat: {display_chat}",
         f"Embedding: {display_embedding}",

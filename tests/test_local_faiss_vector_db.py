@@ -178,3 +178,79 @@ def test_local_faiss_empty_search(tmp_path: Path):
 
     results = db.search("any", [1.0, 0.0, 0.0], limit=10)
     assert results == []
+
+
+def test_local_faiss_search_with_query_filter(tmp_path: Path):
+    """Test search with query_filter parameter for metadata filtering."""
+    db = FaissLocalVectorDB(path=tmp_path)
+
+    # Add points with different metadata
+    db.upsert(
+        "test",
+        [
+            {"id": "1", "vector": [1.0, 0.0, 0.0], "payload": {"category": "A", "level": 1}},
+            {"id": "2", "vector": [0.9, 0.1, 0.0], "payload": {"category": "A", "level": 2}},
+            {"id": "3", "vector": [0.8, 0.2, 0.0], "payload": {"category": "B", "level": 1}},
+            {"id": "4", "vector": [0.7, 0.3, 0.0], "payload": {"category": "B", "level": 3}},
+        ],
+    )
+
+    query = [1.0, 0.0, 0.0]
+
+    # No filter - should return all
+    results = db.search("test", query, limit=10)
+    assert len(results) == 4
+
+    # Filter by exact match
+    results = db.search(
+        "test",
+        query,
+        limit=10,
+        query_filter={"key": "category", "match": {"value": "A"}},
+    )
+    assert len(results) == 2
+    assert all(r.payload["category"] == "A" for r in results)
+
+    # Filter by range
+    results = db.search(
+        "test",
+        query,
+        limit=10,
+        query_filter={"key": "level", "range": {"gte": 2}},
+    )
+    assert len(results) == 2
+    assert all(r.payload["level"] >= 2 for r in results)
+
+    # Filter with must conditions (AND)
+    results = db.search(
+        "test",
+        query,
+        limit=10,
+        query_filter={
+            "must": [
+                {"key": "category", "match": {"value": "B"}},
+                {"key": "level", "range": {"gte": 2}},
+            ]
+        },
+    )
+    assert len(results) == 1
+    assert results[0].id == "4"
+
+    # Filter with should conditions (OR)
+    results = db.search(
+        "test",
+        query,
+        limit=10,
+        query_filter={
+            "should": [
+                {"key": "level", "match": {"value": 1}},
+                {"key": "level", "match": {"value": 3}},
+            ]
+        },
+    )
+    assert len(results) == 3
+    assert set(r.id for r in results) == {"1", "3", "4"}
+
+    # query_filter=None should work (no filtering)
+    results = db.search("test", query, limit=10, query_filter=None)
+    assert len(results) == 4
