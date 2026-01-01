@@ -44,6 +44,7 @@ from fitz_ai.ingestion.enrichment.base import ContentType
 from fitz_ai.ingestion.enrichment.config import EnrichmentConfig
 from fitz_ai.ingestion.enrichment.entities.cache import EntityCache
 from fitz_ai.ingestion.enrichment.entities.extractor import EntityExtractor
+from fitz_ai.ingestion.enrichment.entities.linker import EntityLinker
 from fitz_ai.ingestion.enrichment.hierarchy.enricher import HierarchyEnricher
 from fitz_ai.ingestion.enrichment.models import EnrichmentResult
 from fitz_ai.ingestion.enrichment.summary.cache import SummaryCache
@@ -435,6 +436,10 @@ class EnrichmentPipeline:
                 )
                 if entities:
                     chunk.metadata["entities"] = [e.to_dict() for e in entities]
+
+            # Link co-occurring entities
+            linker = EntityLinker()
+            chunks = linker.link(chunks)
 
             # Save entity cache
             self._entity_extractor.save_cache()
