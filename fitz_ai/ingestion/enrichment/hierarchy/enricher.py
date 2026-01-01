@@ -34,8 +34,13 @@ from fitz_ai.ingestion.enrichment.config import (
     HierarchyConfig,
     HierarchyRule,
 )
+from fitz_ai.ingestion.enrichment.hierarchy.embedding_provider import (
+    Embedder,
+    EmbeddingProvider,
+)
 from fitz_ai.ingestion.enrichment.hierarchy.grouper import ChunkGrouper
 from fitz_ai.ingestion.enrichment.hierarchy.matcher import ChunkMatcher
+from fitz_ai.ingestion.enrichment.hierarchy.semantic_grouper import SemanticGrouper
 from fitz_ai.prompts import hierarchy as hierarchy_prompts
 
 if TYPE_CHECKING:
@@ -168,6 +173,7 @@ class HierarchyEnricher:
         config: HierarchyConfig,
         chat_client: ChatClient,
         semantic_matcher: SemanticMatcher | None = None,
+        embedder: Embedder | None = None,
     ):
         """
         Initialize the hierarchy enricher.
@@ -177,10 +183,33 @@ class HierarchyEnricher:
             chat_client: LLM client for generating summaries
             semantic_matcher: Optional SemanticMatcher for conflict detection.
                              If not provided, conflicts won't be detected.
+            embedder: Optional embedder for semantic grouping.
+                     Required when config.grouping_strategy == "semantic".
         """
         self._config = config
         self._chat = chat_client
         self._semantic_matcher = semantic_matcher
+        self._embedder = embedder
+
+        # Initialize semantic grouper if configured
+        self._semantic_grouper: SemanticGrouper | None = None
+        self._embedding_provider: EmbeddingProvider | None = None
+
+        if config.grouping_strategy == "semantic":
+            if embedder is None:
+                raise ValueError(
+                    "Semantic grouping requires an embedder. "
+                    "Either provide an embedder or use grouping_strategy='metadata'."
+                )
+            self._semantic_grouper = SemanticGrouper(
+                n_clusters=config.n_clusters,
+                max_clusters=config.max_clusters,
+            )
+            self._embedding_provider = EmbeddingProvider(embedder)
+            logger.info(
+                f"[HIERARCHY] Semantic grouping enabled "
+                f"(n_clusters={config.n_clusters}, max={config.max_clusters})"
+            )
 
     def enrich(self, chunks: List[Chunk]) -> List[Chunk]:
         """
@@ -234,20 +263,35 @@ class HierarchyEnricher:
 
         return chunks + corpus_chunks
 
+    def _get_groups(self, chunks: List[Chunk]) -> dict[str, List[Chunk]]:
+        """
+        Get chunk groups using the configured strategy.
+
+        Returns:
+            Dict mapping group_key to list of chunks.
+        """
+        if self._semantic_grouper is not None and self._embedding_provider is not None:
+            # Semantic grouping mode
+            embeddings = self._embedding_provider.get_embeddings(chunks)
+            return self._semantic_grouper.group(chunks, embeddings)
+        else:
+            # Metadata grouping mode (default)
+            grouper = ChunkGrouper(self._config.group_by)
+            return grouper.group(chunks)
+
     def _process_simple_mode(self, chunks: List[Chunk]) -> Chunk | None:
         """
         Process chunks in simple mode (no rules, use defaults).
 
-        Groups all chunks by the configured group_by key and generates
-        summaries using default prompts. L1 summaries are stored as metadata
+        Groups all chunks by the configured strategy (metadata key or semantic similarity)
+        and generates summaries using default prompts. L1 summaries are stored as metadata
         on the original chunks. Only returns the L2 corpus summary chunk.
         """
         if not chunks:
             return None
 
-        # Group by configured key (default: "source")
-        grouper = ChunkGrouper(self._config.group_by)
-        groups = grouper.group(chunks)
+        # Group by configured strategy
+        groups = self._get_groups(chunks)
 
         # Get prompts (use prompt library defaults if not specified)
         group_prompt = self._config.group_prompt or hierarchy_prompts.GROUP_SUMMARY_PROMPT

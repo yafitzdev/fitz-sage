@@ -81,12 +81,14 @@ class EnrichmentPipeline:
         config: EnrichmentConfig,
         project_root: Path,
         chat_client: ChatClient | None = None,
+        embedder: object | None = None,
         cache_path: Path | None = None,
         enricher_id: str | None = None,
     ):
         self.config = config
         self.project_root = Path(project_root).resolve()
         self._chat_client = chat_client
+        self._embedder = embedder
         self._cache_path = cache_path or FitzPaths.workspace() / "enrichment_cache.json"
         self._enricher_id = enricher_id or "default"
 
@@ -125,13 +127,20 @@ class EnrichmentPipeline:
             logger.warning("Hierarchy enrichment enabled but no chat client provided")
             return
 
-        # Initialize enricher - works in both simple mode (no rules) and rules mode
+        # Initialize enricher - works in simple mode, rules mode, and semantic mode
         self._hierarchy_enricher = HierarchyEnricher(
             config=self.config.hierarchy,
             chat_client=self._chat_client,
+            embedder=self._embedder,
         )
 
-        if self.config.hierarchy.rules:
+        if self.config.hierarchy.grouping_strategy == "semantic":
+            logger.info(
+                f"[ENRICHMENT] Hierarchy enricher initialized with semantic grouping "
+                f"(n_clusters={self.config.hierarchy.n_clusters}, "
+                f"max={self.config.hierarchy.max_clusters})"
+            )
+        elif self.config.hierarchy.rules:
             logger.info(
                 f"[ENRICHMENT] Hierarchy enricher initialized with "
                 f"{len(self.config.hierarchy.rules)} rules"
@@ -170,6 +179,7 @@ class EnrichmentPipeline:
         config: EnrichmentConfig | Dict[str, Any] | None,
         project_root: Path,
         chat_client: ChatClient | None = None,
+        embedder: object | None = None,
         cache_path: Path | None = None,
         enricher_id: str | None = None,
     ) -> "EnrichmentPipeline":
@@ -180,6 +190,7 @@ class EnrichmentPipeline:
             config: EnrichmentConfig, dict, or None (uses defaults)
             project_root: Root directory of the project
             chat_client: LLM client for summaries and LLM-based artifacts
+            embedder: Embedder for semantic grouping (optional)
             cache_path: Path to cache file
             enricher_id: Unique identifier for cache invalidation
         """
@@ -192,6 +203,7 @@ class EnrichmentPipeline:
             config=config,
             project_root=project_root,
             chat_client=chat_client,
+            embedder=embedder,
             cache_path=cache_path,
             enricher_id=enricher_id,
         )

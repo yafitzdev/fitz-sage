@@ -127,26 +127,36 @@ class HierarchyConfig:
 
     Hierarchical enrichment generates multi-level summaries:
     - Level 0: Original chunks (unchanged)
-    - Level 1: Group summaries (chunks grouped by metadata key)
+    - Level 1: Group summaries (chunks grouped by metadata key or semantic similarity)
     - Level 2: Corpus summary (summary of all groups)
 
     Zero-config mode (recommended):
         Just set enabled=True or use `fitz ingest --hierarchy`.
         Uses smart defaults: group_by="source", default prompts.
 
+    Semantic grouping mode:
+        Set grouping_strategy="semantic" to cluster chunks by embedding similarity.
+        Requires embedder to be provided.
+
     Power-user mode:
         Configure custom rules for complex grouping scenarios.
 
     Attributes:
         enabled: Whether hierarchy enrichment is active
-        group_by: Metadata key for grouping (default: "source" = per-file)
+        grouping_strategy: "metadata" (default) or "semantic" for embedding-based clustering
+        group_by: Metadata key for grouping (used when strategy is "metadata")
+        n_clusters: Number of clusters for semantic grouping (None = auto-detect)
+        max_clusters: Maximum clusters for auto-detection
         group_prompt: Custom prompt for group summaries (optional)
         corpus_prompt: Custom prompt for corpus summary (optional)
         rules: Advanced rules for power users (optional, overrides simple mode)
     """
 
     enabled: bool = False
-    group_by: str = "source_file"  # Default: each file is a group
+    grouping_strategy: str = "metadata"  # "metadata" or "semantic"
+    group_by: str = "source_file"  # Default: each file is a group (metadata mode)
+    n_clusters: int | None = None  # For semantic grouping (None = auto-detect)
+    max_clusters: int = 10  # Upper bound for auto-detection
     group_prompt: str | None = None  # Uses DEFAULT_GROUP_PROMPT if None
     corpus_prompt: str | None = None  # Uses DEFAULT_CORPUS_PROMPT if None
     rules: list[HierarchyRule] = field(default_factory=list)  # Power user
@@ -236,7 +246,10 @@ class EnrichmentConfig:
             ),
             hierarchy=HierarchyConfig(
                 enabled=hierarchy_data.get("enabled", False),
+                grouping_strategy=hierarchy_data.get("grouping_strategy", "metadata"),
                 group_by=hierarchy_data.get("group_by", "source_file"),
+                n_clusters=hierarchy_data.get("n_clusters"),
+                max_clusters=hierarchy_data.get("max_clusters", 10),
                 group_prompt=hierarchy_data.get("group_prompt"),
                 corpus_prompt=hierarchy_data.get("corpus_prompt"),
                 rules=hierarchy_rules,
@@ -263,7 +276,10 @@ class EnrichmentConfig:
             },
             "hierarchy": {
                 "enabled": self.hierarchy.enabled,
+                "grouping_strategy": self.hierarchy.grouping_strategy,
                 "group_by": self.hierarchy.group_by,
+                "n_clusters": self.hierarchy.n_clusters,
+                "max_clusters": self.hierarchy.max_clusters,
                 "group_prompt": self.hierarchy.group_prompt,
                 "corpus_prompt": self.hierarchy.corpus_prompt,
                 "rules": [
