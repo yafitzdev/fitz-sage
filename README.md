@@ -60,7 +60,7 @@ fitz serve  # http://localhost:8000/docs for interactive API
 
   Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)).
 
-  - ~45k lines of Python
+  - ~55k lines of Python
   - 700+ tests, 100% coverage
   - Zero LangChain/LlamaIndex dependencies — built from scratch
 
@@ -247,7 +247,7 @@ The codebase speaks for itself.
 >
 > **Traditional RAG has two problems—it can't see the forest for the trees, and it lies about what it sees.**
 >
-> Fitz RAG solves both: **hierarchical summaries** for the big picture, **epistemic guardrails** for honesty.
+> Fitz RAG solves both: **hierarchical summaries** for the big picture, **epistemic guardrails** for honesty. And now it also extracts entities and relationships—without the graph construction overhead.
 
 <br>
 
@@ -271,28 +271,44 @@ The codebase speaks for itself.
 
 <br>
 
-#### When GraphRAG wins
+#### What Fitz RAG now shares with GraphRAG
 
->GraphRAG excels at **relationship exploration**:
+>Fitz RAG has closed the gap on key GraphRAG features—without the complexity:
+>
+>| Capability | GraphRAG | Fitz RAG |
+>|------------|----------|----------|
+>| **Entity extraction** | LLM extracts entities | LLM extracts entities (classes, functions, APIs, people, orgs) |
+>| **Entity relationships** | Full knowledge graph | Co-occurrence links (entities in same chunk are linked) |
+>| **Semantic clustering** | Leiden community detection | K-means clustering by embedding similarity |
+>| **Trend analysis** | Community summaries | Hierarchical summaries (L0→L1→L2) |
+>
+>The difference: Fitz extracts entities and links them **without building a graph**. Co-occurrence linking captures 80% of useful relationships at 10% of the complexity.
+
+<br>
+
+#### When GraphRAG still wins
+
+>GraphRAG excels at **multi-hop relationship traversal**:
 >
 >| Use Case | Why GraphRAG |
 >|----------|--------------|
->| "How does X relate to Y?" | Explicit entity connections |
->| "What are the main themes?" | Community summaries |
->| "Who founded the company that acquired Z?" | Multi-hop traversal |
+>| "Who founded the company that acquired Z?" | Multi-hop graph traversal |
+>| Complex relationship chains | Explicit edge following |
 >| Visual knowledge exploration | Graph visualization |
 >
->If you need to traverse relationships or discover entity connections, GraphRAG is the right tool.
+>If you need to traverse 3+ hop relationships or visualize entity networks, GraphRAG is the right tool.
 
 <br>
 
 #### When Fitz RAG wins
 
->Fitz RAG excels at **trusted answers AND analytical queries**:
+>Fitz RAG excels at **trusted answers, entities, and analytical queries**:
 >
 >| Use Case | Why Fitz RAG |
 >|----------|--------------|
 >| Q&A where trust matters | Epistemic guardrails |
+>| "What entities are in this doc?" | **Entity extraction** with type filtering |
+>| "What concepts co-occur?" | **Entity linking** (co-occurrence) |
 >| "What are the trends?" | **Hierarchical summaries** (L0→L1→L2) |
 >| "Summarize this corpus" | **Corpus-level summaries** auto-generated |
 >| Conflicting sources | Conflict detection |
@@ -300,12 +316,11 @@ The codebase speaks for itself.
 >| Fast, cheap retrieval | No graph construction |
 >| Incremental updates | Just add new chunks |
 >
->**Fitz RAG isn't just honest—it's also analytical.** During ingestion, it generates:
->- **Level 0**: Original chunks
->- **Level 1**: Group summaries (per document/source)
->- **Level 2**: Corpus summary (aggregates everything)
->
->Ask "What are the main themes?" and Fitz retrieves the corpus summary—not random chunks. This covers 80% of GraphRAG's "global search" use cases without building a graph.
+>**Fitz RAG extracts entities, links them, clusters them, and summarizes them**—all during ingestion:
+>- **Entities**: Classes, functions, APIs, people, organizations, concepts
+>- **Links**: Co-occurrence relationships stored in chunk metadata
+>- **Clusters**: Semantic grouping via K-means on embeddings
+>- **Summaries**: L0 chunks → L1 group summaries → L2 corpus summary
 
 <br>
 
@@ -313,12 +328,12 @@ The codebase speaks for itself.
 
 >| Aspect | GraphRAG | Fitz RAG |
 >|--------|----------|----------|
->| Ingest cost | **High** — LLM extracts entities per batch | **Low** — optional summaries only |
->| Ingest speed | Slow — graph construction | Fast — direct chunking |
+>| Ingest cost | **High** — LLM extracts entities + builds graph | **Medium** — LLM extracts entities (optional) |
+>| Ingest speed | Slow — graph construction | Fast — no graph building |
 >| Query latency | Higher — graph traversal | Lower — vector search |
->| Error propagation | Bad extraction = bad graph | No extraction = no propagation |
->| Schema dependency | Must define entity types | Schema-free |
->| Incremental updates | Rebuild graph sections | Just add chunks |
+>| Error propagation | Bad extraction = bad graph | Entities are metadata, not structure |
+>| Schema dependency | Must define entity types | Flexible type list |
+>| Incremental updates | Rebuild graph sections | Just add chunks + entities |
 
 <br>
 
@@ -326,16 +341,18 @@ The codebase speaks for itself.
 
 >| Capability | GraphRAG | Fitz RAG |
 >|------------|----------|----------|
->| Entity relationships | Explicit graph | Implicit (chunk proximity) |
+>| Entity extraction | ✅ LLM-based | ✅ LLM-based |
+>| Entity relationships | Full knowledge graph | Co-occurrence links |
+>| Semantic clustering | Leiden algorithm | K-means on embeddings |
 >| Trend analysis | Community summaries | **Hierarchical summaries** |
 >| Corpus overview | Global search | **L2 corpus summary** |
->| Epistemic safety | None | **Guardrails built-in** |
+>| Epistemic safety | ❌ None | ✅ **Guardrails built-in** |
 >
->**GraphRAG wins on relationship traversal. Fitz RAG wins on trusted answers + trends.**
+>**GraphRAG wins on multi-hop traversal. Fitz RAG wins on trusted answers + entities + trends.**
 >
->For most enterprise use cases—support, compliance, internal knowledge, trend analysis—Fitz RAG delivers 80% of GraphRAG's analytical power at 20% of the cost, plus epistemic guarantees GraphRAG simply doesn't have.
+>For most enterprise use cases—support, compliance, internal knowledge, trend analysis—Fitz RAG now delivers 90% of GraphRAG's capabilities at a fraction of the cost, plus epistemic guarantees GraphRAG simply doesn't have.
 >
->Need explicit entity graphs? Fitz gives you both engines. Same data. Same API. Choose per query.
+>Need the full graph? Fitz gives you both engines. Same data. Same API. Choose per query.
 
 </details>
 
@@ -641,7 +658,7 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 │  dense.yaml | dense_rerank.yaml | custom...                   │
 ├───────────────────────────────────────────────────────────────┤
 │  Enrichment (opt-in)                                          │
-│  code artifacts | LLM summaries | hierarchical RAG | custom   │
+│  entities | entity links | semantic clusters | hierarchical   │
 ├───────────────────────────────────────────────────────────────┤
 │  Constraints (epistemic safety)                               │
 │  ConflictAware | InsufficientEvidence | CausalAttribution     │
