@@ -93,6 +93,34 @@ class HierarchyRule:
 
 
 @dataclass
+class EntityConfig:
+    """
+    Configuration for entity extraction.
+
+    Extracts domain concepts and named entities from chunks using LLM.
+    Extracted entities are stored in chunk.metadata["entities"].
+
+    WARNING: Makes 1 LLM call per chunk. Enable explicitly when needed.
+
+    Attributes:
+        enabled: Whether to extract entities (default: False - opt-in)
+        types: Entity types to extract (filters extraction results)
+    """
+
+    enabled: bool = False
+    types: list[str] = field(
+        default_factory=lambda: [
+            "class",
+            "function",
+            "api",
+            "person",
+            "organization",
+            "concept",
+        ]
+    )
+
+
+@dataclass
 class HierarchyConfig:
     """
     Configuration for hierarchical enrichment.
@@ -135,6 +163,7 @@ class EnrichmentConfig:
     Attributes:
         enabled: Master switch for all enrichment
         summary: Chunk-level summary configuration
+        entities: Entity extraction configuration
         artifacts: Project-level artifact configuration
         hierarchy: Hierarchical summarization configuration
 
@@ -143,6 +172,9 @@ class EnrichmentConfig:
           enabled: true
           summary:
             enabled: true
+          entities:
+            enabled: true
+            types: [class, function, api]
           artifacts:
             auto: true
             disabled:
@@ -158,6 +190,7 @@ class EnrichmentConfig:
 
     enabled: bool = False
     summary: SummaryConfig = field(default_factory=SummaryConfig)
+    entities: EntityConfig = field(default_factory=EntityConfig)
     artifacts: ArtifactConfig = field(default_factory=ArtifactConfig)
     hierarchy: HierarchyConfig = field(default_factory=HierarchyConfig)
 
@@ -168,6 +201,7 @@ class EnrichmentConfig:
             return cls()
 
         summary_data = data.get("summary", {})
+        entities_data = data.get("entities", {})
         artifacts_data = data.get("artifacts", {})
         hierarchy_data = data.get("hierarchy", {})
 
@@ -191,6 +225,10 @@ class EnrichmentConfig:
                 provider=summary_data.get("provider"),
                 model=summary_data.get("model"),
             ),
+            entities=EntityConfig(
+                enabled=entities_data.get("enabled", False),  # Opt-in
+                types=entities_data.get("types", EntityConfig().types),
+            ),
             artifacts=ArtifactConfig(
                 auto=artifacts_data.get("auto", True),
                 enabled=artifacts_data.get("enabled", []),
@@ -213,6 +251,10 @@ class EnrichmentConfig:
                 "enabled": self.summary.enabled,
                 "provider": self.summary.provider,
                 "model": self.summary.model,
+            },
+            "entities": {
+                "enabled": self.entities.enabled,
+                "types": self.entities.types,
             },
             "artifacts": {
                 "auto": self.artifacts.auto,
@@ -240,6 +282,7 @@ class EnrichmentConfig:
 
 __all__ = [
     "EnrichmentConfig",
+    "EntityConfig",
     "SummaryConfig",
     "ArtifactConfig",
     "HierarchyConfig",

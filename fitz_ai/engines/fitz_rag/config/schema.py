@@ -335,18 +335,48 @@ class ArtifactConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class EntityConfig(BaseModel):
+    """
+    Configuration for entity extraction.
+
+    Extracts domain concepts and named entities from chunks.
+    Extracted entities are stored in chunk.metadata["entities"].
+    """
+
+    enabled: bool = Field(default=False, description="Enable entity extraction (opt-in)")
+    types: list[str] = Field(
+        default_factory=lambda: [
+            "class",
+            "function",
+            "api",
+            "person",
+            "organization",
+            "concept",
+        ],
+        description="Entity types to extract",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class EnrichmentConfig(BaseModel):
     """
     Configuration for content enrichment during ingestion.
 
-    Enrichment enhances chunks with LLM-generated summaries and
-    generates project-level artifacts for improved retrieval.
+    Enrichment enhances chunks with LLM-generated summaries,
+    extracts entities, and generates project-level artifacts.
 
     Example YAML:
         enrichment:
           enabled: true
           summary:
             enabled: true
+          entities:
+            enabled: true
+            types:
+              - class
+              - function
+              - api
           artifacts:
             auto: true
             disabled:
@@ -355,6 +385,7 @@ class EnrichmentConfig(BaseModel):
     Attributes:
         enabled: Master switch for all enrichment.
         summary: Chunk-level summary configuration.
+        entities: Entity extraction configuration.
         artifacts: Project-level artifact configuration.
     """
 
@@ -362,6 +393,10 @@ class EnrichmentConfig(BaseModel):
     summary: SummaryConfig = Field(
         default_factory=SummaryConfig,
         description="Chunk-level summary configuration",
+    )
+    entities: EntityConfig = Field(
+        default_factory=EntityConfig,
+        description="Entity extraction configuration",
     )
     artifacts: ArtifactConfig = Field(
         default_factory=ArtifactConfig,

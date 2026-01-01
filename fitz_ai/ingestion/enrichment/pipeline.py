@@ -42,6 +42,8 @@ from fitz_ai.ingestion.enrichment.artifacts.registry import (
 )
 from fitz_ai.ingestion.enrichment.base import ContentType
 from fitz_ai.ingestion.enrichment.config import EnrichmentConfig
+from fitz_ai.ingestion.enrichment.entities.cache import EntityCache
+from fitz_ai.ingestion.enrichment.entities.extractor import EntityExtractor
 from fitz_ai.ingestion.enrichment.hierarchy.enricher import HierarchyEnricher
 from fitz_ai.ingestion.enrichment.models import EnrichmentResult
 from fitz_ai.ingestion.enrichment.summary.cache import SummaryCache
@@ -90,11 +92,13 @@ class EnrichmentPipeline:
 
         self._summarizer: ChunkSummarizer | None = None
         self._hierarchy_enricher: HierarchyEnricher | None = None
+        self._entity_extractor: EntityExtractor | None = None
         self._artifact_registry = ArtifactRegistry.get_instance()
         self._project_analysis: ProjectAnalysis | None = None
 
         self._init_summarizer()
         self._init_hierarchy_enricher()
+        self._init_entity_extractor()
 
     def _init_summarizer(self) -> None:
         """Initialize the chunk summarizer if enabled."""
@@ -137,6 +141,28 @@ class EnrichmentPipeline:
                 f"[ENRICHMENT] Hierarchy enricher initialized in simple mode "
                 f"(group_by='{self.config.hierarchy.group_by}')"
             )
+
+    def _init_entity_extractor(self) -> None:
+        """Initialize the entity extractor if enabled."""
+        if not self.config.enabled or not self.config.entities.enabled:
+            return
+
+        if self._chat_client is None:
+            logger.warning("Entity extraction enabled but no chat client provided")
+            return
+
+        entity_cache_path = self._cache_path.parent / "entity_cache.json"
+        cache = EntityCache(entity_cache_path)
+        self._entity_extractor = EntityExtractor(
+            chat_client=self._chat_client,
+            cache=cache,
+            extractor_id=self._enricher_id,
+            entity_types=self.config.entities.types,
+        )
+        logger.info(
+            f"[ENRICHMENT] Entity extractor initialized with types: "
+            f"{self.config.entities.types}"
+        )
 
     @classmethod
     def from_config(
@@ -184,6 +210,15 @@ class EnrichmentPipeline:
     def artifacts_enabled(self) -> bool:
         """Check if artifacts are enabled."""
         return self.config.enabled
+
+    @property
+    def entities_enabled(self) -> bool:
+        """Check if entity extraction is enabled."""
+        return (
+            self.config.enabled
+            and self.config.entities.enabled
+            and self._entity_extractor is not None
+        )
 
     def summarize_chunk(
         self,
@@ -349,9 +384,10 @@ class EnrichmentPipeline:
 
         The method:
         1. Generates summaries for chunks (if enabled) and attaches them to metadata
-        2. Applies hierarchical enrichment (if enabled) - generates group and corpus summaries
-        3. Generates corpus-level artifacts (if enabled)
-        4. Returns unified result
+        2. Extracts entities from chunks (if enabled) and attaches them to metadata
+        3. Applies hierarchical enrichment (if enabled) - generates group and corpus summaries
+        4. Generates corpus-level artifacts (if enabled)
+        5. Returns unified result
 
         Design note: Takes chunks (not raw docs) so future recursive
         enrichment can feed outputs back as inputs.
@@ -376,6 +412,20 @@ class EnrichmentPipeline:
 
             # Save cache after batch summarization
             self.save_cache()
+
+        # Extract entities and attach to chunk metadata
+        if self.entities_enabled:
+            for chunk in chunks:
+                entities = self._entity_extractor.extract(
+                    content=chunk.content,
+                    file_path=chunk.metadata.get("file_path", ""),
+                    content_hash=chunk.id,
+                )
+                if entities:
+                    chunk.metadata["entities"] = [e.to_dict() for e in entities]
+
+            # Save entity cache
+            self._entity_extractor.save_cache()
 
         # Apply hierarchical enrichment (generates group and corpus summaries)
         if self._hierarchy_enricher:
