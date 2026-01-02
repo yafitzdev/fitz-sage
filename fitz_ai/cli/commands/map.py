@@ -116,11 +116,7 @@ def command(
         collection = ctx.retrieval_collection
 
         # Check if it exists
-        collections = ctx.get_collections()
-        if not collections:
-            ui.error("No collections found. Run 'fitz ingest' first.")
-            raise typer.Exit(1)
-
+        collections = ctx.require_collections()
         if collection not in collections:
             if len(collections) == 1:
                 collection = collections[0]

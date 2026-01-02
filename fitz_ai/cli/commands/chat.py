@@ -177,23 +177,14 @@ def _run_collection_chat(collection: Optional[str]) -> None:
 
     # Load config via CLIContext (always succeeds with defaults)
     ctx = CLIContext.load()
-
-    # Chat requires typed config for pipeline
-    if ctx.typed_config is None:
-        ui.error("Invalid config. Run 'fitz init' to reconfigure.")
-        raise typer.Exit(1)
-
-    typed_config = ctx.typed_config
+    typed_config = ctx.require_typed_config()
 
     # Collection selection
     if collection:
         selected_collection = collection
     else:
-        collections = ctx.get_collections()
-        if not collections:
-            ui.error("No collections found. Run 'fitz ingest' first to create a collection.")
-            raise typer.Exit(1)
-        elif len(collections) == 1:
+        collections = ctx.require_collections()
+        if len(collections) == 1:
             selected_collection = collections[0]
             ui.info(f"Using collection: {selected_collection}")
         else:

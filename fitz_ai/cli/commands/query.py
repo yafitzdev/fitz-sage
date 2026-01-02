@@ -193,13 +193,7 @@ def _run_collection_query(
 
     # Load config via CLIContext (always succeeds with defaults)
     ctx = CLIContext.load()
-
-    # Query requires typed config for pipeline
-    if ctx.typed_config is None:
-        ui.error("Invalid config. Run 'fitz init' to reconfigure.")
-        raise typer.Exit(1)
-
-    typed_config = ctx.typed_config
+    typed_config = ctx.require_typed_config()
 
     # Prompt for question if not provided
     if question is None:

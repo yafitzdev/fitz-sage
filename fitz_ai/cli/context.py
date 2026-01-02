@@ -336,6 +336,37 @@ class CLIContext:
         except Exception:
             return []
 
+    def require_collections(self) -> list[str]:
+        """
+        Get collections or exit with error if none exist.
+
+        Use this in commands that require at least one collection to exist.
+        """
+        import typer
+
+        from fitz_ai.cli.ui import ui
+
+        collections = self.get_collections()
+        if not collections:
+            ui.error("No collections found. Run 'fitz ingest' first.")
+            raise typer.Exit(1)
+        return collections
+
+    def require_typed_config(self):
+        """
+        Get typed config or exit with error if invalid.
+
+        Use this in commands that require a valid typed config (e.g., fitz_rag pipeline).
+        """
+        import typer
+
+        from fitz_ai.cli.ui import ui
+
+        if self.typed_config is None:
+            ui.error("Invalid config. Run 'fitz init' to reconfigure.")
+            raise typer.Exit(1)
+        return self.typed_config
+
     def info_line(self, include_rerank: bool = True) -> str:
         """
         Get a single-line info string for display.
