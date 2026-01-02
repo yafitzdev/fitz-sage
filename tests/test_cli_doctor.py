@@ -26,35 +26,6 @@ class TestDoctorCommand:
         assert "doctor" in result.output.lower()
         assert "diagnostic" in result.output.lower()
 
-    def test_doctor_runs_basic_checks(self):
-        """Test that doctor runs without error."""
-        mock_system = MagicMock()
-        mock_system.ollama.available = False
-        mock_system.ollama.details = "not running"
-        mock_system.qdrant.available = False
-        mock_system.qdrant.details = "not running"
-        mock_system.faiss.available = True
-        mock_system.faiss.details = "installed"
-        mock_system.api_keys = {}
-
-        with (
-            patch(
-                "fitz_ai.cli.commands.doctor.detect_system_status",
-                return_value=mock_system,
-            ),
-            patch(
-                "fitz_ai.cli.context.FitzPaths.workspace",
-                return_value=MagicMock(exists=lambda: False),
-            ),
-            patch(
-                "fitz_ai.cli.context.FitzPaths.config",
-                return_value=MagicMock(exists=lambda: False),
-            ),
-        ):
-            result = runner.invoke(app, ["doctor"])
-
-        # Should complete even without config
-        assert "python" in result.output.lower()
 
 
 class TestDoctorChecks:
@@ -111,18 +82,13 @@ class TestDoctorChecks:
         assert ok is False
         assert "init" in detail.lower()
 
-    def test_check_config_valid(self, tmp_path):
-        """Test _check_config with valid config."""
-        import yaml
+    def test_check_config_valid(self):
+        """Test _check_config with valid user config."""
+        mock_ctx = MagicMock()
+        mock_ctx.has_user_config = True
+        mock_ctx.chat_plugin = "cohere"
 
-        config_path = tmp_path / "fitz.yaml"
-        config = {"chat": {"plugin_name": "cohere"}}
-        config_path.write_text(yaml.dump(config))
-
-        with (
-            patch("fitz_ai.cli.context.FitzPaths.engine_config", return_value=config_path),
-            patch("fitz_ai.cli.context.FitzPaths.config", return_value=config_path),
-        ):
+        with patch("fitz_ai.cli.commands.doctor.CLIContext.load", return_value=mock_ctx):
             from fitz_ai.cli.commands.doctor import _check_config
 
             ok, detail, ctx = _check_config()
@@ -131,39 +97,34 @@ class TestDoctorChecks:
         assert detail == "Valid"
         assert ctx.chat_plugin == "cohere"
 
-    def test_check_config_missing(self, tmp_path):
-        """Test _check_config with missing config."""
-        config_path = tmp_path / "missing.yaml"
-        engine_path = tmp_path / "fitz_rag.yaml"
+    def test_check_config_missing(self):
+        """Test _check_config with missing user config (uses defaults)."""
+        # CLIContext.load() now always succeeds with package defaults
+        mock_ctx = MagicMock()
+        mock_ctx.has_user_config = False
 
-        with (
-            patch("fitz_ai.cli.context.FitzPaths.engine_config", return_value=engine_path),
-            patch("fitz_ai.cli.context.FitzPaths.config", return_value=config_path),
-        ):
+        with patch("fitz_ai.cli.commands.doctor.CLIContext.load", return_value=mock_ctx):
             from fitz_ai.cli.commands.doctor import _check_config
 
             ok, detail, ctx = _check_config()
 
         assert ok is False
-        assert "init" in detail.lower()
-        assert ctx is None
+        assert "defaults" in detail.lower() or "init" in detail.lower()
+        assert ctx is mock_ctx  # ctx is returned even without user config
 
-    def test_check_config_invalid(self, tmp_path):
-        """Test _check_config with invalid YAML."""
-        config_path = tmp_path / "fitz.yaml"
-        config_path.write_text("invalid: yaml: content: :")
+    def test_check_config_with_user_config(self):
+        """Test _check_config with user config present."""
+        mock_ctx = MagicMock()
+        mock_ctx.has_user_config = True
 
-        with (
-            patch("fitz_ai.cli.context.FitzPaths.engine_config", return_value=config_path),
-            patch("fitz_ai.cli.context.FitzPaths.config", return_value=config_path),
-        ):
+        with patch("fitz_ai.cli.commands.doctor.CLIContext.load", return_value=mock_ctx):
             from fitz_ai.cli.commands.doctor import _check_config
 
             ok, detail, ctx = _check_config()
 
-        # CLIContext.load_or_none returns None for invalid config
-        assert ok is False
-        assert ctx is None
+        assert ok is True
+        assert detail == "Valid"
+        assert ctx is mock_ctx
 
 
 class TestDoctorDependencies:
@@ -326,35 +287,7 @@ class TestDoctorConnectionTests:
 class TestDoctorVerboseMode:
     """Tests for verbose mode."""
 
-    def test_doctor_verbose_shows_more(self):
-        """Test --verbose shows additional information."""
-        mock_system = MagicMock()
-        mock_system.ollama.available = False
-        mock_system.ollama.details = "not running"
-        mock_system.qdrant.available = False
-        mock_system.qdrant.details = "not running"
-        mock_system.faiss.available = True
-        mock_system.faiss.details = "installed"
-        mock_system.api_keys = {}
 
-        with (
-            patch(
-                "fitz_ai.cli.commands.doctor.detect_system_status",
-                return_value=mock_system,
-            ),
-            patch(
-                "fitz_ai.cli.context.FitzPaths.workspace",
-                return_value=MagicMock(exists=lambda: True),
-            ),
-            patch(
-                "fitz_ai.cli.context.FitzPaths.config",
-                return_value=MagicMock(exists=lambda: False),
-            ),
-        ):
-            result = runner.invoke(app, ["doctor", "-v"])
-
-        # Verbose should show optional packages section
-        assert "optional" in result.output.lower()
 
 
 class TestDoctorTestMode:

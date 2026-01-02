@@ -5,15 +5,24 @@ Central CLI context - single source of truth for all CLI commands.
 All configuration reading happens here. Commands import CLIContext and use it.
 No more scattered dict.get() chains across every command file.
 
+Config Loading Strategy:
+    1. Package defaults (fitz_ai/engines/<engine>/config/default.yaml) - always loaded
+    2. User config (.fitz/config/<engine>.yaml) - overrides defaults
+
+Values are ALWAYS guaranteed to exist. No fallback logic needed in CLI code.
+
 Usage:
     from fitz_ai.cli.context import CLIContext
 
-    # Load config (returns None if no config exists)
+    # Load merged config (defaults + user overrides) - always succeeds
     ctx = CLIContext.load()
-    if ctx:
-        print(ctx.chat_plugin)        # always exists
-        print(ctx.chat_display)       # "cohere (command-r-plus)"
-        print(ctx.retrieval_top_k)    # always exists
+    print(ctx.chat_plugin)        # always exists
+    print(ctx.chat_display)       # "cohere (command-r-plus)"
+    print(ctx.retrieval_top_k)    # always exists
+
+    # Check if user has customized config
+    if ctx.has_user_config:
+        print(f"Using config from {ctx.config_path}")
 """
 
 from __future__ import annotations
@@ -22,10 +31,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from fitz_ai.config.loader import get_config_source, load_engine_config
 from fitz_ai.core.paths import FitzPaths
 from fitz_ai.logging.logger import get_logger
 
 logger = get_logger(__name__)
+
+DEFAULT_ENGINE = "fitz_rag"
 
 
 @dataclass
@@ -35,12 +47,16 @@ class CLIContext:
 
     This is the single source of truth for CLI commands. All config values
     are extracted once and exposed as typed properties.
+
+    The context is ALWAYS valid - package defaults guarantee all values exist.
     """
 
     # Raw and typed config
     raw_config: dict = field(repr=False)
     typed_config: Any = field(default=None, repr=False)
-    config_path: Optional[Path] = field(default=None)
+    config_path: Path = field(default=None)
+    config_source: str = field(default="")
+    has_user_config: bool = field(default=False)
 
     # Chat LLM
     chat_plugin: str = ""
@@ -129,50 +145,70 @@ class CLIContext:
     # -------------------------------------------------------------------------
 
     @classmethod
-    def load(cls) -> Optional["CLIContext"]:
+    def load(cls, engine: str = DEFAULT_ENGINE) -> "CLIContext":
         """
-        Load CLI context from user config.
+        Load CLI context with merged config (defaults + user overrides).
 
-        Returns None if no config exists (user hasn't run 'fitz init').
+        This ALWAYS succeeds because package defaults always exist.
+        Values are guaranteed to be present - no fallback logic needed.
+
+        Args:
+            engine: Engine name (default: "fitz_rag")
 
         Returns:
-            CLIContext with all values populated, or None if no config.
+            CLIContext with all values populated from merged config.
         """
-        from fitz_ai.core.config import ConfigNotFoundError, load_config_dict
-        from fitz_ai.engines.fitz_rag.config import FitzRagConfig
+        # Load merged config (defaults + user overrides)
+        merged_config = load_engine_config(engine)
 
-        # Determine config path (engine-specific first, then global)
-        config_path = FitzPaths.engine_config("fitz_rag")
-        if not config_path.exists():
-            config_path = FitzPaths.config()
+        # Get config source info
+        source = get_config_source(engine)
+        user_config_path = FitzPaths.engine_config(engine)
+        has_user = user_config_path.exists()
 
-        # Load raw config
-        try:
-            raw_config = load_config_dict(config_path)
-        except ConfigNotFoundError:
-            return None
-        except Exception:
-            return None
+        # Load typed config if possible
+        typed_config = cls._load_typed_config(merged_config, engine)
 
-        # Parse into typed config
-        try:
-            typed_config = FitzRagConfig.from_dict(raw_config)
-        except Exception:
-            typed_config = None
-
-        return cls._from_config(raw_config, typed_config, config_path)
+        # Extract all values from merged config
+        return cls._from_config(
+            config=merged_config,
+            typed=typed_config,
+            path=user_config_path if has_user else None,
+            source=source,
+            has_user=has_user,
+        )
 
     @classmethod
-    def _from_config(cls, config: dict, typed: Any, path: Optional[Path]) -> "CLIContext":
-        """
-        Extract all values from config + plugin defaults.
+    def _load_typed_config(cls, config: dict, engine: str) -> Any:
+        """Load typed config from raw config dict."""
+        if engine == "fitz_rag":
+            try:
+                from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 
-        Config provides plugin names. Plugin YAMLs provide model defaults.
-        User kwargs override plugin defaults.
+                return FitzRagConfig.from_dict(config)
+            except Exception as e:
+                logger.debug(f"Could not load typed config: {e}")
+                return None
+        return None
+
+    @classmethod
+    def _from_config(
+        cls,
+        config: dict,
+        typed: Any,
+        path: Optional[Path],
+        source: str,
+        has_user: bool,
+    ) -> "CLIContext":
+        """
+        Extract all values from merged config.
+
+        Since config is merged (defaults + user), all values are guaranteed to exist.
+        No .get() fallbacks needed - values come from defaults if not overridden.
         """
         from fitz_ai.llm.loader import load_plugin
 
-        # Get config sections with defaults
+        # Get config sections - guaranteed to exist from defaults
         chat = config.get("chat", {})
         emb = config.get("embedding", {})
         vdb = config.get("vector_db", {})
@@ -186,37 +222,16 @@ class CLIContext:
         rerank_plugin_name = rerank.get("plugin_name", "")
 
         # Load plugin specs to get model defaults
-        chat_models = {}
-        if chat_plugin_name:
-            try:
-                chat_spec = load_plugin("chat", chat_plugin_name)
-                chat_kwargs = chat.get("kwargs", {})
-                chat_models = chat_kwargs.get("models", chat_spec.defaults.get("models", {}))
-            except Exception:
-                chat_models = chat.get("kwargs", {}).get("models", {})
-
-        emb_model = ""
-        if emb_plugin_name:
-            try:
-                emb_spec = load_plugin("embedding", emb_plugin_name)
-                emb_kwargs = emb.get("kwargs", {})
-                emb_model = emb_kwargs.get("model", emb_spec.defaults.get("model", ""))
-            except Exception:
-                emb_model = emb.get("kwargs", {}).get("model", "")
-
-        rerank_model = ""
-        if rerank.get("enabled") and rerank_plugin_name:
-            try:
-                rerank_spec = load_plugin("rerank", rerank_plugin_name)
-                rerank_kwargs = rerank.get("kwargs", {})
-                rerank_model = rerank_kwargs.get("model", rerank_spec.defaults.get("model", ""))
-            except Exception:
-                rerank_model = rerank.get("kwargs", {}).get("model", "")
+        chat_models = cls._get_chat_models(chat, chat_plugin_name)
+        emb_model = cls._get_embedding_model(emb, emb_plugin_name)
+        rerank_model = cls._get_rerank_model(rerank, rerank_plugin_name)
 
         return cls(
             raw_config=config,
             typed_config=typed,
             config_path=path,
+            config_source=source,
+            has_user_config=has_user,
             # Chat
             chat_plugin=chat_plugin_name,
             chat_model_smart=chat_models.get("smart", ""),
@@ -239,6 +254,69 @@ class CLIContext:
             rgs_citations=rgs.get("enable_citations", True),
             rgs_strict_grounding=rgs.get("strict_grounding", True),
         )
+
+    @staticmethod
+    def _get_chat_models(chat: dict, plugin_name: str) -> dict:
+        """Get chat model names from config or plugin defaults."""
+        from fitz_ai.llm.loader import load_plugin
+
+        if not plugin_name:
+            return {}
+
+        chat_kwargs = chat.get("kwargs", {})
+
+        # User-specified models take precedence
+        if "models" in chat_kwargs:
+            return chat_kwargs["models"]
+
+        # Fall back to plugin defaults
+        try:
+            spec = load_plugin("chat", plugin_name)
+            return spec.defaults.get("models", {})
+        except Exception:
+            return {}
+
+    @staticmethod
+    def _get_embedding_model(emb: dict, plugin_name: str) -> str:
+        """Get embedding model name from config or plugin defaults."""
+        from fitz_ai.llm.loader import load_plugin
+
+        if not plugin_name:
+            return ""
+
+        emb_kwargs = emb.get("kwargs", {})
+
+        # User-specified model takes precedence
+        if "model" in emb_kwargs:
+            return emb_kwargs["model"]
+
+        # Fall back to plugin defaults
+        try:
+            spec = load_plugin("embedding", plugin_name)
+            return spec.defaults.get("model", "")
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _get_rerank_model(rerank: dict, plugin_name: str) -> str:
+        """Get rerank model name from config or plugin defaults."""
+        from fitz_ai.llm.loader import load_plugin
+
+        if not rerank.get("enabled") or not plugin_name:
+            return ""
+
+        rerank_kwargs = rerank.get("kwargs", {})
+
+        # User-specified model takes precedence
+        if "model" in rerank_kwargs:
+            return rerank_kwargs["model"]
+
+        # Fall back to plugin defaults
+        try:
+            spec = load_plugin("rerank", plugin_name)
+            return spec.defaults.get("model", "")
+        except Exception:
+            return ""
 
     # -------------------------------------------------------------------------
     # Helper Methods
@@ -276,4 +354,4 @@ class CLIContext:
         return " | ".join(parts)
 
 
-__all__ = ["CLIContext"]
+__all__ = ["CLIContext", "DEFAULT_ENGINE"]

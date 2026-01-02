@@ -24,13 +24,35 @@ class TestCollectionsCommand:
         assert result.exit_code == 0
         assert "collection" in result.output.lower()
 
-    def test_collections_requires_config(self):
-        """Test that collections requires a config file."""
-        with patch("fitz_ai.cli.context.CLIContext.load", return_value=None):
-            result = runner.invoke(app, ["collections"], input="4\n")  # Exit option
+    def test_collections_starts_correctly(self):
+        """Test that collections starts and shows header with defaults."""
+        # CLIContext.load() always succeeds with package defaults
+        mock_ctx = MagicMock()
+        mock_ctx.vector_db_plugin = "local_faiss"
+        mock_ctx.vector_db_kwargs = {}
 
-        assert result.exit_code != 0
-        assert "init" in result.output.lower() or "config" in result.output.lower()
+        # Mock to return only one available DB (skips selection prompt)
+        mock_available = [{"name": "local_faiss", "kwargs": {}, "is_configured": True}]
+
+        # Mock vector DB
+        mock_vdb = MagicMock()
+        mock_vdb.list_collections.return_value = []  # No collections
+
+        with (
+            patch("fitz_ai.cli.commands.collections.CLIContext.load", return_value=mock_ctx),
+            patch(
+                "fitz_ai.cli.commands.collections._get_available_vector_dbs",
+                return_value=mock_available,
+            ),
+            patch(
+                "fitz_ai.cli.commands.collections._get_vector_client", return_value=mock_vdb
+            ),
+        ):
+            result = runner.invoke(app, ["collections"])
+
+        # Should succeed (no collections found message)
+        assert result.exit_code == 0
+        assert "no collection" in result.output.lower() or "ingest" in result.output.lower()
 
 
 class TestCollectionsHelpers:

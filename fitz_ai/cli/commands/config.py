@@ -158,10 +158,10 @@ def _open_in_editor(config_path: Path) -> None:
 def _get_config_path() -> Path:
     """Get config path, checking engine-specific first, then global."""
     ctx = CLIContext.load()
-    if ctx is not None:
+    if ctx.config_path is not None:
         return ctx.config_path
 
-    # Fall back to expected path for error messages
+    # Fall back to expected path for error messages (when no user config exists)
     engine_config = FitzPaths.engine_config("fitz_rag")
     if engine_config.exists():
         return engine_config
@@ -239,24 +239,17 @@ def command(
         return
 
     # =========================================================================
-    # Load config via CLIContext
+    # Load config via CLIContext (always succeeds with defaults)
     # =========================================================================
 
     ctx = CLIContext.load()
-    if ctx is None:
-        ui.error("No configuration found.")
-        print()
-        ui.info(f"Looked for: {FitzPaths.engine_config('fitz_rag')}")
-        ui.info(f"        or: {FitzPaths.config()}")
-        ui.info("Run 'fitz quickstart' or 'fitz init' to create a configuration.")
-        raise typer.Exit(1)
 
     # =========================================================================
     # Header
     # =========================================================================
 
     ui.header("Fitz Config", "Check your RAG configuration")
-    ui.info(f"File: {ctx.config_path}")
+    ui.info(f"Source: {ctx.config_source}")
 
     # =========================================================================
     # JSON output

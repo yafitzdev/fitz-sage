@@ -102,14 +102,10 @@ def command(
     ui.header("Fitz Map", "Visualize your knowledge base")
 
     # =========================================================================
-    # Load config via CLIContext
+    # Load config via CLIContext (always succeeds with defaults)
     # =========================================================================
 
     ctx = CLIContext.load()
-    if ctx is None:
-        ui.error("No config found. Run 'fitz init' first.")
-        raise typer.Exit(1)
-
     embedding_id = ctx.embedding_id
 
     # =========================================================================

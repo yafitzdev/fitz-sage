@@ -410,14 +410,10 @@ def command(
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     # =========================================================================
-    # Load config via CLIContext
+    # Load config via CLIContext (always succeeds with defaults)
     # =========================================================================
 
     ctx = CLIContext.load()
-    if ctx is None:
-        ui.error("No config found. Run 'fitz init' first.")
-        raise typer.Exit(1)
-
     config = ctx.raw_config
     embedding_id = ctx.embedding_id
     vector_db_plugin = ctx.vector_db_plugin

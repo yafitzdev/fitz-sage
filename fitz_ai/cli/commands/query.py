@@ -191,10 +191,12 @@ def _run_collection_query(
 ) -> None:
     """Run query using an engine with collection support."""
 
-    # Load config via CLIContext
+    # Load config via CLIContext (always succeeds with defaults)
     ctx = CLIContext.load()
-    if ctx is None or ctx.typed_config is None:
-        ui.error("No config found. Run 'fitz init' first.")
+
+    # Query requires typed config for pipeline
+    if ctx.typed_config is None:
+        ui.error("Invalid config. Run 'fitz init' to reconfigure.")
         raise typer.Exit(1)
 
     typed_config = ctx.typed_config

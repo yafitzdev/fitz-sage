@@ -24,19 +24,14 @@ class TestQueryCommand:
         assert result.exit_code == 0
         assert "Query your knowledge base" in result.output or "query" in result.output.lower()
 
-    def test_query_requires_config(self, tmp_path, monkeypatch):
-        """Test that query requires a config file."""
-        # Set workspace to temp dir without config
-        monkeypatch.setattr(
-            "fitz_ai.core.paths.FitzPaths.config",
-            lambda: tmp_path / "nonexistent" / "fitz.yaml",
-        )
-        monkeypatch.setattr(
-            "fitz_ai.cli.context.FitzPaths.engine_config",
-            lambda name: tmp_path / "nonexistent" / f"{name}.yaml",
-        )
+    def test_query_requires_valid_typed_config(self):
+        """Test that query requires a valid typed_config for collection-based queries."""
+        # CLIContext.load() always succeeds, but typed_config can be None
+        mock_ctx = MagicMock()
+        mock_ctx.typed_config = None  # Invalid typed config
 
-        result = runner.invoke(app, ["query", "test question", "--engine", "fitz_rag"])
+        with patch("fitz_ai.cli.commands.query.CLIContext.load", return_value=mock_ctx):
+            result = runner.invoke(app, ["query", "test question", "--engine", "fitz_rag"])
 
         assert result.exit_code != 0
         assert "init" in result.output.lower() or "config" in result.output.lower()

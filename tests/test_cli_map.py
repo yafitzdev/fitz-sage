@@ -46,25 +46,23 @@ class TestMapCommand:
             # The actual behavior depends on how imports are handled
             pass
 
-    def test_map_requires_config(self, tmp_path, monkeypatch):
-        """Test that map requires a config file."""
-        monkeypatch.setattr(
-            "fitz_ai.cli.context.FitzPaths.config",
-            lambda: tmp_path / "nonexistent" / "fitz.yaml",
-        )
-        monkeypatch.setattr(
-            "fitz_ai.cli.context.FitzPaths.engine_config",
-            lambda name: tmp_path / "nonexistent" / f"{name}.yaml",
-        )
+    def test_map_starts_with_defaults(self):
+        """Test that map starts correctly with package defaults."""
+        # CLIContext.load() always succeeds with package defaults
+        mock_ctx = MagicMock()
+        mock_ctx.embedding_id = "cohere:embed-english-v3.0"
+        mock_ctx.retrieval_collection = "test_collection"
+        mock_ctx.get_collections.return_value = []  # No collections
 
         # Mock the imports to avoid dependency issues
         with (
             patch.dict("sys.modules", {"umap": MagicMock(), "sklearn.cluster": MagicMock()}),
+            patch("fitz_ai.cli.commands.map.CLIContext.load", return_value=mock_ctx),
         ):
             result = runner.invoke(app, ["map"])
 
-        assert result.exit_code != 0
-        assert "init" in result.output.lower() or "config" in result.output.lower()
+        # Should fail because no collections exist, not because config missing
+        assert "no collection" in result.output.lower() or "ingest" in result.output.lower()
 
 
 class TestMapHelpers:

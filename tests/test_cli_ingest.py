@@ -25,14 +25,35 @@ class TestIngestCommand:
         assert "ingest" in result.output.lower()
         assert "source" in result.output.lower()
 
-    def test_ingest_requires_config(self, tmp_path):
-        """Test that ingest requires a config file."""
-        # Mock CLIContext.load to return None (no config)
-        with patch("fitz_ai.cli.context.CLIContext.load", return_value=None):
+    def test_ingest_works_with_defaults(self, tmp_path):
+        """Test that ingest works with package defaults."""
+        # Create a source file to ingest
+        (tmp_path / "test.txt").write_text("Test content")
+
+        # CLIContext.load() always succeeds with package defaults
+        mock_ctx = MagicMock()
+        mock_ctx.raw_config = {
+            "embedding": {"plugin_name": "cohere"},
+            "vector_db": {"plugin_name": "local_faiss"},
+            "retrieval": {"collection": "default"},
+            "chunking": {"default": {"plugin_name": "simple", "kwargs": {"chunk_size": 1000}}},
+        }
+        mock_ctx.embedding_id = "cohere:embed-english-v3.0"
+        mock_ctx.embedding_plugin = "cohere"
+        mock_ctx.vector_db_plugin = "local_faiss"
+        mock_ctx.retrieval_collection = "default"
+
+        mock_ingest = MagicMock()
+        mock_ingest.return_value = MagicMock(new_chunks=0, updated_chunks=0, deleted_chunks=0)
+
+        with (
+            patch("fitz_ai.cli.commands.ingest.CLIContext.load", return_value=mock_ctx),
+            patch("fitz_ai.ingestion.diff.run_diff_ingest", mock_ingest),
+        ):
             result = runner.invoke(app, ["ingest", str(tmp_path), "-y"])
 
-        assert result.exit_code != 0
-        assert "init" in result.output.lower() or "config" in result.output.lower()
+        # Should succeed with defaults
+        assert result.exit_code == 0 or "ingest" in result.output.lower()
 
     def test_ingest_non_interactive_requires_source(self):
         """Test that non-interactive mode requires source."""

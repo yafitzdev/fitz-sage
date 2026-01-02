@@ -25,9 +25,13 @@ class TestChatCommand:
         assert "chat" in result.output.lower()
         assert "collection" in result.output.lower()
 
-    def test_chat_requires_config(self):
-        """Test that chat requires a config file."""
-        with patch("fitz_ai.cli.context.CLIContext.load", return_value=None):
+    def test_chat_requires_valid_typed_config(self):
+        """Test that chat requires a valid typed_config."""
+        # CLIContext.load() always succeeds, but typed_config can be None
+        mock_ctx = MagicMock()
+        mock_ctx.typed_config = None  # Invalid typed config
+
+        with patch("fitz_ai.cli.commands.chat.CLIContext.load", return_value=mock_ctx):
             result = runner.invoke(app, ["chat"], input="exit\n")
 
         assert result.exit_code != 0
@@ -50,7 +54,7 @@ class TestChatHelpers:
         mock_ctx.typed_config = MagicMock()
         mock_ctx.typed_config.retrieval.collection = "test"
 
-        with patch("fitz_ai.cli.context.CLIContext.load", return_value=mock_ctx):
+        with patch("fitz_ai.cli.utils.CLIContext.load", return_value=mock_ctx):
             from fitz_ai.cli.utils import load_fitz_rag_config
 
             raw, typed = load_fitz_rag_config()
@@ -224,11 +228,12 @@ class TestChatExitCommands:
         mock_ctx.typed_config = MagicMock()
         mock_ctx.typed_config.retrieval.collection = "test"
         mock_ctx.get_collections.return_value = ["test"]
+        mock_ctx.retrieval_collection = "test"
 
         mock_pipeline = MagicMock()
 
         with (
-            patch("fitz_ai.cli.context.CLIContext.load", return_value=mock_ctx),
+            patch("fitz_ai.cli.commands.chat.CLIContext.load", return_value=mock_ctx),
             patch(
                 "fitz_ai.engines.fitz_rag.pipeline.engine.RAGPipeline.from_config",
                 return_value=mock_pipeline,
@@ -245,11 +250,12 @@ class TestChatExitCommands:
         mock_ctx.typed_config = MagicMock()
         mock_ctx.typed_config.retrieval.collection = "test"
         mock_ctx.get_collections.return_value = ["test"]
+        mock_ctx.retrieval_collection = "test"
 
         mock_pipeline = MagicMock()
 
         with (
-            patch("fitz_ai.cli.context.CLIContext.load", return_value=mock_ctx),
+            patch("fitz_ai.cli.commands.chat.CLIContext.load", return_value=mock_ctx),
             patch(
                 "fitz_ai.engines.fitz_rag.pipeline.engine.RAGPipeline.from_config",
                 return_value=mock_pipeline,

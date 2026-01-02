@@ -14,6 +14,42 @@ from fitz_ai.cli.cli import app
 runner = CliRunner()
 
 
+def _make_mock_context(
+    *,
+    chat_plugin="cohere",
+    embedding_plugin="cohere",
+    vector_db_plugin="local_faiss",
+    retrieval_plugin="dense",
+    retrieval_collection="default",
+    has_user_config=True,
+    config_path=None,
+    config_source="user config",
+    raw_config=None,
+):
+    """Create a mock CLIContext for testing."""
+    ctx = MagicMock()
+    ctx.chat_plugin = chat_plugin
+    ctx.chat_model_smart = "command-r-plus"
+    ctx.chat_model_fast = "command-r"
+    ctx.embedding_plugin = embedding_plugin
+    ctx.embedding_model = "embed-english-v3.0"
+    ctx.vector_db_plugin = vector_db_plugin
+    ctx.vector_db_kwargs = {}
+    ctx.retrieval_plugin = retrieval_plugin
+    ctx.retrieval_collection = retrieval_collection
+    ctx.retrieval_top_k = 5
+    ctx.rerank_enabled = False
+    ctx.rerank_plugin = ""
+    ctx.rerank_model = ""
+    ctx.rgs_citations = True
+    ctx.rgs_strict_grounding = True
+    ctx.has_user_config = has_user_config
+    ctx.config_path = config_path
+    ctx.config_source = config_source
+    ctx.raw_config = raw_config or {"chat": {"plugin_name": chat_plugin}}
+    return ctx
+
+
 class TestConfigCommand:
     """Tests for fitz config command."""
 
@@ -26,24 +62,20 @@ class TestConfigCommand:
         assert "json" in result.output.lower()
         assert "path" in result.output.lower()
 
-    def test_config_requires_config_file(self, tmp_path):
-        """Test that config requires a config file to exist."""
-        nonexistent = tmp_path / "nonexistent"
+    def test_config_works_with_defaults(self):
+        """Test that config works even without user config (uses package defaults)."""
+        mock_ctx = _make_mock_context(
+            has_user_config=False,
+            config_path=None,
+            config_source="package defaults",
+        )
 
-        with (
-            patch(
-                "fitz_ai.cli.commands.config.FitzPaths.config",
-                return_value=nonexistent / "fitz.yaml",
-            ),
-            patch(
-                "fitz_ai.cli.commands.config.FitzPaths.engine_config",
-                return_value=nonexistent / "fitz_rag.yaml",
-            ),
-        ):
+        with patch("fitz_ai.cli.commands.config.CLIContext.load", return_value=mock_ctx):
             result = runner.invoke(app, ["config"])
 
-        assert result.exit_code != 0
-        assert "not found" in result.output.lower() or "init" in result.output.lower()
+        # Should succeed with defaults
+        assert result.exit_code == 0
+        assert "package defaults" in result.output.lower() or "cohere" in result.output.lower()
 
 
 class TestConfigPathOption:
@@ -51,18 +83,15 @@ class TestConfigPathOption:
 
     def test_config_path_shows_path(self, tmp_path):
         """Test --path shows config file path."""
-        import yaml
-
         config_path = tmp_path / "fitz_rag.yaml"
-        config = {"chat": {"plugin_name": "cohere"}}
-        config_path.write_text(yaml.dump(config))
+        config_path.write_text("chat:\n  plugin_name: cohere\n")
 
-        with (
-            patch(
-                "fitz_ai.cli.commands.config.FitzPaths.config", return_value=tmp_path / "fitz.yaml"
-            ),
-            patch("fitz_ai.cli.commands.config.FitzPaths.engine_config", return_value=config_path),
-        ):
+        mock_ctx = _make_mock_context(
+            has_user_config=True,
+            config_path=config_path,
+        )
+
+        with patch("fitz_ai.cli.commands.config.CLIContext.load", return_value=mock_ctx):
             result = runner.invoke(app, ["config", "--path"])
 
         assert result.exit_code == 0
@@ -70,16 +99,22 @@ class TestConfigPathOption:
 
     def test_config_path_missing_file(self, tmp_path):
         """Test --path with missing config shows error."""
-        nonexistent = tmp_path / "nonexistent"
+        nonexistent = tmp_path / "nonexistent" / "fitz_rag.yaml"
+
+        mock_ctx = _make_mock_context(
+            has_user_config=False,
+            config_path=None,
+        )
 
         with (
-            patch(
-                "fitz_ai.cli.commands.config.FitzPaths.config",
-                return_value=nonexistent / "missing.yaml",
-            ),
+            patch("fitz_ai.cli.commands.config.CLIContext.load", return_value=mock_ctx),
             patch(
                 "fitz_ai.cli.commands.config.FitzPaths.engine_config",
-                return_value=nonexistent / "fitz_rag.yaml",
+                return_value=nonexistent,
+            ),
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.config",
+                return_value=nonexistent.parent / "fitz.yaml",
             ),
         ):
             result = runner.invoke(app, ["config", "--path"])
@@ -93,21 +128,19 @@ class TestConfigJsonOption:
 
     def test_config_json_output(self, tmp_path):
         """Test --json outputs valid JSON."""
-        import yaml
-
         config_path = tmp_path / "fitz_rag.yaml"
-        config = {
-            "chat": {"plugin_name": "cohere"},
-            "embedding": {"plugin_name": "cohere"},
-        }
-        config_path.write_text(yaml.dump(config))
+        config_path.write_text("chat:\n  plugin_name: cohere\n")
 
-        with (
-            patch(
-                "fitz_ai.cli.commands.config.FitzPaths.config", return_value=tmp_path / "fitz.yaml"
-            ),
-            patch("fitz_ai.cli.commands.config.FitzPaths.engine_config", return_value=config_path),
-        ):
+        mock_ctx = _make_mock_context(
+            has_user_config=True,
+            config_path=config_path,
+            raw_config={
+                "chat": {"plugin_name": "cohere"},
+                "embedding": {"plugin_name": "cohere"},
+            },
+        )
+
+        with patch("fitz_ai.cli.commands.config.CLIContext.load", return_value=mock_ctx):
             result = runner.invoke(app, ["config", "--json"])
 
         assert result.exit_code == 0
@@ -127,12 +160,12 @@ chat:
         config_path = tmp_path / "fitz_rag.yaml"
         config_path.write_text(config_content)
 
-        with (
-            patch(
-                "fitz_ai.cli.commands.config.FitzPaths.config", return_value=tmp_path / "fitz.yaml"
-            ),
-            patch("fitz_ai.cli.commands.config.FitzPaths.engine_config", return_value=config_path),
-        ):
+        mock_ctx = _make_mock_context(
+            has_user_config=True,
+            config_path=config_path,
+        )
+
+        with patch("fitz_ai.cli.commands.config.CLIContext.load", return_value=mock_ctx):
             result = runner.invoke(app, ["config", "--raw"])
 
         assert result.exit_code == 0
@@ -144,16 +177,22 @@ class TestConfigEditOption:
 
     def test_config_edit_missing_file(self, tmp_path):
         """Test --edit with missing config shows error."""
-        nonexistent = tmp_path / "nonexistent"
+        nonexistent = tmp_path / "nonexistent" / "fitz_rag.yaml"
+
+        mock_ctx = _make_mock_context(
+            has_user_config=False,
+            config_path=None,
+        )
 
         with (
-            patch(
-                "fitz_ai.cli.commands.config.FitzPaths.config",
-                return_value=nonexistent / "missing.yaml",
-            ),
+            patch("fitz_ai.cli.commands.config.CLIContext.load", return_value=mock_ctx),
             patch(
                 "fitz_ai.cli.commands.config.FitzPaths.engine_config",
-                return_value=nonexistent / "fitz_rag.yaml",
+                return_value=nonexistent,
+            ),
+            patch(
+                "fitz_ai.cli.commands.config.FitzPaths.config",
+                return_value=nonexistent.parent / "fitz.yaml",
             ),
         ):
             result = runner.invoke(app, ["config", "--edit"])
@@ -163,17 +202,16 @@ class TestConfigEditOption:
 
     def test_config_edit_no_editor(self, tmp_path):
         """Test --edit with no editor available."""
-        import yaml
-
         config_path = tmp_path / "fitz_rag.yaml"
-        config = {"chat": {"plugin_name": "cohere"}}
-        config_path.write_text(yaml.dump(config))
+        config_path.write_text("chat:\n  plugin_name: cohere\n")
+
+        mock_ctx = _make_mock_context(
+            has_user_config=True,
+            config_path=config_path,
+        )
 
         with (
-            patch(
-                "fitz_ai.cli.commands.config.FitzPaths.config", return_value=tmp_path / "fitz.yaml"
-            ),
-            patch("fitz_ai.cli.commands.config.FitzPaths.engine_config", return_value=config_path),
+            patch("fitz_ai.cli.commands.config.CLIContext.load", return_value=mock_ctx),
             patch.dict("os.environ", {}, clear=True),
             patch("subprocess.run", side_effect=Exception("not found")),
         ):
@@ -188,27 +226,20 @@ class TestConfigSummaryView:
 
     def test_config_summary_shows_components(self, tmp_path):
         """Test default view shows all components."""
-        import yaml
-
         config_path = tmp_path / "fitz_rag.yaml"
-        config = {
-            "chat": {"plugin_name": "cohere", "kwargs": {"model": "command"}},
-            "embedding": {
-                "plugin_name": "cohere",
-                "kwargs": {"model": "embed-english-v3.0"},
-            },
-            "vector_db": {"plugin_name": "local_faiss", "kwargs": {}},
-            "retrieval": {"plugin_name": "dense", "collection": "default", "top_k": 5},
-            "rerank": {"enabled": False},
-            "rgs": {"enable_citations": True, "strict_grounding": True},
-        }
-        config_path.write_text(yaml.dump(config))
+        config_path.write_text("chat:\n  plugin_name: cohere\n")
+
+        mock_ctx = _make_mock_context(
+            chat_plugin="cohere",
+            embedding_plugin="cohere",
+            vector_db_plugin="local_faiss",
+            retrieval_plugin="dense",
+            has_user_config=True,
+            config_path=config_path,
+        )
 
         with (
-            patch(
-                "fitz_ai.cli.commands.config.FitzPaths.config", return_value=tmp_path / "fitz.yaml"
-            ),
-            patch("fitz_ai.cli.commands.config.FitzPaths.engine_config", return_value=config_path),
+            patch("fitz_ai.cli.commands.config.CLIContext.load", return_value=mock_ctx),
             patch("fitz_ai.cli.commands.config.RICH", False),
         ):
             result = runner.invoke(app, ["config"])
@@ -219,23 +250,19 @@ class TestConfigSummaryView:
 
     def test_config_summary_shows_rerank_when_enabled(self, tmp_path):
         """Test summary shows rerank when enabled."""
-        import yaml
-
         config_path = tmp_path / "fitz_rag.yaml"
-        config = {
-            "chat": {"plugin_name": "cohere"},
-            "embedding": {"plugin_name": "cohere"},
-            "vector_db": {"plugin_name": "local_faiss"},
-            "retrieval": {"plugin_name": "dense", "collection": "default"},
-            "rerank": {"enabled": True, "plugin_name": "cohere"},
-        }
-        config_path.write_text(yaml.dump(config))
+        config_path.write_text("chat:\n  plugin_name: cohere\n")
+
+        mock_ctx = _make_mock_context(
+            has_user_config=True,
+            config_path=config_path,
+        )
+        mock_ctx.rerank_enabled = True
+        mock_ctx.rerank_plugin = "cohere"
+        mock_ctx.rerank_model = "rerank-v3.5"
 
         with (
-            patch(
-                "fitz_ai.cli.commands.config.FitzPaths.config", return_value=tmp_path / "fitz.yaml"
-            ),
-            patch("fitz_ai.cli.commands.config.FitzPaths.engine_config", return_value=config_path),
+            patch("fitz_ai.cli.commands.config.CLIContext.load", return_value=mock_ctx),
             patch("fitz_ai.cli.commands.config.RICH", False),
         ):
             result = runner.invoke(app, ["config"])
@@ -255,10 +282,13 @@ class TestShowConfigSummary:
         mock_ctx.embedding_plugin = "cohere"
         mock_ctx.embedding_model = "embed-english-v3.0"
         mock_ctx.vector_db_plugin = "local_faiss"
+        mock_ctx.vector_db_kwargs = {}
         mock_ctx.retrieval_plugin = "dense"
         mock_ctx.retrieval_collection = "test"
         mock_ctx.retrieval_top_k = 5
         mock_ctx.rerank_enabled = False
+        mock_ctx.rerank_plugin = ""
+        mock_ctx.rerank_model = ""
         mock_ctx.rgs_citations = True
         mock_ctx.rgs_strict_grounding = True
 

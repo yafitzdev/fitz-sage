@@ -44,12 +44,12 @@ def _check_workspace() -> tuple[bool, str]:
     return False, "Not found (run 'fitz init')"
 
 
-def _check_config() -> tuple[bool, str, Optional[CLIContext]]:
-    """Check if config exists and is valid."""
+def _check_config() -> tuple[bool, str, CLIContext]:
+    """Check if user config exists and is valid."""
     ctx = CLIContext.load()
 
-    if ctx is None:
-        return False, "Not found (run 'fitz init')", None
+    if not ctx.has_user_config:
+        return False, "Using defaults (run 'fitz init' to customize)", ctx
 
     return True, "Valid", ctx
 

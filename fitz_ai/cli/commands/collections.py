@@ -151,10 +151,8 @@ def command() -> None:
     """
     ui.header("Collections", "Manage vector database collections")
 
+    # Load config via CLIContext (always succeeds with defaults)
     ctx = CLIContext.load()
-    if ctx is None:
-        ui.error("No config found. Run 'fitz init' or 'fitz quickstart' first.")
-        raise typer.Exit(1)
 
     # =========================================================================
     # Step 1: Select Vector DB (if multiple available)
