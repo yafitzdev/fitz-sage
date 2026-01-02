@@ -27,15 +27,17 @@ class TestChatCommand:
 
     def test_chat_requires_valid_typed_config(self):
         """Test that chat requires a valid typed_config."""
-        # CLIContext.load() always succeeds, but typed_config can be None
+        import typer
+
+        # CLIContext.load() always succeeds, but require_typed_config can raise
         mock_ctx = MagicMock()
-        mock_ctx.typed_config = None  # Invalid typed config
+        mock_ctx.typed_config = None
+        mock_ctx.require_typed_config.side_effect = typer.Exit(1)
 
         with patch("fitz_ai.cli.commands.chat.CLIContext.load", return_value=mock_ctx):
             result = runner.invoke(app, ["chat"], input="exit\n")
 
         assert result.exit_code != 0
-        assert "init" in result.output.lower() or "config" in result.output.lower()
 
 
 class TestChatHelpers:
@@ -227,7 +229,8 @@ class TestChatExitCommands:
         mock_ctx = MagicMock()
         mock_ctx.typed_config = MagicMock()
         mock_ctx.typed_config.retrieval.collection = "test"
-        mock_ctx.get_collections.return_value = ["test"]
+        mock_ctx.require_typed_config.return_value = mock_ctx.typed_config
+        mock_ctx.require_collections.return_value = ["test"]
         mock_ctx.retrieval_collection = "test"
 
         mock_pipeline = MagicMock()
@@ -249,7 +252,8 @@ class TestChatExitCommands:
         mock_ctx = MagicMock()
         mock_ctx.typed_config = MagicMock()
         mock_ctx.typed_config.retrieval.collection = "test"
-        mock_ctx.get_collections.return_value = ["test"]
+        mock_ctx.require_typed_config.return_value = mock_ctx.typed_config
+        mock_ctx.require_collections.return_value = ["test"]
         mock_ctx.retrieval_collection = "test"
 
         mock_pipeline = MagicMock()

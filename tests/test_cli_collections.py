@@ -31,21 +31,19 @@ class TestCollectionsCommand:
         mock_ctx.vector_db_plugin = "local_faiss"
         mock_ctx.vector_db_kwargs = {}
 
-        # Mock to return only one available DB (skips selection prompt)
-        mock_available = [{"name": "local_faiss", "kwargs": {}, "is_configured": True}]
-
-        # Mock vector DB
+        # Mock vector DB client returned by require_vector_db_client
         mock_vdb = MagicMock()
         mock_vdb.list_collections.return_value = []  # No collections
+        mock_ctx.require_vector_db_client.return_value = mock_vdb
+
+        # Mock to return only one available DB (skips selection prompt)
+        mock_available = [{"name": "local_faiss", "kwargs": {}, "is_configured": True}]
 
         with (
             patch("fitz_ai.cli.commands.collections.CLIContext.load", return_value=mock_ctx),
             patch(
                 "fitz_ai.cli.commands.collections._get_available_vector_dbs",
                 return_value=mock_available,
-            ),
-            patch(
-                "fitz_ai.cli.commands.collections._get_vector_client", return_value=mock_vdb
             ),
         ):
             result = runner.invoke(app, ["collections"])
@@ -70,20 +68,6 @@ class TestCollectionsHelpers:
 
         assert ctx is not None
         assert ctx.vector_db_plugin == "local_faiss"
-
-    def test_get_vector_client(self):
-        """Test _get_vector_client returns plugin."""
-        mock_plugin = MagicMock()
-
-        with patch(
-            "fitz_ai.vector_db.registry.get_vector_db_plugin",
-            return_value=mock_plugin,
-        ):
-            from fitz_ai.cli.commands.collections import _get_vector_client
-
-            client = _get_vector_client("local_faiss", {})
-
-        assert client == mock_plugin
 
     def test_get_available_vector_dbs(self):
         """Test _get_available_vector_dbs returns sorted list."""

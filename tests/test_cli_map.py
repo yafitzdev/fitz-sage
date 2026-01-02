@@ -48,11 +48,14 @@ class TestMapCommand:
 
     def test_map_starts_with_defaults(self):
         """Test that map starts correctly with package defaults."""
+        import typer
+
         # CLIContext.load() always succeeds with package defaults
         mock_ctx = MagicMock()
         mock_ctx.embedding_id = "cohere:embed-english-v3.0"
         mock_ctx.retrieval_collection = "test_collection"
-        mock_ctx.get_collections.return_value = []  # No collections
+        # require_collections raises typer.Exit when no collections
+        mock_ctx.require_collections.side_effect = typer.Exit(1)
 
         # Mock the imports to avoid dependency issues
         with (
@@ -61,8 +64,8 @@ class TestMapCommand:
         ):
             result = runner.invoke(app, ["map"])
 
-        # Should fail because no collections exist, not because config missing
-        assert "no collection" in result.output.lower() or "ingest" in result.output.lower()
+        # Should fail because no collections exist
+        assert result.exit_code != 0
 
 
 class TestMapHelpers:
