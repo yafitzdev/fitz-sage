@@ -166,7 +166,9 @@ def render_compact(cli_map: CLIMap) -> str:
     # Header
     lines.append("=" * 72)
     lines.append(f"  CLI MAP: {cli_map.app_name}")
-    lines.append(f"  {total_commands} commands | {total_args} args | {total_opts} options | {len(cli_map.subapps)} subapps ({total_subcommands} subcommands)")
+    lines.append(
+        f"  {total_commands} commands | {total_args} args | {total_opts} options | {len(cli_map.subapps)} subapps ({total_subcommands} subcommands)"
+    )
     lines.append("=" * 72)
     lines.append("")
 
@@ -373,6 +375,14 @@ def render_live_output(minimal: bool = False) -> str:
         lines.append("=" * 72)
         lines.append("")
 
+        # =====================================================================
+        # Engine Management
+        # =====================================================================
+        section(
+            "fitz engine --list",
+            run_cmd("engine", "--list"),
+        )
+
         # Create test documents (.md, .txt) - needed for all runs
         (docs_dir / "about.md").write_text(
             "# About Fitz\n\n"
@@ -433,6 +443,7 @@ def render_live_output(minimal: bool = False) -> str:
 
         # Clean up quickstart collection
         from fitz_ai.cli.context import CLIContext
+
         ctx = CLIContext.load()
         client = ctx.get_vector_db_client()
         qs_collections = sorted(client.list_collections())
@@ -470,32 +481,41 @@ def render_live_output(minimal: bool = False) -> str:
         existing_collections = client.list_collections()
         # If no collections, menu is skipped → just send collection name
         # If collections exist, menu shows → send "0" to select "Create new", then name
+        # Note: Engine selection no longer prompts (uses default), so no leading \n needed
         if existing_collections:
-            ingest_stdin = f"\n0\n{test_collection}\n"
+            ingest_stdin = f"0\n{test_collection}\n"
         else:
-            ingest_stdin = f"\n{test_collection}\n"
+            ingest_stdin = f"{test_collection}\n"
 
         section(
             f"fitz ingest {docs_dir}  [interactive: create '{test_collection}']",
             run_cmd("ingest", str(docs_dir), stdin_input=ingest_stdin),
         )
 
-        # 4. fitz collections
+        # 4. fitz collections (show list and exit)
+        # Menu: [1] vector_db selection → Enter, [1] collection, [2] Exit → send "2"
         section(
-            "fitz collections  [interactive: Enter, 3 to exit]",
-            run_cmd("collections", stdin_input="\n3\n"),
+            "fitz collections  [interactive: Enter, 2 to exit]",
+            run_cmd("collections", stdin_input="\n2\n"),
         )
 
         # 5. fitz query - document questions (run in parallel!)
+        # Note: Engine selection no longer prompts, so no stdin needed
         doc_queries = [
             ("What is Fitz?", f'fitz query "What is Fitz?" -c {test_collection}'),
             ("How do I install Fitz?", f'fitz query "How do I install Fitz?" -c {test_collection}'),
-            ("What changed in version 0.4?", f'fitz query "What changed in version 0.4?" -c {test_collection}'),
+            (
+                "What changed in version 0.4?",
+                f'fitz query "What changed in version 0.4?" -c {test_collection}',
+            ),
         ]
 
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = [
-                (q[1], executor.submit(run_cmd, "query", q[0], "-c", test_collection, stdin_input="\n", timeout=120))
+                (
+                    q[1],
+                    executor.submit(run_cmd, "query", q[0], "-c", test_collection, timeout=120),
+                )
                 for q in doc_queries
             ]
             for title, future in futures:
@@ -532,10 +552,11 @@ def render_live_output(minimal: bool = False) -> str:
             ctx = CLIContext.load()
             client = ctx.get_vector_db_client()
             existing_collections = client.list_collections()
+            # Note: Engine selection no longer prompts (uses default), so no leading \n needed
             if existing_collections:
-                ingest_stdin = f"\n0\n{code_collection}\n"
+                ingest_stdin = f"0\n{code_collection}\n"
             else:
-                ingest_stdin = f"\n{code_collection}\n"
+                ingest_stdin = f"{code_collection}\n"
 
             section(
                 f"fitz ingest {contract_map_dir}  [interactive: create '{code_collection}']",
@@ -543,15 +564,35 @@ def render_live_output(minimal: bool = False) -> str:
             )
 
             # 7. fitz query - code questions (run in parallel!)
+            # Note: Engine selection no longer prompts, so no stdin needed
             code_queries = [
-                ("What does the contract_map tool do?", f'fitz query "What does the contract_map tool do?" -c {code_collection}'),
-                ("How are architecture violations detected?", f'fitz query "How are architecture violations detected?" -c {code_collection}'),
-                ("What functions are in the imports module?", f'fitz query "What functions are in the imports module?" -c {code_collection}'),
+                (
+                    "What does the contract_map tool do?",
+                    f'fitz query "What does the contract_map tool do?" -c {code_collection}',
+                ),
+                (
+                    "How are architecture violations detected?",
+                    f'fitz query "How are architecture violations detected?" -c {code_collection}',
+                ),
+                (
+                    "What functions are in the imports module?",
+                    f'fitz query "What functions are in the imports module?" -c {code_collection}',
+                ),
             ]
 
             with ThreadPoolExecutor(max_workers=3) as executor:
                 futures = [
-                    (q[1], executor.submit(run_cmd, "query", q[0], "-c", code_collection, stdin_input="\n", timeout=120))
+                    (
+                        q[1],
+                        executor.submit(
+                            run_cmd,
+                            "query",
+                            q[0],
+                            "-c",
+                            code_collection,
+                            timeout=120,
+                        ),
+                    )
                     for q in code_queries
                 ]
                 for title, future in futures:
@@ -562,7 +603,9 @@ def render_live_output(minimal: bool = False) -> str:
             ctx = CLIContext.load()
             client = ctx.get_vector_db_client()
             collections = sorted(client.list_collections())
-            code_coll_index = collections.index(code_collection) + 1 if code_collection in collections else 1
+            code_coll_index = (
+                collections.index(code_collection) + 1 if code_collection in collections else 1
+            )
 
             section(
                 f"fitz collections  [interactive: delete {code_collection}]",
@@ -664,9 +707,7 @@ def render_help_output(cli_map: CLIMap) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Display CLI structure at a glance."
-    )
+    parser = argparse.ArgumentParser(description="Display CLI structure at a glance.")
     parser.add_argument(
         "--help-only",
         action="store_true",

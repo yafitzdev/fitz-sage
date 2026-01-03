@@ -59,7 +59,7 @@ fitz init --show       # Preview config without saving
 
 ### `fitz ingest`
 
-Ingest documents into the knowledge base.
+Ingest documents into the knowledge base. Uses the default engine (set via `fitz engine`).
 
 ```bash
 fitz ingest [SOURCE]
@@ -68,12 +68,13 @@ fitz ingest ./docs -y                    # Non-interactive
 fitz ingest ./docs -H                    # With hierarchical summaries
 fitz ingest ./docs --artifacts all       # Generate all artifacts
 fitz ingest ./docs -f                    # Force re-ingest all files
+fitz ingest ./docs -e graphrag           # Override engine for this command
 ```
 
 **Options:**
 - `SOURCE` - Path to documents (file or directory)
 - `-c, --collection` - Collection name
-- `-e, --engine` - Engine to use
+- `-e, --engine` - Engine to use (overrides default)
 - `-y, --yes` - Non-interactive mode
 - `-f, --force` - Force re-ingest all files
 - `-H, --hierarchy` - Enable hierarchical summaries (L0/L1/L2)
@@ -89,17 +90,18 @@ Generates multi-level summaries during ingestion:
 
 ### `fitz query`
 
-Query the knowledge base.
+Query the knowledge base. Uses the default engine (set via `fitz engine`).
 
 ```bash
 fitz query "Your question"
 fitz query "What is RAG?" -c my_collection
+fitz query "Question" -e clara           # Override engine for this query
 ```
 
 **Options:**
 - `QUESTION` - Your query text
 - `-c, --collection` - Collection name
-- `-e, --engine` - Engine to use
+- `-e, --engine` - Engine to use (overrides default)
 
 ---
 
@@ -222,6 +224,31 @@ fitz doctor --test       # Test actual connections
 - Required dependencies
 - Available services (Ollama, Qdrant, FAISS)
 - API key configuration
+
+---
+
+### `fitz engine`
+
+View or set the default engine for all commands.
+
+```bash
+fitz engine              # Interactive engine selection
+fitz engine --list       # List available engines
+fitz engine fitz_rag     # Set default to fitz_rag
+fitz engine clara        # Set default to clara
+fitz engine graphrag     # Set default to graphrag
+```
+
+**Options:**
+- `NAME` - Engine name to set as default
+- `-l, --list` - List available engines
+
+All other commands (`ingest`, `query`, `chat`, etc.) will use the default engine.
+Override for a single command with `--engine`:
+
+```bash
+fitz query "question" -e clara   # Use clara just for this query
+```
 
 ---
 
