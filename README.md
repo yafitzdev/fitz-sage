@@ -513,6 +513,80 @@ The codebase speaks for itself.
 
 <details>
 
+<summary><strong>📦 Plugin Generator</strong></summary>
+
+<br>
+
+#### Generate plugins with AI 🤖
+
+>Fitz can generate fully working plugins from natural language descriptions. Describe what you want, and fitz creates, validates, and saves the plugin automatically.
+>
+>```bash
+>fitz plugin
+>? Plugin type: chunker
+>? Description: sentence-based chunker that splits on periods
+>
+>Generating...
+>✓ Syntax valid
+>✓ Schema valid
+>✓ Plugin loads correctly
+>✓ Functional test passed
+>
+>Created: ~/.fitz/plugins/chunking/sentence_chunker.py
+>```
+>
+>The generated plugin is immediately usable—no manual editing required.
+
+<br>
+
+#### Supported plugin types
+
+>| Type | Format | Description |
+>|------|--------|-------------|
+>| `llm-chat` | YAML | Connect to a chat LLM provider |
+>| `llm-embedding` | YAML | Connect to an embedding provider |
+>| `llm-rerank` | YAML | Connect to a reranking provider |
+>| `vector-db` | YAML | Connect to a vector database |
+>| `retrieval` | YAML | Define a retrieval strategy |
+>| `chunker` | Python | Custom document chunking logic |
+>| `reader` | Python | Custom file format reader |
+>| `constraint` | Python | Epistemic safety guardrail |
+
+<br>
+
+#### How it works
+
+>1. **Prompt building**: Fitz loads existing plugin examples and schema definitions
+>2. **Generation**: Your configured LLM generates the plugin code
+>3. **Multi-level validation**: Syntax → Schema → Integration → Functional tests
+>4. **Auto-retry**: If validation fails, fitz feeds the error back and retries (up to 3 attempts)
+>5. **Save**: Working plugins are saved to `~/.fitz/plugins/`
+>
+>Generated plugins are auto-discovered by fitz on next run—no registration needed.
+
+<br>
+
+#### Example: Custom chunker
+
+>```bash
+>fitz plugin
+>? Plugin type: chunker
+>? Description: splits text by paragraphs, keeping code blocks intact
+>
+># Creates ~/.fitz/plugins/chunking/paragraph_chunker.py
+>```
+>
+>```python
+># Generated plugin is immediately usable
+>fitz ingest ./docs --chunker paragraph_chunker
+>```
+
+</details>
+
+---
+
+<details>
+
 <summary><strong>📦 Quick Start</strong></summary>
 
 <br>
@@ -687,6 +761,7 @@ fitz ingest                          # Interactive ingestion
 fitz query                           # Single question with sources
 fitz chat                            # Multi-turn conversation with your knowledge base
 fitz collections                     # List and delete knowledge collections
+fitz plugin                          # Generate plugins with AI
 fitz serve                           # Start REST API server
 fitz config                          # View/edit configuration
 fitz doctor                          # System diagnostics
