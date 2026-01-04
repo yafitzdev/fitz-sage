@@ -557,15 +557,60 @@ class GenericVectorDBPlugin:
                 pass
 
 
+def _get_vector_db_plugin_dirs() -> list[Path]:
+    """
+    Get all directories to search for vector DB plugins.
+
+    Returns paths in priority order:
+    1. User plugins (~/.fitz/plugins/vector_db/) - highest priority
+    2. Package plugins (fitz_ai/vector_db/plugins/)
+    """
+    from fitz_ai.core.paths import FitzPaths
+
+    dirs = []
+
+    # User plugins (highest priority)
+    user_dir = FitzPaths.user_vector_db_plugins()
+    if user_dir.exists():
+        dirs.append(user_dir)
+
+    # Package plugins
+    dirs.append(Path(__file__).parent / "plugins")
+
+    return dirs
+
+
 def load_vector_db_spec(plugin_name: str) -> VectorDBSpec:
-    """Load vector DB specification from YAML file."""
-    plugins_dir = Path(__file__).parent / "plugins"
-    yaml_path = plugins_dir / f"{plugin_name}.yaml"
+    """
+    Load vector DB specification from YAML file.
 
-    if not yaml_path.exists():
-        raise ValueError(f"Vector DB plugin '{plugin_name}' not found. Expected: {yaml_path}")
+    Searches user plugins first, then package plugins.
+    """
+    for plugins_dir in _get_vector_db_plugin_dirs():
+        yaml_path = plugins_dir / f"{plugin_name}.yaml"
+        if yaml_path.exists():
+            return VectorDBSpec(yaml_path)
 
-    return VectorDBSpec(yaml_path)
+    # Not found
+    raise ValueError(
+        f"Vector DB plugin '{plugin_name}' not found. "
+        f"Searched: {[str(d) for d in _get_vector_db_plugin_dirs()]}"
+    )
+
+
+def available_vector_db_plugins() -> list[str]:
+    """
+    List available vector DB plugins.
+
+    Includes both package plugins and user plugins from ~/.fitz/plugins/.
+    """
+    plugins = set()
+
+    for plugins_dir in _get_vector_db_plugin_dirs():
+        if plugins_dir.exists():
+            plugins.update(f.stem for f in plugins_dir.glob("*.yaml"))
+
+    return sorted(plugins)
 
 
 def _get_auto_detected_kwargs(spec: VectorDBSpec, kwargs: Dict[str, Any]) -> Dict[str, Any]:
@@ -679,4 +724,5 @@ __all__ = [
     "load_vector_db_spec",
     "create_vector_db_plugin",
     "get_vector_db_plugin",
+    "available_vector_db_plugins",
 ]

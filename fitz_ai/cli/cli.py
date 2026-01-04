@@ -14,6 +14,7 @@ Commands:
     fitz config        View configuration
     fitz doctor        System diagnostics
     fitz engine        View or set the default engine for all commands
+    fitz plugin        Generate plugins using LLM
 
 NOTE: Commands use lazy loading - heavy imports only happen when a command is invoked.
 """
@@ -193,6 +194,24 @@ def engine(
     from fitz_ai.cli.commands import engine as mod
 
     mod.command(name=name, list_available=list_available)
+
+
+@app.command("plugin")
+def plugin(
+    plugin_type: Optional[str] = typer.Argument(None, help="Plugin type to generate."),
+    description: Optional[str] = typer.Argument(None, help="Description of the plugin."),
+    chat_plugin: Optional[str] = typer.Option(None, "--chat-plugin", "-p", help="Chat plugin."),
+    tier: str = typer.Option("smart", "--tier", "-t", help="Model tier."),
+) -> None:
+    """Generate a plugin using LLM."""
+    from fitz_ai.cli.commands import plugin as mod
+
+    mod.command(
+        plugin_type=plugin_type,
+        description=description,
+        chat_plugin=chat_plugin,
+        tier=tier,
+    )
 
 
 # =============================================================================

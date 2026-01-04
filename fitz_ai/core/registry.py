@@ -17,10 +17,13 @@ Import everything from here, not from domain-specific modules.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import logging
 import pkgutil
+import sys
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Type
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Type
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +80,7 @@ class PluginRegistry:
         plugin_name_attr: Attribute containing the plugin name
         plugin_type_filter: If set, only register plugins with this plugin_type
         check_module_match: If True, only register classes defined in the scanned module
+        user_plugin_path: Optional path to user plugins directory (scanned as files)
     """
 
     name: str
@@ -85,6 +89,7 @@ class PluginRegistry:
     plugin_name_attr: str = "plugin_name"
     plugin_type_filter: str | None = None
     check_module_match: bool = True
+    user_plugin_paths: List[Path] = field(default_factory=list)
     _plugins: Dict[str, Type[Any]] = field(default_factory=dict, repr=False)
     _discovered: bool = field(default=False, repr=False)
 
@@ -138,6 +143,7 @@ class PluginRegistry:
         if self._discovered:
             return
 
+        # Scan package plugins first
         for package_name in self.scan_packages:
             try:
                 package = importlib.import_module(package_name)
@@ -147,10 +153,44 @@ class PluginRegistry:
 
             self._scan_package(package)
 
+        # Scan user plugins (higher priority - can override package plugins)
+        for plugin_path in self.user_plugin_paths:
+            if plugin_path.exists():
+                self._scan_user_plugins(plugin_path)
+
         self._discovered = True
         logger.debug(
             f"Discovered {len(self._plugins)} {self.name} plugin(s): {sorted(self._plugins.keys())}"
         )
+
+    def _scan_user_plugins(self, plugins_dir: Path) -> None:
+        """Scan a directory for user plugin files."""
+        for py_file in plugins_dir.glob("*.py"):
+            if py_file.name.startswith("_"):
+                continue
+
+            module_name = f"fitz_user_plugins.{self.name}.{py_file.stem}"
+
+            try:
+                module = self._load_module_from_file(py_file, module_name)
+            except Exception as e:
+                logger.debug(f"Could not load user plugin {py_file}: {e}")
+                continue
+
+            # Scan with check_module_match=False since these are dynamically loaded
+            self._scan_module(module, check_module_match=False)
+
+    def _load_module_from_file(self, file_path: Path, module_name: str) -> Any:
+        """Load a Python module from a file path."""
+        spec = importlib.util.spec_from_file_location(module_name, file_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Cannot create module spec for {file_path}")
+
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+
+        return module
 
     def _scan_package(self, package: Any) -> None:
         """Scan a package for plugin classes (non-recursive)."""
@@ -173,8 +213,18 @@ class PluginRegistry:
 
             self._scan_module(module)
 
-    def _scan_module(self, module: Any) -> None:
-        """Scan a module for plugin classes."""
+    def _scan_module(self, module: Any, check_module_match: Optional[bool] = None) -> None:
+        """
+        Scan a module for plugin classes.
+
+        Args:
+            module: The module to scan
+            check_module_match: Override for self.check_module_match (for user plugins)
+        """
+        should_check_module = (
+            check_module_match if check_module_match is not None else self.check_module_match
+        )
+
         for name in dir(module):
             if name.startswith("_"):
                 continue
@@ -195,7 +245,7 @@ class PluginRegistry:
                 if plugin_type != self.plugin_type_filter:
                     continue
 
-            if self.check_module_match:
+            if should_check_module:
                 if obj.__module__ != module.__name__:
                     continue
 
@@ -210,10 +260,32 @@ class PluginRegistry:
 # =============================================================================
 
 
+def _get_plugin_paths(plugin_type: str) -> list[Path]:
+    """Get plugin paths for a given plugin type (~/.fitz/plugins/)."""
+    from fitz_ai.core.paths import FitzPaths
+
+    paths = []
+
+    # User home plugins (~/.fitz/plugins/) - same for everyone
+    user_map = {
+        "reader": FitzPaths.user_reader_plugins,
+        "chunking": FitzPaths.user_chunking_plugins,
+        "constraint": FitzPaths.user_constraint_plugins,
+    }
+    getter = user_map.get(plugin_type)
+    if getter:
+        user_path = getter()
+        if user_path.exists():
+            paths.append(user_path)
+
+    return paths
+
+
 INGEST_REGISTRY = PluginRegistry(
     name="ingest",
     scan_packages=["fitz_ai.ingestion.reader.plugins"],
     required_method="ingest",
+    user_plugin_paths=_get_plugin_paths("reader"),
 )
 
 # Default chunkers (simple, recursive) - shown in fitz init
@@ -221,6 +293,7 @@ CHUNKING_REGISTRY = PluginRegistry(
     name="chunking",
     scan_packages=["fitz_ai.ingestion.chunking.plugins.default"],
     required_method="chunk_text",
+    user_plugin_paths=_get_plugin_paths("chunking"),
 )
 
 # Type-specific chunkers (markdown, python_code, pdf_sections)
@@ -230,6 +303,7 @@ TYPED_CHUNKING_REGISTRY = PluginRegistry(
     name="typed_chunking",
     scan_packages=["fitz_ai.ingestion.chunking.plugins"],
     required_method="chunk_text",
+    user_plugin_paths=_get_plugin_paths("chunking"),
 )
 
 RETRIEVER_REGISTRY = PluginRegistry(
@@ -242,6 +316,15 @@ PIPELINE_REGISTRY = PluginRegistry(
     name="pipeline",
     scan_packages=["fitz_ai.engines.fitz_rag.pipeline.pipeline.plugins"],
     required_method="build",
+)
+
+# Constraint plugins registry (for guardrails)
+CONSTRAINT_REGISTRY = PluginRegistry(
+    name="constraint",
+    scan_packages=["fitz_ai.core.guardrails.plugins"],
+    required_method="apply",
+    plugin_name_attr="name",
+    user_plugin_paths=_get_plugin_paths("constraint"),
 )
 
 
@@ -304,6 +387,16 @@ def get_pipeline_plugin(plugin_name: str) -> Type[Any]:
 def available_pipeline_plugins() -> List[str]:
     """List available pipeline plugins."""
     return PIPELINE_REGISTRY.list_available()
+
+
+def get_constraint_plugin(plugin_name: str) -> Type[Any]:
+    """Get a constraint plugin by name."""
+    return CONSTRAINT_REGISTRY.get(plugin_name)
+
+
+def available_constraint_plugins() -> List[str]:
+    """List available constraint plugins."""
+    return CONSTRAINT_REGISTRY.list_available()
 
 
 # =============================================================================
@@ -394,6 +487,7 @@ __all__ = [
     "TYPED_CHUNKING_REGISTRY",
     "RETRIEVER_REGISTRY",
     "PIPELINE_REGISTRY",
+    "CONSTRAINT_REGISTRY",
     # Python-based plugin accessors
     "get_ingest_plugin",
     "available_ingest_plugins",
@@ -405,6 +499,8 @@ __all__ = [
     "available_retrieval_plugins",
     "get_pipeline_plugin",
     "available_pipeline_plugins",
+    "get_constraint_plugin",
+    "available_constraint_plugins",
     # YAML-based plugin accessors (re-exported)
     "get_llm_plugin",
     "available_llm_plugins",

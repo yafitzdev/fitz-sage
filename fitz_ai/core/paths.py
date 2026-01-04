@@ -311,6 +311,104 @@ class FitzPaths:
         """
         return cls.workspace() / "quickstart_config.yaml"
 
+    # =========================================================================
+    # User Plugins (Home Directory)
+    # =========================================================================
+
+    @classmethod
+    def user_home(cls) -> Path:
+        """
+        User's fitz home directory.
+
+        Location: ~/.fitz/
+
+        This is separate from the workspace (which is project-specific).
+        Used for user-created plugins and global configuration.
+        """
+        return Path.home() / ".fitz"
+
+    @classmethod
+    def user_plugins(cls) -> Path:
+        """
+        User plugins directory.
+
+        Location: ~/.fitz/plugins/
+
+        Structure:
+            plugins/
+            ├── llm/
+            │   ├── chat/
+            │   ├── embedding/
+            │   └── rerank/
+            ├── vector_db/
+            ├── chunking/
+            ├── reader/
+            └── constraint/
+        """
+        return cls.user_home() / "plugins"
+
+    @classmethod
+    def user_llm_plugins(cls, plugin_type: str) -> Path:
+        """
+        User LLM plugins directory for a specific type.
+
+        Location: ~/.fitz/plugins/llm/{plugin_type}/
+
+        Args:
+            plugin_type: One of 'chat', 'embedding', 'rerank'
+        """
+        return cls.user_plugins() / "llm" / plugin_type
+
+    @classmethod
+    def user_vector_db_plugins(cls) -> Path:
+        """
+        User vector DB plugins directory.
+
+        Location: ~/.fitz/plugins/vector_db/
+        """
+        return cls.user_plugins() / "vector_db"
+
+    @classmethod
+    def user_chunking_plugins(cls) -> Path:
+        """
+        User chunking plugins directory.
+
+        Location: ~/.fitz/plugins/chunking/
+        """
+        return cls.user_plugins() / "chunking"
+
+    @classmethod
+    def user_reader_plugins(cls) -> Path:
+        """
+        User reader plugins directory.
+
+        Location: ~/.fitz/plugins/reader/
+        """
+        return cls.user_plugins() / "reader"
+
+    @classmethod
+    def user_constraint_plugins(cls) -> Path:
+        """
+        User constraint plugins directory.
+
+        Location: ~/.fitz/plugins/constraint/
+        """
+        return cls.user_plugins() / "constraint"
+
+    @classmethod
+    def ensure_user_plugins(cls) -> Path:
+        """Create user plugins directory structure if it doesn't exist."""
+        base = cls.user_plugins()
+        # Create all plugin subdirectories
+        (base / "llm" / "chat").mkdir(parents=True, exist_ok=True)
+        (base / "llm" / "embedding").mkdir(parents=True, exist_ok=True)
+        (base / "llm" / "rerank").mkdir(parents=True, exist_ok=True)
+        (base / "vector_db").mkdir(parents=True, exist_ok=True)
+        (base / "chunking").mkdir(parents=True, exist_ok=True)
+        (base / "reader").mkdir(parents=True, exist_ok=True)
+        (base / "constraint").mkdir(parents=True, exist_ok=True)
+        return base
+
 
 # =============================================================================
 # Convenience Functions

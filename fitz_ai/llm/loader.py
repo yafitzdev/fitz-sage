@@ -75,8 +75,41 @@ class YAMLPluginValidationError(YAMLPluginError, ValueError):
 # =============================================================================
 
 
+def _get_plugin_dirs(plugin_type: str) -> list[Path]:
+    """
+    Get all directories to search for plugins of a given type.
+
+    Returns paths in priority order:
+    1. User plugins (~/.fitz/plugins/llm/{type}/) - highest priority
+    2. Package plugins (fitz_ai/llm/{type}/)
+    """
+    from fitz_ai.core.paths import FitzPaths
+
+    dirs = []
+
+    # User plugins (highest priority)
+    user_dir = FitzPaths.user_llm_plugins(plugin_type)
+    if user_dir.exists():
+        dirs.append(user_dir)
+
+    # Package plugins
+    dirs.append(YAML_PLUGINS_DIR / plugin_type)
+
+    return dirs
+
+
 def _get_yaml_path(plugin_type: str, plugin_name: str) -> Path:
-    """Get the path to a YAML plugin file."""
+    """
+    Get the path to a YAML plugin file.
+
+    Searches user plugins first, then package plugins.
+    """
+    for plugins_dir in _get_plugin_dirs(plugin_type):
+        path = plugins_dir / f"{plugin_name}.yaml"
+        if path.exists():
+            return path
+
+    # Return package path (will raise FileNotFoundError later)
     return YAML_PLUGINS_DIR / plugin_type / f"{plugin_name}.yaml"
 
 
@@ -254,18 +287,22 @@ def list_plugins(plugin_type: str) -> list[str]:
     """
     List available plugins of a given type.
 
+    Includes both package plugins and user plugins from ~/.fitz/plugins/.
+
     Args:
         plugin_type: "chat", "embedding", or "rerank"
 
     Returns:
-        List of plugin names (without .yaml extension)
+        List of plugin names (without .yaml extension), sorted alphabetically.
+        User plugins with same name as package plugins override them.
     """
-    plugins_dir = YAML_PLUGINS_DIR / plugin_type
+    plugins = set()
 
-    if not plugins_dir.exists():
-        return []
+    for plugins_dir in _get_plugin_dirs(plugin_type):
+        if plugins_dir.exists():
+            plugins.update(f.stem for f in plugins_dir.glob("*.yaml"))
 
-    return sorted(f.stem for f in plugins_dir.glob("*.yaml"))
+    return sorted(plugins)
 
 
 def clear_cache() -> None:
