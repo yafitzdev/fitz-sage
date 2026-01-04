@@ -11,6 +11,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.5] - 2026-01-04
+
+### 🎉 Highlights
+
+**Zero-Friction Quickstart** - The `fitz quickstart` command now truly delivers on "zero-config RAG." Provider detection is fully automatic: Ollama detected → used; API key in environment → used; first time → guided through free Cohere signup. After initial setup, subsequent runs are completely prompt-free.
+
+**CLIContext** - New centralized CLI context system provides a single source of truth for all configuration. Package defaults guarantee all values exist—no more scattered `.get()` fallbacks across commands.
+
+**Collection Warnings** - The CLI now warns when a collection doesn't exist or is empty before querying, preventing confusing "I don't know" answers when the real issue is missing data.
+
+### 🚀 Added
+
+#### Zero-Friction Quickstart (`fitz_ai/cli/commands/quickstart.py`)
+- **Auto-detection cascade**: Ollama → COHERE_API_KEY → OPENAI_API_KEY → guided signup
+- `_resolve_provider()` - Detects best available LLM provider automatically
+- `_check_ollama()` - Detects running Ollama with required models (llama3.2, nomic-embed-text)
+- `_guide_cohere_signup()` - Step-by-step onboarding for new users (free tier)
+- `_save_api_key_to_env()` - Cross-platform API key persistence (Windows: `.fitz/.env`, Unix: `.bashrc`/`.zshrc`)
+- Removed engine selection prompt—quickstart now focuses on fitz_rag for simplicity
+
+#### CLIContext (`fitz_ai/cli/context.py`)
+- Centralized context for all CLI commands
+- Guaranteed configuration values (package defaults always loaded)
+- `get_collections()`, `require_collections()` - Collection discovery
+- `select_collection()`, `select_engine()` - Interactive selection with validation
+- `get_vector_db_client()`, `require_vector_db_client()` - Vector DB access
+- `require_typed_config()` - Typed config with error handling
+- `info_line()` - Single-line status display for commands
+
+#### Config Loader (`fitz_ai/config/loader.py`)
+- `load_engine_config()` - Loads merged config (package defaults + user overrides)
+- `get_config_source()` - Returns config source for debugging
+- Package defaults in `fitz_ai/engines/<engine>/config/default.yaml`
+
+#### Collection Existence Warnings (`fitz_ai/cli/commands/query.py`)
+- `_warn_if_collection_missing()` - Checks collection before query
+- Warns when no collections exist: "Run 'fitz ingest ./docs' first"
+- Warns when specified collection not found with available alternatives
+- Warns when collection is empty (0 documents)
+
+#### Engine Command (`fitz_ai/cli/commands/engine.py`)
+- `fitz engine` - View or set default engine
+- `fitz engine --list` - List all available engines
+- Interactive selection with card-based UI
+- Persists default engine to `.fitz/config.yaml`
+
+#### Instrumentation System (`fitz_ai/core/instrumentation.py`)
+- `BenchmarkHook` protocol for plugin performance measurement
+- `register_hook()` / `unregister_hook()` - Thread-safe hook management
+- `instrument()` decorator for method-level timing
+- `create_instrumented_proxy()` - Transparent proxy wrapper for plugins
+- Zero overhead when no hooks registered
+- Tracks: layer, plugin name, method, duration, errors
+
+#### Enterprise Plugin Discovery (`fitz_ai/cli/cli.py`)
+- Auto-discovers `fitz-ai-enterprise` package when installed
+- Adds `fitz benchmark` command from enterprise module
+- Clean separation: core features in `fitz-ai`, advanced features in enterprise
+
+#### CLI Map Tool (`tools/cli_map/`)
+- New tool for analyzing CLI command structure
+- Generates visual maps of command hierarchy
+
+### 🔄 Changed
+
+- **Engine rename**: `classic_rag` → `fitz_rag` for clearer branding
+- **Quickstart simplified**: Removed `--engine` flag, focuses on fitz_rag for true zero-friction
+- **README updated**: Documents auto-detection cascade and first-time experience
+- **CLI commands**: All commands now use CLIContext instead of direct config loading
+- **Documentation consolidated**: Removed outdated docs (CLARA.md, MIGRATION.md, release notes)
+
+### 🐛 Fixed
+
+- Quickstart no longer prompts for provider when API key is in environment
+- Query command now warns about missing collections instead of returning "I don't know"
+- Windows API key saving works correctly (uses `.fitz/.env` instead of shell config)
+
+---
+
 ## [0.4.4] - 2025-12-30
 
 ### 🎉 Highlights
@@ -657,7 +736,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.1...v0.4.2
