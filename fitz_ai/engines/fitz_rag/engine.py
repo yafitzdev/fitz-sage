@@ -143,4 +143,3 @@ class FitzRagEngine:
 
         config = load_config(config_path)
         return cls(config)
-

@@ -170,8 +170,7 @@ class EnrichmentPipeline:
             entity_types=self.config.entities.types,
         )
         logger.info(
-            f"[ENRICHMENT] Entity extractor initialized with types: "
-            f"{self.config.entities.types}"
+            f"[ENRICHMENT] Entity extractor initialized with types: {self.config.entities.types}"
         )
 
     @classmethod

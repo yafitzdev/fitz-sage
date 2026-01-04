@@ -651,9 +651,7 @@ def render_live_output(minimal: bool = False) -> str:
             section(
                 "10",
                 f"fitz ingest {contract_map_dir} - create {code_collection}",
-                run_cmd(
-                    "ingest", str(contract_map_dir), stdin_input=ingest_stdin, timeout=180
-                ),
+                run_cmd("ingest", str(contract_map_dir), stdin_input=ingest_stdin, timeout=180),
             )
 
             # STEP 11: fitz query - 3 questions for codebase

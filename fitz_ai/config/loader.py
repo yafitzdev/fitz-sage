@@ -109,8 +109,7 @@ def load_engine_defaults(engine: str) -> dict[str, Any]:
 
     if not defaults_path.exists():
         raise FileNotFoundError(
-            f"No defaults found for engine '{engine}'. "
-            f"Expected: {defaults_path}"
+            f"No defaults found for engine '{engine}'. Expected: {defaults_path}"
         )
 
     with defaults_path.open("r", encoding="utf-8") as f:

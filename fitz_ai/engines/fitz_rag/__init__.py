@@ -36,4 +36,3 @@ __all__ = [
     "create_fitz_rag_engine",
     "run",
 ]
-

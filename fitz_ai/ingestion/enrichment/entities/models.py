@@ -27,25 +27,29 @@ class Entity:
 
 
 # Standard entity types
-DOMAIN_ENTITY_TYPES = frozenset({
-    "class",
-    "function",
-    "method",
-    "api",
-    "module",
-    "config",
-    "system",
-    "service",
-    "endpoint",
-})
+DOMAIN_ENTITY_TYPES = frozenset(
+    {
+        "class",
+        "function",
+        "method",
+        "api",
+        "module",
+        "config",
+        "system",
+        "service",
+        "endpoint",
+    }
+)
 
-NAMED_ENTITY_TYPES = frozenset({
-    "person",
-    "organization",
-    "location",
-    "date",
-    "product",
-    "concept",
-})
+NAMED_ENTITY_TYPES = frozenset(
+    {
+        "person",
+        "organization",
+        "location",
+        "date",
+        "product",
+        "concept",
+    }
+)
 
 ALL_ENTITY_TYPES = DOMAIN_ENTITY_TYPES | NAMED_ENTITY_TYPES

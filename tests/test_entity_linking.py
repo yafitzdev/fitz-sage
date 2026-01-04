@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
 from fitz_ai.ingestion.enrichment.entities import EntityLink, EntityLinker

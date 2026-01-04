@@ -144,4 +144,3 @@ def _register_fitz_rag_engine():
 
 # Auto-register on import
 _register_fitz_rag_engine()
-

@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import warnings
 
-import pytest
-
 from fitz_ai.llm.runtime import _resolve_model_from_tier
 
 
@@ -22,7 +20,9 @@ class TestModelTierResolution:
         defaults = {"models": {"smart": "gpt-4o", "fast": "gpt-4o-mini"}}
         user_kwargs = {"model": "custom-model"}
 
-        result = _resolve_model_from_tier(defaults, tier="smart", user_kwargs=user_kwargs, plugin_name="test")
+        result = _resolve_model_from_tier(
+            defaults, tier="smart", user_kwargs=user_kwargs, plugin_name="test"
+        )
 
         # User model specified, so None returned (no tier resolution)
         assert result is None
@@ -31,7 +31,9 @@ class TestModelTierResolution:
         """Test that smart tier returns the smart model."""
         defaults = {"models": {"smart": "gpt-4o", "fast": "gpt-4o-mini", "balanced": "gpt-4o-mini"}}
 
-        result = _resolve_model_from_tier(defaults, tier="smart", user_kwargs={}, plugin_name="test")
+        result = _resolve_model_from_tier(
+            defaults, tier="smart", user_kwargs={}, plugin_name="test"
+        )
 
         assert result == "gpt-4o"
 
@@ -47,7 +49,9 @@ class TestModelTierResolution:
         """Test that balanced tier returns the balanced model."""
         defaults = {"models": {"smart": "gpt-4o", "fast": "gpt-4o-mini", "balanced": "gpt-4o-mini"}}
 
-        result = _resolve_model_from_tier(defaults, tier="balanced", user_kwargs={}, plugin_name="test")
+        result = _resolve_model_from_tier(
+            defaults, tier="balanced", user_kwargs={}, plugin_name="test"
+        )
 
         assert result == "gpt-4o-mini"
 
@@ -69,7 +73,9 @@ class TestModelTierResolution:
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            result = _resolve_model_from_tier(defaults, tier="smart", user_kwargs={}, plugin_name="test")
+            result = _resolve_model_from_tier(
+                defaults, tier="smart", user_kwargs={}, plugin_name="test"
+            )
 
         assert result == "balanced-model"
         # Should warn about fallback
@@ -82,7 +88,9 @@ class TestModelTierResolution:
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            result = _resolve_model_from_tier(defaults, tier="smart", user_kwargs={}, plugin_name="test")
+            result = _resolve_model_from_tier(
+                defaults, tier="smart", user_kwargs={}, plugin_name="test"
+            )
 
         assert result == "fast-model"
         assert len(w) == 1
@@ -94,7 +102,9 @@ class TestModelTierResolution:
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            result = _resolve_model_from_tier(defaults, tier="balanced", user_kwargs={}, plugin_name="test")
+            result = _resolve_model_from_tier(
+                defaults, tier="balanced", user_kwargs={}, plugin_name="test"
+            )
 
         assert result == "fast-model"
         assert len(w) == 1
@@ -106,7 +116,9 @@ class TestModelTierResolution:
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            result = _resolve_model_from_tier(defaults, tier="balanced", user_kwargs={}, plugin_name="test")
+            result = _resolve_model_from_tier(
+                defaults, tier="balanced", user_kwargs={}, plugin_name="test"
+            )
 
         assert result == "smart-model"
         assert len(w) == 1
@@ -119,7 +131,9 @@ class TestModelTierResolution:
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            result = _resolve_model_from_tier(defaults, tier="fast", user_kwargs={}, plugin_name="test")
+            result = _resolve_model_from_tier(
+                defaults, tier="fast", user_kwargs={}, plugin_name="test"
+            )
 
         assert result == "balanced-model"
         assert len(w) == 1
@@ -131,7 +145,9 @@ class TestModelTierResolution:
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            result = _resolve_model_from_tier(defaults, tier="fast", user_kwargs={}, plugin_name="test")
+            result = _resolve_model_from_tier(
+                defaults, tier="fast", user_kwargs={}, plugin_name="test"
+            )
 
         assert result == "smart-model"
         assert len(w) == 1
@@ -146,7 +162,9 @@ class TestModelTierResolution:
         """Test behavior when no models are defined."""
         defaults = {"temperature": 0.7}
 
-        result = _resolve_model_from_tier(defaults, tier="smart", user_kwargs={}, plugin_name="test")
+        result = _resolve_model_from_tier(
+            defaults, tier="smart", user_kwargs={}, plugin_name="test"
+        )
 
         assert result is None
 
@@ -154,7 +172,9 @@ class TestModelTierResolution:
         """Test behavior with single model (no tiers)."""
         defaults = {"model": "default-model"}
 
-        result = _resolve_model_from_tier(defaults, tier="smart", user_kwargs={}, plugin_name="test")
+        result = _resolve_model_from_tier(
+            defaults, tier="smart", user_kwargs={}, plugin_name="test"
+        )
 
         assert result == "default-model"
 
@@ -163,28 +183,42 @@ class TestModelTierResolution:
         defaults = {"models": {"smart": "default-smart", "fast": "default-fast"}}
         user_kwargs = {"models": {"smart": "user-smart"}}
 
-        result = _resolve_model_from_tier(defaults, tier="smart", user_kwargs=user_kwargs, plugin_name="test")
+        result = _resolve_model_from_tier(
+            defaults, tier="smart", user_kwargs=user_kwargs, plugin_name="test"
+        )
 
         assert result == "user-smart"
 
     def test_partial_user_override(self):
         """Test that partial user override merges with defaults."""
-        defaults = {"models": {"smart": "default-smart", "fast": "default-fast", "balanced": "default-balanced"}}
+        defaults = {
+            "models": {
+                "smart": "default-smart",
+                "fast": "default-fast",
+                "balanced": "default-balanced",
+            }
+        }
         user_kwargs = {"models": {"smart": "user-smart"}}  # Only override smart
 
         # Smart should use user override
-        result = _resolve_model_from_tier(defaults, tier="smart", user_kwargs=user_kwargs, plugin_name="test")
+        result = _resolve_model_from_tier(
+            defaults, tier="smart", user_kwargs=user_kwargs, plugin_name="test"
+        )
         assert result == "user-smart"
 
         # Fast should use default
-        result = _resolve_model_from_tier(defaults, tier="fast", user_kwargs=user_kwargs, plugin_name="test")
+        result = _resolve_model_from_tier(
+            defaults, tier="fast", user_kwargs=user_kwargs, plugin_name="test"
+        )
         assert result == "default-fast"
 
     def test_empty_models_dict(self):
         """Test behavior with empty models dict."""
         defaults = {"models": {}}
 
-        result = _resolve_model_from_tier(defaults, tier="smart", user_kwargs={}, plugin_name="test")
+        result = _resolve_model_from_tier(
+            defaults, tier="smart", user_kwargs={}, plugin_name="test"
+        )
 
         assert result is None
 
@@ -194,7 +228,9 @@ class TestModelTierResolution:
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            result = _resolve_model_from_tier(defaults, tier=None, user_kwargs={}, plugin_name="test")
+            result = _resolve_model_from_tier(
+                defaults, tier=None, user_kwargs={}, plugin_name="test"
+            )
 
         # tier=None, so no warning even though fallback happened
         assert result == "balanced-model"

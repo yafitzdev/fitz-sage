@@ -22,9 +22,7 @@ class MockRetrievalPipeline:
 
     plugin_name: str = "mock"
 
-    def retrieve(
-        self, query: str, filter_override: dict | None = None
-    ) -> list[Chunk]:
+    def retrieve(self, query: str, filter_override: dict | None = None) -> list[Chunk]:
         return [
             Chunk(
                 id="chunk_1",

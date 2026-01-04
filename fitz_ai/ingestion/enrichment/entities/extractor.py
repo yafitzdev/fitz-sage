@@ -24,18 +24,28 @@ from .models import Entity
 logger = logging.getLogger(__name__)
 
 # File extensions that should use code-specific prompt
-CODE_EXTENSIONS = frozenset({
-    ".py", ".pyw",  # Python
-    ".js", ".jsx", ".ts", ".tsx",  # JavaScript/TypeScript
-    ".java", ".kt",  # JVM
-    ".go",  # Go
-    ".rs",  # Rust
-    ".c", ".cpp", ".h", ".hpp",  # C/C++
-    ".rb",  # Ruby
-    ".php",  # PHP
-    ".cs",  # C#
-    ".swift",  # Swift
-})
+CODE_EXTENSIONS = frozenset(
+    {
+        ".py",
+        ".pyw",  # Python
+        ".js",
+        ".jsx",
+        ".ts",
+        ".tsx",  # JavaScript/TypeScript
+        ".java",
+        ".kt",  # JVM
+        ".go",  # Go
+        ".rs",  # Rust
+        ".c",
+        ".cpp",
+        ".h",
+        ".hpp",  # C/C++
+        ".rb",  # Ruby
+        ".php",  # PHP
+        ".cs",  # C#
+        ".swift",  # Swift
+    }
+)
 
 
 @runtime_checkable

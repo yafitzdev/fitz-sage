@@ -27,7 +27,6 @@ class TestDoctorCommand:
         assert "diagnostic" in result.output.lower()
 
 
-
 class TestDoctorChecks:
     """Tests for individual doctor check functions."""
 
@@ -286,8 +285,6 @@ class TestDoctorConnectionTests:
 
 class TestDoctorVerboseMode:
     """Tests for verbose mode."""
-
-
 
 
 class TestDoctorTestMode:

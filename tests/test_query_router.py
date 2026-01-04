@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from fitz_ai.engines.fitz_rag.routing import QueryIntent, QueryRouter
 
 
@@ -87,7 +85,9 @@ class TestQueryRouterSemantic:
         embedder = MockEmbedder()
         router = QueryRouter(embedder=embedder.embed, threshold=0.7)
 
-        assert router.classify("What is the function signature of parse_config?") == QueryIntent.LOCAL
+        assert (
+            router.classify("What is the function signature of parse_config?") == QueryIntent.LOCAL
+        )
         assert router.classify("How do I install the package?") == QueryIntent.LOCAL
         assert router.classify("Show me the error handling code") == QueryIntent.LOCAL
 

@@ -131,9 +131,7 @@ class SemanticGrouper:
             return {}
 
         if embeddings.shape[0] != n_samples:
-            raise ValueError(
-                f"Mismatch: {n_samples} chunks but {embeddings.shape[0]} embeddings"
-            )
+            raise ValueError(f"Mismatch: {n_samples} chunks but {embeddings.shape[0]} embeddings")
 
         # Handle small datasets
         if n_samples < self._min_cluster_size:

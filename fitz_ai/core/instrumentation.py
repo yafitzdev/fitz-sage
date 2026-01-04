@@ -32,7 +32,6 @@ import threading
 from functools import wraps
 from typing import Any, Callable, Protocol, runtime_checkable
 
-
 # =============================================================================
 # Hook Protocol
 # =============================================================================

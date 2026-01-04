@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_rag.retrieval.steps.vector_search import VectorSearchStep
+    pass
 
 import yaml
 

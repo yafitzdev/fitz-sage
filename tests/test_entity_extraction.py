@@ -6,8 +6,6 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
-import pytest
-
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
 from fitz_ai.ingestion.enrichment.entities import (
@@ -127,10 +125,12 @@ class TestEntityExtractor:
 
         # Mock chat client that returns JSON entities
         mock_chat = MagicMock()
-        mock_chat.chat.return_value = json.dumps([
-            {"name": "UserAuth", "type": "class", "description": "Auth handler"},
-            {"name": "login", "type": "function", "description": "Logs in user"},
-        ])
+        mock_chat.chat.return_value = json.dumps(
+            [
+                {"name": "UserAuth", "type": "class", "description": "Auth handler"},
+                {"name": "login", "type": "function", "description": "Logs in user"},
+            ]
+        )
 
         extractor = EntityExtractor(
             chat_client=mock_chat,
@@ -179,11 +179,13 @@ class TestEntityExtractor:
         cache = EntityCache(tmp_path / "cache.json")
 
         mock_chat = MagicMock()
-        mock_chat.chat.return_value = json.dumps([
-            {"name": "UserAuth", "type": "class", "description": "Auth"},
-            {"name": "John", "type": "person", "description": "Developer"},
-            {"name": "login", "type": "function", "description": "Login func"},
-        ])
+        mock_chat.chat.return_value = json.dumps(
+            [
+                {"name": "UserAuth", "type": "class", "description": "Auth"},
+                {"name": "John", "type": "person", "description": "Developer"},
+                {"name": "login", "type": "function", "description": "Login func"},
+            ]
+        )
 
         # Only extract class and function types
         extractor = EntityExtractor(
@@ -288,10 +290,12 @@ class TestEnrichmentPipelineWithEntities:
         assert not pipeline.entities_enabled
 
     def test_entities_enabled_with_config(self, tmp_path):
-        config = EnrichmentConfig.from_dict({
-            "enabled": True,
-            "entities": {"enabled": True},
-        })
+        config = EnrichmentConfig.from_dict(
+            {
+                "enabled": True,
+                "entities": {"enabled": True},
+            }
+        )
 
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "[]"
@@ -305,10 +309,12 @@ class TestEnrichmentPipelineWithEntities:
         assert pipeline.entities_enabled
 
     def test_entities_require_chat_client(self, tmp_path):
-        config = EnrichmentConfig.from_dict({
-            "enabled": True,
-            "entities": {"enabled": True},
-        })
+        config = EnrichmentConfig.from_dict(
+            {
+                "enabled": True,
+                "entities": {"enabled": True},
+            }
+        )
 
         # No chat client provided
         pipeline = EnrichmentPipeline(
@@ -320,15 +326,19 @@ class TestEnrichmentPipelineWithEntities:
         assert not pipeline.entities_enabled
 
     def test_enrich_extracts_entities(self, tmp_path):
-        config = EnrichmentConfig.from_dict({
-            "enabled": True,
-            "entities": {"enabled": True},
-        })
+        config = EnrichmentConfig.from_dict(
+            {
+                "enabled": True,
+                "entities": {"enabled": True},
+            }
+        )
 
         mock_chat = MagicMock()
-        mock_chat.chat.return_value = json.dumps([
-            {"name": "TestClass", "type": "class", "description": "A test class"},
-        ])
+        mock_chat.chat.return_value = json.dumps(
+            [
+                {"name": "TestClass", "type": "class", "description": "A test class"},
+            ]
+        )
 
         pipeline = EnrichmentPipeline(
             config=config,
@@ -358,19 +368,23 @@ class TestEnrichmentPipelineWithEntities:
         assert entities[0]["type"] == "class"
 
     def test_enrich_with_type_filter(self, tmp_path):
-        config = EnrichmentConfig.from_dict({
-            "enabled": True,
-            "entities": {
+        config = EnrichmentConfig.from_dict(
+            {
                 "enabled": True,
-                "types": ["class", "function"],  # Only extract these
-            },
-        })
+                "entities": {
+                    "enabled": True,
+                    "types": ["class", "function"],  # Only extract these
+                },
+            }
+        )
 
         mock_chat = MagicMock()
-        mock_chat.chat.return_value = json.dumps([
-            {"name": "MyClass", "type": "class", "description": "A class"},
-            {"name": "John", "type": "person", "description": "A person"},
-        ])
+        mock_chat.chat.return_value = json.dumps(
+            [
+                {"name": "MyClass", "type": "class", "description": "A class"},
+                {"name": "John", "type": "person", "description": "A person"},
+            ]
+        )
 
         pipeline = EnrichmentPipeline(
             config=config,

@@ -21,8 +21,8 @@ from .loader import (
 )
 from .schema import (  # Main config; RAG sub-configs; Ingestion configs
     ChunkingRouterConfig,
-    FitzRagConfig,
     ExtensionChunkerConfig,
+    FitzRagConfig,
     IngestConfig,
     IngesterConfig,
     LoggingConfig,

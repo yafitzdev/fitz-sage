@@ -10,12 +10,12 @@ import pytest
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
+from fitz_ai.ingestion.enrichment.config import HierarchyConfig
 from fitz_ai.ingestion.enrichment.hierarchy import (
     EmbeddingProvider,
     HierarchyEnricher,
     SemanticGrouper,
 )
-from fitz_ai.ingestion.enrichment.config import HierarchyConfig
 
 
 class TestSemanticGrouper:
@@ -35,12 +35,15 @@ class TestSemanticGrouper:
 
         # Create embeddings that cluster into 2 groups
         # First two similar, last two similar
-        embeddings = np.array([
-            [1.0, 0.0, 0.0],  # Topic A
-            [0.9, 0.1, 0.0],  # Topic A (similar)
-            [0.0, 1.0, 0.0],  # Topic B
-            [0.1, 0.9, 0.0],  # Topic B (similar)
-        ], dtype=np.float32)
+        embeddings = np.array(
+            [
+                [1.0, 0.0, 0.0],  # Topic A
+                [0.9, 0.1, 0.0],  # Topic A (similar)
+                [0.0, 1.0, 0.0],  # Topic B
+                [0.1, 0.9, 0.0],  # Topic B (similar)
+            ],
+            dtype=np.float32,
+        )
 
         groups = grouper.group(chunks, embeddings)
 
@@ -60,18 +63,21 @@ class TestSemanticGrouper:
         ]
 
         # Create embeddings with 3 distinct clusters
-        embeddings = np.array([
-            [1.0, 0.0, 0.0],
-            [0.9, 0.1, 0.0],
-            [0.8, 0.2, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.1, 0.9, 0.0],
-            [0.2, 0.8, 0.0],
-            [0.0, 0.0, 1.0],
-            [0.1, 0.0, 0.9],
-            [0.2, 0.0, 0.8],
-            [0.3, 0.0, 0.7],
-        ], dtype=np.float32)
+        embeddings = np.array(
+            [
+                [1.0, 0.0, 0.0],
+                [0.9, 0.1, 0.0],
+                [0.8, 0.2, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.1, 0.9, 0.0],
+                [0.2, 0.8, 0.0],
+                [0.0, 0.0, 1.0],
+                [0.1, 0.0, 0.9],
+                [0.2, 0.0, 0.8],
+                [0.3, 0.0, 0.7],
+            ],
+            dtype=np.float32,
+        )
 
         groups = grouper.group(chunks, embeddings)
 
@@ -87,9 +93,7 @@ class TestSemanticGrouper:
     def test_group_single_chunk(self):
         """Test grouping with single chunk."""
         grouper = SemanticGrouper(n_clusters=None)
-        chunks = [
-            Chunk(id="c1", doc_id="d1", chunk_index=0, content="Content", metadata={})
-        ]
+        chunks = [Chunk(id="c1", doc_id="d1", chunk_index=0, content="Content", metadata={})]
         embeddings = np.array([[1.0, 0.0, 0.0]], dtype=np.float32)
 
         groups = grouper.group(chunks, embeddings)
@@ -155,15 +159,17 @@ class TestHierarchyConfigSemantic:
 
     def test_config_from_dict(self):
         """Test config from dict."""
-        config = EnrichmentConfig.from_dict({
-            "enabled": True,
-            "hierarchy": {
+        config = EnrichmentConfig.from_dict(
+            {
                 "enabled": True,
-                "grouping_strategy": "semantic",
-                "n_clusters": 5,
-                "max_clusters": 15,
-            },
-        })
+                "hierarchy": {
+                    "enabled": True,
+                    "grouping_strategy": "semantic",
+                    "n_clusters": 5,
+                    "max_clusters": 15,
+                },
+            }
+        )
 
         assert config.hierarchy.grouping_strategy == "semantic"
         assert config.hierarchy.n_clusters == 5
@@ -171,13 +177,15 @@ class TestHierarchyConfigSemantic:
 
     def test_config_to_dict(self):
         """Test config serialization."""
-        config = EnrichmentConfig.from_dict({
-            "enabled": True,
-            "hierarchy": {
+        config = EnrichmentConfig.from_dict(
+            {
                 "enabled": True,
-                "grouping_strategy": "semantic",
-            },
-        })
+                "hierarchy": {
+                    "enabled": True,
+                    "grouping_strategy": "semantic",
+                },
+            }
+        )
 
         d = config.to_dict()
         assert d["hierarchy"]["grouping_strategy"] == "semantic"
@@ -254,22 +262,10 @@ class TestHierarchyEnricherSemantic:
         )
 
         chunks = [
-            Chunk(
-                id="c1", doc_id="d1", chunk_index=0,
-                content="Topic A content 1", metadata={}
-            ),
-            Chunk(
-                id="c2", doc_id="d1", chunk_index=1,
-                content="Topic A content 2", metadata={}
-            ),
-            Chunk(
-                id="c3", doc_id="d2", chunk_index=0,
-                content="Topic B content 1", metadata={}
-            ),
-            Chunk(
-                id="c4", doc_id="d2", chunk_index=1,
-                content="Topic B content 2", metadata={}
-            ),
+            Chunk(id="c1", doc_id="d1", chunk_index=0, content="Topic A content 1", metadata={}),
+            Chunk(id="c2", doc_id="d1", chunk_index=1, content="Topic A content 2", metadata={}),
+            Chunk(id="c3", doc_id="d2", chunk_index=0, content="Topic B content 1", metadata={}),
+            Chunk(id="c4", doc_id="d2", chunk_index=1, content="Topic B content 2", metadata={}),
         ]
 
         result = enricher.enrich(chunks)
@@ -292,13 +288,15 @@ class TestEnrichmentPipelineSemantic:
         mock_chat = MagicMock()
         mock_embedder = MagicMock()
 
-        config = EnrichmentConfig.from_dict({
-            "enabled": True,
-            "hierarchy": {
+        config = EnrichmentConfig.from_dict(
+            {
                 "enabled": True,
-                "grouping_strategy": "semantic",
-            },
-        })
+                "hierarchy": {
+                    "enabled": True,
+                    "grouping_strategy": "semantic",
+                },
+            }
+        )
 
         pipeline = EnrichmentPipeline(
             config=config,

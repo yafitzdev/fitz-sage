@@ -98,7 +98,13 @@ def __getattr__(name: str):
         return getattr(fitz_rag, name)
 
     # Runtime (heavy - discovers all engines)
-    if name in ("create_engine", "get_engine_registry", "list_engines", "list_engines_with_info", "run"):
+    if name in (
+        "create_engine",
+        "get_engine_registry",
+        "list_engines",
+        "list_engines_with_info",
+        "run",
+    ):
         from fitz_ai import runtime
 
         return getattr(runtime, name)
@@ -110,6 +116,7 @@ def __getattr__(name: str):
         return getattr(sdk, name)
 
     raise AttributeError(f"module 'fitz_ai' has no attribute {name!r}")
+
 
 # =============================================================================
 # MODULE-LEVEL SDK (matches CLI: fitz ingest, fitz query)

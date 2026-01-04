@@ -68,9 +68,7 @@ class QueryRouter:
     threshold: float = 0.7
 
     # Internal cache for exemplar vectors
-    _exemplar_cache: list[list[float]] | None = field(
-        default=None, repr=False, compare=False
-    )
+    _exemplar_cache: list[list[float]] | None = field(default=None, repr=False, compare=False)
 
     def _get_exemplar_vectors(self) -> list[list[float]]:
         """Get cached exemplar vectors or compute and cache them."""
@@ -108,14 +106,10 @@ class QueryRouter:
         similarity = self._max_similarity(query_vec)
 
         if similarity >= self.threshold:
-            logger.debug(
-                f"QueryRouter: '{query[:50]}...' -> GLOBAL (similarity={similarity:.3f})"
-            )
+            logger.debug(f"QueryRouter: '{query[:50]}...' -> GLOBAL (similarity={similarity:.3f})")
             return QueryIntent.GLOBAL
 
-        logger.debug(
-            f"QueryRouter: '{query[:50]}...' -> LOCAL (similarity={similarity:.3f})"
-        )
+        logger.debug(f"QueryRouter: '{query[:50]}...' -> LOCAL (similarity={similarity:.3f})")
         return QueryIntent.LOCAL
 
     def get_l2_filter(self) -> dict[str, Any]:

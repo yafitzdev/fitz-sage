@@ -106,4 +106,3 @@ __all__ = [
     # Config
     "ConfigError",
 ]
-

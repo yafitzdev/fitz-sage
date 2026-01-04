@@ -13,9 +13,8 @@ from typing import Any
 import pytest
 
 from fitz_ai.core.instrumentation import (
-    BenchmarkHook,
-    InstrumentedProxy,
     _NO_CACHE,
+    InstrumentedProxy,
     clear_hooks,
     get_hooks,
     has_hooks,
@@ -24,7 +23,6 @@ from fitz_ai.core.instrumentation import (
     unregister_hook,
     wrap,
 )
-
 
 # =============================================================================
 # Test Fixtures
@@ -86,11 +84,13 @@ class TrackingHook:
         result: Any,
         error: Exception | None,
     ) -> None:
-        self.end_calls.append({
-            "context": context,
-            "result": result,
-            "error": error,
-        })
+        self.end_calls.append(
+            {
+                "context": context,
+                "result": result,
+                "error": error,
+            }
+        )
 
 
 @dataclass
@@ -262,7 +262,7 @@ class TestInstrumentedProxy:
         plugin = DummyPlugin()
         proxy = InstrumentedProxy(plugin, "test", "dummy")
 
-        result = proxy.process(5)
+        proxy.process(5)
 
         assert len(hook.end_calls) == 1
         assert hook.end_calls[0]["result"] == 10
@@ -303,8 +303,10 @@ class TestInstrumentedProxy:
 
         plugin = DummyPlugin()
         proxy = InstrumentedProxy(
-            plugin, "test", "dummy",
-            methods_to_track={"other_method"}  # Not 'process'
+            plugin,
+            "test",
+            "dummy",
+            methods_to_track={"other_method"},  # Not 'process'
         )
 
         proxy.process(5)
