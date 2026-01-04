@@ -356,6 +356,7 @@ def build_generation_prompt(
             "",
             f"Generate a complete, working {extension} plugin.",
             "- Output ONLY the plugin code, no explanations",
+            "- Do NOT include file path comments at the top (no '# fitz_ai/...' lines)",
             "- Ensure all required fields are present",
             "- Use realistic values based on the description",
             "- The plugin should work immediately after setting the required API key",

@@ -146,8 +146,8 @@ class PluginGenerator:
                     progress("All validations passed!")
                     result.success = True
 
-                    # Use description as plugin name
-                    plugin_name = self._make_plugin_name(description)
+                    # Extract plugin name from generated code
+                    plugin_name = self._extract_plugin_name(code, plugin_type)
                     result.plugin_name = plugin_name
 
                     # Save plugin
@@ -191,18 +191,19 @@ class PluginGenerator:
         response = llm.chat(messages)
         return response
 
-    def _make_plugin_name(self, description: str) -> str:
-        """Create a plugin name from the user's description."""
-        # Convert to snake_case
-        name = description.lower().strip()
-        # Replace common separators with underscore
-        name = re.sub(r"[-\s]+", "_", name)
-        # Remove non-alphanumeric characters except underscore
-        name = re.sub(r"[^a-z0-9_]", "", name)
-        # Remove leading/trailing underscores
-        name = name.strip("_")
-        # Ensure not empty
-        return name or "custom_plugin"
+    def _extract_plugin_name(self, code: str, plugin_type: PluginType) -> str:
+        """Extract the plugin name from generated code."""
+        # Try plugin_name field (YAML and Python)
+        match = re.search(r'plugin_name[:\s]*[=:]?\s*["\']?([a-z][a-z0-9_]*)["\']?', code, re.IGNORECASE)
+        if match:
+            return match.group(1).lower()
+
+        # Try name field (YAML)
+        match = re.search(r'^name[:\s]+["\']?([a-z][a-z0-9_]*)["\']?', code, re.MULTILINE | re.IGNORECASE)
+        if match:
+            return match.group(1).lower()
+
+        return "custom_plugin"
 
     def _save_plugin(
         self,
