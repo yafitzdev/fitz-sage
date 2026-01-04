@@ -107,22 +107,25 @@ def _run_quickstart(source: Path, question: str, collection: str, verbose: bool)
     engine_config_path = FitzPaths.engine_config("fitz_rag")
 
     # =========================================================================
-    # Step 1: Select Provider and Ensure API Key
+    # Step 1: Auto-detect Provider
     # =========================================================================
 
-    # Always prompt for provider selection
-    provider = _select_provider()
-    if provider is None:
+    provider, reason, extra = _resolve_provider(engine_config_path)
+
+    # Handle case where no provider could be resolved
+    if provider is None and reason == "No provider available":
+        ui.error("Could not configure an LLM provider. Exiting.")
         raise typer.Exit(1)
 
-    # Ensure API key for selected provider
-    if provider != "ollama":
-        api_key = _ensure_api_key(provider)
-        if not api_key:
-            raise typer.Exit(1)
-
-    # Create config for selected provider
-    _create_provider_config(engine_config_path, provider)
+    # Show what we're using
+    print()
+    if provider is None:
+        # Using existing config
+        ui.success(reason)
+    else:
+        # Create new config for detected provider
+        ui.success(f"Provider: {provider.capitalize()} ({reason})")
+        _create_provider_config(engine_config_path, provider, extra)
 
     # =========================================================================
     # Step 3: Ingest Documents
@@ -191,101 +194,202 @@ def _run_quickstart(source: Path, question: str, collection: str, verbose: bool)
 
 
 # =============================================================================
-# Provider Selection
+# Provider Resolution (Auto-detection)
 # =============================================================================
 
+# Required Ollama models for quickstart
+OLLAMA_REQUIRED_MODELS = {
+    "embedding": ["nomic-embed-text"],
+    "chat": ["llama3.2", "llama3.1", "llama3", "mistral", "gemma2"],  # Any of these works
+}
+
 # Provider configurations
-PROVIDERS = {
+PROVIDER_CONFIGS = {
     "cohere": {
-        "name": "Cohere",
-        "env_var": "COHERE_API_KEY",
-        "description": "Free tier available, best for RAG (has reranking)",
-        "signup_url": "https://dashboard.cohere.com/api-keys",
+        "chat": {
+            "plugin_name": "cohere",
+            "kwargs": {
+                "models": {"smart": "command-a-03-2025", "fast": "command-r7b-12-2024"},
+                "temperature": 0.2,
+            },
+        },
+        "embedding": {"plugin_name": "cohere", "kwargs": {"model": "embed-english-v3.0"}},
+        "rerank": {"enabled": True, "plugin_name": "cohere", "kwargs": {"model": "rerank-v3.5"}},
     },
     "openai": {
-        "name": "OpenAI",
-        "env_var": "OPENAI_API_KEY",
-        "description": "Most popular, requires payment",
-        "signup_url": "https://platform.openai.com/api-keys",
+        "chat": {
+            "plugin_name": "openai",
+            "kwargs": {"models": {"smart": "gpt-4o", "fast": "gpt-4o-mini"}, "temperature": 0.2},
+        },
+        "embedding": {"plugin_name": "openai", "kwargs": {"model": "text-embedding-3-small"}},
+        "rerank": {"enabled": False},
     },
     "ollama": {
-        "name": "Ollama (Local)",
-        "env_var": None,
-        "description": "Free, runs locally, no API key needed",
-        "signup_url": None,
+        "chat": {
+            "plugin_name": "local_ollama",
+            "kwargs": {"models": {"smart": "llama3.2", "fast": "llama3.2"}},
+        },
+        "embedding": {"plugin_name": "local_ollama", "kwargs": {"model": "nomic-embed-text"}},
+        "rerank": {"enabled": False},
     },
 }
 
 
-def _select_provider() -> Optional[str]:
-    """Prompt user to select an LLM provider."""
-    print()
-
-    # Check which providers have API keys already set
-    available = []
-    for key, info in PROVIDERS.items():
-        env_var = info["env_var"]
-        has_key = env_var is None or os.getenv(env_var)
-        available.append((key, info, has_key))
-
-    # Show options
-    ui.info("Select your LLM provider:")
-    print()
-
-    for i, (key, info, has_key) in enumerate(available, 1):
-        status = " (API key found)" if has_key and info["env_var"] else ""
-        print(f"  [{i}] {info['name']}{status}")
-        print(f"      {info['description']}")
-        print()
-
-    # Get choice
-    try:
-        choice = ui.prompt_int("Choice", default=1)
-        idx = choice - 1
-        if 0 <= idx < len(available):
-            selected = available[idx][0]
-            ui.success(f"Selected: {PROVIDERS[selected]['name']}")
-            return selected
-        else:
-            ui.error("Invalid choice")
-            return None
-    except (ValueError, KeyboardInterrupt):
-        return None
-
-
-# =============================================================================
-# API Key Handling
-# =============================================================================
-
-
-def _ensure_api_key(provider: str) -> Optional[str]:
+def _resolve_provider(config_path: Path) -> tuple[Optional[str], str, Optional[dict]]:
     """
-    Check for API key for the given provider, prompt if missing.
+    Auto-detect the best available provider.
 
-    Returns the API key or None if user declined.
+    Resolution order:
+    1. Existing config file → use it
+    2. Ollama running with required models → use Ollama
+    3. COHERE_API_KEY in environment → use Cohere
+    4. OPENAI_API_KEY in environment → use OpenAI
+    5. Nothing found → guide user to Cohere signup
+
+    Returns:
+        Tuple of (provider_name, reason_message, extra_info)
+        provider_name is None if using existing config
+        extra_info contains provider-specific data (e.g., ollama model names)
     """
-    info = PROVIDERS.get(provider, {})
-    env_var = info.get("env_var")
+    # -------------------------------------------------------------------------
+    # 1. Check for existing config
+    # -------------------------------------------------------------------------
+    if config_path.exists():
+        return (None, "Using existing configuration", None)
 
-    if not env_var:
-        return "local"  # Ollama doesn't need a key
+    # -------------------------------------------------------------------------
+    # 2. Check for Ollama
+    # -------------------------------------------------------------------------
+    ollama_status = _check_ollama()
+    if ollama_status["running"] and ollama_status["ready"]:
+        extra = {
+            "chat_model": ollama_status["chat_model"],
+            "embedding_model": ollama_status["embedding_model"],
+        }
+        return ("ollama", f"Ollama detected ({ollama_status['chat_model']})", extra)
 
-    api_key = os.getenv(env_var)
+    # -------------------------------------------------------------------------
+    # 3. Check for Cohere API key
+    # -------------------------------------------------------------------------
+    if os.getenv("COHERE_API_KEY"):
+        return ("cohere", "COHERE_API_KEY found", None)
 
+    # -------------------------------------------------------------------------
+    # 4. Check for OpenAI API key
+    # -------------------------------------------------------------------------
+    if os.getenv("OPENAI_API_KEY"):
+        return ("openai", "OPENAI_API_KEY found", None)
+
+    # -------------------------------------------------------------------------
+    # 5. Nothing found - guide user to get Cohere API key
+    # -------------------------------------------------------------------------
+    api_key = _guide_cohere_signup()
     if api_key:
-        masked = f"{api_key[:8]}..." if len(api_key) > 8 else "***"
-        ui.success(f"Using API key ({env_var}): {masked}")
-        return api_key
+        return ("cohere", "API key configured", None)
 
-    # No key found - prompt user
+    return (None, "No provider available", None)
+
+
+def _check_ollama() -> dict:
+    """
+    Check if Ollama is running and has the required models.
+
+    Returns:
+        Dict with keys:
+        - running: bool - Is Ollama server responding?
+        - ready: bool - Does it have required models?
+        - chat_model: str - Full name of available chat model (e.g., "llama3.2:1b")
+        - embedding_model: str - Full name of embedding model (e.g., "nomic-embed-text:latest")
+        - missing: list - Models that need to be pulled
+    """
+    import httpx
+
+    result = {
+        "running": False,
+        "ready": False,
+        "chat_model": None,
+        "embedding_model": None,
+        "missing": [],
+    }
+
+    # Check if Ollama is running
+    try:
+        response = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
+        if response.status_code != 200:
+            return result
+        result["running"] = True
+    except (httpx.ConnectError, httpx.TimeoutException):
+        return result
+
+    # Parse available models - keep full names with tags
+    try:
+        data = response.json()
+        models = data.get("models", [])
+        # Create mapping: base_name -> full_name (e.g., "llama3.2" -> "llama3.2:1b")
+        model_map = {}
+        for m in models:
+            full_name = m["name"]
+            base_name = full_name.split(":")[0]
+            # Prefer shorter tags (e.g., "latest" over "1b-q4")
+            if base_name not in model_map or len(full_name) < len(model_map[base_name]):
+                model_map[base_name] = full_name
+    except Exception:
+        return result
+
+    # Check for embedding model
+    embedding_model = None
+    for base_name in OLLAMA_REQUIRED_MODELS["embedding"]:
+        if base_name in model_map:
+            embedding_model = model_map[base_name]
+            break
+
+    if not embedding_model:
+        result["missing"].append("nomic-embed-text")
+    else:
+        result["embedding_model"] = embedding_model
+
+    # Check for chat model (any of the supported ones)
+    chat_model = None
+    for base_name in OLLAMA_REQUIRED_MODELS["chat"]:
+        if base_name in model_map:
+            chat_model = model_map[base_name]
+            break
+
+    if not chat_model:
+        result["missing"].append("llama3.2 (or similar)")
+    else:
+        result["chat_model"] = chat_model
+
+    # Ready if we have both
+    result["ready"] = embedding_model is not None and chat_model is not None
+
+    return result
+
+
+def _guide_cohere_signup() -> Optional[str]:
+    """
+    Guide user through getting a free Cohere API key.
+
+    Returns:
+        The API key if successful, None otherwise.
+    """
     print()
-    ui.warning(f"No API key found ({env_var})")
+    ui.warning("No LLM provider detected")
     print()
-    print(f"  Get your API key at: {info.get('signup_url', 'provider website')}")
+    print("  Fitz needs an LLM to answer questions. Let's set one up!")
+    print()
+    print("  ╭─────────────────────────────────────────────────────────────╮")
+    print("  │  Get a FREE Cohere API key (no credit card required):      │")
+    print("  │                                                             │")
+    print("  │  1. Go to: https://dashboard.cohere.com/api-keys           │")
+    print("  │  2. Sign up with Google/GitHub (30 seconds)                │")
+    print("  │  3. Copy your API key                                      │")
+    print("  │  4. Paste it below                                         │")
+    print("  ╰─────────────────────────────────────────────────────────────╯")
     print()
 
     try:
-        api_key = typer.prompt(f"Paste your API key ({env_var})")
+        api_key = typer.prompt("Paste your Cohere API key")
     except typer.Abort:
         return None
 
@@ -294,39 +398,62 @@ def _ensure_api_key(provider: str) -> Optional[str]:
         return None
 
     # Set for this session
-    os.environ[env_var] = api_key
+    os.environ["COHERE_API_KEY"] = api_key
 
-    # Offer to save
+    # Offer to save permanently
     print()
-    save = typer.confirm("Save to shell config for future sessions?", default=True)
+    save = typer.confirm("Save API key for future sessions?", default=True)
 
     if save:
-        _save_api_key_to_shell(api_key, env_var)
-    else:
-        ui.info("To set permanently, add to your shell config:")
-        ui.info(f'  export {env_var}="{api_key}"')
+        _save_api_key_to_env("COHERE_API_KEY", api_key)
 
-    print()
     return api_key
 
 
-def _save_api_key_to_shell(api_key: str, env_var: str) -> None:
-    """Save API key to user's shell config file."""
+def _save_api_key_to_env(env_var: str, api_key: str) -> None:
+    """Save API key to user's shell config or environment file."""
+    import platform
+
     home = Path.home()
 
-    # Try zshrc first (more common on macOS), then bashrc
+    # Windows: use a .env file or tell user to set system env var
+    if platform.system() == "Windows":
+        env_file = home / ".fitz" / ".env"
+        env_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Read existing content
+        existing = ""
+        if env_file.exists():
+            existing = env_file.read_text()
+
+        # Update or add the key
+        lines = existing.strip().split("\n") if existing.strip() else []
+        updated = False
+        for i, line in enumerate(lines):
+            if line.startswith(f"{env_var}="):
+                lines[i] = f'{env_var}="{api_key}"'
+                updated = True
+                break
+
+        if not updated:
+            lines.append(f'{env_var}="{api_key}"')
+
+        env_file.write_text("\n".join(lines) + "\n")
+        ui.success(f"Saved to {env_file}")
+        ui.info("This will be loaded automatically by Fitz")
+        return
+
+    # Unix: try shell config files
     rc_files = [home / ".zshrc", home / ".bashrc"]
 
     for rc_file in rc_files:
         if rc_file.exists():
             content = rc_file.read_text()
 
-            # Check if already present
             if env_var in content:
                 ui.info(f"{env_var} already in {rc_file.name}")
                 return
 
-            # Append to file
             with open(rc_file, "a") as f:
                 f.write(f'\n# Added by fitz quickstart\nexport {env_var}="{api_key}"\n')
 
@@ -346,47 +473,40 @@ def _save_api_key_to_shell(api_key: str, env_var: str) -> None:
 # Config Generation
 # =============================================================================
 
-# Provider-specific configurations
-PROVIDER_CONFIGS = {
-    "cohere": {
-        "chat": {
-            "plugin_name": "cohere",
-            "kwargs": {
-                "models": {"smart": "command-a-03-2025", "fast": "command-r7b-12-2024"},
-                "temperature": 0.2,
-            },
-        },
-        "embedding": {"plugin_name": "cohere", "kwargs": {"model": "embed-english-v3.0"}},
-        "rerank": {"enabled": True, "plugin_name": "cohere", "kwargs": {"model": "rerank-v3.5"}},
-    },
-    "openai": {
-        "chat": {
-            "plugin_name": "openai",
-            "kwargs": {"models": {"smart": "gpt-4o", "fast": "gpt-4o-mini"}, "temperature": 0.2},
-        },
-        "embedding": {"plugin_name": "openai", "kwargs": {"model": "text-embedding-3-small"}},
-        "rerank": {"enabled": False},  # OpenAI doesn't have reranking
-    },
-    "ollama": {
-        "chat": {
-            "plugin_name": "local_ollama",
-            "kwargs": {"models": {"smart": "llama3.2", "fast": "llama3.2"}},
-        },
-        "embedding": {"plugin_name": "local_ollama", "kwargs": {"model": "nomic-embed-text"}},
-        "rerank": {"enabled": False},  # Ollama doesn't have reranking
-    },
-}
 
-
-def _create_provider_config(config_path: Path, provider: str) -> None:
+def _create_provider_config(config_path: Path, provider: str, extra: Optional[dict] = None) -> None:
     """
     Create a config file for the selected provider.
 
     Uses the selected provider for chat/embedding and local FAISS for vectors.
+
+    Args:
+        config_path: Path to write the config file
+        provider: Provider name (cohere, openai, ollama)
+        extra: Optional extra info (e.g., detected Ollama model names)
     """
     import yaml
 
     provider_cfg = PROVIDER_CONFIGS.get(provider, PROVIDER_CONFIGS["cohere"])
+
+    # For Ollama, use the actual detected model names
+    if provider == "ollama" and extra:
+        provider_cfg = {
+            "chat": {
+                "plugin_name": "local_ollama",
+                "kwargs": {
+                    "models": {
+                        "smart": extra.get("chat_model", "llama3.2"),
+                        "fast": extra.get("chat_model", "llama3.2"),
+                    }
+                },
+            },
+            "embedding": {
+                "plugin_name": "local_ollama",
+                "kwargs": {"model": extra.get("embedding_model", "nomic-embed-text")},
+            },
+            "rerank": {"enabled": False},
+        }
 
     config = {
         "chat": provider_cfg["chat"],
