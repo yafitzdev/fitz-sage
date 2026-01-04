@@ -256,11 +256,14 @@ class TestMapNoChunks:
         mock_vdb.list_collections.return_value = ["test"]
         mock_vdb.scroll_with_vectors = MagicMock()
 
+        # Pre-import the module so patch can find it
+        import fitz_ai.map.embeddings  # noqa: F401
+
         with (
             patch("fitz_ai.cli.context.FitzPaths.engine_config", return_value=config_path),
             patch("fitz_ai.cli.context.FitzPaths.config", return_value=config_path),
             patch("fitz_ai.vector_db.registry.get_vector_db_plugin", return_value=mock_vdb),
-            patch("fitz_ai.map.embeddings.fetch_all_chunk_ids", return_value=[]),
+            patch("fitz_ai.map.embeddings.fetch_all_chunk_ids", return_value=set()),
             patch.dict("sys.modules", {"umap": MagicMock(), "sklearn.cluster": MagicMock()}),
         ):
             result = runner.invoke(app, ["map"])

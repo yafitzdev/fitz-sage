@@ -12,7 +12,6 @@ Usage:
     generate_knowledge_map(collection="default", output_path="map.html")
 """
 
-from fitz_ai.map import embeddings
 from fitz_ai.map.models import (
     ChunkEmbedding,
     ClusterInfo,
@@ -23,7 +22,6 @@ from fitz_ai.map.models import (
 )
 
 __all__ = [
-    "embeddings",
     "ChunkEmbedding",
     "DocumentNode",
     "ClusterInfo",
