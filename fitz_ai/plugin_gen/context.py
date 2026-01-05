@@ -9,10 +9,13 @@ prompts that help the LLM generate correct, working plugins.
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from fitz_ai.plugin_gen.test_inputs import get_expected_behavior
 from fitz_ai.plugin_gen.types import PluginType
+
+if TYPE_CHECKING:
+    from fitz_ai.plugin_gen.library_context import LibraryContext
 
 logger = logging.getLogger(__name__)
 
@@ -295,6 +298,7 @@ def build_generation_prompt(
     plugin_type: PluginType,
     description: str,
     example_code: Optional[str] = None,
+    library_context: Optional["LibraryContext"] = None,
 ) -> str:
     """
     Build the prompt for generating a plugin.
@@ -303,6 +307,7 @@ def build_generation_prompt(
         plugin_type: Type of plugin to generate
         description: User's description of what they want
         example_code: Optional example plugin code
+        library_context: Optional context about an external library to use
 
     Returns:
         Complete prompt for the LLM
@@ -334,39 +339,87 @@ def build_generation_prompt(
         ]
     )
 
+    # Add library context if provided
+    if library_context:
+        parts.extend(
+            [
+                "",
+                "## External Library to Use",
+                "",
+                f"The user explicitly requested using the `{library_context.name}` library.",
+                f"Install command: `{library_context.install_command}`",
+                "",
+                f"**Summary**: {library_context.summary}",
+                "",
+                "### Library Documentation",
+                "",
+                library_context.readme_excerpt,
+                "",
+                "**IMPORTANT**: You MUST use this library in your implementation. "
+                "Import it at the top of the file and use its API as shown in the documentation above.",
+            ]
+        )
+
     # Add example if available
     if example_code:
         parts.extend(
             [
                 "",
-                "## Example Plugin (for reference)",
+                "## Example Plugin Structure (for reference)",
                 "",
                 f"```{'yaml' if plugin_type.is_yaml else 'python'}",
                 example_code.strip(),
                 "```",
             ]
         )
+        if library_context:
+            parts.append(
+                "\nNote: The example above shows the plugin structure. "
+                f"You should adapt it to use the `{library_context.name}` library."
+            )
 
-    # Add instructions
+    # Add instructions - vary based on whether external library is used
     extension = plugin_type.file_extension
-    parts.extend(
-        [
-            "",
-            "## Instructions",
-            "",
-            f"Generate a complete, working {extension} plugin.",
-            "- Output ONLY the plugin code, no explanations",
-            "- Do NOT include file path comments at the top (no '# fitz_ai/...' lines)",
-            "- Ensure all required fields are present",
-            "- Use realistic values based on the description",
-            "- The plugin should work immediately after setting the required API key",
-            "- IMPORTANT: Use only Python standard library or packages already imported in fitz-ai",
-            "- Do NOT use nltk, spacy, or other NLP libraries that require extra downloads",
-            "- For sentence splitting, use regex: re.split(r'(?<=[.!?])\\s+', text)",
-            "",
-            f"Output the complete {extension} code:",
-        ]
-    )
+
+    if library_context:
+        # Instructions when using an external library
+        parts.extend(
+            [
+                "",
+                "## Instructions",
+                "",
+                f"Generate a complete, working {extension} plugin using the "
+                f"`{library_context.name}` library.",
+                "- Output ONLY the plugin code, no explanations",
+                "- Do NOT include file path comments at the top (no '# fitz_ai/...' lines)",
+                "- Ensure all required fields are present",
+                f"- Import and use `{library_context.name}` - this is required",
+                "- Follow the library's documented API patterns",
+                "- Handle the library's output format correctly",
+                "",
+                f"Output the complete {extension} code:",
+            ]
+        )
+    else:
+        # Standard instructions (no external library)
+        parts.extend(
+            [
+                "",
+                "## Instructions",
+                "",
+                f"Generate a complete, working {extension} plugin.",
+                "- Output ONLY the plugin code, no explanations",
+                "- Do NOT include file path comments at the top (no '# fitz_ai/...' lines)",
+                "- Ensure all required fields are present",
+                "- Use realistic values based on the description",
+                "- The plugin should work immediately after setting the required API key",
+                "- IMPORTANT: Use only Python standard library or packages already imported in fitz-ai",
+                "- Do NOT use nltk, spacy, or other NLP libraries that require extra downloads",
+                "- For sentence splitting, use regex: re.split(r'(?<=[.!?])\\s+', text)",
+                "",
+                f"Output the complete {extension} code:",
+            ]
+        )
 
     return "\n".join(parts)
 

@@ -19,6 +19,9 @@ from fitz_ai.plugin_gen.context import (
     extract_code_from_response,
     load_example_plugin,
 )
+from fitz_ai.plugin_gen.library_context import (
+    get_library_context_for_query,
+)
 from fitz_ai.plugin_gen.types import GenerationResult, PluginType
 from fitz_ai.plugin_gen.validators import PluginValidator, format_validation_error
 
@@ -109,8 +112,16 @@ class PluginGenerator:
         progress("Loading example plugins...")
         example_code = load_example_plugin(plugin_type)
 
+        # Check for external library mentions
+        library_context = None
+        if plugin_type.is_python:
+            progress("Checking for library dependencies...")
+            library_context = get_library_context_for_query(description)
+            if library_context:
+                progress(f"Fetched docs for '{library_context.name}' library")
+
         # Build initial prompt
-        prompt = build_generation_prompt(plugin_type, description, example_code)
+        prompt = build_generation_prompt(plugin_type, description, example_code, library_context)
 
         code: Optional[str] = None
         last_error: Optional[str] = None
@@ -136,7 +147,11 @@ class PluginGenerator:
 
                 # Validate
                 progress("Validating generated code...")
-                validations = self.validator.validate(code, plugin_type)
+                validations = self.validator.validate(
+                    code,
+                    plugin_type,
+                    uses_external_library=library_context is not None,
+                )
                 result.validations = validations
 
                 # Check if all validations passed
@@ -194,12 +209,16 @@ class PluginGenerator:
     def _extract_plugin_name(self, code: str, plugin_type: PluginType) -> str:
         """Extract the plugin name from generated code."""
         # Try plugin_name field (YAML and Python)
-        match = re.search(r'plugin_name[:\s]*[=:]?\s*["\']?([a-z][a-z0-9_]*)["\']?', code, re.IGNORECASE)
+        match = re.search(
+            r'plugin_name[:\s]*[=:]?\s*["\']?([a-z][a-z0-9_]*)["\']?', code, re.IGNORECASE
+        )
         if match:
             return match.group(1).lower()
 
         # Try name field (YAML)
-        match = re.search(r'^name[:\s]+["\']?([a-z][a-z0-9_]*)["\']?', code, re.MULTILINE | re.IGNORECASE)
+        match = re.search(
+            r'^name[:\s]+["\']?([a-z][a-z0-9_]*)["\']?', code, re.MULTILINE | re.IGNORECASE
+        )
         if match:
             return match.group(1).lower()
 

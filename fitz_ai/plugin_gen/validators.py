@@ -33,6 +33,7 @@ class PluginValidator:
         code: str,
         plugin_type: PluginType,
         plugin_name: Optional[str] = None,
+        uses_external_library: bool = False,
     ) -> List[ValidationResult]:
         """
         Validate plugin code.
@@ -41,6 +42,8 @@ class PluginValidator:
             code: The generated plugin code
             plugin_type: Type of plugin
             plugin_name: Expected plugin name (for consistency check)
+            uses_external_library: If True, skip import/functional validation
+                (library may not be installed)
 
         Returns:
             List of validation results (one per level attempted)
@@ -48,7 +51,7 @@ class PluginValidator:
         if plugin_type.is_yaml:
             return self._validate_yaml(code, plugin_type, plugin_name)
         else:
-            return self._validate_python(code, plugin_type, plugin_name)
+            return self._validate_python(code, plugin_type, plugin_name, uses_external_library)
 
     def _validate_yaml(
         self,
@@ -196,6 +199,7 @@ class PluginValidator:
         code: str,
         plugin_type: PluginType,
         plugin_name: Optional[str],
+        uses_external_library: bool = False,
     ) -> List[ValidationResult]:
         """Validate Python plugin."""
         results = []
@@ -211,6 +215,14 @@ class PluginValidator:
                     f"Syntax error at line {e.lineno}: {e.msg}",
                 )
             )
+            return results
+
+        # Level 2: AST Structure Check (for external library plugins)
+        if uses_external_library:
+            # Skip import/functional tests - library may not be installed
+            # Just validate the code structure via AST
+            ast_result = self._validate_python_ast_structure(code, plugin_type)
+            results.append(ast_result)
             return results
 
         # Level 2: Import Test
@@ -230,6 +242,83 @@ class PluginValidator:
         results.append(functional_result)
 
         return results
+
+    def _validate_python_ast_structure(
+        self,
+        code: str,
+        plugin_type: PluginType,
+    ) -> ValidationResult:
+        """
+        Validate Python plugin structure via AST (without importing).
+
+        Used when external libraries are required but not installed.
+        """
+        try:
+            tree = ast.parse(code)
+        except SyntaxError as e:
+            return ValidationResult.failed(
+                ValidationLevel.SCHEMA,
+                f"Syntax error at line {e.lineno}: {e.msg}",
+            )
+
+        # Find class definitions
+        classes = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
+
+        if not classes:
+            return ValidationResult.failed(
+                ValidationLevel.SCHEMA,
+                "No class definition found in generated code",
+            )
+
+        # Check the main class has required structure
+        required_methods = {
+            PluginType.CHUNKER: ["chunk_text"],
+            PluginType.READER: ["ingest"],
+            PluginType.CONSTRAINT: ["apply"],
+        }
+
+        target_methods = required_methods.get(plugin_type, [])
+
+        for cls in classes:
+            methods = [node.name for node in ast.walk(cls) if isinstance(node, ast.FunctionDef)]
+
+            # Check for plugin_name attribute
+            has_plugin_name = False
+            for node in ast.walk(cls):
+                if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                    if node.target.id in ("plugin_name", "name"):
+                        has_plugin_name = True
+                        break
+                if isinstance(node, ast.Assign):
+                    for target in node.targets:
+                        if isinstance(target, ast.Name) and target.id in (
+                            "plugin_name",
+                            "name",
+                        ):
+                            has_plugin_name = True
+                            break
+
+            # Check if this class has all required methods
+            has_all_methods = all(m in methods for m in target_methods)
+
+            if has_plugin_name and has_all_methods:
+                return ValidationResult.passed(
+                    ValidationLevel.SCHEMA,
+                    details={"note": "Validated via AST (external library not installed)"},
+                )
+
+        # No suitable class found
+        missing = []
+        if not has_plugin_name:
+            missing.append("plugin_name attribute")
+        for m in target_methods:
+            if m not in methods:
+                missing.append(f"{m}() method")
+
+        return ValidationResult.failed(
+            ValidationLevel.SCHEMA,
+            f"Plugin class missing: {', '.join(missing)}",
+        )
 
     def _validate_python_import(
         self,

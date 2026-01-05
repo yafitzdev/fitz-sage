@@ -137,9 +137,11 @@ class ValidationResult:
     details: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def passed(cls, level: ValidationLevel) -> "ValidationResult":
+    def passed(
+        cls, level: ValidationLevel, details: Optional[Dict[str, Any]] = None
+    ) -> "ValidationResult":
         """Create a passed validation result."""
-        return cls(level=level, success=True)
+        return cls(level=level, success=True, details=details or {})
 
     @classmethod
     def failed(cls, level: ValidationLevel, error: str, **details: Any) -> "ValidationResult":
