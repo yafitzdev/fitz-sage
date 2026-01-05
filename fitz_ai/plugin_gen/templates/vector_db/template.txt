@@ -1,0 +1,44 @@
+# TEMPLATE: Vector Database Plugin
+#
+# Vector DB plugins define connection and operations for vector stores.
+#
+# REQUIRED FIELDS:
+#   - name: Unique identifier
+#   - type: Database type (e.g., "qdrant", "pinecone", "milvus")
+#   - connection: Host, port, auth settings
+#   - operations: CRUD operations for collections and vectors
+
+name: "CHANGE_ME"
+type: "CHANGE_ME"  # e.g., "qdrant", "pinecone", "milvus"
+
+connection:
+  host: "{VECTOR_DB_HOST}"  # Environment variable placeholder
+  port: 6333
+  api_key: "{VECTOR_DB_API_KEY}"  # Optional, for cloud services
+
+operations:
+  create_collection:
+    method: "PUT"
+    path: "/collections/{collection_name}"
+    body:
+      vectors:
+        size: "{dimensions}"
+        distance: "Cosine"
+
+  delete_collection:
+    method: "DELETE"
+    path: "/collections/{collection_name}"
+
+  upsert:
+    method: "PUT"
+    path: "/collections/{collection_name}/points"
+    body:
+      points: "{points}"  # List of {id, vector, payload}
+
+  search:
+    method: "POST"
+    path: "/collections/{collection_name}/points/search"
+    body:
+      vector: "{query_vector}"
+      limit: "{top_k}"
+      with_payload: true

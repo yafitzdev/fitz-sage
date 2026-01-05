@@ -65,16 +65,80 @@ class LibraryContext:
     install_command: str
     summary: str
     readme_excerpt: str
+    has_code_examples: bool = False
 
     def __str__(self) -> str:
         return f"LibraryContext({self.name})"
 
 
+@dataclass
+class PackageDetectionResult:
+    """Result of detecting package mentions in a query."""
+
+    explicit_package: Optional[str] = None  # From package:name syntax
+    implicit_packages: List[str] = None  # From KNOWN_LIBRARIES matching
+
+    def __post_init__(self):
+        if self.implicit_packages is None:
+            self.implicit_packages = []
+
+    @property
+    def has_explicit_package(self) -> bool:
+        return self.explicit_package is not None
+
+
+def detect_explicit_package(query: str) -> Optional[str]:
+    """
+    Detect explicit package:name syntax in query.
+
+    Args:
+        query: User's plugin generation query
+
+    Returns:
+        Package name if found, None otherwise
+
+    Examples:
+        >>> detect_explicit_package("reader for package:docling")
+        'docling'
+        >>> detect_explicit_package("reader using docling")
+        None
+    """
+    match = re.search(r"package:(\w+(?:-\w+)?)", query.lower())
+    if match:
+        return match.group(1)
+    return None
+
+
+def detect_packages(query: str) -> PackageDetectionResult:
+    """
+    Detect package mentions in a query.
+
+    Checks for explicit package:name syntax first, then implicit mentions.
+
+    Args:
+        query: User's plugin generation query
+
+    Returns:
+        PackageDetectionResult with explicit and implicit packages
+    """
+    result = PackageDetectionResult()
+
+    # Check for explicit package:name syntax first
+    explicit = detect_explicit_package(query)
+    if explicit:
+        result.explicit_package = explicit
+        return result
+
+    # Fall back to implicit detection
+    result.implicit_packages = detect_library_mentions(query)
+    return result
+
+
 def detect_library_mentions(query: str) -> List[str]:
     """
-    Detect explicit library mentions in a user query.
+    Detect implicit library mentions in a user query.
 
-    Only returns libraries that are explicitly named, not inferred.
+    Only returns libraries from KNOWN_LIBRARIES.
 
     Args:
         query: User's plugin generation query
@@ -87,14 +151,12 @@ def detect_library_mentions(query: str) -> List[str]:
         ['docling']
         >>> detect_library_mentions("sentence chunker")
         []
-        >>> detect_library_mentions("use pymupdf and pytesseract")
-        ['pymupdf', 'pytesseract']
     """
     query_lower = query.lower()
     detected = []
 
-    # Patterns that indicate explicit library usage
-    explicit_patterns = [
+    # Patterns that indicate library usage
+    patterns = [
         r"using\s+(?:the\s+)?(\w+(?:-\w+)?)",
         r"with\s+(?:the\s+)?(\w+(?:-\w+)?)\s+(?:library|package|module)",
         r"use\s+(?:the\s+)?(\w+(?:-\w+)?)",
@@ -105,7 +167,7 @@ def detect_library_mentions(query: str) -> List[str]:
 
     # Extract candidates from patterns
     candidates = set()
-    for pattern in explicit_patterns:
+    for pattern in patterns:
         for match in re.finditer(pattern, query_lower):
             candidates.add(match.group(1))
 
@@ -134,6 +196,7 @@ def fetch_library_context(name: str) -> Optional[LibraryContext]:
     Returns:
         LibraryContext with documentation, or None if fetch fails
     """
+    # Try KNOWN_LIBRARIES first, otherwise use name as-is for PyPI
     pypi_name = KNOWN_LIBRARIES.get(name, name)
 
     try:
@@ -150,6 +213,10 @@ def fetch_library_context(name: str) -> Optional[LibraryContext]:
         with httpx.Client(timeout=10.0) as client:
             response = client.get(url)
 
+            if response.status_code == 404:
+                logger.warning(f"Package '{pypi_name}' not found on PyPI")
+                return None
+
             if response.status_code != 200:
                 logger.warning(f"PyPI returned {response.status_code} for {pypi_name}")
                 return None
@@ -160,8 +227,12 @@ def fetch_library_context(name: str) -> Optional[LibraryContext]:
         summary = info.get("summary", "")
         description = info.get("description", "")
 
+        # Extract code blocks first to check if any exist
+        code_blocks = _extract_code_blocks(description)
+        has_code = len(code_blocks) > 0 and any(lang == "python" for lang, _ in code_blocks)
+
         # Extract a useful excerpt from the description
-        readme_excerpt = _extract_readme_excerpt(description, max_chars=3000)
+        readme_excerpt = _extract_readme_excerpt(description, max_chars=4000)
 
         return LibraryContext(
             name=name,
@@ -169,6 +240,7 @@ def fetch_library_context(name: str) -> Optional[LibraryContext]:
             install_command=f"pip install {pypi_name}",
             summary=summary,
             readme_excerpt=readme_excerpt,
+            has_code_examples=has_code,
         )
 
     except Exception as e:
@@ -342,27 +414,99 @@ def _extract_context_sections(text: str, max_chars: int) -> str:
     return "\n".join(result).strip()
 
 
-def get_library_context_for_query(query: str) -> Optional[LibraryContext]:
+@dataclass
+class LibraryLookupResult:
+    """Result of looking up a library for plugin generation."""
+
+    success: bool
+    context: Optional[LibraryContext] = None
+    error: Optional[str] = None
+    was_explicit: bool = False  # True if package:name syntax was used
+
+    @classmethod
+    def ok(cls, context: LibraryContext, was_explicit: bool = False) -> "LibraryLookupResult":
+        return cls(success=True, context=context, was_explicit=was_explicit)
+
+    @classmethod
+    def not_found(cls, package_name: str) -> "LibraryLookupResult":
+        return cls(
+            success=False,
+            error=f"Package '{package_name}' not found on PyPI. Check the spelling.",
+            was_explicit=True,
+        )
+
+    @classmethod
+    def no_code_examples(cls, package_name: str) -> "LibraryLookupResult":
+        return cls(
+            success=False,
+            error=(
+                f"Package '{package_name}' has no Python code examples in its documentation. "
+                "Cannot confidently generate plugin without API usage examples."
+            ),
+            was_explicit=True,
+        )
+
+    @classmethod
+    def no_package(cls) -> "LibraryLookupResult":
+        """No package was requested - generate without external library."""
+        return cls(success=True, context=None, was_explicit=False)
+
+
+def get_library_context_for_query(query: str) -> LibraryLookupResult:
     """
-    Convenience function: detect and fetch library context from a query.
+    Look up library context for a plugin generation query.
+
+    Handles both explicit (package:name) and implicit library mentions.
+    Applies epistemic honesty - refuses if package not found or lacks documentation.
 
     Args:
         query: User's plugin generation query
 
     Returns:
-        LibraryContext for the first detected library, or None
+        LibraryLookupResult with context or error
+
+    Examples:
+        >>> result = get_library_context_for_query("reader for package:docling")
+        >>> result.success  # True if found with code examples
+        >>> result.context  # LibraryContext or None
+        >>> result.error    # Error message if failed
     """
-    libraries = detect_library_mentions(query)
+    detection = detect_packages(query)
 
-    if not libraries:
-        return None
+    # Case 1: Explicit package:name syntax - MUST find it
+    if detection.has_explicit_package:
+        package_name = detection.explicit_package
+        context = fetch_library_context(package_name)
 
-    # Fetch context for the first (primary) library mentioned
-    return fetch_library_context(libraries[0])
+        if context is None:
+            return LibraryLookupResult.not_found(package_name)
+
+        if not context.has_code_examples:
+            return LibraryLookupResult.no_code_examples(package_name)
+
+        return LibraryLookupResult.ok(context, was_explicit=True)
+
+    # Case 2: Implicit library mentions - best effort
+    if detection.implicit_packages:
+        # Use first detected library
+        package_name = detection.implicit_packages[0]
+        context = fetch_library_context(package_name)
+
+        if context is not None:
+            # For implicit mentions, we proceed even without code examples
+            # but we note if they exist
+            return LibraryLookupResult.ok(context, was_explicit=False)
+
+    # Case 3: No package mentioned
+    return LibraryLookupResult.no_package()
 
 
 __all__ = [
     "LibraryContext",
+    "LibraryLookupResult",
+    "PackageDetectionResult",
+    "detect_explicit_package",
+    "detect_packages",
     "detect_library_mentions",
     "fetch_library_context",
     "get_library_context_for_query",

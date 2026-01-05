@@ -115,10 +115,18 @@ class PluginGenerator:
         # Check for external library mentions
         library_context = None
         if plugin_type.is_python:
-            progress("Checking for library dependencies...")
-            library_context = get_library_context_for_query(description)
+            progress("Checking for package dependencies...")
+            lookup_result = get_library_context_for_query(description)
+
+            # Handle lookup failures (epistemic honesty)
+            if not lookup_result.success:
+                progress(f"Cannot proceed: {lookup_result.error}")
+                result.errors.append(lookup_result.error)
+                return result
+
+            library_context = lookup_result.context
             if library_context:
-                progress(f"Fetched docs for '{library_context.name}' library")
+                progress(f"Fetched docs for '{library_context.name}' package")
 
         # Build initial prompt
         prompt = build_generation_prompt(plugin_type, description, example_code, library_context)

@@ -2,13 +2,14 @@
 """
 Context builder for LLM plugin generation.
 
-Loads existing plugin examples and schema definitions to build
+Loads minimal plugin templates and schema definitions to build
 prompts that help the LLM generate correct, working plugins.
 """
 
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from fitz_ai.plugin_gen.test_inputs import get_expected_behavior
@@ -19,64 +20,43 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Templates directory
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+
 
 # =============================================================================
-# Example Loading
+# Template Loading
 # =============================================================================
 
 
-def _load_yaml_example(plugin_type: PluginType) -> Optional[str]:
-    """Load an example YAML plugin for reference."""
-    examples_dir = plugin_type.get_example_plugins_dir()
+def load_template(plugin_type: PluginType) -> Optional[str]:
+    """
+    Load the minimal template for the given plugin type.
 
-    if not examples_dir.exists():
-        logger.debug(f"Examples directory does not exist: {examples_dir}")
+    Templates are stored at: templates/{plugin_type}/template.txt
+
+    Args:
+        plugin_type: Type of plugin to generate
+
+    Returns:
+        Template code or None if not found
+    """
+    template_path = TEMPLATES_DIR / plugin_type.name.lower() / "template.txt"
+
+    if not template_path.exists():
+        logger.warning(f"Template not found: {template_path}")
         return None
 
-    # Find first .yaml file
-    yaml_files = list(examples_dir.glob("*.yaml"))
-    if not yaml_files:
-        logger.debug(f"No YAML files found in {examples_dir}")
+    try:
+        return template_path.read_text(encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"Failed to read template {template_path}: {e}")
         return None
-
-    # Prefer openai.yaml or first file
-    for preferred in ["openai.yaml", "qdrant.yaml", "dense.yaml"]:
-        for f in yaml_files:
-            if f.name == preferred:
-                return f.read_text(encoding="utf-8")
-
-    return yaml_files[0].read_text(encoding="utf-8")
-
-
-def _load_python_example(plugin_type: PluginType) -> Optional[str]:
-    """Load an example Python plugin for reference."""
-    examples_dir = plugin_type.get_example_plugins_dir()
-
-    if not examples_dir.exists():
-        logger.debug(f"Examples directory does not exist: {examples_dir}")
-        return None
-
-    # Find first .py file that's not __init__
-    py_files = [f for f in examples_dir.glob("*.py") if not f.name.startswith("_")]
-    if not py_files:
-        logger.debug(f"No Python files found in {examples_dir}")
-        return None
-
-    # Prefer simple.py or conflict_aware.py
-    for preferred in ["simple.py", "conflict_aware.py", "local_fs.py"]:
-        for f in py_files:
-            if f.name == preferred:
-                return f.read_text(encoding="utf-8")
-
-    return py_files[0].read_text(encoding="utf-8")
 
 
 def load_example_plugin(plugin_type: PluginType) -> Optional[str]:
-    """Load an example plugin for the given type."""
-    if plugin_type.is_yaml:
-        return _load_yaml_example(plugin_type)
-    else:
-        return _load_python_example(plugin_type)
+    """Load an example plugin for the given type (now loads templates)."""
+    return load_template(plugin_type)
 
 
 # =============================================================================
@@ -497,10 +477,12 @@ def extract_code_from_response(response: str, plugin_type: PluginType) -> str:
 
 
 __all__ = [
+    "load_template",
     "load_example_plugin",
     "get_yaml_schema_info",
     "get_python_protocol_info",
     "build_generation_prompt",
     "build_retry_prompt",
     "extract_code_from_response",
+    "TEMPLATES_DIR",
 ]
