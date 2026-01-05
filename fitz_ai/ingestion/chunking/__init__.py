@@ -3,7 +3,7 @@
 Chunking subsystem for ingestion.
 
 Provides:
-- ChunkerPlugin protocol for implementing chunkers
+- Chunker protocol for implementing chunkers
 - ChunkingRouter for file-type specific routing
 - ChunkingEngine for orchestration
 - Built-in chunker plugins (simple, etc.)
@@ -12,7 +12,7 @@ Usage:
     from fitz_ai.ingestion.chunking import (
         ChunkingRouter,
         ChunkingEngine,
-        ChunkerPlugin,
+        Chunker,
     )
     from fitz_ai.engines.fitz_rag.config import ChunkingRouterConfig
 
@@ -23,13 +23,14 @@ Usage:
     chunks = engine.run(raw_doc)
 """
 
-from fitz_ai.ingestion.chunking.base import Chunk, ChunkerPlugin
+from fitz_ai.core.chunk import Chunk
+from fitz_ai.ingestion.chunking.base import Chunker
 from fitz_ai.ingestion.chunking.engine import ChunkingEngine
 from fitz_ai.ingestion.chunking.router import ChunkingRouter
 
 __all__ = [
     # Protocol
-    "ChunkerPlugin",
+    "Chunker",
     "Chunk",
     # Router
     "ChunkingRouter",

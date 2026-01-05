@@ -26,8 +26,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.engines.fitz_rag.config import ChunkingRouterConfig
-from fitz_ai.ingestion.chunking.base import ChunkerPlugin
+from fitz_ai.ingestion.chunking.base import Chunker
 from fitz_ai.ingestion.chunking.registry import (
     get_chunker_for_extension,
     get_chunking_plugin,
@@ -56,8 +57,8 @@ class ChunkingRouter:
 
     def __init__(
         self,
-        chunker_map: Dict[str, ChunkerPlugin],
-        default_chunker: ChunkerPlugin,
+        chunker_map: Dict[str, Chunker],
+        default_chunker: Chunker,
         warn_on_fallback: bool = True,
     ) -> None:
         """
@@ -74,7 +75,7 @@ class ChunkingRouter:
         self._warn_on_fallback = warn_on_fallback
         self._warned_extensions: set[str] = set()
         # Cache for auto-discovered chunker instances
-        self._auto_chunkers: Dict[str, ChunkerPlugin] = {}
+        self._auto_chunkers: Dict[str, Chunker] = {}
 
     @classmethod
     def from_config(cls, config: ChunkingRouterConfig) -> "ChunkingRouter":
@@ -96,7 +97,7 @@ class ChunkingRouter:
             context="default",
         )
 
-        chunker_map: Dict[str, ChunkerPlugin] = {}
+        chunker_map: Dict[str, Chunker] = {}
         for ext, ext_config in config.by_extension.items():
             normalized_ext = cls._normalize_ext(ext)
             chunker_map[normalized_ext] = cls._build_chunker(
@@ -122,7 +123,7 @@ class ChunkingRouter:
         plugin_name: str,
         kwargs: Dict[str, Any],
         context: str,
-    ) -> ChunkerPlugin:
+    ) -> Chunker:
         """Build a chunker instance from plugin name and kwargs."""
         try:
             PluginCls = get_chunking_plugin(plugin_name)
@@ -138,7 +139,7 @@ class ChunkingRouter:
                 f"Failed to initialize chunker '{plugin_name}' for {context}: {e}"
             ) from e
 
-    def get_chunker(self, ext: str) -> ChunkerPlugin:
+    def get_chunker(self, ext: str) -> Chunker:
         """
         Get the appropriate chunker for a file extension.
 
@@ -249,6 +250,7 @@ class ChunkingRouter:
             logger.debug(f"Empty content for document: {path_str}")
             return []
 
+        # Build metadata
         base_meta: Dict[str, Any] = {
             "source_file": str(path),
             "doc_id": path.stem,
@@ -258,20 +260,32 @@ class ChunkingRouter:
         if extra_meta:
             base_meta.update(extra_meta)
 
+        # Convert RawDocument to ParsedDocument
+        document = ParsedDocument(
+            source=f"file:///{path}",
+            elements=[
+                DocumentElement(
+                    type=ElementType.TEXT,
+                    content=raw_doc.content,
+                )
+            ],
+            metadata=base_meta,
+        )
+
         chunker = self.get_chunker(ext)
         logger.debug(
             f"Chunking '{path.name}' with {chunker.plugin_name} (chunker_id: {chunker.chunker_id})"
         )
 
         try:
-            return chunker.chunk_text(raw_doc.content, base_meta)
+            return chunker.chunk(document)
         except Exception as e:
             raise IngestionChunkingError(
                 f"Chunking failed for '{path_str}' with {chunker.plugin_name}: {e}"
             ) from e
 
     @property
-    def default_chunker(self) -> ChunkerPlugin:
+    def default_chunker(self) -> Chunker:
         """Get the default fallback chunker."""
         return self._default_chunker
 

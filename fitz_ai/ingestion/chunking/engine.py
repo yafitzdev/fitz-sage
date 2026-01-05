@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.engines.fitz_rag.config import ChunkingRouterConfig
 from fitz_ai.ingestion.chunking.router import ChunkingRouter
 from fitz_ai.ingestion.exceptions.chunking import IngestionChunkingError
@@ -129,8 +130,20 @@ class ChunkingEngine:
             f"(id: {chunker.chunker_id}) for '{path_str}'"
         )
 
+        # Convert RawDocument to ParsedDocument
+        document = ParsedDocument(
+            source=f"file:///{path}" if path else path_str,
+            elements=[
+                DocumentElement(
+                    type=ElementType.TEXT,
+                    content=content,
+                )
+            ],
+            metadata=base_meta,
+        )
+
         try:
-            chunks = chunker.chunk_text(content, base_meta)
+            chunks = chunker.chunk(document)
         except IngestionChunkingError:
             raise
         except Exception as e:

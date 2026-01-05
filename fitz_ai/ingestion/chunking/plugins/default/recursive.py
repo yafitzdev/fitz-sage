@@ -15,9 +15,11 @@ This preserves natural text boundaries while guaranteeing chunk size limits.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import List
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.core.document import ParsedDocument
 
 
 @dataclass
@@ -152,18 +154,32 @@ class RecursiveChunker:
 
         return result
 
-    def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Chunk]:
+    def chunk(self, document: ParsedDocument) -> List[Chunk]:
         """
-        Chunk text using recursive splitting with overlap.
+        Chunk a parsed document using recursive splitting with overlap.
 
         Args:
-            text: Raw text to chunk
-            base_meta: Base metadata (doc_id, source_file, etc.)
+            document: ParsedDocument with structured elements.
 
         Returns:
-            List of Chunk objects
+            List of Chunk objects.
         """
-        doc_id = str(base_meta.get("doc_id") or base_meta.get("source_file") or "unknown")
+        text = document.full_text
+        if not text or not text.strip():
+            return []
+
+        # Extract doc_id from document
+        doc_id = document.metadata.get("doc_id")
+        if not doc_id:
+            source_path = Path(document.source.replace("file:///", ""))
+            doc_id = source_path.stem if source_path.stem else "unknown"
+
+        # Build base metadata
+        base_meta = {
+            "source_file": document.source,
+            "doc_id": doc_id,
+            **document.metadata,
+        }
 
         # Split text
         raw_chunks = self._split_text(text, self.separators)

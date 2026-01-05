@@ -3,35 +3,41 @@
 Base protocol and classes for chunking plugins.
 
 Each chunker plugin must implement:
-- plugin_name: str - The plugin identifier (e.g., "simple", "markdown")
-- chunker_id: str - Unique ID including params that affect output (e.g., "simple:1000:0")
-- chunk_text(text, base_meta) -> List[Chunk]
+- plugin_name: str - The plugin identifier (e.g., "simple", "semantic")
+- chunker_id: str - Unique ID including params that affect output
+- chunk(document) -> List[Chunk]
 
 The chunker_id is used for:
 1. State tracking - stored per file to detect config changes
 2. Re-chunking decisions - if chunker_id changes, file is re-ingested
 3. Reproducibility - same chunker_id guarantees same chunking behavior
+
+Flow: ParsedDocument → Chunker.chunk() → List[Chunk]
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Protocol, runtime_checkable
+from typing import List, Protocol, runtime_checkable
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.core.document import ParsedDocument
 
 
 @runtime_checkable
-class ChunkerPlugin(Protocol):
+class Chunker(Protocol):
     """
-    Protocol for ingestion chunker plugins.
+    Protocol for document chunking plugins.
+
+    Chunkers split ParsedDocument into retrieval-sized Chunks.
+    They can use document structure (headings, paragraphs, etc.) for
+    intelligent splitting decisions.
 
     Contract:
-    - plugin_name: Identifies the plugin type (e.g., "simple", "markdown")
+    - plugin_name: Identifies the plugin type (e.g., "simple", "semantic")
     - chunker_id: Unique ID including params that affect chunk output
-    - chunk_text: Splits text into chunks with metadata
+    - chunk: Splits ParsedDocument into chunks
 
     The chunker_id format is: "{plugin_name}:{param1}:{param2}:..."
-    Each plugin defines which parameters are included in its ID.
 
     Example:
         >>> chunker = SimpleChunker(chunk_size=1000, chunk_overlap=100)
@@ -59,18 +65,21 @@ class ChunkerPlugin(Protocol):
         """
         ...
 
-    def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Chunk]:
+    def chunk(self, document: ParsedDocument) -> List[Chunk]:
         """
-        Split text into chunks.
+        Split a parsed document into chunks.
 
         Args:
-            text: The raw text content to chunk.
-            base_meta: Base metadata to include in each chunk (source_file, doc_id, etc.)
+            document: ParsedDocument with structured elements.
 
         Returns:
             List of Chunk objects with content and metadata.
+
+        Note:
+            Chunkers can use document.elements for structure-aware chunking,
+            or document.full_text for simple text-based chunking.
         """
         ...
 
 
-__all__ = ["ChunkerPlugin", "Chunk"]
+__all__ = ["Chunker", "Chunk"]

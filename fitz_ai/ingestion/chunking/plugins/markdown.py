@@ -18,11 +18,13 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.core.document import ParsedDocument
 
 logger = logging.getLogger(__name__)
 
@@ -294,28 +296,39 @@ class MarkdownChunker:
             logger.debug(f"Failed to parse frontmatter: {e}")
             return {}, text
 
-    def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Chunk]:
+    def chunk(self, document: ParsedDocument) -> List[Chunk]:
         """
-        Chunk markdown text by headers.
+        Chunk a parsed markdown document by headers.
 
         Extracts YAML frontmatter and merges it into chunk metadata.
 
         Args:
-            text: Markdown content to chunk.
-            base_meta: Base metadata to include in each chunk.
+            document: ParsedDocument with structured elements.
 
         Returns:
             List of Chunk objects.
         """
+        text = document.full_text
         if not text or not text.strip():
             return []
+
+        # Extract doc_id from document
+        doc_id = document.metadata.get("doc_id")
+        if not doc_id:
+            source_path = Path(document.source.replace("file:///", ""))
+            doc_id = source_path.stem if source_path.stem else "unknown"
+
+        # Build base metadata
+        base_meta: Dict[str, Any] = {
+            "source_file": document.source,
+            "doc_id": doc_id,
+            **document.metadata,
+        }
 
         # Extract frontmatter and merge into metadata
         frontmatter, text = self._extract_frontmatter(text)
         if frontmatter:
             base_meta = {**base_meta, **frontmatter}
-
-        doc_id = str(base_meta.get("doc_id") or base_meta.get("source_file") or "unknown")
 
         # Split into sections
         sections = self._split_into_sections(text)

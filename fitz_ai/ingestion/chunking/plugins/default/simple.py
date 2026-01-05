@@ -13,9 +13,11 @@ Example: "simple:1000:0" for 1000-char chunks with no overlap
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import List
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.core.document import ParsedDocument
 
 
 @dataclass
@@ -27,7 +29,7 @@ class SimpleChunker:
         >>> chunker = SimpleChunker(chunk_size=500, chunk_overlap=50)
         >>> chunker.chunker_id
         'simple:500:50'
-        >>> chunks = chunker.chunk_text("...", {"doc_id": "test"})
+        >>> chunks = chunker.chunk(parsed_document)
     """
 
     plugin_name: str = field(default="simple", repr=False)
@@ -54,21 +56,34 @@ class SimpleChunker:
         """
         return f"{self.plugin_name}:{self.chunk_size}:{self.chunk_overlap}"
 
-    def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Chunk]:
+    def chunk(self, document: ParsedDocument) -> List[Chunk]:
         """
-        Split text into fixed-size character chunks.
+        Split a parsed document into fixed-size character chunks.
 
         Args:
-            text: The text content to chunk.
-            base_meta: Base metadata to include in each chunk.
+            document: ParsedDocument with structured elements.
 
         Returns:
-            List of Chunk objects. Empty list if text is empty/whitespace.
+            List of Chunk objects. Empty list if document is empty.
         """
+        # Use full text for simple character-based chunking
+        text = document.full_text
         if not text or not text.strip():
             return []
 
-        doc_id = str(base_meta.get("doc_id") or base_meta.get("source_file") or "unknown")
+        # Extract doc_id from document
+        doc_id = document.metadata.get("doc_id")
+        if not doc_id:
+            # Derive from source path
+            source_path = Path(document.source.replace("file:///", ""))
+            doc_id = source_path.stem if source_path.stem else "unknown"
+
+        # Build base metadata
+        base_meta = {
+            "source_file": document.source,
+            "doc_id": doc_id,
+            **document.metadata,
+        }
 
         chunks: List[Chunk] = []
         chunk_index = 0

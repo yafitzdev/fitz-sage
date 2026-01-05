@@ -16,9 +16,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.core.document import ParsedDocument
 
 
 @dataclass
@@ -238,21 +240,32 @@ class PdfSectionChunker:
 
         return chunks
 
-    def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Chunk]:
+    def chunk(self, document: ParsedDocument) -> List[Chunk]:
         """
-        Chunk PDF text by detected sections.
+        Chunk a parsed PDF document by detected sections.
 
         Args:
-            text: Raw PDF text content.
-            base_meta: Base metadata including doc_id, source_file, etc.
+            document: ParsedDocument with structured elements.
 
         Returns:
             List of Chunk objects, one per section (or section part).
         """
+        text = document.full_text
         if not text or not text.strip():
             return []
 
-        doc_id = str(base_meta.get("doc_id") or base_meta.get("source_file") or "unknown")
+        # Extract doc_id from document
+        doc_id = document.metadata.get("doc_id")
+        if not doc_id:
+            source_path = Path(document.source.replace("file:///", ""))
+            doc_id = source_path.stem if source_path.stem else "unknown"
+
+        # Build base metadata
+        base_meta: Dict[str, Any] = {
+            "source_file": document.source,
+            "doc_id": doc_id,
+            **document.metadata,
+        }
 
         # Split into sections
         sections = self._split_into_sections(text)

@@ -20,9 +20,11 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.core.document import ParsedDocument
 
 
 @dataclass
@@ -303,21 +305,32 @@ class PythonCodeChunker:
 
         return chunks
 
-    def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Chunk]:
+    def chunk(self, document: ParsedDocument) -> List[Chunk]:
         """
-        Chunk Python code by classes and functions.
+        Chunk a parsed Python document by classes and functions.
 
         Args:
-            text: Python source code to chunk.
-            base_meta: Base metadata to include in each chunk.
+            document: ParsedDocument with structured elements.
 
         Returns:
             List of Chunk objects.
         """
+        text = document.full_text
         if not text or not text.strip():
             return []
 
-        doc_id = str(base_meta.get("doc_id") or base_meta.get("source_file") or "unknown")
+        # Extract doc_id from document
+        doc_id = document.metadata.get("doc_id")
+        if not doc_id:
+            source_path = Path(document.source.replace("file:///", ""))
+            doc_id = source_path.stem if source_path.stem else "unknown"
+
+        # Build base metadata
+        base_meta: Dict[str, Any] = {
+            "source_file": document.source,
+            "doc_id": doc_id,
+            **document.metadata,
+        }
 
         # Parse and extract chunks
         raw_chunks = self._parse_and_chunk(text)
