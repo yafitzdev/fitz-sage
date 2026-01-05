@@ -22,6 +22,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, runtime_checkable
 
+from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.chunking.router import ChunkingRouter
 from fitz_ai.ingestion.diff.differ import Differ, FileCandidate
 from fitz_ai.ingestion.diff.scanner import FileScanner
@@ -473,14 +474,22 @@ class DiffIngestExecutor:
 
         # 2. Get chunker for this file type and chunk
         chunker = self._router.get_chunker(candidate.ext)
+        doc_id = Path(candidate.path).stem
         base_meta = {
             "source_file": candidate.path,
-            "doc_id": Path(candidate.path).stem,
+            "doc_id": doc_id,
             "content_hash": candidate.content_hash,
             "parser_id": candidate.parser_id,
             "chunker_id": candidate.chunker_id,
         }
-        chunks = chunker.chunk_text(text, base_meta)
+
+        # Convert to ParsedDocument for new chunker API
+        document = ParsedDocument(
+            source=f"file:///{candidate.path}",
+            elements=[DocumentElement(type=ElementType.TEXT, content=text)],
+            metadata=base_meta,
+        )
+        chunks = chunker.chunk(document)
 
         if not chunks:
             logger.warning(f"No chunks from {candidate.path}, skipping")

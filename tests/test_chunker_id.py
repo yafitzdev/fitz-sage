@@ -10,7 +10,17 @@ Verifies:
 
 import pytest
 
+from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
+
+
+def make_document(text: str, doc_id: str = "test", **extra_meta) -> ParsedDocument:
+    """Helper to create a ParsedDocument for testing."""
+    return ParsedDocument(
+        source=f"file:///{doc_id}.txt",
+        elements=[DocumentElement(type=ElementType.TEXT, content=text)],
+        metadata={"doc_id": doc_id, **extra_meta},
+    )
 
 
 class TestSimpleChunkerID:
@@ -120,7 +130,7 @@ class TestChunkingBehavior:
         chunker = SimpleChunker(chunk_size=10, chunk_overlap=0)
         text = "0123456789ABCDEFGHIJ"
 
-        chunks = chunker.chunk_text(text, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(text, "test"))
 
         assert len(chunks) == 2
         assert chunks[0].content == "0123456789"
@@ -131,7 +141,7 @@ class TestChunkingBehavior:
         chunker = SimpleChunker(chunk_size=10, chunk_overlap=3)
         text = "0123456789ABCDEFGHIJ"
 
-        chunks = chunker.chunk_text(text, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(text, "test"))
 
         assert len(chunks) == 3
         assert chunks[0].content == "0123456789"
@@ -141,15 +151,15 @@ class TestChunkingBehavior:
     def test_empty_text_returns_empty_list(self):
         """Empty text produces no chunks."""
         chunker = SimpleChunker()
-        assert chunker.chunk_text("", {"doc_id": "test"}) == []
-        assert chunker.chunk_text("   ", {"doc_id": "test"}) == []
+        assert chunker.chunk(make_document("", "test")) == []
+        assert chunker.chunk(make_document("   ", "test")) == []
 
     def test_chunk_metadata(self):
         """Chunks include base metadata."""
         chunker = SimpleChunker(chunk_size=100)
-        meta = {"doc_id": "mydoc", "source_file": "/path/to/file.txt"}
+        doc = make_document("Hello world", "mydoc", source_file="/path/to/file.txt")
 
-        chunks = chunker.chunk_text("Hello world", meta)
+        chunks = chunker.chunk(doc)
 
         assert len(chunks) == 1
         assert chunks[0].doc_id == "mydoc"
@@ -160,7 +170,7 @@ class TestChunkingBehavior:
         chunker = SimpleChunker(chunk_size=5, chunk_overlap=0)
         text = "AAAAABBBBBCCCCC"
 
-        chunks = chunker.chunk_text(text, {"doc_id": "doc1"})
+        chunks = chunker.chunk(make_document(text, "doc1"))
 
         assert chunks[0].id == "doc1:0"
         assert chunks[1].id == "doc1:1"

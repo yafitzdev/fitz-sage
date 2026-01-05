@@ -16,6 +16,7 @@ from typing import Any, Dict, List
 import pytest
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.core.document import ParsedDocument
 from fitz_ai.engines.fitz_rag.config import (
     ChunkingRouterConfig,
     ExtensionChunkerConfig,
@@ -40,14 +41,16 @@ class MockMarkdownChunker:
     def chunker_id(self) -> str:
         return f"{self.plugin_name}:{self.max_tokens}"
 
-    def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Chunk]:
+    def chunk(self, document: ParsedDocument) -> List[Chunk]:
+        text = document.full_text
+        doc_id = document.metadata.get("doc_id", "test")
         return [
             Chunk(
                 id="md:0",
-                doc_id=base_meta.get("doc_id", "test"),
+                doc_id=doc_id,
                 chunk_index=0,
                 content=f"[MARKDOWN] {text[:50]}",
-                metadata=base_meta,
+                metadata=document.metadata,
             )
         ]
 
@@ -63,14 +66,16 @@ class MockPythonChunker:
     def chunker_id(self) -> str:
         return f"{self.plugin_name}:{self.chunk_by}"
 
-    def chunk_text(self, text: str, base_meta: Dict[str, Any]) -> List[Chunk]:
+    def chunk(self, document: ParsedDocument) -> List[Chunk]:
+        text = document.full_text
+        doc_id = document.metadata.get("doc_id", "test")
         return [
             Chunk(
                 id="py:0",
-                doc_id=base_meta.get("doc_id", "test"),
+                doc_id=doc_id,
                 chunk_index=0,
                 content=f"[PYTHON] {text[:50]}",
-                metadata=base_meta,
+                metadata=document.metadata,
             )
         ]
 

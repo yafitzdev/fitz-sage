@@ -10,9 +10,19 @@ Tests:
 
 import pytest
 
+from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.chunking.plugins.markdown import MarkdownChunker
 from fitz_ai.ingestion.chunking.plugins.pdf_sections import PdfSectionChunker
 from fitz_ai.ingestion.chunking.plugins.python_code import PythonCodeChunker
+
+
+def make_document(text: str, doc_id: str = "test", **extra_meta) -> ParsedDocument:
+    """Helper to create a ParsedDocument for testing."""
+    return ParsedDocument(
+        source=f"file:///{doc_id}.txt",
+        elements=[DocumentElement(type=ElementType.TEXT, content=text)],
+        metadata={"doc_id": doc_id, **extra_meta},
+    )
 
 
 class TestMarkdownChunker:
@@ -44,7 +54,7 @@ This is the methods section.
 
 This is the results section.
 """
-        chunks = chunker.chunk_text(text, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(text, "test"))
 
         assert len(chunks) >= 2
         # Check sections are preserved
@@ -69,7 +79,7 @@ def goodbye():
 
 More text after.
 """
-        chunks = chunker.chunk_text(text, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(text, "test"))
 
         # Code block should be in a single chunk
         code_chunk = None
@@ -84,14 +94,14 @@ More text after.
     def test_handles_empty_input(self):
         """Test empty input returns empty list."""
         chunker = MarkdownChunker()
-        assert chunker.chunk_text("", {"doc_id": "test"}) == []
-        assert chunker.chunk_text("   ", {"doc_id": "test"}) == []
+        assert chunker.chunk(make_document("", "test")) == []
+        assert chunker.chunk(make_document("   ", "test")) == []
 
     def test_no_headers_single_chunk(self):
         """Text without headers becomes single chunk."""
         chunker = MarkdownChunker(max_chunk_size=5000)
         text = "This is plain text without any headers."
-        chunks = chunker.chunk_text(text, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(text, "test"))
 
         assert len(chunks) == 1
         assert chunks[0].content == text
@@ -113,7 +123,7 @@ More text after.
 
 Content here.
 """
-        chunks = chunker.chunk_text(text, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(text, "test"))
 
         assert len(chunks) >= 1
         # Header might be in metadata
@@ -147,7 +157,7 @@ def function_two():
     """Second function."""
     return 2
 '''
-        chunks = chunker.chunk_text(code, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(code, "test"))
 
         assert len(chunks) >= 2
         contents = [c.content for c in chunks]
@@ -166,7 +176,7 @@ class ClassTwo:
     """Second class."""
     pass
 '''
-        chunks = chunker.chunk_text(code, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(code, "test"))
 
         assert len(chunks) >= 2
         contents = [c.content for c in chunks]
@@ -181,7 +191,7 @@ def my_function():
     """This is a docstring for my_function."""
     return 42
 '''
-        chunks = chunker.chunk_text(code, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(code, "test"))
 
         assert len(chunks) >= 1
         assert any("This is a docstring" in c.content for c in chunks)
@@ -190,7 +200,7 @@ def my_function():
         """Test that invalid Python doesn't crash."""
         chunker = PythonCodeChunker()
         code = "def broken( { syntax"
-        chunks = chunker.chunk_text(code, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(code, "test"))
 
         # Should return something, not crash
         assert len(chunks) >= 1
@@ -198,7 +208,7 @@ def my_function():
     def test_handles_empty_input(self):
         """Test empty input returns empty list."""
         chunker = PythonCodeChunker()
-        assert chunker.chunk_text("", {"doc_id": "test"}) == []
+        assert chunker.chunk(make_document("", "test")) == []
 
     def test_includes_imports_when_enabled(self):
         """Test that imports are included in chunks."""
@@ -210,7 +220,7 @@ from pathlib import Path
 def my_function():
     return os.getcwd()
 """
-        chunks = chunker.chunk_text(code, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(code, "test"))
 
         # Function chunk should include imports
         func_chunk = None
@@ -229,7 +239,7 @@ def my_function():
 def my_function():
     pass
 """
-        chunks = chunker.chunk_text(code, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(code, "test"))
 
         assert len(chunks) >= 1
         assert any(c.metadata.get("code_element") == "def my_function" for c in chunks)
@@ -265,7 +275,7 @@ METHODS
 
 This is the methods section.
 """
-        chunks = chunker.chunk_text(text, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(text, "test"))
 
         assert len(chunks) >= 2
         headers = [c.metadata.get("section_header", "") for c in chunks]
@@ -287,7 +297,7 @@ Content for section 2.
 
 Content for subsection.
 """
-        chunks = chunker.chunk_text(text, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(text, "test"))
 
         assert len(chunks) >= 2
 
@@ -306,7 +316,7 @@ Conclusion
 
 This is the conclusion.
 """
-        chunks = chunker.chunk_text(text, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(text, "test"))
 
         assert len(chunks) >= 2
 
@@ -320,7 +330,7 @@ This is the conclusion.
             + "This is a very long paragraph. " * 50
         )
 
-        chunks = chunker.chunk_text(text, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(text, "test"))
 
         # Should be split into multiple chunks
         assert len(chunks) >= 2
@@ -332,13 +342,13 @@ This is the conclusion.
     def test_handles_empty_input(self):
         """Test empty input returns empty list."""
         chunker = PdfSectionChunker()
-        assert chunker.chunk_text("", {"doc_id": "test"}) == []
+        assert chunker.chunk(make_document("", "test")) == []
 
     def test_no_sections_single_chunk(self):
         """Text without section headers becomes single chunk."""
         chunker = PdfSectionChunker(max_section_chars=5000)
         text = "This is plain text without any section headers or keywords."
-        chunks = chunker.chunk_text(text, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(text, "test"))
 
         assert len(chunks) == 1
 
@@ -349,7 +359,7 @@ This is the conclusion.
 
 Content here.
 """
-        chunks = chunker.chunk_text(text, {"doc_id": "test"})
+        chunks = chunker.chunk(make_document(text, "test"))
 
         assert len(chunks) >= 1
         assert chunks[0].metadata.get("section_header") == "INTRODUCTION"
