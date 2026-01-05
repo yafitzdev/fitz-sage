@@ -117,6 +117,34 @@ class PluginType(Enum):
         return path_map.get(self, package_root)
 
 
+class ReviewDecision(Enum):
+    """User's decision after reviewing generated code."""
+
+    APPROVE = "approve"  # Save the code as-is
+    EDIT = "edit"  # User provided modified code
+    REJECT = "reject"  # Don't save, abort generation
+
+
+@dataclass
+class ReviewResult:
+    """Result of user review."""
+
+    decision: ReviewDecision
+    modified_code: Optional[str] = None  # Only set if decision is EDIT
+
+    @classmethod
+    def approve(cls) -> "ReviewResult":
+        return cls(decision=ReviewDecision.APPROVE)
+
+    @classmethod
+    def edit(cls, new_code: str) -> "ReviewResult":
+        return cls(decision=ReviewDecision.EDIT, modified_code=new_code)
+
+    @classmethod
+    def reject(cls) -> "ReviewResult":
+        return cls(decision=ReviewDecision.REJECT)
+
+
 class ValidationLevel(Enum):
     """Levels of validation for generated plugins."""
 
@@ -173,6 +201,8 @@ class GenerationResult:
 
 __all__ = [
     "PluginType",
+    "ReviewDecision",
+    "ReviewResult",
     "ValidationLevel",
     "ValidationResult",
     "GenerationResult",

@@ -62,6 +62,41 @@ def _create_progress_callback():
 
 
 # =============================================================================
+# Code Review
+# =============================================================================
+
+
+def _create_review_callback():
+    """Create a review callback for code approval before save."""
+    from fitz_ai.plugin_gen.types import PluginType, ReviewResult
+
+    def callback(code: str, plugin_type: PluginType) -> ReviewResult:
+        # Show the generated code
+        ui.section("Generated Code")
+
+        lang = "yaml" if plugin_type.is_yaml else "python"
+        ui.print(f"```{lang}")
+        ui.print(code)
+        ui.print("```")
+        print()
+
+        # Prompt for decision
+        ui.print("Options:", "bold")
+        ui.print("  1. Save - Save the plugin as shown")
+        ui.print("  2. Reject - Don't save, abort")
+        print()
+
+        choice = ui.prompt_int("Your choice", default=1)
+
+        if choice == 2:
+            return ReviewResult.reject()
+
+        return ReviewResult.approve()
+
+    return callback
+
+
+# =============================================================================
 # Main Command
 # =============================================================================
 
@@ -86,6 +121,12 @@ def command(
         "--tier",
         "-t",
         help="Model tier for generation (smart, fast, balanced).",
+    ),
+    no_review: bool = typer.Option(
+        False,
+        "--no-review",
+        "-y",
+        help="Skip code review and save automatically.",
     ),
 ) -> None:
     """
@@ -169,11 +210,13 @@ def command(
     generator = PluginGenerator(chat_plugin=chat_plugin, tier=tier)
 
     progress_callback = _create_progress_callback()
+    review_callback = None if no_review else _create_review_callback()
 
     result = generator.generate(
         plugin_type=pt,
         description=description,
         progress_callback=progress_callback,
+        review_callback=review_callback,
     )
 
     # =========================================================================

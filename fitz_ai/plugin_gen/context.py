@@ -409,6 +409,7 @@ def build_retry_prompt(
     description: str,
     previous_code: str,
     error_feedback: str,
+    library_context: Optional["LibraryContext"] = None,
 ) -> str:
     """
     Build a retry prompt after validation failure.
@@ -418,6 +419,7 @@ def build_retry_prompt(
         description: Original user description
         previous_code: The code that failed validation
         error_feedback: Formatted validation error
+        library_context: Optional library context to preserve across retries
 
     Returns:
         Prompt for retry attempt
@@ -434,16 +436,45 @@ def build_retry_prompt(
         f"```{'yaml' if plugin_type.is_yaml else 'python'}",
         previous_code.strip(),
         "```",
-        "",
-        "## Instructions",
-        "",
-        "Fix the error and regenerate the complete plugin.",
-        "- Output ONLY the corrected plugin code",
-        "- Ensure all required fields are present",
-        "- Do not remove any necessary fields",
-        "",
-        "Output the corrected code:",
     ]
+
+    # Include library context on retry so LLM doesn't forget about it
+    if library_context:
+        parts.extend(
+            [
+                "",
+                "## Required Library",
+                "",
+                f"You MUST use the `{library_context.name}` library in your fix.",
+                f"Install: `{library_context.install_command}`",
+                "",
+                "Key API patterns:",
+                "",
+                library_context.readme_excerpt,
+            ]
+        )
+
+    parts.extend(
+        [
+            "",
+            "## Instructions",
+            "",
+            "Fix the error and regenerate the complete plugin.",
+            "- Output ONLY the corrected plugin code",
+            "- Ensure all required fields are present",
+            "- Do not remove any necessary fields",
+        ]
+    )
+
+    if library_context:
+        parts.append(f"- Continue using the `{library_context.name}` library")
+
+    parts.extend(
+        [
+            "",
+            "Output the corrected code:",
+        ]
+    )
 
     return "\n".join(parts)
 

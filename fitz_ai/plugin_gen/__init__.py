@@ -21,6 +21,8 @@ from fitz_ai.plugin_gen.generator import PluginGenerator
 from fitz_ai.plugin_gen.types import (
     GenerationResult,
     PluginType,
+    ReviewDecision,
+    ReviewResult,
     ValidationLevel,
     ValidationResult,
 )
@@ -28,6 +30,8 @@ from fitz_ai.plugin_gen.types import (
 __all__ = [
     "PluginGenerator",
     "PluginType",
+    "ReviewDecision",
+    "ReviewResult",
     "ValidationLevel",
     "ValidationResult",
     "GenerationResult",

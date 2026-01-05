@@ -22,7 +22,12 @@ from fitz_ai.plugin_gen.context import (
 from fitz_ai.plugin_gen.library_context import (
     get_library_context_for_query,
 )
-from fitz_ai.plugin_gen.types import GenerationResult, PluginType
+from fitz_ai.plugin_gen.types import (
+    GenerationResult,
+    PluginType,
+    ReviewDecision,
+    ReviewResult,
+)
 from fitz_ai.plugin_gen.validators import PluginValidator, format_validation_error
 
 logger = logging.getLogger(__name__)
@@ -86,6 +91,7 @@ class PluginGenerator:
         plugin_type: PluginType,
         description: str,
         progress_callback: Optional[Callable[[str], None]] = None,
+        review_callback: Optional[Callable[[str, PluginType], ReviewResult]] = None,
     ) -> GenerationResult:
         """
         Generate a plugin from a description.
@@ -94,6 +100,9 @@ class PluginGenerator:
             plugin_type: Type of plugin to generate
             description: User's description (e.g., "anthropic", "sentence chunker")
             progress_callback: Optional callback for progress updates
+            review_callback: Optional callback to review code before saving.
+                             Called with (code, plugin_type), returns ReviewResult.
+                             If None, code is saved automatically.
 
         Returns:
             GenerationResult with success status, path, and validation results
@@ -143,9 +152,13 @@ class PluginGenerator:
                 if attempt == 1:
                     response = self._call_llm(prompt)
                 else:
-                    # Retry with error feedback
+                    # Retry with error feedback (include library context so LLM doesn't forget)
                     retry_prompt = build_retry_prompt(
-                        plugin_type, description, code or "", last_error or ""
+                        plugin_type,
+                        description,
+                        code or "",
+                        last_error or "",
+                        library_context=library_context,
                     )
                     response = self._call_llm(retry_prompt)
 
@@ -167,15 +180,30 @@ class PluginGenerator:
 
                 if all_passed:
                     progress("All validations passed!")
+
+                    # Review before saving (if callback provided)
+                    code_to_save = code
+                    if review_callback:
+                        review = review_callback(code, plugin_type)
+
+                        if review.decision == ReviewDecision.REJECT:
+                            progress("Plugin rejected by user")
+                            result.errors.append("Rejected by user")
+                            return result
+
+                        if review.decision == ReviewDecision.EDIT and review.modified_code:
+                            code_to_save = review.modified_code
+                            result.code = code_to_save
+
                     result.success = True
 
                     # Extract plugin name from generated code
-                    plugin_name = self._extract_plugin_name(code, plugin_type)
+                    plugin_name = self._extract_plugin_name(code_to_save, plugin_type)
                     result.plugin_name = plugin_name
 
                     # Save plugin
                     progress("Saving plugin...")
-                    result.path = self._save_plugin(code, plugin_type, plugin_name)
+                    result.path = self._save_plugin(code_to_save, plugin_type, plugin_name)
 
                     return result
 
