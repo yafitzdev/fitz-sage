@@ -20,13 +20,91 @@ from fitz_ai.ingestion.source.base import SourceFile
 
 logger = logging.getLogger(__name__)
 
-# Supported extensions
+# Supported extensions - plain text and code files
 PLAINTEXT_EXTENSIONS: Set[str] = {
+    # Plain text
     ".txt",
+    ".text",
+    # Markdown/docs
     ".md",
     ".markdown",
     ".rst",
-    ".text",
+    # Config files
+    ".yaml",
+    ".yml",
+    ".json",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".env",
+    # Code - Python
+    ".py",
+    ".pyi",
+    ".pyx",
+    # Code - JavaScript/TypeScript
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".mjs",
+    ".cjs",
+    # Code - Web
+    ".css",
+    ".scss",
+    ".sass",
+    ".less",
+    ".vue",
+    ".svelte",
+    # Code - Systems
+    ".c",
+    ".h",
+    ".cpp",
+    ".hpp",
+    ".cc",
+    ".cxx",
+    ".rs",
+    ".go",
+    ".java",
+    ".kt",
+    ".scala",
+    ".swift",
+    ".m",
+    # Code - Shell/Scripts
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".fish",
+    ".ps1",
+    ".bat",
+    ".cmd",
+    # Code - Other
+    ".rb",
+    ".php",
+    ".pl",
+    ".lua",
+    ".r",
+    ".R",
+    ".jl",
+    ".ex",
+    ".exs",
+    ".erl",
+    ".hs",
+    ".ml",
+    ".fs",
+    ".cs",
+    ".vb",
+    # Data/Query
+    ".sql",
+    ".graphql",
+    ".gql",
+    # Misc
+    ".xml",
+    ".csv",
+    ".log",
+    ".gitignore",
+    ".dockerignore",
+    ".editorconfig",
 }
 
 

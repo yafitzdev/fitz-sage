@@ -73,23 +73,16 @@ class ParserRouter:
         for ext in PLAINTEXT_EXTENSIONS:
             self._parsers[ext] = plaintext
 
-        # Try to load Docling parser (optional dependency)
-        try:
-            from fitz_ai.ingestion.parser.plugins.docling import (
-                DOCLING_EXTENSIONS,
-                DoclingParser,
-            )
+        # Register Docling parser for complex documents (PDF, DOCX, images, etc.)
+        from fitz_ai.ingestion.parser.plugins.docling import (
+            DOCLING_EXTENSIONS,
+            DoclingParser,
+        )
 
-            docling = DoclingParser()
-            for ext in DOCLING_EXTENSIONS:
-                # Don't override plaintext for .html/.htm (docling handles them differently)
-                if ext not in self._parsers:
-                    self._parsers[ext] = docling
-                # Override plaintext with docling for HTML
-                elif ext in {".html", ".htm"}:
-                    self._parsers[ext] = docling
-        except ImportError:
-            logger.debug("Docling not available, PDF/DOCX parsing disabled")
+        docling = DoclingParser()
+        for ext in DOCLING_EXTENSIONS:
+            # Docling handles these formats - override any plaintext registrations
+            self._parsers[ext] = docling
 
     def register_parser(self, parser: Parser, extensions: Optional[List[str]] = None) -> None:
         """

@@ -61,9 +61,8 @@ dependencies = [
     "jinja2>=3.1",
     # FAISS included by default for zero-friction quickstart
     "faiss-cpu>=1.7.0",
-    # Document ingestion support
-    "pdfplumber>=0.10.0",
-    "python-docx",
+    # Docling for advanced document parsing (PDF, DOCX, PPTX, images)
+    "docling>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -92,11 +91,6 @@ clara = [
     "peft>=0.10",
 ]
 
-# Advanced document parsing (PDF, DOCX, images with OCR)
-docling = [
-    "docling>=2.0",
-]
-
 # REST API server
 api = [
     "fastapi>=0.100.0",
@@ -113,7 +107,7 @@ dev = [
     "ruff>=0.1.0",
 ]
 
-# Install everything at once
+# Install everything at once (docling is now in core dependencies)
 all = [
     "ollama>=0.1.0",
     "qdrant-client>=1.7",
@@ -126,7 +120,6 @@ all = [
     "accelerate>=0.24",
     "bitsandbytes>=0.41",
     "peft>=0.10",
-    "docling>=2.0",
 ]
 
 
