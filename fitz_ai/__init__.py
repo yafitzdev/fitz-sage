@@ -1,3 +1,19 @@
+# fitz_ai/__init__.py
+# =============================================================================
+# EARLY PLATFORM FIXES (must run before any imports)
+# =============================================================================
+# Fix Windows symlink issue with Hugging Face model caching.
+# Windows restricts symlink creation by default, causing Docling model downloads
+# to fail with [WinError 1314]. Setting these env vars BEFORE huggingface_hub
+# is imported anywhere makes HF use file copies instead of symlinks.
+import os as _os
+import sys as _sys
+
+if _sys.platform == "win32":
+    # Force-set these values (not setdefault) to ensure they take effect
+    _os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+    _os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
+
 """
 Fitz - Local-First RAG Framework & Engine Platform
 

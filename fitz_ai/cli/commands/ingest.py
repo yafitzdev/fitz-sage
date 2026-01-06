@@ -356,7 +356,7 @@ def command(
     # Header
     # =========================================================================
 
-    ui.header("Fitz Ingest")
+    ui.header("Fitz Ingest", "Upload documents to vector database")
 
     # =========================================================================
     # Engine Selection (use default if not specified)

@@ -15,14 +15,37 @@ Requires: pip install docling
 from __future__ import annotations
 
 import logging
+import os
+import sys
 from dataclasses import dataclass, field
 from typing import Set
+
+# Fix Windows symlink issue with Hugging Face model caching
+# Windows restricts symlink creation by default, causing model downloads to fail
+# Setting this env var before importing docling/huggingface_hub fixes the issue
+if sys.platform == "win32":
+    os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+    # This actually disables symlinks (not just the warning)
+    os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
 
 from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.parser.base import ParseError
 from fitz_ai.ingestion.source.base import SourceFile
 
 logger = logging.getLogger(__name__)
+
+# Silence verbose third-party loggers
+for _logger_name in [
+    "docling",
+    "docling.document_converter",
+    "docling.pipeline",
+    "docling_core",
+    "rapidocr",
+    "RapidOCR",
+    "httpx",
+    "httpcore",
+]:
+    logging.getLogger(_logger_name).setLevel(logging.WARNING)
 
 # Supported file extensions
 DOCLING_EXTENSIONS: Set[str] = {
