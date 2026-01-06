@@ -7,12 +7,10 @@ structured ParsedDocument with preserved semantics.
 """
 
 from fitz_ai.ingestion.parser.base import ParseError, Parser
-from fitz_ai.ingestion.parser.plugins.docling import DoclingParser
-from fitz_ai.ingestion.parser.plugins.plaintext import PlainTextParser
+from fitz_ai.ingestion.parser.router import ParserRouter
 
 __all__ = [
     "Parser",
     "ParseError",
-    "DoclingParser",
-    "PlainTextParser",
+    "ParserRouter",
 ]

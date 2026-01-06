@@ -6,12 +6,11 @@ Verifies:
 1. Router correctly routes documents to file-type specific chunkers
 2. Fallback to default chunker works with warning
 3. Configuration parsing and normalization works
-4. Integration with ChunkingEngine works
 """
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import List
 
 import pytest
 
@@ -21,7 +20,6 @@ from fitz_ai.engines.fitz_rag.config import (
     ChunkingRouterConfig,
     ExtensionChunkerConfig,
 )
-from fitz_ai.ingestion.chunking.engine import ChunkingEngine
 from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
 from fitz_ai.ingestion.chunking.router import ChunkingRouter
 
@@ -239,113 +237,62 @@ class TestRouterConfig:
 
 
 # =============================================================================
-# Integration with ChunkingEngine
-# =============================================================================
-
-
-class TestEngineIntegration:
-    """Tests for ChunkingEngine with router."""
-
-    def test_engine_get_chunker_id(self):
-        """Engine delegates get_chunker_id to router."""
-        router = ChunkingRouter(
-            chunker_map={".md": MockMarkdownChunker()},
-            default_chunker=SimpleChunker(),
-        )
-        engine = ChunkingEngine(router=router)
-
-        assert engine.get_chunker_id(".md") == "markdown:800"
-        assert engine.get_chunker_id(".txt") == "simple:1000:0"
-
-
-# =============================================================================
 # Document Chunking Tests
 # =============================================================================
 
 
 class TestDocumentChunking:
-    """Tests for chunking actual documents."""
+    """Tests for chunking ParsedDocuments."""
 
-    @dataclass
-    class MockRawDocument:
-        """Mock RawDocument for testing."""
+    def test_chunker_chunks_parsed_document(self):
+        """Chunker correctly chunks a ParsedDocument."""
+        from fitz_ai.core.document import DocumentElement, ElementType
 
-        path: str
-        content: str
-        metadata: Dict[str, Any] = None
-
-        def __post_init__(self):
-            if self.metadata is None:
-                self.metadata = {}
-
-    def test_router_chunk_document(self):
-        """chunk_document routes and chunks correctly."""
         router = ChunkingRouter(
             chunker_map={".md": MockMarkdownChunker()},
             default_chunker=SimpleChunker(chunk_size=100),
         )
 
-        doc = self.MockRawDocument(
-            path="/docs/readme.md",
-            content="# Hello World\n\nThis is a test.",
+        doc = ParsedDocument(
+            source="file:///docs/readme.md",
+            elements=[
+                DocumentElement(
+                    type=ElementType.TEXT,
+                    content="# Hello World\n\nThis is a test.",
+                )
+            ],
+            metadata={"doc_id": "readme"},
         )
 
-        chunks = router.chunk_document(doc)
+        chunker = router.get_chunker(".md")
+        chunks = chunker.chunk(doc)
 
         assert len(chunks) == 1
         assert "[MARKDOWN]" in chunks[0].content
 
-    def test_router_chunk_document_uses_default(self):
-        """chunk_document uses default for unknown extensions."""
+    def test_default_chunker_for_unknown_extension(self):
+        """Default chunker is used for unknown extensions."""
+        from fitz_ai.core.document import DocumentElement, ElementType
+
         router = ChunkingRouter(
             chunker_map={},
             default_chunker=SimpleChunker(chunk_size=100),
             warn_on_fallback=False,
         )
 
-        doc = self.MockRawDocument(
-            path="/docs/data.csv",
-            content="a,b,c\n1,2,3",
+        doc = ParsedDocument(
+            source="file:///docs/data.csv",
+            elements=[
+                DocumentElement(
+                    type=ElementType.TEXT,
+                    content="a,b,c\n1,2,3",
+                )
+            ],
+            metadata={"doc_id": "data"},
         )
 
-        chunks = router.chunk_document(doc)
+        chunker = router.get_chunker(".csv")
+        chunks = chunker.chunk(doc)
 
         assert len(chunks) >= 1
         assert "[MARKDOWN]" not in chunks[0].content
-
-    def test_engine_run_routes_by_extension(self):
-        """Engine.run routes documents by extension."""
-        router = ChunkingRouter(
-            chunker_map={".md": MockMarkdownChunker()},
-            default_chunker=SimpleChunker(chunk_size=100),
-            warn_on_fallback=False,
-        )
-        engine = ChunkingEngine(router=router)
-
-        md_doc = self.MockRawDocument(
-            path="/docs/readme.md",
-            content="# Markdown content",
-        )
-        txt_doc = self.MockRawDocument(
-            path="/docs/notes.txt",
-            content="Plain text content",
-        )
-
-        md_chunks = engine.run(md_doc)
-        txt_chunks = engine.run(txt_doc)
-
-        assert "[MARKDOWN]" in md_chunks[0].content
-        assert "[MARKDOWN]" not in txt_chunks[0].content
-
-    def test_empty_content_returns_empty_list(self):
-        """Empty content produces no chunks."""
-        router = ChunkingRouter(
-            chunker_map={},
-            default_chunker=SimpleChunker(),
-            warn_on_fallback=False,
-        )
-
-        doc = self.MockRawDocument(path="/docs/empty.txt", content="   ")
-        chunks = router.chunk_document(doc)
-
-        assert chunks == []

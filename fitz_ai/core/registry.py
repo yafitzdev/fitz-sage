@@ -268,7 +268,6 @@ def _get_plugin_paths(plugin_type: str) -> list[Path]:
 
     # User home plugins (~/.fitz/plugins/) - same for everyone
     user_map = {
-        "reader": FitzPaths.user_reader_plugins,
         "chunking": FitzPaths.user_chunking_plugins,
         "constraint": FitzPaths.user_constraint_plugins,
     }
@@ -281,18 +280,11 @@ def _get_plugin_paths(plugin_type: str) -> list[Path]:
     return paths
 
 
-INGEST_REGISTRY = PluginRegistry(
-    name="ingest",
-    scan_packages=["fitz_ai.ingestion.reader.plugins"],
-    required_method="ingest",
-    user_plugin_paths=_get_plugin_paths("reader"),
-)
-
 # Default chunkers (simple, recursive) - shown in fitz init
 CHUNKING_REGISTRY = PluginRegistry(
     name="chunking",
     scan_packages=["fitz_ai.ingestion.chunking.plugins.default"],
-    required_method="chunk_text",
+    required_method="chunk",
     user_plugin_paths=_get_plugin_paths("chunking"),
 )
 
@@ -302,7 +294,7 @@ CHUNKING_REGISTRY = PluginRegistry(
 TYPED_CHUNKING_REGISTRY = PluginRegistry(
     name="typed_chunking",
     scan_packages=["fitz_ai.ingestion.chunking.plugins"],
-    required_method="chunk_text",
+    required_method="chunk",
     user_plugin_paths=_get_plugin_paths("chunking"),
 )
 
@@ -331,16 +323,6 @@ CONSTRAINT_REGISTRY = PluginRegistry(
 # =============================================================================
 # Convenience Functions for Python-based Registries
 # =============================================================================
-
-
-def get_ingest_plugin(plugin_name: str) -> Type[Any]:
-    """Get an ingestion plugin by name."""
-    return INGEST_REGISTRY.get(plugin_name)
-
-
-def available_ingest_plugins() -> List[str]:
-    """List available ingestion plugins."""
-    return INGEST_REGISTRY.list_available()
 
 
 def get_chunking_plugin(plugin_name: str) -> Type[Any]:
@@ -482,15 +464,12 @@ __all__ = [
     # Registry class
     "PluginRegistry",
     # Pre-configured registries
-    "INGEST_REGISTRY",
     "CHUNKING_REGISTRY",
     "TYPED_CHUNKING_REGISTRY",
     "RETRIEVER_REGISTRY",
     "PIPELINE_REGISTRY",
     "CONSTRAINT_REGISTRY",
     # Python-based plugin accessors
-    "get_ingest_plugin",
-    "available_ingest_plugins",
     "get_chunking_plugin",
     "available_chunking_plugins",
     "get_typed_chunking_plugin",

@@ -11,6 +11,9 @@ from typing import Any, Dict, List
 
 import pytest
 
+from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
+from fitz_ai.ingestion.source.base import SourceFile
+
 
 class TimingTracker:
     """Track timing of operations."""
@@ -93,21 +96,30 @@ class TracingVectorDBWriter:
         return 1
 
 
-class TracingParser:
-    """Parser that traces all calls."""
+class TracingParserRouter:
+    """Parser router that traces all calls."""
 
     def __init__(self, tracker: TimingTracker, content_size: int = 500):
         self._tracker = tracker
         self._content_size = content_size
         self.parse_calls = 0
 
-    def parse(self, path: str) -> str:
+    def parse(self, source_file: SourceFile) -> ParsedDocument:
         self.parse_calls += 1
+        path = str(source_file.local_path)
         self._tracker.log("parse()", f"call #{self.parse_calls}, path={Path(path).name}")
         # Return content that will create multiple chunks
-        return f"# File: {path}\n\n" + ("Lorem ipsum dolor sit amet. " * 50) * (
+        content = f"# File: {path}\n\n" + ("Lorem ipsum dolor sit amet. " * 50) * (
             self._content_size // 100
         )
+        return ParsedDocument(
+            source=source_file.uri,
+            elements=[DocumentElement(type=ElementType.TEXT, content=content)],
+            metadata={"source_file": path},
+        )
+
+    def get_parser_id(self, ext: str) -> str:
+        return f"tracing:{ext[1:] if ext.startswith('.') else ext}:v1"
 
 
 @pytest.fixture
@@ -173,7 +185,7 @@ def test_ingest_timing_detailed(tmp_path: Path, timing_tracker: TimingTracker, t
 
     embedder = TracingEmbedder(timing_tracker, delay=0.01)  # 10ms simulated API latency
     writer = TracingVectorDBWriter(timing_tracker)
-    parser = TracingParser(timing_tracker)
+    parser_router = TracingParserRouter(timing_tracker)
 
     timing_tracker.log("SETUP", "Components created")
 
@@ -182,7 +194,7 @@ def test_ingest_timing_detailed(tmp_path: Path, timing_tracker: TimingTracker, t
         state_manager=state_manager,
         vector_db_writer=writer,
         embedder=embedder,
-        parser=parser,
+        parser_router=parser_router,
         chunking_router=router,
         collection="test_collection",
         embedding_id="test:embedding",
@@ -201,7 +213,7 @@ def test_ingest_timing_detailed(tmp_path: Path, timing_tracker: TimingTracker, t
     print(f"\n{'=' * 60}")
     print("CALL STATISTICS")
     print(f"{'=' * 60}")
-    print(f"  Parser.parse() calls:      {parser.parse_calls}")
+    print(f"  ParserRouter.parse() calls:  {parser_router.parse_calls}")
     print(f"  Embedder.embed() calls:    {embedder.embed_calls}")
     print(f"  Embedder.embed_batch() calls: {embedder.embed_batch_calls}")
     print(f"  Total texts embedded:      {embedder.total_texts_embedded}")
@@ -258,13 +270,13 @@ def test_ingest_with_real_embedder_mock(tmp_path: Path, timing_tracker: TimingTr
     # Real Cohere embed API: ~100-300ms per batch
     embedder = TracingEmbedder(timing_tracker, delay=0.1)  # 100ms per single embed
     writer = TracingVectorDBWriter(timing_tracker)
-    parser = TracingParser(timing_tracker)
+    parser_router = TracingParserRouter(timing_tracker)
 
     executor = DiffIngestExecutor(
         state_manager=state_manager,
         vector_db_writer=writer,
         embedder=embedder,
-        parser=parser,
+        parser_router=parser_router,
         chunking_router=router,
         collection="test_collection",
         embedding_id="test:embedding",

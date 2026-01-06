@@ -553,11 +553,12 @@ def _run_ingestion(
         ExtensionChunkerConfig,
     )
     from fitz_ai.engines.fitz_rag.config import load_config_dict as load_default_config_dict
-    from fitz_ai.ingestion.chunking.engine import ChunkingEngine
+    from fitz_ai.ingestion.chunking.router import ChunkingRouter
+    from fitz_ai.ingestion.diff.scanner import FileScanner
     from fitz_ai.ingestion.enrichment.config import HierarchyConfig
     from fitz_ai.ingestion.enrichment.hierarchy.enricher import HierarchyEnricher
-    from fitz_ai.ingestion.reader.engine import IngestionEngine
-    from fitz_ai.ingestion.reader.registry import get_ingest_plugin
+    from fitz_ai.ingestion.parser import ParserRouter
+    from fitz_ai.ingestion.source.base import SourceFile
     from fitz_ai.llm.registry import get_llm_plugin
     from fitz_ai.vector_db.registry import get_vector_db_plugin
     from fitz_ai.vector_db.writer import VectorDBWriter
@@ -571,20 +572,37 @@ def _run_ingestion(
     vector_db_config = config.get("vector_db", {})
     chat_config = config.get("chat", {})
 
-    # Step 1: Read documents
+    # Step 1: Discover and parse documents
     if verbose:
-        ui.info("Reading documents...")
+        ui.info("Discovering and parsing documents...")
 
-    IngestPluginCls = get_ingest_plugin("local")
-    ingest_plugin = IngestPluginCls()
-    ingest_engine = IngestionEngine(plugin=ingest_plugin, kwargs={})
-    raw_docs = list(ingest_engine.run(str(source)))
+    scanner = FileScanner()
+    scan_result = scanner.scan(str(source))
 
-    if not raw_docs:
+    if not scan_result.files:
         raise ValueError(f"No documents found in {source}")
 
+    parser_router = ParserRouter()
+    parsed_docs = []
+    for file_info in scan_result.files:
+        source_file = SourceFile(
+            uri=Path(file_info.path).as_uri(),
+            local_path=Path(file_info.path),
+            metadata={},
+        )
+        try:
+            parsed_doc = parser_router.parse(source_file)
+            if parsed_doc.full_text.strip():
+                parsed_docs.append(parsed_doc)
+        except Exception as e:
+            if verbose:
+                ui.warning(f"Failed to parse {file_info.path}: {e}")
+
+    if not parsed_docs:
+        raise ValueError(f"No documents could be parsed in {source}")
+
     if verbose:
-        ui.info(f"Found {len(raw_docs)} documents")
+        ui.info(f"Parsed {len(parsed_docs)} documents")
 
     # Step 2: Chunk documents
     if verbose:
@@ -620,11 +638,13 @@ def _run_ingestion(
             ),
             warn_on_fallback=False,
         )
-    chunking_engine = ChunkingEngine.from_config(chunking_config)
+    chunking_router = ChunkingRouter.from_config(chunking_config)
 
     chunks: List = []
-    for raw_doc in raw_docs:
-        doc_chunks = chunking_engine.run(raw_doc)
+    for parsed_doc in parsed_docs:
+        ext = Path(parsed_doc.metadata.get("source_file", ".txt")).suffix or ".txt"
+        chunker = chunking_router.get_chunker(ext)
+        doc_chunks = chunker.chunk(parsed_doc)
         chunks.extend(doc_chunks)
 
     if not chunks:
@@ -686,7 +706,7 @@ def _run_ingestion(
     writer.upsert(collection=collection, chunks=chunks, vectors=vectors)
 
     return {
-        "documents": len(raw_docs),
+        "documents": len(parsed_docs),
         "chunks": original_chunk_count,
         "hierarchy_summaries": hierarchy_summaries,
     }

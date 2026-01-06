@@ -134,19 +134,14 @@ class TestFitzIngest:
         # Create config first
         f._create_default_config(config_path)
 
-        with patch("fitz_ai.ingestion.reader.registry.get_ingest_plugin") as mock_ingest:
-            mock_plugin_cls = MagicMock()
-            mock_plugin_instance = MagicMock()
-            mock_plugin_cls.return_value = mock_plugin_instance
-            mock_ingest.return_value = mock_plugin_cls
+        # Mock the FileScanner to return no files
+        with patch("fitz_ai.ingestion.diff.scanner.FileScanner") as mock_scanner_cls:
+            mock_scanner = MagicMock()
+            mock_scanner.scan.return_value = MagicMock(files=[])  # No files found
+            mock_scanner_cls.return_value = mock_scanner
 
-            with patch("fitz_ai.ingestion.reader.engine.IngestionEngine") as mock_engine:
-                mock_engine_instance = MagicMock()
-                mock_engine_instance.run.return_value = []  # No documents
-                mock_engine.return_value = mock_engine_instance
-
-                with pytest.raises(ValueError, match="No documents found"):
-                    f.ingest(docs_path)
+            with pytest.raises(ValueError, match="No documents found"):
+                f.ingest(docs_path)
 
 
 class TestFitzAsk:

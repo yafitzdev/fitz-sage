@@ -170,20 +170,6 @@ def _build_chunking_router_config(config: dict):
 # =============================================================================
 
 
-class ParserAdapter:
-    """Adapts ingestion plugin to Parser protocol."""
-
-    def __init__(self, plugin):
-        self._plugin = plugin
-
-    def parse(self, path: str) -> str:
-        """Parse a file and return its text content."""
-        docs = list(self._plugin.ingest(path, kwargs={}))
-        if not docs:
-            return ""
-        return docs[0].content
-
-
 class VectorDBWriterAdapter:
     """Adapts vector DB client to VectorDBWriter protocol."""
 
@@ -388,7 +374,7 @@ def command(
 
     from fitz_ai.ingestion.chunking.router import ChunkingRouter
     from fitz_ai.ingestion.diff import run_diff_ingest
-    from fitz_ai.ingestion.reader.registry import get_ingest_plugin
+    from fitz_ai.ingestion.parser import ParserRouter
     from fitz_ai.ingestion.state import IngestStateManager
     from fitz_ai.llm.registry import get_llm_plugin
     from fitz_ai.vector_db.registry import get_vector_db_plugin
@@ -581,10 +567,8 @@ def command(
         state_manager = IngestStateManager()
         state_manager.load()
 
-        # Ingest plugin (for parsing)
-        IngestPluginCls = get_ingest_plugin("local")
-        ingest_plugin = IngestPluginCls()
-        parser = ParserAdapter(ingest_plugin)
+        # Parser router (routes files to appropriate parsers)
+        parser_router = ParserRouter()
 
         # Build chunking router from config
         router_config = _build_chunking_router_config(config)
@@ -698,7 +682,7 @@ def command(
             state_manager=state_manager,
             vector_db_writer=writer,
             embedder=embedder,
-            parser=parser,
+            parser_router=parser_router,
             chunking_router=chunking_router,
             collection=collection,
             embedding_id=embedding_id,
@@ -792,7 +776,7 @@ def command(
                 state_manager=state_manager,
                 vector_db_writer=writer,
                 embedder=embedder,
-                parser=parser,
+                parser_router=parser_router,
                 chunking_router=chunking_router,
                 collection=collection,
                 embedding_id=embedding_id,
@@ -830,7 +814,7 @@ def command(
                 state_manager=state_manager,
                 vector_db_writer=writer,
                 embedder=embedder,
-                parser=parser,
+                parser_router=parser_router,
                 chunking_router=chunking_router,
                 collection=collection,
                 embedding_id=embedding_id,

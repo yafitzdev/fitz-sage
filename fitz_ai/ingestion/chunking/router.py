@@ -16,17 +16,15 @@ Architecture:
 
 Usage:
     router = ChunkingRouter.from_config(config)
-    chunks = router.chunk_document(raw_doc)
+    chunker = router.get_chunker(".md")
+    chunks = chunker.chunk(parsed_doc)
 """
 
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from fitz_ai.core.chunk import Chunk
-from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.engines.fitz_rag.config import ChunkingRouterConfig
 from fitz_ai.ingestion.chunking.base import Chunker
 from fitz_ai.ingestion.chunking.registry import (
@@ -34,9 +32,6 @@ from fitz_ai.ingestion.chunking.registry import (
     get_chunking_plugin,
 )
 from fitz_ai.ingestion.exceptions.chunking import IngestionChunkingError
-
-if TYPE_CHECKING:
-    from fitz_ai.ingestion.reader.base import RawDocument
 
 logger = logging.getLogger(__name__)
 
@@ -223,66 +218,6 @@ class ChunkingRouter:
     def get_chunker_id(self, ext: str) -> str:
         """Get the chunker_id for a file extension."""
         return self.get_chunker(ext).chunker_id
-
-    def chunk_document(
-        self,
-        raw_doc: "RawDocument",
-        extra_meta: Optional[Dict[str, Any]] = None,
-    ) -> List[Chunk]:
-        """
-        Route a document to the correct chunker and chunk it.
-
-        Args:
-            raw_doc: RawDocument with path, content, and metadata.
-            extra_meta: Additional metadata to merge into base_meta.
-
-        Returns:
-            List of Chunk objects.
-
-        Raises:
-            IngestionChunkingError: If chunking fails.
-        """
-        path_str = raw_doc.path
-        path = Path(path_str)
-        ext = path.suffix.lower() or ".txt"
-
-        if not raw_doc.content or not raw_doc.content.strip():
-            logger.debug(f"Empty content for document: {path_str}")
-            return []
-
-        # Build metadata
-        base_meta: Dict[str, Any] = {
-            "source_file": str(path),
-            "doc_id": path.stem,
-            "file_extension": ext,
-            **(raw_doc.metadata or {}),
-        }
-        if extra_meta:
-            base_meta.update(extra_meta)
-
-        # Convert RawDocument to ParsedDocument
-        document = ParsedDocument(
-            source=f"file:///{path}",
-            elements=[
-                DocumentElement(
-                    type=ElementType.TEXT,
-                    content=raw_doc.content,
-                )
-            ],
-            metadata=base_meta,
-        )
-
-        chunker = self.get_chunker(ext)
-        logger.debug(
-            f"Chunking '{path.name}' with {chunker.plugin_name} (chunker_id: {chunker.chunker_id})"
-        )
-
-        try:
-            return chunker.chunk(document)
-        except Exception as e:
-            raise IngestionChunkingError(
-                f"Chunking failed for '{path_str}' with {chunker.plugin_name}: {e}"
-            ) from e
 
     @property
     def default_chunker(self) -> Chunker:

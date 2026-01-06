@@ -12,6 +12,9 @@ from typing import Any, Dict, List
 
 import pytest
 
+from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
+from fitz_ai.ingestion.source.base import SourceFile
+
 # Enable all logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -35,16 +38,25 @@ class TracingVectorDBWriter:
         return 1
 
 
-class TracingParser:
-    """Parser that traces calls and returns real-ish content."""
+class TracingParserRouter:
+    """Parser router that traces calls and returns real-ish content."""
 
     def __init__(self):
         self.parse_calls = 0
 
-    def parse(self, path: str) -> str:
+    def parse(self, source_file: SourceFile) -> ParsedDocument:
         self.parse_calls += 1
+        path = str(source_file.local_path)
         # Return content that creates multiple chunks
-        return f"# {Path(path).name}\n\n" + ("This is test content for embedding. " * 100)
+        content = f"# {Path(path).name}\n\n" + ("This is test content for embedding. " * 100)
+        return ParsedDocument(
+            source=source_file.uri,
+            elements=[DocumentElement(type=ElementType.TEXT, content=content)],
+            metadata={"source_file": path},
+        )
+
+    def get_parser_id(self, ext: str) -> str:
+        return f"tracing:{ext[1:] if ext.startswith('.') else ext}:v1"
 
 
 @pytest.fixture
@@ -105,13 +117,13 @@ def test_with_real_cohere_embedder(tmp_path: Path, test_files):
     print(f"[TEST] Embedder created in {time.perf_counter() - t0:.2f}s")
 
     writer = TracingVectorDBWriter()
-    parser = TracingParser()
+    parser_router = TracingParserRouter()
 
     executor = DiffIngestExecutor(
         state_manager=state_manager,
         vector_db_writer=writer,
         embedder=embedder,
-        parser=parser,
+        parser_router=parser_router,
         chunking_router=router,
         collection="test_collection",
         embedding_id="cohere:embed-english-v3.0",

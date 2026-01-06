@@ -592,21 +592,39 @@ class ClaraEngine:
         import json
 
         from fitz_ai.core.paths import FitzPaths
-        from fitz_ai.ingestion.reader.engine import IngestionEngine
-        from fitz_ai.ingestion.reader.registry import get_ingest_plugin
+        from fitz_ai.ingestion.diff.scanner import FileScanner
+        from fitz_ai.ingestion.parser import ParserRouter
+        from fitz_ai.ingestion.source.base import SourceFile
 
-        # Read documents
-        IngestPluginCls = get_ingest_plugin("local")
-        ingest_plugin = IngestPluginCls()
-        ingest_engine = IngestionEngine(plugin=ingest_plugin, kwargs={})
-        raw_docs = list(ingest_engine.run(str(source)))
+        # Discover and parse documents
+        scanner = FileScanner()
+        scan_result = scanner.scan(str(source))
 
-        if not raw_docs:
+        if not scan_result.files:
             raise KnowledgeError(f"No documents found in {source}")
 
+        parser_router = ParserRouter()
+        doc_texts = []
+        doc_ids = []
+
+        for file_info in scan_result.files:
+            source_file = SourceFile(
+                uri=Path(file_info.path).as_uri(),
+                local_path=Path(file_info.path),
+                metadata={},
+            )
+            try:
+                parsed_doc = parser_router.parse(source_file)
+                if parsed_doc.full_text.strip():
+                    doc_texts.append(parsed_doc.full_text)
+                    doc_ids.append(file_info.path)
+            except Exception as e:
+                logger.warning(f"Failed to parse {file_info.path}: {e}")
+
+        if not doc_texts:
+            raise KnowledgeError(f"No documents could be parsed in {source}")
+
         # Add documents (this compresses them)
-        doc_texts = [doc.content for doc in raw_docs]
-        doc_ids = [str(doc.path) for doc in raw_docs]
         self.add_documents(doc_texts, doc_ids=doc_ids)
 
         # Save to persistent storage
@@ -629,7 +647,7 @@ class ClaraEngine:
         logger.info(f"CLaRa collection '{collection}' saved to {storage_dir}")
 
         return {
-            "documents": len(raw_docs),
+            "documents": len(doc_texts),
             "compressed_shape": list(self._compressed_docs.shape),
             "memory_tokens_per_doc": self._compressed_docs.shape[1],
             "storage_path": str(storage_dir),

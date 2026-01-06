@@ -1,11 +1,14 @@
 # fitz_ai/ingestion/pipeline/ingestion_pipeline.py
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, List
 
 from fitz_ai.engines.fitz_rag.config import IngestConfig
-from fitz_ai.ingestion.chunking.engine import ChunkingEngine
-from fitz_ai.ingestion.reader.engine import IngestionEngine
+from fitz_ai.ingestion.chunking.router import ChunkingRouter
+from fitz_ai.ingestion.diff.scanner import FileScanner
+from fitz_ai.ingestion.parser import ParserRouter
+from fitz_ai.ingestion.source.base import SourceFile
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 from fitz_ai.vector_db.writer import VectorDBWriter
@@ -18,17 +21,18 @@ logger = get_logger(__name__)
 
 class IngestionPipeline:
     """
-    End-to-end ingestion pipeline:
+    End-to-end ingestion pipeline using three-layer architecture:
 
         source
-          -> ingestion (documents)
-          -> chunking (chunks)
+          -> file discovery (FileScanner)
+          -> parsing (ParserRouter → ParsedDocument)
+          -> chunking (ChunkingRouter → Chunks)
           -> enrichment (optional: summaries + artifacts)
           -> embedding (vectors)   [must be injected upstream]
           -> vector db writer
 
     Architecture:
-    - Construction happens via config-driven factories (for ingest/chunk).
+    - Uses Source → Parser → Chunker three-layer architecture.
     - Provider-specific embedding selection is NOT allowed here.
       Vectors must be provided by an injected embedder.
     - Enrichment is optional and adds summaries to chunks + generates artifacts.
@@ -47,20 +51,46 @@ class IngestionPipeline:
         self.embedder = embedder
         self.enrichment = enrichment
 
-        self.ingester = IngestionEngine.from_config(config)
-        self.chunker = ChunkingEngine.from_config(config.chunker)
+        # Initialize three-layer components
+        self.parser_router = ParserRouter()
+        self.chunking_router = ChunkingRouter.from_config(config.chunker)
+        self.scanner = FileScanner()
 
         self.collection = config.collection
 
     def run(self, source: str) -> int:
         logger.info(f"{PIPELINE} Starting ingestion pipeline")
 
-        # Collect all chunks first (needed for batch enrichment)
-        all_chunks = []
-        for raw_doc in self.ingester.run(source):
-            chunks = self.chunker.run(raw_doc)
-            if chunks:
-                all_chunks.extend(chunks)
+        # 1. Discover files
+        scan_result = self.scanner.scan(source)
+        if not scan_result.files:
+            logger.info(f"{PIPELINE} No files found in {source}")
+            return 0
+
+        # 2. Parse and chunk documents
+        all_chunks: List = []
+        for file_info in scan_result.files:
+            try:
+                source_file = SourceFile(
+                    uri=Path(file_info.path).as_uri(),
+                    local_path=Path(file_info.path),
+                    metadata={},
+                )
+
+                # Parse file → ParsedDocument
+                parsed_doc = self.parser_router.parse(source_file)
+                if not parsed_doc.full_text.strip():
+                    continue
+
+                # Chunk document → Chunks
+                ext = Path(file_info.path).suffix or ".txt"
+                chunker = self.chunking_router.get_chunker(ext)
+                chunks = chunker.chunk(parsed_doc)
+                if chunks:
+                    all_chunks.extend(chunks)
+
+            except Exception as e:
+                logger.warning(f"{PIPELINE} Failed to process {file_info.path}: {e}")
 
         if not all_chunks:
             logger.info(f"{PIPELINE} No chunks to process")

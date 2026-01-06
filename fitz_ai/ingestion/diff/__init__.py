@@ -10,22 +10,24 @@ This package implements content-hash AND config-aware incremental ingestion:
 Key components:
 - Scanner: Walks directories and computes content hashes
 - Differ: Computes action plan by checking state AND config
-- Executor: Orchestrates the full pipeline with ChunkingRouter
+- Executor: Orchestrates the full pipeline with ParserRouter + ChunkingRouter
 
 Usage:
     from fitz_ai.ingestion.diff import run_diff_ingest
     from fitz_ai.ingestion.state import IngestStateManager
     from fitz_ai.ingestion.chunking import ChunkingRouter
+    from fitz_ai.ingestion.parser import ParserRouter
 
-    router = ChunkingRouter.from_config(config)
+    parser_router = ParserRouter()
+    chunking_router = ChunkingRouter.from_config(config)
 
     summary = run_diff_ingest(
         source="./documents",
         state_manager=IngestStateManager(),
         vector_db_writer=writer,
         embedder=embedder,
-        parser=parser,
-        chunking_router=router,
+        parser_router=parser_router,
+        chunking_router=chunking_router,
         collection="my_docs",
         embedding_id="cohere:embed-english-v3.0",
     )
@@ -45,7 +47,6 @@ from fitz_ai.ingestion.diff.executor import (
     DiffIngestExecutor,
     Embedder,
     IngestSummary,
-    Parser,
     VectorDBWriter,
     run_diff_ingest,
 )
@@ -73,7 +74,6 @@ __all__ = [
     # Executor
     "VectorDBWriter",
     "Embedder",
-    "Parser",
     "IngestSummary",
     "DiffIngestExecutor",
     "run_diff_ingest",

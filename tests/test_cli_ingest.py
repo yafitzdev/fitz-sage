@@ -158,32 +158,6 @@ class TestIngestHelpers:
 class TestIngestAdapters:
     """Tests for ingest adapter classes."""
 
-    def test_parser_adapter_parse(self):
-        """Test ParserAdapter.parse returns content."""
-        from fitz_ai.cli.commands.ingest import ParserAdapter
-
-        mock_plugin = MagicMock()
-        mock_doc = MagicMock()
-        mock_doc.content = "Document content"
-        mock_plugin.ingest.return_value = iter([mock_doc])
-
-        adapter = ParserAdapter(mock_plugin)
-        result = adapter.parse("/path/to/file.txt")
-
-        assert result == "Document content"
-
-    def test_parser_adapter_parse_empty(self):
-        """Test ParserAdapter.parse returns empty string for no docs."""
-        from fitz_ai.cli.commands.ingest import ParserAdapter
-
-        mock_plugin = MagicMock()
-        mock_plugin.ingest.return_value = iter([])
-
-        adapter = ParserAdapter(mock_plugin)
-        result = adapter.parse("/path/to/empty.txt")
-
-        assert result == ""
-
     def test_vector_db_writer_adapter_upsert(self):
         """Test VectorDBWriterAdapter.upsert calls client."""
         from fitz_ai.cli.commands.ingest import VectorDBWriterAdapter

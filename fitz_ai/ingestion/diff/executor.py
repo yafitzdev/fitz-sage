@@ -6,7 +6,7 @@ Orchestrates the full pipeline:
 1. (Optional) Generate and ingest project artifacts
 2. Scan files
 3. Compute diff (detect content AND config changes)
-4. Ingest new/changed files using file-type specific chunkers
+4. Ingest new/changed files: Source → Parser → Chunker
 5. (Optional) Enrich chunks with LLM-generated descriptions
 6. Mark deletions
 7. Update state
@@ -22,11 +22,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, runtime_checkable
 
-from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.chunking.router import ChunkingRouter
 from fitz_ai.ingestion.diff.differ import Differ, FileCandidate
 from fitz_ai.ingestion.diff.scanner import FileScanner
 from fitz_ai.ingestion.hashing import compute_chunk_id
+from fitz_ai.ingestion.parser.router import ParserRouter
+from fitz_ai.ingestion.source.base import SourceFile
 from fitz_ai.ingestion.state.manager import IngestStateManager
 
 if TYPE_CHECKING:
@@ -54,15 +55,6 @@ class Embedder(Protocol):
 
     def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Embed multiple texts and return vectors."""
-        ...
-
-
-@runtime_checkable
-class Parser(Protocol):
-    """Protocol for parsing files."""
-
-    def parse(self, path: str) -> str:
-        """Parse a file and return its text content."""
         ...
 
 
@@ -109,20 +101,20 @@ class DiffIngestExecutor:
     """
     Executes the incremental ingestion pipeline.
 
-    Uses ChunkingRouter to route files to type-specific chunkers.
-    Optionally uses EnrichmentRouter to generate searchable descriptions.
+    Uses the three-layer architecture:
+    - ParserRouter: Routes files to appropriate parsers (SourceFile → ParsedDocument)
+    - ChunkingRouter: Routes documents to type-specific chunkers (ParsedDocument → Chunks)
 
     Usage:
         executor = DiffIngestExecutor(
             state_manager=state_manager,
             vector_db_writer=writer,
             embedder=embedder,
-            parser=parser,
-            chunking_router=router,
+            parser_router=parser_router,
+            chunking_router=chunking_router,
             collection="my_collection",
             embedding_id="cohere:embed-english-v3.0",
             vector_db_id="qdrant",
-            enrichment_router=enrichment_router,  # Optional
         )
 
         summary = executor.run("/path/to/documents")
@@ -134,12 +126,11 @@ class DiffIngestExecutor:
         state_manager: IngestStateManager,
         vector_db_writer: VectorDBWriter,
         embedder: Embedder,
-        parser: Parser,
+        parser_router: ParserRouter,
         chunking_router: ChunkingRouter,
         collection: str,
         embedding_id: str,
         vector_db_id: Optional[str] = None,
-        parser_id_func: Optional[callable] = None,
         enrichment_pipeline: Optional["EnrichmentPipeline"] = None,
     ) -> None:
         """
@@ -149,32 +140,24 @@ class DiffIngestExecutor:
             state_manager: Manager for ingest state.
             vector_db_writer: Writer for upserting vectors.
             embedder: Embedder for creating vectors.
-            parser: Parser for extracting text from files.
+            parser_router: Router for file-type specific parsing.
             chunking_router: Router for file-type specific chunking.
             collection: Vector DB collection name.
             embedding_id: Current embedding configuration ID.
             vector_db_id: Vector DB plugin name (e.g., "qdrant", "local_faiss").
-            parser_id_func: Function to get parser_id for extension.
-                           Defaults to "{ext}.v1" format.
             enrichment_pipeline: Optional unified enrichment pipeline.
                                 Handles both chunk summaries and project artifacts.
         """
         self._state = state_manager
         self._vdb_writer = vector_db_writer
         self._embedder = embedder
-        self._parser = parser
-        self._router = chunking_router
+        self._parser_router = parser_router
+        self._chunking_router = chunking_router
         self._collection = collection
         self._embedding_id = embedding_id
         self._vector_db_id = vector_db_id
-        self._get_parser_id = parser_id_func or self._default_parser_id
         self._enrichment_pipeline = enrichment_pipeline
         self._summary: Optional[IngestSummary] = None
-
-    @staticmethod
-    def _default_parser_id(ext: str) -> str:
-        """Default parser ID function."""
-        return f"{ext.lstrip('.')}.v1"
 
     @property
     def _enricher_id(self) -> Optional[str]:
@@ -230,8 +213,8 @@ class DiffIngestExecutor:
         logger.info("Computing diff...")
         differ = Differ(
             state_reader=self._state.state,
-            config_provider=self._router,
-            parser_id_func=self._get_parser_id,
+            config_provider=self._chunking_router,
+            parser_id_func=lambda ext: self._parser_router.get_parser_id(ext),
             embedding_id=self._embedding_id,
             vector_db_id=self._vector_db_id,
             collection=self._collection,
@@ -456,7 +439,7 @@ class DiffIngestExecutor:
 
     def _prepare_file_no_enrich(self, candidate: FileCandidate) -> Optional[Dict]:
         """
-        Prepare a file for ingestion (parse, chunk) without enrichment.
+        Prepare a file for ingestion using Source → Parser → Chunker flow.
 
         Enrichment happens in a separate batch phase for efficiency.
 
@@ -466,36 +449,43 @@ class DiffIngestExecutor:
         Returns:
             file_data dict or None if file should be skipped.
         """
-        # 1. Parse file
-        text = self._parser.parse(candidate.path)
-        if not text or not text.strip():
+        # 1. Create SourceFile from candidate path
+        file_path = Path(candidate.path)
+        source_file = SourceFile(
+            uri=file_path.as_uri(),
+            local_path=file_path,
+            metadata={
+                "content_hash": candidate.content_hash,
+            },
+        )
+
+        # 2. Parse file using ParserRouter → ParsedDocument
+        parsed_doc = self._parser_router.parse(source_file)
+
+        # Check for empty content
+        if not parsed_doc.full_text.strip():
             logger.warning(f"Empty content from {candidate.path}, skipping")
             return None
 
-        # 2. Get chunker for this file type and chunk
-        chunker = self._router.get_chunker(candidate.ext)
-        doc_id = Path(candidate.path).stem
-        base_meta = {
+        # 3. Add metadata to parsed document
+        doc_id = file_path.stem
+        parsed_doc.metadata.update({
             "source_file": candidate.path,
             "doc_id": doc_id,
             "content_hash": candidate.content_hash,
             "parser_id": candidate.parser_id,
             "chunker_id": candidate.chunker_id,
-        }
+        })
 
-        # Convert to ParsedDocument for new chunker API
-        document = ParsedDocument(
-            source=f"file:///{candidate.path}",
-            elements=[DocumentElement(type=ElementType.TEXT, content=text)],
-            metadata=base_meta,
-        )
-        chunks = chunker.chunk(document)
+        # 4. Get chunker and chunk the ParsedDocument
+        chunker = self._chunking_router.get_chunker(candidate.ext)
+        chunks = chunker.chunk(parsed_doc)
 
         if not chunks:
             logger.warning(f"No chunks from {candidate.path}, skipping")
             return None
 
-        # 3. Prepare chunk data (no enrichment yet - that's batched later)
+        # 5. Prepare chunk data (no enrichment yet - that's batched later)
         chunk_data = []
         for chunk in chunks:
             chunk_id = compute_chunk_id(
@@ -655,12 +645,11 @@ def run_diff_ingest(
     state_manager: IngestStateManager,
     vector_db_writer: VectorDBWriter,
     embedder: Embedder,
-    parser: Parser,
+    parser_router: ParserRouter,
     chunking_router: ChunkingRouter,
     collection: str,
     embedding_id: str,
     vector_db_id: Optional[str] = None,
-    parser_id_func: Optional[callable] = None,
     enrichment_pipeline: Optional["EnrichmentPipeline"] = None,
     force: bool = False,
     on_progress: Optional[callable] = None,
@@ -674,12 +663,11 @@ def run_diff_ingest(
         state_manager: Manager for ingest state.
         vector_db_writer: Writer for upserting vectors.
         embedder: Embedder for creating vectors.
-        parser: Parser for extracting text from files.
+        parser_router: Router for file-type specific parsing.
         chunking_router: Router for file-type specific chunking.
         collection: Vector DB collection name.
         embedding_id: Current embedding configuration ID.
         vector_db_id: Vector DB plugin name (e.g., "qdrant", "local_faiss").
-        parser_id_func: Function to get parser_id for extension.
         enrichment_pipeline: Optional unified enrichment pipeline.
         force: If True, ingest everything regardless of state.
         on_progress: Optional callback(current, total, file_path) for progress updates.
@@ -692,12 +680,11 @@ def run_diff_ingest(
         state_manager=state_manager,
         vector_db_writer=vector_db_writer,
         embedder=embedder,
-        parser=parser,
+        parser_router=parser_router,
         chunking_router=chunking_router,
         collection=collection,
         embedding_id=embedding_id,
         vector_db_id=vector_db_id,
-        parser_id_func=parser_id_func,
         enrichment_pipeline=enrichment_pipeline,
     )
     return executor.run(source, force=force, on_progress=on_progress, skip_artifacts=skip_artifacts)
@@ -706,7 +693,6 @@ def run_diff_ingest(
 __all__ = [
     "VectorDBWriter",
     "Embedder",
-    "Parser",
     "IngestSummary",
     "DiffIngestExecutor",
     "run_diff_ingest",

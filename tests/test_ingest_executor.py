@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Set
 
 import pytest
 
+from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
 from fitz_ai.ingestion.chunking.router import ChunkingRouter
 from fitz_ai.ingestion.diff.executor import (
@@ -22,6 +23,7 @@ from fitz_ai.ingestion.diff.executor import (
     IngestSummary,
     run_diff_ingest,
 )
+from fitz_ai.ingestion.source.base import SourceFile
 from fitz_ai.ingestion.state import IngestStateManager
 
 
@@ -55,8 +57,8 @@ class MockEmbedder:
         return [[0.1] * self._dim for _ in texts]
 
 
-class MockParser:
-    """Mock parser."""
+class MockParserRouter:
+    """Mock parser router for testing."""
 
     def __init__(self, content: str = "Test content for parsing"):
         self._content = content
@@ -65,10 +67,20 @@ class MockParser:
     def fail_on(self, path: str) -> None:
         self._fail_paths.add(path)
 
-    def parse(self, path: str) -> str:
-        if path in self._fail_paths:
-            raise Exception(f"Parse failed for {path}")
-        return self._content
+    def parse(self, source_file: SourceFile) -> ParsedDocument:
+        path_str = str(source_file.local_path)
+        if path_str in self._fail_paths:
+            raise Exception(f"Parse failed for {path_str}")
+        return ParsedDocument(
+            source=source_file.uri,
+            elements=[
+                DocumentElement(type=ElementType.TEXT, content=self._content)
+            ],
+            metadata={"source_file": path_str},
+        )
+
+    def get_parser_id(self, ext: str) -> str:
+        return f"mock:{ext[1:] if ext.startswith('.') else ext}:v1"
 
 
 class TestIngestSummary:
@@ -123,7 +135,7 @@ class TestDiffIngestExecutor:
             "state_manager": state_manager,
             "vector_db_writer": MockVectorDBWriter(),
             "embedder": MockEmbedder(),
-            "parser": MockParser(),
+            "parser_router": MockParserRouter(),
             "chunking_router": router,
             "collection": "test_collection",
             "embedding_id": "test:embedding",
@@ -159,7 +171,7 @@ class TestDiffIngestExecutor:
             size_bytes=test_file.stat().st_size,
             mtime_epoch=test_file.stat().st_mtime,
             chunker_id="simple:1000:0",
-            parser_id="md.v1",
+            parser_id="mock:md:v1",
             embedding_id="test:embedding",
             collection="test_collection",
         )
@@ -187,9 +199,9 @@ class TestDiffIngestExecutor:
         test_file = tmp_path / "failing.md"
         test_file.write_text("# Will fail")
 
-        parser = MockParser()
-        parser.fail_on(str(test_file.resolve()))
-        executor_deps["parser"] = parser
+        parser_router = MockParserRouter()
+        parser_router.fail_on(str(test_file.resolve()))
+        executor_deps["parser_router"] = parser_router
 
         executor = DiffIngestExecutor(**executor_deps)
         summary = executor.run(tmp_path)
@@ -235,7 +247,7 @@ class TestDiffIngestExecutor:
             size_bytes=test_file.stat().st_size,
             mtime_epoch=test_file.stat().st_mtime,
             chunker_id="simple:1000:0",
-            parser_id="md.v1",
+            parser_id="mock:md:v1",
             embedding_id="test:embedding",
             collection="test_collection",
         )
@@ -253,9 +265,9 @@ class TestDiffIngestExecutor:
         failing_file.write_text("# Bad")
         (tmp_path / "good2.md").write_text("# Good 2")
 
-        parser = MockParser()
-        parser.fail_on(str(failing_file.resolve()))
-        executor_deps["parser"] = parser
+        parser_router = MockParserRouter()
+        parser_router.fail_on(str(failing_file.resolve()))
+        executor_deps["parser_router"] = parser_router
 
         executor = DiffIngestExecutor(**executor_deps)
         summary = executor.run(tmp_path)
@@ -326,7 +338,7 @@ class TestRunDiffIngest:
             state_manager=state_manager,
             vector_db_writer=MockVectorDBWriter(),
             embedder=MockEmbedder(),
-            parser=MockParser(),
+            parser_router=MockParserRouter(),
             chunking_router=router,
             collection="test",
             embedding_id="test:embedding",
