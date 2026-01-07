@@ -111,9 +111,9 @@ def _get_default_model(plugin_type: str, plugin_name: str, tier: str = "smart") 
     """Get the default model for a plugin.
 
     Args:
-        plugin_type: Type of plugin (chat, embedding, rerank)
+        plugin_type: Type of plugin (chat, embedding, rerank, vision)
         plugin_name: Name of the plugin (cohere, openai, etc.)
-        tier: Model tier for chat plugins ("smart" or "fast")
+        tier: Model tier for chat plugins ("smart", "fast", or "balanced")
     """
     defaults = {
         "chat_smart": {
@@ -141,6 +141,12 @@ def _get_default_model(plugin_type: str, plugin_name: str, tier: str = "smart") 
         },
         "rerank": {
             "cohere": "rerank-v3.5",
+        },
+        "vision": {
+            "cohere": "command-a-vision-07-2025",
+            "openai": "gpt-4o",
+            "anthropic": "claude-sonnet-4-20250514",
+            "local_ollama": "llama3.2-vision",
         },
     }
     if plugin_type == "chat":
@@ -205,6 +211,7 @@ def _generate_fitz_rag_config(
     parser: str = "docling",
     # Vision config
     vision: str | None = None,
+    vision_model: str = "",
 ) -> str:
     """Generate the Fitz RAG config YAML string."""
     # Build chat kwargs with smart/fast/balanced models
@@ -265,11 +272,14 @@ chunking:
 
     # Build vision section
     if vision:
+        vision_kwargs = " {}"
+        if vision_model:
+            vision_kwargs = f"\n    model: {vision_model}"
         vision_section = f"""
 # Vision (VLM for describing figures/images in PDFs - prompted at ingest time)
 vision:
   plugin_name: {vision}
-  kwargs: {{}}
+  kwargs:{vision_kwargs}
 """
     else:
         vision_section = """
@@ -864,6 +874,7 @@ def command(
         chunk_overlap = default_chunk_overlap
         # Vision provider (if available) - parser plugin determines if used
         vision_choice = avail_vision[0] if avail_vision else None
+        vision_model = _get_default_model("vision", vision_choice) if vision_choice else ""
         # Parser selection: docling_vision if VLM available, else docling
         parser_choice = "docling_vision" if vision_choice else "docling"
 
@@ -903,6 +914,21 @@ def command(
             print()
             ui.info("Rerank: not available (no rerank plugins detected)")
 
+        # Vision provider (parser plugin determines if used)
+        vision_choice = None
+        vision_model = ""
+        if avail_vision:
+            print()
+            vision_choice = ui.prompt_numbered_choice(
+                "Vision plugin",
+                avail_vision,
+                avail_vision[0],
+            )
+            vision_model = _prompt_model("vision", vision_choice)
+        else:
+            print()
+            ui.info("Vision: not available (no vision plugins detected)")
+
         # Vector DB
         print()
         vector_db_choice = ui.prompt_numbered_choice(
@@ -922,34 +948,23 @@ def command(
 
         # Chunking (defaults from default.yaml)
         print()
-        ui.print("Chunking configuration:", "bold")
         chunker_choice = ui.prompt_numbered_choice(
-            "Default chunker", avail_chunkers, default_chunker
+            "Chunking strategy", avail_chunkers, default_chunker
         )
-        chunk_size = ui.prompt_int("Chunk size", default_chunk_size)
-        chunk_overlap = ui.prompt_int("Chunk overlap", default_chunk_overlap)
+        chunk_size = ui.prompt_int("  Chunk size", default_chunk_size)
+        chunk_overlap = ui.prompt_int("  Chunk overlap", default_chunk_overlap)
 
-        # Vision provider (parser plugin determines if used)
+        # Parser selection (determines if VLM is used for figures)
         print()
-        ui.print("Vision (VLM) for PDF figure description:", "bold")
-        vision_choice = None
         if avail_vision:
-            vision_choice = ui.prompt_numbered_choice(
-                "Vision plugin",
-                avail_vision,
-                avail_vision[0],
-            )
-            # Parser selection: docling vs docling_vision
-            print()
             parser_descs = [
-                "docling - Standard document parsing",
                 "docling_vision - VLM-powered figure description",
+                "docling - Standard document parsing",
             ]
-            selected = ui.prompt_numbered_choice("Parser", parser_descs, parser_descs[1])
+            selected = ui.prompt_numbered_choice("Parser", parser_descs, parser_descs[0])
             parser_choice = selected.split(" - ")[0]
         else:
-            ui.info("No vision plugins available.")
-            ui.info("Requires: OPENAI_API_KEY, ANTHROPIC_API_KEY, COHERE_API_KEY, or Ollama.")
+            ui.info("Parser: docling (VLM not available)")
             parser_choice = "docling"
 
     # =========================================================================
@@ -983,6 +998,7 @@ def command(
             chunk_overlap=chunk_overlap,
             parser=parser_choice,
             vision=vision_choice,
+            vision_model=vision_model,
         )
     else:
         # For any other engine, use auto-discovery to copy default.yaml
