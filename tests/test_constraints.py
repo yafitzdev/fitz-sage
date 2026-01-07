@@ -13,7 +13,7 @@ Uses semantic matching with mock embedder for testing.
 from __future__ import annotations
 
 import pytest
-from conftest_guardrails import create_deterministic_embedder
+from conftest import create_deterministic_embedder
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.core.guardrails import (
