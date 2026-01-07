@@ -5,20 +5,32 @@ Docling-based parser for PDF, DOCX, images, and more.
 Uses IBM's Docling library for advanced document understanding including:
 - Layout analysis and reading order
 - Table structure extraction
-- Figure/image detection
+- Figure/image detection with optional VLM description
 - Code block recognition
 - Formula handling
+
+VLM Integration:
+    When a vision client is provided, figures/images detected by Docling are
+    sent to a Vision Language Model for description. This replaces the default
+    "[Figure]" placeholder with an actual description of the image content.
+
+    Configure vision in fitz.yaml:
+        vision:
+          enabled: true
+          plugin_name: openai  # or "anthropic", "local_ollama"
 
 Requires: pip install docling
 """
 
 from __future__ import annotations
 
+import base64
+import io
 import logging
 import os
 import sys
 from dataclasses import dataclass, field
-from typing import Set
+from typing import Any, Set
 
 # Fix Windows symlink issue with Hugging Face model caching
 # Windows restricts symlink creation by default, causing model downloads to fail
@@ -77,19 +89,33 @@ class DoclingParser:
     - Table structure detection
     - Reading order inference
     - Multi-format support
+    - VLM-powered figure/image description (optional)
 
     Example:
         parser = DoclingParser()
         doc = parser.parse(source_file)
         for element in doc.elements:
             print(element.type, element.content[:50])
+
+    With VLM for figure description:
+        from fitz_ai.llm.runtime import create_yaml_client
+        vision_client = create_yaml_client("vision", "openai")
+        parser = DoclingParser(vision_client=vision_client)
+        doc = parser.parse(source_file)  # Figures will have descriptions!
     """
 
     plugin_name: str = field(default="docling", repr=False)
     supported_extensions: Set[str] = field(default_factory=lambda: DOCLING_EXTENSIONS)
 
+    # Optional VLM client for describing figures/images
+    vision_client: Any = field(default=None, repr=False)
+
     # Lazy-loaded converter
     _converter: object = field(default=None, repr=False)
+
+    # Track VLM statistics
+    _vlm_calls: int = field(default=0, repr=False)
+    _vlm_errors: int = field(default=0, repr=False)
 
     def _get_converter(self):
         """Lazy-load the DocumentConverter."""
@@ -165,6 +191,17 @@ class DoclingParser:
         if hasattr(doc, "pages") and doc.pages:
             metadata["page_count"] = len(doc.pages)
 
+        # Add VLM statistics if vision was used
+        if self.vision_client is not None:
+            metadata["vlm_enabled"] = True
+            metadata["vlm_calls"] = self._vlm_calls
+            metadata["vlm_errors"] = self._vlm_errors
+            if self._vlm_calls > 0:
+                logger.info(
+                    f"VLM processed {self._vlm_calls} figures "
+                    f"({self._vlm_errors} errors) in {file.uri}"
+                )
+
         return ParsedDocument(
             source=file.uri,
             elements=elements,
@@ -239,7 +276,7 @@ class DoclingParser:
                 return None
 
         elif label == DocItemLabel.PICTURE:
-            # For pictures, store description or placeholder
+            # For pictures, try VLM description first, then caption, then placeholder
             caption = ""
             if hasattr(item, "captions") and item.captions:
                 # Try to get caption text
@@ -248,11 +285,25 @@ class DoclingParser:
                         caption = cap_ref.text
                         break
 
+            # Try VLM description if available
+            vlm_description = self._describe_image_with_vlm(item)
+
+            # Build content: VLM description > caption > placeholder
+            if vlm_description:
+                # Include caption as context if available
+                if caption:
+                    content = f"{vlm_description}\n\nCaption: {caption}"
+                else:
+                    content = vlm_description
+            else:
+                content = caption or "[Figure]"
+
             return DocumentElement(
                 type=ElementType.FIGURE,
-                content=caption or "[Figure]",
+                content=content,
                 metadata={
                     "has_image": item.image is not None if hasattr(item, "image") else False,
+                    "vlm_described": vlm_description is not None,
                 },
             )
 
@@ -320,6 +371,57 @@ class DoclingParser:
         if hasattr(item, "orig") and item.orig:
             return item.orig.strip()
         return ""
+
+    def _describe_image_with_vlm(self, item) -> str | None:
+        """
+        Use VLM to describe an image from a Docling picture item.
+
+        Args:
+            item: Docling picture item with potential image data.
+
+        Returns:
+            Description string if successful, None otherwise.
+        """
+        if self.vision_client is None:
+            return None
+
+        # Try to get image data from the item
+        image_data = getattr(item, "image", None)
+        if image_data is None:
+            return None
+
+        try:
+            # Convert image to base64
+            # Docling stores images as PIL Image objects or as ImageRef
+            if hasattr(image_data, "pil_image"):
+                # ImageRef with PIL image
+                pil_image = image_data.pil_image
+            elif hasattr(image_data, "save"):
+                # Direct PIL Image
+                pil_image = image_data
+            else:
+                logger.debug(f"Unknown image data type: {type(image_data)}")
+                return None
+
+            # Convert PIL image to base64 PNG
+            buffer = io.BytesIO()
+            pil_image.save(buffer, format="PNG")
+            buffer.seek(0)
+            image_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+            # Call vision client
+            self._vlm_calls += 1
+            description = self.vision_client.describe_image(image_base64)
+
+            if description:
+                logger.debug(f"VLM described image: {description[:100]}...")
+                return description
+
+        except Exception as e:
+            self._vlm_errors += 1
+            logger.warning(f"VLM failed to describe image: {e}")
+
+        return None
 
 
 __all__ = ["DoclingParser", "DOCLING_EXTENSIONS"]

@@ -1,0 +1,85 @@
+# fitz_ai/llm/vision/anthropic.yaml
+#
+# Anthropic Vision Plugin - Claude 3 Vision API
+# Documentation: https://docs.anthropic.com/claude/docs/vision
+# Claude 3 models support vision natively
+
+# =============================================================================
+# IDENTITY
+# =============================================================================
+plugin_name: "anthropic"
+plugin_type: "vision"
+version: "1.0"
+
+# =============================================================================
+# PROVIDER
+# =============================================================================
+provider:
+  name: "anthropic"
+  base_url: "https://api.anthropic.com/v1"
+
+# =============================================================================
+# AUTHENTICATION
+# =============================================================================
+auth:
+  type: "header"
+  header_name: "x-api-key"
+  header_format: "{key}"
+  env_vars:
+    - "ANTHROPIC_API_KEY"
+
+# =============================================================================
+# REQUIRED ENVIRONMENT VARIABLES
+# =============================================================================
+required_env: []
+
+# =============================================================================
+# HEALTH CHECK
+# =============================================================================
+health_check: null
+
+# =============================================================================
+# ENDPOINT
+# =============================================================================
+endpoint:
+  path: "/messages"
+  method: "POST"
+  timeout: 120
+
+# =============================================================================
+# DEFAULTS
+# =============================================================================
+# Claude 3 models - all support vision
+defaults:
+  models:
+    smart: "claude-sonnet-4-20250514"
+    fast: "claude-haiku-4-20250514"
+    balanced: "claude-sonnet-4-20250514"
+  temperature: 0.2
+  max_tokens: 1024
+  # Default prompt for figure description
+  default_prompt: "Describe this figure/chart/diagram in detail. Include any data values, labels, axes, trends, and key insights visible in the image."
+
+# =============================================================================
+# REQUEST CONFIGURATION
+# =============================================================================
+request:
+  messages_transform: "anthropic_vision"
+  static_fields:
+    anthropic-version: "2023-06-01"
+  param_map:
+    model: "model"
+    temperature: "temperature"
+    max_tokens: "max_tokens"
+
+# =============================================================================
+# RESPONSE CONFIGURATION
+# =============================================================================
+response:
+  content_path: "content[0].text"
+  is_array: false
+  array_index: 0
+  metadata_paths:
+    stop_reason: "stop_reason"
+    tokens_input: "usage.input_tokens"
+    tokens_output: "usage.output_tokens"

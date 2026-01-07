@@ -17,6 +17,13 @@ Architecture:
 Usage:
     router = ParserRouter()
     parsed_doc = router.parse(source_file)
+
+VLM Integration:
+    Pass a vision_client to enable VLM-powered figure description:
+
+    from fitz_ai.llm.runtime import create_yaml_client
+    vision_client = create_yaml_client("vision", "openai")
+    router = ParserRouter(vision_client=vision_client)
 """
 
 from __future__ import annotations
@@ -44,7 +51,13 @@ class ParserRouter:
     Example:
         router = ParserRouter()
         doc = router.parse(source_file)
+
+    With VLM for figure description (via docling_vision parser):
+        router = ParserRouter(docling_parser="docling_vision")
     """
+
+    # Which docling parser to use: "docling" or "docling_vision"
+    docling_parser: str = field(default="docling")
 
     # Map of extension -> parser instance
     _parsers: Dict[str, Parser] = field(default_factory=dict)
@@ -74,12 +87,23 @@ class ParserRouter:
             self._parsers[ext] = plaintext
 
         # Register Docling parser for complex documents (PDF, DOCX, images, etc.)
-        from fitz_ai.ingestion.parser.plugins.docling import (
-            DOCLING_EXTENSIONS,
-            DoclingParser,
-        )
+        # Use docling_vision if configured for VLM-powered figure description
+        if self.docling_parser == "docling_vision":
+            from fitz_ai.ingestion.parser.plugins.docling_vision import (
+                DOCLING_EXTENSIONS,
+                DoclingVisionParser,
+            )
 
-        docling = DoclingParser()
+            docling = DoclingVisionParser()
+            logger.info("Using docling_vision parser (VLM-powered figure description)")
+        else:
+            from fitz_ai.ingestion.parser.plugins.docling import (
+                DOCLING_EXTENSIONS,
+                DoclingParser,
+            )
+
+            docling = DoclingParser()
+
         for ext in DOCLING_EXTENSIONS:
             # Docling handles these formats - override any plaintext registrations
             self._parsers[ext] = docling
@@ -152,9 +176,7 @@ class ParserRouter:
             ParseError: If parsing fails.
         """
         parser = self.get_parser(file.extension)
-        logger.debug(
-            f"Parsing '{file.name}' with {parser.plugin_name} parser"
-        )
+        logger.debug(f"Parsing '{file.name}' with {parser.plugin_name} parser")
 
         try:
             return parser.parse(file)

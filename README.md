@@ -733,8 +733,8 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 │  └────────┘ └───────────┘ └────────┘ └──────────┘             │
 │  openai, cohere, anthropic, ollama, azure...                  │
 ├───────────────────────────────────────────────────────────────┤
-│  Retrieval Pipelines (YAML-composed)                          │
-│  dense.yaml | dense_rerank.yaml | custom...                   │
+│  Retrieval Pipelines (plugin choice controls features)        │
+│  dense (no rerank) | dense_rerank (with rerank)               │
 ├───────────────────────────────────────────────────────────────┤
 │  Enrichment (opt-in)                                          │
 │  entities | entity links | semantic clusters | hierarchical   │
@@ -942,3 +942,5 @@ MIT
 - [PyPI](https://pypi.org/project/fitz-ai/)
 - [Changelog](CHANGELOG.md)
 - [CLI Documentation](docs/CLI.md)
+- [Plugin Guide](docs/PLUGINS.md)
+- [Feature Control Architecture](docs/FEATURE_CONTROL.md)

@@ -567,8 +567,16 @@ def command(
         state_manager = IngestStateManager()
         state_manager.load()
 
-        # Parser router (routes files to appropriate parsers)
-        parser_router = ParserRouter()
+        # Parser router - uses docling_vision if configured for VLM
+        # The parser choice determines if VLM is used (docling vs docling_vision)
+        chunking_cfg = config.get("chunking", {})
+        default_chunking = chunking_cfg.get("default", {})
+        docling_parser = default_chunking.get("parser", "docling")
+
+        if docling_parser == "docling_vision":
+            ui.info("VLM enabled (docling_vision parser)")
+
+        parser_router = ParserRouter(docling_parser=docling_parser)
 
         # Build chunking router from config
         router_config = _build_chunking_router_config(config)

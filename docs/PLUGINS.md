@@ -4,18 +4,65 @@ Fitz uses a YAML-based plugin system for LLM providers and vector databases. Thi
 
 ---
 
+## Feature Control Architecture
+
+**Important:** Optional features (VLM, reranking) are controlled by plugin choice, not config flags.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  CONFIG declares WHICH provider/model to use                    │
+│  (fitz init configures these sections)                          │
+├─────────────────────────────────────────────────────────────────┤
+│  vision:                    │  rerank:                          │
+│    plugin_name: cohere      │    plugin_name: cohere            │
+│    kwargs: {}               │    kwargs:                        │
+│                             │      model: rerank-v3.5           │
+├─────────────────────────────────────────────────────────────────┤
+│  PLUGIN determines IF the feature is used                       │
+│  (plugin choice enables/disables the feature)                   │
+├─────────────────────────────────────────────────────────────────┤
+│  Parser Plugin (VLM control):                                   │
+│    docling        → No VLM (figures become "[Figure]")          │
+│    docling_vision → Uses VLM from vision: config                │
+│                                                                 │
+│  Retrieval Plugin (Rerank control):                             │
+│    dense          → No reranking (pure vector search)           │
+│    dense_rerank   → Uses reranker from rerank: config           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**The pattern:**
+- `fitz init` prompts for providers and saves them to config
+- Config sections (`vision:`, `rerank:`) specify WHAT provider to use
+- Plugin choice specifies IF the feature is used
+- No `enabled: true/false` flags - plugin name IS the toggle
+
+**Config locations:**
+- Parser: `chunking.default.parser` → `"docling"` or `"docling_vision"`
+- Retrieval: `retrieval.plugin_name` → `"dense"` or `"dense_rerank"`
+
+---
+
 ## Overview
 
-Plugins are YAML files that describe how to interact with external services. No Python code required.
+Fitz uses two types of plugins:
+
+- **YAML plugins** - For external service integrations (LLM providers, vector DBs). Declarative, no code required.
+- **Python plugins** - For logic-based components (chunking, parsing, constraints). Require Python code.
 
 **Plugin Types:**
 
-| Type | Location | Purpose |
-|------|----------|---------|
-| Chat | `fitz_ai/llm/chat/` | LLM chat/completion |
-| Embedding | `fitz_ai/llm/embedding/` | Text embeddings |
-| Rerank | `fitz_ai/llm/rerank/` | Document reranking |
-| Vector DB | `fitz_ai/vector_db/plugins/` | Vector storage |
+| Type | Format | Location | Purpose |
+|------|--------|----------|---------|
+| Chat | YAML | `fitz_ai/llm/chat/` | LLM chat/completion |
+| Embedding | YAML | `fitz_ai/llm/embedding/` | Text embeddings |
+| Rerank | YAML | `fitz_ai/llm/rerank/` | Document reranking |
+| Vision | YAML | `fitz_ai/llm/vision/` | VLM for image description |
+| Vector DB | YAML | `fitz_ai/vector_db/plugins/` | Vector storage |
+| Retrieval | YAML | `fitz_ai/retrieval/plugins/` | Retrieval strategies |
+| Chunking | Python | `fitz_ai/ingestion/chunking/plugins/` | Document chunking |
+| Parser | Python | `fitz_ai/ingestion/parser/plugins/` | Document parsing |
+| Constraint | Python | `fitz_ai/engines/fitz_rag/constraints/plugins/` | Epistemic safety |
 
 ---
 

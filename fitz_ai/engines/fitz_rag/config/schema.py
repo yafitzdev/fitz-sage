@@ -232,6 +232,53 @@ class RerankConfig(BaseModel):
 
 
 # =============================================================================
+# Vision Configuration
+# =============================================================================
+
+
+class VisionConfig(BaseModel):
+    """
+    Vision/VLM configuration for describing figures and images.
+
+    When enabled during ingestion, figures/images detected by Docling are
+    sent to a vision model for description. The descriptions are stored
+    as searchable text content instead of "[Figure]" placeholders.
+
+    API keys are resolved from environment variables - same as chat/embedding:
+    - OpenAI: OPENAI_API_KEY
+    - Anthropic: ANTHROPIC_API_KEY
+    - Ollama: No API key required (local)
+
+    Example YAML:
+        vision:
+          enabled: true
+          plugin_name: openai    # or "anthropic", "ollama"
+          kwargs:
+            model: gpt-4o        # or "claude-sonnet-4-20250514", "llama3.2-vision"
+
+    Available models by provider:
+    - OpenAI: gpt-4o, gpt-4o-mini
+    - Anthropic: claude-sonnet-4-20250514, claude-haiku-4-20250514
+    - Ollama: llama3.2-vision, llava, bakllava
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable vision for figure/image description during ingestion",
+    )
+    plugin_name: str | None = Field(
+        default=None,
+        description="Vision plugin name (openai, anthropic, ollama)",
+    )
+    kwargs: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Vision plugin kwargs (model, temperature, etc.)",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
+# =============================================================================
 # RGS Configuration
 # =============================================================================
 
@@ -459,6 +506,7 @@ class FitzRagConfig(BaseModel):
 
     # Optional components
     rerank: RerankConfig = Field(default_factory=RerankConfig, description="Reranker configuration")
+    vision: VisionConfig = Field(default_factory=VisionConfig, description="Vision/VLM configuration")
     rgs: RGSConfig = Field(default_factory=RGSConfig, description="RGS configuration")
     logging: LoggingConfig = Field(
         default_factory=LoggingConfig, description="Logging configuration"

@@ -223,11 +223,12 @@ class TestGenerateConfig:
 
         config = yaml.safe_load(config_str)
 
-        assert config["rerank"]["enabled"] is True
+        # Rerank section has plugin_name and kwargs (no enabled flag)
         assert config["rerank"]["plugin_name"] == "cohere"
+        assert "model" in config["rerank"]["kwargs"]
 
     def test_generate_fitz_rag_config_without_rerank(self):
-        """Test _generate_fitz_rag_config disables rerank when not provided."""
+        """Test _generate_fitz_rag_config omits rerank when not provided."""
         import yaml
 
         from fitz_ai.cli.commands.init import _generate_fitz_rag_config
@@ -251,7 +252,8 @@ class TestGenerateConfig:
 
         config = yaml.safe_load(config_str)
 
-        assert config["rerank"]["enabled"] is False
+        # Rerank section is commented out (not present in config)
+        assert "rerank" not in config
 
     def test_generate_fitz_rag_config_qdrant(self):
         """Test _generate_fitz_rag_config includes Qdrant settings."""

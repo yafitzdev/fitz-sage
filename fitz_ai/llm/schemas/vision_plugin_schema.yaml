@@ -1,0 +1,261 @@
+# fitz_ai/llm/schemas/vision_plugin_schema.yaml
+#
+# MASTER SCHEMA: All fields for vision plugins
+# ============================================
+#
+# This is the SINGLE SOURCE OF TRUTH for vision plugin fields.
+# - All vision plugin YAML files must follow this structure
+# - Code reads defaults from here
+# - Add new fields HERE first
+#
+# Field definition format:
+#   field_name:
+#     required: true/false
+#     type: string/integer/float/boolean/list/object
+#     default: <value> (only if required=false)
+#     options: [...] (optional, restricts allowed values)
+#     description: "..."
+#     example: <value>
+
+fields:
+
+  # ============================================================================
+  # IDENTITY
+  # ============================================================================
+
+  plugin_name:
+    required: true
+    type: string
+    description: "Unique plugin identifier"
+    example: "openai"
+
+  plugin_type:
+    required: true
+    type: string
+    options: ["vision"]
+    description: "Must be 'vision' for vision plugins"
+    example: "vision"
+
+  version:
+    required: false
+    type: string
+    default: "1.0"
+    description: "Plugin schema version"
+    example: "1.0"
+
+  # ============================================================================
+  # PROVIDER
+  # ============================================================================
+
+  provider.name:
+    required: true
+    type: string
+    description: "Provider name for credential resolution"
+    example: "openai"
+
+  provider.base_url:
+    required: true
+    type: string
+    description: "API base URL"
+    example: "https://api.openai.com/v1"
+
+  # ============================================================================
+  # AUTHENTICATION
+  # ============================================================================
+
+  auth.type:
+    required: false
+    type: string
+    default: "bearer"
+    options: ["bearer", "header", "query", "none"]
+    description: "Authentication type"
+    example: "bearer"
+
+  auth.header_name:
+    required: false
+    type: string
+    default: "Authorization"
+    description: "HTTP header name for auth"
+    example: "Authorization"
+
+  auth.header_format:
+    required: false
+    type: string
+    default: "Bearer {key}"
+    description: "Header value format (use {key} placeholder)"
+    example: "Bearer {key}"
+
+  auth.env_vars:
+    required: false
+    type: list
+    default: []
+    description: "Environment variables to check for API key"
+    example: ["OPENAI_API_KEY"]
+
+  # ============================================================================
+  # REQUIRED ENVIRONMENT VARIABLES
+  # ============================================================================
+
+  required_env:
+    required: false
+    type: list
+    default: []
+    description: "Additional required env vars"
+
+  # ============================================================================
+  # HEALTH CHECK (optional)
+  # ============================================================================
+
+  health_check:
+    required: false
+    type: object
+    default: null
+    description: "Optional health check config for local services"
+
+  health_check.path:
+    required: false
+    type: string
+    default: "/health"
+    description: "Health check endpoint path"
+
+  health_check.method:
+    required: false
+    type: string
+    default: "GET"
+    options: ["GET", "POST"]
+    description: "HTTP method for health check"
+
+  health_check.timeout:
+    required: false
+    type: integer
+    default: 2
+    description: "Health check timeout in seconds"
+
+  # ============================================================================
+  # ENDPOINT
+  # ============================================================================
+
+  endpoint.path:
+    required: true
+    type: string
+    description: "API endpoint path"
+    example: "/chat/completions"
+
+  endpoint.method:
+    required: false
+    type: string
+    default: "POST"
+    options: ["GET", "POST", "PUT", "DELETE"]
+    description: "HTTP method"
+
+  endpoint.timeout:
+    required: false
+    type: integer
+    default: 120
+    description: "Request timeout in seconds"
+
+  # ============================================================================
+  # DEFAULTS
+  # ============================================================================
+
+  defaults:
+    required: false
+    type: object
+    default: {}
+    description: "Default parameter values"
+
+  defaults.models:
+    required: false
+    type: object
+    default: {}
+    description: "Model tier configuration (smart, fast, balanced)"
+
+  defaults.models.smart:
+    required: false
+    type: string
+    description: "Best quality model"
+    example: "gpt-4o"
+
+  defaults.models.fast:
+    required: false
+    type: string
+    description: "Fastest model"
+    example: "gpt-4o-mini"
+
+  defaults.models.balanced:
+    required: false
+    type: string
+    description: "Cost-effective model"
+    example: "gpt-4o-mini"
+
+  defaults.temperature:
+    required: false
+    type: float
+    default: 0.2
+    description: "Sampling temperature"
+
+  defaults.max_tokens:
+    required: false
+    type: integer
+    default: 1024
+    description: "Maximum output tokens"
+
+  defaults.default_prompt:
+    required: false
+    type: string
+    default: "Describe this figure/chart/diagram in detail. Include any data values, labels, axes, trends, and key insights visible in the image."
+    description: "Default prompt for figure description"
+
+  # ============================================================================
+  # REQUEST CONFIGURATION
+  # ============================================================================
+
+  request.messages_transform:
+    required: false
+    type: string
+    default: "openai_vision"
+    options: ["openai_vision", "cohere_vision", "anthropic_vision", "ollama_vision"]
+    description: "Message transformation strategy for image+text"
+
+  request.static_fields:
+    required: false
+    type: object
+    default: {}
+    description: "Static fields to include in every request"
+
+  request.param_map:
+    required: false
+    type: object
+    default:
+      model: "model"
+      temperature: "temperature"
+      max_tokens: "max_tokens"
+    description: "Parameter name mapping"
+
+  # ============================================================================
+  # RESPONSE CONFIGURATION
+  # ============================================================================
+
+  response.content_path:
+    required: true
+    type: string
+    description: "Path to extract response content"
+    example: "choices[0].message.content"
+
+  response.is_array:
+    required: false
+    type: boolean
+    default: false
+    description: "Whether response is an array"
+
+  response.array_index:
+    required: false
+    type: integer
+    default: 0
+    description: "Array index to extract (if is_array)"
+
+  response.metadata_paths:
+    required: false
+    type: object
+    default: {}
+    description: "Paths to extract metadata"

@@ -83,6 +83,11 @@ class MessageTransform(str, Enum):
     ANTHROPIC_CHAT = "anthropic_chat"
     GEMINI_CHAT = "gemini_chat"
     OLLAMA_CHAT = "ollama_chat"
+    # Vision transforms (handle image + text input)
+    OPENAI_VISION = "openai_vision"
+    COHERE_VISION = "cohere_vision"
+    ANTHROPIC_VISION = "anthropic_vision"
+    OLLAMA_VISION = "ollama_vision"
 
 
 # =============================================================================
@@ -332,10 +337,52 @@ class RerankPluginSpec(BasePluginSpec):
 
 
 # =============================================================================
+# Vision Plugin Schema
+# =============================================================================
+
+
+class VisionRequestConfig(BaseModel):
+    """Request transformation for vision plugins."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    messages_transform: MessageTransform = MessageTransform.OPENAI_VISION
+    static_fields: dict[str, Any] = Field(default_factory=dict)
+    param_map: dict[str, str] = Field(
+        default_factory=lambda: {
+            "model": "model",
+            "temperature": "temperature",
+            "max_tokens": "max_tokens",
+        }
+    )
+
+
+class VisionResponseConfig(BaseModel):
+    """Response extraction for vision plugins."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    content_path: str = Field(..., description="Path to response text")
+    metadata_paths: dict[str, str] = Field(default_factory=dict)
+    is_array: bool = False
+    array_index: int = 0
+
+
+class VisionPluginSpec(BasePluginSpec):
+    """Complete specification for a vision plugin."""
+
+    plugin_type: Literal["vision"] = "vision"
+    health_check: HealthCheckConfig | None = None
+
+    request: VisionRequestConfig
+    response: VisionResponseConfig
+
+
+# =============================================================================
 # Union type for any plugin spec
 # =============================================================================
 
-PluginSpec = ChatPluginSpec | EmbeddingPluginSpec | RerankPluginSpec
+PluginSpec = ChatPluginSpec | EmbeddingPluginSpec | RerankPluginSpec | VisionPluginSpec
 
 
 # =============================================================================
@@ -367,6 +414,10 @@ __all__ = [
     "RerankRequestConfig",
     "RerankResponseConfig",
     "RerankPluginSpec",
+    # Vision
+    "VisionRequestConfig",
+    "VisionResponseConfig",
+    "VisionPluginSpec",
     # Union
     "PluginSpec",
 ]

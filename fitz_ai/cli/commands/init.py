@@ -128,6 +128,12 @@ def _get_default_model(plugin_type: str, plugin_name: str, tier: str = "smart") 
             "anthropic": "claude-haiku-3-5-20241022",
             "local_ollama": "llama3.2:1b",
         },
+        "chat_balanced": {
+            "cohere": "command-r-08-2024",
+            "openai": "gpt-4o-mini",
+            "anthropic": "claude-sonnet-4-20250514",
+            "local_ollama": "llama3.2",
+        },
         "embedding": {
             "cohere": "embed-english-v3.0",
             "openai": "text-embedding-3-small",
@@ -149,7 +155,7 @@ def _prompt_model(plugin_type: str, plugin_name: str, tier: str = "smart") -> st
     Args:
         plugin_type: Type of plugin (chat, embedding, rerank)
         plugin_name: Name of the plugin
-        tier: Model tier for chat plugins ("smart" or "fast")
+        tier: Model tier for chat plugins ("smart", "fast", or "balanced")
     """
     default_model = _get_default_model(plugin_type, plugin_name, tier)
 
@@ -157,8 +163,7 @@ def _prompt_model(plugin_type: str, plugin_name: str, tier: str = "smart") -> st
         return ""
 
     if plugin_type == "chat":
-        tier_label = "smart" if tier == "smart" else "fast"
-        return ui.prompt_text(f"  {tier_label.capitalize()} model for {plugin_name}", default_model)
+        return ui.prompt_text(f"  {tier.capitalize()} model for {plugin_name}", default_model)
 
     return ui.prompt_text(f"  Model for {plugin_name}", default_model)
 
@@ -183,6 +188,7 @@ def _generate_fitz_rag_config(
     chat: str,
     chat_model_smart: str,
     chat_model_fast: str,
+    chat_model_balanced: str = "",
     embedding: str,
     embedding_model: str,
     rerank: str | None,
@@ -195,16 +201,22 @@ def _generate_fitz_rag_config(
     chunker: str,
     chunk_size: int,
     chunk_overlap: int,
+    # Parser config (docling or docling_vision)
+    parser: str = "docling",
+    # Vision config
+    vision: str | None = None,
 ) -> str:
     """Generate the Fitz RAG config YAML string."""
-    # Build chat kwargs with smart/fast models
+    # Build chat kwargs with smart/fast/balanced models
     chat_kwargs = ""
-    if chat_model_smart or chat_model_fast:
+    if chat_model_smart or chat_model_fast or chat_model_balanced:
         chat_kwargs = "\n    models:"
         if chat_model_smart:
             chat_kwargs += f"\n      smart: {chat_model_smart}"
         if chat_model_fast:
             chat_kwargs += f"\n      fast: {chat_model_fast}"
+        if chat_model_balanced:
+            chat_kwargs += f"\n      balanced: {chat_model_balanced}"
         chat_kwargs += "\n    temperature: 0.2"
 
     # Build embedding kwargs
@@ -218,17 +230,18 @@ def _generate_fitz_rag_config(
         if rerank_model:
             rerank_kwargs = f"\n    model: {rerank_model}"
         rerank_section = f"""
-# Reranker (used by retrieval plugins that support reranking)
+# Reranker (improves retrieval quality - prompted at query time)
 rerank:
-  enabled: true
   plugin_name: {rerank}
   kwargs:{rerank_kwargs}
 """
     else:
         rerank_section = """
-# Reranker (no reranker available)
-rerank:
-  enabled: false
+# Reranker (no reranker available - install cohere or similar)
+# rerank:
+#   plugin_name: cohere
+#   kwargs:
+#     model: rerank-v3.5
 """
 
     # Build vector DB kwargs
@@ -239,13 +252,32 @@ rerank:
     # Build chunking section
     chunking_section = f"""
 # Chunking (document splitting for ingestion)
+# parser: docling (default) or docling_vision (VLM-powered figure description)
 chunking:
   default:
+    parser: {parser}
     plugin_name: {chunker}
     kwargs:
       chunk_size: {chunk_size}
       chunk_overlap: {chunk_overlap}
   by_extension: {{}}
+"""
+
+    # Build vision section
+    if vision:
+        vision_section = f"""
+# Vision (VLM for describing figures/images in PDFs - prompted at ingest time)
+vision:
+  plugin_name: {vision}
+  kwargs: {{}}
+"""
+    else:
+        vision_section = """
+# Vision (VLM for describing figures/images in PDFs)
+# Uncomment to enable - requires OPENAI_API_KEY, ANTHROPIC_API_KEY, or Ollama
+# vision:
+#   plugin_name: openai  # or anthropic, cohere, local_ollama
+#   kwargs: {}
 """
 
     return f"""# Fitz RAG Engine Configuration
@@ -273,7 +305,7 @@ retrieval:
   plugin_name: {retrieval}
   collection: default
   top_k: 5
-{chunking_section}
+{chunking_section}{vision_section}
 # RGS (Retrieval-Guided Synthesis)
 rgs:
   enable_citations: true
@@ -751,6 +783,7 @@ def command(
     all_chat = available_llm_plugins("chat")
     all_embedding = available_llm_plugins("embedding")
     all_rerank = available_llm_plugins("rerank")
+    all_vision = available_llm_plugins("vision")
     all_vector_db = available_vector_db_plugins()
     all_retrieval = available_retrieval_plugins()
     all_chunkers = available_chunking_plugins()
@@ -759,6 +792,7 @@ def command(
     avail_chat = _filter_available_plugins(all_chat, "chat", system)
     avail_embedding = _filter_available_plugins(all_embedding, "embedding", system)
     avail_rerank = _filter_available_plugins(all_rerank, "rerank", system)
+    avail_vision = _filter_available_plugins(all_vision, "vision", system)
     avail_vector_db = _filter_available_plugins(all_vector_db, "vector_db", system)
     avail_retrieval = all_retrieval
     avail_chunkers = all_chunkers if all_chunkers else ["simple"]
@@ -814,8 +848,10 @@ def command(
         chat_choice = _get_default_or_first(avail_chat, default_chat)
         chat_model_smart = _get_default_model("chat", chat_choice, "smart")
         chat_model_fast = _get_default_model("chat", chat_choice, "fast")
+        chat_model_balanced = _get_default_model("chat", chat_choice, "balanced")
         embedding_choice = _get_default_or_first(avail_embedding, default_embedding)
         embedding_model = _get_default_model("embedding", embedding_choice)
+        # Rerank provider (if available) - retrieval plugin determines if used
         rerank_choice = (
             _get_default_or_first(avail_rerank, default_rerank) if avail_rerank else None
         )
@@ -826,17 +862,22 @@ def command(
         chunker_choice = default_chunker
         chunk_size = default_chunk_size
         chunk_overlap = default_chunk_overlap
+        # Vision provider (if available) - parser plugin determines if used
+        vision_choice = avail_vision[0] if avail_vision else None
+        # Parser selection: docling_vision if VLM available, else docling
+        parser_choice = "docling_vision" if vision_choice else "docling"
 
     else:
         # Interactive selection
         ui.section("Configuration")
 
-        # Chat plugin with smart/fast model selection
+        # Chat plugin with smart/fast/balanced model selection
         chat_choice = ui.prompt_numbered_choice(
             "Chat plugin", avail_chat, _get_default_or_first(avail_chat, default_chat)
         )
         chat_model_smart = _prompt_model("chat", chat_choice, "smart")
         chat_model_fast = _prompt_model("chat", chat_choice, "fast")
+        chat_model_balanced = _prompt_model("chat", chat_choice, "balanced")
 
         # Embedding
         print()
@@ -847,7 +888,7 @@ def command(
         )
         embedding_model = _prompt_model("embedding", embedding_choice)
 
-        # Rerank (optional) - comes after embedding
+        # Rerank provider (retrieval plugin determines if used)
         rerank_choice = None
         rerank_model = ""
         if avail_rerank:
@@ -862,7 +903,7 @@ def command(
             print()
             ui.info("Rerank: not available (no rerank plugins detected)")
 
-        # Vector DB - comes after rerank
+        # Vector DB
         print()
         vector_db_choice = ui.prompt_numbered_choice(
             "Vector database",
@@ -870,8 +911,9 @@ def command(
             _get_default_or_first(avail_vector_db, default_vector_db),
         )
 
-        # Retrieval
+        # Retrieval (determines if reranking is used)
         print()
+        ui.info("Retrieval plugin determines if reranking is used")
         retrieval_choice = ui.prompt_numbered_choice(
             "Retrieval strategy",
             avail_retrieval,
@@ -886,6 +928,29 @@ def command(
         )
         chunk_size = ui.prompt_int("Chunk size", default_chunk_size)
         chunk_overlap = ui.prompt_int("Chunk overlap", default_chunk_overlap)
+
+        # Vision provider (parser plugin determines if used)
+        print()
+        ui.print("Vision (VLM) for PDF figure description:", "bold")
+        vision_choice = None
+        if avail_vision:
+            vision_choice = ui.prompt_numbered_choice(
+                "Vision plugin",
+                avail_vision,
+                avail_vision[0],
+            )
+            # Parser selection: docling vs docling_vision
+            print()
+            parser_descs = [
+                "docling - Standard document parsing",
+                "docling_vision - VLM-powered figure description",
+            ]
+            selected = ui.prompt_numbered_choice("Parser", parser_descs, parser_descs[1])
+            parser_choice = selected.split(" - ")[0]
+        else:
+            ui.info("No vision plugins available.")
+            ui.info("Requires: OPENAI_API_KEY, ANTHROPIC_API_KEY, COHERE_API_KEY, or Ollama.")
+            parser_choice = "docling"
 
     # =========================================================================
     # Generate Config
@@ -904,6 +969,7 @@ def command(
             chat=chat_choice,
             chat_model_smart=chat_model_smart,
             chat_model_fast=chat_model_fast,
+            chat_model_balanced=chat_model_balanced,
             embedding=embedding_choice,
             embedding_model=embedding_model,
             rerank=rerank_choice,
@@ -915,6 +981,8 @@ def command(
             chunker=chunker_choice,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
+            parser=parser_choice,
+            vision=vision_choice,
         )
     else:
         # For any other engine, use auto-discovery to copy default.yaml

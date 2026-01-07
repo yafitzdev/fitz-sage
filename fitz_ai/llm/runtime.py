@@ -38,6 +38,7 @@ from fitz_ai.llm.schema import (
     InputWrap,
     PluginSpec,
     RerankPluginSpec,
+    VisionPluginSpec,
 )
 from fitz_ai.llm.transforms import get_transformer
 
@@ -521,10 +522,64 @@ class YAMLRerankClient(YAMLPluginBase):
             ) from e
 
 
+class YAMLVisionClient(YAMLPluginBase):
+    """Vision plugin client for describing images/figures."""
+
+    plugin_type: ClassVar[str] = "vision"
+    spec: VisionPluginSpec
+
+    def __init__(
+        self, spec: VisionPluginSpec, *, tier: ModelTier | None = None, **kwargs: Any
+    ) -> None:
+        super().__init__(spec, tier=tier, **kwargs)
+        self._transformer = get_transformer(spec.request.messages_transform.value)
+
+    def describe_image(self, image_base64: str, prompt: str | None = None) -> str:
+        """
+        Describe an image using the vision model.
+
+        Args:
+            image_base64: Base64-encoded image data (PNG, JPEG, etc.)
+            prompt: Custom prompt for the description. If not provided,
+                   uses the default prompt from the plugin spec.
+
+        Returns:
+            Text description of the image
+        """
+        # Use provided prompt or fall back to plugin default
+        actual_prompt = prompt or self.params.get(
+            "default_prompt",
+            "Describe this figure/chart/diagram in detail. Include any data values, "
+            "labels, axes, trends, and key insights visible in the image.",
+        )
+
+        # Create message with image
+        messages = [{"role": "user", "content": actual_prompt, "image_base64": image_base64}]
+
+        # Transform messages to provider-specific format
+        payload = self._transformer.transform(messages)
+        payload.update(self.spec.request.static_fields)
+
+        # Add model parameters
+        for fitz_name, provider_name in self.spec.request.param_map.items():
+            if fitz_name in self.params:
+                set_nested_path(payload, provider_name, self.params[fitz_name])
+
+        response = self._make_request(payload)
+
+        try:
+            content = extract_path(response, self.spec.response.content_path)
+            return str(content) if content else ""
+        except (KeyError, IndexError) as e:
+            logger.warning(f"Failed to extract vision response: {e}. Full response: {response}")
+            return ""
+
+
 _CLIENT_CLASSES: dict[str, type[YAMLPluginBase]] = {
     "chat": YAMLChatClient,
     "embedding": YAMLEmbeddingClient,
     "rerank": YAMLRerankClient,
+    "vision": YAMLVisionClient,
 }
 
 
@@ -552,6 +607,16 @@ def create_yaml_client(
 
 @overload
 def create_yaml_client(
+    plugin_type: Literal["vision"],
+    plugin_name: str,
+    *,
+    tier: ModelTier | None = None,
+    **kwargs: Any,
+) -> YAMLVisionClient: ...
+
+
+@overload
+def create_yaml_client(
     plugin_type: str, plugin_name: str, *, tier: ModelTier | None = None, **kwargs: Any
 ) -> YAMLPluginBase: ...
 
@@ -567,11 +632,12 @@ def create_yaml_client(
     Create a YAML plugin client.
 
     Args:
-        plugin_type: "chat", "embedding", or "rerank"
+        plugin_type: "chat", "embedding", "rerank", or "vision"
         plugin_name: Plugin name (e.g., "cohere", "openai")
-        tier: Model tier for chat plugins ("smart" or "fast").
+        tier: Model tier for chat/vision plugins ("smart", "fast", or "balanced").
               - "smart": Best quality for user-facing responses (queries)
               - "fast": Best speed for background tasks (enrichment)
+              - "balanced": Cost-effective with good quality (evaluation, bulk)
               If not specified, uses the default model from the plugin spec.
         **kwargs: Plugin configuration
 
@@ -587,8 +653,8 @@ def create_yaml_client(
     spec = load_plugin(plugin_type, plugin_name)
     client_class = _CLIENT_CLASSES[plugin_type]
 
-    # Only pass tier for chat clients
-    if plugin_type == "chat" and tier is not None:
+    # Pass tier for chat and vision clients (they support model tiers)
+    if plugin_type in ("chat", "vision") and tier is not None:
         return client_class(spec, tier=tier, **kwargs)  # type: ignore[arg-type]
 
     return client_class(spec, **kwargs)  # type: ignore[arg-type]
@@ -600,5 +666,6 @@ __all__ = [
     "YAMLChatClient",
     "YAMLEmbeddingClient",
     "YAMLRerankClient",
+    "YAMLVisionClient",
     "create_yaml_client",
 ]

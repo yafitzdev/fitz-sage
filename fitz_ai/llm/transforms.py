@@ -209,16 +209,232 @@ class OllamaChatTransform:
 
 
 # =============================================================================
+# Vision Transforms (handle image + text input)
+# =============================================================================
+
+
+class CohereVisionTransform:
+    """
+    Cohere Command A Vision API format.
+
+    Cohere uses OpenAI-compatible format with "image_url" content type.
+    Model: command-a-vision-07-2025
+
+    Input messages should have format:
+    [
+        {"role": "user", "content": "Describe this image", "image_base64": "..."}
+    ]
+
+    Output:
+    {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Describe this image"},
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
+                ]
+            }
+        ]
+    }
+    """
+
+    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+        transformed = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            image_base64 = msg.get("image_base64")
+            image_url = msg.get("image_url")
+
+            if image_base64 or image_url:
+                # Vision message with image (OpenAI-compatible format)
+                content_parts = [{"type": "text", "text": content}]
+                if image_base64:
+                    content_parts.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{image_base64}"},
+                        }
+                    )
+                elif image_url:
+                    content_parts.append({"type": "image_url", "image_url": {"url": image_url}})
+                transformed.append({"role": role, "content": content_parts})
+            else:
+                transformed.append({"role": role, "content": content})
+
+        return {"messages": transformed}
+
+
+class OpenAIVisionTransform:
+    """
+    OpenAI Vision API format (GPT-4o, GPT-4o-mini).
+
+    Images are passed as content array with type "image_url" containing
+    base64-encoded data or URL.
+
+    Input messages should have format:
+    [
+        {"role": "user", "content": "Describe this image", "image_base64": "..."}
+    ]
+
+    Output:
+    {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Describe this image"},
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
+                ]
+            }
+        ]
+    }
+    """
+
+    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+        transformed = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            image_base64 = msg.get("image_base64")
+            image_url = msg.get("image_url")
+
+            if image_base64 or image_url:
+                # Vision message with image
+                content_parts = [{"type": "text", "text": content}]
+                if image_base64:
+                    # Detect image type from base64 header or default to png
+                    content_parts.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{image_base64}"},
+                        }
+                    )
+                elif image_url:
+                    content_parts.append({"type": "image_url", "image_url": {"url": image_url}})
+                transformed.append({"role": role, "content": content_parts})
+            else:
+                # Regular text message
+                transformed.append({"role": role, "content": content})
+
+        return {"messages": transformed}
+
+
+class AnthropicVisionTransform:
+    """
+    Anthropic Vision API format (Claude 3).
+
+    Images are passed as content array with type "image" containing
+    base64-encoded data.
+
+    Input messages should have format:
+    [
+        {"role": "user", "content": "Describe this image", "image_base64": "..."}
+    ]
+
+    Output:
+    {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "..."}},
+                    {"type": "text", "text": "Describe this image"}
+                ]
+            }
+        ]
+    }
+    """
+
+    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+        system_content = ""
+        user_messages: list[dict[str, Any]] = []
+
+        for msg in messages:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            image_base64 = msg.get("image_base64")
+
+            if role == "system":
+                system_content = content
+            elif role in ("user", "assistant"):
+                if image_base64 and role == "user":
+                    # Vision message with image
+                    content_parts = [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/png",
+                                "data": image_base64,
+                            },
+                        },
+                        {"type": "text", "text": content},
+                    ]
+                    user_messages.append({"role": role, "content": content_parts})
+                else:
+                    user_messages.append({"role": role, "content": content})
+
+        result: dict[str, Any] = {"messages": user_messages}
+        if system_content:
+            result["system"] = system_content
+
+        return result
+
+
+class OllamaVisionTransform:
+    """
+    Ollama Vision API format (LLaVA, llama3.2-vision).
+
+    Images are passed as a separate "images" array with base64 data.
+
+    Input messages should have format:
+    [
+        {"role": "user", "content": "Describe this image", "image_base64": "..."}
+    ]
+
+    Output:
+    {
+        "messages": [
+            {"role": "user", "content": "Describe this image", "images": ["base64..."]}
+        ]
+    }
+    """
+
+    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+        transformed = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            image_base64 = msg.get("image_base64")
+
+            if image_base64:
+                # Ollama expects images as array of base64 strings
+                transformed.append({"role": role, "content": content, "images": [image_base64]})
+            else:
+                transformed.append({"role": role, "content": content})
+
+        return {"messages": transformed}
+
+
+# =============================================================================
 # Transform Registry
 # =============================================================================
 
 
 TRANSFORM_REGISTRY: dict[str, type[MessageTransformer]] = {
+    # Chat transforms
     "openai_chat": OpenAIChatTransform,
     "cohere_chat": CohereChatTransform,
     "anthropic_chat": AnthropicChatTransform,
     "gemini_chat": GeminiChatTransform,
     "ollama_chat": OllamaChatTransform,
+    # Vision transforms
+    "openai_vision": OpenAIVisionTransform,
+    "cohere_vision": CohereVisionTransform,
+    "anthropic_vision": AnthropicVisionTransform,
+    "ollama_vision": OllamaVisionTransform,
 }
 
 

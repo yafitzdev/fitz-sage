@@ -6,13 +6,14 @@ Handles discovery and instantiation of:
 - chat plugins (YAML files in fitz_ai/llm/chat/)
 - embedding plugins (YAML files in fitz_ai/llm/embedding/)
 - rerank plugins (YAML files in fitz_ai/llm/rerank/)
+- vision plugins (YAML files in fitz_ai/llm/vision/)
 
 Design principle: NO SILENT FALLBACK
 - If user configures "cohere", they get cohere or an error
 - Plugins are YAML files, not Python modules
 
 Model Tiers:
-- Chat plugins support three model tiers: "smart", "fast", and "balanced"
+- Chat/vision plugins support three model tiers: "smart", "fast", and "balanced"
 - Use tier="smart" for user-facing responses (queries)
 - Use tier="fast" for background tasks (enrichment, summaries)
 - Use tier="balanced" for cost-effective tasks with good quality (evaluation, bulk)
@@ -37,9 +38,10 @@ _LLM_METHODS_TO_TRACK = {
     "chat": {"chat"},
     "embedding": {"embed", "embed_batch"},
     "rerank": {"rerank"},
+    "vision": {"describe_image"},
 }
 
-VALID_LLM_TYPES = frozenset({"chat", "embedding", "rerank"})
+VALID_LLM_TYPES = frozenset({"chat", "embedding", "rerank", "vision"})
 
 
 def available_llm_plugins(plugin_type: str) -> List[str]:

@@ -24,6 +24,7 @@ from fitz_ai.llm.schema import (
     EmbeddingPluginSpec,
     PluginSpec,
     RerankPluginSpec,
+    VisionPluginSpec,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ _SPEC_CLASSES: dict[str, type[PluginSpec]] = {
     "chat": ChatPluginSpec,
     "embedding": EmbeddingPluginSpec,
     "rerank": RerankPluginSpec,
+    "vision": VisionPluginSpec,
 }
 
 
@@ -257,6 +259,10 @@ def load_plugin(plugin_type: Literal["rerank"], plugin_name: str) -> RerankPlugi
 
 
 @overload
+def load_plugin(plugin_type: Literal["vision"], plugin_name: str) -> VisionPluginSpec: ...
+
+
+@overload
 def load_plugin(plugin_type: str, plugin_name: str) -> PluginSpec: ...
 
 
@@ -265,7 +271,7 @@ def load_plugin(plugin_type: str, plugin_name: str) -> PluginSpec:
     Load a plugin specification from YAML.
 
     Args:
-        plugin_type: "chat", "embedding", or "rerank"
+        plugin_type: "chat", "embedding", "rerank", or "vision"
         plugin_name: Plugin name (e.g., "openai", "cohere")
 
     Returns:
@@ -290,7 +296,7 @@ def list_plugins(plugin_type: str) -> list[str]:
     Includes both package plugins and user plugins from ~/.fitz/plugins/.
 
     Args:
-        plugin_type: "chat", "embedding", or "rerank"
+        plugin_type: "chat", "embedding", "rerank", or "vision"
 
     Returns:
         List of plugin names (without .yaml extension), sorted alphabetically.

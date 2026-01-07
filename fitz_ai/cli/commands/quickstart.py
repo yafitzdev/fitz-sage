@@ -214,7 +214,7 @@ PROVIDER_CONFIGS = {
             },
         },
         "embedding": {"plugin_name": "cohere", "kwargs": {"model": "embed-english-v3.0"}},
-        "rerank": {"enabled": True, "plugin_name": "cohere", "kwargs": {"model": "rerank-v3.5"}},
+        "rerank": {"enabled": False, "plugin_name": "cohere", "kwargs": {"model": "rerank-v3.5"}},
     },
     "openai": {
         "chat": {
@@ -582,7 +582,8 @@ def _run_ingestion(
     if not scan_result.files:
         raise ValueError(f"No documents found in {source}")
 
-    parser_router = ParserRouter()
+    # Quickstart skips VLM for speed - use 'fitz ingest' for VLM figure description
+    parser_router = ParserRouter(vision_client=None)
     parsed_docs = []
     for file_info in scan_result.files:
         source_file = SourceFile(

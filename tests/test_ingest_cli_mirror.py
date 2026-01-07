@@ -87,32 +87,12 @@ def test_ingest_cli_mirror():
     state_manager.load()
     t = log_timing("State manager", t)
 
-    # Parser
+    # Parser Router
     t = time.perf_counter()
-    from fitz_ai.ingestion.reader.registry import get_ingest_plugin
+    from fitz_ai.ingestion.parser import ParserRouter
 
-    IngestPluginCls = get_ingest_plugin("local")
-    ingest_plugin = IngestPluginCls()
-    t = log_timing("Parser plugin", t)
-
-    # Wrap parser like CLI does
-    class ParserAdapter:
-        def __init__(self, plugin):
-            self._plugin = plugin
-            self.parse_count = 0
-            self.parse_times = []
-
-        def parse(self, path: str) -> str:
-            t0 = time.perf_counter()
-            self.parse_count += 1
-            docs = list(self._plugin.ingest(path, kwargs={}))
-            elapsed = time.perf_counter() - t0
-            self.parse_times.append(elapsed)
-            if self.parse_count <= 5 or self.parse_count % 10 == 0:
-                print(f"    [PARSE] #{self.parse_count} {Path(path).name}: {elapsed:.3f}s")
-            return docs[0].content if docs else ""
-
-    parser = ParserAdapter(ingest_plugin)
+    parser_router = ParserRouter()
+    t = log_timing("Parser router", t)
 
     # Chunking router
     t = time.perf_counter()
@@ -231,7 +211,7 @@ def test_ingest_cli_mirror():
         state_manager=state_manager,
         vector_db_writer=writer,
         embedder=embedder,
-        parser=parser,
+        parser_router=parser_router,
         chunking_router=chunking_router,
         collection="test_mirror",
         embedding_id=embedding_id,
@@ -274,13 +254,8 @@ def test_ingest_cli_mirror():
     print(f"  Total time:       {total_time:.2f}s")
     print(f"  Ingestion time:   {t_ingest_end - t_ingest_start:.2f}s")
 
-    if parser.parse_times:
-        print("\n[PARSING]")
-        print(f"  Parse calls:      {parser.parse_count}")
-        print(f"  Total parse time: {sum(parser.parse_times):.2f}s")
-        print(
-            f"  Avg per file:     {sum(parser.parse_times) / len(parser.parse_times) * 1000:.0f}ms"
-        )
+    print("\n[PARSING]")
+    print(f"  Parser router:    {parser_router}")
 
     if writer.upsert_times:
         print("\n[VECTOR DB]")

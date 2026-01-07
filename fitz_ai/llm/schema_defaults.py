@@ -34,6 +34,7 @@ SCHEMA_FILES = {
     "chat": "chat_plugin_schema.yaml",
     "embedding": "embedding_plugin_schema.yaml",
     "rerank": "rerank_plugin_schema.yaml",
+    "vision": "vision_plugin_schema.yaml",
 }
 
 
