@@ -3,7 +3,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.4.5-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.0-green.svg)](CHANGELOG.md)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
 
 ---
@@ -25,7 +25,7 @@ That's it. Your documents are now searchable with AI.
 
 <details>
 
-<summary><strong>Python SDK</strong></summary>
+<summary><strong>Python SDK</strong> → <a href="docs/SDK.md">Full SDK Reference</a></summary>
 
 <br>
 
@@ -42,7 +42,7 @@ answer = fitz_ai.query("What is our refund policy?")
 
 <details>
 
-<summary><strong>REST API</strong></summary>
+<summary><strong>REST API</strong> → <a href="docs/API.md">Full API Reference</a></summary>
 
 <br>
 
@@ -60,8 +60,8 @@ fitz serve  # http://localhost:8000/docs for interactive API
 
   Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)).
 
-  - ~55k lines of Python
-  - 700+ tests, 100% coverage
+  - ~65k lines of Python
+  - 750+ tests, 100% coverage
   - Zero LangChain/LlamaIndex dependencies — built from scratch
 
 ![fitz-ai honest_rag](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/honest_rag.jpg)
@@ -363,11 +363,11 @@ The codebase speaks for itself.
 
 <br>
 
-#### Hierarchical RAG 📊
+#### Hierarchical RAG 📊 → [Enrichment Guide](docs/ENRICHMENT.md)
 
->Standard RAG struggles with analytical queries like "What are the trends?" because it retrieves random chunks instead of aggregated insights. Hierarchical RAG solves this.
->
 >**The problem ☔️**
+>
+>Standard RAG struggles with analytical queries like "What are the trends?" because it retrieves random chunks instead of aggregated insights. Hierarchical RAG solves this.
 >```
 >Q: "What are the trends in my comments?"
 >Standard RAG: Returns random individual comments (not useful)
@@ -418,7 +418,7 @@ The codebase speaks for itself.
 >    Mode: ABSTAIN
 >```
 >
->Three constraint plugins run automatically:
+>Three constraint plugins run automatically ([learn more](docs/CONSTRAINTS.md)):
 >1. [X] **📕 ConflictAwareConstraint**: Detects contradictions across sources
 >2. [X] **📗 InsufficientEvidenceConstraint**: Blocks answers without evidence
 >3. [X] **📘 CausalAttributionConstraint**: Prevents hallucinated cause-effect claims
@@ -476,7 +476,7 @@ The codebase speaks for itself.
 
 <br>
 
-#### Incremental Ingestion ⚡
+#### Incremental Ingestion ⚡ → [Ingestion Guide](docs/INGESTION.md)
 
 >Fitz tracks file hashes and only re-ingests what changed:
 >
@@ -513,7 +513,7 @@ The codebase speaks for itself.
 
 <details>
 
-<summary><strong>📦 Plugin Generator</strong></summary>
+<summary><strong>📦 Plugin Generator</strong> → <a href="docs/PLUGINS.md">Plugin Development Guide</a></summary>
 
 <br>
 
@@ -709,7 +709,7 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 
 <details>
 
-<summary><strong>📦 Architecture</strong></summary>
+<summary><strong>📦 Architecture</strong> → <a href="docs/ARCHITECTURE.md">Full Architecture Guide</a></summary>
 
 <br>
 
@@ -750,7 +750,7 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 
 <details>
 
-<summary><strong>📦 CLI Reference</strong></summary>
+<summary><strong>📦 CLI Reference</strong> → <a href="docs/CLI.md">Full CLI Guide</a></summary>
 
 <br>
 
@@ -773,7 +773,7 @@ fitz doctor                          # System diagnostics
 
 <details>
 
-<summary><strong>📦 Python SDK Reference</strong></summary>
+<summary><strong>📦 Python SDK Reference</strong> → <a href="docs/SDK.md">Full SDK Guide</a></summary>
 
 <br>
 
@@ -824,7 +824,7 @@ for source in answer.provenance:
 
 <details>
 
-<summary><strong>📦 REST API Reference</strong></summary>
+<summary><strong>📦 REST API Reference</strong> → <a href="docs/API.md">Full API Guide</a></summary>
 
 <br>
 
@@ -947,9 +947,12 @@ MIT
 - [Python SDK](docs/SDK.md)
 - [REST API](docs/API.md)
 - [Configuration Guide](docs/CONFIG.md)
+- [Architecture](docs/ARCHITECTURE.md)
 - [Ingestion Pipeline](docs/INGESTION.md)
 - [Enrichment (Hierarchies, Entities)](docs/ENRICHMENT.md)
 - [Epistemic Constraints](docs/CONSTRAINTS.md)
 - [Plugin Development](docs/PLUGINS.md)
 - [Feature Control](docs/FEATURE_CONTROL.md)
 - [Custom Engines](docs/CUSTOM_ENGINES.md)
+- [Engine Comparison](docs/ENGINES.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
