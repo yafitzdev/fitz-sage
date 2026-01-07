@@ -11,6 +11,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-01-07
+
+### 🎉 Highlights
+
+**Plugin Generator** - New `fitz plugin` command generates complete plugin scaffolds with templates, validation, and library context awareness. Generate chat, embedding, rerank, vision, chunker, retrieval, or constraint plugins with a single command.
+
+**Parser Plugin System** - New parser abstraction replaces the reader module. Parsers handle document-to-structured-content conversion with plugins for plaintext, Docling (PDF/DOCX), and Docling+VLM (with figure description).
+
+**Vision Plugin System** - Full YAML-based vision plugin support for VLM-powered figure description during ingestion. Supports Cohere, OpenAI, Anthropic, and Ollama vision models.
+
+**Comprehensive Documentation** - Added 9 new documentation files covering API, architecture, configuration, constraints, enrichment, feature control, ingestion, SDK, and troubleshooting.
+
+### 🚀 Added
+
+#### Plugin Generator (`fitz_ai/plugin_gen/`)
+- `fitz plugin generate` - Interactive plugin scaffolding wizard
+- Template-based generation for all plugin types
+- Library context awareness (detects installed packages)
+- Validation and review workflow
+- Templates for: `chunker`, `constraint`, `llm_chat`, `llm_embedding`, `llm_rerank`, `reader`, `retrieval`, `vector_db`
+
+#### Parser Plugin System (`fitz_ai/ingestion/parser/`)
+- `ParserRouter` - Routes files to appropriate parsers by extension
+- `Parser` protocol with `can_parse()` and `parse()` methods
+- `PlainTextParser` - Handles .txt, .md, .py, .json, etc.
+- `DoclingParser` - PDF, DOCX, images via Docling library
+- `DoclingVisionParser` - Docling + VLM for figure description
+- `ParsedDocument` with typed `DocumentElement` structure
+
+#### Vision Plugin System (`fitz_ai/llm/vision/`)
+- YAML-based vision plugins matching chat/embedding pattern
+- `cohere.yaml` - Cohere vision (command-a-vision-07-2025)
+- `openai.yaml` - OpenAI vision (gpt-4o)
+- `anthropic.yaml` - Anthropic vision (claude-sonnet-4)
+- `local_ollama.yaml` - Ollama vision (llama3.2-vision)
+- Vision plugin schema (`vision_plugin_schema.yaml`)
+- Message transforms for vision requests
+
+#### Source Abstraction (`fitz_ai/ingestion/source/`)
+- `Source` protocol for file discovery
+- `SourceFile` dataclass with URI, local path, metadata
+- `FileSystemSource` plugin for local files
+
+#### Documentation (`docs/`)
+- `API.md` - REST API reference
+- `ARCHITECTURE.md` - System design and layer dependencies
+- `CONFIG.md` - Configuration reference
+- `CONSTRAINTS.md` - Epistemic guardrails guide
+- `ENRICHMENT.md` - Enrichment pipeline documentation
+- `FEATURE_CONTROL.md` - Plugin-based feature control
+- `INGESTION.md` - Ingestion pipeline guide
+- `SDK.md` - Python SDK reference
+- `TROUBLESHOOTING.md` - Common issues and solutions
+
+#### CLI Improvements
+- `fitz plugin` - New command for plugin generation
+- `fitz init` - Vision model selection prompt added
+- Vision provider/model configuration in init wizard
+
+### 🔄 Changed
+
+- **Parser replaces Reader**: `fitz_ai/ingestion/reader/` removed, replaced by `fitz_ai/ingestion/parser/`
+- **Config schema**: `ExtensionChunkerConfig` now includes `parser` field for VLM control
+- **Chunking router**: Now accepts parser selection via config
+- **Init wizard**: Reordered sections (Chat → Embedding → Rerank → Vision → VectorDB)
+
+### 🐛 Fixed
+
+- `ParserRouter` no longer accepts invalid `vision_client` parameter
+- Vision model defaults now use correct models (e.g., `command-a-vision-07-2025` not text model)
+- Config validation accepts `parser` field in chunking config
+
+### 🗑️ Removed
+
+- `fitz_ai/ingestion/reader/` module (replaced by parser system)
+- `fitz_ai/ingestion/chunking/engine.py` (consolidated into router)
+
+---
+
 ## [0.4.5] - 2026-01-04
 
 ### 🎉 Highlights
@@ -736,7 +815,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.5...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.5...v0.5.0
 [0.4.5]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.2...v0.4.3

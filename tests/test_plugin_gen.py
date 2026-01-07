@@ -15,7 +15,6 @@ from fitz_ai.plugin_gen.types import (
 )
 from fitz_ai.plugin_gen.validators import PluginValidator, format_validation_error
 
-
 # =============================================================================
 # PluginType Tests
 # =============================================================================

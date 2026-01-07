@@ -583,7 +583,7 @@ def _run_ingestion(
         raise ValueError(f"No documents found in {source}")
 
     # Quickstart skips VLM for speed - use 'fitz ingest' for VLM figure description
-    parser_router = ParserRouter(vision_client=None)
+    parser_router = ParserRouter(docling_parser="docling")
     parsed_docs = []
     for file_info in scan_result.files:
         source_file = SourceFile(

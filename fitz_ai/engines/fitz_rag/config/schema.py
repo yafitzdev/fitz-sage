@@ -66,8 +66,16 @@ class ExtensionChunkerConfig(BaseModel):
         ...     plugin_name="markdown",
         ...     kwargs={"max_tokens": 800, "preserve_headers": True}
         ... )
+
+    With VLM parser:
+        >>> ExtensionChunkerConfig(
+        ...     parser="docling_vision",
+        ...     plugin_name="recursive",
+        ...     kwargs={"chunk_size": 1000}
+        ... )
     """
 
+    parser: str = Field(default="docling", description="Parser plugin: docling or docling_vision")
     plugin_name: str = Field(..., description="Chunker plugin name")
     kwargs: dict[str, Any] = Field(default_factory=dict, description="Chunker-specific parameters")
 
@@ -506,7 +514,9 @@ class FitzRagConfig(BaseModel):
 
     # Optional components
     rerank: RerankConfig = Field(default_factory=RerankConfig, description="Reranker configuration")
-    vision: VisionConfig = Field(default_factory=VisionConfig, description="Vision/VLM configuration")
+    vision: VisionConfig = Field(
+        default_factory=VisionConfig, description="Vision/VLM configuration"
+    )
     rgs: RGSConfig = Field(default_factory=RGSConfig, description="RGS configuration")
     logging: LoggingConfig = Field(
         default_factory=LoggingConfig, description="Logging configuration"

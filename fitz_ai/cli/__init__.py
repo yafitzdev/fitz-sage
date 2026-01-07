@@ -24,6 +24,6 @@ Usage:
     fitz doctor             # System diagnostics
 """
 
-from fitz_ai.cli.cli import app
+from fitz_ai.cli.cli import app  # noqa: E402
 
 __all__ = ["app"]

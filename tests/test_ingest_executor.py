@@ -73,9 +73,7 @@ class MockParserRouter:
             raise Exception(f"Parse failed for {path_str}")
         return ParsedDocument(
             source=source_file.uri,
-            elements=[
-                DocumentElement(type=ElementType.TEXT, content=self._content)
-            ],
+            elements=[DocumentElement(type=ElementType.TEXT, content=self._content)],
             metadata={"source_file": path_str},
         )
 

@@ -12,7 +12,6 @@ from typing import Any, Dict, Optional
 
 from fitz_ai.plugin_gen.types import PluginType
 
-
 # Sample markdown document for chunker testing
 SAMPLE_MARKDOWN = """# Introduction
 

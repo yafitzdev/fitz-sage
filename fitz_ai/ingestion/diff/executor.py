@@ -469,13 +469,15 @@ class DiffIngestExecutor:
 
         # 3. Add metadata to parsed document
         doc_id = file_path.stem
-        parsed_doc.metadata.update({
-            "source_file": candidate.path,
-            "doc_id": doc_id,
-            "content_hash": candidate.content_hash,
-            "parser_id": candidate.parser_id,
-            "chunker_id": candidate.chunker_id,
-        })
+        parsed_doc.metadata.update(
+            {
+                "source_file": candidate.path,
+                "doc_id": doc_id,
+                "content_hash": candidate.content_hash,
+                "parser_id": candidate.parser_id,
+                "chunker_id": candidate.chunker_id,
+            }
+        )
 
         # 4. Get chunker and chunk the ParsedDocument
         chunker = self._chunking_router.get_chunker(candidate.ext)

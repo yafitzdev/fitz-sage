@@ -19,11 +19,9 @@ Usage:
     parsed_doc = router.parse(source_file)
 
 VLM Integration:
-    Pass a vision_client to enable VLM-powered figure description:
+    Use docling_vision parser for VLM-powered figure description:
 
-    from fitz_ai.llm.runtime import create_yaml_client
-    vision_client = create_yaml_client("vision", "openai")
-    router = ParserRouter(vision_client=vision_client)
+    router = ParserRouter(docling_parser="docling_vision")
 """
 
 from __future__ import annotations
