@@ -254,13 +254,15 @@ fitz query "question" -e clara   # Use clara just for this query
 
 ## Configuration
 
-The `fitz init` command creates `~/.fitz/fitz.yaml`:
+The `fitz init` command creates `.fitz/config/fitz_rag.yaml` in your project root:
 
 ```yaml
 chat:
   plugin_name: cohere
   kwargs:
-    model: command-a-03-2025
+    models:
+      smart: command-a-03-2025
+      fast: command-r7b-12-2024
     temperature: 0.2
 
 embedding:
@@ -274,16 +276,23 @@ vector_db:
     host: "localhost"
     port: 6333
 
-retriever:
-  plugin_name: dense
+# Retrieval strategy - plugin choice controls reranking
+retrieval:
+  plugin_name: dense_rerank  # or "dense" for no reranking
   collection: default
   top_k: 5
 
+# Rerank provider (used only if retrieval uses reranking)
 rerank:
-  enabled: true
   plugin_name: cohere
   kwargs:
     model: rerank-v3.5
+
+# Parser choice controls VLM usage
+chunking:
+  default:
+    parser: docling_vision  # or "docling" for no VLM
+    plugin_name: recursive
 ```
 
 ---

@@ -59,10 +59,10 @@ Fitz uses two types of plugins:
 | Rerank | YAML | `fitz_ai/llm/rerank/` | Document reranking |
 | Vision | YAML | `fitz_ai/llm/vision/` | VLM for image description |
 | Vector DB | YAML | `fitz_ai/vector_db/plugins/` | Vector storage |
-| Retrieval | YAML | `fitz_ai/retrieval/plugins/` | Retrieval strategies |
+| Retrieval | YAML | `fitz_ai/engines/fitz_rag/retrieval/plugins/` | Retrieval strategies |
 | Chunking | Python | `fitz_ai/ingestion/chunking/plugins/` | Document chunking |
 | Parser | Python | `fitz_ai/ingestion/parser/plugins/` | Document parsing |
-| Constraint | Python | `fitz_ai/engines/fitz_rag/constraints/plugins/` | Epistemic safety |
+| Guardrail | Python | `fitz_ai/core/guardrails/plugins/` | Epistemic safety |
 
 ---
 

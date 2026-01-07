@@ -143,8 +143,8 @@ rerank:
 
 | File | Purpose |
 |------|---------|
-| `fitz_ai/retrieval/plugins/dense.yaml` | Pure dense retrieval |
-| `fitz_ai/retrieval/plugins/dense_rerank.yaml` | Dense + reranking |
+| `fitz_ai/engines/fitz_rag/retrieval/plugins/dense.yaml` | Pure dense retrieval |
+| `fitz_ai/engines/fitz_rag/retrieval/plugins/dense_rerank.yaml` | Dense + reranking |
 | `fitz_ai/engines/fitz_rag/engine.py` | Loads retrieval plugin |
 
 ---

@@ -941,6 +941,15 @@ MIT
 - [GitHub](https://github.com/yafitzdev/fitz-ai)
 - [PyPI](https://pypi.org/project/fitz-ai/)
 - [Changelog](CHANGELOG.md)
-- [CLI Documentation](docs/CLI.md)
-- [Plugin Guide](docs/PLUGINS.md)
-- [Feature Control Architecture](docs/FEATURE_CONTROL.md)
+
+**Documentation:**
+- [CLI Reference](docs/CLI.md)
+- [Python SDK](docs/SDK.md)
+- [REST API](docs/API.md)
+- [Configuration Guide](docs/CONFIG.md)
+- [Ingestion Pipeline](docs/INGESTION.md)
+- [Enrichment (Hierarchies, Entities)](docs/ENRICHMENT.md)
+- [Epistemic Constraints](docs/CONSTRAINTS.md)
+- [Plugin Development](docs/PLUGINS.md)
+- [Feature Control](docs/FEATURE_CONTROL.md)
+- [Custom Engines](docs/CUSTOM_ENGINES.md)

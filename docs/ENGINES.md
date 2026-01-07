@@ -88,11 +88,13 @@ print(answer.provenance)
 ### Configuration
 
 ```yaml
-# fitz.yaml
+# .fitz/config/fitz_rag.yaml
 chat:
   plugin_name: cohere
   kwargs:
-    model: command-a-03-2025
+    models:
+      smart: command-a-03-2025
+      fast: command-r7b-12-2024
 
 embedding:
   plugin_name: cohere
@@ -105,13 +107,14 @@ vector_db:
     host: "localhost"
     port: 6333
 
-retriever:
-  plugin_name: dense
+# Retrieval strategy - plugin choice controls reranking
+retrieval:
+  plugin_name: dense_rerank  # or "dense" for no reranking
   collection: my_knowledge
   top_k: 5
 
+# Rerank provider (used only if retrieval.plugin_name includes reranking)
 rerank:
-  enabled: true
   plugin_name: cohere
   kwargs:
     model: rerank-v3.5
