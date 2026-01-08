@@ -507,6 +507,43 @@ The codebase speaks for itself.
 >
 >No more retrieving half a function or a code block split mid-syntax.
 
+<br>
+
+#### Keyword Vocabulary (Exact Match) 🔍
+
+>**The problem**
+>
+>Semantic search struggles with exact identifiers. Ask "What happened with TC-1001?" and vector similarity might return chunks about TC-1002, TC-1003, or unrelated test cases—because embeddings treat them as semantically similar.
+>
+>**The solution**
+>
+>Fitz auto-detects identifiers during ingestion and builds a per-collection vocabulary:
+>- **Test cases**: TC-1001, testcase_42
+>- **Tickets**: JIRA-4521, BUG-789
+>- **Versions**: v2.0.1, 1.0.0-beta
+>- **Pull requests**: PR #123, PR-456
+>- **People**: John Smith, Jane Doe
+>- **Files**: config.yaml, report.pdf
+>
+>At query time, detected keywords pre-filter chunks before semantic search:
+>```
+>Q: "What happened with TC-1001?"
+>→ Chunks filtered to only those containing TC-1001 (or variations)
+>→ Semantic search runs on filtered set
+>→ Result: Only TC-1001 content, never TC-1002
+>```
+>
+>**Variation matching**
+>
+>Keywords match across common formats automatically:
+>```
+>TC-1001 → tc-1001, TC_1001, tc 1001, testcase 1001, test case 1001
+>JIRA-123 → jira-123, JIRA123, jira 123
+>v2.0.1 → V2.0.1, 2.0.1, version 2.0.1
+>```
+>
+>Vocabulary is stored per-collection in `.fitz/keywords/{collection}.yaml`. User modifications are preserved across re-ingestion.
+
 </details>
 
 ---
@@ -761,6 +798,7 @@ fitz ingest                          # Interactive ingestion
 fitz query                           # Single question with sources
 fitz chat                            # Multi-turn conversation with your knowledge base
 fitz collections                     # List and delete knowledge collections
+fitz keywords                        # Manage keyword vocabulary for exact matching
 fitz plugin                          # Generate plugins with AI
 fitz serve                           # Start REST API server
 fitz config                          # View/edit configuration

@@ -139,6 +139,41 @@ Interactive menu to:
 
 ---
 
+### `fitz keywords`
+
+Manage keyword vocabulary for exact matching. Keywords are auto-detected during ingestion and used to pre-filter chunks before semantic search.
+
+```bash
+fitz keywords list                      # List all keywords
+fitz keywords list -c my_collection     # For specific collection
+fitz keywords add "CUSTOM-ID"           # Add custom keyword
+fitz keywords add "MyTerm" --category custom  # With category
+fitz keywords remove "TC-1001"          # Remove a keyword
+fitz keywords clear                     # Clear all keywords
+```
+
+**Options:**
+- `-c, --collection` - Collection name (uses default if not specified)
+- `--category` - Category for new keywords (e.g., testcase, ticket, custom)
+
+**Auto-detected patterns:**
+- Test cases: TC-1001, testcase_42
+- Tickets: JIRA-4521, BUG-789
+- Versions: v2.0.1, 1.0.0-beta
+- Pull requests: PR #123, PR-456
+- People: John Smith (when mentioned multiple times)
+- Files: config.yaml, report.pdf
+
+**How it works:**
+1. During ingestion, Fitz scans chunks for identifier patterns
+2. Detected keywords are stored in `.fitz/keywords/{collection}.yaml`
+3. At query time, keywords in your question pre-filter chunks
+4. Semantic search runs only on chunks containing the keyword
+
+This ensures queries like "What happened with TC-1001?" only return chunks mentioning TC-1001, not similar IDs like TC-1002.
+
+---
+
 ### `fitz map`
 
 Visualize knowledge base as an interactive graph.
