@@ -236,9 +236,9 @@ class DiffIngestExecutor:
 
         # Phase 1: Prepare all files (parse, chunk) - NO summarization yet
         all_prepared: List[tuple] = []  # (candidate, file_data)
-        all_chunk_info: List[tuple] = (
-            []
-        )  # (content, file_path, content_hash) for batch summarization
+        all_chunk_info: List[
+            tuple
+        ] = []  # (content, file_path, content_hash) for batch summarization
 
         for i, candidate in enumerate(diff.to_ingest):
             if on_progress:
@@ -398,6 +398,10 @@ class DiffIngestExecutor:
             self._vdb_writer.flush()
         elif hasattr(self._vdb_writer, "_client") and hasattr(self._vdb_writer._client, "flush"):
             self._vdb_writer._client.flush()
+
+        # Phase 4: Auto-detect vocabulary keywords from all ingested chunks
+        if all_prepared:
+            self._detect_vocabulary(all_prepared)
 
         # Final progress update
         if on_progress and total_to_ingest > 0:
@@ -562,6 +566,47 @@ class DiffIngestExecutor:
 
         self._vdb_writer.upsert(self._collection, points, defer_persist=defer_persist)
         logger.debug(f"Upserted {len(points)} chunks from {candidate.path}")
+
+    def _detect_vocabulary(self, prepared_files: List[tuple]) -> None:
+        """
+        Auto-detect keywords from ingested chunks and save to vocabulary.
+
+        This scans all chunks for patterns like test case IDs, ticket numbers,
+        version numbers, etc. and saves them to .fitz/keywords/{collection}.yaml.
+
+        Args:
+            prepared_files: List of (candidate, file_data) tuples from ingestion.
+        """
+        try:
+            from fitz_ai.ingestion.vocabulary import KeywordDetector, VocabularyStore
+
+            # Collect all chunks (as simple objects with content, doc_id, metadata)
+            all_chunks = []
+            for candidate, file_data in prepared_files:
+                for chunk_data in file_data["chunk_data"]:
+                    chunk = chunk_data["chunk"]
+                    all_chunks.append(chunk)
+
+            if not all_chunks:
+                return
+
+            # Detect keywords
+            detector = KeywordDetector()
+            keywords = detector.detect_from_chunks(all_chunks)
+
+            if keywords:
+                # Merge with existing vocabulary (preserves user edits)
+                # Store per-collection so different collections have separate vocabularies
+                store = VocabularyStore(collection=self._collection)
+                merged = store.merge_and_save(keywords, source_docs=len(prepared_files))
+                logger.info(
+                    f"Vocabulary [{self._collection}]: detected {len(keywords)}, "
+                    f"saved {len(merged)} keywords"
+                )
+
+        except Exception as e:
+            # Non-fatal: vocabulary detection is optional
+            logger.warning(f"Vocabulary detection failed: {e}")
 
     def ingest_artifacts(
         self,

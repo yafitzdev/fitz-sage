@@ -146,6 +146,30 @@ class FitzPaths:
         return cls.workspace() / "ingest.json"
 
     # =========================================================================
+    # Vocabulary
+    # =========================================================================
+
+    @classmethod
+    def vocabulary(cls, collection: Optional[str] = None) -> Path:
+        """
+        Auto-detected keyword vocabulary file.
+
+        Location: {workspace}/keywords.yaml (default/global)
+        Or with collection: {workspace}/keywords/{collection}.yaml
+
+        This file contains:
+        - Auto-detected keywords (testcases, tickets, versions, etc.)
+        - Variations for each keyword
+        - User-added custom keywords and variations
+
+        Args:
+            collection: Optional collection name for per-collection vocabulary
+        """
+        if collection:
+            return cls.workspace() / "keywords" / f"{collection}.yaml"
+        return cls.workspace() / "keywords.yaml"
+
+    # =========================================================================
     # Vector Database
     # =========================================================================
 

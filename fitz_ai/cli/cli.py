@@ -215,12 +215,29 @@ def plugin(
 
 
 # =============================================================================
+# SUBCOMMAND GROUPS
+# =============================================================================
+# Commands that have subcommands (like "fitz keywords list")
+# Note: Lazy import to avoid startup overhead
+
+
+def _register_subcommands() -> None:
+    """Register subcommand groups with lazy imports."""
+    from fitz_ai.cli.commands.keywords import app as keywords_app
+
+    app.add_typer(keywords_app, name="keywords")
+
+
+_register_subcommands()
+
+
+# =============================================================================
 # ENTERPRISE PLUGIN DISCOVERY
 # =============================================================================
 # If fitz-ai-enterprise is installed, add its commands to the main CLI.
 
 try:
-    from fitz_ai_enterprise.cli import benchmark_app
+    from fitz_ai_enterprise.cli import benchmark_app  # noqa: E402
 
     app.add_typer(benchmark_app, name="benchmark")
 except ImportError:

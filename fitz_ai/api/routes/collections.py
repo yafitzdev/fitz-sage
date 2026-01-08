@@ -84,6 +84,7 @@ async def delete_collection(name: str) -> dict:
     Delete a collection.
 
     Returns the number of chunks deleted.
+    Also deletes the associated vocabulary file.
     """
     try:
         vdb = get_vector_db()
@@ -99,6 +100,9 @@ async def delete_collection(name: str) -> dict:
         # Some plugins return count, others return None
         deleted_count = result if isinstance(result, int) else 0
 
+        # Also delete associated vocabulary file
+        _delete_vocabulary(name)
+
         return {"deleted": True, "collection": name, "chunks_deleted": deleted_count}
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Collection '{name}' not found")
@@ -106,3 +110,15 @@ async def delete_collection(name: str) -> dict:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _delete_vocabulary(collection: str) -> None:
+    """Delete vocabulary file associated with a collection."""
+    from fitz_ai.core.paths import FitzPaths
+
+    vocab_path = FitzPaths.vocabulary(collection)
+    if vocab_path.exists():
+        try:
+            vocab_path.unlink()
+        except Exception:
+            pass  # Non-fatal in API context

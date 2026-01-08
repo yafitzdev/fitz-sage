@@ -109,6 +109,19 @@ def _load_collections_with_stats(client: Any) -> List[Dict[str, Any]]:
     return collections
 
 
+def _delete_vocabulary(collection: str) -> None:
+    """Delete vocabulary file associated with a collection."""
+    from fitz_ai.core.paths import FitzPaths
+
+    vocab_path = FitzPaths.vocabulary(collection)
+    if vocab_path.exists():
+        try:
+            vocab_path.unlink()
+            ui.info(f"Deleted vocabulary file: {vocab_path.name}")
+        except Exception as e:
+            logger.warning(f"Failed to delete vocabulary file: {e}")
+
+
 def _display_example_chunks(client: Any, collection: str, limit: int = 3) -> None:
     """Display example chunks from a collection."""
     print()
@@ -261,6 +274,10 @@ def command() -> None:
                 try:
                     deleted = client.delete_collection(selected_collection)
                     ui.success(f"Deleted '{selected_collection}' ({deleted} chunks)")
+
+                    # Also delete associated vocabulary file
+                    _delete_vocabulary(selected_collection)
+
                     return  # Exit after deletion
                 except Exception as e:
                     ui.error(f"Failed to delete: {e}")

@@ -36,6 +36,7 @@ from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
 from fitz_ai.engines.fitz_rag.pipeline.pipeline import ContextPipeline
 from fitz_ai.engines.fitz_rag.retrieval.registry import get_retrieval_plugin
 from fitz_ai.engines.fitz_rag.routing import QueryIntent, QueryRouter
+from fitz_ai.ingestion.vocabulary import KeywordMatcher, create_matcher_from_store
 from fitz_ai.llm.registry import get_llm_plugin
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE, VECTOR_DB
@@ -65,12 +66,14 @@ class RAGPipeline:
         constraints: Sequence[ConstraintPlugin] | None = None,
         semantic_matcher: SemanticMatcher | None = None,
         query_router: QueryRouter | None = None,
+        keyword_matcher: KeywordMatcher | None = None,
     ):
         self.retrieval = retrieval
         self.chat = chat
         self.rgs = rgs
         self.context = context or ContextPipeline()
         self.query_router = query_router
+        self.keyword_matcher = keyword_matcher
 
         # Default constraints: ConflictAware + InsufficientEvidence + CausalAttribution
         # Uses semantic embedding similarity for language-agnostic detection.
@@ -90,9 +93,11 @@ class RAGPipeline:
             self.constraints = list(constraints)
 
         routing_status = "enabled" if query_router and query_router.enabled else "disabled"
+        keyword_status = "enabled" if keyword_matcher else "disabled"
         logger.info(
             f"{PIPELINE} RAGPipeline initialized with {retrieval.plugin_name} retrieval, "
-            f"{len(self.constraints)} constraint(s), routing={routing_status}"
+            f"{len(self.constraints)} constraint(s), routing={routing_status}, "
+            f"keywords={keyword_status}"
         )
 
     def run(self, query: str) -> RGSAnswer:
@@ -113,6 +118,15 @@ class RAGPipeline:
         except Exception as exc:
             logger.error(f"{PIPELINE} Retrieval failed: {exc}")
             raise PipelineError("Retrieval failed") from exc
+
+        # Step 1.5: Apply keyword filtering (if vocabulary exists)
+        if self.keyword_matcher:
+            filtered_chunks = self.keyword_matcher.filter_chunks(query, raw_chunks)
+            if len(filtered_chunks) < len(raw_chunks):
+                logger.info(
+                    f"{PIPELINE} Keyword filter: {len(raw_chunks)} → {len(filtered_chunks)} chunks"
+                )
+            raw_chunks = filtered_chunks
 
         # Step 2: Apply constraints
         constraint_results = self._apply_all_constraints(query, raw_chunks)
@@ -267,6 +281,14 @@ class RAGPipeline:
             threshold=cfg.routing.threshold,
         )
 
+        # Keyword matcher (auto-loaded from collection's vocabulary if exists)
+        keyword_matcher = create_matcher_from_store(collection=cfg.retrieval.collection)
+        if keyword_matcher:
+            logger.info(
+                f"{PIPELINE} Loaded vocabulary [{cfg.retrieval.collection}] "
+                f"with {len(keyword_matcher.keywords)} keywords"
+            )
+
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
         return cls(
             retrieval=retrieval,
@@ -276,6 +298,7 @@ class RAGPipeline:
             constraints=constraints,
             semantic_matcher=semantic_matcher,
             query_router=query_router,
+            keyword_matcher=keyword_matcher,
         )
 
     @classmethod
