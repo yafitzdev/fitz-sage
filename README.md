@@ -511,11 +511,11 @@ The codebase speaks for itself.
 
 #### Keyword Vocabulary (Exact Match) 🔍
 
->**The problem**
+>**The problem ☔️**
 >
 >Semantic search struggles with exact identifiers. Ask "What happened with TC-1001?" and vector similarity might return chunks about TC-1002, TC-1003, or unrelated test cases—because embeddings treat them as semantically similar.
 >
->**The solution**
+>**The solution ☀️**
 >
 >Fitz auto-detects identifiers during ingestion and builds a per-collection vocabulary:
 >- **Test cases**: TC-1001, testcase_42
