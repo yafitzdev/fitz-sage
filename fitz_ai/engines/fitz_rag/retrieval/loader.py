@@ -192,7 +192,46 @@ def build_pipeline_from_spec(
         step = _build_step(step_spec.type, params, deps)
         steps.append(step)
 
+    # Auto-inject table_query after vector_search if chat is available
+    # This is "always on" like keyword matching and multi-query expansion
+    if deps.chat is not None:
+        steps = _inject_table_query_step(steps, deps)
+
     return steps
+
+
+def _inject_table_query_step(
+    steps: list[RetrievalStep],
+    deps: RetrievalDependencies,
+) -> list[RetrievalStep]:
+    """
+    Inject table_query step after vector_search.
+
+    Table query processing is "always on" when chat is available,
+    similar to keyword matching and multi-query expansion.
+    """
+    from fitz_ai.engines.fitz_rag.retrieval.steps.vector_search import VectorSearchStep
+
+    # Find vector_search step index
+    vector_search_idx = None
+    for i, step in enumerate(steps):
+        if isinstance(step, VectorSearchStep):
+            vector_search_idx = i
+            break
+
+    if vector_search_idx is None:
+        # No vector search step, can't inject
+        return steps
+
+    # Build table_query step
+    table_query_step = _build_step("table_query", {}, deps)
+
+    # Insert after vector_search
+    result = steps[: vector_search_idx + 1] + [table_query_step] + steps[vector_search_idx + 1 :]
+
+    logger.debug(f"{RETRIEVER} Auto-injected table_query step after vector_search")
+
+    return result
 
 
 def _build_step(
@@ -223,6 +262,11 @@ def _build_step(
 
         params.setdefault("artifact_client", SimpleArtifactClient(deps.vector_client))
         params.setdefault("collection", deps.collection)
+
+    elif step_type == "table_query":
+        if deps.chat is None:
+            raise ValueError("Table query step requires chat dependency")
+        params.setdefault("chat", deps.chat)
 
     return step_cls(**params)
 

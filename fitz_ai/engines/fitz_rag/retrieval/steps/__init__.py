@@ -54,20 +54,27 @@ STEP_REGISTRY: dict[str, type[RetrievalStep]] = {
     "limit": LimitStep,
     "dedupe": DedupeStep,
     "artifact_fetch": ArtifactFetchStep,
+    # table_query is registered lazily to avoid circular imports
 }
 
 
 def get_step_class(step_type: str) -> type[RetrievalStep]:
     """Get step class by type name."""
+    # Handle table_query lazily to avoid circular imports
+    if step_type == "table_query":
+        from fitz_ai.tabular import TableQueryStep
+
+        return TableQueryStep
+
     if step_type not in STEP_REGISTRY:
-        available = list(STEP_REGISTRY.keys())
+        available = list(STEP_REGISTRY.keys()) + ["table_query"]
         raise ValueError(f"Unknown step type: {step_type!r}. Available: {available}")
     return STEP_REGISTRY[step_type]
 
 
 def list_available_steps() -> list[str]:
     """List all available step types."""
-    return list(STEP_REGISTRY.keys())
+    return list(STEP_REGISTRY.keys()) + ["table_query"]
 
 
 __all__ = [
@@ -86,6 +93,7 @@ __all__ = [
     "LimitStep",
     "DedupeStep",
     "ArtifactFetchStep",
+    # table_query loaded lazily via get_step_class()
     # Registry functions
     "STEP_REGISTRY",
     "get_step_class",

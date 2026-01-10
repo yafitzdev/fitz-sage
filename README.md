@@ -136,7 +136,7 @@ You can—but you'll hit walls fast.
 > RAG is evolving fast—GraphRAG, HyDE, ColBERT, whatever's next. Fitz lets you switch engines in one line. Your ingested data stays. Your queries stay. No migration, no re-ingestion, no new API to learn. Frameworks lock you in; Fitz lets you move.
 
 **Queries that actually work 📊**
-> Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1001", multi-query decomposition for complex questions, and AST-aware chunking for code. No configuration—it just works.
+> Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1001", multi-query decomposition for complex questions, AST-aware chunking for code, and SQL execution for tabular data. No configuration—it just works.
 
 **Other Features at a Glance 🃏**
 >
@@ -163,13 +163,14 @@ The codebase speaks for itself.
 
 Most RAG implementations are naive vector search—they fail silently on real-world queries. Fitz has **built-in intelligence** that handles edge cases automatically:
 
-| Query | Why Naive RAG Fails | Result | FitzRAG Solution |
-|-------|---------------------|--------|------------------|
-| "What was our Q4 revenue?" | Info doesn't exist, but LLM won't admit it | ❌ Hallucinated number | ✅ "I don't know" |
-| "What are the design principles?" | Answer is spread across docs; no single chunk contains it | ❌ Random fragments | ✅ Hierarchical summaries |
-| "Find TC_CAN_001" | Embeddings see TC_1001 ≈ TC_1002 (semantically similar) | ❌ Wrong test case | ✅ Exact keyword matching |
+| Query                                                   | Why Naive RAG Fails                                            | Result | FitzRAG Solution |
+|---------------------------------------------------------|----------------------------------------------------------------|--------|------------------|
+| "What was our Q4 revenue?"                              | Info doesn't exist, but LLM won't admit it                     | ❌ Hallucinated number | ✅ "I don't know" |
+| "What are the design principles?"                       | Answer is spread across docs; no single chunk contains it      | ❌ Random fragments | ✅ Hierarchical summaries |
+| "Find TC_1000"                                          | Embeddings see TC_1000 ≈ TC_2000 (semantically similar)        | ❌ Wrong test case | ✅ Exact keyword matching |
 | *[User pastes 500-char test report]* "What failed and why?" | Long input → averaged embedding → matches nothing specifically | ❌ Vaguely related chunks | ✅ Multi-query decomposition |
-| "How does the auth module work?" *(code)* | Naive chunking splits functions mid-body | ❌ Broken code fragments | ✅ Complete functions |
+| "How does the auth module work?" *(code)*               | Naive chunking splits functions mid-body                       | ❌ Broken code fragments | ✅ Complete functions |
+| "What's the timeout for CAN?" *(table)*                 | Tables chunked arbitrarily, structure lost                     | ❌ Fragmented rows | ✅ SQL on structured data |
 
 These features are **always on**—no configuration needed. Fitz automatically detects when to use each capability.
 
@@ -303,6 +304,34 @@ These features are **always on**—no configuration needed. Fitz automatically d
 
 <details>
 
+<summary><strong>Tabular Data Routing</strong></summary>
+
+<br>
+
+>**The problem ☔️**
+>
+>Tables in documents get chunked arbitrarily—rows split across chunks, headers separated from data. Ask "What's the timeout for CAN?" and RAG returns fragments that don't answer the question.
+>
+>**The solution ☀️**
+>
+>Fitz extracts tables during ingestion and stores them as structured data:
+>```
+>Q: "What's the timeout for CAN?"
+>→ Schema chunk retrieved (table detected)
+>→ LLM selects relevant columns: [Module, Timeout]
+>→ In-memory SQLite built with pruned data
+>→ SQL generated: SELECT Module, Timeout FROM data WHERE Module = 'CAN'
+>→ Result: "CAN timeout is 100ms"
+>```
+>
+>**Column pruning** makes this fast—a 20-column table becomes 2 columns before SQL execution (~10x speedup).
+>
+>**Always on.** Tables are automatically detected and routed. No configuration needed.
+
+</details>
+
+<details>
+
 <summary><strong>Epistemic Honesty</strong></summary>
 
 <br>
@@ -352,8 +381,9 @@ These features are **always on**—no configuration needed. Fitz automatically d
 >| Multi-Query Decomposition | ✅ Done | Automatic expansion for complex queries |
 >| Code-Aware Chunking | ✅ Done | AST-aware splitting for Python, Markdown, PDF |
 >| Epistemic Honesty | ✅ Done | "I don't know" when evidence is insufficient |
->| Comparison Queries | 🔜 Next | Multi-entity retrieval ("A vs B") |
->| Tabular Data Routing | 📋 Planned | Route table queries to structured search |
+>| Comparison Queries | ✅ Done | Multi-entity retrieval ("A vs B") |
+>| Tabular Data Routing | ✅ Done | SQL on structured table data |
+>| Multi-Table Joins | 🔜 Next | JOIN queries across multiple tables |
 >| Multi-Hop Reasoning | 📋 Planned | Chain retrieval across related entities |
 
 </details>

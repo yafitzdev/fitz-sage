@@ -29,6 +29,7 @@ from fitz_ai.ingestion.hashing import compute_chunk_id
 from fitz_ai.ingestion.parser.router import ParserRouter
 from fitz_ai.ingestion.source.base import SourceFile
 from fitz_ai.ingestion.state.manager import IngestStateManager
+from fitz_ai.tabular import TableExtractor
 
 if TYPE_CHECKING:
     from fitz_ai.ingestion.enrichment.pipeline import EnrichmentPipeline
@@ -483,9 +484,17 @@ class DiffIngestExecutor:
             }
         )
 
-        # 4. Get chunker and chunk the ParsedDocument
+        # 3.5 Extract tables before chunking
+        # Tables are converted to schema chunks with embedded JSON data
+        table_extractor = TableExtractor()
+        parsed_doc, table_chunks = table_extractor.extract(parsed_doc)
+
+        # 4. Get chunker and chunk the ParsedDocument (tables removed)
         chunker = self._chunking_router.get_chunker(candidate.ext)
         chunks = chunker.chunk(parsed_doc)
+
+        # Add table chunks to the regular chunks
+        chunks.extend(table_chunks)
 
         if not chunks:
             logger.warning(f"No chunks from {candidate.path}, skipping")
