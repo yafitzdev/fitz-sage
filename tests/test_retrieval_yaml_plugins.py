@@ -153,7 +153,7 @@ class TestPluginSpecLoading:
         # First step in raw spec is artifact_fetch (conditionally enabled)
         assert spec.steps[0].type == "artifact_fetch"
         assert spec.steps[0].enabled_if == "fetch_artifacts"
-        # Vector search is second
+        # Vector search is second (has multi-query + keyword filtering baked in)
         assert spec.steps[1].type == "vector_search"
 
     def test_step_spec_from_dict(self):

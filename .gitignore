@@ -121,4 +121,7 @@ CLAUDE.md
 .claude
 clara_model_cache
 docs/blog
+docs/features
+docs/roadmap
 nul
+.mcp.json

@@ -18,7 +18,9 @@ from fitz_ai.engines.fitz_rag.retrieval.loader import (
 
 if TYPE_CHECKING:
     from fitz_ai.engines.fitz_rag.retrieval.steps import (
+        ChatClient,
         Embedder,
+        KeywordMatcherClient,
         Reranker,
         VectorClient,
     )
@@ -36,6 +38,8 @@ def get_retrieval_plugin(
     embedder: "Embedder",
     collection: str,
     reranker: "Reranker | None" = None,
+    chat: "ChatClient | None" = None,
+    keyword_matcher: "KeywordMatcherClient | None" = None,
     top_k: int = 5,
     fetch_artifacts: bool = False,
 ) -> RetrievalPipelineFromYaml:
@@ -48,6 +52,8 @@ def get_retrieval_plugin(
         embedder: Embedding service
         collection: Collection name
         reranker: Optional reranking service
+        chat: Optional fast-tier chat client for multi-query expansion
+        keyword_matcher: Optional keyword matcher for exact term filtering
         top_k: Final number of chunks to return
         fetch_artifacts: Whether to fetch artifacts (always with score=1.0)
 
@@ -64,6 +70,8 @@ def get_retrieval_plugin(
             embedder=embedder,
             collection=collection,
             reranker=reranker,
+            chat=chat,
+            keyword_matcher=keyword_matcher,
             top_k=top_k,
             fetch_artifacts=fetch_artifacts,
         )

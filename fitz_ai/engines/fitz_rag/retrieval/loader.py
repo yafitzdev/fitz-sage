@@ -20,7 +20,9 @@ if TYPE_CHECKING:
 import yaml
 
 from fitz_ai.engines.fitz_rag.retrieval.steps import (
+    ChatClient,
     Embedder,
+    KeywordMatcherClient,
     Reranker,
     RetrievalStep,
     VectorClient,
@@ -108,6 +110,8 @@ class RetrievalDependencies:
     embedder: Embedder
     collection: str
     reranker: Reranker | None = None
+    chat: ChatClient | None = None  # Fast-tier chat for multi-query expansion
+    keyword_matcher: KeywordMatcherClient | None = None  # Exact keyword matching
 
     # Config overrides (from retrieval config)
     top_k: int = 5
@@ -204,6 +208,8 @@ def _build_step(
         params.setdefault("client", deps.vector_client)
         params.setdefault("embedder", deps.embedder)
         params.setdefault("collection", deps.collection)
+        params.setdefault("chat", deps.chat)  # Enables multi-query expansion
+        params.setdefault("keyword_matcher", deps.keyword_matcher)  # Enables keyword filtering
 
     elif step_type == "rerank":
         if deps.reranker is None:
@@ -232,6 +238,8 @@ def create_retrieval_pipeline(
     embedder: Embedder,
     collection: str,
     reranker: Reranker | None = None,
+    chat: ChatClient | None = None,
+    keyword_matcher: KeywordMatcherClient | None = None,
     top_k: int = 5,
     fetch_artifacts: bool = False,
 ) -> "RetrievalPipelineFromYaml":
@@ -244,6 +252,8 @@ def create_retrieval_pipeline(
         embedder: Embedding service
         collection: Collection name
         reranker: Optional reranking service
+        chat: Optional fast-tier chat client for multi-query expansion
+        keyword_matcher: Optional keyword matcher for exact term filtering
         top_k: Final number of chunks to return
         fetch_artifacts: Whether to fetch artifacts (always with score=1.0)
 
@@ -257,6 +267,8 @@ def create_retrieval_pipeline(
         embedder=embedder,
         collection=collection,
         reranker=reranker,
+        chat=chat,
+        keyword_matcher=keyword_matcher,
         top_k=top_k,
         fetch_artifacts=fetch_artifacts,
     )
@@ -300,12 +312,12 @@ class RetrievalPipelineFromYaml:
 
         logger.info(f"{RETRIEVER} Running {self.plugin_name} pipeline ({len(self.steps)} steps)")
 
-        # Apply filter override to vector search step if provided
+        # Apply filter override to vector search steps if provided
         if filter_override:
             for step in self.steps:
                 if isinstance(step, VectorSearchStep):
                     step.filter_conditions = filter_override
-                    logger.debug(f"{RETRIEVER} Applied filter override to vector search")
+                    logger.debug(f"{RETRIEVER} Applied filter override to {step.name}")
                     break
 
         chunks: list[Chunk] = []

@@ -247,6 +247,28 @@ class RAGPipeline:
             )
             logger.info(f"{PIPELINE} Using rerank plugin='{cfg.rerank.plugin_name}'")
 
+        # Fast chat for multi-query expansion (uses same plugin, fast tier)
+        fast_chat = get_llm_plugin(
+            plugin_type="chat",
+            plugin_name=cfg.chat.plugin_name,
+            tier="fast",
+            **cfg.chat.kwargs,
+        )
+        fast_model = getattr(fast_chat, "params", {}).get("model", "unknown")
+        logger.info(
+            f"{PIPELINE} Using chat plugin='{cfg.chat.plugin_name}' model='{fast_model}' "
+            "(fast tier for multi-query expansion)"
+        )
+
+        # Keyword matcher (auto-loaded from collection's vocabulary if exists)
+        # Must be created before retrieval pipeline so multi-query can use it
+        keyword_matcher = create_matcher_from_store(collection=cfg.retrieval.collection)
+        if keyword_matcher:
+            logger.info(
+                f"{PIPELINE} Loaded vocabulary [{cfg.retrieval.collection}] "
+                f"with {len(keyword_matcher.keywords)} keywords"
+            )
+
         # Retrieval (YAML-based plugin)
         retrieval = get_retrieval_plugin(
             plugin_name=cfg.retrieval.plugin_name,
@@ -254,6 +276,8 @@ class RAGPipeline:
             embedder=embedder,
             collection=cfg.retrieval.collection,
             reranker=reranker,
+            chat=fast_chat,
+            keyword_matcher=keyword_matcher,
             top_k=cfg.retrieval.top_k,
             fetch_artifacts=cfg.retrieval.fetch_artifacts,
         )
@@ -280,14 +304,6 @@ class RAGPipeline:
             embedder=embedder.embed,
             threshold=cfg.routing.threshold,
         )
-
-        # Keyword matcher (auto-loaded from collection's vocabulary if exists)
-        keyword_matcher = create_matcher_from_store(collection=cfg.retrieval.collection)
-        if keyword_matcher:
-            logger.info(
-                f"{PIPELINE} Loaded vocabulary [{cfg.retrieval.collection}] "
-                f"with {len(keyword_matcher.keywords)} keywords"
-            )
 
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
         return cls(

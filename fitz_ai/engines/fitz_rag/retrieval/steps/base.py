@@ -41,6 +41,22 @@ class Reranker(Protocol):
     ) -> list[tuple[int, float]]: ...
 
 
+@runtime_checkable
+class ChatClient(Protocol):
+    """Protocol for chat services (used for query expansion)."""
+
+    def chat(self, messages: list[dict[str, Any]]) -> str: ...
+
+
+@runtime_checkable
+class KeywordMatcherClient(Protocol):
+    """Protocol for keyword matching services (used for exact keyword filtering)."""
+
+    def find_in_query(self, query: str) -> list[Any]: ...
+
+    def chunk_matches_any(self, chunk: Any, keywords: list[Any] | None = None) -> bool: ...
+
+
 # =============================================================================
 # Base Step
 # =============================================================================

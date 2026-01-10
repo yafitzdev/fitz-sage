@@ -12,6 +12,10 @@ Each step:
 - Returns a list of chunks
 - Is stateless and reusable
 
+Note: VectorSearchStep has built-in multi-query expansion and keyword filtering.
+These features are always active when dependencies are available - no plugin
+configuration needed. Sophistication is baked in.
+
 Usage:
     from fitz_ai.engines.fitz_rag.retrieval.steps import (
         VectorSearchStep,
@@ -25,7 +29,14 @@ Usage:
 """
 
 from .artifact_fetch import ArtifactClient, ArtifactFetchStep
-from .base import Embedder, Reranker, RetrievalStep, VectorClient
+from .base import (
+    ChatClient,
+    Embedder,
+    KeywordMatcherClient,
+    Reranker,
+    RetrievalStep,
+    VectorClient,
+)
 from .dedupe import DedupeStep
 from .limit import LimitStep
 from .rerank import RerankStep
@@ -65,6 +76,8 @@ __all__ = [
     "VectorClient",
     "Embedder",
     "Reranker",
+    "ChatClient",
+    "KeywordMatcherClient",
     "ArtifactClient",
     # Step classes
     "VectorSearchStep",
