@@ -20,40 +20,42 @@ The enrichment pipeline adds AI-generated metadata to chunks during ingestion:
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
 │  │  Summaries  │  │  Entities   │  │  Hierarchy              │  │
-│  │             │  │             │  │                         │  │
-│  │ Per-chunk   │  │ Extract:    │  │ Level 0: Chunks         │  │
-│  │ descriptions│  │ - classes   │  │ Level 1: Group summaries│  │
-│  │             │  │ - concepts  │  │ Level 2: Corpus summary │  │
+│  │             │  │ (GraphRAG)  │  │                         │  │
+│  │ Per-chunk   │  │             │  │ Level 0: Chunks         │  │
+│  │ descriptions│  │ Extract:    │  │ Level 1: Group summaries│  │
+│  │             │  │ - classes   │  │ Level 2: Corpus summary │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 **Key features:**
 - **Summaries** - Natural language descriptions for better search
-- **Entities** - Named entity and concept extraction
+- **Entities** - Named entity extraction (GraphRAG only)
 - **Hierarchy** - Multi-level summaries for analytical queries
 
 ---
 
 ## Configuration
 
-Add to `.fitz/config/fitz_rag.yaml`:
+Add to your config YAML:
 
 ```yaml
+# FitzRAG config (entities not available)
 enrichment:
   enabled: true
-
   summary:
     enabled: false       # Per-chunk summaries (expensive!)
-
-  entities:
-    enabled: false       # Entity extraction
-    types: [class, function, api, person, organization, concept]
-
   hierarchy:
     enabled: true        # Multi-level summaries
     grouping_strategy: metadata
     group_by: source_file
+
+# GraphRAG config (entities available)
+enrichment:
+  enabled: true
+  entities:
+    enabled: true        # Entity extraction
+    types: [class, function, api, person, organization, concept]
 ```
 
 ---
@@ -104,6 +106,8 @@ enrichment:
 ---
 
 ## Entities
+
+> **Note:** Entity extraction is for GraphRAG, not FitzRAG. FitzRAG uses keyword vocabulary for exact term matching and will use iterative retrieval for multi-hop queries.
 
 Extracts named entities and domain concepts from chunks.
 
@@ -285,21 +289,20 @@ enrichment:
 
 ## Cost Considerations
 
-| Feature | LLM Calls | When |
-|---------|-----------|------|
-| Summaries | 1 per chunk | At ingest |
-| Entities | 1 per chunk | At ingest |
-| Hierarchy L1 | 1 per group | At ingest |
-| Hierarchy L2 | 1 total | At ingest |
+| Feature | LLM Calls | When | Engine |
+|---------|-----------|------|--------|
+| Summaries | 1 per chunk | At ingest | All |
+| Entities | 1 per chunk | At ingest | GraphRAG |
+| Hierarchy L1 | 1 per group | At ingest | All |
+| Hierarchy L2 | 1 total | At ingest | All |
 
 **Example costs (1000 chunks, 10 groups):**
 
 | Feature | Calls | Approx. Cost |
 |---------|-------|--------------|
 | Summaries only | 1000 | $1-5 |
-| Entities only | 1000 | $1-5 |
+| Entities only (GraphRAG) | 1000 | $1-5 |
 | Hierarchy only | 11 | $0.05-0.10 |
-| All enabled | 2011 | $3-10 |
 
 Hierarchy is the most cost-effective enrichment.
 

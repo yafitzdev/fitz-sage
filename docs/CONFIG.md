@@ -117,9 +117,6 @@ enrichment:
   enabled: false
   summary:
     enabled: false             # LLM summary per chunk (expensive!)
-  entities:
-    enabled: false             # Entity extraction
-    types: [class, function, api, person, organization, concept]
   hierarchy:
     enabled: false             # Multi-level summaries
     grouping_strategy: metadata  # metadata, semantic
@@ -293,15 +290,6 @@ Optional chunk enrichment pipeline.
 | `model` | string | null | Override model |
 
 **Warning:** Makes 1 LLM call per chunk. Enable only when needed.
-
-#### enrichment.entities
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `enabled` | bool | `false` | Extract entities from chunks |
-| `types` | list | see below | Entity types to extract |
-
-Default types: `class`, `function`, `api`, `person`, `organization`, `concept`
 
 #### enrichment.hierarchy
 

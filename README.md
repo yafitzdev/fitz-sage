@@ -8,7 +8,7 @@
 
 ---
 
-**Honest RAG in 5 minutes. No infrastructure. No boilerplate.**
+**Intelligent, honest RAG in 5 minutes. No infrastructure. No boilerplate.**
 
 ```bash
 pip install fitz-ai
@@ -135,8 +135,8 @@ You can—but you'll hit walls fast.
 **Swap engines, keep everything else ⚙️**
 > RAG is evolving fast—GraphRAG, HyDE, ColBERT, whatever's next. Fitz lets you switch engines in one line. Your ingested data stays. Your queries stay. No migration, no re-ingestion, no new API to learn. Frameworks lock you in; Fitz lets you move.
 
-**Analytical queries that actually work 📊**
-> Standard RAG fails on questions like "What are the trends?"—it retrieves random chunks instead of insights. Fitz's hierarchical RAG generates multi-level summaries during ingestion. Ask for trends, get aggregated analysis. Ask for specifics, get detail chunks. No special syntax required.
+**Queries that actually work 📊**
+> Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1001", multi-query decomposition for complex questions, and AST-aware chunking for code. No configuration—it just works.
 
 **Other Features at a Glance 🃏**
 >
@@ -156,6 +156,207 @@ fitz quickstart ./fitz_ai "How does the chunking pipeline work?"
 ```
 
 The codebase speaks for itself.
+
+---
+
+### Retrieval Intelligence
+
+Most RAG implementations are naive vector search—they fail silently on real-world queries. Fitz has **built-in intelligence** that handles edge cases automatically:
+
+| Query | Problem | Naive RAG | FitzRAG                     |
+|-------|---------|-----------|-----------------------------|
+| "What was our Q4 revenue?" | Answer not in docs | ❌ Hallucinated answer | ✅ "I don't know"            |
+| "What are the design principles?" | Global/analytical query | ❌ Random chunks | ✅ Hierarchical summaries    |
+| "Find TC_CAN_001" | Exact identifier | ❌ Returns TC_CAN_002 | ✅ Keyword matching          |
+| "Summarize failures and root causes" | Complex multi-part | ❌ Query dilution | ✅ Multi-query decomposition |
+| "How does auth module work?" | Code structure | ❌ Split functions | ✅ AST-aware chunking        |
+
+These features are **always on**—no configuration needed. Fitz automatically detects when to use each capability.
+
+<details>
+
+<summary><strong>Multi-Query Decomposition</strong></summary>
+
+<br>
+
+>**The problem ☔️**
+>
+>Long, complex queries dilute into weak embeddings. Ask "Summarize the test failures, their root causes, and recommended fixes" and vector search returns chunks vaguely related to tests—missing failures, causes, or fixes entirely.
+>
+>**The solution ☀️**
+>
+>Fitz automatically detects long queries (>300 chars) and decomposes them:
+>```
+>Original: "Summarize the test failures, their root causes, and recommended fixes"
+>     ↓
+>Decomposed:
+>  → "test failures"
+>  → "root causes of failures"
+>  → "recommended fixes"
+>     ↓
+>3 focused searches → deduplicated results → complete answer
+>```
+>
+>**Always on.** Short queries run as single searches (no overhead). Long queries automatically expand. No configuration needed.
+
+</details>
+
+<details>
+
+<summary><strong>Keyword Vocabulary (Exact Match)</strong></summary>
+
+<br>
+
+>**The problem ☔️**
+>
+>Semantic search struggles with identifiers. Ask "What happened with TC-1001?" and embeddings return TC-1002, TC-1003, or unrelated test cases—because they're "semantically similar."
+>
+>**The solution ☀️**
+>
+>Fitz auto-detects identifiers during ingestion and builds a vocabulary:
+>- **Test cases**: TC-1001, testcase_42
+>- **Tickets**: JIRA-4521, BUG-789
+>- **Versions**: v2.0.1, 1.0.0-beta
+>- **Code**: `AuthService`, `handle_login()`
+>
+>At query time, keywords pre-filter chunks before semantic search:
+>```
+>Q: "What happened with TC-1001?"
+>→ Chunks filtered to only those containing TC-1001
+>→ Semantic search runs on filtered set
+>→ Result: Only TC-1001 content, never TC-1002
+>```
+>
+>**Variation matching** handles format differences automatically:
+>```
+>TC-1001 → tc-1001, TC_1001, tc 1001
+>JIRA-123 → jira-123, JIRA123, jira 123
+>```
+
+</details>
+
+<details>
+
+<summary><strong>Hierarchical RAG</strong></summary>
+
+<br>
+
+>**The problem ☔️**
+>
+>Standard RAG can't answer analytical queries. Ask "What are the trends?" and it returns random chunks instead of aggregated insights.
+>
+>**The solution ☀️**
+>
+>Fitz generates multi-level summaries during ingestion:
+>- **Level 0**: Original chunks
+>- **Level 1**: Group summaries (per source file)
+>- **Level 2**: Corpus summary (all documents)
+>
+>```
+>Q: "What are the overall trends?"
+>→ Returns L2 corpus summary + L1 group summaries
+>
+>Q: "What did users say about the async tutorial?"
+>→ Returns L0 individual chunks from that file
+>```
+>
+>Query routing is automatic—summaries match analytical queries via embedding similarity.
+
+</details>
+
+<details>
+
+<summary><strong>Code-Aware Chunking</strong></summary>
+
+<br>
+
+>**The problem ☔️**
+>
+>Naive chunking splits code mid-function, breaking syntax and losing context. A 50-line class becomes 3 fragments that don't make sense alone.
+>
+>**The solution ☀️**
+>
+>Fitz uses AST-aware chunking for code:
+>
+>| Language | Strategy |
+>|----------|----------|
+>| **Python** | Classes, functions, methods as units. Large classes split by method. Imports preserved. |
+>| **Markdown** | Header-aware splits. Code blocks kept intact. YAML frontmatter extracted. |
+>| **PDF** | Section detection (1.1, 2.3.1, roman numerals). Keywords like "Abstract", "Conclusion". |
+>
+>```python
+># Naive chunking:
+>def authenticate(user):     # ← chunk 1 ends here
+>    if not user.token:      # ← chunk 2 starts here (broken)
+>        raise AuthError()
+>
+># Fitz chunking:
+>def authenticate(user):     # ← entire function = 1 chunk
+>    if not user.token:
+>        raise AuthError()
+>    return validate(user.token)
+>```
+>
+>Docstrings, decorators, and type hints stay attached to their functions.
+
+</details>
+
+<details>
+
+<summary><strong>Epistemic Honesty</strong></summary>
+
+<br>
+
+>**The problem ☔️**
+>
+>Most RAG systems confidently answer even when the answer isn't in the documents. Ask "What was our Q4 revenue?" when docs only cover Q1-Q3, and they hallucinate a number.
+>
+>**The solution ☀️**
+>
+>Fitz has built-in epistemic guardrails that detect uncertainty:
+>
+>```
+>Q: "What was our Q4 revenue?"
+>A: "I cannot find Q4 revenue figures in the provided documents.
+>    The available financial data covers Q1-Q3 only."
+>
+>   Mode: ABSTAIN
+>```
+>
+>Three constraint plugins run automatically:
+>
+>| Constraint | What it catches |
+>|------------|-----------------|
+>| **ConflictAware** | Sources disagree → surfaces the conflict |
+>| **InsufficientEvidence** | No supporting evidence → refuses to guess |
+>| **CausalAttribution** | Correlation ≠ causation → blocks hallucinated "why" |
+>
+>Every answer includes a **mode** indicating confidence:
+>- `CONFIDENT` — Strong evidence supports the answer
+>- `QUALIFIED` — Answer given with noted limitations
+>- `DISPUTED` — Sources conflict, both views presented
+>- `ABSTAIN` — Insufficient evidence, refuses to answer
+
+</details>
+
+<details>
+
+<summary><strong>Roadmap</strong></summary>
+
+<br>
+
+>| Feature | Status | Description |
+>|---------|--------|-------------|
+>| Hierarchical RAG | ✅ Done | Multi-level summaries for analytical queries |
+>| Keyword Vocabulary | ✅ Done | Exact matching for identifiers |
+>| Multi-Query Decomposition | ✅ Done | Automatic expansion for complex queries |
+>| Code-Aware Chunking | ✅ Done | AST-aware splitting for Python, Markdown, PDF |
+>| Epistemic Honesty | ✅ Done | "I don't know" when evidence is insufficient |
+>| Comparison Queries | 🔜 Next | Multi-entity retrieval ("A vs B") |
+>| Tabular Data Routing | 📋 Planned | Route table queries to structured search |
+>| Multi-Hop Reasoning | 📋 Planned | Chain retrieval across related entities |
+
+</details>
 
 ---
 
@@ -236,192 +437,9 @@ The codebase speaks for itself.
 </details>
 
 ---
-
-<details>
-
-<summary><strong>📦 Fitz RAG vs GraphRAG</strong></summary>
-
-<br>
-
-> **"RAG is dead"** posts flood the AI scene. The argument: traditional RAG can't handle relationships or trends. GraphRAG is the new hotness.
->
-> **Traditional RAG has two problems—it can't see the forest for the trees, and it lies about what it sees.**
->
-> Fitz RAG solves both: **hierarchical summaries** for the big picture, **epistemic guardrails** for honesty. And now it also extracts entities and relationships—without the graph construction overhead.
-
-<br>
-
-#### The real problem with RAG isn't retrieval—it's confidence
-
->Most RAG failures aren't "couldn't find the relationship." They're:
->- Hallucinated answers presented confidently
->- Conflicting sources silently collapsed into one answer
->- Causality invented from correlation
->
->**GraphRAG doesn't solve any of these.** It just finds relationships better.
->
->Fitz RAG solves them with **epistemic guardrails**:
->
->| Problem | GraphRAG | Fitz RAG |
->|---------|----------|----------|
->| Sources disagree | Picks one silently | **DISPUTED mode** — surfaces the conflict |
->| No evidence for claim | Answers anyway | **ABSTAIN mode** — refuses to guess |
->| Correlation ≠ causation | Invents "why" | **Blocks causal hallucination** |
->| Uncertain answer | Sounds confident | **QUALIFIED mode** — notes limitations |
-
-<br>
-
-#### What Fitz RAG now shares with GraphRAG
-
->Fitz RAG has closed the gap on key GraphRAG features—without the complexity:
->
->| Capability | GraphRAG | Fitz RAG |
->|------------|----------|----------|
->| **Entity extraction** | LLM extracts entities | LLM extracts entities (classes, functions, APIs, people, orgs) |
->| **Entity relationships** | Full knowledge graph | Co-occurrence links (entities in same chunk are linked) |
->| **Semantic clustering** | Leiden community detection | K-means clustering by embedding similarity |
->| **Trend analysis** | Community summaries | Hierarchical summaries (L0→L1→L2) |
->
->The difference: Fitz extracts entities and links them **without building a graph**. Co-occurrence linking captures 80% of useful relationships at 10% of the complexity.
-
-<br>
-
-#### When GraphRAG still wins
-
->GraphRAG excels at **multi-hop relationship traversal**:
->
->| Use Case | Why GraphRAG |
->|----------|--------------|
->| "Who founded the company that acquired Z?" | Multi-hop graph traversal |
->| Complex relationship chains | Explicit edge following |
->| Visual knowledge exploration | Graph visualization |
->
->If you need to traverse 3+ hop relationships or visualize entity networks, GraphRAG is the right tool.
-
-<br>
-
-#### When Fitz RAG wins
-
->Fitz RAG excels at **trusted answers, entities, and analytical queries**:
->
->| Use Case | Why Fitz RAG |
->|----------|--------------|
->| Q&A where trust matters | Epistemic guardrails |
->| "What entities are in this doc?" | **Entity extraction** with type filtering |
->| "What concepts co-occur?" | **Entity linking** (co-occurrence) |
->| "What are the trends?" | **Hierarchical summaries** (L0→L1→L2) |
->| "Summarize this corpus" | **Corpus-level summaries** auto-generated |
->| Conflicting sources | Conflict detection |
->| Compliance/legal queries | Admits uncertainty |
->| Fast, cheap retrieval | No graph construction |
->| Incremental updates | Just add new chunks |
->
->**Fitz RAG extracts entities, links them, clusters them, and summarizes them**—all during ingestion:
->- **Entities**: Classes, functions, APIs, people, organizations, concepts
->- **Links**: Co-occurrence relationships stored in chunk metadata
->- **Clusters**: Semantic grouping via K-means on embeddings
->- **Summaries**: L0 chunks → L1 group summaries → L2 corpus summary
-
-<br>
-
-#### The cost difference
-
->| Aspect | GraphRAG | Fitz RAG |
->|--------|----------|----------|
->| Ingest cost | **High** — LLM extracts entities + builds graph | **Medium** — LLM extracts entities (optional) |
->| Ingest speed | Slow — graph construction | Fast — no graph building |
->| Query latency | Higher — graph traversal | Lower — vector search |
->| Error propagation | Bad extraction = bad graph | Entities are metadata, not structure |
->| Schema dependency | Must define entity types | Flexible type list |
->| Incremental updates | Rebuild graph sections | Just add chunks + entities |
-
-<br>
-
-#### The bottom line
-
->| Capability | GraphRAG | Fitz RAG |
->|------------|----------|----------|
->| Entity extraction | ✅ LLM-based | ✅ LLM-based |
->| Entity relationships | Full knowledge graph | Co-occurrence links |
->| Semantic clustering | Leiden algorithm | K-means on embeddings |
->| Trend analysis | Community summaries | **Hierarchical summaries** |
->| Corpus overview | Global search | **L2 corpus summary** |
->| Epistemic safety | ❌ None | ✅ **Guardrails built-in** |
->
->**GraphRAG wins on multi-hop traversal. Fitz RAG wins on trusted answers + entities + trends.**
->
->For most enterprise use cases—support, compliance, internal knowledge, trend analysis—Fitz RAG now delivers 90% of GraphRAG's capabilities at a fraction of the cost, plus epistemic guarantees GraphRAG simply doesn't have.
->
->Need the full graph? Fitz gives you both engines. Same data. Same API. Choose per query.
-
-</details>
-
----
 <details>
 
 <summary><strong>📦 Features</strong></summary>
-
-<br>
-
-#### Hierarchical RAG 📊 → [Enrichment Guide](docs/ENRICHMENT.md)
-
->**The problem ☔️**
->
->Standard RAG struggles with analytical queries like "What are the trends?" because it retrieves random chunks instead of aggregated insights. Hierarchical RAG solves this.
->```
->Q: "What are the trends in my comments?"
->Standard RAG: Returns random individual comments (not useful)
->```
->
->**The solution ☀️**
->
->For documents, Fitz auto-enables hierarchy when an LLM is available. It groups by file and generates multi-level summaries:
->- **Level 0**: Original chunks (unchanged)
->- **Level 1**: Group summaries (one per source file)
->- **Level 2**: Corpus summary (aggregates all groups)
->
->**Example: YouTube comment analysis**
->```
->Ingested: 500 comments across 10 videos
->
->Level 0: "This tutorial helped me understand async/await finally!"
->Level 1: "Tutorial Video #3: 47 comments, mostly positive. Users praise
->         clarity of examples. Common request: more on error handling."
->Level 2: "Across 10 videos (500 comments): 78% positive sentiment.
->         Top themes: code clarity, pacing, example quality.
->         Recurring requests: longer videos, more advanced topics."
->```
->
->Now analytical queries retrieve summaries, while specific queries still retrieve details:
->```
->Q: "What are the overall trends in my comments?"
->→ Returns Level 2 corpus summary + Level 1 video summaries
->```
->```
->Q: "What did people say about my async tutorial?"
->→ Returns Level 0 individual comments from that video
->```
->
->No special query syntax. No retrieval config changes. Summaries match analytical queries naturally via vector similarity.
-
-<br>
-
-#### Actually admits when it doesn't know 📚
-
-> When documents don't contain the answer, fitz says so:
->
-> ```
-> Q: "What was our Q4 revenue?"
-> A: "I cannot find Q4 revenue figures in the provided documents.
->     The available financial data covers Q1-Q3 only."
->
->    Mode: ABSTAIN
->```
->
->Three constraint plugins run automatically ([learn more](docs/CONSTRAINTS.md)):
->1. [X] **📕 ConflictAwareConstraint**: Detects contradictions across sources
->2. [X] **📗 InsufficientEvidenceConstraint**: Blocks answers without evidence
->3. [X] **📘 CausalAttributionConstraint**: Prevents hallucinated cause-effect claims
 
 <br>
 
@@ -492,57 +510,6 @@ The codebase speaks for itself.
 >```
 >
 >Re-running ingestion on a large codebase takes seconds, not minutes. Changed your chunking config? Fitz detects that too and re-processes affected files.
-
-<br>
-
-#### Smart Chunking 🧠
-
->Format-aware chunking that preserves structure:
->
->| Format | Strategy |
->|--------|----------|
->| **Python** | AST-aware: keeps classes, functions, imports intact. Large classes split by method. |
->| **Markdown** | Header-aware: splits on `#` headers, preserves code blocks and lists. Extracts YAML frontmatter as metadata. |
->| **PDF** | Section-aware: detects numbered headings (1.1, 2.3.1), roman numerals, and keywords (Abstract, Conclusion). |
->
->No more retrieving half a function or a code block split mid-syntax.
-
-<br>
-
-#### Keyword Vocabulary (Exact Match) 🔍
-
->**The problem ☔️**
->
->Semantic search struggles with exact identifiers. Ask "What happened with TC-1001?" and vector similarity might return chunks about TC-1002, TC-1003, or unrelated test cases—because embeddings treat them as semantically similar.
->
->**The solution ☀️**
->
->Fitz auto-detects identifiers during ingestion and builds a per-collection vocabulary:
->- **Test cases**: TC-1001, testcase_42
->- **Tickets**: JIRA-4521, BUG-789
->- **Versions**: v2.0.1, 1.0.0-beta
->- **Pull requests**: PR #123, PR-456
->- **People**: John Smith, Jane Doe
->- **Files**: config.yaml, report.pdf
->
->At query time, detected keywords pre-filter chunks before semantic search:
->```
->Q: "What happened with TC-1001?"
->→ Chunks filtered to only those containing TC-1001 (or variations)
->→ Semantic search runs on filtered set
->→ Result: Only TC-1001 content, never TC-1002
->```
->
->**Variation matching**
->
->Keywords match across common formats automatically:
->```
->TC-1001 → tc-1001, TC_1001, tc 1001, testcase 1001, test case 1001
->JIRA-123 → jira-123, JIRA123, jira 123
->v2.0.1 → V2.0.1, 2.0.1, version 2.0.1
->```
->
->Vocabulary is stored per-collection in `.fitz/keywords/{collection}.yaml`. User modifications are preserved across re-ingestion.
 
 </details>
 
