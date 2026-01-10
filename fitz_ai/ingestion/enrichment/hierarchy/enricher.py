@@ -228,8 +228,7 @@ class HierarchyEnricher:
         Returns:
             Original chunks (enriched with hierarchy_summary metadata) + L2 corpus summary chunk
         """
-        if not self._config.enabled:
-            return chunks
+        # Hierarchy is always on - no enabled check needed
 
         # Mark all original chunks as level 0 (leaf level)
         for chunk in chunks:

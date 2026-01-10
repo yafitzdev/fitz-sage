@@ -84,13 +84,22 @@ from fitz_ai.ingestion.enrichment.base import (
     EnrichmentContext,
 )
 
+# Chunk enrichment bus
+from fitz_ai.ingestion.enrichment.chunk import (
+    ChunkEnricher,
+    EnrichmentModule,
+    EntityModule,
+    KeywordModule,
+    SummaryModule,
+    create_default_enricher,
+)
+
 # Configuration
 from fitz_ai.ingestion.enrichment.config import (
     ArtifactConfig,
     EnrichmentConfig,
     HierarchyConfig,
     HierarchyRule,
-    SummaryConfig,
 )
 from fitz_ai.ingestion.enrichment.context.registry import (
     ContextRegistry,
@@ -125,7 +134,6 @@ from fitz_ai.ingestion.enrichment.summary import (
 __all__ = [
     # Configuration
     "EnrichmentConfig",
-    "SummaryConfig",
     "ArtifactConfig",
     "HierarchyConfig",
     "HierarchyRule",
@@ -133,6 +141,13 @@ __all__ = [
     "EnrichmentPipeline",
     # Models
     "EnrichmentResult",
+    # Chunk Enrichment Bus
+    "ChunkEnricher",
+    "EnrichmentModule",
+    "SummaryModule",
+    "KeywordModule",
+    "EntityModule",
+    "create_default_enricher",
     # Base types
     "ContentType",
     "EnrichmentContext",
@@ -140,7 +155,7 @@ __all__ = [
     "DocumentEnrichmentContext",
     "ContextBuilder",
     "Enricher",
-    # Summary
+    # Summary (legacy - now handled by ChunkEnricher)
     "ChunkSummarizer",
     "SummaryCache",
     # Hierarchy

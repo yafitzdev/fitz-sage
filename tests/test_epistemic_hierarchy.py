@@ -216,7 +216,7 @@ class TestHierarchyEnricherEpistemic:
 
     def test_simple_mode_adds_epistemic_metadata(self):
         """Test that simple mode adds epistemic metadata to original chunks."""
-        config = HierarchyConfig(enabled=True, group_by="source")
+        config = HierarchyConfig(group_by="source")
 
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "This is a summary."
@@ -264,7 +264,7 @@ class TestHierarchyEnricherEpistemic:
 
         from fitz_ai.core.guardrails import SemanticMatcher
 
-        config = HierarchyConfig(enabled=True, group_by="source")
+        config = HierarchyConfig(group_by="source")
 
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "Summary acknowledging conflicts."
@@ -308,7 +308,7 @@ class TestHierarchyEnricherEpistemic:
 
     def test_corpus_summary_includes_epistemic_aggregates(self):
         """Test that corpus summary has aggregated epistemic metadata."""
-        config = HierarchyConfig(enabled=True, group_by="source")
+        config = HierarchyConfig(group_by="source")
 
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "Summary content."
@@ -342,30 +342,6 @@ class TestHierarchyEnricherEpistemic:
         assert "epistemic_groups_with_conflicts" in corpus.metadata
         assert "epistemic_evidence_density" in corpus.metadata
         assert "epistemic_agreement_ratio" in corpus.metadata
-
-    def test_disabled_enricher_skips_epistemic(self):
-        """Test that disabled enricher returns chunks unchanged."""
-        config = HierarchyConfig(enabled=False)
-
-        mock_chat = MagicMock()
-        enricher = HierarchyEnricher(config=config, chat_client=mock_chat)
-
-        chunks = [
-            Chunk(
-                id="c1",
-                doc_id="d1",
-                content="Some content.",
-                chunk_index=0,
-                metadata={},
-            ),
-        ]
-
-        result = enricher.enrich(chunks)
-
-        assert len(result) == 1
-        assert result[0].id == "c1"
-        mock_chat.chat.assert_not_called()
-
 
 class TestSingleSourceOfTruth:
     """Tests verifying that epistemic detection uses the existing constraint plugins."""

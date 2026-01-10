@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🎉 Highlights
+
+**ChunkEnricher - Unified Enrichment Bus** - All chunk-level enrichment (summary, keywords, entities) is now baked in and runs automatically via a unified enrichment bus. The `ChunkEnricher` batches ~15 chunks per LLM call, making enrichment nearly free (~$0.13-0.74 for 1000 chunks).
+
+### 🚀 Added
+
+#### ChunkEnricher (`fitz_ai/ingestion/enrichment/chunk/`)
+- `ChunkEnricher` - Unified enrichment bus with extensible module architecture
+- `EnrichmentModule` - Abstract base class for pluggable enrichment types
+- `SummaryModule` - Generates searchable per-chunk summaries
+- `KeywordModule` - Extracts exact-match identifiers (TC-1001, JIRA-123, `AuthService`)
+- `EntityModule` - Extracts named entities (classes, people, technologies)
+- Batched processing (~15 chunks per LLM call) for cost efficiency
+- Keywords automatically saved to `VocabularyStore` for exact-match retrieval
+
+### 🔄 Changed
+
+- **Enrichment is now baked in**: Summary, keyword, and entity extraction run automatically when chat client is available
+- **Removed opt-in config flags**: `enrichment.summary.enabled` and `enrichment.entities.enabled` removed
+- **EnrichmentPipeline**: Now uses `ChunkEnricher` instead of separate summarizer and entity extractor
+- **Documentation updated**: ENRICHMENT.md, INGESTION.md, CONFIG.md, ARCHITECTURE.md, README.md
+
+### 🗑️ Removed
+
+- `SummaryConfig` - No longer needed (summaries always on)
+- `EntityConfig` - No longer needed (entities always on)
+- `summaries_enabled` property on EnrichmentPipeline (replaced by `chunk_enrichment_enabled`)
+- `entities_enabled` property on EnrichmentPipeline (replaced by `chunk_enrichment_enabled`)
+
 ---
 
 ## [0.5.0] - 2026-01-07

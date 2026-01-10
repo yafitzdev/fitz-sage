@@ -77,11 +77,10 @@ fitz ingest ./docs -e graphrag           # Override engine for this command
 - `-e, --engine` - Engine to use (overrides default)
 - `-y, --yes` - Non-interactive mode
 - `-f, --force` - Force re-ingest all files
-- `-H, --hierarchy` - Enable hierarchical summaries (L0/L1/L2)
 - `-a, --artifacts` - Artifacts to generate (e.g., "all", "architecture_narrative")
 
-**Hierarchical Mode (`-H`):**
-Generates multi-level summaries during ingestion:
+**Hierarchical Summaries (always on):**
+Every ingestion automatically generates multi-level summaries:
 - L0: Original chunks (for specific queries)
 - L1: Document/group summaries
 - L2: Corpus summary (for "what are the trends?" queries)

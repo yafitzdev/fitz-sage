@@ -4,8 +4,11 @@ Unified enrichment pipeline.
 
 The EnrichmentPipeline is the single entry point for all enrichment operations.
 It coordinates:
-1. Chunk-level summaries (universal)
-2. Project-level artifacts (type-specific plugins)
+1. Chunk-level enrichment (summary, keywords, entities) - ALWAYS ON
+2. Hierarchical summaries (L1 group + L2 corpus) - ALWAYS ON
+3. Project-level artifacts (type-specific plugins)
+
+All retrieval intelligence features are baked in - no configuration needed.
 
 Usage:
     from fitz_ai.ingestion.enrichment import EnrichmentPipeline, EnrichmentConfig
@@ -14,17 +17,12 @@ Usage:
         config=EnrichmentConfig.from_dict(config_dict.get("enrichment", {})),
         project_root=Path("/path/to/project"),
         chat_client=my_llm_client,
+        collection="my_collection",  # For keyword vocabulary
     )
 
-    # Generate artifacts
-    artifacts = pipeline.generate_artifacts()
-
-    # Summarize a chunk
-    description = pipeline.summarize_chunk(
-        content="def hello(): ...",
-        file_path="/path/to/file.py",
-        content_hash="abc123",
-    )
+    result = pipeline.enrich(chunks)
+    # result.chunks have metadata attached
+    # keywords saved to vocabulary store
 """
 
 from __future__ import annotations
@@ -41,14 +39,11 @@ from fitz_ai.ingestion.enrichment.artifacts.registry import (
     ArtifactRegistry,
 )
 from fitz_ai.ingestion.enrichment.base import ContentType
+from fitz_ai.ingestion.enrichment.chunk import ChunkEnricher, create_default_enricher
 from fitz_ai.ingestion.enrichment.config import EnrichmentConfig
-from fitz_ai.ingestion.enrichment.entities.cache import EntityCache
-from fitz_ai.ingestion.enrichment.entities.extractor import EntityExtractor
-from fitz_ai.ingestion.enrichment.entities.linker import EntityLinker
 from fitz_ai.ingestion.enrichment.hierarchy.enricher import HierarchyEnricher
 from fitz_ai.ingestion.enrichment.models import EnrichmentResult
-from fitz_ai.ingestion.enrichment.summary.cache import SummaryCache
-from fitz_ai.ingestion.enrichment.summary.summarizer import ChunkInfo, ChunkSummarizer
+from fitz_ai.ingestion.vocabulary import Keyword, VocabularyStore
 
 if TYPE_CHECKING:
     from fitz_ai.core.chunk import Chunk
@@ -67,13 +62,17 @@ class EnrichmentPipeline:
     """
     Unified enrichment pipeline.
 
-    Coordinates chunk-level summaries and project-level artifacts.
+    Coordinates all enrichment operations:
+    - Chunk-level: summary, keywords, entities (via ChunkEnricher bus)
+    - Hierarchy-level: L1 group summaries, L2 corpus summary
+    - Project-level: artifacts
+
+    All retrieval intelligence is baked in - no opt-in configuration.
 
     Attributes:
         config: Enrichment configuration
         project_root: Root directory of the project
-        summarizer: Chunk summarizer (if summaries enabled)
-        artifact_registry: Registry of artifact plugins
+        collection: Collection name for keyword vocabulary
     """
 
     def __init__(
@@ -83,52 +82,42 @@ class EnrichmentPipeline:
         project_root: Path,
         chat_client: ChatClient | None = None,
         embedder: object | None = None,
-        cache_path: Path | None = None,
-        enricher_id: str | None = None,
+        collection: str | None = None,
     ):
         self.config = config
         self.project_root = Path(project_root).resolve()
         self._chat_client = chat_client
         self._embedder = embedder
-        self._cache_path = cache_path or FitzPaths.workspace() / "enrichment_cache.json"
-        self._enricher_id = enricher_id or "default"
+        self._collection = collection
 
-        self._summarizer: ChunkSummarizer | None = None
+        self._chunk_enricher: ChunkEnricher | None = None
         self._hierarchy_enricher: HierarchyEnricher | None = None
-        self._entity_extractor: EntityExtractor | None = None
+        self._vocabulary_store: VocabularyStore | None = None
         self._artifact_registry = ArtifactRegistry.get_instance()
         self._project_analysis: ProjectAnalysis | None = None
 
-        self._init_summarizer()
+        self._init_chunk_enricher()
         self._init_hierarchy_enricher()
-        self._init_entity_extractor()
+        self._init_vocabulary_store()
 
-    def _init_summarizer(self) -> None:
-        """Initialize the chunk summarizer if enabled."""
-        if not self.config.enabled or not self.config.summary.enabled:
-            return
-
+    def _init_chunk_enricher(self) -> None:
+        """Initialize the chunk enrichment bus (always on)."""
         if self._chat_client is None:
-            logger.warning("Summaries enabled but no chat client provided")
+            logger.warning("[ENRICHMENT] No chat client provided, chunk enrichment disabled")
             return
 
-        cache = SummaryCache(self._cache_path)
-        self._summarizer = ChunkSummarizer(
-            chat_client=self._chat_client,
-            cache=cache,
-            enricher_id=self._enricher_id,
+        self._chunk_enricher = create_default_enricher(self._chat_client)
+        logger.info(
+            f"[ENRICHMENT] Chunk enricher initialized with modules: "
+            f"{[m.name for m in self._chunk_enricher.modules]}"
         )
 
     def _init_hierarchy_enricher(self) -> None:
-        """Initialize the hierarchy enricher if enabled."""
-        if not self.config.enabled or not self.config.hierarchy.enabled:
-            return
-
+        """Initialize the hierarchy enricher (always on)."""
         if self._chat_client is None:
-            logger.warning("Hierarchy enrichment enabled but no chat client provided")
+            logger.warning("[ENRICHMENT] No chat client provided, hierarchy enrichment disabled")
             return
 
-        # Initialize enricher - works in simple mode, rules mode, and semantic mode
         self._hierarchy_enricher = HierarchyEnricher(
             config=self.config.hierarchy,
             chat_client=self._chat_client,
@@ -152,26 +141,11 @@ class EnrichmentPipeline:
                 f"(group_by='{self.config.hierarchy.group_by}')"
             )
 
-    def _init_entity_extractor(self) -> None:
-        """Initialize the entity extractor if enabled."""
-        if not self.config.enabled or not self.config.entities.enabled:
-            return
-
-        if self._chat_client is None:
-            logger.warning("Entity extraction enabled but no chat client provided")
-            return
-
-        entity_cache_path = self._cache_path.parent / "entity_cache.json"
-        cache = EntityCache(entity_cache_path)
-        self._entity_extractor = EntityExtractor(
-            chat_client=self._chat_client,
-            cache=cache,
-            extractor_id=self._enricher_id,
-            entity_types=self.config.entities.types,
-        )
-        logger.info(
-            f"[ENRICHMENT] Entity extractor initialized with types: {self.config.entities.types}"
-        )
+    def _init_vocabulary_store(self) -> None:
+        """Initialize the vocabulary store for keywords."""
+        if self._collection:
+            self._vocabulary_store = VocabularyStore(collection=self._collection)
+            logger.info(f"[ENRICHMENT] Vocabulary store initialized for collection '{self._collection}'")
 
     @classmethod
     def from_config(
@@ -180,8 +154,7 @@ class EnrichmentPipeline:
         project_root: Path,
         chat_client: ChatClient | None = None,
         embedder: object | None = None,
-        cache_path: Path | None = None,
-        enricher_id: str | None = None,
+        collection: str | None = None,
     ) -> "EnrichmentPipeline":
         """
         Create pipeline from config.
@@ -189,10 +162,9 @@ class EnrichmentPipeline:
         Args:
             config: EnrichmentConfig, dict, or None (uses defaults)
             project_root: Root directory of the project
-            chat_client: LLM client for summaries and LLM-based artifacts
+            chat_client: LLM client for enrichment (fast tier recommended)
             embedder: Embedder for semantic grouping (optional)
-            cache_path: Path to cache file
-            enricher_id: Unique identifier for cache invalidation
+            collection: Collection name for keyword vocabulary
         """
         if config is None:
             config = EnrichmentConfig()
@@ -204,8 +176,7 @@ class EnrichmentPipeline:
             project_root=project_root,
             chat_client=chat_client,
             embedder=embedder,
-            cache_path=cache_path,
-            enricher_id=enricher_id,
+            collection=collection,
         )
 
     @property
@@ -214,70 +185,19 @@ class EnrichmentPipeline:
         return self.config.enabled
 
     @property
-    def summaries_enabled(self) -> bool:
-        """Check if chunk summaries are enabled."""
-        return self.config.enabled and self.config.summary.enabled and self._summarizer is not None
+    def chunk_enrichment_enabled(self) -> bool:
+        """Check if chunk-level enrichment is available."""
+        return self._chunk_enricher is not None
+
+    @property
+    def hierarchy_enrichment_enabled(self) -> bool:
+        """Check if hierarchy enrichment is available."""
+        return self._hierarchy_enricher is not None
 
     @property
     def artifacts_enabled(self) -> bool:
         """Check if artifacts are enabled."""
         return self.config.enabled
-
-    @property
-    def entities_enabled(self) -> bool:
-        """Check if entity extraction is enabled."""
-        return (
-            self.config.enabled
-            and self.config.entities.enabled
-            and self._entity_extractor is not None
-        )
-
-    def summarize_chunk(
-        self,
-        content: str,
-        file_path: str,
-        content_hash: str,
-    ) -> str | None:
-        """
-        Generate a summary for a chunk.
-
-        Args:
-            content: The chunk content
-            file_path: Path to the source file
-            content_hash: Hash of the content (for caching)
-
-        Returns:
-            Summary string, or None if summaries are disabled
-        """
-        if not self.summaries_enabled:
-            return None
-
-        return self._summarizer.summarize(content, file_path, content_hash)
-
-    def summarize_chunks_batch(
-        self,
-        chunks: List[tuple[str, str, str]],
-        batch_size: int = 20,
-    ) -> List[str | None]:
-        """
-        Generate summaries for multiple chunks efficiently.
-
-        Uses batched LLM calls to reduce API overhead (e.g., 20 chunks per call
-        instead of 1 call per chunk).
-
-        Args:
-            chunks: List of (content, file_path, content_hash) tuples
-            batch_size: Max chunks per LLM call (default 20)
-
-        Returns:
-            List of summaries in same order as input, or None values if disabled
-        """
-        if not self.summaries_enabled:
-            return [None] * len(chunks)
-
-        chunk_infos = [ChunkInfo(content=c, file_path=f, content_hash=h) for c, f, h in chunks]
-
-        return self._summarizer.summarize_batch(chunk_infos, batch_size=batch_size)
 
     def analyze_project(self) -> ProjectAnalysis:
         """
@@ -381,11 +301,6 @@ class EnrichmentPipeline:
 
         return artifacts
 
-    def save_cache(self) -> None:
-        """Save the summary cache to disk."""
-        if self._summarizer:
-            self._summarizer.save_cache()
-
     def enrich(self, chunks: List["Chunk"]) -> EnrichmentResult:
         """
         Unified enrichment entry point.
@@ -395,14 +310,13 @@ class EnrichmentPipeline:
         - Output: EnrichmentResult with enriched chunks + artifacts
 
         The method:
-        1. Generates summaries for chunks (if enabled) and attaches them to metadata
-        2. Extracts entities from chunks (if enabled) and attaches them to metadata
-        3. Applies hierarchical enrichment (if enabled) - generates group and corpus summaries
-        4. Generates corpus-level artifacts (if enabled)
+        1. Runs chunk-level enrichment (summary, keywords, entities) via enrichment bus
+        2. Saves extracted keywords to vocabulary store
+        3. Applies hierarchical enrichment (L1 group + L2 corpus summaries)
+        4. Generates corpus-level artifacts
         5. Returns unified result
 
-        Design note: Takes chunks (not raw docs) so future recursive
-        enrichment can feed outputs back as inputs.
+        All enrichment is baked in - no configuration needed.
 
         Args:
             chunks: List of chunks to enrich
@@ -413,44 +327,105 @@ class EnrichmentPipeline:
         if not self.is_enabled:
             return EnrichmentResult(chunks=chunks, artifacts=[])
 
-        # Generate summaries and attach to chunk metadata
-        if self.summaries_enabled:
-            chunk_tuples = [(c.content, c.metadata.get("file_path", ""), c.id) for c in chunks]
-            summaries = self.summarize_chunks_batch(chunk_tuples)
+        # Step 1: Chunk-level enrichment (summary, keywords, entities)
+        if self._chunk_enricher:
+            logger.info(f"[ENRICHMENT] Running chunk enrichment on {len(chunks)} chunks")
+            enrich_result = self._chunk_enricher.enrich(chunks)
+            chunks = enrich_result.chunks
 
-            for chunk, summary in zip(chunks, summaries):
-                if summary:
-                    chunk.metadata["summary"] = summary
+            # Step 2: Save keywords to vocabulary store
+            if enrich_result.all_keywords and self._vocabulary_store:
+                self._save_keywords(enrich_result.all_keywords, len(chunks))
 
-            # Save cache after batch summarization
-            self.save_cache()
-
-        # Extract entities and attach to chunk metadata
-        if self.entities_enabled:
-            for chunk in chunks:
-                entities = self._entity_extractor.extract(
-                    content=chunk.content,
-                    file_path=chunk.metadata.get("file_path", ""),
-                    content_hash=chunk.id,
-                )
-                if entities:
-                    chunk.metadata["entities"] = [e.to_dict() for e in entities]
-
-            # Link co-occurring entities
-            linker = EntityLinker()
-            chunks = linker.link(chunks)
-
-            # Save entity cache
-            self._entity_extractor.save_cache()
-
-        # Apply hierarchical enrichment (generates group and corpus summaries)
+        # Step 3: Hierarchical enrichment (L1 group + L2 corpus summaries)
         if self._hierarchy_enricher:
+            logger.info(f"[ENRICHMENT] Running hierarchy enrichment")
             chunks = self._hierarchy_enricher.enrich(chunks)
 
-        # Generate artifacts
+        # Step 4: Generate artifacts
         artifacts = self.generate_artifacts() if self.artifacts_enabled else []
 
         return EnrichmentResult(chunks=chunks, artifacts=artifacts)
+
+    def _save_keywords(self, keywords: List[str], source_docs: int) -> None:
+        """
+        Convert extracted keyword strings to Keyword objects and save.
+
+        Args:
+            keywords: List of keyword strings extracted by ChunkEnricher
+            source_docs: Number of source documents (for metadata)
+        """
+        if not self._vocabulary_store:
+            return
+
+        # Convert strings to Keyword objects
+        # Group by detecting category from format
+        keyword_objects: List[Keyword] = []
+        seen: set[str] = set()
+
+        for kw in keywords:
+            kw_lower = kw.lower()
+            if kw_lower in seen:
+                continue
+            seen.add(kw_lower)
+
+            category = self._detect_keyword_category(kw)
+            keyword_objects.append(
+                Keyword(
+                    id=kw,
+                    category=category,
+                    match=[kw],  # LLM-extracted, no variations needed
+                    occurrences=1,
+                    user_defined=False,
+                    auto_generated=[kw],
+                )
+            )
+
+        if keyword_objects:
+            self._vocabulary_store.merge_and_save(keyword_objects, source_docs=source_docs)
+            logger.info(
+                f"[ENRICHMENT] Saved {len(keyword_objects)} keywords to vocabulary"
+            )
+
+    def _detect_keyword_category(self, keyword: str) -> str:
+        """Detect category from keyword format."""
+        import re
+
+        # Test case patterns
+        if re.match(r"^TC[_\-]?\d+$", keyword, re.IGNORECASE):
+            return "testcase"
+
+        # Ticket/issue patterns (PREFIX-NUMBER)
+        if re.match(r"^[A-Z]{2,5}-\d+$", keyword):
+            return "ticket"
+
+        # Version patterns
+        if re.match(r"^v?\d+\.\d+(\.\d+)?", keyword, re.IGNORECASE):
+            return "version"
+
+        # Function/method names (camelCase or snake_case)
+        if re.match(r"^[a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*$", keyword):
+            return "function"  # camelCase
+        if re.match(r"^[a-z][a-z0-9]*(_[a-z0-9]+)+$", keyword):
+            return "function"  # snake_case
+
+        # Class names (PascalCase)
+        if re.match(r"^[A-Z][a-zA-Z0-9]+$", keyword):
+            return "class"
+
+        # Constants (SCREAMING_SNAKE_CASE)
+        if re.match(r"^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$", keyword):
+            return "constant"
+
+        # API endpoints
+        if keyword.startswith("/"):
+            return "endpoint"
+
+        # Error codes
+        if re.match(r"^E\d{3,}$", keyword) or re.match(r"^ERR_", keyword):
+            return "error_code"
+
+        return "identifier"
 
 
 __all__ = [

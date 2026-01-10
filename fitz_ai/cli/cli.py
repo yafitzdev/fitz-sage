@@ -75,11 +75,8 @@ def ingest(
     artifacts: Optional[str] = typer.Option(
         None, "--artifacts", "-a", help="Artifacts to generate."
     ),
-    hierarchy: bool = typer.Option(
-        False, "--hierarchy", "-H", help="Enable hierarchical summaries."
-    ),
 ) -> None:
-    """Ingest documents into the knowledge base."""
+    """Ingest documents into the knowledge base. Hierarchical summaries are always generated."""
     from fitz_ai.cli.commands import ingest as mod
 
     mod.command(
@@ -89,7 +86,6 @@ def ingest(
         non_interactive=non_interactive,
         force=force,
         artifacts=artifacts,
-        hierarchy=hierarchy,
     )
 
 

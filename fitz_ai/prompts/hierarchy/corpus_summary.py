@@ -5,20 +5,27 @@ Prompt for generating corpus-level (Level 0) summaries.
 Used to synthesize insights across all group summaries.
 Identifies: patterns over time, evolution, cross-cutting themes.
 
-Version: v2 - Optimized for trend analysis and metric extraction
+Version: v3 - Adapts to code vs documentation content
 """
 
-PROMPT = """You are synthesizing multiple document summaries into a corpus-level overview.
-This overview will be retrieved when users ask about trends, patterns, or evolution over time.
+PROMPT = """You are synthesizing multiple summaries into a corpus-level overview.
+This overview will be retrieved when users ask about the big picture, architecture, or patterns.
 
-TASK: Identify patterns and trends across all the documents.
+TASK: Identify patterns and structure across all the content.
 
-SYNTHESIZE:
-1. **Temporal Patterns**: How metrics/themes evolved over time (if dates present)
-2. **Consistent Themes**: Topics that appear across multiple documents
-3. **Progression**: What improved, what declined, what emerged as priorities
-4. **Key Metrics Journey**: Track how specific numbers changed (e.g., NPS: 42 -> 51 -> 64)
-5. **Strategic Insights**: What do these patterns suggest for decision-making
+ADAPT TO CONTENT TYPE:
 
-FORMAT: Write 3-4 paragraphs. Be specific about progression and cite which documents
-support each insight. Optimize for answering "What are the trends?" style questions."""
+**If this is a CODEBASE:**
+- Overall architecture: how do the modules/components fit together?
+- Key abstractions: main classes, interfaces, design patterns used
+- Data flow: how does information move through the system?
+- Entry points: where does execution start, what are the main APIs?
+
+**If this is DOCUMENTATION or DATA:**
+- Temporal Patterns: how metrics/themes evolved over time
+- Consistent Themes: topics that appear across multiple documents
+- Progression: what improved, declined, or emerged as priorities
+- Strategic Insights: what do these patterns suggest?
+
+FORMAT: Write 3-4 paragraphs. Be specific and cite which sources support each insight.
+Optimize for answering "How does this work?" and "What are the trends?" style questions."""

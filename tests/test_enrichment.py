@@ -255,7 +255,7 @@ class TestEnrichmentPipeline:
         )
 
         assert pipeline.is_enabled
-        assert not pipeline.summaries_enabled  # No chat client
+        assert not pipeline.chunk_enrichment_enabled  # No chat client
         assert pipeline.artifacts_enabled
 
     def test_pipeline_from_dict(self, tmp_path):

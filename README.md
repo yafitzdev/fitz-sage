@@ -163,13 +163,13 @@ The codebase speaks for itself.
 
 Most RAG implementations are naive vector search—they fail silently on real-world queries. Fitz has **built-in intelligence** that handles edge cases automatically:
 
-| Query | Problem | Naive RAG | FitzRAG                     |
-|-------|---------|-----------|-----------------------------|
-| "What was our Q4 revenue?" | Answer not in docs | ❌ Hallucinated answer | ✅ "I don't know"            |
-| "What are the design principles?" | Global/analytical query | ❌ Random chunks | ✅ Hierarchical summaries    |
-| "Find TC_CAN_001" | Exact identifier | ❌ Returns TC_CAN_002 | ✅ Keyword matching          |
-| "Summarize failures and root causes" | Complex multi-part | ❌ Query dilution | ✅ Multi-query decomposition |
-| "How does auth module work?" | Code structure | ❌ Split functions | ✅ AST-aware chunking        |
+| Query | Why Naive RAG Fails | Result | FitzRAG Solution |
+|-------|---------------------|--------|------------------|
+| "What was our Q4 revenue?" | Info doesn't exist, but LLM won't admit it | ❌ Hallucinated number | ✅ "I don't know" |
+| "What are the design principles?" | Answer is spread across docs; no single chunk contains it | ❌ Random fragments | ✅ Hierarchical summaries |
+| "Find TC_CAN_001" | Embeddings see TC_1001 ≈ TC_1002 (semantically similar) | ❌ Wrong test case | ✅ Exact keyword matching |
+| *[User pastes 500-char test report]* "What failed and why?" | Long input → averaged embedding → matches nothing specifically | ❌ Vaguely related chunks | ✅ Multi-query decomposition |
+| "How does the auth module work?" *(code)* | Naive chunking splits functions mid-body | ❌ Broken code fragments | ✅ Complete functions |
 
 These features are **always on**—no configuration needed. Fitz automatically detects when to use each capability.
 
@@ -740,8 +740,8 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 │  Retrieval Pipelines (plugin choice controls features)        │
 │  dense (no rerank) | dense_rerank (with rerank)               │
 ├───────────────────────────────────────────────────────────────┤
-│  Enrichment (opt-in)                                          │
-│  entities | entity links | semantic clusters | hierarchical   │
+│  Enrichment (baked in via ChunkEnricher)                      │
+│  summaries | keywords | entities | hierarchical summaries     │
 ├───────────────────────────────────────────────────────────────┤
 │  Constraints (epistemic safety)                               │
 │  ConflictAware | InsufficientEvidence | CausalAttribution     │

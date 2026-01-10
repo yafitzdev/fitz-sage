@@ -667,7 +667,7 @@ def _run_ingestion(
     )
 
     # Create hierarchy enricher with simple mode defaults
-    hierarchy_config = HierarchyConfig(enabled=True, group_by="source")
+    hierarchy_config = HierarchyConfig(group_by="source")
     hierarchy_enricher = HierarchyEnricher(config=hierarchy_config, chat_client=chat_client)
 
     # Enrich chunks (adds L1 summaries as metadata, returns chunks + L2 corpus summary)

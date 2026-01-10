@@ -2,50 +2,29 @@
 """
 Configuration schema for the enrichment pipeline.
 
-Enrichment is an optional pipeline step that enhances chunks with:
-1. Summaries - LLM-generated descriptions for better search (universal)
-2. Artifacts - High-level project insights (type-specific plugins)
-3. Hierarchy - Multi-level summaries for analytical queries (zero-config)
+All retrieval intelligence is BAKED IN - no opt-in configuration needed.
+
+Enrichment automatically provides:
+1. Chunk-level: summary, keywords, entities (via unified enrichment bus)
+2. Hierarchy-level: L1 group summaries, L2 corpus summary
+3. Project-level: artifacts (auto-detected plugins)
+
+The enrichment bus batches chunks efficiently (~15 per LLM call), making
+the cost negligible even for large codebases.
 
 Config structure in .fitz/config.yaml:
     enrichment:
-      enabled: true
-      summary:
-        enabled: false  # Opt-in: 1 LLM call per chunk
+      enabled: true  # Master switch (default: true)
+      hierarchy:
+        group_by: source_file  # How to group chunks for L1 summaries
       artifacts:
         auto: true
-        disabled: []
-      hierarchy:
-        enabled: true  # Or use: fitz ingest --hierarchy
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
-
-
-@dataclass
-class SummaryConfig:
-    """
-    Configuration for chunk-level summaries.
-
-    Summaries are LLM-generated descriptions that improve search relevance.
-    They are universal - applied to all chunk types using type-specific
-    context builders for optimal results.
-
-    WARNING: Summaries make 1 LLM call per chunk. For a codebase with 1000
-    chunks, that's 1000 API calls. Enable explicitly only when needed.
-
-    Attributes:
-        enabled: Whether to generate summaries (default: False - opt-in)
-        provider: LLM provider to use (defaults to config's chat provider)
-        model: Model to use (defaults to config's chat model)
-    """
-
-    enabled: bool = False  # Opt-in: 1 LLM call per chunk is expensive
-    provider: str | None = None
-    model: str | None = None
 
 
 @dataclass
@@ -93,34 +72,6 @@ class HierarchyRule:
 
 
 @dataclass
-class EntityConfig:
-    """
-    Configuration for entity extraction.
-
-    Extracts domain concepts and named entities from chunks using LLM.
-    Extracted entities are stored in chunk.metadata["entities"].
-
-    WARNING: Makes 1 LLM call per chunk. Enable explicitly when needed.
-
-    Attributes:
-        enabled: Whether to extract entities (default: False - opt-in)
-        types: Entity types to extract (filters extraction results)
-    """
-
-    enabled: bool = False
-    types: list[str] = field(
-        default_factory=lambda: [
-            "class",
-            "function",
-            "api",
-            "person",
-            "organization",
-            "concept",
-        ]
-    )
-
-
-@dataclass
 class HierarchyConfig:
     """
     Configuration for hierarchical enrichment.
@@ -142,7 +93,6 @@ class HierarchyConfig:
         Configure custom rules for complex grouping scenarios.
 
     Attributes:
-        enabled: Whether hierarchy enrichment is active
         grouping_strategy: "metadata" (default) or "semantic" for embedding-based clustering
         group_by: Metadata key for grouping (used when strategy is "metadata")
         n_clusters: Number of clusters for semantic grouping (None = auto-detect)
@@ -152,7 +102,7 @@ class HierarchyConfig:
         rules: Advanced rules for power users (optional, overrides simple mode)
     """
 
-    enabled: bool = False
+    # No enabled field - hierarchy is always on
     grouping_strategy: str = "metadata"  # "metadata" or "semantic"
     group_by: str = "source_file"  # Default: each file is a group (metadata mode)
     n_clusters: int | None = None  # For semantic grouping (None = auto-detect)
@@ -167,30 +117,23 @@ class EnrichmentConfig:
     """
     Configuration for the enrichment pipeline.
 
-    The enrichment pipeline is an optional step in document ingestion
-    that enhances chunks and generates project-level insights.
+    All chunk-level enrichment (summary, keywords, entities) is BAKED IN
+    via the unified enrichment bus. No opt-in configuration needed.
 
     Attributes:
         enabled: Master switch for all enrichment
-        summary: Chunk-level summary configuration
-        entities: Entity extraction configuration
         artifacts: Project-level artifact configuration
         hierarchy: Hierarchical summarization configuration
 
     Example in .fitz/config.yaml:
         enrichment:
           enabled: true
-          summary:
-            enabled: true
-          entities:
-            enabled: true
-            types: [class, function, api]
           artifacts:
             auto: true
             disabled:
               - architecture_narrative
           hierarchy:
-            enabled: true
+            group_by: source_file
             rules:
               - name: video_comments
                 paths: ["comments/**"]
@@ -198,9 +141,7 @@ class EnrichmentConfig:
                 prompt: "Summarize sentiment and themes"
     """
 
-    enabled: bool = False
-    summary: SummaryConfig = field(default_factory=SummaryConfig)
-    entities: EntityConfig = field(default_factory=EntityConfig)
+    enabled: bool = True  # Master switch
     artifacts: ArtifactConfig = field(default_factory=ArtifactConfig)
     hierarchy: HierarchyConfig = field(default_factory=HierarchyConfig)
 
@@ -210,8 +151,6 @@ class EnrichmentConfig:
         if not data:
             return cls()
 
-        summary_data = data.get("summary", {})
-        entities_data = data.get("entities", {})
         artifacts_data = data.get("artifacts", {})
         hierarchy_data = data.get("hierarchy", {})
 
@@ -229,23 +168,13 @@ class EnrichmentConfig:
             )
 
         return cls(
-            enabled=data.get("enabled", False),
-            summary=SummaryConfig(
-                enabled=summary_data.get("enabled", False),  # Opt-in
-                provider=summary_data.get("provider"),
-                model=summary_data.get("model"),
-            ),
-            entities=EntityConfig(
-                enabled=entities_data.get("enabled", False),  # Opt-in
-                types=entities_data.get("types", EntityConfig().types),
-            ),
+            enabled=data.get("enabled", True),
             artifacts=ArtifactConfig(
                 auto=artifacts_data.get("auto", True),
                 enabled=artifacts_data.get("enabled", []),
                 disabled=artifacts_data.get("disabled", []),
             ),
             hierarchy=HierarchyConfig(
-                enabled=hierarchy_data.get("enabled", False),
                 grouping_strategy=hierarchy_data.get("grouping_strategy", "metadata"),
                 group_by=hierarchy_data.get("group_by", "source_file"),
                 n_clusters=hierarchy_data.get("n_clusters"),
@@ -260,22 +189,12 @@ class EnrichmentConfig:
         """Convert to dictionary for serialization."""
         return {
             "enabled": self.enabled,
-            "summary": {
-                "enabled": self.summary.enabled,
-                "provider": self.summary.provider,
-                "model": self.summary.model,
-            },
-            "entities": {
-                "enabled": self.entities.enabled,
-                "types": self.entities.types,
-            },
             "artifacts": {
                 "auto": self.artifacts.auto,
                 "enabled": self.artifacts.enabled,
                 "disabled": self.artifacts.disabled,
             },
             "hierarchy": {
-                "enabled": self.hierarchy.enabled,
                 "grouping_strategy": self.hierarchy.grouping_strategy,
                 "group_by": self.hierarchy.group_by,
                 "n_clusters": self.hierarchy.n_clusters,
@@ -298,8 +217,6 @@ class EnrichmentConfig:
 
 __all__ = [
     "EnrichmentConfig",
-    "EntityConfig",
-    "SummaryConfig",
     "ArtifactConfig",
     "HierarchyConfig",
     "HierarchyRule",

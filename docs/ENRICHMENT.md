@@ -1,12 +1,12 @@
 # Enrichment Pipeline
 
-Optional LLM-powered enhancements for ingested content.
+LLM-powered enhancements for ingested content. **Always on, nearly free.**
 
 ---
 
 ## Overview
 
-The enrichment pipeline adds AI-generated metadata to chunks during ingestion:
+The enrichment pipeline adds AI-generated metadata to chunks during ingestion. All enrichment is **baked in** - no configuration needed.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -16,152 +16,155 @@ The enrichment pipeline adds AI-generated metadata to chunks during ingestion:
                      │
                      ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Enrichment Pipeline (optional)                                 │
+│  Enrichment Pipeline (always on)                                │
 ├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │  Summaries  │  │  Entities   │  │  Hierarchy              │  │
-│  │             │  │ (GraphRAG)  │  │                         │  │
-│  │ Per-chunk   │  │             │  │ Level 0: Chunks         │  │
-│  │ descriptions│  │ Extract:    │  │ Level 1: Group summaries│  │
-│  │             │  │ - classes   │  │ Level 2: Corpus summary │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │              ChunkEnricher (Enrichment Bus)             │    │
+│  │         One LLM call per batch (~15 chunks)             │    │
+│  ├─────────────────────────────────────────────────────────┤    │
+│  │  ┌───────────┐  ┌───────────┐  ┌───────────────────┐    │    │
+│  │  │  Summary  │  │ Keywords  │  │     Entities      │    │    │
+│  │  │  Module   │  │  Module   │  │      Module       │    │    │
+│  │  │           │  │           │  │                   │    │    │
+│  │  │ Per-chunk │  │ Exact-    │  │ Named entities    │    │    │
+│  │  │ search    │  │ match IDs │  │ (class, person,   │    │    │
+│  │  │ summaries │  │ for vocab │  │  technology...)   │    │    │
+│  │  └───────────┘  └───────────┘  └───────────────────┘    │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                              │                                  │
+│  ┌───────────────────────────┴───────────────────────────┐      │
+│  │                   Hierarchy Enricher                   │      │
+│  │                                                        │      │
+│  │  Level 0: Chunks (with enrichments from above)         │      │
+│  │  Level 1: Group summaries (per source file)            │      │
+│  │  Level 2: Corpus summary (all documents)               │      │
+│  └────────────────────────────────────────────────────────┘      │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 **Key features:**
-- **Summaries** - Natural language descriptions for better search
-- **Entities** - Named entity extraction (GraphRAG only)
+- **Summaries** - Natural language descriptions for better semantic search
+- **Keywords** - Exact-match identifiers (TC-1001, JIRA-123, `AuthService`)
+- **Entities** - Named entity extraction (classes, people, technologies)
 - **Hierarchy** - Multi-level summaries for analytical queries
 
----
-
-## Configuration
-
-Add to your config YAML:
-
-```yaml
-# FitzRAG config (entities not available)
-enrichment:
-  enabled: true
-  summary:
-    enabled: false       # Per-chunk summaries (expensive!)
-  hierarchy:
-    enabled: true        # Multi-level summaries
-    grouping_strategy: metadata
-    group_by: source_file
-
-# GraphRAG config (entities available)
-enrichment:
-  enabled: true
-  entities:
-    enabled: true        # Entity extraction
-    types: [class, function, api, person, organization, concept]
-```
+All features run automatically when a chat client is available.
 
 ---
 
-## Summaries
+## Architecture: ChunkEnricher
 
-LLM-generated descriptions that improve search relevance.
+The `ChunkEnricher` is the unified enrichment bus that extracts multiple enrichments in a single LLM call per batch of chunks.
 
-### What it does
+### How it works
 
-For each chunk, generates a natural language summary:
-
-```
-Original chunk (code):
-  def calculate_refund(order_id, amount):
-      """Calculate refund based on return policy."""
-      if days_since_purchase(order_id) > 30:
-          return 0
-      return amount * 0.9  # 10% restocking fee
-
-Generated summary:
-  "Refund calculation function that applies a 10% restocking fee
-   for returns within 30 days, and denies refunds after 30 days."
-```
-
-### When to use
-
-- Dense technical content (code, specs)
-- Content where semantic search underperforms
-- When you need natural language hooks for retrieval
-
-### Cost warning
-
-**1 LLM call per chunk.** For a codebase with 1000 chunks:
-- ~1000 API calls during ingestion
-- Significant cost and time
-
-### Configuration
-
-```yaml
-enrichment:
-  summary:
-    enabled: true
-    provider: null    # Use default chat provider
-    model: null       # Use default model
-```
-
----
-
-## Entities
-
-> **Note:** Entity extraction is for GraphRAG, not FitzRAG. FitzRAG uses keyword vocabulary for exact term matching and will use iterative retrieval for multi-hop queries.
-
-Extracts named entities and domain concepts from chunks.
-
-### What it does
-
-Identifies and extracts:
-- **Code entities**: classes, functions, APIs
-- **Named entities**: people, organizations
-- **Domain concepts**: technical terms, product names
-
-```
-Chunk: "The UserService class handles authentication via OAuth2..."
-
-Extracted entities:
-  - UserService (class)
-  - OAuth2 (api)
-  - authentication (concept)
-```
-
-### When to use
-
-- Building knowledge graphs
-- Entity-based search ("find all mentions of UserService")
-- Understanding codebase structure
-
-### Configuration
-
-```yaml
-enrichment:
-  entities:
-    enabled: true
-    types:
-      - class
-      - function
-      - api
-      - person
-      - organization
-      - concept
-```
-
-### Accessing entities
-
-Entities are stored in chunk metadata:
+1. **Batching**: Chunks are processed in batches of ~15
+2. **Single LLM call**: One call extracts summary + keywords + entities for the entire batch
+3. **JSON response**: LLM returns structured JSON with all enrichments
+4. **Module parsing**: Each module parses its portion and applies to chunks
 
 ```python
-chunk.metadata["entities"]
-# [{"name": "UserService", "type": "class"}, ...]
+# One LLM call returns:
+[
+  {
+    "summary": "Authentication module handling OAuth2 flows...",
+    "keywords": ["AuthService", "OAuth2", "JWT_TOKEN"],
+    "entities": [{"name": "AuthService", "type": "class"}, ...]
+  },
+  # ... for each chunk in batch
+]
 ```
+
+### Extensibility
+
+Adding new enrichment types is simple - implement `EnrichmentModule`:
+
+```python
+class EnrichmentModule(ABC):
+    @property
+    @abstractmethod
+    def name(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def json_key(self) -> str: ...
+
+    @abstractmethod
+    def prompt_instruction(self) -> str: ...
+
+    @abstractmethod
+    def parse_result(self, data: Any) -> Any: ...
+
+    def apply_to_chunk(self, chunk: Chunk, result: Any) -> None:
+        pass  # Override to attach to chunks
+```
+
+New modules ride the same LLM call at zero additional cost.
+
+---
+
+## Built-in Modules
+
+### Summary Module
+
+Generates searchable descriptions for each chunk.
+
+**Input:**
+```python
+def calculate_refund(order_id, amount):
+    """Calculate refund based on return policy."""
+    if days_since_purchase(order_id) > 30:
+        return 0
+    return amount * 0.9  # 10% restocking fee
+```
+
+**Output:**
+```
+"Refund calculation function that applies a 10% restocking fee
+ for returns within 30 days, and denies refunds after 30 days."
+```
+
+**Stored in:** `chunk.metadata["summary"]`
+
+---
+
+### Keyword Module
+
+Extracts exact-match identifiers for vocabulary-based retrieval.
+
+**What it extracts:**
+- Test cases: `TC-1001`, `testcase_42`
+- Tickets: `JIRA-4521`, `BUG-789`
+- Versions: `v2.0.1`, `1.0.0-beta`
+- Code identifiers: `AuthService`, `handle_login()`
+- Constants: `MAX_RETRIES`, `API_KEY`
+- API endpoints: `/api/v2/users`
+
+**Stored in:** `VocabularyStore` for exact-match retrieval at query time.
+
+---
+
+### Entity Module
+
+Extracts named entities and domain concepts.
+
+**Entity types:**
+- `class` - Code classes
+- `function` - Functions/methods
+- `person` - People mentioned
+- `organization` - Companies, teams
+- `technology` - Tools, frameworks, protocols
+- `concept` - Domain concepts
+
+**Stored in:** `chunk.metadata["entities"]`
 
 ---
 
 ## Hierarchy
 
-Multi-level summaries for analytical queries.
+Multi-level summaries for analytical queries. **Always on by default.**
 
 ### The problem
 
@@ -195,15 +198,12 @@ Hierarchy creates summary layers:
     ┌────┴────┐          ┌────┴────┐          ┌────┴────┐
     │ Level 0 │          │ Level 0 │          │ Level 0 │
     │ Chunks  │          │ Chunks  │          │ Chunks  │
+    │ (with   │          │ (with   │          │ (with   │
+    │summary, │          │summary, │          │summary, │
+    │keywords,│          │keywords,│          │keywords,│
+    │entities)│          │entities)│          │entities)│
     └─────────┘          └─────────┘          └─────────┘
 ```
-
-### How it works
-
-1. **Grouping**: Chunks are grouped (by file, or semantically)
-2. **L1 Summaries**: Each group gets an LLM summary
-3. **L2 Summary**: All L1 summaries get a corpus summary
-4. **Storage**: L1/L2 summaries stored as searchable chunks
 
 ### Query behavior
 
@@ -217,10 +217,12 @@ No special query syntax needed - summaries match analytical queries via vector s
 
 ### Configuration
 
+Hierarchy configuration is the only enrichment setting available:
+
 ```yaml
 enrichment:
+  enabled: true  # Master switch (default: true)
   hierarchy:
-    enabled: true
     grouping_strategy: metadata   # or "semantic"
     group_by: source_file         # metadata key for grouping
     # n_clusters: 10              # for semantic grouping
@@ -228,39 +230,57 @@ enrichment:
     # corpus_prompt: "..."        # custom corpus summary prompt
 ```
 
-### Grouping strategies
-
-**Metadata grouping** (default):
-- Groups by metadata key (e.g., `source_file`)
-- Best for: documents, codebases with clear file structure
-
-**Semantic grouping**:
-- Clusters chunks by embedding similarity (K-means)
-- Best for: mixed content, no clear structure
-
-```yaml
-enrichment:
-  hierarchy:
-    grouping_strategy: semantic
-    n_clusters: null        # Auto-detect optimal count
-    max_clusters: 10        # Upper bound for auto-detect
-```
-
 ---
 
 ## CLI Usage
 
-### Enable hierarchy at ingest time
+Enrichment runs automatically on every ingestion. No flags needed:
 
 ```bash
-fitz ingest ./docs --hierarchy
+fitz ingest ./docs
 ```
 
 ### Force re-enrichment
 
+To regenerate enrichments for already-ingested files:
+
 ```bash
-fitz ingest ./docs --force --hierarchy
+fitz ingest ./docs --force
 ```
+
+---
+
+## Cost Analysis
+
+The ChunkEnricher's batching makes enrichment **nearly free**.
+
+### Per batch (~15 chunks)
+
+| Component | Tokens |
+|-----------|--------|
+| Prompt overhead | ~500 |
+| Chunk content (15 × ~400) | ~6,000 |
+| **Total input** | **~6,500** |
+| Response (15 × ~100) | ~1,500 |
+| **Total output** | **~1,500** |
+
+### Cost per model
+
+| Model | Per Batch | Per Chunk | 1000 Chunks |
+|-------|-----------|-----------|-------------|
+| Claude 3.5 Haiku | $0.011 | $0.0007 | **$0.74** |
+| GPT-4o-mini | $0.002 | $0.0001 | **$0.13** |
+
+**For under $1, you get summary + keywords + entities for your entire codebase.**
+
+Adding new enrichment modules costs nothing extra - they ride the same LLM call.
+
+### Comparison with old architecture
+
+| Architecture | LLM Calls (1000 chunks) | Cost |
+|--------------|-------------------------|------|
+| Old: 1 call per chunk | 1,000 | $1-5 |
+| **New: Batched ChunkEnricher** | **67** | **$0.13-0.74** |
 
 ---
 
@@ -271,7 +291,6 @@ Power users can define custom hierarchy rules:
 ```yaml
 enrichment:
   hierarchy:
-    enabled: true
     rules:
       - name: video_comments
         paths: ["comments/**/*.txt"]
@@ -287,36 +306,15 @@ enrichment:
 
 ---
 
-## Cost Considerations
-
-| Feature | LLM Calls | When | Engine |
-|---------|-----------|------|--------|
-| Summaries | 1 per chunk | At ingest | All |
-| Entities | 1 per chunk | At ingest | GraphRAG |
-| Hierarchy L1 | 1 per group | At ingest | All |
-| Hierarchy L2 | 1 total | At ingest | All |
-
-**Example costs (1000 chunks, 10 groups):**
-
-| Feature | Calls | Approx. Cost |
-|---------|-------|--------------|
-| Summaries only | 1000 | $1-5 |
-| Entities only (GraphRAG) | 1000 | $1-5 |
-| Hierarchy only | 11 | $0.05-0.10 |
-
-Hierarchy is the most cost-effective enrichment.
-
----
-
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `fitz_ai/ingestion/enrichment/config.py` | Configuration schema |
+| `fitz_ai/ingestion/enrichment/chunk/enricher.py` | ChunkEnricher bus and modules |
 | `fitz_ai/ingestion/enrichment/pipeline.py` | Main orchestrator |
-| `fitz_ai/ingestion/enrichment/summary/summarizer.py` | Chunk summaries |
-| `fitz_ai/ingestion/enrichment/entities/extractor.py` | Entity extraction |
+| `fitz_ai/ingestion/enrichment/config.py` | Configuration schema |
 | `fitz_ai/ingestion/enrichment/hierarchy/enricher.py` | Hierarchy generation |
+| `fitz_ai/ingestion/vocabulary/store.py` | Keyword vocabulary storage |
 
 ---
 

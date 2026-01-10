@@ -112,13 +112,10 @@ chunking:
     .md:
       plugin_name: markdown
 
-# Enrichment (optional enhancements)
+# Enrichment (always on when chat client available)
 enrichment:
-  enabled: false
-  summary:
-    enabled: false             # LLM summary per chunk (expensive!)
+  enabled: true                  # Master switch
   hierarchy:
-    enabled: false             # Multi-level summaries
     grouping_strategy: metadata  # metadata, semantic
     group_by: source_file
 
@@ -275,27 +272,23 @@ Document chunking configuration.
 
 ### enrichment
 
-Optional chunk enrichment pipeline.
+Chunk enrichment pipeline. **All chunk-level enrichment (summary, keywords, entities) is baked in** when a chat client is available. Only hierarchy settings are configurable.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `enabled` | bool | `false` | Master switch |
+| `enabled` | bool | `true` | Master switch for all enrichment |
 
-#### enrichment.summary
+**What's always on (when chat client available):**
+- Per-chunk summaries
+- Keyword extraction (saved to VocabularyStore)
+- Entity extraction
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `enabled` | bool | `false` | Generate per-chunk summaries |
-| `provider` | string | null | Override chat provider |
-| `model` | string | null | Override model |
-
-**Warning:** Makes 1 LLM call per chunk. Enable only when needed.
+These run via the `ChunkEnricher` bus which batches ~15 chunks per LLM call, making enrichment nearly free.
 
 #### enrichment.hierarchy
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `enabled` | bool | `false` | Generate multi-level summaries |
 | `grouping_strategy` | string | `metadata` | `metadata` or `semantic` |
 | `group_by` | string | `source_file` | Metadata key for grouping |
 | `n_clusters` | int | null | For semantic grouping |

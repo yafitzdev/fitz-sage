@@ -328,18 +328,13 @@ def command(
         "-a",
         help="Artifacts to generate: 'all', 'none', or comma-separated list (e.g. 'navigation_index,interface_catalog'). Interactive selection if not provided.",
     ),
-    hierarchy: bool = typer.Option(
-        False,
-        "--hierarchy",
-        "-H",
-        help="Enable hierarchical summaries (group + corpus level). Zero-config, uses smart defaults.",
-    ),
 ) -> None:
     """
     Ingest documents into the vector database.
 
     Uses the default engine (set via 'fitz engine'). Override with --engine.
     Incremental by default - only processes new/changed files.
+    Hierarchical summaries (L1/L2) are generated automatically.
 
     Examples:
         fitz ingest ./src            # Uses default engine
@@ -348,7 +343,6 @@ def command(
         fitz ingest ./src -a navigation_index,interface_catalog  # Specific artifacts
         fitz ingest ./src -f         # Force re-ingest
         fitz ingest ./src -a all -y  # Non-interactive with all artifacts
-        fitz ingest ./docs --hierarchy  # Enable hierarchical summaries (zero-config)
         fitz ingest ./docs -e graphrag  # Use GraphRAG engine
         fitz ingest ./docs -e clara     # Use CLaRa engine
     """
@@ -430,8 +424,7 @@ def command(
             enabled_features.append("docs corpus")
             if artifacts is None:
                 artifacts = "none"
-            if not hierarchy and has_chat_llm:
-                hierarchy = True
+            if has_chat_llm:
                 enabled_features.append("hierarchical summaries")
 
     else:
@@ -515,7 +508,7 @@ def command(
         has_chat_llm = bool(config.get("chat", {}).get("plugin_name"))
 
         if content_type == "codebase":
-            # CODEBASE: Auto-enable codebase analysis, skip hierarchy
+            # CODEBASE: Enable codebase analysis artifacts
             enabled_features.append("codebase")
 
             if artifacts is None:
@@ -531,20 +524,20 @@ def command(
                         )
                     enabled_features.append("codebase analysis")
 
-            # Don't auto-enable hierarchy for codebases (prompts are document-focused)
-            # User can still enable with --hierarchy if desired
+            # Hierarchy runs automatically (prompts adapt to code vs docs)
+            if has_chat_llm:
+                enabled_features.append("hierarchical summaries")
 
         else:
-            # DOCUMENTS: Auto-enable hierarchy, skip codebase analysis
+            # DOCUMENTS: Skip codebase artifacts
             enabled_features.append("docs corpus")
 
             # Skip codebase analysis for non-code
             if artifacts is None:
                 artifacts = "none"
 
-            # Auto-enable hierarchy for documents (if LLM available)
-            if not hierarchy and has_chat_llm:
-                hierarchy = True
+            # Hierarchy runs automatically
+            if has_chat_llm:
                 enabled_features.append("hierarchical summaries")
 
     # Print consolidated collection info
@@ -610,13 +603,8 @@ def command(
             # Explicitly disabled via 'none'
             enrichment_cfg["enabled"] = False
 
-        # Handle --hierarchy flag (zero-config hierarchical summaries)
-        if hierarchy:
-            enrichment_cfg["enabled"] = True
-            if "hierarchy" not in enrichment_cfg:
-                enrichment_cfg["hierarchy"] = {}
-            enrichment_cfg["hierarchy"]["enabled"] = True
-            # Uses smart defaults: group_by="source", default prompts
+        # Enrichment is always enabled (hierarchy is always on)
+        enrichment_cfg["enabled"] = True
 
         if enrichment_cfg.get("enabled", False):
             from pathlib import Path
@@ -628,21 +616,18 @@ def command(
 
             enrichment_config = EnrichmentConfig.from_dict(enrichment_cfg)
 
-            # Check if any selected artifact requires LLM or if hierarchy is enabled
+            # Check if any selected artifact requires LLM
+            # Hierarchy always requires LLM for summarization
             chat_client = None
-            needs_llm = False
+            needs_llm = True  # Hierarchy is always on, always needs LLM
 
-            # Check artifacts that require LLM
+            # Also check artifacts that require LLM
             if selected_artifacts:
                 registry = get_artifact_registry()
-                needs_llm = any(
+                needs_llm = needs_llm or any(
                     registry.get_plugin(name) and registry.get_plugin(name).requires_llm
                     for name in selected_artifacts
                 )
-
-            # Hierarchy always requires LLM for summarization
-            if hierarchy:
-                needs_llm = True
 
             if needs_llm:
                 # Get chat client from config - use "fast" tier for enrichment tasks

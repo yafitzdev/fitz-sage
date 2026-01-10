@@ -276,27 +276,17 @@ class TestEntityExtractor:
         assert py_prompt != md_prompt
 
 
-class TestEnrichmentPipelineWithEntities:
-    """Tests for entity extraction integration in EnrichmentPipeline."""
+class TestEnrichmentPipelineChunkEnrichment:
+    """Tests for chunk enrichment integration in EnrichmentPipeline.
 
-    def test_entities_disabled_by_default(self, tmp_path):
+    Note: Entity extraction is now baked into the ChunkEnricher bus along with
+    summary and keyword extraction. All enrichments run automatically when
+    a chat_client is provided.
+    """
+
+    def test_chunk_enrichment_enabled_with_chat_client(self, tmp_path):
+        """Chunk enrichment is enabled when chat_client is provided."""
         config = EnrichmentConfig(enabled=True)
-        pipeline = EnrichmentPipeline(
-            config=config,
-            project_root=tmp_path,
-            chat_client=MagicMock(),
-        )
-
-        assert not pipeline.entities_enabled
-
-    def test_entities_enabled_with_config(self, tmp_path):
-        config = EnrichmentConfig.from_dict(
-            {
-                "enabled": True,
-                "entities": {"enabled": True},
-            }
-        )
-
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "[]"
 
@@ -306,37 +296,32 @@ class TestEnrichmentPipelineWithEntities:
             chat_client=mock_chat,
         )
 
-        assert pipeline.entities_enabled
+        assert pipeline.chunk_enrichment_enabled
 
-    def test_entities_require_chat_client(self, tmp_path):
-        config = EnrichmentConfig.from_dict(
-            {
-                "enabled": True,
-                "entities": {"enabled": True},
-            }
-        )
-
-        # No chat client provided
+    def test_chunk_enrichment_disabled_without_chat_client(self, tmp_path):
+        """Chunk enrichment is disabled when no chat_client is provided."""
+        config = EnrichmentConfig(enabled=True)
         pipeline = EnrichmentPipeline(
             config=config,
             project_root=tmp_path,
             chat_client=None,
         )
 
-        assert not pipeline.entities_enabled
+        assert not pipeline.chunk_enrichment_enabled
 
     def test_enrich_extracts_entities(self, tmp_path):
-        config = EnrichmentConfig.from_dict(
-            {
-                "enabled": True,
-                "entities": {"enabled": True},
-            }
-        )
+        """ChunkEnricher extracts entities as part of batch enrichment."""
+        config = EnrichmentConfig(enabled=True)
 
         mock_chat = MagicMock()
+        # ChunkEnricher expects batch response with summary, keywords, entities
         mock_chat.chat.return_value = json.dumps(
             [
-                {"name": "TestClass", "type": "class", "description": "A test class"},
+                {
+                    "summary": "A test class for unit testing.",
+                    "keywords": ["TestClass"],
+                    "entities": [{"name": "TestClass", "type": "class"}],
+                },
             ]
         )
 
@@ -353,36 +338,41 @@ class TestEnrichmentPipelineWithEntities:
                 doc_id="doc1",
                 chunk_index=0,
                 content="class TestClass:\n    pass",
-                metadata={"file_path": "/path/to/file.py"},
+                metadata={"source_file": "/path/to/file.py"},
             ),
         ]
 
         result = pipeline.enrich(chunks)
 
-        assert len(result.chunks) == 1
-        chunk = result.chunks[0]
-        assert "entities" in chunk.metadata
-        entities = chunk.metadata["entities"]
+        # Find the original chunk (hierarchy enrichment may add L2 summary chunks)
+        original_chunk = next(c for c in result.chunks if c.id == "chunk1")
+
+        # Verify entities extracted
+        assert "entities" in original_chunk.metadata
+        entities = original_chunk.metadata["entities"]
         assert len(entities) == 1
         assert entities[0]["name"] == "TestClass"
         assert entities[0]["type"] == "class"
 
-    def test_enrich_with_type_filter(self, tmp_path):
-        config = EnrichmentConfig.from_dict(
-            {
-                "enabled": True,
-                "entities": {
-                    "enabled": True,
-                    "types": ["class", "function"],  # Only extract these
-                },
-            }
-        )
+        # Verify summary also extracted (baked in)
+        assert "summary" in original_chunk.metadata
+        assert "test class" in original_chunk.metadata["summary"].lower()
+
+    def test_enrich_extracts_all_enrichments(self, tmp_path):
+        """ChunkEnricher extracts summary, keywords, and entities together."""
+        config = EnrichmentConfig(enabled=True)
 
         mock_chat = MagicMock()
         mock_chat.chat.return_value = json.dumps(
             [
-                {"name": "MyClass", "type": "class", "description": "A class"},
-                {"name": "John", "type": "person", "description": "A person"},
+                {
+                    "summary": "User authentication module.",
+                    "keywords": ["UserAuth", "authenticate", "AUTH_TOKEN"],
+                    "entities": [
+                        {"name": "UserAuth", "type": "class"},
+                        {"name": "authenticate", "type": "function"},
+                    ],
+                },
             ]
         )
 
@@ -397,15 +387,17 @@ class TestEnrichmentPipelineWithEntities:
                 id="chunk1",
                 doc_id="doc1",
                 chunk_index=0,
-                content="class MyClass: ...",
-                metadata={"file_path": "/path/to/file.py"},
+                content="class UserAuth:\n    def authenticate(self): pass",
+                metadata={"source_file": "/path/to/auth.py"},
             ),
         ]
 
         result = pipeline.enrich(chunks)
 
-        chunk = result.chunks[0]
-        entities = chunk.metadata["entities"]
-        # Should only have class, not person
-        assert len(entities) == 1
-        assert entities[0]["type"] == "class"
+        # Find the original chunk (hierarchy enrichment may add L2 summary chunks)
+        original_chunk = next(c for c in result.chunks if c.id == "chunk1")
+
+        # All enrichments should be present
+        assert "summary" in original_chunk.metadata
+        assert "entities" in original_chunk.metadata
+        assert len(original_chunk.metadata["entities"]) == 2

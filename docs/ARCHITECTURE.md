@@ -154,14 +154,14 @@ Verify with: `python -m tools.contract_map --fail-on-errors`
                                        ▼
                                 ┌─────────────┐    ┌─────────────┐
                                 │  Enrich     │───▶│   Store     │
-                                │ (optional)  │    │             │
+                                │ (always on) │    │             │
                                 └─────────────┘    └─────────────┘
                                        │                  │
                                        ▼                  ▼
                                 ┌─────────────┐    ┌─────────────┐
-                                │ Summaries   │    │ FAISS/      │
-                                │ Entities    │    │ Pinecone/   │
-                                │ Hierarchy   │    │ Qdrant      │
+                                │ChunkEnricher│    │ FAISS/      │
+                                │ + Hierarchy │    │ Pinecone/   │
+                                │             │    │ Qdrant      │
                                 └─────────────┘    └─────────────┘
 ```
 
@@ -248,7 +248,7 @@ Features are controlled by plugin selection, not boolean flags:
 |---------|------------|-------------|
 | Reranking | `retrieval.plugin_name: dense_rerank` | `retrieval.plugin_name: dense` |
 | Vision/VLM | `parser.plugin_name: docling_vision` | `parser.plugin_name: docling` |
-| Enrichment | `enrichment.hierarchy.enabled: true` | `enrichment.hierarchy.enabled: false` |
+| Enrichment | Chat client available (automatic) | `enrichment.enabled: false` |
 
 ---
 

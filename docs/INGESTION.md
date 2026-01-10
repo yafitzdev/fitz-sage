@@ -220,65 +220,61 @@ VectorDB.upsert(collection, points)
 
 ---
 
-## Enrichment Pipeline (Optional)
+## Enrichment Pipeline (Always On)
 
-The enrichment pipeline adds LLM-generated enhancements.
+The enrichment pipeline adds LLM-generated enhancements. **All chunk-level enrichment is baked in** - no configuration needed.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Enrichment Pipeline (optional, runs after chunking)            │
+│  Enrichment Pipeline (always on, runs after chunking)           │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │  Summaries  │  │  Entities   │  │  Hierarchy              │  │
-│  │             │  │             │  │                         │  │
-│  │ Per-chunk   │  │ Extract:    │  │ Level 0: Chunks         │  │
-│  │ LLM summary │  │ - classes   │  │ Level 1: Group summaries│  │
-│  │             │  │ - functions │  │ Level 2: Corpus summary │  │
-│  │             │  │ - concepts  │  │                         │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │           ChunkEnricher (Enrichment Bus)                │    │
+│  │        One LLM call per batch (~15 chunks)              │    │
+│  ├─────────────────────────────────────────────────────────┤    │
+│  │  Summary     │  Keywords      │  Entities               │    │
+│  │  Module      │  Module        │  Module                 │    │
+│  │  (per-chunk  │  (exact-match  │  (classes, people,      │    │
+│  │   summaries) │   identifiers) │   technologies)         │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                              │                                  │
+│  ┌───────────────────────────┴───────────────────────────┐      │
+│  │                Hierarchy Enricher                      │      │
+│  │  Level 0: Chunks (with enrichments from above)         │      │
+│  │  Level 1: Group summaries (per source file)            │      │
+│  │  Level 2: Corpus summary (all documents)               │      │
+│  └────────────────────────────────────────────────────────┘      │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Summaries
+### ChunkEnricher (Baked In)
 
-LLM-generated descriptions for better search.
+The `ChunkEnricher` bus extracts **summary + keywords + entities** in a single LLM call per batch of ~15 chunks. This makes enrichment nearly free (~$0.13-0.74 for 1000 chunks).
 
-```yaml
-enrichment:
-  summary:
-    enabled: true  # Warning: 1 LLM call per chunk!
-```
+**What it extracts:**
+- **Summaries** - Natural language descriptions for each chunk
+- **Keywords** - Exact-match identifiers (TC-1001, JIRA-123, `AuthService`)
+- **Entities** - Named entities (classes, people, technologies)
 
-**Use case:** When chunk content is dense code or technical text, summaries provide natural language hooks for retrieval.
-
-### Entities
-
-Extracts named entities and concepts.
-
-```yaml
-enrichment:
-  entities:
-    enabled: true
-    types: [class, function, api, person, organization]
-```
-
-**Result:** Entities stored in `chunk.metadata["entities"]`
+**Results:**
+- Summaries stored in `chunk.metadata["summary"]`
+- Keywords saved to `VocabularyStore` for exact-match retrieval
+- Entities stored in `chunk.metadata["entities"]`
 
 ### Hierarchy
 
-Multi-level summaries for analytical queries.
+Multi-level summaries for analytical queries. **Always on by default.**
 
 ```yaml
 enrichment:
   hierarchy:
-    enabled: true
     group_by: source_file  # Or use semantic clustering
 ```
 
 **Levels:**
-- **Level 0:** Original chunks (unchanged)
+- **Level 0:** Original chunks (with summary, keywords, entities)
 - **Level 1:** Group summaries (e.g., per-file)
 - **Level 2:** Corpus summary (all groups)
 

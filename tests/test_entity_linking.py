@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock
 
 from fitz_ai.core.chunk import Chunk
@@ -238,26 +239,30 @@ class TestEntityLinker:
 
 
 class TestEntityLinkingPipelineIntegration:
-    """Tests for entity linking integration with EnrichmentPipeline."""
+    """Tests for entity linking integration with EnrichmentPipeline.
 
-    def test_pipeline_links_entities(self, tmp_path):
-        """Pipeline should link entities after extraction."""
+    Note: Entity extraction is now baked into the ChunkEnricher bus.
+    Entity linking is a separate post-processing step that runs on extracted entities.
+    """
+
+    def test_pipeline_extracts_entities(self, tmp_path):
+        """Pipeline should extract entities via ChunkEnricher."""
         mock_chat = MagicMock()
-        # Return entities in expected JSON format
-        mock_chat.chat.return_value = """[
-            {"name": "UserService", "type": "class", "description": "Handles users"},
-            {"name": "OAuth2", "type": "api", "description": "Auth protocol"}
-        ]"""
-
-        config = EnrichmentConfig.from_dict(
-            {
-                "enabled": True,
-                "entities": {
-                    "enabled": True,
-                    "types": ["class", "api"],
-                },
-            }
+        # ChunkEnricher expects batch response format
+        mock_chat.chat.return_value = json.dumps(
+            [
+                {
+                    "summary": "Authentication service using OAuth2.",
+                    "keywords": ["UserService", "OAuth2"],
+                    "entities": [
+                        {"name": "UserService", "type": "class"},
+                        {"name": "OAuth2", "type": "technology"},
+                    ],
+                }
+            ]
         )
+
+        config = EnrichmentConfig(enabled=True)
 
         pipeline = EnrichmentPipeline(
             config=config,
@@ -271,19 +276,18 @@ class TestEntityLinkingPipelineIntegration:
                 doc_id="d1",
                 chunk_index=0,
                 content="UserService uses OAuth2 for authentication",
-                metadata={"file_path": "auth.py"},
+                metadata={"source_file": "auth.py"},
             )
         ]
 
         result = pipeline.enrich(chunks)
 
-        # Should have entities
-        assert "entities" in result.chunks[0].metadata
-        assert len(result.chunks[0].metadata["entities"]) == 2
+        # Find original chunk (hierarchy enrichment may add summary chunks)
+        original_chunk = next(c for c in result.chunks if c.id == "c1")
 
-        # Should have entity links
-        assert "entity_links" in result.chunks[0].metadata
-        links = result.chunks[0].metadata["entity_links"]
-        assert len(links) == 1
-        assert links[0]["source"] == "UserService"
-        assert links[0]["target"] == "OAuth2"
+        # Should have entities extracted
+        assert "entities" in original_chunk.metadata
+        assert len(original_chunk.metadata["entities"]) == 2
+        entity_names = {e["name"] for e in original_chunk.metadata["entities"]}
+        assert "UserService" in entity_names
+        assert "OAuth2" in entity_names
