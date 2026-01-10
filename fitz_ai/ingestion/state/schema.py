@@ -12,7 +12,7 @@ When any config ID changes, the file will be re-ingested on next run.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, Optional
 
@@ -47,7 +47,7 @@ class FileEntry(BaseModel):
     mtime_epoch: float = Field(..., description="Modification time as Unix epoch")
     status: FileStatus = Field(default=FileStatus.ACTIVE, description="File status")
     ingested_at: datetime = Field(
-        default_factory=datetime.utcnow, description="When file was last ingested"
+        default_factory=lambda: datetime.now(timezone.utc), description="When file was last ingested"
     )
 
     # Config IDs - stored to detect config changes
@@ -87,7 +87,7 @@ class RootEntry(BaseModel):
         default_factory=dict, description="Files keyed by absolute path"
     )
     last_scan_at: datetime = Field(
-        default_factory=datetime.utcnow, description="When root was last scanned"
+        default_factory=lambda: datetime.now(timezone.utc), description="When root was last scanned"
     )
 
 
@@ -128,7 +128,7 @@ class IngestState(BaseModel):
 
     schema_version: int = Field(default=1, description="Schema version for migrations")
     project_id: str = Field(..., description="UUID for this project")
-    updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update time")
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Last update time")
     roots: Dict[str, RootEntry] = Field(
         default_factory=dict, description="Tracked roots keyed by abs path"
     )

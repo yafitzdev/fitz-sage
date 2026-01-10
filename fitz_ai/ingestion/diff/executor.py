@@ -18,7 +18,7 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, runtime_checkable
 
@@ -73,7 +73,7 @@ class IngestSummary:
     artifacts_generated: int = 0  # Number of artifacts generated
     hierarchy_summaries: int = 0  # Number of hierarchy summary chunks generated
     error_details: List[str] = field(default_factory=list)
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: Optional[datetime] = None
 
     @property
@@ -434,7 +434,7 @@ class DiffIngestExecutor:
         if self._enrichment_pipeline:
             self._enrichment_pipeline.save_cache()
 
-        summary.finished_at = datetime.utcnow()
+        summary.finished_at = datetime.now(timezone.utc)
         self._summary = None
 
         logger.info(f"Ingestion complete: {summary}")
@@ -548,7 +548,7 @@ class DiffIngestExecutor:
                 "chunker_id": candidate.chunker_id,
                 "embedding_id": candidate.embedding_id,
                 "is_deleted": False,
-                "ingested_at": datetime.utcnow().isoformat(),
+                "ingested_at": datetime.now(timezone.utc).isoformat(),
                 "metadata": dict(chunk.metadata or {}),
             }
 
@@ -659,7 +659,7 @@ class DiffIngestExecutor:
                 payload = artifact.to_payload()
                 payload["collection"] = self._collection
                 payload["embedding_id"] = self._embedding_id
-                payload["ingested_at"] = datetime.utcnow().isoformat()
+                payload["ingested_at"] = datetime.now(timezone.utc).isoformat()
 
                 points.append(
                     {

@@ -103,10 +103,10 @@ class TestIngestSummary:
 
     def test_duration(self):
         """Test duration calculation."""
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         summary = IngestSummary()
-        summary.started_at = datetime.utcnow()
+        summary.started_at = datetime.now(timezone.utc)
         summary.finished_at = summary.started_at + timedelta(seconds=5)
 
         assert summary.duration_seconds == pytest.approx(5.0, abs=0.1)

@@ -134,7 +134,8 @@ def _open_in_editor(config_path: Path) -> None:
                 if result.returncode == 0:
                     editor = candidate
                     break
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Editor {candidate} not found: {e}")
                 continue
 
     if not editor:

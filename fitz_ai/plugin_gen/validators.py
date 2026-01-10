@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import logging
 import sys
 import tempfile
 from pathlib import Path
@@ -19,6 +20,8 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 import yaml
 
 from fitz_ai.plugin_gen.types import PluginType, ValidationLevel, ValidationResult
+
+logger = logging.getLogger(__name__)
 
 
 class PluginValidator:
@@ -389,8 +392,8 @@ class PluginValidator:
             # Cleanup temp file
             try:
                 temp_path.unlink()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to cleanup temp plugin file: {e}")
             # Remove from sys.modules
             sys.modules.pop("temp_plugin", None)
 

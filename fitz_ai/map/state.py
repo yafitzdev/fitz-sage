@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -126,7 +126,7 @@ class KnowledgeMapStateManager:
             return
 
         # Update timestamp
-        self._state.updated_at = datetime.utcnow()
+        self._state.updated_at = datetime.now(timezone.utc)
 
         # Ensure parent directory exists
         self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -154,7 +154,7 @@ class KnowledgeMapStateManager:
         return KnowledgeMapState(
             collection=collection,
             embedding_id=embedding_id,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
         )
 
     def get_cached_chunk_ids(self) -> set[str]:

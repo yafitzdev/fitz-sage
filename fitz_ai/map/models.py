@@ -10,7 +10,7 @@ Embeddings are stored as float16 for ~50% space reduction with minimal accuracy 
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -117,7 +117,7 @@ class KnowledgeMapState(BaseModel):
     schema_version: int = Field(default=1)
     collection: str = Field(..., description="Vector DB collection name")
     embedding_id: str = Field(..., description="Embedding config ID for cache invalidation")
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Cached data (persisted)
     chunks: Dict[str, ChunkEmbedding] = Field(

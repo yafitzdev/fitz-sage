@@ -13,11 +13,14 @@ Philosophy:
     - Engines declare their capabilities for CLI/API adaptation
 """
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Type
 
 from fitz_ai.core import ConfigurationError, KnowledgeEngine
 from fitz_ai.core.instrumentation import maybe_wrap
+
+logger = logging.getLogger(__name__)
 
 # Methods to track for engine plugins
 _ENGINE_METHODS_TO_TRACK = {"answer"}
@@ -437,8 +440,8 @@ def get_default_engine() -> str:
             config = load_config_dict(config_path)
             if "default_engine" in config:
                 return config["default_engine"]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to load default engine from user config: {e}")
 
     # Fall back to package default (single source of truth)
     try:
@@ -447,8 +450,8 @@ def get_default_engine() -> str:
         default_config = load_default_config()
         if "default_engine" in default_config:
             return default_config["default_engine"]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to load default engine from package config: {e}")
 
     # Last resort fallback (should never reach here if default.yaml is valid)
     return "fitz_rag"

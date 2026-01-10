@@ -220,8 +220,8 @@ def _check_qdrant_http(host: str, port: int, timeout: float = 1.0) -> Optional[d
         )
         if response.status_code == 200:
             return response.json()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Qdrant check failed at {host}:{port}: {e}")
     return None
 
 
@@ -244,8 +244,8 @@ def _get_config_qdrant_host() -> Optional[str]:
                 host = vector_db.get("host")
                 if host:
                     return host
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to get Qdrant host from config: {e}")
     return None
 
 
@@ -353,7 +353,8 @@ def _scan_hosts_concurrent(
                     for f in future_to_host:
                         f.cancel()
                     return (host, result)
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Host check failed for {host}: {e}")
                 continue
 
     return None

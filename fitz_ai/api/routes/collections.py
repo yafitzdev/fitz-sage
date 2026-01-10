@@ -3,12 +3,15 @@
 
 from __future__ import annotations
 
+import logging
 from typing import List
 
 from fastapi import APIRouter, HTTPException
 
 from fitz_ai.api.dependencies import get_vector_db
 from fitz_ai.api.models.schemas import CollectionInfo, CollectionStats
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/collections", tags=["collections"])
 
@@ -38,8 +41,8 @@ async def list_collections() -> List[CollectionInfo]:
                 try:
                     stats = vdb.get_collection_stats(name)
                     chunk_count = stats.get("count", stats.get("chunk_count", 0))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Failed to get stats for collection {name}: {e}")
             result.append(CollectionInfo(name=name, chunk_count=chunk_count))
 
         return result
@@ -120,5 +123,5 @@ def _delete_vocabulary(collection: str) -> None:
     if vocab_path.exists():
         try:
             vocab_path.unlink()
-        except Exception:
-            pass  # Non-fatal in API context
+        except Exception as e:
+            logger.debug(f"Failed to delete vocabulary for {collection}: {e}")

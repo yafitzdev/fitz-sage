@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -118,7 +118,7 @@ class IngestStateManager:
             return
 
         # Update timestamp
-        self._state.updated_at = datetime.utcnow()
+        self._state.updated_at = datetime.now(timezone.utc)
 
         # Ensure parent directory exists
         self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -145,7 +145,7 @@ class IngestStateManager:
         """Create a new empty state."""
         return IngestState(
             project_id=str(uuid.uuid4()),
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
         )
 
     def _ensure_root(self, root: str) -> RootEntry:
@@ -197,7 +197,7 @@ class IngestStateManager:
             mtime_epoch=mtime_epoch,
             content_hash=content_hash,
             status=FileStatus.ACTIVE,
-            ingested_at=datetime.utcnow(),
+            ingested_at=datetime.now(timezone.utc),
             chunker_id=chunker_id,
             parser_id=parser_id,
             embedding_id=embedding_id,
@@ -205,7 +205,7 @@ class IngestStateManager:
             enricher_id=enricher_id,
             collection=collection,
         )
-        root_entry.last_scan_at = datetime.utcnow()
+        root_entry.last_scan_at = datetime.now(timezone.utc)
         self._dirty = True
 
     def mark_deleted(self, root: str, file_path: str) -> None:

@@ -28,9 +28,12 @@ Usage (enterprise side):
 
 from __future__ import annotations
 
+import logging
 import threading
 from functools import wraps
 from typing import Any, Callable, Protocol, runtime_checkable
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Hook Protocol
@@ -315,8 +318,8 @@ class InstrumentedProxy:
                         if cached is not _NO_CACHE:
                             # Cache hit - return without calling actual method
                             return cached
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Hook get_cached_result failed: {e}")
 
             # Notify all hooks: start
             contexts: list[tuple[BenchmarkHook, Any]] = []
@@ -330,9 +333,9 @@ class InstrumentedProxy:
                         kwargs=kwargs,
                     )
                     contexts.append((hook, ctx))
-                except Exception:
+                except Exception as e:
                     # Don't let hook errors break the actual call
-                    pass
+                    logger.debug(f"Hook on_call_start failed: {e}")
 
             # Execute the actual method
             error: Exception | None = None
@@ -352,8 +355,8 @@ class InstrumentedProxy:
                                 kwargs=kwargs,
                                 result=result,
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Hook cache_result failed: {e}")
 
                 return result
             except Exception as e:
@@ -364,9 +367,9 @@ class InstrumentedProxy:
                 for hook, ctx in contexts:
                     try:
                         hook.on_call_end(ctx, result, error)
-                    except Exception:
+                    except Exception as e:
                         # Don't let hook errors break execution
-                        pass
+                        logger.debug(f"Hook on_call_end failed: {e}")
 
         return wrapper
 
