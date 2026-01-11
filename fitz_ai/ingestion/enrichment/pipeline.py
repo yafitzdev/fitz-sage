@@ -31,7 +31,6 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Protocol, runtime_checkable
 
-from fitz_ai.core.paths import FitzPaths
 from fitz_ai.ingestion.enrichment.artifacts.analyzer import ProjectAnalyzer
 from fitz_ai.ingestion.enrichment.artifacts.base import Artifact, ProjectAnalysis
 from fitz_ai.ingestion.enrichment.artifacts.registry import (
@@ -145,7 +144,9 @@ class EnrichmentPipeline:
         """Initialize the vocabulary store for keywords."""
         if self._collection:
             self._vocabulary_store = VocabularyStore(collection=self._collection)
-            logger.info(f"[ENRICHMENT] Vocabulary store initialized for collection '{self._collection}'")
+            logger.info(
+                f"[ENRICHMENT] Vocabulary store initialized for collection '{self._collection}'"
+            )
 
     @classmethod
     def from_config(
@@ -339,7 +340,7 @@ class EnrichmentPipeline:
 
         # Step 3: Hierarchical enrichment (L1 group + L2 corpus summaries)
         if self._hierarchy_enricher:
-            logger.info(f"[ENRICHMENT] Running hierarchy enrichment")
+            logger.info("[ENRICHMENT] Running hierarchy enrichment")
             chunks = self._hierarchy_enricher.enrich(chunks)
 
         # Step 4: Generate artifacts
@@ -383,9 +384,7 @@ class EnrichmentPipeline:
 
         if keyword_objects:
             self._vocabulary_store.merge_and_save(keyword_objects, source_docs=source_docs)
-            logger.info(
-                f"[ENRICHMENT] Saved {len(keyword_objects)} keywords to vocabulary"
-            )
+            logger.info(f"[ENRICHMENT] Saved {len(keyword_objects)} keywords to vocabulary")
 
     def _detect_keyword_category(self, keyword: str) -> str:
         """Detect category from keyword format."""

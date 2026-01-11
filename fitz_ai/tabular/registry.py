@@ -9,7 +9,6 @@ fetched directly at query time without scrolling or searching.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from fitz_ai.core.paths import FitzPaths
 

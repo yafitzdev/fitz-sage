@@ -87,7 +87,9 @@ def parse_csv(file_path: Path) -> ParsedTableFile:
     path_str = str(file_path.resolve())
     table_id = hashlib.md5(path_str.encode()).hexdigest()[:12]
 
-    logger.debug(f"Parsed table {file_path.name}: {len(columns)} columns, {len(normalized_rows)} rows")
+    logger.debug(
+        f"Parsed table {file_path.name}: {len(columns)} columns, {len(normalized_rows)} rows"
+    )
 
     return ParsedTableFile(
         table_id=table_id,

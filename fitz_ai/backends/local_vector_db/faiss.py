@@ -415,10 +415,12 @@ class FaissLocalVectorDB:
                 result_payload = dict(payload) if with_payload else {}
                 result_payload.pop("_collection", None)
 
-                results.append({
-                    "id": point_id,
-                    "payload": result_payload,
-                })
+                results.append(
+                    {
+                        "id": point_id,
+                        "payload": result_payload,
+                    }
+                )
 
         return results
 

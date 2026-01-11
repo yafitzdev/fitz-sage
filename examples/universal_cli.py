@@ -86,7 +86,7 @@ def query_command(
 
 @app.command("engines")
 def list_engines_command(
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show descriptions")
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show descriptions"),
 ) -> None:
     """
     List available engines.

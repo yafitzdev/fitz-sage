@@ -171,7 +171,10 @@ class DiffIngestExecutor:
     @property
     def _enricher_id(self) -> Optional[str]:
         """Get the enricher ID if enrichment is enabled."""
-        if self._enrichment_pipeline is None or not self._enrichment_pipeline.hierarchy_enrichment_enabled:
+        if (
+            self._enrichment_pipeline is None
+            or not self._enrichment_pipeline.hierarchy_enrichment_enabled
+        ):
             return None
         return getattr(self._enrichment_pipeline, "_enricher_id", None)
 
@@ -276,9 +279,7 @@ class DiffIngestExecutor:
             enrich_result = self._enrichment_pipeline._chunk_enricher.enrich(all_chunks)
             enrich_time = time.perf_counter() - t0
             # Count chunks that got summaries
-            summary.enriched = sum(
-                1 for c in enrich_result.chunks if c.metadata.get("summary")
-            )
+            summary.enriched = sum(1 for c in enrich_result.chunks if c.metadata.get("summary"))
             logger.info(f"Enriched {len(all_chunks)} chunks in {enrich_time:.2f}s")
 
         # Build texts to embed (use summary if available, otherwise content)

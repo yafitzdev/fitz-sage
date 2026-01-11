@@ -71,9 +71,7 @@ class TableExtractor:
                 non_table_elements.append(element)
 
         if schema_chunks:
-            logger.info(
-                f"Extracted {len(schema_chunks)} tables from {document.source}"
-            )
+            logger.info(f"Extracted {len(schema_chunks)} tables from {document.source}")
 
         # Create modified document without table elements
         modified_doc = ParsedDocument(
@@ -84,9 +82,7 @@ class TableExtractor:
 
         return modified_doc, schema_chunks
 
-    def _parse_markdown_table(
-        self, element: DocumentElement, source: str
-    ) -> ParsedTable | None:
+    def _parse_markdown_table(self, element: DocumentElement, source: str) -> ParsedTable | None:
         """
         Parse markdown table to structured form.
 

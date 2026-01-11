@@ -47,7 +47,8 @@ class FileEntry(BaseModel):
     mtime_epoch: float = Field(..., description="Modification time as Unix epoch")
     status: FileStatus = Field(default=FileStatus.ACTIVE, description="File status")
     ingested_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), description="When file was last ingested"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When file was last ingested",
     )
 
     # Config IDs - stored to detect config changes
@@ -128,7 +129,9 @@ class IngestState(BaseModel):
 
     schema_version: int = Field(default=1, description="Schema version for migrations")
     project_id: str = Field(..., description="UUID for this project")
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Last update time")
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), description="Last update time"
+    )
     roots: Dict[str, RootEntry] = Field(
         default_factory=dict, description="Tracked roots keyed by abs path"
     )

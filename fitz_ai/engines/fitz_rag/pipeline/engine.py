@@ -277,9 +277,7 @@ class RAGPipeline:
             vector_db_plugin=cfg.vector_db.plugin_name,
             vector_plugin_instance=vector_client,
         )
-        logger.info(
-            f"{PIPELINE} Using table store for plugin='{cfg.vector_db.plugin_name}'"
-        )
+        logger.info(f"{PIPELINE} Using table store for plugin='{cfg.vector_db.plugin_name}'")
 
         # Retrieval (YAML-based plugin)
         retrieval = get_retrieval_plugin(

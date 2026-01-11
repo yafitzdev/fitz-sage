@@ -94,7 +94,7 @@ def create_schema_chunk(table: ParsedTable) -> Chunk:
     """
     # Human-readable content for embedding/retrieval
     content = f"""Table from {table.source_doc}
-Columns: {', '.join(table.headers)}
+Columns: {", ".join(table.headers)}
 Row count: {table.row_count} rows
 Sample data:
   {_format_sample_rows(table, max_rows=3)}"""
@@ -168,7 +168,7 @@ def create_schema_chunk_for_stored_table(
 
     # Human-readable content for embedding/retrieval
     content = f"""Table from {source_file}
-Columns: {', '.join(columns)}
+Columns: {", ".join(columns)}
 Row count: {row_count} rows
 Sample data:
   {sample_str}"""

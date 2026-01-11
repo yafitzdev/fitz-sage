@@ -1,7 +1,6 @@
 # tests/tabular/test_query.py
 """Tests for TableQueryStep - table queries at retrieval time."""
 
-import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -61,7 +60,7 @@ class TestTableQueryStep:
         # Mock LLM responses
         mock_chat.chat.side_effect = [
             '["Country", "Population"]',  # Column selection
-            'SELECT Country, Population FROM data WHERE Population > 100000000',  # SQL
+            "SELECT Country, Population FROM data WHERE Population > 100000000",  # SQL
         ]
 
         result = step.execute("Countries with population over 100 million", [sample_table_chunk])
@@ -84,7 +83,7 @@ class TestTableQueryStep:
         # Mock for table chunk processing
         mock_chat.chat.side_effect = [
             '["Country"]',
-            'SELECT Country FROM data',
+            "SELECT Country FROM data",
         ]
 
         result = step.execute("query", [regular_chunk, sample_table_chunk])
@@ -98,7 +97,7 @@ class TestTableQueryStep:
         """Test fallback when column selection returns invalid JSON."""
         mock_chat.chat.side_effect = [
             "invalid json response",  # Bad column selection
-            'SELECT * FROM data',  # SQL with all columns
+            "SELECT * FROM data",  # SQL with all columns
         ]
 
         result = step.execute("query", [sample_table_chunk])
@@ -112,7 +111,7 @@ class TestTableQueryStep:
         """Test handling of SQL execution errors."""
         mock_chat.chat.side_effect = [
             '["Country"]',
-            'SELECT NonExistentColumn FROM data',  # Invalid SQL
+            "SELECT NonExistentColumn FROM data",  # Invalid SQL
         ]
 
         result = step.execute("query", [sample_table_chunk])
@@ -158,9 +157,9 @@ class TestColumnSelection:
     def test_handles_markdown_code_block(self, step):
         """Test parsing JSON in markdown code block."""
         step_instance, mock_chat = step
-        mock_chat.chat.return_value = '''```json
+        mock_chat.chat.return_value = """```json
 ["Country", "Population"]
-```'''
+```"""
 
         columns = step_instance._select_columns("query", ["Country", "Population", "GDP"])
 
@@ -202,11 +201,11 @@ class TestSQLGeneration:
     def test_extracts_sql_from_code_block(self, step):
         """Test extracting SQL from markdown code block."""
         step_instance, mock_chat = step
-        mock_chat.chat.return_value = '''Here's the query:
+        mock_chat.chat.return_value = """Here's the query:
 ```sql
 SELECT Country, Population FROM data WHERE Population > 1000000
 ```
-This will return countries with large populations.'''
+This will return countries with large populations."""
 
         sql = step_instance._generate_sql(
             "large countries",
@@ -286,7 +285,7 @@ class TestEndToEnd:
         mock_chat = MagicMock()
         mock_chat.chat.side_effect = [
             '["Country", "Capital"]',  # Column selection
-            'SELECT Country, Capital FROM data',  # SQL
+            "SELECT Country, Capital FROM data",  # SQL
         ]
 
         step = TableQueryStep(chat=mock_chat)

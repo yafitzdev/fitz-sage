@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import base64
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fitz_ai.logging.logger import get_logger
 

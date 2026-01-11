@@ -191,7 +191,7 @@ class EntityModule(EnrichmentModule):
     def prompt_instruction(self) -> str:
         return (
             '"entities": Array of named entities as objects with "name" and "type" fields. '
-            'Types: person, organization, product, technology, concept. '
+            "Types: person, organization, product, technology, concept. "
             'Example: [{"name": "John Smith", "type": "person"}, '
             '{"name": "PostgreSQL", "type": "technology"}]. '
             "Return empty array if none found."
@@ -300,8 +300,7 @@ class ChunkEnricher:
             total_batches = (len(chunks) + self.batch_size - 1) // self.batch_size
 
             logger.info(
-                f"[ENRICH] Batch {batch_num}/{total_batches}: "
-                f"enriching {len(batch)} chunks"
+                f"[ENRICH] Batch {batch_num}/{total_batches}: enriching {len(batch)} chunks"
             )
 
             # Run enrichment for this batch
@@ -322,8 +321,7 @@ class ChunkEnricher:
         unique_keywords = list(dict.fromkeys(all_keywords))
 
         logger.info(
-            f"[ENRICH] Completed: {len(chunks)} chunks, "
-            f"{len(unique_keywords)} unique keywords"
+            f"[ENRICH] Completed: {len(chunks)} chunks, {len(unique_keywords)} unique keywords"
         )
 
         return EnrichmentBatchResult(chunks=chunks, all_keywords=unique_keywords)
@@ -339,16 +337,12 @@ class ChunkEnricher:
         except Exception as e:
             logger.error(f"[ENRICH] LLM call failed: {e}")
             # Return empty results on failure
-            return [
-                ChunkEnrichmentResult(chunk_index=i) for i in range(len(batch))
-            ]
+            return [ChunkEnrichmentResult(chunk_index=i) for i in range(len(batch))]
 
     def _build_prompt(self, batch: list["Chunk"]) -> str:
         """Build the combined prompt for a batch."""
         # Build module instructions
-        module_instructions = ",\n  ".join(
-            module.prompt_instruction() for module in self.modules
-        )
+        module_instructions = ",\n  ".join(module.prompt_instruction() for module in self.modules)
 
         prompt_parts = [
             "Analyze each numbered chunk and extract structured information.\n\n"
@@ -379,15 +373,12 @@ class ChunkEnricher:
             prompt_parts.append(f"\n--- CHUNK [{i}] from {file_name} ---\n{content}\n")
 
         prompt_parts.append(
-            "\n--- END OF CHUNKS ---\n\n"
-            "Now return the JSON array with analysis for each chunk:"
+            "\n--- END OF CHUNKS ---\n\nNow return the JSON array with analysis for each chunk:"
         )
 
         return "".join(prompt_parts)
 
-    def _parse_response(
-        self, response: str, expected_count: int
-    ) -> list[ChunkEnrichmentResult]:
+    def _parse_response(self, response: str, expected_count: int) -> list[ChunkEnrichmentResult]:
         """Parse the LLM response into enrichment results."""
         results: list[ChunkEnrichmentResult] = []
 

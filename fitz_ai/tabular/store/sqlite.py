@@ -46,7 +46,8 @@ class SqliteTableStore:
 
     def _ensure_schema(self) -> None:
         """Create tables schema if not exists."""
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS tables (
                 table_id TEXT PRIMARY KEY,
                 hash TEXT NOT NULL,
@@ -55,7 +56,8 @@ class SqliteTableStore:
                 row_count INTEGER NOT NULL,
                 source_file TEXT
             )
-        """)
+        """
+        )
         self.conn.commit()
 
     def store(

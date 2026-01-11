@@ -105,9 +105,7 @@ class GenericTableStore:
         # Also cache locally for fast access
         self.cache.store(table_id, content_hash, columns, rows, source_file)
 
-        logger.debug(
-            f"Stored table {table_id} ({len(rows)} rows, {len(compressed)} bytes)"
-        )
+        logger.debug(f"Stored table {table_id} ({len(rows)} rows, {len(compressed)} bytes)")
         return content_hash
 
     def retrieve(self, table_id: str) -> StoredTable | None:

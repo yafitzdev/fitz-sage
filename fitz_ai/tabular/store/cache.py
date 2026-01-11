@@ -42,7 +42,8 @@ class TableCache:
 
     def _ensure_schema(self) -> None:
         """Create cache schema if not exists."""
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS cache (
                 table_id TEXT PRIMARY KEY,
                 hash TEXT NOT NULL,
@@ -51,7 +52,8 @@ class TableCache:
                 row_count INTEGER NOT NULL,
                 source_file TEXT
             )
-        """)
+        """
+        )
         self.conn.commit()
 
     def store(

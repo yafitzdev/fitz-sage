@@ -9,9 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.1] - 2026-01-11
+
 ### 🎉 Highlights
 
 **ChunkEnricher - Unified Enrichment Bus** - All chunk-level enrichment (summary, keywords, entities) is now baked in and runs automatically via a unified enrichment bus. The `ChunkEnricher` batches ~15 chunks per LLM call, making enrichment nearly free (~$0.13-0.74 for 1000 chunks).
+
+**Exact Keyword Matching** - Keywords extracted during ingestion (test case IDs, ticket numbers, code identifiers) are now used for exact-match filtering at query time. Queries mentioning "TC-1001" will only return chunks containing that exact identifier.
+
+**Multi-Query RAG** - Long or complex queries are automatically expanded into multiple focused search queries. 
+
+**Comparison queries** - ("X vs Y") are detected and expanded to ensure both entities are retrieved.
+
+**Table Registry** - CSV/table files are now reliably retrieved via a table registry that stores chunk IDs at ingestion time. No more missed tables due to low semantic similarity.
 
 ### 🚀 Added
 
@@ -24,11 +36,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Batched processing (~15 chunks per LLM call) for cost efficiency
 - Keywords automatically saved to `VocabularyStore` for exact-match retrieval
 
+#### Keyword Matching (`fitz_ai/engines/fitz_rag/retrieval/`)
+- `KeywordMatcher` - Matches query terms against ingested vocabulary
+- `VocabularyStore` - Persists auto-detected keywords per collection
+- Keyword filtering in `VectorSearchStep` - filters results to chunks containing matched keywords
+
+#### Multi-Query Expansion (`fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py`)
+- Automatic query expansion for queries > 300 characters
+- Comparison query detection (vs, compare, difference between)
+- Comparison-aware expansion ensures both compared entities are retrieved
+- Deduplication across expanded queries
+
+#### Table Registry (`fitz_ai/tabular/registry.py`)
+- `add_table_id()` / `get_table_ids()` - Store and retrieve table chunk IDs per collection
+- Table IDs registered at ingestion time for reliable retrieval
+- `retrieve()` method added to `VectorClient` protocol
+- Table registry cleaned up on collection delete
+
 ### 🔄 Changed
 
 - **Enrichment is now baked in**: Summary, keyword, and entity extraction run automatically when chat client is available
 - **Removed opt-in config flags**: `enrichment.summary.enabled` and `enrichment.entities.enabled` removed
 - **EnrichmentPipeline**: Now uses `ChunkEnricher` instead of separate summarizer and entity extractor
+- **VectorClient protocol**: Added `retrieve(collection, ids)` method for direct ID-based lookup
+- **Ingest UX**: Type a name to create new collection (no more "[0] + Create new" step)
+- **Ingest UX**: Removed verbose "(docs corpus, hierarchical summaries)" and "VLM enabled" text
 - **Documentation updated**: ENRICHMENT.md, INGESTION.md, CONFIG.md, ARCHITECTURE.md, README.md
 
 ### 🗑️ Removed
@@ -37,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EntityConfig` - No longer needed (entities always on)
 - `summaries_enabled` property on EnrichmentPipeline (replaced by `chunk_enrichment_enabled`)
 - `entities_enabled` property on EnrichmentPipeline (replaced by `chunk_enrichment_enabled`)
+- Dead code: `enabled_features` list in ingest command (was built but never displayed)
 
 ---
 
@@ -844,7 +877,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.5...v0.5.0
 [0.4.5]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.3...v0.4.4

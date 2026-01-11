@@ -18,6 +18,7 @@ from fitz_ai.tabular.store import SqliteTableStore
 from fitz_ai.vector_db.writer import VectorDBWriter
 
 if TYPE_CHECKING:
+    from fitz_ai.core.chunk import Chunk
     from fitz_ai.ingestion.enrichment.pipeline import EnrichmentPipeline
     from fitz_ai.tabular.store.base import TableStore
 
@@ -169,7 +170,6 @@ class IngestionPipeline:
         Returns:
             Schema chunk for the table, or None on failure.
         """
-        from fitz_ai.core.chunk import Chunk
 
         try:
             # Parse CSV file

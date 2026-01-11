@@ -3,7 +3,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.5.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.1-green.svg)](CHANGELOG.md)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
 
 ---
@@ -310,21 +310,24 @@ These features are **always on**—no configuration needed. Fitz automatically d
 
 >**The problem ☔️**
 >
->Tables in documents get chunked arbitrarily—rows split across chunks, headers separated from data. Ask "What's the timeout for CAN?" and RAG returns fragments that don't answer the question.
+>Tables in documents get chunked arbitrarily—rows split across chunks, headers separated from data. Semantic search fails on entity-specific queries like "How much does Alice earn?" because the embedding doesn't capture row-level data.
 >
 >**The solution ☀️**
 >
->Fitz extracts tables during ingestion and stores them as structured data:
+>Fitz stores tables in SQLite and registers them for guaranteed retrieval:
 >```
->Q: "What's the timeout for CAN?"
->→ Schema chunk retrieved (table detected)
->→ LLM selects relevant columns: [Module, Timeout]
->→ In-memory SQLite built with pruned data
->→ SQL generated: SELECT Module, Timeout FROM data WHERE Module = 'CAN'
->→ Result: "CAN timeout is 100ms"
+>Q: "How much does Alice earn?"
+>→ Table chunk retrieved via registry (guaranteed, not semantic similarity)
+>→ LLM generates SQL: SELECT salary FROM employees WHERE name = 'Alice'
+>→ SQL executed on stored table data
+>→ Result: "Alice earns $85,000"
 >```
 >
->**Column pruning** makes this fast—a 20-column table becomes 2 columns before SQL execution (~10x speedup).
+>**How it works:**
+>- CSV files and embedded tables stored in SQLite TableStore
+>- Schema chunks (columns + sample rows) indexed for search
+>- Table registry ensures tables are always retrieved, even when semantic similarity is low
+>- LLM generates SQL, executed on full table data
 >
 >**Always on.** Tables are automatically detected and routed. No configuration needed.
 

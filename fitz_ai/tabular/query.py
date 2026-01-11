@@ -180,9 +180,7 @@ Return ONLY the SQL query, no explanation."""
         # Check if this is a stored table (CSV file in TableStore)
         if chunk.metadata.get("is_stored_table"):
             if self.table_store is None:
-                logger.warning(
-                    f"Table {table_id} requires TableStore but none provided"
-                )
+                logger.warning(f"Table {table_id} requires TableStore but none provided")
                 return None
 
             stored = self.table_store.retrieve(table_id)
@@ -242,9 +240,7 @@ Return ONLY the SQL query, no explanation."""
             logger.debug(f"Selected columns: {needed_cols}")
 
             # 3. Prune to needed columns only
-            col_indices = [
-                table.headers.index(c) for c in needed_cols if c in table.headers
-            ]
+            col_indices = [table.headers.index(c) for c in needed_cols if c in table.headers]
             if not col_indices:
                 # Fallback: use all columns
                 col_indices = list(range(len(table.headers)))
@@ -253,9 +249,7 @@ Return ONLY the SQL query, no explanation."""
             pruned_headers = [table.headers[i] for i in col_indices]
             pruned_rows = [[row[i] for i in col_indices] for row in table.rows]
 
-            logger.debug(
-                f"Pruned from {table.column_count} to {len(pruned_headers)} columns"
-            )
+            logger.debug(f"Pruned from {table.column_count} to {len(pruned_headers)} columns")
 
             # 4. Build in-memory SQLite with pruned data
             conn = sqlite3.connect(":memory:")
@@ -481,16 +475,14 @@ Return ONLY the SQL query, no explanation."""
         results_md = self._format_as_markdown(col_names, results)
 
         content = f"""Multi-table query result
-Source tables: {', '.join(table_names)}
+Source tables: {", ".join(table_names)}
 
 SQL executed: {sql}
 Results ({len(results)} rows):
 {results_md}"""
 
         # Combine table IDs for unique chunk ID
-        combined_id = "_".join(
-            c.metadata.get("table_id", "unknown")[:4] for c in source_chunks
-        )
+        combined_id = "_".join(c.metadata.get("table_id", "unknown")[:4] for c in source_chunks)
 
         return Chunk(
             id=f"multi_table_{combined_id}",
@@ -514,9 +506,7 @@ Results ({len(results)} rows):
         response = self.chat.chat([{"role": "user", "content": prompt}])
         return self._parse_json_list(response, fallback=columns)
 
-    def _generate_sql(
-        self, query: str, columns: list[str], sample_rows: list[list[str]]
-    ) -> str:
+    def _generate_sql(self, query: str, columns: list[str], sample_rows: list[list[str]]) -> str:
         """Use LLM to generate SQL query."""
         # Format samples as dict for prompt
         samples: dict[str, list[str]] = {}
@@ -545,9 +535,7 @@ Results ({len(results)} rows):
         conn.executemany(f"INSERT INTO data VALUES ({placeholders})", rows)
         conn.commit()
 
-    def _augment_chunk(
-        self, chunk: Chunk, sql: str, cols: list[str], rows: list[tuple]
-    ) -> Chunk:
+    def _augment_chunk(self, chunk: Chunk, sql: str, cols: list[str], rows: list[tuple]) -> Chunk:
         """Create augmented chunk with query results."""
         results_md = self._format_as_markdown(cols, rows)
 
@@ -556,7 +544,7 @@ Results ({len(results)} rows):
         columns = chunk.metadata.get("columns", [])
 
         content = f"""Table: {chunk.doc_id}
-Columns: {', '.join(columns) if columns else 'see below'}
+Columns: {", ".join(columns) if columns else "see below"}
 Total rows: {row_count}
 
 --- SQL Query Results (from FULL dataset, not just sample) ---

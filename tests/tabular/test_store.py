@@ -1,9 +1,6 @@
 # tests/tabular/test_store.py
 """Tests for table storage backends."""
 
-import tempfile
-from pathlib import Path
-
 import pytest
 
 from fitz_ai.core.paths import FitzPaths

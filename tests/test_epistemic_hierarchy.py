@@ -343,6 +343,7 @@ class TestHierarchyEnricherEpistemic:
         assert "epistemic_evidence_density" in corpus.metadata
         assert "epistemic_agreement_ratio" in corpus.metadata
 
+
 class TestSingleSourceOfTruth:
     """Tests verifying that epistemic detection uses the existing constraint plugins."""
 

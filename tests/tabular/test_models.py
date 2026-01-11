@@ -3,7 +3,6 @@
 
 import json
 
-import pytest
 
 from fitz_ai.tabular.models import ParsedTable, create_schema_chunk
 
@@ -46,10 +45,12 @@ class TestParsedTable:
 
     def test_from_json_deserialization(self):
         """Test JSON deserialization."""
-        json_str = json.dumps({
-            "headers": ["X", "Y", "Z"],
-            "rows": [["a", "b", "c"], ["d", "e", "f"]],
-        })
+        json_str = json.dumps(
+            {
+                "headers": ["X", "Y", "Z"],
+                "rows": [["a", "b", "c"], ["d", "e", "f"]],
+            }
+        )
 
         table = ParsedTable.from_json(json_str, "restored123", "restored.pdf")
 
@@ -152,7 +153,11 @@ class TestCreateSchemaChunk:
             table_id="long123",
             source_doc="long.pdf",
             headers=["Content"],
-            rows=[["This is a very long cell value that should be truncated to prevent overly long content"]],
+            rows=[
+                [
+                    "This is a very long cell value that should be truncated to prevent overly long content"
+                ]
+            ],
         )
 
         chunk = create_schema_chunk(table)

@@ -593,10 +593,12 @@ class GenericVectorDBPlugin:
             if result_payload and "_original_id" in result_payload:
                 result_id = result_payload["_original_id"]
 
-            retrieved.append({
-                "id": str(result_id),
-                "payload": result_payload if result_payload else {},
-            })
+            retrieved.append(
+                {
+                    "id": str(result_id),
+                    "payload": result_payload if result_payload else {},
+                }
+            )
 
         return retrieved
 

@@ -56,11 +56,11 @@ class VectorSearchStep(RetrievalStep):
 
     # Comparison patterns - triggers comparison-aware query expansion
     COMPARISON_PATTERNS: ClassVar[tuple[str, ...]] = (
-        r"\bvs\.?\b",                    # "vs" or "vs."
-        r"\bversus\b",                   # "versus"
-        r"\bcompare[ds]?\b",             # "compare", "compared", "compares"
-        r"\bcomparing\b",                # "comparing"
-        r"\bdifference\s+between\b",     # "difference between"
+        r"\bvs\.?\b",  # "vs" or "vs."
+        r"\bversus\b",  # "versus"
+        r"\bcompare[ds]?\b",  # "compare", "compared", "compares"
+        r"\bcomparing\b",  # "comparing"
+        r"\bdifference\s+between\b",  # "difference between"
         r"\bhow\s+does\s+.+\s+compare\b",  # "how does X compare"
         r"\bwhich\s+(?:is|has|one)\s+(?:better|faster|slower|higher|lower)\b",
     )
@@ -91,9 +91,7 @@ class VectorSearchStep(RetrievalStep):
             return self._comparison_search(query, chunks)
 
         # Existing logic for long queries
-        use_multi_query = (
-            self.chat is not None and len(query) >= self.min_query_length
-        )
+        use_multi_query = self.chat is not None and len(query) >= self.min_query_length
 
         if use_multi_query:
             return self._multi_search(query, chunks)
@@ -103,8 +101,7 @@ class VectorSearchStep(RetrievalStep):
     def _single_search(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
         """Standard single-query vector search with keyword filtering."""
         logger.debug(
-            f"{RETRIEVER} VectorSearchStep: single search, k={self.k}, "
-            f"collection={self.collection}"
+            f"{RETRIEVER} VectorSearchStep: single search, k={self.k}, collection={self.collection}"
         )
 
         query_vector = self._embed(query)
@@ -122,7 +119,8 @@ class VectorSearchStep(RetrievalStep):
                 # Keep chunks matching keywords OR table schema chunks
                 # (tables don't contain all data, so keyword filtering would wrongly exclude them)
                 filtered = [
-                    c for c in results
+                    c
+                    for c in results
                     if self.keyword_matcher.chunk_matches_any(c, keywords_in_query)
                     or c.metadata.get("is_table_schema")
                 ]
@@ -164,7 +162,8 @@ class VectorSearchStep(RetrievalStep):
                 keywords_in_sq = self.keyword_matcher.find_in_query(sq)
                 if keywords_in_sq:
                     sub_results = [
-                        c for c in sub_results
+                        c
+                        for c in sub_results
                         if self.keyword_matcher.chunk_matches_any(c, keywords_in_sq)
                         or c.metadata.get("is_table_schema")
                     ]
@@ -257,7 +256,8 @@ Return ONLY a JSON array of strings, no explanation. Example: ["query 1", "query
                 keywords_in_sq = self.keyword_matcher.find_in_query(sq)
                 if keywords_in_sq:
                     sub_results = [
-                        c for c in sub_results
+                        c
+                        for c in sub_results
                         if self.keyword_matcher.chunk_matches_any(c, keywords_in_sq)
                         or c.metadata.get("is_table_schema")
                     ]
@@ -366,9 +366,15 @@ Return ONLY a JSON object:
 
             added = 0
             for record in records:
-                record_id = record.get("id") if isinstance(record, dict) else getattr(record, "id", None)
+                record_id = (
+                    record.get("id") if isinstance(record, dict) else getattr(record, "id", None)
+                )
                 if record_id and str(record_id) not in seen_ids:
-                    payload = record.get("payload", {}) if isinstance(record, dict) else getattr(record, "payload", {})
+                    payload = (
+                        record.get("payload", {})
+                        if isinstance(record, dict)
+                        else getattr(record, "payload", {})
+                    )
                     metadata = payload.get("metadata", {})
                     if isinstance(metadata, dict):
                         flat_metadata = {**payload, **metadata}
@@ -425,7 +431,11 @@ Return ONLY a JSON object:
             # Flatten nested metadata (ingestion stores chunk.metadata under "metadata" key)
             nested_metadata = payload.get("metadata", {})
             if isinstance(nested_metadata, dict):
-                flat_metadata = {**payload, **nested_metadata, "vector_score": getattr(hit, "score", None)}
+                flat_metadata = {
+                    **payload,
+                    **nested_metadata,
+                    "vector_score": getattr(hit, "score", None),
+                }
             else:
                 flat_metadata = {**payload, "vector_score": getattr(hit, "score", None)}
 

@@ -1,13 +1,11 @@
 # tests/tabular/test_parser.py
 """Tests for table file parsers."""
 
-import tempfile
 from pathlib import Path
 
 import pytest
 
 from fitz_ai.tabular.parser.csv_parser import (
-    SUPPORTED_EXTENSIONS,
     can_parse,
     get_sample_rows,
     parse_csv,
@@ -75,9 +73,9 @@ Carol,35,Chicago"""
 
     def test_parse_with_quoted_values(self, temp_dir):
         """Test parsing CSV with quoted values."""
-        csv_content = '''Name,Description,Value
+        csv_content = """Name,Description,Value
 "John Doe","A very, long description",100
-"Jane, Smith","Another ""quoted"" value",200'''
+"Jane, Smith","Another ""quoted"" value",200"""
 
         csv_file = temp_dir / "test.csv"
         csv_file.write_text(csv_content)
