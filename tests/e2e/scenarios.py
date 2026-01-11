@@ -304,6 +304,438 @@ SCENARIOS: list[TestScenario] = [
         must_contain_any=["55,000", "$55"],
         min_sources=1,
     ),
+    # =========================================================================
+    # Keyword Exact Match
+    # =========================================================================
+    TestScenario(
+        id="E22",
+        name="Keyword: unique company name",
+        feature=Feature.KEYWORD_EXACT,
+        query="What is GreenDrive Inc's annual revenue?",
+        must_contain_any=["2.3 billion", "$2.3"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E23",
+        name="Keyword: specific product model",
+        feature=Feature.KEYWORD_EXACT,
+        query="What is the 0-60 time for Model Z50?",
+        must_contain_any=["6.8", "seconds"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E24",
+        name="Keyword: unique person name",
+        feature=Feature.KEYWORD_EXACT,
+        query="Where did Marcus Webb work before GreenDrive?",
+        must_contain_any=["Toyota", "fuel cell"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Deduplication
+    # =========================================================================
+    TestScenario(
+        id="E25",
+        name="Dedup: term appearing in multiple docs",
+        feature=Feature.DEDUP,
+        query="What products does TechCorp make?",
+        # TechCorp mentioned in people.md, products.md, conflicts.md - should dedupe
+        must_contain_any=["electric vehicle", "battery", "Model"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Table Queries
+    # =========================================================================
+    TestScenario(
+        id="E26",
+        name="Table: location filter",
+        feature=Feature.TABLE_QUERY,
+        query="Which employees work in the Nevada location?",
+        must_contain_any=["Eva Brown", "Nathan Park", "Nevada"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E27",
+        name="Table: highest salary",
+        feature=Feature.TABLE_QUERY,
+        query="Who has the highest salary in the employee data?",
+        # James Wilson at $145,000 or Peter Adams at $140,000
+        must_contain_any=["James Wilson", "145,000", "Peter Adams", "140,000"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E28",
+        name="Table: department count",
+        feature=Feature.TABLE_QUERY,
+        query="How many departments are there in the employee data?",
+        # Engineering, Marketing, Sales, HR, Finance = 5
+        must_contain_any=["5", "five", "Engineering", "Marketing", "Sales", "HR", "Finance"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Code Search
+    # =========================================================================
+    TestScenario(
+        id="E29",
+        name="Code: exception classes",
+        feature=Feature.CODE_SEARCH,
+        query="What exceptions are defined in the authentication module?",
+        must_contain_any=["AuthenticationError", "SessionExpiredError"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E30",
+        name="Code: RoleAuthorizer permissions",
+        feature=Feature.CODE_SEARCH,
+        query="What permissions does an admin role have?",
+        must_contain_any=["read", "write", "delete", "manage_users"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E31",
+        name="Code: session expiration",
+        feature=Feature.CODE_SEARCH,
+        query="How long do sessions last in UserAuth by default?",
+        must_contain_any=["24", "hour", "session_duration"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Long Document
+    # =========================================================================
+    TestScenario(
+        id="E32",
+        name="Long doc: vehicle telemetry",
+        feature=Feature.LONG_DOC,
+        query="How does TechCorp process vehicle telemetry data?",
+        must_contain_any=["Kafka", "Flink", "TimescaleDB", "500,000"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E33",
+        name="Long doc: payment security",
+        feature=Feature.LONG_DOC,
+        query="What security measures does the Payment Service use?",
+        must_contain_any=["PCI DSS", "tokenized", "Stripe", "3D Secure"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E34",
+        name="Long doc: notification channels",
+        feature=Feature.LONG_DOC,
+        query="What notification channels does TechCorp support?",
+        must_contain_any=["push", "email", "SMS", "Firebase", "SendGrid", "Twilio"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Multi-Hop
+    # =========================================================================
+    TestScenario(
+        id="E35",
+        name="Multi-hop: person's previous employer product",
+        feature=Feature.MULTI_HOP,
+        query="What kind of vehicles does Sarah Chen's previous employer make?",
+        # Sarah Chen → AutoMotors → gasoline-powered vehicles
+        must_contain_any=["gasoline", "traditional", "AutoMotors"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E36",
+        name="Multi-hop: competitor headquarters",
+        feature=Feature.MULTI_HOP,
+        query="Where is TechCorp's main competitor headquartered?",
+        # TechCorp → GreenDrive → San Jose
+        must_contain=["San Jose"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Comparison
+    # =========================================================================
+    TestScenario(
+        id="E37",
+        name="Comparison: three models",
+        feature=Feature.COMPARISON,
+        query="Compare the range of all three TechCorp models",
+        must_contain_any=["300", "400", "200"],  # miles for X100, Y200, Z50
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E38",
+        name="Comparison: feature difference",
+        feature=Feature.COMPARISON,
+        query="What features does Model Y200 have that Model Z50 doesn't?",
+        must_contain_any=["self-driving", "solar", "Bang & Olufsen", "heads-up", "17-inch"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Causal Attribution
+    # =========================================================================
+    TestScenario(
+        id="E39",
+        name="Causal: competitor stock decline",
+        feature=Feature.CAUSAL_ATTRIBUTION,
+        query="Why did GreenDrive's stock decline in Q1 2024?",
+        must_contain_any=["recall", "50,000", "cost-cutting", "confidence"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Basic Retrieval
+    # =========================================================================
+    TestScenario(
+        id="E40",
+        name="Basic: founding year",
+        feature=Feature.BASIC_RETRIEVAL,
+        query="When was TechCorp Industries founded?",
+        must_contain=["2015"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E41",
+        name="Basic: battery warranty",
+        feature=Feature.BASIC_RETRIEVAL,
+        query="What is the warranty on TechCorp batteries?",
+        must_contain_any=["8-year", "150,000 mile", "8 year"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E42",
+        name="Basic: Project Alpha team size",
+        feature=Feature.BASIC_RETRIEVAL,
+        query="How many engineers are on the Project Alpha team?",
+        must_contain=["5"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Edge Cases: Query Robustness
+    # =========================================================================
+    TestScenario(
+        id="E43",
+        name="Edge: case insensitivity",
+        feature=Feature.BASIC_RETRIEVAL,
+        query="WHERE IS TECHCORP INDUSTRIES HEADQUARTERED?",
+        must_contain=["Austin"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E44",
+        name="Edge: typo in query",
+        feature=Feature.BASIC_RETRIEVAL,
+        query="What is the price of the Model Y2OO?",  # O instead of 0
+        must_contain_any=["55,000", "$55", "Y200"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E45",
+        name="Edge: very short query",
+        feature=Feature.BASIC_RETRIEVAL,
+        query="TechCorp CEO",
+        must_contain=["Sarah Chen"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E46",
+        name="Edge: question without question mark",
+        feature=Feature.BASIC_RETRIEVAL,
+        query="Tell me the headquarters location of TechCorp",
+        must_contain=["Austin"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Edge Cases: Negation and Exclusion
+    # =========================================================================
+    TestScenario(
+        id="E47",
+        name="Edge: negation query",
+        feature=Feature.COMPARISON,
+        query="Which TechCorp model does NOT have a solar roof option?",
+        # Only Y200 has solar roof, so X100 and Z50 don't
+        must_contain_any=["X100", "Z50"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Edge Cases: Out of Domain
+    # =========================================================================
+    TestScenario(
+        id="E48",
+        name="Edge: completely out of domain",
+        feature=Feature.INSUFFICIENT_EVIDENCE,
+        query="What is the recipe for chocolate cake?",
+        must_contain_any=[
+            "don't know",
+            "no information",
+            "not found",
+            "cannot",
+            "don't have",
+            "not available",
+            "outside",
+            "beyond",
+            "unrelated",
+            "no recipe",
+            "not contain",
+            "unable",
+            "doesn't",
+            "does not",
+            "no mention",
+            "no data",
+        ],
+        min_sources=0,
+    ),
+    TestScenario(
+        id="E49",
+        name="Edge: plausible but missing info",
+        feature=Feature.INSUFFICIENT_EVIDENCE,
+        query="What is TechCorp's stock ticker symbol?",
+        # TECH is mentioned in causal_claims.md but only as hypothetical
+        must_contain_any=[
+            "TECH",
+            "don't know",
+            "not provided",
+            "not specified",
+            "not found",
+        ],
+        min_sources=0,
+    ),
+    # =========================================================================
+    # Multi-Query Expansion (long complex queries)
+    # =========================================================================
+    TestScenario(
+        id="E50",
+        name="Multi-query: very long complex question",
+        feature=Feature.MULTI_QUERY,
+        query=(
+            "I need a comprehensive analysis of TechCorp's product lineup including "
+            "all vehicle models with their prices, ranges, battery capacities, and "
+            "key distinguishing features. Also include information about the target "
+            "market segment for each model."
+        ),
+        # Should retrieve info about all 3 models
+        must_contain_any=["X100", "Y200", "Z50"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Temporal Queries
+    # =========================================================================
+    TestScenario(
+        id="E51",
+        name="Temporal: specific quarter",
+        feature=Feature.BASIC_RETRIEVAL,
+        query="What happened in Q1 2024 at TechCorp?",
+        must_contain_any=["revenue", "stock", "20%", "record"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E52",
+        name="Temporal: founding dates comparison",
+        feature=Feature.COMPARISON,
+        query="Which company was founded first, TechCorp or GreenDrive?",
+        # GreenDrive 2012, TechCorp 2015
+        must_contain_any=["GreenDrive", "2012", "first", "earlier", "before"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Aggregation Queries
+    # =========================================================================
+    TestScenario(
+        id="E53",
+        name="Aggregation: count across sources",
+        feature=Feature.MULTI_QUERY,
+        query="How many different companies are mentioned in the documents?",
+        # TechCorp, GreenDrive, AutoMotors, Toyota (mentioned)
+        must_contain_any=["TechCorp", "GreenDrive", "AutoMotors", "3", "4", "three", "four"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E54",
+        name="Aggregation: list all products",
+        feature=Feature.MULTI_QUERY,
+        query="List all vehicle models mentioned across all documents",
+        must_contain=["X100"],
+        must_contain_any=["Y200", "Z50"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Cross-Document Synthesis
+    # =========================================================================
+    TestScenario(
+        id="E55",
+        name="Cross-doc: info from multiple sources",
+        feature=Feature.ENTITY_GRAPH,
+        query="What is the complete profile of Sarah Chen including her education and career history?",
+        # Info spread across people.md
+        must_contain_any=["MIT", "PhD", "AutoMotors", "CEO", "2019"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Numeric Precision
+    # =========================================================================
+    TestScenario(
+        id="E56",
+        name="Numeric: exact number lookup",
+        feature=Feature.BASIC_RETRIEVAL,
+        query="What is the exact battery capacity of the Model X100 in kWh?",
+        must_contain=["75"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E57",
+        name="Numeric: calculation required",
+        feature=Feature.COMPARISON,
+        query="What is the total battery capacity if you bought one of each TechCorp model?",
+        # 75 + 100 + 50 = 225 kWh
+        must_contain_any=["225", "75", "100", "50"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Ambiguous Queries
+    # =========================================================================
+    TestScenario(
+        id="E58",
+        name="Ambiguous: which 'company'",
+        feature=Feature.BASIC_RETRIEVAL,
+        query="When was the company founded?",
+        # Ambiguous - could be TechCorp (2015) or GreenDrive (2012)
+        must_contain_any=["2015", "2012", "TechCorp", "GreenDrive"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Code: Edge Cases
+    # =========================================================================
+    TestScenario(
+        id="E59",
+        name="Code: method signature",
+        feature=Feature.CODE_SEARCH,
+        query="What parameters does the register_user method take?",
+        must_contain_any=["username", "password", "email", "role"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E60",
+        name="Code: return type",
+        feature=Feature.CODE_SEARCH,
+        query="What does the login method return?",
+        must_contain_any=["token", "str", "string", "session"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Table: Edge Cases
+    # =========================================================================
+    TestScenario(
+        id="E61",
+        name="Table: manager lookup",
+        feature=Feature.TABLE_QUERY,
+        query="Who is the manager of Alice Wong?",
+        # Alice Wong's manager_id is E010, which is James Wilson
+        must_contain_any=["James Wilson", "E010", "manager"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E62",
+        name="Table: date-based query",
+        feature=Feature.TABLE_QUERY,
+        query="Who was hired in 2022?",
+        # David Lee (2022-02-20), Nathan Park (2022-06-10)
+        must_contain_any=["David Lee", "Nathan Park", "2022"],
+        min_sources=1,
+    ),
 ]
 
 

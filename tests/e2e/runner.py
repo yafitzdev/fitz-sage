@@ -153,13 +153,19 @@ class E2ERunner:
 
         # Parser and chunking - use simple chunker for all files
         parser_router = ParserRouter(docling_parser="docling")
+        simple_chunker = ExtensionChunkerConfig(
+            plugin_name="simple",
+            # Larger chunks to keep product sections/facts together
+            kwargs={"chunk_size": 2000, "chunk_overlap": 200},
+        )
         router_config = ChunkingRouterConfig(
-            default=ExtensionChunkerConfig(
-                plugin_name="simple",
-                # Larger chunks to keep product sections/facts together
-                kwargs={"chunk_size": 2000, "chunk_overlap": 200},
-            ),
-            by_extension={},  # Use default for all extensions
+            default=simple_chunker,
+            by_extension={
+                ".md": simple_chunker,
+                ".py": simple_chunker,
+                ".csv": simple_chunker,
+                ".txt": simple_chunker,
+            },
         )
         chunking_router = ChunkingRouter.from_config(router_config)
 
