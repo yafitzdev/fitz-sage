@@ -30,9 +30,14 @@ from fitz_ai.ingestion.parser.router import ParserRouter
 from fitz_ai.ingestion.source.base import SourceFile
 from fitz_ai.ingestion.state.manager import IngestStateManager
 from fitz_ai.tabular import TableExtractor
+from fitz_ai.tabular.models import create_schema_chunk_for_stored_table
+from fitz_ai.tabular.parser import can_parse as is_table_file
+from fitz_ai.tabular.parser import get_sample_rows, parse_csv
+from fitz_ai.tabular.store import SqliteTableStore
 
 if TYPE_CHECKING:
     from fitz_ai.ingestion.enrichment.pipeline import EnrichmentPipeline
+    from fitz_ai.tabular.store.base import TableStore
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +138,7 @@ class DiffIngestExecutor:
         embedding_id: str,
         vector_db_id: Optional[str] = None,
         enrichment_pipeline: Optional["EnrichmentPipeline"] = None,
+        table_store: Optional["TableStore"] = None,
     ) -> None:
         """
         Initialize the executor.
@@ -148,6 +154,7 @@ class DiffIngestExecutor:
             vector_db_id: Vector DB plugin name (e.g., "qdrant", "local_faiss").
             enrichment_pipeline: Optional unified enrichment pipeline.
                                 Handles both chunk summaries and project artifacts.
+            table_store: Optional table storage backend for CSV/table files.
         """
         self._state = state_manager
         self._vdb_writer = vector_db_writer
@@ -158,14 +165,15 @@ class DiffIngestExecutor:
         self._embedding_id = embedding_id
         self._vector_db_id = vector_db_id
         self._enrichment_pipeline = enrichment_pipeline
+        self._table_store = table_store or SqliteTableStore(collection)
         self._summary: Optional[IngestSummary] = None
 
     @property
     def _enricher_id(self) -> Optional[str]:
         """Get the enricher ID if enrichment is enabled."""
-        if self._enrichment_pipeline is None or not self._enrichment_pipeline.summaries_enabled:
+        if self._enrichment_pipeline is None or not self._enrichment_pipeline.hierarchy_enrichment_enabled:
             return None
-        return self._enrichment_pipeline._enricher_id
+        return getattr(self._enrichment_pipeline, "_enricher_id", None)
 
     def run(
         self,
@@ -228,18 +236,15 @@ class DiffIngestExecutor:
 
         # 3. Ingest files - three phases: prepare, summarize, embed
         summaries_enabled = (
-            self._enrichment_pipeline and self._enrichment_pipeline.summaries_enabled
+            self._enrichment_pipeline and self._enrichment_pipeline.hierarchy_enrichment_enabled
         )
         enrichment_status = "enabled" if summaries_enabled else "disabled"
         logger.info(f"Ingesting {len(diff.to_ingest)} files (summaries: {enrichment_status})...")
 
         total_to_ingest = len(diff.to_ingest)
 
-        # Phase 1: Prepare all files (parse, chunk) - NO summarization yet
+        # Phase 1: Prepare all files (parse, chunk) - NO enrichment yet
         all_prepared: List[tuple] = []  # (candidate, file_data)
-        all_chunk_info: List[
-            tuple
-        ] = []  # (content, file_path, content_hash) for batch summarization
 
         for i, candidate in enumerate(diff.to_ingest):
             if on_progress:
@@ -249,42 +254,44 @@ class DiffIngestExecutor:
                 file_data = self._prepare_file_no_enrich(candidate)
                 if file_data is not None:
                     all_prepared.append((candidate, file_data))
-                    # Collect chunk info for batch summarization
-                    for chunk_data in file_data["chunk_data"]:
-                        all_chunk_info.append(
-                            (
-                                chunk_data["chunk"].content,
-                                candidate.path,
-                                chunk_data["content_hash"],
-                            )
-                        )
             except Exception as e:
                 summary.errors += 1
                 summary.error_details.append(f"Prepare error: {candidate.path}: {e}")
                 logger.warning(f"Failed to prepare {candidate.path}: {e}")
 
-        # Phase 1.5: Batch summarize ALL chunks at once
-        all_descriptions: List[str | None] = []
-        if summaries_enabled and all_chunk_info:
-            t0 = time.perf_counter()
-            all_descriptions = self._enrichment_pipeline.summarize_chunks_batch(all_chunk_info)
-            summarize_time = time.perf_counter() - t0
-            summary.enriched = sum(1 for d in all_descriptions if d is not None)
-            logger.info(f"Summarized {len(all_chunk_info)} chunks in {summarize_time:.2f}s")
-        else:
-            all_descriptions = [None] * len(all_chunk_info)
+        # Collect all chunks for batch enrichment
+        all_chunks: List = [
+            chunk_data["chunk"]
+            for _, file_data in all_prepared
+            for chunk_data in file_data["chunk_data"]
+        ]
 
-        # Apply descriptions back to chunk data and build texts to embed
+        # Phase 1.5: Batch enrich ALL chunks at once (summary, keywords, entities)
+        if (
+            summaries_enabled
+            and all_chunks
+            and self._enrichment_pipeline._chunk_enricher is not None
+        ):
+            t0 = time.perf_counter()
+            enrich_result = self._enrichment_pipeline._chunk_enricher.enrich(all_chunks)
+            enrich_time = time.perf_counter() - t0
+            # Count chunks that got summaries
+            summary.enriched = sum(
+                1 for c in enrich_result.chunks if c.metadata.get("summary")
+            )
+            logger.info(f"Enriched {len(all_chunks)} chunks in {enrich_time:.2f}s")
+
+        # Build texts to embed (use summary if available, otherwise content)
         all_texts: List[str] = []
-        desc_idx = 0
         for candidate, file_data in all_prepared:
             for chunk_data in file_data["chunk_data"]:
-                description = all_descriptions[desc_idx]
-                chunk_data["description"] = description
-                # Embed description if available, otherwise content
-                text_to_embed = description if description else chunk_data["chunk"].content
+                chunk = chunk_data["chunk"]
+                # Get summary from chunk metadata (set by ChunkEnricher)
+                chunk_summary = chunk.metadata.get("summary")
+                chunk_data["description"] = chunk_summary
+                # Embed summary if available, otherwise content
+                text_to_embed = chunk_summary if chunk_summary else chunk.content
                 all_texts.append(text_to_embed)
-                desc_idx += 1
 
         # Phase 1.75: Hierarchy enrichment (generates group + corpus summaries)
         hierarchy_chunks: List = []
@@ -292,32 +299,25 @@ class DiffIngestExecutor:
             self._enrichment_pipeline
             and hasattr(self._enrichment_pipeline, "_hierarchy_enricher")
             and self._enrichment_pipeline._hierarchy_enricher is not None
+            and all_chunks
         ):
-            # Collect all Chunk objects
-            all_chunks = [
-                chunk_data["chunk"]
-                for _, file_data in all_prepared
-                for chunk_data in file_data["chunk_data"]
+            t0 = time.perf_counter()
+            enriched_chunks = self._enrichment_pipeline._hierarchy_enricher.enrich(all_chunks)
+            hierarchy_time = time.perf_counter() - t0
+
+            # Extract only the new hierarchy summary chunks
+            hierarchy_chunks = [
+                c for c in enriched_chunks if c.metadata.get("is_hierarchy_summary", False)
             ]
 
-            if all_chunks:
-                t0 = time.perf_counter()
-                enriched_chunks = self._enrichment_pipeline._hierarchy_enricher.enrich(all_chunks)
-                hierarchy_time = time.perf_counter() - t0
-
-                # Extract only the new hierarchy summary chunks
-                hierarchy_chunks = [
-                    c for c in enriched_chunks if c.metadata.get("is_hierarchy_summary", False)
-                ]
-
-                if hierarchy_chunks:
-                    logger.info(
-                        f"Generated {len(hierarchy_chunks)} hierarchy summaries "
-                        f"in {hierarchy_time:.2f}s"
-                    )
-                    # Add hierarchy chunk texts for embedding
-                    for hc in hierarchy_chunks:
-                        all_texts.append(hc.content)
+            if hierarchy_chunks:
+                logger.info(
+                    f"Generated {len(hierarchy_chunks)} hierarchy summaries "
+                    f"in {hierarchy_time:.2f}s"
+                )
+                # Add hierarchy chunk texts for embedding
+                for hc in hierarchy_chunks:
+                    all_texts.append(hc.content)
 
         # Phase 2: Batch embed ALL texts at once
         if all_texts:
@@ -430,10 +430,8 @@ class DiffIngestExecutor:
             self._state.mark_deleted(root_path, deleted_path)
             summary.marked_deleted += 1
 
-        # 6. Save state and enrichment cache
+        # 6. Save state
         self._state.save()
-        if self._enrichment_pipeline:
-            self._enrichment_pipeline.save_cache()
 
         summary.finished_at = datetime.now(timezone.utc)
         self._summary = None
@@ -454,8 +452,13 @@ class DiffIngestExecutor:
         Returns:
             file_data dict or None if file should be skipped.
         """
-        # 1. Create SourceFile from candidate path
         file_path = Path(candidate.path)
+
+        # Handle table files (CSV, TSV) specially
+        if is_table_file(file_path):
+            return self._prepare_table_file(candidate, file_path)
+
+        # 1. Create SourceFile from candidate path
         source_file = SourceFile(
             uri=file_path.as_uri(),
             local_path=file_path,
@@ -523,6 +526,75 @@ class DiffIngestExecutor:
             )
 
         return {"chunk_data": chunk_data}
+
+    def _prepare_table_file(
+        self,
+        candidate: FileCandidate,
+        file_path: Path,
+    ) -> Optional[Dict]:
+        """
+        Process a table file (CSV, TSV) into TableStore and create schema chunk.
+
+        Args:
+            candidate: File candidate with metadata.
+            file_path: Path to the table file.
+
+        Returns:
+            file_data dict with schema chunk, or None on error.
+        """
+        try:
+            # Parse CSV file
+            parsed = parse_csv(file_path)
+
+            # Store in TableStore
+            table_hash = self._table_store.store(
+                table_id=parsed.table_id,
+                columns=parsed.columns,
+                rows=parsed.rows,
+                source_file=str(file_path),
+            )
+
+            # Create schema chunk for vector search
+            sample_rows = get_sample_rows(parsed, n=3)
+            schema_chunk = create_schema_chunk_for_stored_table(
+                table_id=parsed.table_id,
+                columns=parsed.columns,
+                row_count=parsed.row_count,
+                source_file=str(file_path),
+                table_hash=table_hash,
+                sample_rows=sample_rows,
+            )
+
+            logger.info(
+                f"Stored table {file_path.name}: {len(parsed.columns)} columns, "
+                f"{parsed.row_count} rows"
+            )
+
+            # Compute chunk_id for the schema chunk
+            chunk_id = compute_chunk_id(
+                content_hash=candidate.content_hash,
+                chunk_index=0,
+                parser_id="table",
+                chunker_id="table",
+                embedding_id=candidate.embedding_id,
+            )
+
+            chunk_content_hash = _hash_text(schema_chunk.content)
+
+            return {
+                "chunk_data": [
+                    {
+                        "chunk_id": chunk_id,
+                        "chunk": schema_chunk,
+                        "content_hash": chunk_content_hash,
+                        "description": None,
+                    }
+                ]
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to process table {file_path}: {e}")
+            return None
 
     def _upsert_file(
         self,

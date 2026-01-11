@@ -187,7 +187,7 @@ def _run_collection_chat(collection: Optional[str]) -> None:
         pipeline = RAGPipeline.from_config(typed_config)
     except Exception as e:
         ui.error(f"Failed to initialize pipeline: {e}")
-        logger.exception("Pipeline initialization error")
+        logger.debug("Pipeline initialization error", exc_info=True)
         raise typer.Exit(1)
 
     # Chat loop
@@ -221,7 +221,7 @@ def _run_collection_chat(collection: Optional[str]) -> None:
                 chunks = pipeline.retrieval.retrieve(user_input)
             except Exception as e:
                 ui.error(f"Retrieval failed: {e}")
-                logger.exception("Retrieval error")
+                logger.debug("Retrieval error", exc_info=True)
                 continue
 
             # Build messages with history and context
@@ -232,7 +232,7 @@ def _run_collection_chat(collection: Optional[str]) -> None:
                 response = pipeline.chat.chat(messages)
             except Exception as e:
                 ui.error(f"LLM request failed: {e}")
-                logger.exception("LLM error")
+                logger.debug("LLM error", exc_info=True)
                 continue
 
             # Display response and sources

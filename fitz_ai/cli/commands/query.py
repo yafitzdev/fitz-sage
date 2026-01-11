@@ -27,6 +27,39 @@ logger = get_logger(__name__)
 
 
 # =============================================================================
+# Helpers
+# =============================================================================
+
+
+def _get_root_cause(exc: Exception) -> str:
+    """
+    Extract the root cause message from a chain of exceptions.
+
+    Walks the __cause__ chain to find the most specific error message,
+    filtering out generic wrapper messages like "Retrieval failed".
+    """
+    messages = []
+    current = exc
+
+    while current is not None:
+        msg = str(current)
+        # Skip generic wrapper messages
+        if msg and msg not in ("Retrieval failed", "Retrieval failed: Retrieval failed"):
+            messages.append(msg)
+        current = current.__cause__
+
+    # Return the most specific (deepest) meaningful message
+    if messages:
+        # Prefer the deepest cause that has useful info
+        for msg in reversed(messages):
+            if "timed out" in msg.lower() or "error" in msg.lower() or len(msg) > 20:
+                return msg
+        return messages[-1]
+
+    return str(exc)
+
+
+# =============================================================================
 # Main Command
 # =============================================================================
 
@@ -220,8 +253,9 @@ def _run_persistent_ingest_query(
         answer = engine_instance.answer(query)
         display_answer(answer)
     except Exception as e:
-        ui.error(f"Query failed: {e}")
-        logger.exception("Query error")
+        # Show clean error message, full traceback only at debug level
+        ui.error(f"Query failed: {_get_root_cause(e)}")
+        logger.debug("Query error", exc_info=True)
         raise typer.Exit(1)
 
 
@@ -258,8 +292,9 @@ def _run_collection_query(
         answer = engine_instance.answer(query)
         display_answer(answer)
     except Exception as e:
-        ui.error(f"Query failed: {e}")
-        logger.exception("Query error")
+        # Show clean error message, full traceback only at debug level
+        ui.error(f"Query failed: {_get_root_cause(e)}")
+        logger.debug("Query error", exc_info=True)
         raise typer.Exit(1)
 
 
@@ -281,6 +316,7 @@ def _run_generic_query(question: Optional[str], engine_name: str) -> None:
         answer = engine_instance.answer(query)
         display_answer(answer)
     except Exception as e:
-        ui.error(f"Query failed: {e}")
-        logger.exception("Query error")
+        # Show clean error message, full traceback only at debug level
+        ui.error(f"Query failed: {_get_root_cause(e)}")
+        logger.debug("Query error", exc_info=True)
         raise typer.Exit(1)

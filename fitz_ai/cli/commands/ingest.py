@@ -249,7 +249,7 @@ def _run_engine_specific_ingest(
         ui.success("Engine initialized")
     except Exception as e:
         ui.error(f"Failed to initialize engine: {e}")
-        logger.exception("Engine init error")
+        logger.debug("Engine init error", exc_info=True)
         raise typer.Exit(1)
 
     ui.step(2, 2, "Ingesting documents...")
@@ -284,7 +284,7 @@ def _run_engine_specific_ingest(
 
     except Exception as e:
         ui.error(f"Ingestion failed: {e}")
-        logger.exception("Ingestion error")
+        logger.debug("Ingestion error", exc_info=True)
         raise typer.Exit(1)
 
 
@@ -825,7 +825,7 @@ def command(
 
     except Exception as e:
         ui.error(f"Ingestion failed: {e}")
-        logger.exception("Ingestion error")
+        logger.debug("Ingestion error", exc_info=True)
         raise typer.Exit(1)
 
     # =========================================================================
