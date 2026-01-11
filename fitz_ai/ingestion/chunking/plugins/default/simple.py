@@ -97,7 +97,9 @@ class SimpleChunker:
             end = pos + self.chunk_size
             piece = text[pos:end].strip()
 
-            if piece:
+            # Skip tiny trailing chunks that are already covered by previous overlap
+            # This prevents creating near-duplicate chunks at document end
+            if piece and (chunk_index == 0 or len(piece) > self.chunk_overlap):
                 chunk_id = f"{doc_id}:{chunk_index}"
                 chunks.append(
                     Chunk(

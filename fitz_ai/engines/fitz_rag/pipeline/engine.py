@@ -228,8 +228,16 @@ class RAGPipeline:
         cls,
         cfg: FitzRagConfig,
         constraints: Sequence[ConstraintPlugin] | None = None,
+        enable_keywords: bool = True,
     ) -> "RAGPipeline":
-        """Create a RAGPipeline from configuration."""
+        """
+        Create a RAGPipeline from configuration.
+
+        Args:
+            cfg: RAG configuration
+            constraints: Optional list of constraints to override defaults
+            enable_keywords: Whether to load keyword matcher from vocabulary store
+        """
         logger.info(f"{PIPELINE} Constructing RAGPipeline from config")
 
         # Vector DB
@@ -281,7 +289,9 @@ class RAGPipeline:
 
         # Keyword matcher (auto-loaded from collection's vocabulary if exists)
         # Must be created before retrieval pipeline so multi-query can use it
-        keyword_matcher = create_matcher_from_store(collection=cfg.retrieval.collection)
+        keyword_matcher = None
+        if enable_keywords:
+            keyword_matcher = create_matcher_from_store(collection=cfg.retrieval.collection)
         if keyword_matcher:
             logger.info(
                 f"{PIPELINE} Loaded vocabulary [{cfg.retrieval.collection}] "

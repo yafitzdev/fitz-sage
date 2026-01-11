@@ -1,0 +1,17 @@
+employee_id,name,department,salary,hire_date,manager_id,location
+E001,Alice Wong,Engineering,95000,2021-03-15,E010,Austin
+E002,Bob Smith,Marketing,75000,2020-06-01,E011,Austin
+E003,Carol Davis,Engineering,105000,2019-01-10,E010,Austin
+E004,David Lee,Sales,85000,2022-02-20,E012,San Jose
+E005,Eva Brown,Engineering,98000,2021-08-05,E010,Nevada
+E006,Frank Miller,HR,72000,2020-11-15,E013,Austin
+E007,Grace Kim,Engineering,110000,2018-05-22,E010,Austin
+E008,Henry Chen,Marketing,78000,2021-04-01,E011,San Jose
+E009,Iris Johnson,Sales,92000,2019-09-12,E012,Austin
+E010,James Wilson,Engineering,145000,2017-03-01,,Austin
+E011,Karen White,Marketing,125000,2018-07-15,,Austin
+E012,Leo Martinez,Sales,135000,2017-11-20,,San Jose
+E013,Maria Garcia,HR,115000,2019-02-28,,Austin
+E014,Nathan Park,Engineering,88000,2022-06-10,E010,Nevada
+E015,Olivia Taylor,Finance,95000,2020-01-05,E016,Austin
+E016,Peter Adams,Finance,140000,2016-08-12,,Austin

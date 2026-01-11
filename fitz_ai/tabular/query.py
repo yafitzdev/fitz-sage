@@ -151,7 +151,8 @@ Return ONLY the SQL query, no explanation."""
         if self._needs_multi_table(query, table_chunks):
             logger.debug(f"Multi-table query detected for {len(table_chunks)} tables")
             result_chunk = self._process_multi_table(query, table_chunks)
-            return [result_chunk] + regular_chunks
+            # Put regular chunks first, table results at the end
+            return regular_chunks + [result_chunk]
 
         # Single-table processing (existing logic)
         result_chunks: list[Chunk] = []
@@ -159,7 +160,9 @@ Return ONLY the SQL query, no explanation."""
             augmented = self._process_table_chunk(query, chunk)
             result_chunks.append(augmented)
 
-        return result_chunks + regular_chunks
+        # Put regular chunks first, table results at the end
+        # This prevents table SQL results from dominating the context
+        return regular_chunks + result_chunks
 
     def _load_table_data(self, chunk: Chunk) -> ParsedTable | None:
         """

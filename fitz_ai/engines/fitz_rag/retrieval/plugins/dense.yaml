@@ -21,8 +21,9 @@ steps:
     enabled_if: fetch_artifacts
 
   - type: vector_search        # Intelligent vector search (multi-query + keyword baked in)
-    k: 10                      # Candidates to retrieve (no reranking, so smaller pool)
+    k: 25                      # Candidates to retrieve (larger pool to not miss relevant chunks)
+    use_config: top_k          # Use top_k from config if set (multiplied by 2)
 
   - type: limit
-    k: 5                       # Final chunks returned (uses retrieval.top_k from config)
+    k: 10                      # Final chunks returned (uses retrieval.top_k from config)
     use_config: top_k          # Override k with value from retrieval config
