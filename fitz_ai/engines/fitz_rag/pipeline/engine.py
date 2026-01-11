@@ -34,6 +34,11 @@ from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
     RGSConfig as RGSRuntimeConfig,
 )
 from fitz_ai.engines.fitz_rag.pipeline.pipeline import ContextPipeline
+from fitz_ai.engines.fitz_rag.retrieval.multihop import (
+    BridgeExtractor,
+    EvidenceEvaluator,
+    HopController,
+)
 from fitz_ai.engines.fitz_rag.retrieval.registry import get_retrieval_plugin
 from fitz_ai.engines.fitz_rag.routing import QueryIntent, QueryRouter
 from fitz_ai.ingestion.entity_graph import EntityGraphStore
@@ -69,6 +74,7 @@ class RAGPipeline:
         semantic_matcher: SemanticMatcher | None = None,
         query_router: QueryRouter | None = None,
         keyword_matcher: KeywordMatcher | None = None,
+        hop_controller: HopController | None = None,
     ):
         self.retrieval = retrieval
         self.chat = chat
@@ -76,6 +82,7 @@ class RAGPipeline:
         self.context = context or ContextPipeline()
         self.query_router = query_router
         self.keyword_matcher = keyword_matcher
+        self.hop_controller = hop_controller
 
         # Default constraints: ConflictAware + InsufficientEvidence + CausalAttribution
         # Uses semantic embedding similarity for language-agnostic detection.
@@ -96,10 +103,11 @@ class RAGPipeline:
 
         routing_status = "enabled" if query_router and query_router.enabled else "disabled"
         keyword_status = "enabled" if keyword_matcher else "disabled"
+        multihop_status = f"enabled (max {hop_controller.max_hops})" if hop_controller else "disabled"
         logger.info(
             f"{PIPELINE} RAGPipeline initialized with {retrieval.plugin_name} retrieval, "
             f"{len(self.constraints)} constraint(s), routing={routing_status}, "
-            f"keywords={keyword_status}"
+            f"keywords={keyword_status}, multihop={multihop_status}"
         )
 
     def run(self, query: str) -> RGSAnswer:
@@ -114,9 +122,18 @@ class RAGPipeline:
                 filter_override = self.query_router.get_l2_filter()
                 logger.info(f"{PIPELINE} Query routed to L2 corpus summaries (global intent)")
 
-        # Step 1: Retrieve relevant chunks (using YAML-based plugin)
+        # Step 1: Retrieve relevant chunks (using multi-hop or single retrieval)
         try:
-            raw_chunks = self.retrieval.retrieve(query, filter_override=filter_override)
+            if self.hop_controller:
+                raw_chunks, hop_metadata = self.hop_controller.retrieve(
+                    query, filter_override=filter_override
+                )
+                logger.info(
+                    f"{PIPELINE} Multi-hop retrieval: {hop_metadata.total_hops} hop(s), "
+                    f"{len(raw_chunks)} total chunks"
+                )
+            else:
+                raw_chunks = self.retrieval.retrieve(query, filter_override=filter_override)
         except Exception as exc:
             logger.error(f"{PIPELINE} Retrieval failed: {exc}")
             raise PipelineError("Retrieval failed") from exc
@@ -335,6 +352,23 @@ class RAGPipeline:
             threshold=cfg.routing.threshold,
         )
 
+        # Multi-hop controller (iterative evidence gathering)
+        # Always on when fast_chat is available, but naturally stops after 1 hop
+        # when evidence is sufficient
+        hop_controller = None
+        if fast_chat and cfg.multihop.max_hops > 1:
+            evaluator = EvidenceEvaluator(chat=fast_chat)
+            extractor = BridgeExtractor(chat=fast_chat)
+            hop_controller = HopController(
+                retrieval_pipeline=retrieval,
+                evaluator=evaluator,
+                extractor=extractor,
+                max_hops=cfg.multihop.max_hops,
+            )
+            logger.info(
+                f"{PIPELINE} Multi-hop retrieval enabled (max {cfg.multihop.max_hops} hops)"
+            )
+
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
         return cls(
             retrieval=retrieval,
@@ -345,6 +379,7 @@ class RAGPipeline:
             semantic_matcher=semantic_matcher,
             query_router=query_router,
             keyword_matcher=keyword_matcher,
+            hop_controller=hop_controller,
         )
 
     @classmethod

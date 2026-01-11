@@ -357,6 +357,39 @@ class EntityGraphConfig(BaseModel):
 
 
 # =============================================================================
+# Multi-Hop Retrieval Configuration
+# =============================================================================
+
+
+class MultihopConfig(BaseModel):
+    """
+    Multi-hop retrieval configuration for complex reasoning chains.
+
+    When fast_chat is available, multi-hop retrieval iteratively retrieves
+    evidence until sufficient information is found to answer the query.
+
+    This handles complex queries like "What does Sarah's company's competitor make?"
+    where the entity graph alone may not find all needed information.
+
+    Multi-hop is always on (baked in) but naturally stops after 1 hop when
+    evidence is sufficient. Set max_hops=1 to effectively disable multi-hop.
+
+    Example YAML:
+        multihop:
+          max_hops: 2
+    """
+
+    max_hops: int = Field(
+        default=2,
+        ge=1,
+        le=5,
+        description="Maximum retrieval iterations (1 = no multi-hop, 2 = one follow-up)",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
+# =============================================================================
 # Query Routing Configuration
 # =============================================================================
 
@@ -546,6 +579,12 @@ class FitzRagConfig(BaseModel):
     entity_graph: EntityGraphConfig = Field(
         default_factory=EntityGraphConfig,
         description="Entity graph configuration for related chunk discovery",
+    )
+
+    # Multi-hop retrieval (iterative evidence gathering)
+    multihop: MultihopConfig = Field(
+        default_factory=MultihopConfig,
+        description="Multi-hop retrieval configuration for complex reasoning chains",
     )
 
     model_config = ConfigDict(extra="forbid")
