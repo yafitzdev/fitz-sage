@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fitz-ai"
-version = "0.5.0"
+version = "0.5.1"
 description = "A modular, production-ready knowledge engine platform with clean architecture and multi-paradigm support (RAG, CLaRa)."
 readme = "README.md"
 license = {text = "MIT"}
