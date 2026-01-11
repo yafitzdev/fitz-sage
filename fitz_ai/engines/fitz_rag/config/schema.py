@@ -323,6 +323,40 @@ class LoggingConfig(BaseModel):
 
 
 # =============================================================================
+# Entity Graph Configuration
+# =============================================================================
+
+
+class EntityGraphConfig(BaseModel):
+    """
+    Entity graph configuration for related chunk discovery.
+
+    When enabled (default), the entity graph is used to expand retrieval results
+    with related chunks that share entities (people, companies, concepts, etc.).
+
+    This enables "multi-hop" style retrieval without LLM calls at query time.
+
+    Example YAML:
+        entity_graph:
+          enabled: true
+          max_expansion: 10
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable entity-based retrieval expansion (default: True)",
+    )
+    max_expansion: int = Field(
+        default=10,
+        ge=0,
+        le=50,
+        description="Maximum related chunks to add per query (default: 10)",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
+# =============================================================================
 # Query Routing Configuration
 # =============================================================================
 
@@ -394,26 +428,24 @@ class EnrichmentConfig(BaseModel):
     """
     Configuration for content enrichment during ingestion.
 
-    Enrichment enhances chunks with LLM-generated summaries
-    and generates project-level artifacts.
+    Enrichment is always on - it's baked into the ingestion pipeline.
+    This extracts keywords, entities, and generates hierarchical summaries
+    for improved retrieval.
 
     Example YAML:
         enrichment:
-          enabled: true
           summary:
-            enabled: true
+            enabled: true  # Opt-in: per-chunk summaries (expensive)
           artifacts:
             auto: true
             disabled:
               - architecture_narrative
 
     Attributes:
-        enabled: Master switch for all enrichment.
-        summary: Chunk-level summary configuration.
+        summary: Chunk-level summary configuration (opt-in, expensive).
         artifacts: Project-level artifact configuration.
     """
 
-    enabled: bool = Field(default=False, description="Enable enrichment during ingestion")
     summary: SummaryConfig = Field(
         default_factory=SummaryConfig,
         description="Chunk-level summary configuration",
@@ -508,6 +540,12 @@ class FitzRagConfig(BaseModel):
     routing: QueryRoutingConfig = Field(
         default_factory=QueryRoutingConfig,
         description="Query routing configuration for hierarchical retrieval",
+    )
+
+    # Entity graph (related chunk discovery via shared entities)
+    entity_graph: EntityGraphConfig = Field(
+        default_factory=EntityGraphConfig,
+        description="Entity graph configuration for related chunk discovery",
     )
 
     model_config = ConfigDict(extra="forbid")

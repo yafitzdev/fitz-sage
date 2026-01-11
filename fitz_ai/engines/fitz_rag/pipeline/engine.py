@@ -36,6 +36,7 @@ from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
 from fitz_ai.engines.fitz_rag.pipeline.pipeline import ContextPipeline
 from fitz_ai.engines.fitz_rag.retrieval.registry import get_retrieval_plugin
 from fitz_ai.engines.fitz_rag.routing import QueryIntent, QueryRouter
+from fitz_ai.ingestion.entity_graph import EntityGraphStore
 from fitz_ai.ingestion.vocabulary import KeywordMatcher, create_matcher_from_store
 from fitz_ai.llm.registry import get_llm_plugin
 from fitz_ai.logging.logger import get_logger
@@ -279,6 +280,22 @@ class RAGPipeline:
         )
         logger.info(f"{PIPELINE} Using table store for plugin='{cfg.vector_db.plugin_name}'")
 
+        # Entity graph for related chunk discovery (auto-loaded from collection)
+        entity_graph = None
+        max_entity_expansion = cfg.entity_graph.max_expansion
+        if cfg.entity_graph.enabled:
+            entity_graph = EntityGraphStore(collection=cfg.retrieval.collection)
+            graph_stats = entity_graph.stats()
+            if graph_stats["entities"] > 0:
+                logger.info(
+                    f"{PIPELINE} Loaded entity graph [{cfg.retrieval.collection}] "
+                    f"with {graph_stats['entities']} entities, {graph_stats['edges']} edges"
+                )
+            else:
+                entity_graph = None  # No entities, don't use expansion
+        else:
+            logger.info(f"{PIPELINE} Entity graph disabled by config")
+
         # Retrieval (YAML-based plugin)
         retrieval = get_retrieval_plugin(
             plugin_name=cfg.retrieval.plugin_name,
@@ -288,6 +305,8 @@ class RAGPipeline:
             reranker=reranker,
             chat=fast_chat,
             keyword_matcher=keyword_matcher,
+            entity_graph=entity_graph,
+            max_entity_expansion=max_entity_expansion,
             table_store=table_store,
             top_k=cfg.retrieval.top_k,
             fetch_artifacts=cfg.retrieval.fetch_artifacts,

@@ -22,7 +22,14 @@ from fitz_ai.engines.fitz_rag.exceptions import EmbeddingError, VectorSearchErro
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
 
-from .base import ChatClient, Embedder, KeywordMatcherClient, RetrievalStep, VectorClient
+from .base import (
+    ChatClient,
+    Embedder,
+    EntityGraphClient,
+    KeywordMatcherClient,
+    RetrievalStep,
+    VectorClient,
+)
 
 logger = get_logger(__name__)
 
@@ -48,9 +55,11 @@ class VectorSearchStep(RetrievalStep):
         collection: Collection name to search
         chat: Fast-tier chat client for query expansion (optional, enables multi-query)
         keyword_matcher: Keyword matcher for exact term filtering (optional)
+        entity_graph: Entity graph for related chunk discovery (optional)
         k: Number of candidates to retrieve per query (default: 25)
         min_query_length: Minimum query length to trigger expansion (default: 300)
         max_queries: Maximum number of expanded queries (default: 5)
+        max_entity_expansion: Maximum related chunks to add from entity graph (default: 10)
         filter_conditions: Optional Qdrant-style filter for metadata filtering
     """
 
@@ -70,9 +79,11 @@ class VectorSearchStep(RetrievalStep):
     collection: str
     chat: ChatClient | None = None
     keyword_matcher: KeywordMatcherClient | None = None
+    entity_graph: EntityGraphClient | None = None
     k: int = 25
     min_query_length: int = 300
     max_queries: int = 5
+    max_entity_expansion: int = 10
     filter_conditions: dict[str, Any] = field(default_factory=dict)
 
     def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
@@ -111,6 +122,9 @@ class VectorSearchStep(RetrievalStep):
         # Always include table schema chunks - they may not match semantically
         # but TableQueryStep needs them to execute SQL queries
         results = self._ensure_table_chunks(results)
+
+        # Expand with related chunks via entity graph
+        results = self._expand_by_entity_graph(results)
 
         # Apply keyword filtering if available
         if self.keyword_matcher:
@@ -181,6 +195,9 @@ class VectorSearchStep(RetrievalStep):
 
         # Ensure table schema chunks are included
         all_results = self._ensure_table_chunks(all_results)
+
+        # Expand with related chunks via entity graph
+        all_results = self._expand_by_entity_graph(all_results)
 
         # Preserve any pre-existing chunks (e.g., artifacts)
         if chunks:
@@ -275,6 +292,9 @@ Return ONLY a JSON array of strings, no explanation. Example: ["query 1", "query
 
         # Ensure table schema chunks are included
         all_results = self._ensure_table_chunks(all_results)
+
+        # Expand with related chunks via entity graph
+        all_results = self._expand_by_entity_graph(all_results)
 
         # Preserve any pre-existing chunks (e.g., artifacts)
         if chunks:
@@ -397,6 +417,82 @@ Return ONLY a JSON object:
 
         except Exception as e:
             logger.debug(f"{RETRIEVER} Table fetch failed: {e}")
+
+        return results
+
+    def _expand_by_entity_graph(self, results: list[Chunk]) -> list[Chunk]:
+        """
+        Expand results with related chunks via shared entities.
+
+        Uses the entity graph to find chunks that share entities with the
+        retrieved chunks. This helps answer questions that require information
+        from multiple documents connected by shared entities.
+
+        Example:
+            Retrieved: "Sarah Chen leads Company XY"
+            Entity graph finds: "Company XY manufactures cars"
+            → Both chunks now available for answering "What does Sarah's company make?"
+        """
+        if not self.entity_graph:
+            return results
+
+        if not results:
+            return results
+
+        # Get IDs of current results
+        current_ids = [c.id for c in results]
+        seen_ids = set(current_ids)
+
+        # Find related chunks via entity graph
+        try:
+            related_ids = self.entity_graph.get_related_chunks(
+                chunk_ids=current_ids,
+                max_total=self.max_entity_expansion,
+            )
+
+            if not related_ids:
+                return results
+
+            # Fetch related chunks by ID
+            records = self.client.retrieve(
+                self.collection,
+                ids=related_ids,
+                with_payload=True,
+            )
+
+            added = 0
+            for record in records:
+                record_id = (
+                    record.get("id") if isinstance(record, dict) else getattr(record, "id", None)
+                )
+                if record_id and str(record_id) not in seen_ids:
+                    payload = (
+                        record.get("payload", {})
+                        if isinstance(record, dict)
+                        else getattr(record, "payload", {})
+                    )
+                    metadata = payload.get("metadata", {})
+                    if isinstance(metadata, dict):
+                        flat_metadata = {**payload, **metadata, "from_entity_graph": True}
+                    else:
+                        flat_metadata = {**payload, "from_entity_graph": True}
+
+                    chunk = Chunk(
+                        id=str(record_id),
+                        doc_id=str(payload.get("doc_id", "unknown")),
+                        content=str(payload.get("content", "")),
+                        chunk_index=int(payload.get("chunk_index", 0)),
+                        metadata=flat_metadata,
+                    )
+                    results.append(chunk)
+                    seen_ids.add(str(record_id))
+                    added += 1
+
+            if added:
+                logger.debug(f"{RETRIEVER} Entity graph added {added} related chunks")
+
+        except Exception as e:
+            logger.debug(f"{RETRIEVER} Entity graph expansion failed: {e}")
 
         return results
 

@@ -64,6 +64,18 @@ class KeywordMatcherClient(Protocol):
     def chunk_matches_any(self, chunk: Any, keywords: list[Any] | None = None) -> bool: ...
 
 
+@runtime_checkable
+class EntityGraphClient(Protocol):
+    """Protocol for entity graph services (used for related chunk discovery)."""
+
+    def get_related_chunks(
+        self,
+        chunk_ids: list[str],
+        max_total: int = 20,
+        min_shared_entities: int = 1,
+    ) -> list[str]: ...
+
+
 # =============================================================================
 # Base Step
 # =============================================================================

@@ -135,6 +135,19 @@ def _delete_table_registry(collection: str) -> None:
             logger.warning(f"Failed to delete table registry: {e}")
 
 
+def _delete_entity_graph(collection: str) -> None:
+    """Delete entity graph database associated with a collection."""
+    from fitz_ai.core.paths import FitzPaths
+
+    graph_path = FitzPaths.entity_graph(collection)
+    if graph_path.exists():
+        try:
+            graph_path.unlink()
+            ui.info(f"Deleted entity graph: {graph_path.name}")
+        except Exception as e:
+            logger.warning(f"Failed to delete entity graph: {e}")
+
+
 def _display_example_chunks(client: Any, collection: str, limit: int = 3) -> None:
     """Display example chunks from a collection."""
     print()
@@ -291,6 +304,7 @@ def command() -> None:
                     # Also delete associated files
                     _delete_vocabulary(selected_collection)
                     _delete_table_registry(selected_collection)
+                    _delete_entity_graph(selected_collection)
 
                     return  # Exit after deletion
                 except Exception as e:

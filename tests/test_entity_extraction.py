@@ -286,7 +286,7 @@ class TestEnrichmentPipelineChunkEnrichment:
 
     def test_chunk_enrichment_enabled_with_chat_client(self, tmp_path):
         """Chunk enrichment is enabled when chat_client is provided."""
-        config = EnrichmentConfig(enabled=True)
+        config = EnrichmentConfig()
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "[]"
 
@@ -300,7 +300,7 @@ class TestEnrichmentPipelineChunkEnrichment:
 
     def test_chunk_enrichment_disabled_without_chat_client(self, tmp_path):
         """Chunk enrichment is disabled when no chat_client is provided."""
-        config = EnrichmentConfig(enabled=True)
+        config = EnrichmentConfig()
         pipeline = EnrichmentPipeline(
             config=config,
             project_root=tmp_path,
@@ -311,7 +311,7 @@ class TestEnrichmentPipelineChunkEnrichment:
 
     def test_enrich_extracts_entities(self, tmp_path):
         """ChunkEnricher extracts entities as part of batch enrichment."""
-        config = EnrichmentConfig(enabled=True)
+        config = EnrichmentConfig()
 
         mock_chat = MagicMock()
         # ChunkEnricher expects batch response with summary, keywords, entities
@@ -360,7 +360,7 @@ class TestEnrichmentPipelineChunkEnrichment:
 
     def test_enrich_extracts_all_enrichments(self, tmp_path):
         """ChunkEnricher extracts summary, keywords, and entities together."""
-        config = EnrichmentConfig(enabled=True)
+        config = EnrichmentConfig()
 
         mock_chat = MagicMock()
         mock_chat.chat.return_value = json.dumps(

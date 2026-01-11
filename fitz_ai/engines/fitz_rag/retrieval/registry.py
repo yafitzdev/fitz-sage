@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from fitz_ai.engines.fitz_rag.retrieval.steps import (
         ChatClient,
         Embedder,
+        EntityGraphClient,
         KeywordMatcherClient,
         Reranker,
         VectorClient,
@@ -40,6 +41,8 @@ def get_retrieval_plugin(
     reranker: "Reranker | None" = None,
     chat: "ChatClient | None" = None,
     keyword_matcher: "KeywordMatcherClient | None" = None,
+    entity_graph: "EntityGraphClient | None" = None,
+    max_entity_expansion: int = 10,
     table_store: Any | None = None,
     top_k: int = 5,
     fetch_artifacts: bool = False,
@@ -55,6 +58,8 @@ def get_retrieval_plugin(
         reranker: Optional reranking service
         chat: Optional fast-tier chat client for multi-query expansion
         keyword_matcher: Optional keyword matcher for exact term filtering
+        entity_graph: Optional entity graph for related chunk discovery
+        max_entity_expansion: Maximum related chunks to add per query
         table_store: Optional TableStore for CSV file queries
         top_k: Final number of chunks to return
         fetch_artifacts: Whether to fetch artifacts (always with score=1.0)
@@ -74,6 +79,8 @@ def get_retrieval_plugin(
             reranker=reranker,
             chat=chat,
             keyword_matcher=keyword_matcher,
+            entity_graph=entity_graph,
+            max_entity_expansion=max_entity_expansion,
             table_store=table_store,
             top_k=top_k,
             fetch_artifacts=fetch_artifacts,

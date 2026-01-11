@@ -2,7 +2,7 @@
 """
 Configuration schema for the enrichment pipeline.
 
-All retrieval intelligence is BAKED IN - no opt-in configuration needed.
+All retrieval intelligence is BAKED IN - always on, no opt-in needed.
 
 Enrichment automatically provides:
 1. Chunk-level: summary, keywords, entities (via unified enrichment bus)
@@ -14,7 +14,6 @@ the cost negligible even for large codebases.
 
 Config structure in .fitz/config.yaml:
     enrichment:
-      enabled: true  # Master switch (default: true)
       hierarchy:
         group_by: source_file  # How to group chunks for L1 summaries
       artifacts:
@@ -117,17 +116,15 @@ class EnrichmentConfig:
     """
     Configuration for the enrichment pipeline.
 
-    All chunk-level enrichment (summary, keywords, entities) is BAKED IN
-    via the unified enrichment bus. No opt-in configuration needed.
+    Enrichment is always on - baked into the ingestion pipeline.
+    Extracts keywords, entities, and generates hierarchical summaries.
 
     Attributes:
-        enabled: Master switch for all enrichment
         artifacts: Project-level artifact configuration
         hierarchy: Hierarchical summarization configuration
 
     Example in .fitz/config.yaml:
         enrichment:
-          enabled: true
           artifacts:
             auto: true
             disabled:
@@ -141,7 +138,6 @@ class EnrichmentConfig:
                 prompt: "Summarize sentiment and themes"
     """
 
-    enabled: bool = True  # Master switch
     artifacts: ArtifactConfig = field(default_factory=ArtifactConfig)
     hierarchy: HierarchyConfig = field(default_factory=HierarchyConfig)
 
@@ -168,7 +164,6 @@ class EnrichmentConfig:
             )
 
         return cls(
-            enabled=data.get("enabled", True),
             artifacts=ArtifactConfig(
                 auto=artifacts_data.get("auto", True),
                 enabled=artifacts_data.get("enabled", []),
@@ -188,7 +183,6 @@ class EnrichmentConfig:
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
-            "enabled": self.enabled,
             "artifacts": {
                 "auto": self.artifacts.auto,
                 "enabled": self.artifacts.enabled,

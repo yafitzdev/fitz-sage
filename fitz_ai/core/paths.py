@@ -165,6 +165,30 @@ class FitzPaths:
         return path
 
     # =========================================================================
+    # Entity Graph
+    # =========================================================================
+
+    @classmethod
+    def entity_graph(cls, collection: str) -> Path:
+        """
+        Entity graph database for a collection.
+
+        Location: {workspace}/entity_graph/{collection}.db
+
+        This SQLite database stores:
+        - Entity definitions (name, type, mention count)
+        - Entity-to-chunk mappings for related chunk discovery
+        """
+        return cls.workspace() / "entity_graph" / f"{collection}.db"
+
+    @classmethod
+    def ensure_entity_graph_dir(cls) -> Path:
+        """Get entity graph directory and create it if it doesn't exist."""
+        path = cls.workspace() / "entity_graph"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    # =========================================================================
     # Vocabulary
     # =========================================================================
 

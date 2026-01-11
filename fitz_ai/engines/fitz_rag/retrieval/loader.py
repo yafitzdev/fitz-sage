@@ -22,6 +22,7 @@ import yaml
 from fitz_ai.engines.fitz_rag.retrieval.steps import (
     ChatClient,
     Embedder,
+    EntityGraphClient,
     KeywordMatcherClient,
     Reranker,
     RetrievalStep,
@@ -112,6 +113,8 @@ class RetrievalDependencies:
     reranker: Reranker | None = None
     chat: ChatClient | None = None  # Fast-tier chat for multi-query expansion
     keyword_matcher: KeywordMatcherClient | None = None  # Exact keyword matching
+    entity_graph: EntityGraphClient | None = None  # Entity graph for related chunk discovery
+    max_entity_expansion: int = 10  # Max related chunks per query
     table_store: Any | None = None  # TableStore for CSV file queries
 
     # Config overrides (from retrieval config)
@@ -250,6 +253,8 @@ def _build_step(
         params.setdefault("collection", deps.collection)
         params.setdefault("chat", deps.chat)  # Enables multi-query expansion
         params.setdefault("keyword_matcher", deps.keyword_matcher)  # Enables keyword filtering
+        params.setdefault("entity_graph", deps.entity_graph)  # Enables entity-based expansion
+        params.setdefault("max_entity_expansion", deps.max_entity_expansion)
 
     elif step_type == "rerank":
         if deps.reranker is None:
@@ -287,6 +292,8 @@ def create_retrieval_pipeline(
     reranker: Reranker | None = None,
     chat: ChatClient | None = None,
     keyword_matcher: KeywordMatcherClient | None = None,
+    entity_graph: EntityGraphClient | None = None,
+    max_entity_expansion: int = 10,
     table_store: Any | None = None,
     top_k: int = 5,
     fetch_artifacts: bool = False,
@@ -302,6 +309,8 @@ def create_retrieval_pipeline(
         reranker: Optional reranking service
         chat: Optional fast-tier chat client for multi-query expansion
         keyword_matcher: Optional keyword matcher for exact term filtering
+        entity_graph: Optional entity graph for related chunk discovery
+        max_entity_expansion: Maximum related chunks to add per query
         table_store: Optional TableStore for CSV file queries
         top_k: Final number of chunks to return
         fetch_artifacts: Whether to fetch artifacts (always with score=1.0)
@@ -318,6 +327,8 @@ def create_retrieval_pipeline(
         reranker=reranker,
         chat=chat,
         keyword_matcher=keyword_matcher,
+        entity_graph=entity_graph,
+        max_entity_expansion=max_entity_expansion,
         table_store=table_store,
         top_k=top_k,
         fetch_artifacts=fetch_artifacts,

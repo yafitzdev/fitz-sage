@@ -262,7 +262,7 @@ class TestEntityLinkingPipelineIntegration:
             ]
         )
 
-        config = EnrichmentConfig(enabled=True)
+        config = EnrichmentConfig()
 
         pipeline = EnrichmentPipeline(
             config=config,

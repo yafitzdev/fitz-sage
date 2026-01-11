@@ -32,6 +32,7 @@ from .artifact_fetch import ArtifactClient, ArtifactFetchStep
 from .base import (
     ChatClient,
     Embedder,
+    EntityGraphClient,
     KeywordMatcherClient,
     Reranker,
     RetrievalStep,
@@ -85,6 +86,7 @@ __all__ = [
     "Reranker",
     "ChatClient",
     "KeywordMatcherClient",
+    "EntityGraphClient",
     "ArtifactClient",
     # Step classes
     "VectorSearchStep",

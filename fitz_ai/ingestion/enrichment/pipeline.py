@@ -42,6 +42,7 @@ from fitz_ai.ingestion.enrichment.chunk import ChunkEnricher, create_default_enr
 from fitz_ai.ingestion.enrichment.config import EnrichmentConfig
 from fitz_ai.ingestion.enrichment.hierarchy.enricher import HierarchyEnricher
 from fitz_ai.ingestion.enrichment.models import EnrichmentResult
+from fitz_ai.ingestion.entity_graph import EntityGraphStore
 from fitz_ai.ingestion.vocabulary import Keyword, VocabularyStore
 
 if TYPE_CHECKING:
@@ -92,12 +93,14 @@ class EnrichmentPipeline:
         self._chunk_enricher: ChunkEnricher | None = None
         self._hierarchy_enricher: HierarchyEnricher | None = None
         self._vocabulary_store: VocabularyStore | None = None
+        self._entity_graph: EntityGraphStore | None = None
         self._artifact_registry = ArtifactRegistry.get_instance()
         self._project_analysis: ProjectAnalysis | None = None
 
         self._init_chunk_enricher()
         self._init_hierarchy_enricher()
         self._init_vocabulary_store()
+        self._init_entity_graph()
 
     def _init_chunk_enricher(self) -> None:
         """Initialize the chunk enrichment bus (always on)."""
@@ -148,6 +151,14 @@ class EnrichmentPipeline:
                 f"[ENRICHMENT] Vocabulary store initialized for collection '{self._collection}'"
             )
 
+    def _init_entity_graph(self) -> None:
+        """Initialize the entity graph store for related chunk discovery."""
+        if self._collection:
+            self._entity_graph = EntityGraphStore(collection=self._collection)
+            logger.info(
+                f"[ENRICHMENT] Entity graph initialized for collection '{self._collection}'"
+            )
+
     @classmethod
     def from_config(
         cls,
@@ -181,11 +192,6 @@ class EnrichmentPipeline:
         )
 
     @property
-    def is_enabled(self) -> bool:
-        """Check if enrichment is enabled."""
-        return self.config.enabled
-
-    @property
     def chunk_enrichment_enabled(self) -> bool:
         """Check if chunk-level enrichment is available."""
         return self._chunk_enricher is not None
@@ -197,8 +203,8 @@ class EnrichmentPipeline:
 
     @property
     def artifacts_enabled(self) -> bool:
-        """Check if artifacts are enabled."""
-        return self.config.enabled
+        """Check if artifacts are enabled (always true, baked in)."""
+        return True
 
     def analyze_project(self) -> ProjectAnalysis:
         """
@@ -325,9 +331,6 @@ class EnrichmentPipeline:
         Returns:
             EnrichmentResult with enriched chunks and artifacts
         """
-        if not self.is_enabled:
-            return EnrichmentResult(chunks=chunks, artifacts=[])
-
         # Step 1: Chunk-level enrichment (summary, keywords, entities)
         if self._chunk_enricher:
             logger.info(f"[ENRICHMENT] Running chunk enrichment on {len(chunks)} chunks")
@@ -337,6 +340,10 @@ class EnrichmentPipeline:
             # Step 2: Save keywords to vocabulary store
             if enrich_result.all_keywords and self._vocabulary_store:
                 self._save_keywords(enrich_result.all_keywords, len(chunks))
+
+            # Step 2b: Populate entity graph for related chunk discovery
+            if self._entity_graph:
+                self._populate_entity_graph(chunks)
 
         # Step 3: Hierarchical enrichment (L1 group + L2 corpus summaries)
         if self._hierarchy_enricher:
@@ -385,6 +392,40 @@ class EnrichmentPipeline:
         if keyword_objects:
             self._vocabulary_store.merge_and_save(keyword_objects, source_docs=source_docs)
             logger.info(f"[ENRICHMENT] Saved {len(keyword_objects)} keywords to vocabulary")
+
+    def _populate_entity_graph(self, chunks: List["Chunk"]) -> None:
+        """
+        Populate the entity graph with entities from enriched chunks.
+
+        Args:
+            chunks: Chunks with entities in metadata (from ChunkEnricher)
+        """
+        if not self._entity_graph:
+            return
+
+        entity_count = 0
+        for chunk in chunks:
+            entities = chunk.metadata.get("entities", [])
+            if not entities:
+                continue
+
+            # Convert entity dicts to (name, type) tuples
+            entity_tuples = [
+                (e.get("name", ""), e.get("type", "unknown"))
+                for e in entities
+                if e.get("name")
+            ]
+
+            if entity_tuples:
+                self._entity_graph.add_chunk_entities(chunk.id, entity_tuples)
+                entity_count += len(entity_tuples)
+
+        if entity_count > 0:
+            stats = self._entity_graph.stats()
+            logger.info(
+                f"[ENRICHMENT] Entity graph updated: {stats['entities']} entities, "
+                f"{stats['edges']} edges"
+            )
 
     def _detect_keyword_category(self, keyword: str) -> str:
         """Detect category from keyword format."""

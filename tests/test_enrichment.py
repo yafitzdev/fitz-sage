@@ -247,25 +247,23 @@ class TestEnrichmentPipeline:
 
     def test_pipeline_creation(self, tmp_path):
         """Test that pipeline can be created with default config."""
-        config = EnrichmentConfig(enabled=True)
+        config = EnrichmentConfig()
         pipeline = EnrichmentPipeline(
             config=config,
             project_root=tmp_path,
             chat_client=None,
         )
 
-        assert pipeline.is_enabled
         assert not pipeline.chunk_enrichment_enabled  # No chat client
         assert pipeline.artifacts_enabled
 
     def test_pipeline_from_dict(self, tmp_path):
         """Test creating pipeline from dict config."""
         pipeline = EnrichmentPipeline.from_config(
-            config={"enabled": True, "artifacts": {"auto": True}},
+            config={"artifacts": {"auto": True}},
             project_root=tmp_path,
         )
 
-        assert pipeline.is_enabled
         assert pipeline.artifacts_enabled
 
     def test_generate_structural_artifacts(self, tmp_path):
@@ -288,7 +286,7 @@ def my_func():
 '''
         )
 
-        config = EnrichmentConfig(enabled=True)
+        config = EnrichmentConfig()
         pipeline = EnrichmentPipeline(
             config=config,
             project_root=proj,
