@@ -7,7 +7,7 @@ Discovers and loads retrieval plugins from YAML files in the plugins directory.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.engines.fitz_rag.retrieval.loader import (
     RetrievalDependencies,
@@ -40,6 +40,7 @@ def get_retrieval_plugin(
     reranker: "Reranker | None" = None,
     chat: "ChatClient | None" = None,
     keyword_matcher: "KeywordMatcherClient | None" = None,
+    table_store: Any | None = None,
     top_k: int = 5,
     fetch_artifacts: bool = False,
 ) -> RetrievalPipelineFromYaml:
@@ -54,6 +55,7 @@ def get_retrieval_plugin(
         reranker: Optional reranking service
         chat: Optional fast-tier chat client for multi-query expansion
         keyword_matcher: Optional keyword matcher for exact term filtering
+        table_store: Optional TableStore for CSV file queries
         top_k: Final number of chunks to return
         fetch_artifacts: Whether to fetch artifacts (always with score=1.0)
 
@@ -72,6 +74,7 @@ def get_retrieval_plugin(
             reranker=reranker,
             chat=chat,
             keyword_matcher=keyword_matcher,
+            table_store=table_store,
             top_k=top_k,
             fetch_artifacts=fetch_artifacts,
         )

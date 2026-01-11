@@ -140,6 +140,11 @@ class TableCache:
         self.conn.commit()
         logger.debug(f"Cleared table cache for {self.collection}")
 
+    def list_tables(self) -> list[str]:
+        """List all table IDs in cache."""
+        cursor = self.conn.execute("SELECT table_id FROM cache")
+        return [row[0] for row in cursor.fetchall()]
+
     def close(self) -> None:
         """Close database connection."""
         if self._conn:

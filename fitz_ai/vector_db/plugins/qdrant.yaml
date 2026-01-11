@@ -132,6 +132,22 @@ operations:
       name_field: name
 
   # ---------------------------------------------------------------------------
+  # Retrieve points by IDs
+  # ---------------------------------------------------------------------------
+  retrieve:
+    endpoint: /collections/{{collection}}/points
+    method: POST
+    body:
+      ids: "{{ids}}"
+      with_payload: "{{with_payload}}"
+
+    response:
+      results_path: result
+      mapping:
+        id: id
+        payload: payload
+
+  # ---------------------------------------------------------------------------
   # Get collection statistics
   # ---------------------------------------------------------------------------
   get_stats:

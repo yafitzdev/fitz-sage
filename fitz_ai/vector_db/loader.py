@@ -517,6 +517,89 @@ class GenericVectorDBPlugin:
         name_field = response_config.get("name_field", "name")
         return [c[name_field] if isinstance(c, dict) else str(c) for c in collections]
 
+    def retrieve(
+        self,
+        collection_name: str,
+        ids: List[str],
+        with_payload: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve points by their IDs.
+
+        Args:
+            collection_name: Name of the collection
+            ids: List of point IDs to retrieve
+            with_payload: Whether to include payload in response
+
+        Returns:
+            List of dicts with 'id' and 'payload' keys
+        """
+        if "retrieve" not in self.spec.operations:
+            raise NotImplementedError(f"{self.plugin_name} does not support retrieve")
+
+        if not ids:
+            return []
+
+        op = self.spec.operations["retrieve"]
+
+        # Convert IDs if required (e.g., string to UUID for Qdrant)
+        converted_ids = ids
+        if self.spec.requires_uuid_ids():
+            converted_ids = []
+            for point_id in ids:
+                try:
+                    uuid.UUID(point_id)
+                    converted_ids.append(point_id)
+                except ValueError:
+                    converted_ids.append(_string_to_uuid(point_id))
+
+        context = {
+            "collection": collection_name,
+            "ids": converted_ids,
+            "with_payload": with_payload,
+            **self.kwargs,
+        }
+
+        endpoint = Template(op["endpoint"]).render(context)
+        body = self.spec.render_template(op.get("body", {}), context)
+
+        if op["method"] == "GET":
+            response = self.client.get(endpoint)
+        else:
+            response = self.client.request(
+                method=op["method"],
+                url=endpoint,
+                json=body if body else None,
+            )
+        response.raise_for_status()
+
+        data = response.json()
+        results_path = op["response"]["results_path"]
+        results = extract_path(data, results_path, default=[], strict=False)
+
+        if not results:
+            return []
+
+        mapping = op["response"]["mapping"]
+        retrieved = []
+
+        for item in results:
+            result_id = extract_path(item, mapping["id"], strict=False)
+            result_payload = extract_path(
+                item, mapping.get("payload", ""), default={}, strict=False
+            )
+
+            # Restore original ID if we converted it
+            if result_payload and "_original_id" in result_payload:
+                result_id = result_payload["_original_id"]
+
+            retrieved.append({
+                "id": str(result_id),
+                "payload": result_payload if result_payload else {},
+            })
+
+        return retrieved
+
     def get_collection_stats(self, collection: str) -> Dict[str, Any]:
         """Get statistics for a collection."""
         if "get_stats" not in self.spec.operations:

@@ -138,15 +138,43 @@ Required fields:
         PluginType.VECTOR_DB: """
 Required fields:
 - name: string (unique identifier)
-- type: string (e.g., "qdrant", "pinecone", "milvus")
+- type: "vector_db"
+- description: string (describe the vector database)
+- features:
+    - requires_uuid_ids: bool (true if DB requires UUID point IDs)
+    - auto_detect: string|null (service name for auto-detection, e.g., "qdrant")
+    - supports_namespaces: bool (true if uses namespaces instead of collections)
 - connection:
-    - host: string (can be {ENV_VAR} placeholder)
-    - port: integer
-- operations:
-    - create_collection: HTTP operation spec
-    - delete_collection: HTTP operation spec
-    - upsert: HTTP operation spec
-    - search: HTTP operation spec
+    - type: "http"
+    - base_url: string with {{host}} and {{port}} placeholders
+    - default_host: string (e.g., "localhost")
+    - default_port: integer
+    - auth:
+        - type: "bearer" | "custom"
+        - env_var: string (API key environment variable)
+        - header: string (e.g., "Authorization")
+        - scheme: string (e.g., "Bearer", or "" for no prefix)
+        - optional: bool (true for self-hosted, false for cloud)
+- operations (all use Jinja2 templates with {{collection}}, {{ids}}, etc.):
+    - search: Find similar vectors (POST with query_vector, limit)
+    - upsert: Insert/update points (POST/PUT with points array)
+    - retrieve: Fetch points by IDs (REQUIRED for table storage)
+    - count: Get collection size
+    - create_collection: Create new collection
+    - delete_collection: Delete collection
+    - list_collections: List all collections
+    - get_stats: Get collection statistics
+
+Each operation needs:
+- endpoint: string with {{collection}} placeholder
+- method: "GET" | "POST" | "PUT" | "DELETE"
+- body: request body template (optional for GET)
+- response:
+    - results_path: JSONPath to results (e.g., "result.points")
+    - mapping: dict mapping id, score, payload fields
+
+IMPORTANT: The 'retrieve' operation is REQUIRED for table/CSV file support.
+It fetches points by their IDs and must return id + payload.
 """,
         PluginType.RETRIEVAL: """
 Required fields:

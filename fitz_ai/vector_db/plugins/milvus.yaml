@@ -144,6 +144,24 @@ operations:
       is_string_list: true
 
   # ---------------------------------------------------------------------------
+  # Retrieve vectors by IDs
+  # ---------------------------------------------------------------------------
+  retrieve:
+    endpoint: /vector/get
+    method: POST
+    body:
+      collectionName: "{{collection}}"
+      id: "{{ids}}"
+      outputFields:
+        - "*"
+
+    response:
+      results_path: data
+      mapping:
+        id: id
+        payload: ""  # Milvus returns all fields at top level
+
+  # ---------------------------------------------------------------------------
   # Get collection statistics
   # ---------------------------------------------------------------------------
   get_stats:

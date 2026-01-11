@@ -133,6 +133,23 @@ operations:
       extract_keys: true
 
   # ---------------------------------------------------------------------------
+  # Retrieve vectors by IDs
+  # ---------------------------------------------------------------------------
+  retrieve:
+    endpoint: /vectors/fetch
+    method: GET
+    query_params:
+      ids: "{{ids}}"
+      namespace: "{{collection}}"
+
+    response:
+      results_path: vectors
+      # Pinecone returns a dict keyed by ID
+      mapping:
+        id: id
+        payload: metadata
+
+  # ---------------------------------------------------------------------------
   # Get namespace statistics
   # ---------------------------------------------------------------------------
   get_stats:

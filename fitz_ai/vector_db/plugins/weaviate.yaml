@@ -186,6 +186,22 @@ operations:
       name_field: class
 
   # ---------------------------------------------------------------------------
+  # Retrieve objects by IDs
+  # ---------------------------------------------------------------------------
+  retrieve:
+    endpoint: /v1/objects
+    method: GET
+    query_params:
+      class: "{{collection}}"
+      id: "{{ids}}"
+
+    response:
+      results_path: objects
+      mapping:
+        id: id
+        payload: properties
+
+  # ---------------------------------------------------------------------------
   # Get class (collection) statistics
   # ---------------------------------------------------------------------------
   get_stats:

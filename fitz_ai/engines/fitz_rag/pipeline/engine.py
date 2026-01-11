@@ -40,6 +40,7 @@ from fitz_ai.ingestion.vocabulary import KeywordMatcher, create_matcher_from_sto
 from fitz_ai.llm.registry import get_llm_plugin
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE, VECTOR_DB
+from fitz_ai.tabular.store import get_table_store
 from fitz_ai.vector_db.registry import get_vector_db_plugin
 
 logger = get_logger(__name__)
@@ -269,6 +270,17 @@ class RAGPipeline:
                 f"with {len(keyword_matcher.keywords)} keywords"
             )
 
+        # Table store for CSV file queries
+        # Uses GenericTableStore for remote vector DBs, SqliteTableStore for local
+        table_store = get_table_store(
+            collection=cfg.retrieval.collection,
+            vector_db_plugin=cfg.vector_db.plugin_name,
+            vector_plugin_instance=vector_client,
+        )
+        logger.info(
+            f"{PIPELINE} Using table store for plugin='{cfg.vector_db.plugin_name}'"
+        )
+
         # Retrieval (YAML-based plugin)
         retrieval = get_retrieval_plugin(
             plugin_name=cfg.retrieval.plugin_name,
@@ -278,6 +290,7 @@ class RAGPipeline:
             reranker=reranker,
             chat=fast_chat,
             keyword_matcher=keyword_matcher,
+            table_store=table_store,
             top_k=cfg.retrieval.top_k,
             fetch_artifacts=cfg.retrieval.fetch_artifacts,
         )

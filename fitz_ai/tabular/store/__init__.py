@@ -12,26 +12,31 @@ from fitz_ai.tabular.store.base import (
     compute_hash,
     decompress_csv,
 )
+from fitz_ai.tabular.store.generic import GenericTableStore
 from fitz_ai.tabular.store.sqlite import SqliteTableStore
 
 if TYPE_CHECKING:
-    from qdrant_client import QdrantClient
+    pass
 
 __all__ = [
     "StoredTable",
     "TableStore",
     "SqliteTableStore",
+    "GenericTableStore",
     "compress_csv",
     "compute_hash",
     "decompress_csv",
     "get_table_store",
 ]
 
+# Local plugins that use SQLite table store (no remote sync)
+LOCAL_PLUGINS = {"local_faiss", "local-faiss"}
+
 
 def get_table_store(
     collection: str,
     vector_db_plugin: str = "local_faiss",
-    qdrant_client: "QdrantClient | None" = None,
+    vector_plugin_instance: Any = None,
 ) -> TableStore:
     """
     Get appropriate table store based on vector DB plugin.
@@ -39,18 +44,20 @@ def get_table_store(
     Args:
         collection: Collection name
         vector_db_plugin: Name of vector DB plugin being used
-        qdrant_client: Qdrant client instance (required for qdrant plugin)
+        vector_plugin_instance: Vector DB plugin instance (for remote stores)
 
     Returns:
-        TableStore instance (SqliteTableStore for local, QdrantTableStore for team)
+        TableStore instance:
+        - SqliteTableStore for local plugins (FAISS)
+        - GenericTableStore for remote plugins (Qdrant, Pinecone, Weaviate, Milvus)
     """
-    if vector_db_plugin == "qdrant":
-        if qdrant_client is None:
-            raise ValueError("Qdrant client required for qdrant table store")
+    # Local mode: use SQLite directly
+    if vector_db_plugin in LOCAL_PLUGINS:
+        return SqliteTableStore(collection)
 
-        from fitz_ai.tabular.store.qdrant import QdrantTableStore
+    # Remote mode: use GenericTableStore with plugin's retrieve operation
+    if vector_plugin_instance is not None:
+        return GenericTableStore(collection, vector_plugin_instance)
 
-        return QdrantTableStore(collection, qdrant_client)
-
-    # Default to local SQLite for all other plugins
+    # Fallback to SQLite if no plugin instance provided
     return SqliteTableStore(collection)
