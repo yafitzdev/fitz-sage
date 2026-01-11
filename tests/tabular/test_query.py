@@ -90,10 +90,9 @@ class TestTableQueryStep:
         result = step.execute("query", [regular_chunk, sample_table_chunk])
 
         assert len(result) == 2
-        # Regular chunk unchanged
-        assert result[0].content == "Regular content"
-        # Table chunk augmented
-        assert "Query Results" in result[1].content
+        # Table chunks processed first, then regular chunks
+        assert "Query Results" in result[0].content  # Table result
+        assert result[1].content == "Regular content"  # Regular chunk unchanged
 
     def test_column_selection_fallback(self, step, mock_chat, sample_table_chunk):
         """Test fallback when column selection returns invalid JSON."""
@@ -301,3 +300,224 @@ class TestEndToEnd:
         assert "Washington" in result[0].content
         assert "Paris" in result[0].content
         assert "Tokyo" in result[0].content
+
+
+class TestMultiTableJoins:
+    """Tests for multi-table join functionality."""
+
+    @pytest.fixture
+    def step(self):
+        mock_chat = MagicMock()
+        return TableQueryStep(chat=mock_chat), mock_chat
+
+    @pytest.fixture
+    def employees_chunk(self):
+        """Create employees table chunk."""
+        table = ParsedTable(
+            table_id="emp123",
+            source_doc="employees.csv",
+            headers=["id", "name", "dept_id"],
+            rows=[
+                ["1", "Alice", "10"],
+                ["2", "Bob", "20"],
+                ["3", "Carol", "10"],
+            ],
+        )
+        return create_schema_chunk(table)
+
+    @pytest.fixture
+    def departments_chunk(self):
+        """Create departments table chunk."""
+        table = ParsedTable(
+            table_id="dept456",
+            source_doc="departments.csv",
+            headers=["id", "dept_name", "location"],
+            rows=[
+                ["10", "Engineering", "Building A"],
+                ["20", "Sales", "Building B"],
+            ],
+        )
+        return create_schema_chunk(table)
+
+    def test_needs_multi_table_returns_false_for_single_chunk(self, step):
+        """Test detection returns false for single table."""
+        step_instance, mock_chat = step
+        table = ParsedTable(
+            table_id="t1",
+            source_doc="data.csv",
+            headers=["col1"],
+            rows=[["val"]],
+        )
+        chunk = create_schema_chunk(table)
+
+        result = step_instance._needs_multi_table("query", [chunk])
+
+        assert result is False
+        # LLM should not be called for single table
+        mock_chat.chat.assert_not_called()
+
+    def test_needs_multi_table_calls_llm_for_multiple_chunks(
+        self, step, employees_chunk, departments_chunk
+    ):
+        """Test detection calls LLM for multiple tables."""
+        step_instance, mock_chat = step
+        mock_chat.chat.return_value = "no"
+
+        result = step_instance._needs_multi_table(
+            "What is Alice's name?",
+            [employees_chunk, departments_chunk],
+        )
+
+        assert result is False
+        mock_chat.chat.assert_called_once()
+
+    def test_needs_multi_table_returns_true_for_join_query(
+        self, step, employees_chunk, departments_chunk
+    ):
+        """Test detection returns true for join query."""
+        step_instance, mock_chat = step
+        mock_chat.chat.return_value = "yes"
+
+        result = step_instance._needs_multi_table(
+            "Show employee names with their department names",
+            [employees_chunk, departments_chunk],
+        )
+
+        assert result is True
+
+    def test_derive_table_name_from_doc_id(self, step):
+        """Test table name derivation from doc_id."""
+        step_instance, _ = step
+
+        chunk = Chunk(
+            id="test",
+            doc_id="employees.csv",
+            content="",
+            chunk_index=0,
+            metadata={"table_id": "abc123"},
+        )
+
+        name = step_instance._derive_table_name(chunk)
+
+        assert name == "employees"
+
+    def test_derive_table_name_sanitizes_special_chars(self, step):
+        """Test table name sanitization."""
+        step_instance, _ = step
+
+        chunk = Chunk(
+            id="test",
+            doc_id="my-data (2024).csv",
+            content="",
+            chunk_index=0,
+            metadata={"table_id": "abc123"},
+        )
+
+        name = step_instance._derive_table_name(chunk)
+
+        # Special chars replaced with underscores
+        assert "-" not in name
+        assert "(" not in name
+        assert ")" not in name
+        assert " " not in name
+
+    def test_derive_table_name_handles_leading_digit(self, step):
+        """Test table name with leading digit gets prefix."""
+        step_instance, _ = step
+
+        chunk = Chunk(
+            id="test",
+            doc_id="2024_data.csv",
+            content="",
+            chunk_index=0,
+            metadata={"table_id": "abc123"},
+        )
+
+        name = step_instance._derive_table_name(chunk)
+
+        # Should prefix with t_
+        assert name.startswith("t_")
+
+    def test_multi_table_execution(self, step, employees_chunk, departments_chunk):
+        """Test multi-table query execution."""
+        step_instance, mock_chat = step
+
+        # Mock responses: detection=yes, SQL generation
+        mock_chat.chat.side_effect = [
+            "yes",  # Multi-table detection
+            """SELECT e.name, d.dept_name
+               FROM employees e
+               JOIN departments d ON e.dept_id = d.id""",  # SQL
+        ]
+
+        result = step_instance.execute(
+            "Show employee names with department names",
+            [employees_chunk, departments_chunk],
+        )
+
+        assert len(result) == 1
+        assert result[0].metadata.get("is_multi_table_result") is True
+        assert "employees" in result[0].metadata.get("source_tables", [])
+        assert "departments" in result[0].metadata.get("source_tables", [])
+
+    def test_multi_table_fallback_on_single_table_query(
+        self, step, employees_chunk, departments_chunk
+    ):
+        """Test fallback to single-table processing when not a join query."""
+        step_instance, mock_chat = step
+
+        # Mock: detection=no, then single table processing
+        mock_chat.chat.side_effect = [
+            "no",  # Multi-table detection - not needed
+            '["name"]',  # Column selection
+            "SELECT name FROM data",  # SQL
+            '["dept_name"]',  # Column selection for second table
+            "SELECT dept_name FROM data",  # SQL for second table
+        ]
+
+        result = step_instance.execute(
+            "What are the employee names?",
+            [employees_chunk, departments_chunk],
+        )
+
+        # Should process each table independently
+        assert len(result) == 2
+
+    def test_multi_table_sql_generation(self, step):
+        """Test multi-table SQL generation prompt."""
+        step_instance, mock_chat = step
+        mock_chat.chat.return_value = """SELECT p.name, s.company
+FROM products p JOIN suppliers s ON p.supplier_id = s.id"""
+
+        tables = [
+            ("products", ["id", "name", "supplier_id"], [["1", "Widget", "100"]]),
+            ("suppliers", ["id", "company"], [["100", "Acme Corp"]]),
+        ]
+
+        sql = step_instance._generate_multi_table_sql("products with suppliers", tables)
+
+        assert "SELECT" in sql.upper()
+        assert "JOIN" in sql.upper()
+
+    def test_create_and_populate_named(self, step):
+        """Test creating named table in SQLite."""
+        step_instance, _ = step
+        import sqlite3
+
+        conn = sqlite3.connect(":memory:")
+        step_instance._create_and_populate_named(
+            conn,
+            "test_table",
+            ["col1", "col2"],
+            [["a", "1"], ["b", "2"]],
+        )
+
+        # Verify table exists with correct data
+        cursor = conn.execute("SELECT * FROM test_table")
+        rows = cursor.fetchall()
+
+        assert len(rows) == 2
+        assert rows[0] == ("a", "1")
+        assert rows[1] == ("b", "2")
+
+        conn.close()

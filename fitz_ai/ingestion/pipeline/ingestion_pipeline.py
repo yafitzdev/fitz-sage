@@ -11,10 +11,15 @@ from fitz_ai.ingestion.parser import ParserRouter
 from fitz_ai.ingestion.source.base import SourceFile
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
+from fitz_ai.tabular.models import create_schema_chunk_for_stored_table
+from fitz_ai.tabular.parser import can_parse as is_table_file
+from fitz_ai.tabular.parser import parse_csv
+from fitz_ai.tabular.store import SqliteTableStore
 from fitz_ai.vector_db.writer import VectorDBWriter
 
 if TYPE_CHECKING:
     from fitz_ai.ingestion.enrichment.pipeline import EnrichmentPipeline
+    from fitz_ai.tabular.store.base import TableStore
 
 logger = get_logger(__name__)
 
@@ -45,6 +50,7 @@ class IngestionPipeline:
         writer: VectorDBWriter,
         embedder: object,
         enrichment: "EnrichmentPipeline | None" = None,
+        table_store: "TableStore | None" = None,
     ) -> None:
         self.config = config
         self.writer = writer
@@ -58,6 +64,9 @@ class IngestionPipeline:
 
         self.collection = config.collection
 
+        # Table storage (defaults to local SQLite)
+        self.table_store = table_store or SqliteTableStore(config.collection)
+
     def run(self, source: str) -> int:
         logger.info(f"{PIPELINE} Starting ingestion pipeline")
 
@@ -69,11 +78,24 @@ class IngestionPipeline:
 
         # 2. Parse and chunk documents
         all_chunks: List = []
+        table_count = 0
+
         for file_info in scan_result.files:
             try:
+                file_path = Path(file_info.path)
+
+                # Check if file is a table file (CSV, TSV)
+                if is_table_file(file_path):
+                    chunk = self._process_table_file(file_path)
+                    if chunk:
+                        all_chunks.append(chunk)
+                        table_count += 1
+                    continue
+
+                # Regular document processing
                 source_file = SourceFile(
-                    uri=Path(file_info.path).as_uri(),
-                    local_path=Path(file_info.path),
+                    uri=file_path.as_uri(),
+                    local_path=file_path,
                     metadata={},
                 )
 
@@ -83,7 +105,7 @@ class IngestionPipeline:
                     continue
 
                 # Chunk document → Chunks
-                ext = Path(file_info.path).suffix or ".txt"
+                ext = file_path.suffix or ".txt"
                 chunker = self.chunking_router.get_chunker(ext)
                 chunks = chunker.chunk(parsed_doc)
                 if chunks:
@@ -91,6 +113,9 @@ class IngestionPipeline:
 
             except Exception as e:
                 logger.warning(f"{PIPELINE} Failed to process {file_info.path}: {e}")
+
+        if table_count > 0:
+            logger.info(f"{PIPELINE} Processed {table_count} table files")
 
         if not all_chunks:
             logger.info(f"{PIPELINE} No chunks to process")
@@ -133,3 +158,48 @@ class IngestionPipeline:
 
         logger.info(f"{PIPELINE} Ingestion finished, written={total_written}")
         return total_written
+
+    def _process_table_file(self, file_path: Path) -> "Chunk | None":
+        """
+        Process a table file (CSV, TSV) into TableStore and create schema chunk.
+
+        Args:
+            file_path: Path to the table file.
+
+        Returns:
+            Schema chunk for the table, or None on failure.
+        """
+        from fitz_ai.core.chunk import Chunk
+
+        try:
+            # Parse CSV file
+            parsed = parse_csv(file_path)
+
+            # Store in TableStore (SQLite or Qdrant)
+            table_hash = self.table_store.store(
+                table_id=parsed.table_id,
+                columns=parsed.columns,
+                rows=parsed.rows,
+                source_file=str(file_path),
+            )
+
+            # Create lightweight schema chunk (no embedded table_data)
+            chunk = create_schema_chunk_for_stored_table(
+                table_id=parsed.table_id,
+                columns=parsed.columns,
+                row_count=parsed.row_count,
+                source_file=str(file_path),
+                table_hash=table_hash,
+                sample_rows=parsed.rows[:3],
+            )
+
+            logger.info(
+                f"{PIPELINE} Stored table {file_path.name}: "
+                f"{len(parsed.columns)} cols, {parsed.row_count} rows"
+            )
+
+            return chunk
+
+        except Exception as e:
+            logger.warning(f"{PIPELINE} Failed to process table {file_path}: {e}")
+            return None

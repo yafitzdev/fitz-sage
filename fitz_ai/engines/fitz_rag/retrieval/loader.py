@@ -112,6 +112,7 @@ class RetrievalDependencies:
     reranker: Reranker | None = None
     chat: ChatClient | None = None  # Fast-tier chat for multi-query expansion
     keyword_matcher: KeywordMatcherClient | None = None  # Exact keyword matching
+    table_store: Any | None = None  # TableStore for CSV file queries
 
     # Config overrides (from retrieval config)
     top_k: int = 5
@@ -267,6 +268,8 @@ def _build_step(
         if deps.chat is None:
             raise ValueError("Table query step requires chat dependency")
         params.setdefault("chat", deps.chat)
+        if deps.table_store is not None:
+            params.setdefault("table_store", deps.table_store)
 
     return step_cls(**params)
 
@@ -284,6 +287,7 @@ def create_retrieval_pipeline(
     reranker: Reranker | None = None,
     chat: ChatClient | None = None,
     keyword_matcher: KeywordMatcherClient | None = None,
+    table_store: Any | None = None,
     top_k: int = 5,
     fetch_artifacts: bool = False,
 ) -> "RetrievalPipelineFromYaml":
@@ -298,6 +302,7 @@ def create_retrieval_pipeline(
         reranker: Optional reranking service
         chat: Optional fast-tier chat client for multi-query expansion
         keyword_matcher: Optional keyword matcher for exact term filtering
+        table_store: Optional TableStore for CSV file queries
         top_k: Final number of chunks to return
         fetch_artifacts: Whether to fetch artifacts (always with score=1.0)
 
@@ -313,6 +318,7 @@ def create_retrieval_pipeline(
         reranker=reranker,
         chat=chat,
         keyword_matcher=keyword_matcher,
+        table_store=table_store,
         top_k=top_k,
         fetch_artifacts=fetch_artifacts,
     )

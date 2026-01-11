@@ -383,7 +383,7 @@ These features are **always on**—no configuration needed. Fitz automatically d
 >| Epistemic Honesty | ✅ Done | "I don't know" when evidence is insufficient |
 >| Comparison Queries | ✅ Done | Multi-entity retrieval ("A vs B") |
 >| Tabular Data Routing | ✅ Done | SQL on structured table data |
->| Multi-Table Joins | 🔜 Next | JOIN queries across multiple tables |
+>| Multi-Table Joins | ✅ Done | JOIN queries across multiple tables |
 >| Multi-Hop Reasoning | 📋 Planned | Chain retrieval across related entities |
 
 </details>

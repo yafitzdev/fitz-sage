@@ -115,7 +115,83 @@ Sample data:
     )
 
 
+def _format_sample_from_rows(
+    columns: list[str],
+    rows: list[list[str]],
+    max_rows: int = 3,
+) -> str:
+    """Format sample rows for human-readable content."""
+    if not rows:
+        return "(empty table)"
+
+    lines = []
+    for row in rows[:max_rows]:
+        # Truncate long cell values
+        truncated = [cell[:30] + "..." if len(cell) > 30 else cell for cell in row]
+        lines.append(" | ".join(truncated))
+
+    if len(rows) > max_rows:
+        lines.append(f"... and {len(rows) - max_rows} more rows")
+
+    return "\n  ".join(lines)
+
+
+def create_schema_chunk_for_stored_table(
+    table_id: str,
+    columns: list[str],
+    row_count: int,
+    source_file: str,
+    table_hash: str,
+    sample_rows: list[list[str]] | None = None,
+) -> Chunk:
+    """
+    Create a lightweight schema chunk for a table stored in TableStore.
+
+    Unlike create_schema_chunk(), this does NOT embed table_data in metadata.
+    The actual table data lives in TableStore (SQLite or Qdrant payloads).
+    At query time, TableQueryStep fetches the table from TableStore.
+
+    Args:
+        table_id: Unique identifier for the table
+        columns: Column headers
+        row_count: Number of data rows
+        source_file: Original file path
+        table_hash: Content hash for cache invalidation
+        sample_rows: Optional sample rows for schema content
+
+    Returns:
+        Chunk with table schema in content, pointer (not data) in metadata
+    """
+    sample_str = "(sample data not available)"
+    if sample_rows:
+        sample_str = _format_sample_from_rows(columns, sample_rows)
+
+    # Human-readable content for embedding/retrieval
+    content = f"""Table from {source_file}
+Columns: {', '.join(columns)}
+Row count: {row_count} rows
+Sample data:
+  {sample_str}"""
+
+    return Chunk(
+        id=f"table_{table_id}",
+        doc_id=source_file,
+        content=content,
+        chunk_index=0,
+        metadata={
+            "is_table_schema": True,
+            "table_id": table_id,
+            "table_hash": table_hash,  # For cache invalidation
+            "columns": columns,
+            "row_count": row_count,
+            "is_stored_table": True,  # Flag to indicate TableStore lookup needed
+            # NO table_data - just pointer via table_id
+        },
+    )
+
+
 __all__ = [
     "ParsedTable",
     "create_schema_chunk",
+    "create_schema_chunk_for_stored_table",
 ]

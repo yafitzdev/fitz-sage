@@ -4,11 +4,20 @@ Table Query Step - Handles schema chunks at query time.
 
 When a schema chunk is retrieved:
 1. LLM selects relevant columns (column pruning)
-2. Pruned data is extracted from JSON payload
+2. Data is loaded from payload (embedded tables) or TableStore (CSV files)
 3. In-memory SQLite is built with pruned columns
 4. LLM generates SQL query
 5. SQL is executed
 6. Results are formatted and chunk is augmented
+
+Multi-table join support:
+- When multiple schema chunks are retrieved, LLM detects if query needs joins
+- All tables are loaded into a single SQLite database with distinct names
+- LLM generates SQL with JOINs, inferring join keys from column names
+
+Table storage modes:
+- Embedded tables (from documents): Data in chunk metadata as JSON
+- Stored tables (CSV files): Data in TableStore, fetched by table_id
 """
 
 from __future__ import annotations
@@ -17,13 +26,17 @@ import json
 import logging
 import re
 import sqlite3
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.fitz_rag.retrieval.steps.base import ChatClient, RetrievalStep
 
 from .models import ParsedTable
+
+if TYPE_CHECKING:
+    from fitz_ai.tabular.store.base import TableStore
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +54,19 @@ class TableQueryStep(RetrievalStep):
 
     Regular (non-table) chunks pass through unchanged.
 
+    Supports two table storage modes:
+    - Embedded tables: Data in chunk metadata (small tables from documents)
+    - Stored tables: Data in TableStore (CSV files, fetched by table_id)
+
     Args:
         chat: Chat client for LLM calls (column selection + SQL generation).
         max_results: Maximum number of SQL result rows to include (default: 100).
+        table_store: Optional TableStore for fetching stored tables (CSV files).
     """
 
     chat: ChatClient
     max_results: int = 100
+    table_store: "TableStore | None" = field(default=None)
 
     COLUMN_SELECT_PROMPT = """Given this table schema and question, which columns are needed to answer?
 
@@ -74,9 +93,38 @@ Rules:
 
 Return ONLY the SQL query, no explanation."""
 
+    MULTI_TABLE_DETECT_PROMPT = """Does answering this question require combining data from multiple tables?
+
+Available tables and their columns:
+{table_schemas}
+
+Question: {question}
+
+Answer ONLY "yes" or "no"."""
+
+    MULTI_TABLE_SQL_PROMPT = """Generate a SQLite query to answer this question using these tables.
+
+Tables:
+{table_schemas}
+
+Question: {question}
+
+Rules:
+1. Use the exact table names shown above
+2. If tables need to be joined, infer join columns from matching column names
+3. Use LIMIT {max_results} unless aggregating
+4. Column names with spaces need double quotes
+
+Return ONLY the SQL query, no explanation."""
+
     def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
         """
-        Process chunks, handling table schema chunks specially.
+        Process chunks, with multi-table join support.
+
+        When multiple schema chunks are retrieved:
+        1. LLM decides if query needs multiple tables
+        2. If yes, all tables loaded into one SQLite with JOIN SQL
+        3. If no, each table processed independently (existing behavior)
 
         Args:
             query: User query.
@@ -85,22 +133,79 @@ Return ONLY the SQL query, no explanation."""
         Returns:
             Chunks with table schema chunks augmented with query results.
         """
+        table_chunks = [c for c in chunks if c.metadata.get("is_table_schema")]
+        regular_chunks = [c for c in chunks if not c.metadata.get("is_table_schema")]
+
+        if not table_chunks:
+            return chunks
+
+        # Check if multi-table query needed
+        if self._needs_multi_table(query, table_chunks):
+            logger.debug(f"Multi-table query detected for {len(table_chunks)} tables")
+            result_chunk = self._process_multi_table(query, table_chunks)
+            return [result_chunk] + regular_chunks
+
+        # Single-table processing (existing logic)
         result_chunks: list[Chunk] = []
+        for chunk in table_chunks:
+            augmented = self._process_table_chunk(query, chunk)
+            result_chunks.append(augmented)
 
-        for chunk in chunks:
-            if chunk.metadata.get("is_table_schema"):
-                augmented = self._process_table_chunk(query, chunk)
-                result_chunks.append(augmented)
-            else:
-                result_chunks.append(chunk)
+        return result_chunks + regular_chunks
 
-        return result_chunks
+    def _load_table_data(self, chunk: Chunk) -> ParsedTable | None:
+        """
+        Load table data from chunk metadata or TableStore.
+
+        Handles two storage modes:
+        - Embedded tables: Data in chunk metadata as JSON (table_data field)
+        - Stored tables: Data in TableStore, fetched by table_id
+
+        Args:
+            chunk: Table schema chunk.
+
+        Returns:
+            ParsedTable if data loaded successfully, None otherwise.
+        """
+        table_id = chunk.metadata.get("table_id", "unknown")
+
+        # Check if this is a stored table (CSV file in TableStore)
+        if chunk.metadata.get("is_stored_table"):
+            if self.table_store is None:
+                logger.warning(
+                    f"Table {table_id} requires TableStore but none provided"
+                )
+                return None
+
+            stored = self.table_store.retrieve(table_id)
+            if stored is None:
+                logger.warning(f"Table {table_id} not found in TableStore")
+                return None
+
+            return ParsedTable(
+                table_id=stored.table_id,
+                source_doc=stored.source_file,
+                headers=stored.columns,
+                rows=stored.rows,
+            )
+
+        # Embedded table (data in chunk metadata)
+        table_data = chunk.metadata.get("table_data")
+        if not table_data:
+            logger.warning(f"Table chunk {chunk.id} missing table_data")
+            return None
+
+        return ParsedTable.from_json(
+            table_data,
+            table_id,
+            chunk.doc_id,
+        )
 
     def _process_table_chunk(self, query: str, chunk: Chunk) -> Chunk:
         """
         Process a table schema chunk.
 
-        1. Load table data from payload
+        1. Load table data from payload or TableStore
         2. Select relevant columns via LLM
         3. Build pruned SQLite
         4. Generate and execute SQL
@@ -114,17 +219,10 @@ Return ONLY the SQL query, no explanation."""
             Augmented chunk with query results, or original on failure.
         """
         try:
-            # 1. Load table data from payload
-            table_data = chunk.metadata.get("table_data")
-            if not table_data:
-                logger.warning(f"Table chunk {chunk.id} missing table_data")
+            # 1. Load table data
+            table = self._load_table_data(chunk)
+            if table is None:
                 return chunk
-
-            table = ParsedTable.from_json(
-                table_data,
-                chunk.metadata.get("table_id", "unknown"),
-                chunk.doc_id,
-            )
 
             logger.debug(
                 f"Processing table {table.table_id}: "
@@ -178,6 +276,226 @@ Return ONLY the SQL query, no explanation."""
         except Exception as e:
             logger.warning(f"Table query failed for {chunk.id}: {e}")
             return chunk  # Return original on failure
+
+    def _needs_multi_table(self, query: str, table_chunks: list[Chunk]) -> bool:
+        """
+        Detect if query needs data from multiple tables.
+
+        Uses LLM to determine if the query requires joining tables.
+
+        Args:
+            query: User query.
+            table_chunks: Retrieved table schema chunks.
+
+        Returns:
+            True if multi-table query detected.
+        """
+        if len(table_chunks) < 2:
+            return False
+
+        schemas = []
+        for chunk in table_chunks:
+            name = self._derive_table_name(chunk)
+            cols = chunk.metadata.get("columns", [])
+            schemas.append(f"- {name}: {', '.join(cols)}")
+
+        prompt = self.MULTI_TABLE_DETECT_PROMPT.format(
+            table_schemas="\n".join(schemas),
+            question=query,
+        )
+        response = self.chat.chat([{"role": "user", "content": prompt}])
+        return response.strip().lower() == "yes"
+
+    def _derive_table_name(self, chunk: Chunk) -> str:
+        """
+        Derive SQL-safe table name from chunk metadata.
+
+        Uses doc_id stem, sanitized for SQL identifiers.
+
+        Args:
+            chunk: Table schema chunk.
+
+        Returns:
+            SQL-safe table name.
+        """
+        table_id = chunk.metadata.get("table_id", "")
+
+        # Try to get meaningful name from doc_id
+        doc_id = chunk.doc_id or ""
+        base_name = Path(doc_id).stem  # "report.csv" → "report"
+
+        # Sanitize for SQL
+        name = base_name or f"table_{table_id[:8]}"
+        name = re.sub(r"[^a-zA-Z0-9_]", "_", name)
+
+        # Handle leading digit
+        if name and name[0].isdigit():
+            name = f"t_{name}"
+
+        return name or "data"
+
+    def _process_multi_table(self, query: str, table_chunks: list[Chunk]) -> Chunk:
+        """
+        Process multiple tables with JOIN support.
+
+        Loads all tables into one SQLite database with distinct names,
+        then generates and executes JOIN SQL.
+
+        Args:
+            query: User query.
+            table_chunks: Retrieved table schema chunks.
+
+        Returns:
+            Merged result chunk.
+        """
+        conn = sqlite3.connect(":memory:")
+        tables_info: list[tuple[str, list[str], list[list[str]]]] = []
+
+        try:
+            # Load each table with its own name
+            for chunk in table_chunks:
+                table = self._load_table_data(chunk)
+                if table is None:
+                    continue
+
+                table_name = self._derive_table_name(chunk)
+                self._create_and_populate_named(conn, table_name, table.headers, table.rows)
+                tables_info.append((table_name, table.headers, table.rows[:3]))
+
+                logger.debug(
+                    f"Loaded table {table_name}: {len(table.headers)} cols, {len(table.rows)} rows"
+                )
+
+            if not tables_info:
+                return self._process_table_chunk(query, table_chunks[0])
+
+            # Generate multi-table SQL
+            sql = self._generate_multi_table_sql(query, tables_info)
+            logger.debug(f"Generated multi-table SQL: {sql}")
+
+            # Execute
+            try:
+                cursor = conn.execute(sql)
+                results = cursor.fetchall()
+                col_names = [d[0] for d in cursor.description]
+            except sqlite3.Error as e:
+                logger.warning(f"Multi-table SQL failed: {e}, falling back to single-table")
+                conn.close()
+                return self._process_table_chunk(query, table_chunks[0])
+
+            conn.close()
+
+            # Create merged result chunk
+            table_names = [t[0] for t in tables_info]
+            return self._create_multi_table_result_chunk(
+                table_chunks, table_names, sql, col_names, results
+            )
+
+        except Exception as e:
+            logger.warning(f"Multi-table query failed: {e}, falling back to single-table")
+            conn.close()
+            return self._process_table_chunk(query, table_chunks[0])
+
+    def _generate_multi_table_sql(
+        self,
+        query: str,
+        tables: list[tuple[str, list[str], list[list[str]]]],
+    ) -> str:
+        """
+        Generate SQL that may JOIN multiple tables.
+
+        Args:
+            query: User query.
+            tables: List of (table_name, headers, sample_rows).
+
+        Returns:
+            SQL query string.
+        """
+        schemas = []
+        for name, headers, samples in tables:
+            sample_vals = {}
+            for i, h in enumerate(headers):
+                sample_vals[h] = [row[i] for row in samples if i < len(row)]
+            schemas.append(f"Table: {name}\nColumns: {headers}\nSamples: {sample_vals}")
+
+        prompt = self.MULTI_TABLE_SQL_PROMPT.format(
+            table_schemas="\n\n".join(schemas),
+            question=query,
+            max_results=self.max_results,
+        )
+        response = self.chat.chat([{"role": "user", "content": prompt}])
+        return self._extract_sql(response)
+
+    def _create_and_populate_named(
+        self,
+        conn: sqlite3.Connection,
+        table_name: str,
+        headers: list[str],
+        rows: list[list[str]],
+    ) -> None:
+        """
+        Create named table and insert rows.
+
+        Args:
+            conn: SQLite connection.
+            table_name: Table name to use.
+            headers: Column names.
+            rows: Row data.
+        """
+        cols_def = ", ".join(f'"{h}" TEXT' for h in headers)
+        conn.execute(f'CREATE TABLE "{table_name}" ({cols_def})')
+
+        placeholders = ", ".join("?" * len(headers))
+        conn.executemany(f'INSERT INTO "{table_name}" VALUES ({placeholders})', rows)
+        conn.commit()
+
+    def _create_multi_table_result_chunk(
+        self,
+        source_chunks: list[Chunk],
+        table_names: list[str],
+        sql: str,
+        col_names: list[str],
+        results: list[tuple],
+    ) -> Chunk:
+        """
+        Create merged result chunk from multi-table query.
+
+        Args:
+            source_chunks: Original table schema chunks.
+            table_names: Names of tables in the query.
+            sql: Executed SQL query.
+            col_names: Result column names.
+            results: Query results.
+
+        Returns:
+            New chunk with combined results.
+        """
+        results_md = self._format_as_markdown(col_names, results)
+
+        content = f"""Multi-table query result
+Source tables: {', '.join(table_names)}
+
+SQL executed: {sql}
+Results ({len(results)} rows):
+{results_md}"""
+
+        # Combine table IDs for unique chunk ID
+        combined_id = "_".join(
+            c.metadata.get("table_id", "unknown")[:4] for c in source_chunks
+        )
+
+        return Chunk(
+            id=f"multi_table_{combined_id}",
+            doc_id=source_chunks[0].doc_id,
+            content=content,
+            chunk_index=0,
+            metadata={
+                "is_multi_table_result": True,
+                "source_tables": table_names,
+                "sql_executed": sql,
+                "result_count": len(results),
+            },
+        )
 
     def _select_columns(self, query: str, columns: list[str]) -> list[str]:
         """Use LLM to select relevant columns."""

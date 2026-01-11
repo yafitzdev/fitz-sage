@@ -208,7 +208,6 @@ class TestHierarchyEnricherSemantic:
         mock_embedder.embed.return_value = [1.0, 0.0, 0.0]
 
         config = HierarchyConfig(
-            enabled=True,
             grouping_strategy="semantic",
             n_clusters=3,
         )
@@ -227,7 +226,6 @@ class TestHierarchyEnricherSemantic:
         mock_chat = MagicMock()
 
         config = HierarchyConfig(
-            enabled=True,
             grouping_strategy="semantic",
         )
 
@@ -255,7 +253,6 @@ class TestHierarchyEnricherSemantic:
         mock_embedder.embed.side_effect = mock_embed
 
         config = HierarchyConfig(
-            enabled=True,
             grouping_strategy="semantic",
             n_clusters=2,
         )
