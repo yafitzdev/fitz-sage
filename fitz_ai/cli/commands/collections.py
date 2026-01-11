@@ -122,6 +122,19 @@ def _delete_vocabulary(collection: str) -> None:
             logger.warning(f"Failed to delete vocabulary file: {e}")
 
 
+def _delete_table_registry(collection: str) -> None:
+    """Delete table registry file associated with a collection."""
+    from fitz_ai.core.paths import FitzPaths
+
+    registry_path = FitzPaths.table_registry(collection)
+    if registry_path.exists():
+        try:
+            registry_path.unlink()
+            ui.info(f"Deleted table registry: {registry_path.name}")
+        except Exception as e:
+            logger.warning(f"Failed to delete table registry: {e}")
+
+
 def _display_example_chunks(client: Any, collection: str, limit: int = 3) -> None:
     """Display example chunks from a collection."""
     print()
@@ -275,8 +288,9 @@ def command() -> None:
                     deleted = client.delete_collection(selected_collection)
                     ui.success(f"Deleted '{selected_collection}' ({deleted} chunks)")
 
-                    # Also delete associated vocabulary file
+                    # Also delete associated files
                     _delete_vocabulary(selected_collection)
+                    _delete_table_registry(selected_collection)
 
                     return  # Exit after deletion
                 except Exception as e:

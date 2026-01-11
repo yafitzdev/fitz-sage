@@ -145,6 +145,25 @@ class FitzPaths:
         """
         return cls.workspace() / "ingest.json"
 
+    @classmethod
+    def table_registry(cls, collection: str) -> Path:
+        """
+        Table chunk IDs registry for a collection.
+
+        Location: {workspace}/tables/{collection}.json
+
+        This file stores the list of table schema chunk IDs
+        so they can be fetched directly at query time.
+        """
+        return cls.workspace() / "tables" / f"{collection}.json"
+
+    @classmethod
+    def ensure_table_registry_dir(cls) -> Path:
+        """Get tables directory and create it if it doesn't exist."""
+        path = cls.workspace() / "tables"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
     # =========================================================================
     # Vocabulary
     # =========================================================================

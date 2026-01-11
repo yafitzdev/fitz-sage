@@ -421,7 +421,6 @@ def command(
                         )
                     enabled_features.append("codebase analysis")
         else:
-            enabled_features.append("docs corpus")
             if artifacts is None:
                 artifacts = "none"
             if has_chat_llm:
@@ -435,19 +434,17 @@ def command(
         # 2. Collection - smart selection
         if collection is None:
             existing_collections = ctx.get_collections()
+            suggested = _suggest_collection_name(source)
 
             if existing_collections:
-                # Collections exist - let user choose or create new
-                # Show [0] Create new, then [1]+ for existing collections
+                # Show existing collections with numbers
                 print()
                 if RICH:
                     from rich.prompt import Prompt
 
                     console.print("[bold]Collection:[/bold]")
-                    console.print("[cyan][0][/cyan] + Create new")
                 else:
                     print("Collection:")
-                    print("[0] + Create new")
 
                 # Reorder: default first, then rest
                 if default_collection in existing_collections:
@@ -469,38 +466,31 @@ def command(
                         else:
                             print(f"[{i}] {coll}")
 
-                # Get choice
-                while True:
-                    if RICH:
-                        response = Prompt.ask("Choice", default="1")
-                    else:
-                        response = input("Choice (1): ").strip() or "1"
+                # Hint for creating new
+                if RICH:
+                    console.print("[dim]Or type a name to create new[/dim]")
+                else:
+                    print("Or type a name to create new")
 
-                    try:
-                        idx = int(response)
-                        if idx == 0:
-                            # Create new
-                            suggested = _suggest_collection_name(source)
-                            collection = ui.prompt_text("Collection name", suggested)
-                            break
-                        elif 1 <= idx <= len(ordered):
-                            collection = ordered[idx - 1]
-                            if RICH:
-                                console.print(f"[dim]→ {collection}[/dim]")
-                            break
-                        else:
-                            if RICH:
-                                console.print(f"[red]Please enter 0-{len(ordered)}[/red]")
-                            else:
-                                print(f"Please enter 0-{len(ordered)}")
-                    except ValueError:
-                        if RICH:
-                            console.print("[red]Please enter a number[/red]")
-                        else:
-                            print("Please enter a number")
+                # Get choice - number selects existing, text creates new
+                if RICH:
+                    response = Prompt.ask("Collection", default="1")
+                else:
+                    response = input("Collection (1): ").strip() or "1"
+
+                # Check if it's a number (select existing) or name (create new)
+                try:
+                    idx = int(response)
+                    if 1 <= idx <= len(ordered):
+                        collection = ordered[idx - 1]
+                    else:
+                        # Invalid number, treat as new collection name
+                        collection = response
+                except ValueError:
+                    # Not a number, use as new collection name
+                    collection = response
             else:
                 # No collections exist - prompt for name
-                suggested = _suggest_collection_name(source)
                 collection = ui.prompt_text("Collection name", suggested)
 
         # 3. Auto-detect content type and configure enrichment accordingly
@@ -530,8 +520,6 @@ def command(
 
         else:
             # DOCUMENTS: Skip codebase artifacts
-            enabled_features.append("docs corpus")
-
             # Skip codebase analysis for non-code
             if artifacts is None:
                 artifacts = "none"
@@ -540,11 +528,7 @@ def command(
             if has_chat_llm:
                 enabled_features.append("hierarchical summaries")
 
-    # Print consolidated collection info
-    if enabled_features:
-        ui.info(f"Collection: {collection} ({', '.join(enabled_features)})")
-    else:
-        ui.info(f"Collection: {collection}")
+    ui.info(f"Collection: {collection}")
     print()
 
     # =========================================================================
@@ -565,9 +549,6 @@ def command(
         chunking_cfg = config.get("chunking", {})
         default_chunking = chunking_cfg.get("default", {})
         docling_parser = default_chunking.get("parser", "docling")
-
-        if docling_parser == "docling_vision":
-            ui.info("VLM enabled (docling_vision parser)")
 
         parser_router = ParserRouter(docling_parser=docling_parser)
 

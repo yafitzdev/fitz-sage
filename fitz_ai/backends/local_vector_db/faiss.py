@@ -226,7 +226,14 @@ class FaissLocalVectorDB:
         if key is None:
             return True
 
-        value = payload.get(key)
+        # Support nested key lookup via dot notation (e.g., "metadata.is_table_schema")
+        value = payload
+        for part in key.split("."):
+            if isinstance(value, dict):
+                value = value.get(part)
+            else:
+                value = None
+                break
 
         # Match condition (exact equality)
         if "match" in filter_cond:
@@ -372,6 +379,46 @@ class FaissLocalVectorDB:
 
             if len(results) >= limit:
                 break
+
+        return results
+
+    def retrieve(
+        self,
+        collection_name: str,
+        ids: List[str],
+        with_payload: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve points by their IDs.
+
+        Args:
+            collection_name: Name of the collection
+            ids: List of point IDs to retrieve
+            with_payload: Whether to include payload in response
+
+        Returns:
+            List of dicts with 'id' and 'payload' keys
+        """
+        if not ids:
+            return []
+
+        id_set = set(ids)
+        results = []
+
+        for i, point_id in enumerate(self._ids):
+            if point_id in id_set:
+                payload = self._payloads[i] if i < len(self._payloads) else {}
+                # Filter by collection
+                if payload.get("_collection") != collection_name:
+                    continue
+
+                result_payload = dict(payload) if with_payload else {}
+                result_payload.pop("_collection", None)
+
+                results.append({
+                    "id": point_id,
+                    "payload": result_payload,
+                })
 
         return results
 

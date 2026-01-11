@@ -193,6 +193,11 @@ class IngestionPipeline:
                 sample_rows=parsed.rows[:3],
             )
 
+            # Register table chunk ID for direct retrieval at query time
+            from fitz_ai.tabular.registry import add_table_id
+
+            add_table_id(self.collection, chunk.id)
+
             logger.info(
                 f"{PIPELINE} Stored table {file_path.name}: "
                 f"{len(parsed.columns)} cols, {parsed.row_count} rows"

@@ -111,13 +111,20 @@ class VectorSearchStep(RetrievalStep):
         hits = self._search(query_vector)
         results = self._hits_to_chunks(hits)
 
+        # Always include table schema chunks - they may not match semantically
+        # but TableQueryStep needs them to execute SQL queries
+        results = self._ensure_table_chunks(results)
+
         # Apply keyword filtering if available
         if self.keyword_matcher:
             keywords_in_query = self.keyword_matcher.find_in_query(query)
             if keywords_in_query:
+                # Keep chunks matching keywords OR table schema chunks
+                # (tables don't contain all data, so keyword filtering would wrongly exclude them)
                 filtered = [
                     c for c in results
                     if self.keyword_matcher.chunk_matches_any(c, keywords_in_query)
+                    or c.metadata.get("is_table_schema")
                 ]
                 logger.debug(
                     f"{RETRIEVER} Keyword filter: {len(results)} → {len(filtered)} chunks "
@@ -156,16 +163,11 @@ class VectorSearchStep(RetrievalStep):
             if self.keyword_matcher:
                 keywords_in_sq = self.keyword_matcher.find_in_query(sq)
                 if keywords_in_sq:
-                    filtered = [
+                    sub_results = [
                         c for c in sub_results
                         if self.keyword_matcher.chunk_matches_any(c, keywords_in_sq)
+                        or c.metadata.get("is_table_schema")
                     ]
-                    logger.debug(
-                        f"{RETRIEVER} Keyword filter for '{sq}': "
-                        f"{len(sub_results)} → {len(filtered)} chunks "
-                        f"(keywords: {[k.id for k in keywords_in_sq]})"
-                    )
-                    sub_results = filtered
 
             # Deduplicate across queries
             for chunk in sub_results:
@@ -177,6 +179,9 @@ class VectorSearchStep(RetrievalStep):
             f"{RETRIEVER} VectorSearchStep: retrieved {len(all_results)} unique chunks "
             f"from {len(search_queries)} queries"
         )
+
+        # Ensure table schema chunks are included
+        all_results = self._ensure_table_chunks(all_results)
 
         # Preserve any pre-existing chunks (e.g., artifacts)
         if chunks:
@@ -252,9 +257,9 @@ Return ONLY a JSON array of strings, no explanation. Example: ["query 1", "query
                 keywords_in_sq = self.keyword_matcher.find_in_query(sq)
                 if keywords_in_sq:
                     sub_results = [
-                        c
-                        for c in sub_results
+                        c for c in sub_results
                         if self.keyword_matcher.chunk_matches_any(c, keywords_in_sq)
+                        or c.metadata.get("is_table_schema")
                     ]
 
             # Deduplicate across queries
@@ -267,6 +272,9 @@ Return ONLY a JSON array of strings, no explanation. Example: ["query 1", "query
             f"{RETRIEVER} VectorSearchStep: retrieved {len(all_results)} unique chunks "
             f"from {len(search_queries)} comparison queries"
         )
+
+        # Ensure table schema chunks are included
+        all_results = self._ensure_table_chunks(all_results)
 
         # Preserve any pre-existing chunks (e.g., artifacts)
         if chunks:
@@ -324,6 +332,71 @@ Return ONLY a JSON object:
     # -------------------------------------------------------------------------
     # Helper Methods
     # -------------------------------------------------------------------------
+
+    def _ensure_table_chunks(self, results: list[Chunk]) -> list[Chunk]:
+        """
+        Ensure table schema chunks are included in results.
+
+        Table schema chunks may have low semantic similarity to queries about
+        specific entities (e.g., "how much does Iris Johnson earn?") because
+        the schema only contains column names and sample rows, not all data.
+
+        Uses table registry (created at ingestion) to fetch table chunks by ID.
+        """
+        # Check if we already have table schema chunks
+        has_tables = any(c.metadata.get("is_table_schema") for c in results)
+        if has_tables:
+            return results
+
+        # Get table IDs from registry
+        from fitz_ai.tabular.registry import get_table_ids
+
+        table_ids = get_table_ids(self.collection)
+        if not table_ids:
+            return results
+
+        # Fetch table chunks by ID
+        try:
+            if not hasattr(self.client, "retrieve"):
+                logger.debug(f"{RETRIEVER} Vector DB doesn't support retrieve")
+                return results
+
+            seen_ids = {c.id for c in results}
+            records = self.client.retrieve(
+                self.collection,
+                ids=table_ids,
+                with_payload=True,
+            )
+
+            added = 0
+            for record in records:
+                record_id = record.get("id") if isinstance(record, dict) else getattr(record, "id", None)
+                if record_id and str(record_id) not in seen_ids:
+                    payload = record.get("payload", {}) if isinstance(record, dict) else getattr(record, "payload", {})
+                    metadata = payload.get("metadata", {})
+                    if isinstance(metadata, dict):
+                        flat_metadata = {**payload, **metadata}
+                    else:
+                        flat_metadata = payload
+
+                    chunk = Chunk(
+                        id=str(record_id),
+                        doc_id=str(payload.get("doc_id", "unknown")),
+                        content=str(payload.get("content", "")),
+                        chunk_index=int(payload.get("chunk_index", 0)),
+                        metadata=flat_metadata,
+                    )
+                    results.append(chunk)
+                    seen_ids.add(str(record_id))
+                    added += 1
+
+            if added:
+                logger.debug(f"{RETRIEVER} Added {added} table chunks from registry")
+
+        except Exception as e:
+            logger.debug(f"{RETRIEVER} Table fetch failed: {e}")
+
+        return results
 
     def _embed(self, query: str) -> list[float]:
         """Embed query text."""
