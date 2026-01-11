@@ -1,10 +1,10 @@
 # fitz_ai/engines/fitz_rag/retrieval/plugins/dense.yaml
 #
-# Dense Retrieval Plugin
+# Dense Retrieval Plugin (No Reranking)
 #
-# This YAML file defines the retrieval pipeline for dense (vector) search.
-# The steps reference standard Python step classes that are written once
-# and reused across different retrieval plugins.
+# Pure vector search without cross-encoder reranking.
+# Use this when you don't have a reranker configured or want faster queries.
+# For better precision, use dense_rerank instead.
 #
 # VectorSearchStep has built-in:
 # - Multi-query expansion for long queries (automatic, no config needed)
@@ -12,7 +12,7 @@
 # - Deduplication of results (automatic, no config needed)
 
 plugin_name: dense
-description: "Dense retrieval with intelligent vector search"
+description: "Dense retrieval with vector search only (no reranking)"
 
 # Pipeline steps - executed in order
 # Each step references a Python class in fitz_ai.engines.fitz_rag.retrieval.steps
@@ -21,11 +21,7 @@ steps:
     enabled_if: fetch_artifacts
 
   - type: vector_search        # Intelligent vector search (multi-query + keyword baked in)
-    k: 25                      # Candidates to retrieve
-
-  - type: rerank
-    k: 10                      # Top-k after reranking
-    enabled_if: reranker       # Only run if reranker dependency is provided
+    k: 10                      # Candidates to retrieve (no reranking, so smaller pool)
 
   - type: limit
     k: 5                       # Final chunks returned (uses retrieval.top_k from config)

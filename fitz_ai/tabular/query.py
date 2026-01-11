@@ -74,7 +74,11 @@ Table columns: {columns}
 Question: {question}
 
 Return ONLY a JSON array of column names needed. Example: ["col1", "col2"]
-Include all columns that might be relevant for filtering or returning results."""
+Rules:
+- Include columns needed for filtering AND for displaying results
+- For "who/which/what" questions, ALWAYS include identifying columns (name, id, title, etc.)
+- For numeric comparisons (highest, lowest, average), include the numeric column
+- When in doubt, include more columns rather than fewer"""
 
     SQL_PROMPT = """Generate a SQLite query to answer this question.
 
@@ -90,6 +94,10 @@ Rules:
 3. Use LIMIT {max_results} unless aggregating
 4. For text search use LIKE with % wildcards
 5. Column names with spaces need double quotes
+6. For "highest/maximum" use ORDER BY column DESC LIMIT 1
+7. For "lowest/minimum" use ORDER BY column ASC LIMIT 1
+8. For "who/which" questions, include identifying columns (name, id) in SELECT
+9. IMPORTANT: All columns are TEXT type. For numeric operations (MAX, MIN, AVG, SUM, ORDER BY numbers), use CAST(column AS REAL) or CAST(column AS INTEGER)
 
 Return ONLY the SQL query, no explanation."""
 
@@ -543,12 +551,20 @@ Results ({len(results)} rows):
         """Create augmented chunk with query results."""
         results_md = self._format_as_markdown(cols, rows)
 
-        content = f"""{chunk.content}
+        # Get table metadata for context
+        row_count = chunk.metadata.get("row_count", "unknown")
+        columns = chunk.metadata.get("columns", [])
 
---- Query Results ---
-SQL: {sql}
+        content = f"""Table: {chunk.doc_id}
+Columns: {', '.join(columns) if columns else 'see below'}
+Total rows: {row_count}
+
+--- SQL Query Results (from FULL dataset, not just sample) ---
+Query: {sql}
 Results ({len(rows)} rows):
-{results_md}"""
+{results_md}
+
+Note: These results are computed from all {row_count} rows in the table. Use these results to answer the question."""
 
         return Chunk(
             id=chunk.id,

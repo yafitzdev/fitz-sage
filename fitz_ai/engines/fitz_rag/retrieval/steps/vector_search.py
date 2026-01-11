@@ -353,6 +353,13 @@ Return ONLY a JSON object:
             if not isinstance(payload, dict):
                 payload = {}
 
+            # Flatten nested metadata (ingestion stores chunk.metadata under "metadata" key)
+            nested_metadata = payload.get("metadata", {})
+            if isinstance(nested_metadata, dict):
+                flat_metadata = {**payload, **nested_metadata, "vector_score": getattr(hit, "score", None)}
+            else:
+                flat_metadata = {**payload, "vector_score": getattr(hit, "score", None)}
+
             chunk = Chunk(
                 id=str(getattr(hit, "id", idx)),
                 doc_id=str(
@@ -363,10 +370,7 @@ Return ONLY a JSON object:
                 ),
                 content=str(payload.get("content") or payload.get("text") or ""),
                 chunk_index=int(payload.get("chunk_index", idx)),
-                metadata={
-                    **payload,
-                    "vector_score": getattr(hit, "score", None),
-                },
+                metadata=flat_metadata,
             )
             results.append(chunk)
 

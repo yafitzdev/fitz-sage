@@ -219,8 +219,8 @@ class TestPipelineBuilding:
         assert "RerankStep" not in step_names
 
     def test_build_pipeline_includes_rerank_with_reranker(self):
-        """Should include rerank step if reranker provided."""
-        spec = load_plugin_spec("dense")
+        """Should include rerank step if reranker provided and using dense_rerank plugin."""
+        spec = load_plugin_spec("dense_rerank")
         deps = RetrievalDependencies(
             vector_client=MockVectorClient(make_hits(10)),
             embedder=MockEmbedder(),
@@ -259,10 +259,10 @@ class TestPipelineExecution:
         assert all(isinstance(c, Chunk) for c in chunks)
 
     def test_retrieve_with_reranker(self):
-        """Should execute retrieval with reranking."""
+        """Should execute retrieval with reranking when using dense_rerank plugin."""
         reranker = MockReranker()
         pipeline = create_retrieval_pipeline(
-            plugin_name="dense",
+            plugin_name="dense_rerank",
             vector_client=MockVectorClient(make_hits(20)),
             embedder=MockEmbedder(),
             collection="test_collection",
@@ -274,7 +274,9 @@ class TestPipelineExecution:
 
         # Reranker should have been called
         assert len(reranker.rerank_calls) == 1
-        assert len(chunks) == 5
+        # dense_rerank has threshold=0.6, MockReranker gives 0.99, 0.89, 0.79, 0.69, 0.59...
+        # So 4 chunks pass the threshold (0.99, 0.89, 0.79, 0.69 are >= 0.6)
+        assert len(chunks) == 4
 
 
 # =============================================================================
