@@ -357,10 +357,6 @@ Return ONLY a JSON object:
 
         # Fetch table chunks by ID
         try:
-            if not hasattr(self.client, "retrieve"):
-                logger.debug(f"{RETRIEVER} Vector DB doesn't support retrieve")
-                return results
-
             seen_ids = {c.id for c in results}
             records = self.client.retrieve(
                 self.collection,

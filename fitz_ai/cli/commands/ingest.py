@@ -392,9 +392,6 @@ def command(
     # Interactive Prompts (fitz_rag)
     # =========================================================================
 
-    # Track enabled features for consolidated output
-    enabled_features: List[str] = []
-
     if non_interactive:
         if source is None:
             ui.error("Source path required in non-interactive mode.")
@@ -409,7 +406,6 @@ def command(
         has_chat_llm = bool(config.get("chat", {}).get("plugin_name"))
 
         if content_type == "codebase":
-            enabled_features.append("codebase")
             if artifacts is None:
                 available_artifacts = _get_available_artifacts(has_llm=has_chat_llm)
                 if available_artifacts:
@@ -419,12 +415,9 @@ def command(
                         artifacts = ",".join(
                             name for name, desc in available_artifacts if "requires LLM" not in desc
                         )
-                    enabled_features.append("codebase analysis")
         else:
             if artifacts is None:
                 artifacts = "none"
-            if has_chat_llm:
-                enabled_features.append("hierarchical summaries")
 
     else:
         # 1. Source path
@@ -499,34 +492,19 @@ def command(
 
         if content_type == "codebase":
             # CODEBASE: Enable codebase analysis artifacts
-            enabled_features.append("codebase")
-
             if artifacts is None:
-                # Auto-select all applicable artifacts
                 available_artifacts = _get_available_artifacts(has_llm=has_chat_llm)
                 if available_artifacts:
                     if has_chat_llm:
                         artifacts = ",".join(name for name, _ in available_artifacts)
                     else:
-                        # Only structural artifacts (no LLM required)
                         artifacts = ",".join(
                             name for name, desc in available_artifacts if "requires LLM" not in desc
                         )
-                    enabled_features.append("codebase analysis")
-
-            # Hierarchy runs automatically (prompts adapt to code vs docs)
-            if has_chat_llm:
-                enabled_features.append("hierarchical summaries")
-
         else:
             # DOCUMENTS: Skip codebase artifacts
-            # Skip codebase analysis for non-code
             if artifacts is None:
                 artifacts = "none"
-
-            # Hierarchy runs automatically
-            if has_chat_llm:
-                enabled_features.append("hierarchical summaries")
 
     ui.info(f"Collection: {collection}")
     print()

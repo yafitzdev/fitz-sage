@@ -24,6 +24,13 @@ class VectorClient(Protocol):
 
     def search(self, *args: Any, **kwargs: Any) -> list[Any]: ...
 
+    def retrieve(
+        self,
+        collection_name: str,
+        ids: list[str],
+        with_payload: bool = True,
+    ) -> list[dict[str, Any]]: ...
+
 
 @runtime_checkable
 class Embedder(Protocol):
