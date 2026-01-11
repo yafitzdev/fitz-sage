@@ -168,13 +168,18 @@ Required fields:
 Each operation needs:
 - endpoint: string with {{collection}} placeholder
 - method: "GET" | "POST" | "PUT" | "DELETE"
-- body: request body template (optional for GET)
+- body: request body template (for POST/PUT). Use "{{variable}}" for Jinja2 substitution.
 - response:
-    - results_path: JSONPath to results (e.g., "result.points")
-    - mapping: dict mapping id, score, payload fields
+    - results_path: DOT NOTATION path to results array (e.g., "result.points", NOT JSONPath like "$.result.points")
+    - mapping: field names within each result item (e.g., id: "id", score: "score", payload: "payload")
 
-IMPORTANT: The 'retrieve' operation is REQUIRED for table/CSV file support.
-It fetches points by their IDs and must return id + payload.
+CRITICAL SYNTAX RULES:
+1. Use DOT NOTATION for paths, NOT JSONPath. Examples:
+   - CORRECT: "result.points"
+   - WRONG: "$.result.points"
+2. Template variables use Jinja2 double braces: "{{variable}}"
+3. Body values that are arrays should be quoted: '["value1", "value2"]'
+4. The 'retrieve' operation is REQUIRED for table/CSV file support.
 """,
         PluginType.RETRIEVAL: """
 Required fields:

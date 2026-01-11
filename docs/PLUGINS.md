@@ -339,6 +339,19 @@ operations:
     body:
       points: "{{points}}"
 
+  # Retrieve points by ID (REQUIRED for table/CSV support)
+  retrieve:
+    endpoint: /collections/{{collection}}/points
+    method: POST
+    body:
+      ids: "{{ids}}"
+      with_payload: "{{with_payload}}"
+    response:
+      results_path: result
+      mapping:
+        id: id
+        payload: payload
+
   # Count points
   count:
     endpoint: /collections/{{collection}}/count
@@ -353,6 +366,13 @@ operations:
     response:
       success_codes: [200, 404]
 
+  # Create collection
+  create_collection:
+    endpoint: /collections/{{collection}}
+    method: PUT
+    body:
+      dimension: "{{vector_size}}"
+
   # List collections
   list_collections:
     endpoint: /collections
@@ -360,6 +380,13 @@ operations:
     response:
       collections_path: collections
       name_field: name
+
+  # Get collection statistics
+  get_stats:
+    endpoint: /collections/{{collection}}
+    method: GET
+    response:
+      stats_path: result
 ```
 
 ---
