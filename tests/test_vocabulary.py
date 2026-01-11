@@ -16,26 +16,25 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fitz_ai.ingestion.vocabulary.models import (
-    Keyword,
-    VocabularyConfig,
-    VocabularyMetadata,
-)
-from fitz_ai.ingestion.vocabulary.variations import (
-    generate_variations,
-    normalize_for_matching,
-)
 from fitz_ai.ingestion.vocabulary.detector import (
     DetectorPattern,
     KeywordDetector,
     suggest_keywords,
 )
-from fitz_ai.ingestion.vocabulary.store import VocabularyStore
 from fitz_ai.ingestion.vocabulary.matcher import (
     KeywordMatcher,
     create_matcher_from_store,
 )
-
+from fitz_ai.ingestion.vocabulary.models import (
+    Keyword,
+    VocabularyConfig,
+    VocabularyMetadata,
+)
+from fitz_ai.ingestion.vocabulary.store import VocabularyStore
+from fitz_ai.ingestion.vocabulary.variations import (
+    generate_variations,
+    normalize_for_matching,
+)
 
 # ---------------------------------------------------------------------------
 # Test Fixtures
