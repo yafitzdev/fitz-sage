@@ -165,6 +165,31 @@ class FitzPaths:
         return path
 
     # =========================================================================
+    # Sparse Index (Hybrid Search)
+    # =========================================================================
+
+    @classmethod
+    def sparse_index(cls, collection: str) -> Path:
+        """
+        Sparse (TF-IDF) index for hybrid search.
+
+        Location: {workspace}/sparse_index/{collection}
+
+        Files created:
+        - {collection}.pkl - TF-IDF vectorizer
+        - {collection}.npz - Sparse document vectors
+        - {collection}.json - Chunk ID mapping
+        """
+        return cls.workspace() / "sparse_index" / collection
+
+    @classmethod
+    def ensure_sparse_index_dir(cls) -> Path:
+        """Get sparse index directory and create it if it doesn't exist."""
+        path = cls.workspace() / "sparse_index"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    # =========================================================================
     # Entity Graph
     # =========================================================================
 

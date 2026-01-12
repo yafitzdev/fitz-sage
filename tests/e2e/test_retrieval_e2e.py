@@ -205,6 +205,62 @@ class TestBasicRetrieval:
         assert result.validation.passed, result.validation.reason
 
 
+class TestFreshness:
+    """Tests for freshness/authority boosting."""
+
+    @pytest.mark.parametrize(
+        "scenario",
+        get_scenarios_by_feature(Feature.FRESHNESS),
+        ids=lambda s: s.id,
+    )
+    def test_freshness_scenario(self, e2e_runner, scenario):
+        """Test authority boosting with official/spec keywords."""
+        result = e2e_runner.run_scenario(scenario)
+        assert result.validation.passed, result.validation.reason
+
+
+class TestHybridSearch:
+    """Tests for hybrid search (dense + sparse)."""
+
+    @pytest.mark.parametrize(
+        "scenario",
+        get_scenarios_by_feature(Feature.HYBRID_SEARCH),
+        ids=lambda s: s.id,
+    )
+    def test_hybrid_search_scenario(self, e2e_runner, scenario):
+        """Test hybrid search with exact keyword matching."""
+        result = e2e_runner.run_scenario(scenario)
+        assert result.validation.passed, result.validation.reason
+
+
+class TestQueryExpansion:
+    """Tests for query expansion (synonym/acronym variations)."""
+
+    @pytest.mark.parametrize(
+        "scenario",
+        get_scenarios_by_feature(Feature.QUERY_EXPANSION),
+        ids=lambda s: s.id,
+    )
+    def test_query_expansion_scenario(self, e2e_runner, scenario):
+        """Test query expansion with synonym and acronym variations."""
+        result = e2e_runner.run_scenario(scenario)
+        assert result.validation.passed, result.validation.reason
+
+
+class TestTemporal:
+    """Tests for temporal query handling (time-based comparisons and periods)."""
+
+    @pytest.mark.parametrize(
+        "scenario",
+        get_scenarios_by_feature(Feature.TEMPORAL),
+        ids=lambda s: s.id,
+    )
+    def test_temporal_scenario(self, e2e_runner, scenario):
+        """Test temporal query handling with time references."""
+        result = e2e_runner.run_scenario(scenario)
+        assert result.validation.passed, result.validation.reason
+
+
 # =============================================================================
 # Full Suite Test with Report
 # =============================================================================

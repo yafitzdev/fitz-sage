@@ -115,11 +115,14 @@ class FileSystemSource:
         # Detect MIME type
         mime_type, _ = mimetypes.guess_type(str(path))
 
-        # Get file size
+        # Get file stats
         try:
-            size = path.stat().st_size
+            stat = path.stat()
+            size = stat.st_size
+            modified_at = stat.st_mtime
         except OSError:
             size = None
+            modified_at = None
 
         return SourceFile(
             uri=path.as_uri(),  # file:///path/to/file
@@ -129,8 +132,41 @@ class FileSystemSource:
             metadata={
                 "filename": path.name,
                 "extension": path.suffix.lower(),
+                "modified_at": modified_at,
+                "source_type": self._infer_source_type(path),
             },
         )
+
+    def _infer_source_type(self, path: Path) -> str:
+        """
+        Infer document authority level from path patterns.
+
+        Returns:
+            One of: "spec", "design", "notes", "document"
+        """
+        path_str = str(path).lower().replace("\\", "/")
+        name = path.name.lower()
+
+        # High authority - specifications and requirements
+        if any(x in path_str for x in ["/spec/", "/specs/", "/requirements/", "/rfc/"]):
+            return "spec"
+        if any(x in name for x in ["spec.", "requirement", "rfc-", "rfc_"]):
+            return "spec"
+
+        # Medium authority - design docs and architecture
+        if any(x in path_str for x in ["/design/", "/architecture/", "/adr/", "/decisions/"]):
+            return "design"
+        if any(x in name for x in ["design.", "architecture.", "adr-", "adr_"]):
+            return "design"
+
+        # Low authority - notes and drafts
+        if any(x in path_str for x in ["/notes/", "/drafts/", "/scratch/", "/wip/"]):
+            return "notes"
+        if any(x in name for x in ["note.", "draft.", "wip.", "todo."]):
+            return "notes"
+
+        # Default authority
+        return "document"
 
 
 __all__ = ["FileSystemSource", "DEFAULT_EXTENSIONS"]

@@ -30,6 +30,10 @@ class Feature(Enum):
     LONG_DOC = "long_doc"
     DEDUP = "dedup"
     BASIC_RETRIEVAL = "basic_retrieval"
+    FRESHNESS = "freshness"
+    HYBRID_SEARCH = "hybrid_search"
+    QUERY_EXPANSION = "query_expansion"
+    TEMPORAL = "temporal"
 
 
 @dataclass
@@ -734,6 +738,162 @@ SCENARIOS: list[TestScenario] = [
         query="Who was hired in 2022?",
         # David Lee (2022-02-20), Nathan Park (2022-06-10)
         must_contain_any=["David Lee", "Nathan Park", "2022"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Freshness / Authority Boosting
+    # =========================================================================
+    TestScenario(
+        id="E63",
+        name="Freshness: official spec keyword",
+        feature=Feature.FRESHNESS,
+        query="What is the official EPA range for the Model X100?",
+        # Official spec says 298 miles (EPA certified), products.md says 300 miles
+        must_contain_any=["298", "EPA", "certified", "official"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E64",
+        name="Freshness: spec keyword for warranty",
+        feature=Feature.FRESHNESS,
+        query="What does the specification say about battery warranty?",
+        # Spec document has official warranty terms
+        must_contain_any=["8 years", "150,000 miles", "official", "warranty"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E65",
+        name="Freshness: authoritative towing capacity",
+        feature=Feature.FRESHNESS,
+        query="What is the authoritative maximum towing capacity for Model Y200?",
+        # Only in spec document: 5,500 lbs
+        must_contain_any=["5,500", "5500", "towing"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E66",
+        name="Freshness: official service requirements",
+        feature=Feature.FRESHNESS,
+        query="What are the official service requirements for TechCorp vehicles?",
+        # Only in spec document
+        must_contain_any=["12,500 miles", "12 months", "brake fluid", "service"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Hybrid Search (Dense + Sparse)
+    # =========================================================================
+    TestScenario(
+        id="E67",
+        name="Hybrid: exact model number",
+        feature=Feature.HYBRID_SEARCH,
+        query="X100 battery capacity",
+        # Exact model number should be matched by sparse search
+        must_contain_any=["75 kWh", "75kWh", "X100"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E68",
+        name="Hybrid: technical identifier",
+        feature=Feature.HYBRID_SEARCH,
+        query="CCS Combo 1 charging standard",
+        # Technical identifier from spec doc
+        must_contain_any=["CCS", "DC Fast", "charging"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E69",
+        name="Hybrid: specific department name",
+        feature=Feature.HYBRID_SEARCH,
+        query="employees in Engineering",
+        # Department name should be exact matched
+        must_contain_any=["Engineering", "employee"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E70",
+        name="Hybrid: acronym lookup",
+        feature=Feature.HYBRID_SEARCH,
+        query="What is SAE Level 2+",
+        # Technical acronym from spec
+        must_contain_any=["SAE", "Level 2", "autonomous", "driving", "certified"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Query Expansion (Synonym/Acronym Variations)
+    # =========================================================================
+    TestScenario(
+        id="E71",
+        name="Query expansion: synonym for retrieve",
+        feature=Feature.QUERY_EXPANSION,
+        query="How do I fetch employee data?",
+        # "fetch" should expand to "retrieve/get" and find relevant content
+        must_contain_any=["employee", "data", "retrieve", "get", "query"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E72",
+        name="Query expansion: synonym for create",
+        feature=Feature.QUERY_EXPANSION,
+        query="How do I add a new user account?",
+        # "add" should expand to "create/register" and find auth module content
+        must_contain_any=["register", "create", "user", "account"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E73",
+        name="Query expansion: acronym db to database",
+        feature=Feature.QUERY_EXPANSION,
+        query="How does the db connection work?",
+        # "db" should expand to "database" and find Data Service content
+        must_contain_any=["database", "connection", "PostgreSQL", "pool"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E74",
+        name="Query expansion: synonym for error",
+        feature=Feature.QUERY_EXPANSION,
+        query="What failures can occur in authentication?",
+        # "failures" should expand to "errors/exceptions" and find auth content
+        must_contain_any=["error", "exception", "authentication", "fail"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Temporal Queries (Time-Based Comparisons and Periods)
+    # =========================================================================
+    TestScenario(
+        id="E75",
+        name="Temporal: Q1 2024 period query",
+        feature=Feature.TEMPORAL,
+        query="What happened at TechCorp in Q1 2024?",
+        # Should retrieve Q1 2024 content from conflicts.md and causal_claims.md
+        must_contain_any=["Q1 2024", "revenue", "stock", "20%", "record"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E76",
+        name="Temporal: year-based comparison",
+        feature=Feature.TEMPORAL,
+        query="Compare TechCorp's founding in 2015 with GreenDrive's founding in 2012",
+        # Should find info about both companies and their founding years
+        must_contain_any=["2015", "2012", "TechCorp", "GreenDrive", "founded"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E77",
+        name="Temporal: before a specific event",
+        feature=Feature.TEMPORAL,
+        query="What was Sarah Chen's role before becoming CEO in 2019?",
+        # Should find info about her previous role at AutoMotors
+        must_contain_any=["AutoMotors", "engineer", "2019", "CEO"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E78",
+        name="Temporal: what changed query",
+        feature=Feature.TEMPORAL,
+        query="What changed for TechCorp's stock price?",
+        # Should detect "what changed" and find stock-related content
+        must_contain_any=["stock", "20%", "rose", "price", "TECH"],
         min_sources=1,
     ),
 ]

@@ -3,6 +3,9 @@
 Vector Search Step - Intelligent retrieval from vector database.
 
 Embeds query and searches for top-k candidates. Automatically applies:
+- Temporal query handling (time-based comparisons and period filtering)
+- Query expansion (synonym/acronym variations) for improved recall
+- Hybrid search (dense + sparse) with RRF fusion (when sparse index available)
 - Multi-query expansion for long queries (when chat client available)
 - Keyword filtering for exact term matching (when keyword_matcher available)
 - Deduplication of results from multiple queries
@@ -37,9 +40,12 @@ logger = get_logger(__name__)
 @dataclass
 class VectorSearchStep(RetrievalStep):
     """
-    Intelligent vector search step with automatic multi-query expansion.
+    Intelligent vector search step with automatic query expansion.
 
     This is the core retrieval step that handles:
+    - Temporal query handling (time comparisons, period filtering)
+    - Query expansion (synonym/acronym variations for improved recall)
+    - Hybrid search (dense + sparse) with RRF fusion
     - Standard vector search for short queries
     - Automatic query expansion for long queries (> min_query_length)
     - Comparison query handling (ensures both compared entities are retrieved)
@@ -61,6 +67,7 @@ class VectorSearchStep(RetrievalStep):
         max_queries: Maximum number of expanded queries (default: 5)
         max_entity_expansion: Maximum related chunks to add from entity graph (default: 10)
         filter_conditions: Optional Qdrant-style filter for metadata filtering
+        rrf_k: RRF constant for score fusion (default: 60)
     """
 
     # Comparison patterns - triggers comparison-aware query expansion
@@ -85,19 +92,34 @@ class VectorSearchStep(RetrievalStep):
     max_queries: int = 5
     max_entity_expansion: int = 10
     filter_conditions: dict[str, Any] = field(default_factory=dict)
+    rrf_k: int = 60  # RRF constant (higher = more weight to lower ranks)
+
+    # Lazy-loaded sparse index for hybrid search
+    _sparse_index: Any = field(default=None, init=False, repr=False)
+    # Lazy-loaded query expander
+    _query_expander: Any = field(default=None, init=False, repr=False)
+    # Lazy-loaded temporal detector
+    _temporal_detector: Any = field(default=None, init=False, repr=False)
 
     def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
         """
         Execute vector search with automatic query expansion.
 
         Routing logic:
-        1. Comparison queries (detected by pattern) → comparison-aware expansion
-        2. Long queries (≥ min_query_length) → generic multi-query expansion
-        3. Short queries → single vector search
+        1. Temporal queries (time comparisons/periods) → temporal-aware search
+        2. Comparison queries (detected by pattern) → comparison-aware expansion
+        3. Long queries (≥ min_query_length) → generic multi-query expansion
+        4. Short queries → single vector search
 
         Pre-existing chunks (e.g., artifacts) are preserved and prepended.
         """
-        # Check for comparison pattern first (regardless of query length)
+        # Check for temporal query first (time-based comparisons, periods)
+        temporal_result = self._check_temporal_query(query)
+        if temporal_result is not None:
+            intent, references, temporal_queries = temporal_result
+            return self._temporal_search(query, chunks, intent, references, temporal_queries)
+
+        # Check for comparison pattern (regardless of query length)
         if self.chat is not None and self._is_comparison_query(query):
             return self._comparison_search(query, chunks)
 
@@ -110,14 +132,16 @@ class VectorSearchStep(RetrievalStep):
             return self._single_search(query, chunks)
 
     def _single_search(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
-        """Standard single-query vector search with keyword filtering."""
+        """Standard single-query search with query expansion and hybrid fusion."""
         logger.debug(
             f"{RETRIEVER} VectorSearchStep: single search, k={self.k}, collection={self.collection}"
         )
 
-        query_vector = self._embed(query)
-        hits = self._search(query_vector)
-        results = self._hits_to_chunks(hits)
+        # Expand query to variations (synonyms, acronyms)
+        query_variations = self._get_query_variations(query)
+
+        # Search with all query variations and merge with RRF
+        results = self._expanded_search(query_variations)
 
         # Always include table schema chunks - they may not match semantically
         # but TableQueryStep needs them to execute SQL queries
@@ -126,7 +150,7 @@ class VectorSearchStep(RetrievalStep):
         # Expand with related chunks via entity graph
         results = self._expand_by_entity_graph(results)
 
-        # Apply keyword filtering if available
+        # Apply keyword filtering if available (use original query for keyword detection)
         if self.keyword_matcher:
             keywords_in_query = self.keyword_matcher.find_in_query(query)
             if keywords_in_query:
@@ -548,5 +572,391 @@ Return ONLY a JSON object:
                 metadata=flat_metadata,
             )
             results.append(chunk)
+
+        return results
+
+    # -------------------------------------------------------------------------
+    # Hybrid Search (Dense + Sparse with RRF Fusion)
+    # -------------------------------------------------------------------------
+
+    def _get_sparse_index(self):
+        """Lazy-load the sparse index for this collection."""
+        if self._sparse_index is None:
+            try:
+                from fitz_ai.retrieval.sparse import SparseIndex
+
+                self._sparse_index = SparseIndex.load(self.collection)
+                if self._sparse_index.is_ready():
+                    logger.debug(
+                        f"{RETRIEVER} Loaded sparse index: {len(self._sparse_index)} documents"
+                    )
+                else:
+                    logger.debug(f"{RETRIEVER} No sparse index available for {self.collection}")
+            except Exception as e:
+                logger.debug(f"{RETRIEVER} Failed to load sparse index: {e}")
+                # Create empty placeholder to avoid retrying
+                from fitz_ai.retrieval.sparse import SparseIndex
+
+                self._sparse_index = SparseIndex(self.collection)
+
+        return self._sparse_index
+
+    def _hybrid_search(self, query: str, query_vector: list[float]) -> list[Chunk]:
+        """
+        Perform hybrid search combining dense and sparse results with RRF.
+
+        Reciprocal Rank Fusion (RRF) formula:
+            score(d) = sum(1 / (k + rank_i(d))) for each retrieval method i
+
+        Args:
+            query: Original query text (for sparse search)
+            query_vector: Query embedding (for dense search)
+
+        Returns:
+            Combined and re-ranked chunks
+        """
+        sparse_index = self._get_sparse_index()
+
+        # Get dense results
+        dense_hits = self._search(query_vector)
+        dense_chunks = self._hits_to_chunks(dense_hits)
+
+        # If no sparse index, return dense results only
+        if not sparse_index.is_ready():
+            return dense_chunks
+
+        # Get sparse results
+        sparse_hits = sparse_index.search(query, k=self.k)
+
+        if not sparse_hits:
+            return dense_chunks
+
+        # Build RRF scores
+        # Map chunk_id -> RRF score
+        rrf_scores: dict[str, float] = {}
+
+        # Add dense ranks (1-indexed for RRF formula)
+        for rank, chunk in enumerate(dense_chunks, start=1):
+            rrf_scores[chunk.id] = 1.0 / (self.rrf_k + rank)
+
+        # Add sparse ranks
+        for rank, hit in enumerate(sparse_hits, start=1):
+            if hit.chunk_id in rrf_scores:
+                rrf_scores[hit.chunk_id] += 1.0 / (self.rrf_k + rank)
+            else:
+                rrf_scores[hit.chunk_id] = 1.0 / (self.rrf_k + rank)
+
+        # Build chunk lookup from dense results
+        chunk_lookup: dict[str, Chunk] = {c.id: c for c in dense_chunks}
+
+        # Fetch any sparse-only chunks from vector DB
+        sparse_only_ids = [hit.chunk_id for hit in sparse_hits if hit.chunk_id not in chunk_lookup]
+        if sparse_only_ids:
+            try:
+                records = self.client.retrieve(
+                    self.collection,
+                    ids=sparse_only_ids,
+                    with_payload=True,
+                )
+                for record in records:
+                    record_id = (
+                        record.get("id") if isinstance(record, dict) else getattr(record, "id", None)
+                    )
+                    if record_id:
+                        payload = (
+                            record.get("payload", {})
+                            if isinstance(record, dict)
+                            else getattr(record, "payload", {})
+                        )
+                        metadata = payload.get("metadata", {})
+                        if isinstance(metadata, dict):
+                            flat_metadata = {**payload, **metadata, "from_sparse": True}
+                        else:
+                            flat_metadata = {**payload, "from_sparse": True}
+
+                        chunk = Chunk(
+                            id=str(record_id),
+                            doc_id=str(payload.get("doc_id", "unknown")),
+                            content=str(payload.get("content", "")),
+                            chunk_index=int(payload.get("chunk_index", 0)),
+                            metadata=flat_metadata,
+                        )
+                        chunk_lookup[str(record_id)] = chunk
+            except Exception as e:
+                logger.debug(f"{RETRIEVER} Failed to fetch sparse-only chunks: {e}")
+
+        # Sort by RRF score and build result list
+        sorted_ids = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
+
+        results = []
+        for chunk_id in sorted_ids[: self.k]:
+            if chunk_id in chunk_lookup:
+                chunk = chunk_lookup[chunk_id]
+                # Store RRF score for debugging/logging
+                chunk.metadata["rrf_score"] = rrf_scores[chunk_id]
+                results.append(chunk)
+
+        sparse_count = sum(1 for c in results if c.metadata.get("from_sparse"))
+        logger.debug(
+            f"{RETRIEVER} Hybrid search: {len(dense_chunks)} dense + "
+            f"{len(sparse_hits)} sparse → {len(results)} merged "
+            f"({sparse_count} sparse-only)"
+        )
+
+        return results
+
+    # -------------------------------------------------------------------------
+    # Query Expansion (Synonym/Acronym Variations)
+    # -------------------------------------------------------------------------
+
+    def _get_query_expander(self):
+        """Lazy-load the query expander."""
+        if self._query_expander is None:
+            try:
+                from fitz_ai.retrieval.expansion import QueryExpander
+
+                self._query_expander = QueryExpander()
+                logger.debug(f"{RETRIEVER} Query expander initialized")
+            except Exception as e:
+                logger.debug(f"{RETRIEVER} Failed to load query expander: {e}")
+                self._query_expander = None
+
+        return self._query_expander
+
+    def _get_query_variations(self, query: str) -> list[str]:
+        """
+        Get query variations using the expander.
+
+        Returns list with at least the original query.
+        """
+        expander = self._get_query_expander()
+        if expander is None:
+            return [query]
+
+        try:
+            return expander.expand(query)
+        except Exception as e:
+            logger.debug(f"{RETRIEVER} Query expansion failed: {e}")
+            return [query]
+
+    def _expanded_search(self, query_variations: list[str]) -> list[Chunk]:
+        """
+        Search with multiple query variations and merge results with RRF.
+
+        For each variation:
+        1. Embed the query
+        2. Run hybrid search (dense + sparse)
+        3. Collect ranked results
+
+        Then merge all results using Reciprocal Rank Fusion.
+
+        Args:
+            query_variations: List of query strings (original + expansions)
+
+        Returns:
+            Merged and re-ranked chunks
+        """
+        if len(query_variations) == 1:
+            # Single query - just run hybrid search
+            query = query_variations[0]
+            query_vector = self._embed(query)
+            return self._hybrid_search(query, query_vector)
+
+        # Multiple queries - search each and merge with RRF
+        # Map chunk_id -> (RRF score, Chunk)
+        rrf_scores: dict[str, float] = {}
+        chunk_lookup: dict[str, Chunk] = {}
+
+        for variation in query_variations:
+            query_vector = self._embed(variation)
+            results = self._hybrid_search(variation, query_vector)
+
+            # Add RRF scores for this variation's results
+            for rank, chunk in enumerate(results, start=1):
+                rrf_delta = 1.0 / (self.rrf_k + rank)
+                if chunk.id in rrf_scores:
+                    rrf_scores[chunk.id] += rrf_delta
+                else:
+                    rrf_scores[chunk.id] = rrf_delta
+                    chunk_lookup[chunk.id] = chunk
+
+        # Sort by combined RRF score
+        sorted_ids = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
+
+        # Build final result list
+        results = []
+        for chunk_id in sorted_ids[: self.k]:
+            if chunk_id in chunk_lookup:
+                chunk = chunk_lookup[chunk_id]
+                chunk.metadata["expansion_rrf_score"] = rrf_scores[chunk_id]
+                results.append(chunk)
+
+        logger.debug(
+            f"{RETRIEVER} Query expansion: {len(query_variations)} variations → "
+            f"{len(results)} chunks (from {len(rrf_scores)} unique)"
+        )
+
+        return results
+
+    # -------------------------------------------------------------------------
+    # Temporal Query Handling (Time-Based Comparisons and Periods)
+    # -------------------------------------------------------------------------
+
+    def _get_temporal_detector(self):
+        """Lazy-load the temporal detector."""
+        if self._temporal_detector is None:
+            try:
+                from fitz_ai.retrieval.temporal import TemporalDetector
+
+                self._temporal_detector = TemporalDetector()
+                logger.debug(f"{RETRIEVER} Temporal detector initialized")
+            except Exception as e:
+                logger.debug(f"{RETRIEVER} Failed to load temporal detector: {e}")
+                self._temporal_detector = None
+
+        return self._temporal_detector
+
+    def _check_temporal_query(self, query: str):
+        """
+        Check if query has temporal intent and extract references.
+
+        Returns:
+            Tuple of (intent, references, temporal_queries) if temporal query detected,
+            None otherwise.
+        """
+        detector = self._get_temporal_detector()
+        if detector is None:
+            return None
+
+        try:
+            from fitz_ai.retrieval.temporal import TemporalIntent
+
+            intent, references = detector.detect(query)
+
+            if intent == TemporalIntent.NONE:
+                return None
+
+            # Generate sub-queries for temporal coverage
+            temporal_queries = detector.generate_temporal_queries(query, intent, references)
+
+            logger.debug(
+                f"{RETRIEVER} Temporal query detected: intent={intent.value}, "
+                f"refs={[r.text for r in references]}, queries={len(temporal_queries)}"
+            )
+
+            return intent, references, temporal_queries
+
+        except Exception as e:
+            logger.debug(f"{RETRIEVER} Temporal detection failed: {e}")
+            return None
+
+    def _temporal_search(
+        self,
+        query: str,
+        chunks: list[Chunk],
+        intent: Any,
+        references: list,
+        temporal_queries: list[str],
+    ) -> list[Chunk]:
+        """
+        Execute search with temporal awareness.
+
+        For temporal queries:
+        1. Search with each temporal sub-query
+        2. Tag results with their temporal reference
+        3. Merge results with RRF
+        4. Ensure coverage of all time periods mentioned
+
+        Args:
+            query: Original query
+            chunks: Pre-existing chunks (artifacts)
+            intent: TemporalIntent enum value
+            references: List of TemporalReference objects
+            temporal_queries: List of queries to search
+
+        Returns:
+            Merged and temporally-aware chunks
+        """
+        logger.debug(
+            f"{RETRIEVER} VectorSearchStep: temporal search with "
+            f"{len(temporal_queries)} queries"
+        )
+
+        # Map chunk_id -> (RRF score, Chunk)
+        rrf_scores: dict[str, float] = {}
+        chunk_lookup: dict[str, Chunk] = {}
+
+        # Track which temporal references each chunk matches
+        chunk_temporal_tags: dict[str, list[str]] = {}
+
+        for idx, tq in enumerate(temporal_queries):
+            # Expand each temporal query with synonyms/acronyms
+            query_variations = self._get_query_variations(tq)
+
+            for variation in query_variations:
+                query_vector = self._embed(variation)
+                results = self._hybrid_search(variation, query_vector)
+
+                # Add RRF scores
+                for rank, chunk in enumerate(results, start=1):
+                    rrf_delta = 1.0 / (self.rrf_k + rank)
+                    if chunk.id in rrf_scores:
+                        rrf_scores[chunk.id] += rrf_delta
+                    else:
+                        rrf_scores[chunk.id] = rrf_delta
+                        chunk_lookup[chunk.id] = chunk
+                        chunk_temporal_tags[chunk.id] = []
+
+                    # Tag with temporal reference if this is a focused query
+                    if idx > 0 and idx <= len(references):
+                        ref = references[idx - 1]
+                        if ref.text not in chunk_temporal_tags.get(chunk.id, []):
+                            chunk_temporal_tags.setdefault(chunk.id, []).append(ref.text)
+
+        # Sort by combined RRF score
+        sorted_ids = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
+
+        # Build final result list with temporal metadata
+        results = []
+        for chunk_id in sorted_ids[: self.k]:
+            if chunk_id in chunk_lookup:
+                chunk = chunk_lookup[chunk_id]
+                chunk.metadata["temporal_rrf_score"] = rrf_scores[chunk_id]
+
+                # Add temporal tags if present
+                if chunk_id in chunk_temporal_tags and chunk_temporal_tags[chunk_id]:
+                    chunk.metadata["temporal_refs"] = chunk_temporal_tags[chunk_id]
+
+                results.append(chunk)
+
+        # Ensure table schema chunks are included
+        results = self._ensure_table_chunks(results)
+
+        # Expand with related chunks via entity graph
+        results = self._expand_by_entity_graph(results)
+
+        # Apply keyword filtering (using original query)
+        if self.keyword_matcher:
+            keywords_in_query = self.keyword_matcher.find_in_query(query)
+            if keywords_in_query:
+                filtered = [
+                    c
+                    for c in results
+                    if self.keyword_matcher.chunk_matches_any(c, keywords_in_query)
+                    or c.metadata.get("is_table_schema")
+                ]
+                logger.debug(
+                    f"{RETRIEVER} Keyword filter: {len(results)} → {len(filtered)} chunks"
+                )
+                results = filtered
+
+        logger.debug(
+            f"{RETRIEVER} Temporal search: {len(temporal_queries)} queries → "
+            f"{len(results)} chunks"
+        )
+
+        # Preserve any pre-existing chunks
+        if chunks:
+            return chunks + results
 
         return results

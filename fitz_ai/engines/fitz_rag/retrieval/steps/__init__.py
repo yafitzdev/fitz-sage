@@ -39,6 +39,7 @@ from .base import (
     VectorClient,
 )
 from .dedupe import DedupeStep
+from .freshness import FreshnessStep
 from .limit import LimitStep
 from .rerank import RerankStep
 from .threshold import ThresholdStep
@@ -55,6 +56,7 @@ STEP_REGISTRY: dict[str, type[RetrievalStep]] = {
     "limit": LimitStep,
     "dedupe": DedupeStep,
     "artifact_fetch": ArtifactFetchStep,
+    "freshness": FreshnessStep,
     # table_query is registered lazily to avoid circular imports
 }
 
@@ -95,6 +97,7 @@ __all__ = [
     "LimitStep",
     "DedupeStep",
     "ArtifactFetchStep",
+    "FreshnessStep",
     # table_query loaded lazily via get_step_class()
     # Registry functions
     "STEP_REGISTRY",

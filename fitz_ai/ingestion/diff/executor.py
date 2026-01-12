@@ -405,6 +405,10 @@ class DiffIngestExecutor:
         if all_prepared:
             self._detect_vocabulary(all_prepared)
 
+        # Phase 4.5: Build/update sparse index for hybrid search
+        if all_chunks:
+            self._build_sparse_index(all_chunks, hierarchy_chunks)
+
         # Final progress update
         if on_progress and total_to_ingest > 0:
             on_progress(total_to_ingest, total_to_ingest, "Done")
@@ -694,6 +698,50 @@ class DiffIngestExecutor:
         except Exception as e:
             # Non-fatal: vocabulary detection is optional
             logger.warning(f"Vocabulary detection failed: {e}")
+
+    def _build_sparse_index(
+        self,
+        chunks: List,
+        hierarchy_chunks: Optional[List] = None,
+    ) -> None:
+        """
+        Build/update sparse (TF-IDF) index for hybrid search.
+
+        This creates a parallel index to the dense vectors for keyword-based
+        retrieval. The sparse index is combined with dense search using
+        Reciprocal Rank Fusion (RRF) at query time.
+
+        Args:
+            chunks: List of ingested chunks.
+            hierarchy_chunks: Optional list of hierarchy summary chunks.
+        """
+        try:
+            from fitz_ai.retrieval.sparse import SparseIndex
+
+            # Collect all chunk IDs and contents
+            all_chunks = list(chunks)
+            if hierarchy_chunks:
+                all_chunks.extend(hierarchy_chunks)
+
+            if not all_chunks:
+                return
+
+            chunk_ids = [c.id for c in all_chunks]
+            contents = [c.content for c in all_chunks]
+
+            # Build sparse index
+            sparse_index = SparseIndex(collection=self._collection)
+            sparse_index.build(chunk_ids=chunk_ids, contents=contents)
+            sparse_index.save()
+
+            logger.info(
+                f"Built sparse index [{self._collection}]: "
+                f"{len(chunk_ids)} documents, {len(sparse_index.vectorizer.vocabulary_)} terms"
+            )
+
+        except Exception as e:
+            # Non-fatal: sparse index is optional enhancement
+            logger.warning(f"Sparse index build failed: {e}")
 
     def ingest_artifacts(
         self,
