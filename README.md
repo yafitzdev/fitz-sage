@@ -149,13 +149,14 @@ You can—but you'll hit walls fast.
 
 ####
 
-Any questions left? Try fitz on itself:
-
-```bash
-fitz quickstart ./fitz_ai "How does the chunking pipeline work?"
-```
-
-The codebase speaks for itself.
+> [!TIP]
+> Any questions left? Try fitz on itself:
+> 
+> ```bash
+> fitz quickstart ./fitz_ai "How does the chunking pipeline work?"
+> ```
+>
+> The codebase speaks for itself.
 
 ---
 
