@@ -149,13 +149,14 @@ You can—but you'll hit walls fast.
 
 ####
 
-Any questions left? Try fitz on itself:
-
-```bash
-fitz quickstart ./fitz_ai "How does the chunking pipeline work?"
-```
-
-The codebase speaks for itself.
+> [!TIP]
+> Any questions left? Try fitz on itself:
+> 
+> ```bash
+> fitz quickstart ./fitz_ai "How does the chunking pipeline work?"
+> ```
+>
+> The codebase speaks for itself.
 
 ---
 
@@ -171,11 +172,6 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 | *[User pastes 500-char test report]* "What failed and why?" | Long input → averaged embedding → matches nothing specifically | ❌ Vaguely related chunks | ✅ Multi-query decomposition |
 | "How does the auth module work?" *(code)*               | Naive chunking splits functions mid-body                       | ❌ Broken code fragments | ✅ Complete functions |
 | "What's the timeout for CAN?" *(table)*                 | Tables chunked arbitrarily, structure lost                     | ❌ Fragmented rows | ✅ SQL on structured data |
-| "X100 battery specs"                                    | Semantic search misses exact model numbers                     | ❌ Returns Y200 docs | ✅ Hybrid search (dense + sparse) |
-| "How do I fetch the db config?"                         | User says "fetch", docs say "retrieve"; "db" vs "database"     | ❌ No matches | ✅ Query expansion |
-| "What changed between Q1 and Q2?"                       | No awareness of time periods in query                          | ❌ Random chunks | ✅ Temporal query handling |
-| "What does the official spec say?"                      | Can't distinguish authoritative vs informal sources            | ❌ Returns notes | ✅ Freshness/authority boosting |
-| "List all the test cases that failed"                   | No mechanism for comprehensive retrieval                       | ❌ Partial list | ✅ Aggregation query handling |
 
 These features are **always on**—no configuration needed. Fitz automatically detects when to use each capability.
 
@@ -378,162 +374,6 @@ These features are **always on**—no configuration needed. Fitz automatically d
 
 <details>
 
-<summary><strong>Hybrid Search (Dense + Sparse)</strong></summary>
-
-<br>
-
->**The problem ☔️**
->
->Dense (semantic) search understands meaning but misses exact keywords. Ask "X100 battery specs" and embeddings might return Y200 docs because they're semantically similar.
->
->**The solution ☀️**
->
->Fitz combines dense and sparse (TF-IDF) search with Reciprocal Rank Fusion:
->```
->Q: "X100 battery specs"
->
->Dense search:  [doc_A, doc_B, doc_C]  (semantic similarity)
->Sparse search: [doc_C, doc_D, doc_A]  (exact keyword TF-IDF)
->                        ↓
->                   RRF Fusion
->                        ↓
->Combined:       [doc_A, doc_C, doc_B, doc_D]  (best of both)
->```
->
->**Always on.** Sparse index is built automatically during ingestion. No configuration needed.
-
-</details>
-
-<details>
-
-<summary><strong>Query Expansion</strong></summary>
-
-<br>
-
->**The problem ☔️**
->
->Users say "fetch", docs say "retrieve". Users say "db", docs say "database". Semantic similarity helps, but synonym gaps still cause missed results.
->
->**The solution ☀️**
->
->Fitz automatically expands queries with synonym and acronym variations:
->```
->Q: "How do I fetch the db config?"
->     ↓
->Expanded:
->  → "How do I fetch the db config?"
->  → "How do I retrieve the db config?"
->  → "How do I fetch the database config?"
->     ↓
->3 searches → RRF fusion → better recall
->```
->
->**Built-in vocabulary** covers 50+ technical synonyms and 50+ common acronyms (API, db, auth, config, etc.).
->
->**Always on.** No configuration needed.
-
-</details>
-
-<details>
-
-<summary><strong>Temporal Queries</strong></summary>
-
-<br>
-
->**The problem ☔️**
->
->Time-based questions get no special treatment. Ask "What changed between Q1 and Q2?" and naive RAG returns random chunks without understanding the temporal comparison.
->
->**The solution ☀️**
->
->Fitz detects temporal intent and generates time-focused sub-queries:
->```
->Q: "What changed between Q1 and Q2 2024?"
->     ↓
->Detected: CHANGE intent, refs: [Q1, Q2 2024]
->     ↓
->Sub-queries:
->  → "What changed between Q1 and Q2 2024?"
->  → "What changed Q1"
->  → "What changed Q2 2024"
->     ↓
->Searches merged → chunks from both periods retrieved
->```
->
->**Detects:** Quarters, years, versions, months, relative time ("last month"), before/after patterns.
->
->**Always on.** No configuration needed.
-
-</details>
-
-<details>
-
-<summary><strong>Freshness & Authority</strong></summary>
-
-<br>
-
->**The problem ☔️**
->
->All documents are treated equally. Ask "What does the official spec say?" and you might get informal notes instead of the authoritative specification.
->
->**The solution ☀️**
->
->Fitz detects authority/recency signals in queries and boosts accordingly:
->```
->Q: "What does the official spec say about battery warranty?"
->     ↓
->Detected: authority intent ("official", "spec")
->     ↓
->Boost applied:
->  - /spec/ folder docs: +15% score
->  - /notes/ folder docs: -10% score
->     ↓
->Result: Specification docs ranked higher
->```
->
->**Authority signals:** "official", "spec", "authoritative", "canonical"
->**Recency signals:** "latest", "recent", "current", "updated"
->
->**Always on.** No configuration needed.
-
-</details>
-
-<details>
-
-<summary><strong>Aggregation Queries</strong></summary>
-
-<br>
-
->**The problem ☔️**
->
->Questions asking for lists, counts, or enumerations need comprehensive coverage. Ask "List all test cases that failed" and naive RAG returns only a few matches from limited chunks.
->
->**The solution ☀️**
->
->Fitz detects aggregation intent and expands retrieval for comprehensive coverage:
->```
->Q: "List all the people mentioned in the documents"
->     ↓
->Detected: LIST intent, target: "people"
->     ↓
->Expanded retrieval:
->  - Fetch 3x more chunks (75 instead of 25)
->  - Augmented query for exhaustive results
->     ↓
->Result: Complete list instead of partial
->```
->
->**Aggregation types:**
->- **LIST**: "list all", "enumerate", "what are the" → 3x chunks
->- **COUNT**: "how many", "number of" → 4x chunks
->- **UNIQUE**: "different types", "distinct" → 3x chunks
->
->**Always on.** No configuration needed.
-
-</details>
-
-<details>
-
 <summary><strong>Roadmap</strong></summary>
 
 <br>
@@ -548,11 +388,6 @@ These features are **always on**—no configuration needed. Fitz automatically d
 >| Comparison Queries | ✅ Done | Multi-entity retrieval ("A vs B") |
 >| Tabular Data Routing | ✅ Done | SQL on structured table data |
 >| Multi-Table Joins | ✅ Done | JOIN queries across multiple tables |
->| Hybrid Search | ✅ Done | Dense + sparse with RRF fusion |
->| Query Expansion | ✅ Done | Synonym/acronym variations for better recall |
->| Temporal Queries | ✅ Done | Time-based comparisons and period filtering |
->| Freshness & Authority | ✅ Done | Boost recent/authoritative sources |
->| Aggregation Queries | ✅ Done | Comprehensive retrieval for list/count/enumerate |
 >| Multi-Hop Reasoning | 📋 Planned | Chain retrieval across related entities |
 
 </details>
