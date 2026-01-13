@@ -124,7 +124,8 @@ docs/blog
 docs/limitations
 docs/roadmap
 docs/archive
-nul
-.mcp.jsontmpclaude-*-cwd
+
+# Claude Code temp files
 tmpclaude-*-cwd
 .mcp.json
+openapi.json
