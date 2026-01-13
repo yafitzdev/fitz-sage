@@ -554,7 +554,7 @@ These features are **always on**—no configuration needed. Fitz automatically d
 >| Temporal Queries | ✅ Done | Time-based comparisons and period filtering |
 >| Freshness & Authority | ✅ Done | Boost recent/authoritative sources |
 >| Aggregation Queries | ✅ Done | Comprehensive retrieval for list/count/enumerate |
->| Multi-Hop Reasoning | 📋 Planned | Chain retrieval across related entities |
+>| Multi-Hop Reasoning | ✅ Done | Iterative retrieval for multi-step reasoning |
 
 </details>
 
