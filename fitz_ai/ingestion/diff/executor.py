@@ -669,7 +669,7 @@ class DiffIngestExecutor:
             prepared_files: List of (candidate, file_data) tuples from ingestion.
         """
         try:
-            from fitz_ai.ingestion.vocabulary import KeywordDetector, VocabularyStore
+            from fitz_ai.retrieval.vocabulary import KeywordDetector, VocabularyStore
 
             # Collect all chunks (as simple objects with content, doc_id, metadata)
             all_chunks = []

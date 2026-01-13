@@ -175,6 +175,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 | "How do I fetch the db config?"                         | User says "fetch", docs say "retrieve"; "db" vs "database"     | ❌ No matches | ✅ Query expansion |
 | "What changed between Q1 and Q2?"                       | No awareness of time periods in query                          | ❌ Random chunks | ✅ Temporal query handling |
 | "What does the official spec say?"                      | Can't distinguish authoritative vs informal sources            | ❌ Returns notes | ✅ Freshness/authority boosting |
+| "List all the test cases that failed"                   | No mechanism for comprehensive retrieval                       | ❌ Partial list | ✅ Aggregation query handling |
 
 These features are **always on**—no configuration needed. Fitz automatically detects when to use each capability.
 
@@ -499,6 +500,40 @@ These features are **always on**—no configuration needed. Fitz automatically d
 
 <details>
 
+<summary><strong>Aggregation Queries</strong></summary>
+
+<br>
+
+>**The problem ☔️**
+>
+>Questions asking for lists, counts, or enumerations need comprehensive coverage. Ask "List all test cases that failed" and naive RAG returns only a few matches from limited chunks.
+>
+>**The solution ☀️**
+>
+>Fitz detects aggregation intent and expands retrieval for comprehensive coverage:
+>```
+>Q: "List all the people mentioned in the documents"
+>     ↓
+>Detected: LIST intent, target: "people"
+>     ↓
+>Expanded retrieval:
+>  - Fetch 3x more chunks (75 instead of 25)
+>  - Augmented query for exhaustive results
+>     ↓
+>Result: Complete list instead of partial
+>```
+>
+>**Aggregation types:**
+>- **LIST**: "list all", "enumerate", "what are the" → 3x chunks
+>- **COUNT**: "how many", "number of" → 4x chunks
+>- **UNIQUE**: "different types", "distinct" → 3x chunks
+>
+>**Always on.** No configuration needed.
+
+</details>
+
+<details>
+
 <summary><strong>Roadmap</strong></summary>
 
 <br>
@@ -517,6 +552,7 @@ These features are **always on**—no configuration needed. Fitz automatically d
 >| Query Expansion | ✅ Done | Synonym/acronym variations for better recall |
 >| Temporal Queries | ✅ Done | Time-based comparisons and period filtering |
 >| Freshness & Authority | ✅ Done | Boost recent/authoritative sources |
+>| Aggregation Queries | ✅ Done | Comprehensive retrieval for list/count/enumerate |
 >| Multi-Hop Reasoning | 📋 Planned | Chain retrieval across related entities |
 
 </details>

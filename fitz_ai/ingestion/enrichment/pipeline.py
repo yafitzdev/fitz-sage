@@ -42,8 +42,8 @@ from fitz_ai.ingestion.enrichment.chunk import ChunkEnricher, create_default_enr
 from fitz_ai.ingestion.enrichment.config import EnrichmentConfig
 from fitz_ai.ingestion.enrichment.hierarchy.enricher import HierarchyEnricher
 from fitz_ai.ingestion.enrichment.models import EnrichmentResult
-from fitz_ai.ingestion.entity_graph import EntityGraphStore
-from fitz_ai.ingestion.vocabulary import Keyword, VocabularyStore
+from fitz_ai.retrieval.entity_graph import EntityGraphStore
+from fitz_ai.retrieval.vocabulary import Keyword, VocabularyStore
 
 if TYPE_CHECKING:
     from fitz_ai.core.chunk import Chunk

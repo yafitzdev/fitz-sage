@@ -1,6 +1,6 @@
 # tests/test_vocabulary.py
 """
-Tests for fitz_ai.ingestion.vocabulary module.
+Tests for fitz_ai.retrieval.vocabulary module.
 
 Tests cover:
 1. Keyword model - serialization, matching, variations
@@ -16,22 +16,22 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fitz_ai.ingestion.vocabulary.detector import (
+from fitz_ai.retrieval.vocabulary.detector import (
     DetectorPattern,
     KeywordDetector,
     suggest_keywords,
 )
-from fitz_ai.ingestion.vocabulary.matcher import (
+from fitz_ai.retrieval.vocabulary.matcher import (
     KeywordMatcher,
     create_matcher_from_store,
 )
-from fitz_ai.ingestion.vocabulary.models import (
+from fitz_ai.retrieval.vocabulary.models import (
     Keyword,
     VocabularyConfig,
     VocabularyMetadata,
 )
-from fitz_ai.ingestion.vocabulary.store import VocabularyStore
-from fitz_ai.ingestion.vocabulary.variations import (
+from fitz_ai.retrieval.vocabulary.store import VocabularyStore
+from fitz_ai.retrieval.vocabulary.variations import (
     generate_variations,
     normalize_for_matching,
 )

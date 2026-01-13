@@ -60,7 +60,7 @@ def list_keywords(
     ),
 ) -> None:
     """List all keywords in the vocabulary."""
-    from fitz_ai.ingestion.vocabulary import VocabularyStore
+    from fitz_ai.retrieval.vocabulary import VocabularyStore
 
     collection = _get_collection(collection)
     store = VocabularyStore(collection=collection)
@@ -159,7 +159,7 @@ def add_keyword(
     ),
 ) -> None:
     """Add a custom keyword to the vocabulary."""
-    from fitz_ai.ingestion.vocabulary import Keyword, VocabularyStore, generate_variations
+    from fitz_ai.retrieval.vocabulary import Keyword, VocabularyStore, generate_variations
 
     collection = _get_collection(collection)
     store = VocabularyStore(collection=collection)
@@ -213,7 +213,7 @@ def edit_keyword(
     ),
 ) -> None:
     """Edit variations for an existing keyword."""
-    from fitz_ai.ingestion.vocabulary import VocabularyStore
+    from fitz_ai.retrieval.vocabulary import VocabularyStore
 
     if not add and not remove:
         ui.error("Specify --add or --remove to edit variations.")
@@ -268,7 +268,7 @@ def remove_keyword(
     ),
 ) -> None:
     """Remove a keyword from the vocabulary."""
-    from fitz_ai.ingestion.vocabulary import VocabularyStore
+    from fitz_ai.retrieval.vocabulary import VocabularyStore
 
     collection = _get_collection(collection)
     store = VocabularyStore(collection=collection)
@@ -307,7 +307,7 @@ def suggest_keywords(
 ) -> None:
     """Suggest keywords from the corpus."""
     from fitz_ai.cli.context import CLIContext
-    from fitz_ai.ingestion.vocabulary import KeywordDetector, VocabularyStore
+    from fitz_ai.retrieval.vocabulary import KeywordDetector, VocabularyStore
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     ctx = CLIContext.load()
@@ -403,7 +403,7 @@ def detect_keywords(
 ) -> None:
     """Re-detect keywords from collection and update vocabulary."""
     from fitz_ai.cli.context import CLIContext
-    from fitz_ai.ingestion.vocabulary import KeywordDetector, VocabularyStore
+    from fitz_ai.retrieval.vocabulary import KeywordDetector, VocabularyStore
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     ctx = CLIContext.load()

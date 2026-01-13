@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from fitz_ai.core.paths import FitzPaths
-from fitz_ai.ingestion.entity_graph import EntityGraphStore
+from fitz_ai.retrieval.entity_graph import EntityGraphStore
 
 
 class TestEntityGraphStore:

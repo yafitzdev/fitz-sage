@@ -34,6 +34,7 @@ class Feature(Enum):
     HYBRID_SEARCH = "hybrid_search"
     QUERY_EXPANSION = "query_expansion"
     TEMPORAL = "temporal"
+    AGGREGATION = "aggregation"
 
 
 @dataclass
@@ -894,6 +895,45 @@ SCENARIOS: list[TestScenario] = [
         query="What changed for TechCorp's stock price?",
         # Should detect "what changed" and find stock-related content
         must_contain_any=["stock", "20%", "rose", "price", "TECH"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Aggregation Queries (List All, Count, Enumerate)
+    # =========================================================================
+    TestScenario(
+        id="E79",
+        name="Aggregation: list all people",
+        feature=Feature.AGGREGATION,
+        query="List all the people mentioned in the company documents",
+        # Should fetch more chunks to find all people (Sarah Chen, Marcus Webb, etc.)
+        must_contain_any=["Sarah Chen", "Marcus Webb"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E80",
+        name="Aggregation: what are the different companies",
+        feature=Feature.AGGREGATION,
+        query="What are the different companies mentioned?",
+        # Should detect "what are the different" and find all company references
+        must_contain_any=["TechCorp", "GreenDrive", "AutoMotors"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E81",
+        name="Aggregation: how many query",
+        feature=Feature.AGGREGATION,
+        query="How many products does TechCorp Industries have?",
+        # Should fetch comprehensive results for accurate count
+        must_contain_any=["vehicle", "product", "AI", "autonomous"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E82",
+        name="Aggregation: enumerate features",
+        feature=Feature.AGGREGATION,
+        query="Enumerate all the features of the autonomous vehicle system",
+        # Should list out features comprehensively
+        must_contain_any=["autonomous", "AI", "navigation", "sensor"],
         min_sources=1,
     ),
 ]

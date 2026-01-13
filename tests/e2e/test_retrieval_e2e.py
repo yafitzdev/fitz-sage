@@ -261,6 +261,20 @@ class TestTemporal:
         assert result.validation.passed, result.validation.reason
 
 
+class TestAggregation:
+    """Tests for aggregation query handling (list all, count, enumerate)."""
+
+    @pytest.mark.parametrize(
+        "scenario",
+        get_scenarios_by_feature(Feature.AGGREGATION),
+        ids=lambda s: s.id,
+    )
+    def test_aggregation_scenario(self, e2e_runner, scenario):
+        """Test aggregation query handling with comprehensive retrieval."""
+        result = e2e_runner.run_scenario(scenario)
+        assert result.validation.passed, result.validation.reason
+
+
 # =============================================================================
 # Full Suite Test with Report
 # =============================================================================

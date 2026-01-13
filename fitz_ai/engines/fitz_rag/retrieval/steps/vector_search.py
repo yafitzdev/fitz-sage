@@ -3,6 +3,7 @@
 Vector Search Step - Intelligent retrieval from vector database.
 
 Embeds query and searches for top-k candidates. Automatically applies:
+- Aggregation query handling (list all, count, enumerate queries)
 - Temporal query handling (time-based comparisons and period filtering)
 - Query expansion (synonym/acronym variations) for improved recall
 - Hybrid search (dense + sparse) with RRF fusion (when sparse index available)
@@ -100,20 +101,28 @@ class VectorSearchStep(RetrievalStep):
     _query_expander: Any = field(default=None, init=False, repr=False)
     # Lazy-loaded temporal detector
     _temporal_detector: Any = field(default=None, init=False, repr=False)
+    # Lazy-loaded aggregation detector
+    _aggregation_detector: Any = field(default=None, init=False, repr=False)
 
     def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
         """
         Execute vector search with automatic query expansion.
 
         Routing logic:
-        1. Temporal queries (time comparisons/periods) → temporal-aware search
-        2. Comparison queries (detected by pattern) → comparison-aware expansion
-        3. Long queries (≥ min_query_length) → generic multi-query expansion
-        4. Short queries → single vector search
+        1. Aggregation queries (list all, count, enumerate) → comprehensive retrieval
+        2. Temporal queries (time comparisons/periods) → temporal-aware search
+        3. Comparison queries (detected by pattern) → comparison-aware expansion
+        4. Long queries (≥ min_query_length) → generic multi-query expansion
+        5. Short queries → single vector search
 
         Pre-existing chunks (e.g., artifacts) are preserved and prepended.
         """
-        # Check for temporal query first (time-based comparisons, periods)
+        # Check for aggregation query first (list all, count, enumerate)
+        aggregation_result = self._check_aggregation_query(query)
+        if aggregation_result is not None:
+            return self._aggregation_search(query, chunks, aggregation_result)
+
+        # Check for temporal query (time-based comparisons, periods)
         temporal_result = self._check_temporal_query(query)
         if temporal_result is not None:
             intent, references, temporal_queries = temporal_result
@@ -954,6 +963,150 @@ Return ONLY a JSON object:
             f"{RETRIEVER} Temporal search: {len(temporal_queries)} queries → "
             f"{len(results)} chunks"
         )
+
+        # Preserve any pre-existing chunks
+        if chunks:
+            return chunks + results
+
+        return results
+
+    # -------------------------------------------------------------------------
+    # Aggregation Query Handling (List All, Count, Enumerate)
+    # -------------------------------------------------------------------------
+
+    def _get_aggregation_detector(self):
+        """Lazy-load the aggregation detector."""
+        if self._aggregation_detector is None:
+            try:
+                from fitz_ai.retrieval.aggregation import AggregationDetector
+
+                self._aggregation_detector = AggregationDetector()
+                logger.debug(f"{RETRIEVER} Aggregation detector initialized")
+            except Exception as e:
+                logger.debug(f"{RETRIEVER} Failed to load aggregation detector: {e}")
+                self._aggregation_detector = None
+
+        return self._aggregation_detector
+
+    def _check_aggregation_query(self, query: str):
+        """
+        Check if query has aggregation intent (list all, count, enumerate).
+
+        Returns:
+            AggregationResult if detected, None otherwise.
+        """
+        detector = self._get_aggregation_detector()
+        if detector is None:
+            return None
+
+        try:
+            result = detector.detect(query)
+
+            if not result.detected:
+                return None
+
+            logger.debug(
+                f"{RETRIEVER} Aggregation query detected: type={result.intent.type.name}, "
+                f"target='{result.intent.target}', multiplier={result.fetch_multiplier}"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.debug(f"{RETRIEVER} Aggregation detection failed: {e}")
+            return None
+
+    def _aggregation_search(
+        self,
+        query: str,
+        chunks: list[Chunk],
+        aggregation_result: Any,
+    ) -> list[Chunk]:
+        """
+        Execute search optimized for aggregation queries.
+
+        Aggregation queries need comprehensive coverage:
+        1. Use augmented query for better retrieval
+        2. Fetch more chunks (multiplied by fetch_multiplier)
+        3. Use multiple query variations for diversity
+        4. Tag results with aggregation metadata
+
+        Args:
+            query: Original query
+            chunks: Pre-existing chunks (artifacts)
+            aggregation_result: AggregationResult from detector
+
+        Returns:
+            Comprehensive set of chunks for aggregation
+        """
+        # Calculate expanded k for comprehensive coverage
+        base_k = self.k
+        expanded_k = base_k * aggregation_result.fetch_multiplier
+
+        logger.debug(
+            f"{RETRIEVER} VectorSearchStep: aggregation search, "
+            f"k={base_k}→{expanded_k}, target='{aggregation_result.intent.target}'"
+        )
+
+        # Temporarily increase k for this search
+        original_k = self.k
+        self.k = expanded_k
+
+        try:
+            # Use augmented query for better retrieval
+            search_query = aggregation_result.augmented_query or query
+
+            # Get query variations (synonyms, acronyms)
+            query_variations = self._get_query_variations(search_query)
+
+            # Also add variations of the original query to ensure coverage
+            if search_query != query:
+                original_variations = self._get_query_variations(query)
+                # Merge unique variations
+                seen = set(query_variations)
+                for var in original_variations:
+                    if var not in seen:
+                        query_variations.append(var)
+                        seen.add(var)
+
+            # Search with all variations and merge with RRF
+            results = self._expanded_search(query_variations)
+
+            # Always include table schema chunks for potential SQL aggregations
+            results = self._ensure_table_chunks(results)
+
+            # Expand with related chunks via entity graph
+            # (important for comprehensive aggregation)
+            results = self._expand_by_entity_graph(results)
+
+            # Apply keyword filtering if available (use original query)
+            if self.keyword_matcher:
+                keywords_in_query = self.keyword_matcher.find_in_query(query)
+                if keywords_in_query:
+                    filtered = [
+                        c
+                        for c in results
+                        if self.keyword_matcher.chunk_matches_any(c, keywords_in_query)
+                        or c.metadata.get("is_table_schema")
+                    ]
+                    logger.debug(
+                        f"{RETRIEVER} Keyword filter: {len(results)} → {len(filtered)} chunks"
+                    )
+                    results = filtered
+
+            # Tag results with aggregation metadata
+            for chunk in results:
+                chunk.metadata["aggregation_type"] = aggregation_result.intent.type.name
+                chunk.metadata["aggregation_target"] = aggregation_result.intent.target
+
+            logger.debug(
+                f"{RETRIEVER} Aggregation search: {len(query_variations)} variations → "
+                f"{len(results)} chunks"
+            )
+
+        finally:
+            # Restore original k
+            self.k = original_k
 
         # Preserve any pre-existing chunks
         if chunks:

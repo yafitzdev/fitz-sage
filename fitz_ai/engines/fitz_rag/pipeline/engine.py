@@ -41,8 +41,8 @@ from fitz_ai.engines.fitz_rag.retrieval.multihop import (
 )
 from fitz_ai.engines.fitz_rag.retrieval.registry import get_retrieval_plugin
 from fitz_ai.engines.fitz_rag.routing import QueryIntent, QueryRouter
-from fitz_ai.ingestion.entity_graph import EntityGraphStore
-from fitz_ai.ingestion.vocabulary import KeywordMatcher, create_matcher_from_store
+from fitz_ai.retrieval.entity_graph import EntityGraphStore
+from fitz_ai.retrieval.vocabulary import KeywordMatcher, create_matcher_from_store
 from fitz_ai.llm.registry import get_llm_plugin
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE, VECTOR_DB
