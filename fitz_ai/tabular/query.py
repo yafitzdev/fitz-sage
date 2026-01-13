@@ -405,17 +405,57 @@ Return ONLY the SQL query, no explanation."""
         self,
         query: str,
         tables: list[tuple[str, list[str], list[list[str]]]],
+        max_retries: int = 2,
     ) -> str:
         """
-        Generate SQL that may JOIN multiple tables.
+        Generate SQL that may JOIN multiple tables, with validation and retry.
 
         Args:
             query: User query.
             tables: List of (table_name, headers, sample_rows).
+            max_retries: Maximum retry attempts (default: 2).
 
         Returns:
-            SQL query string.
+            Validated SQL query string.
         """
+        previous_error = None
+
+        for attempt in range(max_retries + 1):
+            # Generate SQL (with error feedback on retries)
+            sql = self._generate_multi_table_sql_attempt(query, tables, previous_error)
+
+            # Validate by test execution on sample data
+            try:
+                test_conn = sqlite3.connect(":memory:")
+                for table_name, headers, sample_rows in tables:
+                    self._create_and_populate_named(test_conn, table_name, headers, sample_rows[:3])
+                test_conn.execute(sql)  # Test query
+                test_conn.close()
+
+                logger.debug(
+                    f"Multi-table SQL validated successfully{' (retry '+str(attempt)+')' if attempt > 0 else ''}"
+                )
+                return sql  # Success!
+
+            except sqlite3.Error as e:
+                previous_error = str(e)
+                logger.warning(
+                    f"Multi-table SQL validation failed (attempt {attempt+1}/{max_retries+1}): {previous_error}"
+                )
+
+                if attempt == max_retries:
+                    logger.error(f"Multi-table SQL generation failed after {max_retries+1} attempts")
+                    return sql
+
+        return sql  # Fallback (should not reach here)
+
+    def _generate_multi_table_sql_attempt(
+        self,
+        query: str,
+        tables: list[tuple[str, list[str], list[list[str]]]],
+        previous_error: str | None,
+    ) -> str:
+        """Generate multi-table SQL query (single attempt)."""
         schemas = []
         for name, headers, samples in tables:
             sample_vals = {}
@@ -423,11 +463,22 @@ Return ONLY the SQL query, no explanation."""
                 sample_vals[h] = [row[i] for row in samples if i < len(row)]
             schemas.append(f"Table: {name}\nColumns: {headers}\nSamples: {sample_vals}")
 
+        # Add error feedback to prompt if retrying
+        error_context = ""
+        if previous_error:
+            error_context = f"""
+IMPORTANT: Your previous SQL query failed with this error:
+{previous_error}
+
+Please generate corrected SQL that avoids this error."""
+
         prompt = self.MULTI_TABLE_SQL_PROMPT.format(
             table_schemas="\n\n".join(schemas),
             question=query,
             max_results=self.max_results,
         )
+        prompt = prompt + error_context
+
         response = self.chat.chat([{"role": "user", "content": prompt}])
         return self._extract_sql(response)
 
@@ -509,12 +560,68 @@ Results ({len(results)} rows):
         response = self.chat.chat([{"role": "user", "content": prompt}])
         return self._parse_json_list(response, fallback=columns)
 
-    def _generate_sql(self, query: str, columns: list[str], sample_rows: list[list[str]]) -> str:
-        """Use LLM to generate SQL query."""
+    def _generate_sql(
+        self, query: str, columns: list[str], sample_rows: list[list[str]], max_retries: int = 2
+    ) -> str:
+        """
+        Use LLM to generate SQL query with validation and retry.
+
+        Generates SQL, tests it on sample data, and retries with error feedback
+        if execution fails. This handles LLM hallucinations like invalid functions.
+
+        Args:
+            query: User query.
+            columns: Table columns.
+            sample_rows: Sample data rows.
+            max_retries: Maximum retry attempts (default: 2).
+
+        Returns:
+            Validated SQL query string.
+        """
+        previous_error = None
+
+        for attempt in range(max_retries + 1):
+            # Generate SQL (with error feedback on retries)
+            sql = self._generate_sql_attempt(query, columns, sample_rows, previous_error)
+
+            # Validate by test execution on sample data
+            try:
+                test_conn = sqlite3.connect(":memory:")
+                self._create_and_populate(test_conn, columns, sample_rows[:3])
+                test_conn.execute(sql)  # Test query
+                test_conn.close()
+
+                logger.debug(f"SQL validated successfully{' (retry '+str(attempt)+')' if attempt > 0 else ''}")
+                return sql  # Success!
+
+            except sqlite3.Error as e:
+                previous_error = str(e)
+                logger.warning(f"SQL validation failed (attempt {attempt+1}/{max_retries+1}): {previous_error}")
+
+                if attempt == max_retries:
+                    # Give up, return the SQL anyway (will fail with proper error later)
+                    logger.error(f"SQL generation failed after {max_retries+1} attempts")
+                    return sql
+
+        return sql  # Fallback (should not reach here)
+
+    def _generate_sql_attempt(
+        self, query: str, columns: list[str], sample_rows: list[list[str]], previous_error: str | None
+    ) -> str:
+        """Generate SQL query (single attempt)."""
         # Format samples as dict for prompt
         samples: dict[str, list[str]] = {}
         for i, col in enumerate(columns):
             samples[col] = [row[i] for row in sample_rows if i < len(row)]
+
+        # Add error feedback to prompt if retrying
+        error_context = ""
+        if previous_error:
+            error_context = f"""
+IMPORTANT: Your previous SQL query failed with this error:
+{previous_error}
+
+Please generate corrected SQL that avoids this error."""
 
         prompt = self.SQL_PROMPT.format(
             columns=columns,
@@ -522,6 +629,8 @@ Results ({len(results)} rows):
             question=query,
             max_results=self.max_results,
         )
+        prompt = prompt + error_context
+
         response = self.chat.chat([{"role": "user", "content": prompt}])
         return self._extract_sql(response)
 

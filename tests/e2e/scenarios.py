@@ -651,8 +651,8 @@ SCENARIOS: list[TestScenario] = [
     TestScenario(
         id="E54",
         name="Aggregation: list all products",
-        feature=Feature.MULTI_QUERY,
-        query="List all vehicle models mentioned across all documents",
+        feature=Feature.AGGREGATION,
+        query="List all the TechCorp vehicle models",
         must_contain=["X100"],
         must_contain_any=["Y200", "Z50"],
         min_sources=1,

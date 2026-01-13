@@ -151,7 +151,7 @@ class E2ERunner:
             **embedding_kwargs,
         )
 
-        # Parser and chunking - use simple chunker for all files
+        # Parser and chunking - use simple chunker for text
         parser_router = ParserRouter(docling_parser="docling")
         simple_chunker = ExtensionChunkerConfig(
             plugin_name="simple",
@@ -163,7 +163,6 @@ class E2ERunner:
             by_extension={
                 ".md": simple_chunker,
                 ".py": simple_chunker,
-                ".csv": simple_chunker,
                 ".txt": simple_chunker,
             },
         )
@@ -231,12 +230,12 @@ class E2ERunner:
             "retrieval": {
                 "plugin_name": "dense",
                 "collection": self.collection,
-                "top_k": 15,
+                "top_k": 20,  # Higher for aggregation queries (20 * 3x = 60 chunks)
             },
             "multihop": {"max_hops": 2},
             "rgs": {
                 "strict_grounding": False,  # Allow more flexible answers in tests
-                "max_chunks": 15,  # Use more chunks to ensure code/docs aren't cut off
+                "max_chunks": 50,  # Higher limit to accommodate aggregation queries (3x multiplier)
             },
         }
 
