@@ -135,6 +135,11 @@ class E2ERunner:
         ctx = CLIContext.load()
         config = ctx.raw_config
 
+        # DEBUG: Print config source
+        logger.info(f"E2E Setup: Config source: {ctx.config_source}")
+        logger.info(f"E2E Setup: Config path: {ctx.config_path}")
+        logger.info(f"E2E Setup: Has user config: {ctx.has_user_config}")
+
         # Get plugin names from config
         chat_plugin = config.get("chat", {}).get("plugin_name", "openai")
         chat_kwargs = config.get("chat", {}).get("kwargs", {})

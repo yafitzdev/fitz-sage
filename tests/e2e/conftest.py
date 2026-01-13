@@ -14,14 +14,28 @@ import pytest
 
 from .runner import FIXTURES_DIR, E2ERunner
 
+# Set workspace to project root so FitzPaths finds .fitz/config/
+# This is needed because PyCharm may run pytest from a different CWD
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 
-@pytest.fixture(scope="module")
-def e2e_runner():
+
+@pytest.fixture(scope="session", autouse=True)
+def set_workspace():
+    """Set FitzPaths workspace to project root before any tests run."""
+    from fitz_ai.core.paths import FitzPaths
+
+    FitzPaths.set_workspace(PROJECT_ROOT / ".fitz")
+    yield
+    FitzPaths.reset()
+
+
+@pytest.fixture(scope="session")
+def e2e_runner(set_workspace):
     """
-    Module-scoped E2E runner fixture.
+    Session-scoped E2E runner fixture.
 
-    Sets up the test environment (ingests fixtures into a unique collection)
-    before any tests run, and tears down (deletes collection) after all tests.
+    Sets up the test environment once per pytest session. The setup() call
+    automatically cleans up any stale collections via _cleanup_stale_data().
 
     Usage:
         def test_something(e2e_runner):
