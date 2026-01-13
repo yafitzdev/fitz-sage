@@ -444,7 +444,9 @@ Return ONLY the SQL query, no explanation."""
                 )
 
                 if attempt == max_retries:
-                    logger.error(f"Multi-table SQL generation failed after {max_retries+1} attempts")
+                    logger.error(
+                        f"Multi-table SQL generation failed after {max_retries+1} attempts"
+                    )
                     return sql
 
         return sql  # Fallback (should not reach here)
@@ -591,12 +593,16 @@ Results ({len(results)} rows):
                 test_conn.execute(sql)  # Test query
                 test_conn.close()
 
-                logger.debug(f"SQL validated successfully{' (retry '+str(attempt)+')' if attempt > 0 else ''}")
+                logger.debug(
+                    f"SQL validated successfully{' (retry '+str(attempt)+')' if attempt > 0 else ''}"
+                )
                 return sql  # Success!
 
             except sqlite3.Error as e:
                 previous_error = str(e)
-                logger.warning(f"SQL validation failed (attempt {attempt+1}/{max_retries+1}): {previous_error}")
+                logger.warning(
+                    f"SQL validation failed (attempt {attempt+1}/{max_retries+1}): {previous_error}"
+                )
 
                 if attempt == max_retries:
                     # Give up, return the SQL anyway (will fail with proper error later)
@@ -606,7 +612,11 @@ Results ({len(results)} rows):
         return sql  # Fallback (should not reach here)
 
     def _generate_sql_attempt(
-        self, query: str, columns: list[str], sample_rows: list[list[str]], previous_error: str | None
+        self,
+        query: str,
+        columns: list[str],
+        sample_rows: list[list[str]],
+        previous_error: str | None,
     ) -> str:
         """Generate SQL query (single attempt)."""
         # Format samples as dict for prompt

@@ -41,11 +41,11 @@ from fitz_ai.engines.fitz_rag.retrieval.multihop import (
 )
 from fitz_ai.engines.fitz_rag.retrieval.registry import get_retrieval_plugin
 from fitz_ai.engines.fitz_rag.routing import QueryIntent, QueryRouter
-from fitz_ai.retrieval.entity_graph import EntityGraphStore
-from fitz_ai.retrieval.vocabulary import KeywordMatcher, create_matcher_from_store
 from fitz_ai.llm.registry import get_llm_plugin
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE, VECTOR_DB
+from fitz_ai.retrieval.entity_graph import EntityGraphStore
+from fitz_ai.retrieval.vocabulary import KeywordMatcher, create_matcher_from_store
 from fitz_ai.tabular.store import get_table_store
 from fitz_ai.vector_db.registry import get_vector_db_plugin
 
@@ -103,7 +103,9 @@ class RAGPipeline:
 
         routing_status = "enabled" if query_router and query_router.enabled else "disabled"
         keyword_status = "enabled" if keyword_matcher else "disabled"
-        multihop_status = f"enabled (max {hop_controller.max_hops})" if hop_controller else "disabled"
+        multihop_status = (
+            f"enabled (max {hop_controller.max_hops})" if hop_controller else "disabled"
+        )
         logger.info(
             f"{PIPELINE} RAGPipeline initialized with {retrieval.plugin_name} retrieval, "
             f"{len(self.constraints)} constraint(s), routing={routing_status}, "

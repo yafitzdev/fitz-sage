@@ -411,9 +411,7 @@ class EnrichmentPipeline:
 
             # Convert entity dicts to (name, type) tuples
             entity_tuples = [
-                (e.get("name", ""), e.get("type", "unknown"))
-                for e in entities
-                if e.get("name")
+                (e.get("name", ""), e.get("type", "unknown")) for e in entities if e.get("name")
             ]
 
             if entity_tuples:

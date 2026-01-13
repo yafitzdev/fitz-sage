@@ -57,60 +57,72 @@ class TemporalDetector:
     """
 
     # Patterns for temporal references
-    QUARTER_PATTERN: str = r'\b[Qq][1-4]\s*(?:20\d{2})?\b'
-    YEAR_PATTERN: str = r'\b20[12]\d\b'
-    VERSION_PATTERN: str = r'\b[Vv](?:ersion\s*)?(\d+(?:\.\d+)*)\b'
-    MONTH_PATTERN: str = r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*(?:20\d{2})?\b'
-    DATE_PATTERN: str = r'\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b'
+    QUARTER_PATTERN: str = r"\b[Qq][1-4]\s*(?:20\d{2})?\b"
+    YEAR_PATTERN: str = r"\b20[12]\d\b"
+    VERSION_PATTERN: str = r"\b[Vv](?:ersion\s*)?(\d+(?:\.\d+)*)\b"
+    MONTH_PATTERN: str = (
+        r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*(?:20\d{2})?\b"
+    )
+    DATE_PATTERN: str = r"\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b"
 
     # Relative time expressions
-    RELATIVE_PATTERNS: list[str] = field(default_factory=lambda: [
-        r'\blast\s+(?:week|month|year|quarter)\b',
-        r'\bprevious\s+(?:week|month|year|quarter)\b',
-        r'\bthis\s+(?:week|month|year|quarter)\b',
-        r'\bnext\s+(?:week|month|year|quarter)\b',
-        r'\byesterday\b',
-        r'\btoday\b',
-        r'\brecently\b',
-    ])
+    RELATIVE_PATTERNS: list[str] = field(
+        default_factory=lambda: [
+            r"\blast\s+(?:week|month|year|quarter)\b",
+            r"\bprevious\s+(?:week|month|year|quarter)\b",
+            r"\bthis\s+(?:week|month|year|quarter)\b",
+            r"\bnext\s+(?:week|month|year|quarter)\b",
+            r"\byesterday\b",
+            r"\btoday\b",
+            r"\brecently\b",
+        ]
+    )
 
     # Comparison indicators
-    COMPARISON_PATTERNS: list[str] = field(default_factory=lambda: [
-        r'\bbetween\s+.+\s+and\s+',
-        r'\bfrom\s+.+\s+to\s+',
-        r'\bvs\.?\s+',
-        r'\bversus\s+',
-        r'\bcompare[ds]?\s+.+\s+(?:to|with|and)\s+',
-        r'\bdifference\s+(?:between|from)\s+',
-    ])
+    COMPARISON_PATTERNS: list[str] = field(
+        default_factory=lambda: [
+            r"\bbetween\s+.+\s+and\s+",
+            r"\bfrom\s+.+\s+to\s+",
+            r"\bvs\.?\s+",
+            r"\bversus\s+",
+            r"\bcompare[ds]?\s+.+\s+(?:to|with|and)\s+",
+            r"\bdifference\s+(?:between|from)\s+",
+        ]
+    )
 
     # Change indicators
-    CHANGE_PATTERNS: list[str] = field(default_factory=lambda: [
-        r'\bwhat\s+(?:has\s+)?changed\b',
-        r'\bwhat\s+(?:are\s+)?(?:the\s+)?changes\b',
-        r'\bwhat\s+(?:is\s+)?(?:the\s+)?difference\b',
-        r'\bhow\s+(?:has|did)\s+.+\s+change[ds]?\b',
-        r'\bupdates?\s+(?:since|from|between)\b',
-        r'\bmodifications?\s+(?:since|from|between)\b',
-        r'\bevolution\s+of\b',
-    ])
+    CHANGE_PATTERNS: list[str] = field(
+        default_factory=lambda: [
+            r"\bwhat\s+(?:has\s+)?changed\b",
+            r"\bwhat\s+(?:are\s+)?(?:the\s+)?changes\b",
+            r"\bwhat\s+(?:is\s+)?(?:the\s+)?difference\b",
+            r"\bhow\s+(?:has|did)\s+.+\s+change[ds]?\b",
+            r"\bupdates?\s+(?:since|from|between)\b",
+            r"\bmodifications?\s+(?:since|from|between)\b",
+            r"\bevolution\s+of\b",
+        ]
+    )
 
     # Before/after indicators
-    BEFORE_PATTERNS: list[str] = field(default_factory=lambda: [
-        r'\bbefore\s+',
-        r'\bprior\s+to\s+',
-        r'\bearlier\s+than\s+',
-        r'\bpre[-\s]',
-        r'\buntil\s+',
-    ])
+    BEFORE_PATTERNS: list[str] = field(
+        default_factory=lambda: [
+            r"\bbefore\s+",
+            r"\bprior\s+to\s+",
+            r"\bearlier\s+than\s+",
+            r"\bpre[-\s]",
+            r"\buntil\s+",
+        ]
+    )
 
-    AFTER_PATTERNS: list[str] = field(default_factory=lambda: [
-        r'\bafter\s+',
-        r'\bsince\s+',
-        r'\bfollowing\s+',
-        r'\bpost[-\s]',
-        r'\bstarting\s+(?:from\s+)?',
-    ])
+    AFTER_PATTERNS: list[str] = field(
+        default_factory=lambda: [
+            r"\bafter\s+",
+            r"\bsince\s+",
+            r"\bfollowing\s+",
+            r"\bpost[-\s]",
+            r"\bstarting\s+(?:from\s+)?",
+        ]
+    )
 
     def detect(self, query: str) -> tuple[TemporalIntent, list[TemporalReference]]:
         """
@@ -179,22 +191,26 @@ class TemporalDetector:
         for match in re.finditer(self.QUARTER_PATTERN, query, re.IGNORECASE):
             text = match.group(0).strip()
             if text.lower() not in seen_texts:
-                references.append(TemporalReference(
-                    text=text,
-                    ref_type="quarter",
-                    normalized=text.upper(),
-                ))
+                references.append(
+                    TemporalReference(
+                        text=text,
+                        ref_type="quarter",
+                        normalized=text.upper(),
+                    )
+                )
                 seen_texts.add(text.lower())
 
         # Extract years
         for match in re.finditer(self.YEAR_PATTERN, query):
             text = match.group(0)
             if text not in seen_texts:
-                references.append(TemporalReference(
-                    text=text,
-                    ref_type="year",
-                    normalized=text,
-                ))
+                references.append(
+                    TemporalReference(
+                        text=text,
+                        ref_type="year",
+                        normalized=text,
+                    )
+                )
                 seen_texts.add(text)
 
         # Extract versions
@@ -202,21 +218,25 @@ class TemporalDetector:
             text = match.group(0)
             version_num = match.group(1)
             if text.lower() not in seen_texts:
-                references.append(TemporalReference(
-                    text=text,
-                    ref_type="version",
-                    normalized=f"v{version_num}",
-                ))
+                references.append(
+                    TemporalReference(
+                        text=text,
+                        ref_type="version",
+                        normalized=f"v{version_num}",
+                    )
+                )
                 seen_texts.add(text.lower())
 
         # Extract months
         for match in re.finditer(self.MONTH_PATTERN, query, re.IGNORECASE):
             text = match.group(0).strip()
             if text.lower() not in seen_texts:
-                references.append(TemporalReference(
-                    text=text,
-                    ref_type="month",
-                ))
+                references.append(
+                    TemporalReference(
+                        text=text,
+                        ref_type="month",
+                    )
+                )
                 seen_texts.add(text.lower())
 
         # Extract relative time expressions
@@ -224,20 +244,24 @@ class TemporalDetector:
             for match in re.finditer(pattern, query, re.IGNORECASE):
                 text = match.group(0).strip()
                 if text.lower() not in seen_texts:
-                    references.append(TemporalReference(
-                        text=text,
-                        ref_type="relative",
-                    ))
+                    references.append(
+                        TemporalReference(
+                            text=text,
+                            ref_type="relative",
+                        )
+                    )
                     seen_texts.add(text.lower())
 
         # Extract dates
         for match in re.finditer(self.DATE_PATTERN, query):
             text = match.group(0)
             if text not in seen_texts:
-                references.append(TemporalReference(
-                    text=text,
-                    ref_type="date",
-                ))
+                references.append(
+                    TemporalReference(
+                        text=text,
+                        ref_type="date",
+                    )
+                )
                 seen_texts.add(text)
 
         return references
@@ -297,15 +321,15 @@ class TemporalDetector:
         if ref.ref_type == "version":
             # Extract the core topic (remove comparison words)
             core = re.sub(
-                r'\b(between|and|vs\.?|versus|compare[ds]?|difference|from|to)\b',
-                '',
+                r"\b(between|and|vs\.?|versus|compare[ds]?|difference|from|to)\b",
+                "",
                 query,
-                flags=re.IGNORECASE
+                flags=re.IGNORECASE,
             ).strip()
             # Remove other version references
-            core = re.sub(self.VERSION_PATTERN, '', core, flags=re.IGNORECASE).strip()
-            core = re.sub(r'\s+', ' ', core).strip()
-            core = re.sub(r'\?+', '', core).strip()  # Remove question marks
+            core = re.sub(self.VERSION_PATTERN, "", core, flags=re.IGNORECASE).strip()
+            core = re.sub(r"\s+", " ", core).strip()
+            core = re.sub(r"\?+", "", core).strip()  # Remove question marks
             if core and len(core) > 3:
                 return f"{core} {ref.text}"
             else:
@@ -315,16 +339,16 @@ class TemporalDetector:
         # For quarters/years, create a time-focused query
         if ref.ref_type in ("quarter", "year", "month"):
             core = re.sub(
-                r'\b(between|and|vs\.?|versus|compare[ds]?|difference|from|to)\b',
-                '',
+                r"\b(between|and|vs\.?|versus|compare[ds]?|difference|from|to)\b",
+                "",
                 query,
-                flags=re.IGNORECASE
+                flags=re.IGNORECASE,
             ).strip()
             # Remove other time references
-            core = re.sub(self.QUARTER_PATTERN, '', core, flags=re.IGNORECASE)
-            core = re.sub(self.YEAR_PATTERN, '', core)
-            core = re.sub(r'\s+', ' ', core).strip()
-            core = re.sub(r'\?+', '', core).strip()  # Remove question marks
+            core = re.sub(self.QUARTER_PATTERN, "", core, flags=re.IGNORECASE)
+            core = re.sub(self.YEAR_PATTERN, "", core)
+            core = re.sub(r"\s+", " ", core).strip()
+            core = re.sub(r"\?+", "", core).strip()  # Remove question marks
             if core and len(core) > 3:
                 return f"{core} {ref.text}"
             else:

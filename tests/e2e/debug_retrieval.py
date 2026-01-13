@@ -136,7 +136,7 @@ def debug_retrieval():
         print(f"  austin={has_austin}, price={has_price}, y200={has_y200}, len={len(content)}")
         print(f"  Content: {content[:150]}...")
 
-    print(f"\n\nSUMMARY:")
+    print("\n\nSUMMARY:")
     print(f"  Chunks with price: {price_chunks}")
     print(f"  Chunks with y200: {y200_chunks}")
     print(f"  Chunks with austin: {austin_chunks}")
@@ -212,7 +212,7 @@ def debug_retrieval():
             if has_term:
                 # Show context around the term
                 idx = content.lower().find(term.lower())
-                snippet = content[max(0, idx-50):idx+len(term)+50]
+                snippet = content[max(0, idx - 50) : idx + len(term) + 50]
                 print(f"      ...{snippet}...")
 
     # Cleanup

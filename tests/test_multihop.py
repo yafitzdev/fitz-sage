@@ -12,9 +12,7 @@ from fitz_ai.engines.fitz_rag.retrieval.multihop import (
     BridgeExtractor,
     EvidenceEvaluator,
     HopController,
-    HopMetadata,
 )
-
 
 # =============================================================================
 # Test Fixtures
@@ -182,8 +180,6 @@ class TestHopController:
 
     def test_single_hop_sufficient(self, mock_retrieval, sample_chunks):
         """Test that sufficient evidence stops after 1 hop."""
-        mock_chat = MagicMock()
-
         # Evaluator says sufficient on first hop
         evaluator = MagicMock()
         evaluator.evaluate.return_value = True
@@ -207,8 +203,6 @@ class TestHopController:
 
     def test_two_hop_with_bridge(self, mock_retrieval, sample_chunks):
         """Test two-hop retrieval with bridge question."""
-        mock_chat = MagicMock()
-
         # First hop insufficient, second hop sufficient
         evaluator = MagicMock()
         evaluator.evaluate.side_effect = [False, True]
@@ -325,9 +319,7 @@ class TestHopController:
         filter_override = {"hierarchy_level": 2}
         controller.retrieve("Query", filter_override=filter_override)
 
-        mock_retrieval.retrieve.assert_called_once_with(
-            "Query", filter_override=filter_override
-        )
+        mock_retrieval.retrieve.assert_called_once_with("Query", filter_override=filter_override)
 
     def test_hop_metadata_trace(self, mock_retrieval, sample_chunks):
         """Test that hop trace captures all iterations."""

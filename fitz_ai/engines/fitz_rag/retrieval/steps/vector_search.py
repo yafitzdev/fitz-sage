@@ -669,7 +669,9 @@ Return ONLY a JSON object:
                 )
                 for record in records:
                     record_id = (
-                        record.get("id") if isinstance(record, dict) else getattr(record, "id", None)
+                        record.get("id")
+                        if isinstance(record, dict)
+                        else getattr(record, "id", None)
                     )
                     if record_id:
                         payload = (
@@ -954,9 +956,7 @@ Return ONLY a JSON object:
                     if self.keyword_matcher.chunk_matches_any(c, keywords_in_query)
                     or c.metadata.get("is_table_schema")
                 ]
-                logger.debug(
-                    f"{RETRIEVER} Keyword filter: {len(results)} → {len(filtered)} chunks"
-                )
+                logger.debug(f"{RETRIEVER} Keyword filter: {len(results)} → {len(filtered)} chunks")
                 results = filtered
 
         logger.debug(

@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import pickle
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from fitz_ai.core.paths import FitzPaths
@@ -24,7 +23,7 @@ logger = get_logger(__name__)
 # Optional dependencies - sparse search degrades gracefully if not available
 try:
     import numpy as np
-    from scipy.sparse import csr_matrix, save_npz, load_npz
+    from scipy.sparse import csr_matrix, load_npz, save_npz
     from sklearn.feature_extraction.text import TfidfVectorizer
 
     SPARSE_AVAILABLE = True
@@ -115,8 +114,7 @@ class SparseIndex:
                 index.chunk_ids = json.load(f)
 
             logger.debug(
-                f"Loaded sparse index for '{collection}': "
-                f"{len(index.chunk_ids)} documents"
+                f"Loaded sparse index for '{collection}': " f"{len(index.chunk_ids)} documents"
             )
 
         except Exception as e:
@@ -200,6 +198,7 @@ class SparseIndex:
 
         # Stack sparse matrices
         from scipy.sparse import vstack
+
         self.doc_vectors = vstack([self.doc_vectors, new_vectors])
         self.chunk_ids.extend(chunk_ids)
 
@@ -264,19 +263,19 @@ class SparseIndex:
         for idx in top_indices:
             score = float(scores[idx])
             if score > 0:
-                results.append(SparseHit(
-                    chunk_id=self.chunk_ids[idx],
-                    score=score,
-                ))
+                results.append(
+                    SparseHit(
+                        chunk_id=self.chunk_ids[idx],
+                        score=score,
+                    )
+                )
 
         return results
 
     def is_ready(self) -> bool:
         """Check if index is ready for querying."""
         return (
-            self.vectorizer is not None
-            and self.doc_vectors is not None
-            and len(self.chunk_ids) > 0
+            self.vectorizer is not None and self.doc_vectors is not None and len(self.chunk_ids) > 0
         )
 
     def __len__(self) -> int:

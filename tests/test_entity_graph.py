@@ -186,9 +186,7 @@ class TestEntityGraphStore:
         )
 
         # With min_shared_entities=2, only chunk2 qualifies
-        related = store.get_related_chunks(
-            ["chunk1"], max_total=10, min_shared_entities=2
-        )
+        related = store.get_related_chunks(["chunk1"], max_total=10, min_shared_entities=2)
         assert related == ["chunk2"]
 
     def test_empty_inputs(self, store):
@@ -258,8 +256,12 @@ class TestEntityGraphIntegration:
         store = EntityGraphStore(collection="test")
         try:
             store.add_chunk_entities("bio", [("John Doe", "person")])
-            store.add_chunk_entities("meeting_notes", [("John Doe", "person"), ("Q4 Review", "event")])
-            store.add_chunk_entities("email", [("John Doe", "person"), ("Project Alpha", "project")])
+            store.add_chunk_entities(
+                "meeting_notes", [("John Doe", "person"), ("Q4 Review", "event")]
+            )
+            store.add_chunk_entities(
+                "email", [("John Doe", "person"), ("Project Alpha", "project")]
+            )
             store.add_chunk_entities("other_doc", [("Jane Smith", "person")])
 
             # Get all chunks mentioning John Doe

@@ -129,9 +129,11 @@ class FreshnessStep(RetrievalStep):
 
         # Re-sort by freshness score (or original score if no freshness)
         def sort_key(c: Chunk) -> float:
-            return c.metadata.get("freshness_score") or c.metadata.get(
-                "rerank_score"
-            ) or c.metadata.get("vector_score", 0)
+            return (
+                c.metadata.get("freshness_score")
+                or c.metadata.get("rerank_score")
+                or c.metadata.get("vector_score", 0)
+            )
 
         chunks.sort(key=sort_key, reverse=True)
 

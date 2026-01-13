@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from .runner import E2ERunner, FIXTURES_DIR
+from .runner import FIXTURES_DIR, E2ERunner
 
 
 @pytest.fixture(scope="module")

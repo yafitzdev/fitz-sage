@@ -12,7 +12,6 @@ import hashlib
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional
 
 
 class AuthenticationError(Exception):
@@ -82,9 +81,7 @@ class UserAuth:
         self._sessions: dict[str, Session] = {}
         self._users: dict[str, tuple[str, User]] = {}  # username -> (password_hash, User)
 
-    def register_user(
-        self, username: str, password: str, email: str, role: str = "user"
-    ) -> User:
+    def register_user(self, username: str, password: str, email: str, role: str = "user") -> User:
         """
         Register a new user.
 
@@ -217,9 +214,7 @@ class UserAuth:
     def _hash_password(self, password: str) -> str:
         """Hash a password using SHA-256 with salt."""
         salt = self.secret_key.encode()
-        return hashlib.pbkdf2_hmac(
-            "sha256", password.encode(), salt, 100000
-        ).hex()
+        return hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100000).hex()
 
     def _verify_password(self, password: str, password_hash: str) -> bool:
         """Verify a password against its hash."""

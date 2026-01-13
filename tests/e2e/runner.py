@@ -16,7 +16,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from fitz_ai.logging.logger import get_logger
 
@@ -139,7 +139,9 @@ class E2ERunner:
         vector_db_plugin = config.get("vector_db", {}).get("plugin_name", "qdrant")
         vector_db_kwargs = config.get("vector_db", {}).get("kwargs", {})
 
-        logger.info(f"E2E Setup: Using chat={chat_plugin}, embedding={embedding_plugin}, vector_db={vector_db_plugin}")
+        logger.info(
+            f"E2E Setup: Using chat={chat_plugin}, embedding={embedding_plugin}, vector_db={vector_db_plugin}"
+        )
 
         # Initialize components for ingestion
         self.vector_client = get_vector_db_plugin(vector_db_plugin, **vector_db_kwargs)
@@ -185,14 +187,6 @@ class E2ERunner:
                     self._client.flush()
 
         writer = VectorDBWriterAdapter(self.vector_client)
-
-        # Chat client for enrichment (fast tier)
-        chat_client = get_llm_plugin(
-            plugin_type="chat",
-            plugin_name=chat_plugin,
-            tier="fast",
-            **chat_kwargs,
-        )
 
         # Skip enrichment for faster E2E tests (enrichment is tested separately)
         enrichment_pipeline = None
@@ -376,9 +370,7 @@ class E2ERunner:
             results.append(result)
 
             status = "PASS" if result.validation.passed else "FAIL"
-            logger.info(
-                f"  [{status}] {scenario.id}: {scenario.name} ({result.duration_ms:.0f}ms)"
-            )
+            logger.info(f"  [{status}] {scenario.id}: {scenario.name} ({result.duration_ms:.0f}ms)")
 
         total_duration = time.time() - start_time
 

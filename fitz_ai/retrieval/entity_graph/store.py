@@ -131,9 +131,7 @@ class EntityGraphStore:
         Args:
             chunk_id: The chunk identifier to remove
         """
-        self.conn.execute(
-            "DELETE FROM entity_chunks WHERE chunk_id = ?", (chunk_id,)
-        )
+        self.conn.execute("DELETE FROM entity_chunks WHERE chunk_id = ?", (chunk_id,))
         self.conn.commit()
 
     def remove_chunks(self, chunk_ids: list[str]) -> None:
@@ -296,8 +294,7 @@ class EntityGraphStore:
             (chunk_id,),
         )
         return [
-            {"name": row[0], "display_name": row[1], "type": row[2]}
-            for row in cursor.fetchall()
+            {"name": row[0], "display_name": row[1], "type": row[2]} for row in cursor.fetchall()
         ]
 
     def get_entities_for_chunks(self, chunk_ids: list[str]) -> dict[str, list[str]]:
@@ -366,9 +363,7 @@ class EntityGraphStore:
         return {
             "entities": entities,
             "edges": edges,
-            "top_entities": [
-                {"name": row[0], "mentions": row[1]} for row in top_entities
-            ],
+            "top_entities": [{"name": row[0], "mentions": row[1]} for row in top_entities],
         }
 
     def clear(self) -> None:

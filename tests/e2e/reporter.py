@@ -12,8 +12,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .runner import E2ERunResult, ScenarioResult
-    from .scenarios import Feature
+    from .runner import E2ERunResult
 
 
 class E2EReporter:
@@ -58,9 +57,7 @@ class E2EReporter:
 
     def _group_by_feature(self) -> dict[str, dict]:
         """Group results by feature."""
-        by_feature: dict[str, dict] = defaultdict(
-            lambda: {"passed": 0, "failed": 0, "total": 0}
-        )
+        by_feature: dict[str, dict] = defaultdict(lambda: {"passed": 0, "failed": 0, "total": 0})
 
         for r in self.result.scenario_results:
             feature_name = r.scenario.feature.value
@@ -146,7 +143,7 @@ class E2EReporter:
                         "",
                         f"**Reason:** {r.validation.reason}",
                         "",
-                        f"**Answer Preview:**",
+                        "**Answer Preview:**",
                         "```",
                         r.answer_text[:300] if r.answer_text else "(no answer)",
                         "```",
@@ -186,8 +183,7 @@ class E2EReporter:
             rate = (stats["passed"] / stats["total"] * 100) if stats["total"] > 0 else 0
             status = "OK" if stats["failed"] == 0 else "!!"
             print(
-                f"  [{status}] {feature:<25} "
-                f"{stats['passed']}/{stats['total']} ({rate:.0f}%)"
+                f"  [{status}] {feature:<25} " f"{stats['passed']}/{stats['total']} ({rate:.0f}%)"
             )
         print()
 

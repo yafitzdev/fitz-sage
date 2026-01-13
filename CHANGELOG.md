@@ -11,6 +11,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.2] - 2026-01-13
+
+### 🎉 Highlights
+
+**Multi-Hop Reasoning** - Fitz RAG now supports iterative multi-hop retrieval for complex queries requiring information synthesis across multiple documents. The system automatically detects when additional context is needed and performs follow-up retrievals.
+
+**Entity Graph Expansion** - New entity graph system enriches retrieval by linking related chunks through shared entities. When a chunk mentions entities, the system automatically retrieves other chunks discussing the same concepts.
+
+**Advanced Retrieval Intelligence** - Comprehensive suite of retrieval features now baked into the system including temporal queries, query expansion, hybrid search (dense+sparse), freshness/authority boosting, and aggregation query detection.
+
+**End-to-End Testing Framework** - New comprehensive E2E test framework validates retrieval quality across diverse scenarios with automated validation and detailed reporting.
+
+### 🚀 Added
+
+#### Multi-Hop Reasoning (`fitz_ai/engines/fitz_rag/retrieval/multihop/`)
+- `MultiHopController` - Orchestrates iterative retrieval with termination logic
+- `InfoExtractor` - Extracts key information from intermediate results
+- `CompletionEvaluator` - Determines when sufficient information has been gathered
+- Configurable max hops and answer quality thresholds
+- Multi-hop config in `FitzRagConfig` schema
+
+#### Entity Graph System (`fitz_ai/ingestion/entity_graph/`)
+- `EntityGraphStore` - Persistent storage for entity relationships
+- Entity linking during ingestion enrichment
+- Graph expansion step in retrieval pipeline
+- Automatic retrieval of chunks sharing entities with top results
+- Graph stored per collection in `.fitz/graphs/`
+
+#### Retrieval Intelligence Suite (`fitz_ai/retrieval/`)
+- **Temporal Queries** (`temporal/detector.py`) - Detects time-based comparisons and period filters
+- **Query Expansion** (`expansion/expander.py`) - Generates synonym/acronym variations
+- **Hybrid Search** (`sparse/index.py`) - BM25 sparse index with RRF fusion
+- **Freshness & Authority** (`fitz_rag/retrieval/steps/freshness.py`) - Recency and authority boosting
+- **Aggregation Queries** (`aggregation/detector.py`) - Detects statistical aggregation intent
+- **Vocabulary System** (`vocabulary/`) - Exact keyword matching across chunks
+  - `VocabularyDetector` - Extracts identifiers from content
+  - `VocabularyMatcher` - Matches query terms to vocabulary
+  - `VocabularyStore` - Persists keywords per collection
+  - `VariationGenerator` - Generates term variations
+
+#### End-to-End Testing (`tests/e2e/`)
+- `E2ETestRunner` - Orchestrates full retrieval scenarios
+- `TestReporter` - Generates detailed test reports
+- `ScenarioValidator` - Validates retrieval results
+- 15+ test scenarios covering:
+  - Temporal queries (comparison, period filtering)
+  - Sparse retrieval (exact keyword matching)
+  - Tabular data routing
+  - Conflict detection
+  - Causal attribution
+  - Code-aware search
+  - Entity matching
+- Test fixtures with structured markdown, code, CSV data
+
+### 🔄 Changed
+
+- **Module Organization**: Moved `vocabulary` and `entity_graph` modules from `fitz_ai/ingestion/` to `fitz_ai/retrieval/` for clearer separation of concerns
+- **VectorSearchStep**: Now includes temporal handling, query expansion, hybrid search, multi-query expansion, and aggregation detection
+- **EnrichmentPipeline**: Integrated entity graph construction during ingestion
+- **Collection Delete**: Now cleans up entity graphs and vocabulary stores
+- **README**: Major refactor with dedicated feature documentation pages in `docs/features/`
+  - `aggregation-queries.md` - Statistical query handling
+  - `code-aware-chunking.md` - Programming language support
+  - `comparison-queries.md` - Entity comparison queries
+  - `epistemic-honesty.md` - Constraint system
+  - `freshness-authority.md` - Temporal relevance
+  - `hierarchical-rag.md` - Multi-level summaries
+  - `hybrid-search.md` - Dense + sparse fusion
+  - `keyword-vocabulary.md` - Exact term matching
+  - `multi-hop-reasoning.md` - Iterative retrieval
+  - `multi-query-rag.md` - Query expansion
+  - `query-expansion.md` - Synonym generation
+  - `tabular-data-routing.md` - CSV/table handling
+  - `temporal-queries.md` - Time-based filtering
+
+### 🗑️ Removed
+
+- `tools/smoketest/` - Replaced by E2E test framework
+  - `smoke_fitz_rag_e2e.py` (750 lines)
+  - `smoke_local_llm.py` (219 lines)
+
+### 🐛 Fixed
+
+- Tabular query handling now properly routes to registered tables
+- Filesystem source plugin handles metadata more robustly
+- Simple chunker improves overlap handling
+
+---
+
 ## [0.5.1] - 2026-01-11
 
 ### 🎉 Highlights
@@ -877,7 +966,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.5...v0.5.0
 [0.4.5]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.4...v0.4.5

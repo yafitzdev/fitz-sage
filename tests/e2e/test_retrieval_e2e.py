@@ -23,7 +23,6 @@ import pytest
 from .reporter import E2EReporter
 from .scenarios import SCENARIOS, Feature, get_scenarios_by_feature
 
-
 # Mark all tests in this module as e2e tests
 pytestmark = pytest.mark.e2e
 
@@ -292,9 +291,6 @@ def test_full_suite_with_report(e2e_runner):
     # Generate and print report
     reporter = E2EReporter(result)
     reporter.console_report()
-
-    # Collect failures for summary assertion
-    failed_scenarios = [r for r in result.scenario_results if not r.validation.passed]
 
     # This test passes if majority (>50%) of tests pass
     # Individual tests above handle strict pass/fail

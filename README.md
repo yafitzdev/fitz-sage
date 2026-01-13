@@ -3,7 +3,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.5.1-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.2-green.svg)](CHANGELOG.md)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
 
 ---
@@ -710,51 +710,6 @@ curl -X POST http://localhost:8000/chat \
     "collection": "default"
   }'
 ```
-
-</details>
-
----
-
-<details>
-
-<summary><strong>📦 Beyond RAG</strong></summary>
-
-<br>
-
-> **RAG is a method. Knowledge access is a strategy.**
-
-Fitz is not a RAG framework. It's a knowledge platform that *currently* uses RAG as its primary engine.
-
-```python
-from fitz_ai import run
-
-# Fitz RAG - fast, reliable vector search
-answer = run("What are the payment terms?", engine="fitz_rag")
-
-# CLaRa - compressed RAG, 16x smaller context
-answer = run("What are the payment terms?", engine="clara")
-
-# GraphRAG - knowledge graph with entity extraction and community summaries
-answer = run("What are the payment terms?", engine="graphrag")
-```
-
-The engine is an implementation detail. Your ingested knowledge, your queries, your workflow—all stay the same. When a better retrieval paradigm emerges, swap one line, not your entire codebase.
-
-</details>
-
----
-
-<details>
-
-<summary><strong>📦 Philosophy</strong></summary>
-
-<br>
-
-**Principles:**
-- **Explicit over clever**: No magic. Read the config, know what happens.
-- **Answers over architecture**: Optimize for time-to-insight, not flexibility.
-- **Honest over helpful**: Better to say "I don't know" than hallucinate.
-- **Files over frameworks**: YAML plugins over class hierarchies.
 
 </details>
 
