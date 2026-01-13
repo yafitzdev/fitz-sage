@@ -125,6 +125,10 @@ class E2ERunner:
 
         logger.info(f"E2E Setup: Creating collection '{self.collection}'")
 
+        # Clean up any stale test data from previous interrupted runs
+        # This ensures a clean slate even if teardown didn't run
+        self._cleanup_stale_data()
+
         start_time = time.time()
 
         # Load config from fitz.yaml via CLIContext
@@ -245,6 +249,48 @@ class E2ERunner:
 
         return ingestion_duration
 
+    def _cleanup_stale_data(self) -> None:
+        """
+        Clean up any stale data from previous test runs.
+
+        Called at the start of setup() to ensure a clean slate, even if
+        a previous test run was interrupted and teardown didn't execute.
+        """
+        from fitz_ai.cli.context import CLIContext
+        from fitz_ai.vector_db.registry import get_vector_db_plugin
+
+        try:
+            # Need vector client to delete collection
+            ctx = CLIContext.load()
+            config = ctx.raw_config
+            vector_db_plugin = config.get("vector_db", {}).get("plugin_name", "qdrant")
+            vector_db_kwargs = config.get("vector_db", {}).get("kwargs", {})
+
+            temp_client = get_vector_db_plugin(vector_db_plugin, **vector_db_kwargs)
+
+            # Try to delete the collection (fails silently if doesn't exist)
+            try:
+                temp_client.delete_collection(self.collection)
+                logger.debug(f"E2E Setup: Cleaned up stale collection '{self.collection}'")
+            except Exception:
+                pass  # Collection didn't exist, which is fine
+
+            # Try to delete table collection
+            try:
+                temp_client.delete_collection(f"{self.collection}_tables")
+                logger.debug(f"E2E Setup: Cleaned up stale table collection")
+            except Exception:
+                pass
+
+            # Delete associated files
+            self._delete_vocabulary()
+            self._delete_table_registry()
+            self._delete_entity_graph()
+            self._delete_table_store()
+
+        except Exception as e:
+            logger.debug(f"E2E Setup: Stale data cleanup encountered error (non-fatal): {e}")
+
     def teardown(self) -> None:
         """
         Clean up the test environment.
@@ -267,6 +313,7 @@ class E2ERunner:
         self._delete_vocabulary()
         self._delete_table_registry()
         self._delete_entity_graph()
+        self._delete_table_store()
 
         self._setup_complete = False
         logger.info("E2E Teardown: Complete")
@@ -306,6 +353,31 @@ class E2ERunner:
                 logger.debug(f"Deleted entity graph: {graph_path.name}")
             except Exception as e:
                 logger.warning(f"Failed to delete entity graph: {e}")
+
+    def _delete_table_store(self) -> None:
+        """Delete table storage (both collection and cache) associated with collection."""
+        try:
+            # Delete the table collection in vector DB (e.g., {collection}_tables for Qdrant)
+            table_collection = f"{self.collection}_tables"
+            try:
+                self.vector_client.delete_collection(table_collection)
+                logger.debug(f"Deleted table collection: {table_collection}")
+            except Exception:
+                # Collection might not exist
+                pass
+
+            # Delete SQLite cache used by GenericTableStore
+            from fitz_ai.core.paths import FitzPaths
+
+            cache_path = FitzPaths.workspace() / f"tables_{self.collection}.db"
+            if cache_path.exists():
+                try:
+                    cache_path.unlink()
+                    logger.debug(f"Deleted table cache: {cache_path.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete table cache: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to delete table store: {e}")
 
     def run_scenario(self, scenario: TestScenario) -> ScenarioResult:
         """

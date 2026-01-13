@@ -53,7 +53,7 @@ endpoint:
 # DEFAULTS
 # =============================================================================
 defaults:
-  model: "embed-english-v3.0"
+  model: "embed-multilingual-v3.0"
   input_type: "search_document"
 
 # =============================================================================

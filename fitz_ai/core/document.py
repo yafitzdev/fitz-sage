@@ -16,6 +16,35 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 
+@dataclass
+class Table:
+    """
+    Structured table data extracted from a document.
+
+    Used for CSV, Excel, SQLite tables, or tables extracted from PDFs.
+    Stored separately in TableStore for SQL-like querying.
+    """
+
+    id: str  # Unique table identifier (e.g., "employees", "sales_2024")
+    columns: List[str]  # Column headers
+    rows: List[List[str]]  # Data rows (all values as strings)
+    source_file: str  # Original file path
+    metadata: Dict[str, Any] = field(default_factory=dict)  # Sheet name, DB name, etc.
+
+    @property
+    def row_count(self) -> int:
+        """Number of data rows (excluding header)."""
+        return len(self.rows)
+
+    @property
+    def column_count(self) -> int:
+        """Number of columns."""
+        return len(self.columns)
+
+    def __repr__(self) -> str:
+        return f"Table({self.id!r}, {self.column_count} cols, {self.row_count} rows)"
+
+
 class ElementType(Enum):
     """Types of structural elements in a document."""
 
@@ -62,6 +91,7 @@ class ParsedDocument:
     source: str  # Original source URI or path
     elements: List[DocumentElement]
     metadata: Dict[str, Any] = field(default_factory=dict)
+    tables: List[Table] = field(default_factory=list)  # Structured tables (CSV, Excel, etc.)
 
     @property
     def full_text(self) -> str:
@@ -87,6 +117,7 @@ class ParsedDocument:
 
 
 __all__ = [
+    "Table",
     "ElementType",
     "DocumentElement",
     "ParsedDocument",

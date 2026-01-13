@@ -30,10 +30,6 @@ from fitz_ai.ingestion.parser.router import ParserRouter
 from fitz_ai.ingestion.source.base import SourceFile
 from fitz_ai.ingestion.state.manager import IngestStateManager
 from fitz_ai.tabular import TableExtractor
-from fitz_ai.tabular.models import create_schema_chunk_for_stored_table
-from fitz_ai.tabular.parser import can_parse as is_table_file
-from fitz_ai.tabular.parser import get_sample_rows, parse_csv
-from fitz_ai.tabular.store import SqliteTableStore
 
 if TYPE_CHECKING:
     from fitz_ai.ingestion.enrichment.pipeline import EnrichmentPipeline
@@ -165,7 +161,22 @@ class DiffIngestExecutor:
         self._embedding_id = embedding_id
         self._vector_db_id = vector_db_id
         self._enrichment_pipeline = enrichment_pipeline
-        self._table_store = table_store or SqliteTableStore(collection)
+
+        # Use appropriate table store based on vector DB plugin
+        # This ensures ingestion and retrieval use the same storage backend
+        if table_store is not None:
+            self._table_store = table_store
+        else:
+            from fitz_ai.tabular.store import get_table_store
+
+            # Get writer's underlying vector client if available
+            vector_client = getattr(vector_db_writer, "_client", None)
+            self._table_store = get_table_store(
+                collection=collection,
+                vector_db_plugin=vector_db_id or "local_faiss",
+                vector_plugin_instance=vector_client,
+            )
+
         self._summary: Optional[IngestSummary] = None
 
     @property
@@ -449,6 +460,11 @@ class DiffIngestExecutor:
         """
         Prepare a file for ingestion using Source → Parser → Chunker flow.
 
+        All files follow the same path:
+        1. Parser → ParsedDocument
+        2. Store tables (if any) in TableStore
+        3. Chunker → Chunks
+
         Enrichment happens in a separate batch phase for efficiency.
 
         Args:
@@ -458,10 +474,6 @@ class DiffIngestExecutor:
             file_data dict or None if file should be skipped.
         """
         file_path = Path(candidate.path)
-
-        # Handle table files (CSV, TSV) specially
-        if is_table_file(file_path):
-            return self._prepare_table_file(candidate, file_path)
 
         # 1. Create SourceFile from candidate path
         source_file = SourceFile(
@@ -475,11 +487,6 @@ class DiffIngestExecutor:
         # 2. Parse file using ParserRouter → ParsedDocument
         parsed_doc = self._parser_router.parse(source_file)
 
-        # Check for empty content
-        if not parsed_doc.full_text.strip():
-            logger.warning(f"Empty content from {candidate.path}, skipping")
-            return None
-
         # 3. Add metadata to parsed document
         doc_id = file_path.stem
         parsed_doc.metadata.update(
@@ -492,18 +499,36 @@ class DiffIngestExecutor:
             }
         )
 
-        # 3.5 Extract tables before chunking
-        # Tables are converted to schema chunks with embedded JSON data
+        # 4. Store structured tables in TableStore (CSV, SQLite, or tables from PDFs)
+        if parsed_doc.tables:
+            for table in parsed_doc.tables:
+                try:
+                    self._table_store.store(
+                        table_id=table.id,
+                        columns=table.columns,
+                        rows=table.rows,
+                        source_file=table.source_file,
+                    )
+                    logger.debug(
+                        f"Stored table {table.id}: {len(table.columns)} columns, "
+                        f"{table.row_count} rows"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to store table {table.id}: {e}")
+
+        # 5. Extract embedded tables from document elements (markdown/PDF tables)
+        # These are different from structured files like CSV
         table_extractor = TableExtractor()
         parsed_doc, table_chunks = table_extractor.extract(parsed_doc)
 
-        # 4. Get chunker and chunk the ParsedDocument (tables removed)
+        # 6. Get chunker and chunk the ParsedDocument
         chunker = self._chunking_router.get_chunker(candidate.ext)
         chunks = chunker.chunk(parsed_doc)
 
-        # Add table chunks to the regular chunks
+        # Add extracted table chunks to regular chunks
         chunks.extend(table_chunks)
 
+        # Check for empty content
         if not chunks:
             logger.warning(f"No chunks from {candidate.path}, skipping")
             return None
@@ -531,80 +556,6 @@ class DiffIngestExecutor:
             )
 
         return {"chunk_data": chunk_data}
-
-    def _prepare_table_file(
-        self,
-        candidate: FileCandidate,
-        file_path: Path,
-    ) -> Optional[Dict]:
-        """
-        Process a table file (CSV, TSV) into TableStore and create schema chunk.
-
-        Args:
-            candidate: File candidate with metadata.
-            file_path: Path to the table file.
-
-        Returns:
-            file_data dict with schema chunk, or None on error.
-        """
-        try:
-            # Parse CSV file
-            parsed = parse_csv(file_path)
-
-            # Store in TableStore
-            table_hash = self._table_store.store(
-                table_id=parsed.table_id,
-                columns=parsed.columns,
-                rows=parsed.rows,
-                source_file=str(file_path),
-            )
-
-            # Create schema chunk for vector search
-            sample_rows = get_sample_rows(parsed, n=3)
-            schema_chunk = create_schema_chunk_for_stored_table(
-                table_id=parsed.table_id,
-                columns=parsed.columns,
-                row_count=parsed.row_count,
-                source_file=str(file_path),
-                table_hash=table_hash,
-                sample_rows=sample_rows,
-            )
-
-            logger.info(
-                f"Stored table {file_path.name}: {len(parsed.columns)} columns, "
-                f"{parsed.row_count} rows"
-            )
-
-            # Compute chunk_id for the schema chunk
-            chunk_id = compute_chunk_id(
-                content_hash=candidate.content_hash,
-                chunk_index=0,
-                parser_id="table",
-                chunker_id="table",
-                embedding_id=candidate.embedding_id,
-            )
-
-            # Register table chunk ID for direct retrieval at query time
-            from fitz_ai.tabular.registry import add_table_id
-
-            add_table_id(self._collection, chunk_id)
-
-            chunk_content_hash = _hash_text(schema_chunk.content)
-
-            return {
-                "chunk_data": [
-                    {
-                        "chunk_id": chunk_id,
-                        "chunk": schema_chunk,
-                        "content_hash": chunk_content_hash,
-                        "description": None,
-                    }
-                ]
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to process table {file_path}: {e}")
-            return None
 
     def _upsert_file(
         self,
