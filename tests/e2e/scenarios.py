@@ -936,6 +936,414 @@ SCENARIOS: list[TestScenario] = [
         must_contain_any=["autonomous", "AI", "navigation", "sensor"],
         min_sources=1,
     ),
+    # =========================================================================
+    # Additional Multi-Hop - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E83",
+        name="Multi-hop: 3+ hop chain",
+        feature=Feature.MULTI_HOP,
+        query="What university did the CEO of the company that competes with GreenDrive attend?",
+        # GreenDrive → competitor TechCorp → CEO Sarah Chen → MIT
+        must_contain=["MIT"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E84",
+        name="Multi-hop: reverse direction chain",
+        feature=Feature.MULTI_HOP,
+        query="Which company hired someone from the fuel cell division of Toyota?",
+        # Toyota fuel cell → Marcus Webb → GreenDrive
+        must_contain=["GreenDrive"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Entity Graph - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E85",
+        name="Entity graph: location-based entity discovery",
+        feature=Feature.ENTITY_GRAPH,
+        query="What activities happen at the Nevada campus?",
+        # Should connect Nevada → Gigafactory, Project Alpha, employees Eva Brown/Nathan Park
+        must_contain_any=["Gigafactory", "Project Alpha", "battery", "research"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E86",
+        name="Entity graph: cross-document entity linking",
+        feature=Feature.ENTITY_GRAPH,
+        query="What connections exist between AutoMotors and current EV companies?",
+        # AutoMotors → Sarah Chen → TechCorp; AutoMotors = traditional
+        must_contain_any=["Sarah Chen", "TechCorp", "VP", "Engineering"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E87",
+        name="Entity graph: weak entity signal",
+        feature=Feature.ENTITY_GRAPH,
+        query="What do we know about the Nevada research campus?",
+        # Mentioned briefly - tests weak entity extraction
+        must_contain_any=["Project Alpha", "Gigafactory", "battery"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Multi-Query - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E88",
+        name="Multi-query: implicit AND across domains",
+        feature=Feature.MULTI_QUERY,
+        query="What security measures protect both user authentication and payment processing?",
+        # Needs to retrieve from both auth service and payment service sections
+        must_contain_any=["JWT", "PCI DSS", "token", "encryption"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E89",
+        name="Multi-query: mixed structured and unstructured",
+        feature=Feature.MULTI_QUERY,
+        query="Which employees work in Engineering and what products do they work on?",
+        # Needs CSV employee data + product docs
+        must_contain_any=["Engineering", "Alice", "Carol", "Model"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E90",
+        name="Multi-query: code and documentation",
+        feature=Feature.MULTI_QUERY,
+        query="How does the login method work and what are the session timeouts?",
+        # Needs code_sample.py + technical.txt
+        must_contain_any=["24", "hour", "authenticate", "token"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Keyword Exact - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E91",
+        name="Keyword: numeric ID with prefix",
+        feature=Feature.KEYWORD_EXACT,
+        query="What role does E016 have?",
+        # Exact ID lookup - Peter Adams, Finance manager
+        must_contain_any=["Peter Adams", "Finance"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E92",
+        name="Keyword: version number lookup",
+        feature=Feature.KEYWORD_EXACT,
+        query="What does version 2.1 of the architecture document cover?",
+        # technical.txt is Version 2.1
+        must_contain_any=["microservices", "architecture", "January 2024"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E93",
+        name="Keyword: technical acronym in context",
+        feature=Feature.KEYWORD_EXACT,
+        query="What is the RBAC configuration?",
+        # Role-based access control in technical.txt
+        must_contain_any=["role", "access", "control", "admin"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Conflict Aware - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E94",
+        name="Conflict: implicit vs explicit numbers",
+        feature=Feature.CONFLICT_AWARE,
+        query="How many people support production at TechCorp?",
+        # Operations breaks down (2100+350+280=2730) vs total employee counts
+        must_contain_any=["2,100", "factory", "quality", "logistics", "2,730"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E95",
+        name="Conflict: percentage vs absolute",
+        feature=Feature.CONFLICT_AWARE,
+        query="What is the customer satisfaction at TechCorp?",
+        # Marketing: 92%, HR: 4.2/5 (=84%) - different metrics
+        must_contain_any=["92%", "4.2", "satisfaction"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E96",
+        name="Conflict: dated information",
+        feature=Feature.CONFLICT_AWARE,
+        query="What is TechCorp's market share?",
+        # Marketing press release says 18%, may conflict with other sources
+        must_contain_any=["18%", "market share"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E97",
+        name="Conflict: definitional differences",
+        feature=Feature.CONFLICT_AWARE,
+        query="What counts as an employee at TechCorp?",
+        # HR includes contractors >6 months, Finance doesn't
+        must_contain_any=["contractor", "full-time", "HR", "Finance"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Causal Attribution - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E98",
+        name="Causal: correlation not causation",
+        feature=Feature.CAUSAL_ATTRIBUTION,
+        query="Did the Model Z50 launch cause TechCorp's stock to rise?",
+        # Multiple events happened - should hedge, not claim direct causation
+        must_contain_any=["multiple", "factor", "also", "same time", "correlat"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E99",
+        name="Causal: contradicting expert opinions",
+        feature=Feature.CAUSAL_ATTRIBUTION,
+        query="According to analysts, what drove TechCorp's growth?",
+        # Different analysts cite different reasons - should present multiple
+        must_contain_any=["Morgan Stanley", "Goldman", "Barclays", "JP Morgan"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E100",
+        name="Causal: reverse causation question",
+        feature=Feature.CAUSAL_ATTRIBUTION,
+        query="What events might have influenced the EV tax credit expansion?",
+        # Documents don't establish this causation - should abstain or hedge
+        must_contain_any=["not clear", "unknown", "cannot determine", "government", "policy"],
+        min_sources=0,
+    ),
+    TestScenario(
+        id="E101",
+        name="Causal: spurious correlation",
+        feature=Feature.CAUSAL_ATTRIBUTION,
+        query="Did oil prices rising cause TechCorp's success?",
+        # Mentioned as industry context but not direct cause
+        must_contain_any=["oil", "factor", "industry", "tailwind", "multiple"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Table Schema - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E102",
+        name="Table schema: infer foreign keys",
+        feature=Feature.TABLE_SCHEMA,
+        query="How are employees linked to their managers in the data?",
+        # Should identify manager_id as FK relationship
+        must_contain_any=["manager_id", "E010", "E011", "reports to"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E103",
+        name="Table schema: null values handling",
+        feature=Feature.TABLE_SCHEMA,
+        query="Which employees don't have managers?",
+        # James Wilson, Karen White, Leo Martinez, Maria Garcia, Peter Adams have no manager_id
+        must_contain_any=["James Wilson", "Karen White", "Leo Martinez"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E104",
+        name="Table schema: data type inference",
+        feature=Feature.TABLE_SCHEMA,
+        query="What numeric fields are in the employee data?",
+        # salary is numeric, employee_id has numbers but is ID
+        must_contain_any=["salary", "numeric", "number"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E105",
+        name="Table schema: cardinality question",
+        feature=Feature.TABLE_SCHEMA,
+        query="How many unique values are in the department column?",
+        # 5 departments: Engineering, Marketing, Sales, HR, Finance
+        must_contain_any=["5", "five", "Engineering", "Marketing", "Sales"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E106",
+        name="Table schema: date format detection",
+        feature=Feature.TABLE_SCHEMA,
+        query="What date format is used in the employee hire dates?",
+        # YYYY-MM-DD format
+        must_contain_any=["YYYY", "2021", "2022", "date", "format"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Dedup - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E107",
+        name="Dedup: same fact different wording",
+        feature=Feature.DEDUP,
+        query="What is the price of the entry-level TechCorp vehicle?",
+        # Model Z50 = $35,000 mentioned in products.md - should not duplicate
+        must_contain_any=["35,000", "Z50", "entry-level"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E108",
+        name="Dedup: overlapping date ranges",
+        feature=Feature.DEDUP,
+        query="What happened at TechCorp in early 2024?",
+        # Q1 2024 info in multiple docs - should consolidate
+        must_contain_any=["Q1", "2024", "revenue", "stock"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E109",
+        name="Dedup: entity mentioned in many contexts",
+        feature=Feature.DEDUP,
+        query="In what contexts is Sarah Chen mentioned?",
+        # CEO role, MIT, AutoMotors history, CNBC interview
+        must_contain_any=["CEO", "MIT", "AutoMotors", "CNBC"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E110",
+        name="Dedup: technical term across docs",
+        feature=Feature.DEDUP,
+        query="What do the documents say about JWT?",
+        # Mentioned in technical.txt and possibly code
+        must_contain_any=["JWT", "token", "24", "authentication"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E111",
+        name="Dedup: conflicting info same entity",
+        feature=Feature.DEDUP,
+        query="What battery sizes are mentioned for TechCorp vehicles?",
+        # 75 vs 74.8 kWh for X100 in different docs
+        must_contain_any=["75", "74.8", "100", "50", "kWh"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Insufficient Evidence - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E112",
+        name="Insufficient: plausible but absent",
+        feature=Feature.INSUFFICIENT_EVIDENCE,
+        query="What is TechCorp's office address in Austin?",
+        # Austin HQ mentioned, but no street address
+        must_contain_any=[
+            "not provided", "not specified", "no address",
+            "don't have", "not found", "Austin", "headquarters",
+        ],
+        min_sources=0,
+    ),
+    TestScenario(
+        id="E113",
+        name="Insufficient: partial info available",
+        feature=Feature.INSUFFICIENT_EVIDENCE,
+        query="What is the full specification of Project Alpha's technology?",
+        # Only limited info due to classification
+        must_contain_any=[
+            "classified", "restricted", "Phase 2", "confidential",
+            "security clearance", "limited",
+        ],
+        min_sources=0,
+    ),
+    # =========================================================================
+    # Additional Freshness - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E114",
+        name="Freshness: spec vs marketing discrepancy",
+        feature=Feature.FRESHNESS,
+        query="What is the precise battery capacity of Model X100?",
+        # Spec: 74.8 kWh usable vs products.md: 75 kWh rounded
+        must_contain_any=["74.8", "75", "kWh"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E115",
+        name="Freshness: authoritative source signal",
+        feature=Feature.FRESHNESS,
+        query="According to official specifications, what is the Z50's EPA range?",
+        # Spec: 198 miles (certified) vs products.md: 200 miles
+        must_contain_any=["198", "official", "EPA", "certified"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Hybrid Search - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E116",
+        name="Hybrid: rare technical term",
+        feature=Feature.HYBRID_SEARCH,
+        query="What uses Apache Flink?",
+        # Exact term from technical.txt - stream processing
+        must_contain_any=["Flink", "stream", "telemetry", "processing"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E117",
+        name="Hybrid: code identifier lookup",
+        feature=Feature.HYBRID_SEARCH,
+        query="What does SessionExpiredError indicate?",
+        # Exact exception class from code_sample.py
+        must_contain_any=["session", "expired", "exception", "error"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Query Expansion - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E118",
+        name="Query expansion: informal term",
+        feature=Feature.QUERY_EXPANSION,
+        query="How do I log out of my account?",
+        # "log out" should find logout method
+        must_contain_any=["logout", "invalidate", "session", "token"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E119",
+        name="Query expansion: British vs American spelling",
+        feature=Feature.QUERY_EXPANSION,
+        query="What authorisation levels exist?",
+        # British "authorisation" should find "authorization" content
+        must_contain_any=["role", "admin", "manager", "permission", "user"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Temporal - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E120",
+        name="Temporal: implicit time reference",
+        feature=Feature.TEMPORAL,
+        query="What happened after the competitor recall?",
+        # January 15 recall → subsequent events
+        must_contain_any=["recall", "February", "March", "stock", "launch"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E121",
+        name="Temporal: relative time query",
+        feature=Feature.TEMPORAL,
+        query="What was TechCorp's status before Sarah Chen became CEO?",
+        # Pre-2019 history
+        must_contain_any=["2015", "founded", "before", "2019"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Additional Aggregation - EDGE CASES
+    # =========================================================================
+    TestScenario(
+        id="E122",
+        name="Aggregation: count with filter",
+        feature=Feature.AGGREGATION,
+        query="How many employees earn over $100,000?",
+        # Need to count from CSV: Carol (105k), Grace (110k), James (145k), Karen (125k), Leo (135k), Maria (115k), Peter (140k) = 7
+        must_contain_any=["7", "seven", "Carol", "James", "Grace"],
+        min_sources=1,
+    ),
 ]
 
 
