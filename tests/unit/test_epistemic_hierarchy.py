@@ -52,7 +52,7 @@ class TestEpistemicAssessment:
 
     def test_conflicting_classifications_detected(self):
         """Test that conflicting classifications are detected via the constraint plugin."""
-        from conftest import create_deterministic_embedder
+        from .mock_embedder import create_deterministic_embedder
 
         from fitz_ai.core.guardrails import SemanticMatcher
 
@@ -260,7 +260,7 @@ class TestHierarchyEnricherEpistemic:
 
     def test_conflict_detection_uses_constraint_plugin(self):
         """Test that conflict detection uses the existing ConflictAwareConstraint logic."""
-        from conftest import create_deterministic_embedder
+        from .mock_embedder import create_deterministic_embedder
 
         from fitz_ai.core.guardrails import SemanticMatcher
 
@@ -349,7 +349,7 @@ class TestSingleSourceOfTruth:
 
     def test_uses_conflict_aware_constraint_patterns(self):
         """Verify that the same patterns detected by ConflictAwareConstraint are detected here."""
-        from conftest import create_deterministic_embedder
+        from .mock_embedder import create_deterministic_embedder
 
         from fitz_ai.core.guardrails import ConflictAwareConstraint, SemanticMatcher
 
