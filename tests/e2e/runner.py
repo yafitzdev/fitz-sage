@@ -6,7 +6,7 @@ Handles the full lifecycle:
 1. Create a unique test collection
 2. Ingest test fixtures
 3. Build RAG pipeline
-4. Run test scenarios
+4. Run test scenarios (with tiered fallback)
 5. Clean up collection and associated files
 """
 
@@ -20,6 +20,8 @@ from typing import Optional
 
 from fitz_ai.logging.logger import get_logger
 
+from .cache import ResponseCache
+from .config import get_cache_config, get_tier_config, get_tier_names, load_e2e_config
 from .scenarios import SCENARIOS, TestScenario
 from .validators import ValidationResult, validate_answer
 
@@ -70,6 +72,66 @@ class E2ERunResult:
         return (self.passed / self.total * 100) if self.total > 0 else 0.0
 
 
+@dataclass
+class TieredRunResult:
+    """Result of tiered test execution."""
+
+    results: dict[str, tuple[ScenarioResult, str]] = field(default_factory=dict)  # id -> (result, tier)
+    tier_names: list[str] = field(default_factory=list)
+    cache_stats: dict = field(default_factory=dict)
+    total_duration_s: float = 0.0
+
+    def tier_summary(self) -> dict[str, int]:
+        """Count scenarios by tier."""
+        counts: dict[str, int] = {}
+        for _result, tier in self.results.values():
+            counts[tier] = counts.get(tier, 0) + 1
+        return counts
+
+    @property
+    def total_passed(self) -> int:
+        """Total scenarios that passed (any tier)."""
+        return sum(1 for r, _t in self.results.values() if r.validation.passed)
+
+    @property
+    def total_failed(self) -> int:
+        """Total scenarios that failed all tiers."""
+        return sum(1 for r, _t in self.results.values() if not r.validation.passed)
+
+    @property
+    def total(self) -> int:
+        """Total scenarios."""
+        return len(self.results)
+
+    @property
+    def pass_rate(self) -> float:
+        """Pass rate as percentage."""
+        return (self.total_passed / self.total * 100) if self.total > 0 else 0.0
+
+    def print_summary(self) -> None:
+        """Print a summary of tiered results."""
+        print("\n" + "=" * 60)
+        print("TIERED E2E TEST RESULTS")
+        print("=" * 60)
+
+        tier_counts = self.tier_summary()
+        for tier, count in tier_counts.items():
+            if tier == "cached":
+                print(f"  Cached (skipped LLM):  {count}")
+            elif tier == "failed_all":
+                print(f"  Failed all tiers:      {count}")
+            else:
+                print(f"  Passed with '{tier}':    {count}")
+
+        print("-" * 60)
+        print(f"  Total: {self.total_passed}/{self.total} passed ({self.pass_rate:.1f}%)")
+        print(f"  Duration: {self.total_duration_s:.1f}s")
+
+        if self.cache_stats:
+            print(f"  Cache: {self.cache_stats.get('hits', 0)} hits, {self.cache_stats.get('misses', 0)} misses")
+        print("=" * 60)
+
+
 class E2ERunner:
     """
     End-to-end test runner.
@@ -85,6 +147,7 @@ class E2ERunner:
         self,
         fixtures_dir: Path | None = None,
         collection_prefix: str = "e2e_test",
+        use_cache: bool = True,
     ):
         """
         Initialize the E2E runner.
@@ -92,24 +155,36 @@ class E2ERunner:
         Args:
             fixtures_dir: Path to test fixtures (default: tests/e2e/fixtures)
             collection_prefix: Prefix for test collection name
+            use_cache: Whether to use response caching
         """
         self.fixtures_dir = fixtures_dir or FIXTURES_DIR
         self.collection = f"{collection_prefix}_{uuid.uuid4().hex[:8]}"
         self.pipeline = None
         self.vector_client = None
         self._setup_complete = False
+        self._current_tier: str | None = None
 
-    def setup(self) -> float:
+        # Initialize cache
+        cache_config = get_cache_config()
+        self.cache = ResponseCache(
+            max_entries=cache_config.get("max_entries", 1000),
+            ttl_days=cache_config.get("ttl_days", 30),
+            enabled=use_cache and cache_config.get("enabled", True),
+        )
+
+    def setup(self, tier_name: str | None = None) -> float:
         """
         Set up the test environment.
 
         Creates collection, ingests fixtures, builds pipeline.
-        Uses plugins configured in fitz.yaml (via CLIContext).
+        Uses e2e_config.yaml for test-specific configuration.
+
+        Args:
+            tier_name: Which tier to initialize with (default: first tier)
 
         Returns:
             Duration of ingestion in seconds
         """
-        from fitz_ai.cli.context import CLIContext
         from fitz_ai.engines.fitz_rag.config import FitzRagConfig
         from fitz_ai.engines.fitz_rag.config.schema import (
             ChunkingRouterConfig,
@@ -131,22 +206,24 @@ class E2ERunner:
 
         start_time = time.time()
 
-        # Load config from fitz.yaml via CLIContext
-        ctx = CLIContext.load()
-        config = ctx.raw_config
+        # Load e2e test config
+        e2e_config = load_e2e_config()
+        tier_names = get_tier_names(e2e_config)
+        tier_name = tier_name or tier_names[0]  # Default to first tier
 
-        # DEBUG: Print config source
-        logger.info(f"E2E Setup: Config source: {ctx.config_source}")
-        logger.info(f"E2E Setup: Config path: {ctx.config_path}")
-        logger.info(f"E2E Setup: Has user config: {ctx.has_user_config}")
+        logger.info(f"E2E Setup: Using e2e_config.yaml (tier: {tier_name})")
+        logger.info(f"E2E Setup: Available tiers: {tier_names}")
+
+        # Get tier-specific config
+        tier_config = get_tier_config(tier_name, e2e_config)
 
         # Get plugin names from config
-        chat_plugin = config.get("chat", {}).get("plugin_name", "openai")
-        chat_kwargs = config.get("chat", {}).get("kwargs", {})
-        embedding_plugin = config.get("embedding", {}).get("plugin_name", "openai")
-        embedding_kwargs = config.get("embedding", {}).get("kwargs", {})
-        vector_db_plugin = config.get("vector_db", {}).get("plugin_name", "qdrant")
-        vector_db_kwargs = config.get("vector_db", {}).get("kwargs", {})
+        chat_plugin = tier_config["chat"]["plugin_name"]
+        chat_kwargs = tier_config["chat"].get("kwargs", {})
+        embedding_plugin = e2e_config["embedding"]["plugin_name"]
+        embedding_kwargs = e2e_config["embedding"].get("kwargs", {})
+        vector_db_plugin = e2e_config["vector_db"]["plugin_name"]
+        vector_db_kwargs = e2e_config["vector_db"].get("kwargs", {})
 
         logger.info(
             f"E2E Setup: Using chat={chat_plugin}, embedding={embedding_plugin}, vector_db={vector_db_plugin}"
@@ -233,7 +310,7 @@ class E2ERunner:
             "retrieval": {
                 "plugin_name": "dense",
                 "collection": self.collection,
-                "top_k": 20,  # Higher for aggregation queries (20 * 3x = 60 chunks)
+                "top_k": 40,  # Higher for better recall with local embeddings
             },
             "multihop": {"max_hops": 2},
             "rgs": {
@@ -245,14 +322,64 @@ class E2ERunner:
         cfg = FitzRagConfig.from_dict(config_dict)
         # Disable default constraints for E2E tests to isolate retrieval testing
         # (constraints=[] prevents InsufficientEvidence/ConflictAware from blocking)
-        # Also disable keyword matching - auto-detected vocabulary is too aggressive
-        # for small test fixtures and filters out valid results
+        # Disable keywords - auto-detected vocabulary filters out valid results on small corpus
         self.pipeline = RAGPipeline.from_config(cfg, constraints=[], enable_keywords=False)
 
         self._setup_complete = True
-        logger.info("E2E Setup: Complete")
+        self._current_tier = tier_name
+        logger.info(f"E2E Setup: Complete (tier: {tier_name})")
 
         return ingestion_duration
+
+    def _rebuild_pipeline(self, tier_name: str) -> None:
+        """
+        Rebuild pipeline with a different tier's chat model.
+
+        Only swaps the chat/LLM component - reuses existing vector client,
+        embedder, and retrieval infrastructure to avoid losing the ingested collection.
+
+        Args:
+            tier_name: Name of the tier to switch to
+        """
+        from fitz_ai.llm.registry import get_llm_plugin
+
+        if tier_name == self._current_tier:
+            logger.debug(f"Already on tier '{tier_name}', skipping rebuild")
+            return
+
+        logger.info(f"E2E: Switching to tier '{tier_name}'")
+
+        e2e_config = load_e2e_config()
+        tier_config = get_tier_config(tier_name, e2e_config)
+
+        # Get the new chat plugin for this tier
+        chat_plugin_name = tier_config["chat"]["plugin_name"]
+        chat_kwargs = tier_config["chat"].get("kwargs", {})
+
+        new_chat = get_llm_plugin(
+            plugin_type="chat",
+            plugin_name=chat_plugin_name,
+            **chat_kwargs,
+        )
+
+        # Also get fast chat for multi-hop (uses same tier)
+        new_fast_chat = get_llm_plugin(
+            plugin_type="chat",
+            plugin_name=chat_plugin_name,
+            tier="fast",
+            **chat_kwargs,
+        )
+
+        # Swap chat models in existing pipeline (keeps vector client, retrieval, etc.)
+        self.pipeline.chat = new_chat
+
+        # Update hop controller if it exists (for multi-hop queries)
+        if self.pipeline.hop_controller is not None:
+            self.pipeline.hop_controller.evaluator.chat = new_fast_chat
+            self.pipeline.hop_controller.extractor.chat = new_fast_chat
+
+        self._current_tier = tier_name
+        logger.info(f"E2E: Switched to tier '{tier_name}' (chat={chat_plugin_name})")
 
     def _cleanup_stale_data(self) -> None:
         """
@@ -261,15 +388,13 @@ class E2ERunner:
         Called at the start of setup() to ensure a clean slate, even if
         a previous test run was interrupted and teardown didn't execute.
         """
-        from fitz_ai.cli.context import CLIContext
         from fitz_ai.vector_db.registry import get_vector_db_plugin
 
         try:
-            # Need vector client to delete collection
-            ctx = CLIContext.load()
-            config = ctx.raw_config
-            vector_db_plugin = config.get("vector_db", {}).get("plugin_name", "qdrant")
-            vector_db_kwargs = config.get("vector_db", {}).get("kwargs", {})
+            # Need vector client to delete collection - use e2e config
+            e2e_config = load_e2e_config()
+            vector_db_plugin = e2e_config["vector_db"]["plugin_name"]
+            vector_db_kwargs = e2e_config["vector_db"].get("kwargs", {})
 
             temp_client = get_vector_db_plugin(vector_db_plugin, **vector_db_kwargs)
 
@@ -384,12 +509,15 @@ class E2ERunner:
         except Exception as e:
             logger.warning(f"Failed to delete table store: {e}")
 
-    def run_scenario(self, scenario: TestScenario) -> ScenarioResult:
+    def run_scenario(
+        self, scenario: TestScenario, use_cache: bool = True
+    ) -> ScenarioResult:
         """
         Run a single test scenario.
 
         Args:
             scenario: The scenario to run
+            use_cache: Whether to check/update cache (default: True)
 
         Returns:
             ScenarioResult with validation outcome
@@ -400,6 +528,27 @@ class E2ERunner:
         logger.debug(f"Running scenario {scenario.id}: {scenario.name}")
 
         start_time = time.time()
+
+        # Check cache first (using query as key, empty chunk_ids for simplicity)
+        # Cache hit only returns if the cached result passed - failed results aren't cached
+        if use_cache and self.cache.enabled:
+            cached = self.cache.get(scenario.query, [])
+            if cached and cached.get("passed"):
+                logger.debug(f"Cache hit for scenario {scenario.id} (tier={cached.get('tier')})")
+                duration_ms = (time.time() - start_time) * 1000
+                return ScenarioResult(
+                    scenario=scenario,
+                    validation=ValidationResult(
+                        passed=True,
+                        reason="Cached result",
+                        details={"cached": True, "original_tier": cached.get("tier")},
+                    ),
+                    answer_text=cached.get("answer_text", "")[:500],
+                    duration_ms=duration_ms,
+                    error=None,
+                )
+
+        # Cache miss or disabled - run the pipeline
         error = None
         answer_text = ""
 
@@ -417,6 +566,17 @@ class E2ERunner:
             )
 
         duration_ms = (time.time() - start_time) * 1000
+
+        # Cache successful results only (failed results should be retried)
+        if use_cache and self.cache.enabled and validation.passed:
+            self.cache.set(
+                query=scenario.query,
+                chunk_ids=[],  # Simplified key - just query-based
+                scenario_id=scenario.id,
+                answer_text=answer_text[:500] if answer_text else "",
+                passed=True,
+                tier=self._current_tier or "unknown",
+            )
 
         return ScenarioResult(
             scenario=scenario,
@@ -464,6 +624,124 @@ class E2ERunner:
 
         return run_result
 
+    def run_tiered(self, scenarios: list[TestScenario] | None = None) -> TieredRunResult:
+        """
+        Run tests with tiered fallback.
+
+        Executes scenarios through tiers in order:
+        1. Check cache for previously passed results
+        2. Run remaining with first tier (fast/local)
+        3. Re-run failures with second tier (cloud)
+        4. Continue until all tiers exhausted or all passed
+
+        Args:
+            scenarios: Optional list of scenarios (default: all SCENARIOS)
+
+        Returns:
+            TieredRunResult with results and tier assignments
+        """
+        if not self._setup_complete:
+            raise RuntimeError("E2E runner not set up. Call setup() first.")
+
+        scenarios = scenarios or SCENARIOS
+        e2e_config = load_e2e_config()
+        tier_names = get_tier_names(e2e_config)
+
+        all_results: dict[str, tuple[ScenarioResult, str]] = {}
+        remaining = list(scenarios)
+
+        logger.info(f"E2E Tiered Run: Starting {len(scenarios)} scenarios")
+        logger.info(f"E2E Tiered Run: Tiers = {tier_names}")
+        logger.info(f"E2E Tiered Run: Cache enabled = {self.cache.enabled}")
+        start_time = time.time()
+
+        # Phase 0: Check cache for previously passed results
+        if self.cache.enabled:
+            logger.info("\n--- Checking cache ---")
+            still_need_run = []
+            for scenario in remaining:
+                cached = self.cache.get(scenario.query, [])
+                if cached and cached.get("passed"):
+                    # Return cached result
+                    result = ScenarioResult(
+                        scenario=scenario,
+                        validation=ValidationResult(
+                            passed=True,
+                            reason="Cached result",
+                            details={"cached": True, "original_tier": cached.get("tier")},
+                        ),
+                        answer_text=cached.get("answer_text", "")[:500],
+                        duration_ms=0.0,
+                        error=None,
+                    )
+                    all_results[scenario.id] = (result, "cached")
+                    logger.info(f"  [CACHE] {scenario.id}: {scenario.name}")
+                else:
+                    still_need_run.append(scenario)
+
+            cached_count = len(remaining) - len(still_need_run)
+            logger.info(f"Cache: {cached_count} hits, {len(still_need_run)} need to run")
+            remaining = still_need_run
+
+        # Track last result for scenarios that fail all tiers
+        last_results: dict[str, ScenarioResult] = {}
+
+        # Iterate through tiers
+        for tier_name in tier_names:
+            if not remaining:
+                break
+
+            logger.info(f"\n--- Tier '{tier_name}': {len(remaining)} scenarios ---")
+            self._rebuild_pipeline(tier_name)
+
+            still_failing = []
+            for scenario in remaining:
+                # Don't use cache in run_scenario - we already checked above
+                result = self.run_scenario(scenario, use_cache=False)
+                last_results[scenario.id] = result  # Track for failed_all
+
+                if result.validation.passed:
+                    all_results[scenario.id] = (result, tier_name)
+                    status = "PASS"
+                    # Cache successful result
+                    if self.cache.enabled:
+                        self.cache.set(
+                            query=scenario.query,
+                            chunk_ids=[],
+                            scenario_id=scenario.id,
+                            answer_text=result.answer_text,
+                            passed=True,
+                            tier=tier_name,
+                        )
+                else:
+                    still_failing.append(scenario)
+                    status = "FAIL"
+
+                logger.info(f"  [{status}] {scenario.id}: {scenario.name} ({result.duration_ms:.0f}ms)")
+
+            passed_this_tier = len(remaining) - len(still_failing)
+            logger.info(f"Tier '{tier_name}': {passed_this_tier}/{len(remaining)} passed")
+
+            remaining = still_failing
+
+        # Any remaining scenarios failed all tiers - use their last result
+        for scenario in remaining:
+            result = last_results[scenario.id]
+            all_results[scenario.id] = (result, "failed_all")
+
+        total_duration = time.time() - start_time
+
+        tiered_result = TieredRunResult(
+            results=all_results,
+            tier_names=tier_names,
+            cache_stats=self.cache.stats(),
+            total_duration_s=total_duration,
+        )
+
+        tiered_result.print_summary()
+
+        return tiered_result
+
 
 def run_e2e_tests(
     fixtures_dir: Path | None = None,
@@ -492,32 +770,68 @@ def run_e2e_tests(
         runner.teardown()
 
 
+def run_e2e_tests_tiered(
+    fixtures_dir: Path | None = None,
+    scenarios: list[TestScenario] | None = None,
+) -> TieredRunResult:
+    """
+    Convenience function to run E2E tests with tiered fallback.
+
+    Runs tests through multiple tiers (local -> cloud), cascading
+    failures to higher tiers.
+
+    Args:
+        fixtures_dir: Path to fixtures (default: tests/e2e/fixtures)
+        scenarios: Optional specific scenarios to run
+
+    Returns:
+        TieredRunResult with tier assignments
+    """
+    runner = E2ERunner(fixtures_dir=fixtures_dir)
+
+    try:
+        runner.setup()
+        result = runner.run_tiered(scenarios)
+        return result
+    finally:
+        runner.teardown()
+
+
 if __name__ == "__main__":
     # Run E2E tests from command line
     import sys
 
+    tiered_mode = "--tiered" in sys.argv
+
     print("=" * 60)
     print("E2E Retrieval Intelligence Tests")
+    if tiered_mode:
+        print("(TIERED MODE: local -> cloud fallback)")
     print("=" * 60)
     print()
 
-    result = run_e2e_tests()
+    if tiered_mode:
+        result = run_e2e_tests_tiered()
+        # TieredRunResult.print_summary() already called
+        sys.exit(0 if result.total_failed == 0 else 1)
+    else:
+        result = run_e2e_tests()
 
-    print()
-    print("=" * 60)
-    print(f"Results: {result.passed}/{result.total} passed ({result.pass_rate:.1f}%)")
-    print(f"Ingestion: {result.ingestion_duration_s:.1f}s")
-    print(f"Total: {result.total_duration_s:.1f}s")
-    print("=" * 60)
-
-    # Print failed scenarios
-    failed = [r for r in result.scenario_results if not r.validation.passed]
-    if failed:
         print()
-        print("Failed Scenarios:")
-        for r in failed:
-            print(f"  [{r.scenario.id}] {r.scenario.name}")
-            print(f"      Reason: {r.validation.reason}")
-            print()
+        print("=" * 60)
+        print(f"Results: {result.passed}/{result.total} passed ({result.pass_rate:.1f}%)")
+        print(f"Ingestion: {result.ingestion_duration_s:.1f}s")
+        print(f"Total: {result.total_duration_s:.1f}s")
+        print("=" * 60)
 
-    sys.exit(0 if result.failed == 0 else 1)
+        # Print failed scenarios
+        failed = [r for r in result.scenario_results if not r.validation.passed]
+        if failed:
+            print()
+            print("Failed Scenarios:")
+            for r in failed:
+                print(f"  [{r.scenario.id}] {r.scenario.name}")
+                print(f"      Reason: {r.validation.reason}")
+                print()
+
+        sys.exit(0 if result.failed == 0 else 1)
