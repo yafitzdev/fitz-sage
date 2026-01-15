@@ -205,6 +205,7 @@ class CloudClient:
         payload = {
             "cache_key": cache_key,
             "query_embedding": query_embedding,
+            "retrieval_fingerprint": retrieval_fingerprint,  # Required by backend
             "encrypted_blob": base64.b64encode(blob.ciphertext).decode(),
             "timestamp": str(blob.timestamp),  # Backend expects string
             "versions": {
