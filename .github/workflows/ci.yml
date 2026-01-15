@@ -79,6 +79,8 @@ jobs:
           # Install minimal dependencies for unit tests (skip heavy ML dependencies like docling/torch)
           pip install pydantic pyyaml httpx typing-extensions typer jinja2
           pip install pytest pytest-cov pytest-xdist psutil
+          # Scientific computing (needed for embeddings/vectors in unit tests)
+          pip install numpy faiss-cpu
           # Install package in editable mode without dependencies (they're already installed above)
           pip install -e . --no-deps
 
@@ -142,6 +144,8 @@ jobs:
           # Install minimal dependencies for unit tests (skip heavy ML deps)
           pip install pydantic pyyaml httpx typing-extensions typer jinja2
           pip install pytest pytest-cov pytest-xdist psutil
+          # Scientific computing (needed for embeddings/vectors)
+          pip install numpy faiss-cpu
           pip install -e . --no-deps
 
       - name: Run tests with coverage
