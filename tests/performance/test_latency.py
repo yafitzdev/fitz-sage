@@ -26,7 +26,7 @@ class TestQueryLatency:
         """Simple factual query should be fast."""
 
         def query():
-            return self.runner.pipeline.query("Where is TechCorp headquartered?")
+            return self.runner.pipeline.run("Where is TechCorp headquartered?")
 
         metrics = measure_perf(query, iterations=5, warmup=1)
 
@@ -44,7 +44,7 @@ class TestQueryLatency:
         """Multi-hop query latency."""
 
         def query():
-            return self.runner.pipeline.query(
+            return self.runner.pipeline.run(
                 "What does Sarah Chen's company's main competitor manufacture?"
             )
 
@@ -61,7 +61,7 @@ class TestQueryLatency:
         """Long multi-part query latency."""
 
         def query():
-            return self.runner.pipeline.query(
+            return self.runner.pipeline.run(
                 "I need a comprehensive analysis of TechCorp's product lineup "
                 "including all vehicle models with their prices, ranges, battery "
                 "capacities, and key distinguishing features. Also include "
@@ -84,12 +84,10 @@ class TestRetrievalLatency:
 
     def test_retrieval_only_latency(self, measure_perf):
         """Pure retrieval without LLM should be very fast."""
-        from fitz_ai.core import Query
 
         def retrieve():
-            query = Query(text="TechCorp electric vehicles")
             # Access retrieval step directly
-            return self.runner.pipeline.retriever.retrieve(query)
+            return self.runner.pipeline.retrieval.retrieve("TechCorp electric vehicles")
 
         metrics = measure_perf(retrieve, iterations=10, warmup=2)
 
@@ -114,7 +112,7 @@ class TestMemoryUsage:
         """Memory should not grow unbounded across queries."""
 
         def query():
-            return self.runner.pipeline.query("What is TechCorp?")
+            return self.runner.pipeline.run("What is TechCorp?")
 
         metrics = measure_perf(query, iterations=20, warmup=2)
 
