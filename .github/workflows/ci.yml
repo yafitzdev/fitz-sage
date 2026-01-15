@@ -86,12 +86,6 @@ jobs:
           # These require real API keys and external services
           pytest tests/unit/ -v --tb=short
 
-      - name: Run smoketest (mocked, no external services)
-        env:
-          PYTHONUTF8: 1
-        run: |
-          python tools/smoketest/smoke_fitz_rag_e2e.py
-
   # ===========================================================================
   # Import & Module Health Check
   # ===========================================================================

@@ -412,7 +412,7 @@ class E2ERunner:
             # Try to delete table collection
             try:
                 temp_client.delete_collection(f"{self.collection}_tables")
-                logger.debug(f"E2E Setup: Cleaned up stale table collection")
+                logger.debug("E2E Setup: Cleaned up stale table collection")
             except Exception:
                 pass
 

@@ -11,7 +11,6 @@ from __future__ import annotations
 import csv
 import hashlib
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Set
 
 from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument, Table
