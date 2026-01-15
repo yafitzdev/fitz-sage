@@ -1231,8 +1231,13 @@ SCENARIOS: list[TestScenario] = [
         query="What is TechCorp's office address in Austin?",
         # Austin HQ mentioned, but no street address
         must_contain_any=[
-            "not provided", "not specified", "no address",
-            "don't have", "not found", "Austin", "headquarters",
+            "not provided",
+            "not specified",
+            "no address",
+            "don't have",
+            "not found",
+            "Austin",
+            "headquarters",
         ],
         min_sources=0,
     ),
@@ -1243,8 +1248,12 @@ SCENARIOS: list[TestScenario] = [
         query="What is the full specification of Project Alpha's technology?",
         # Only limited info due to classification
         must_contain_any=[
-            "classified", "restricted", "Phase 2", "confidential",
-            "security clearance", "limited",
+            "classified",
+            "restricted",
+            "Phase 2",
+            "confidential",
+            "security clearance",
+            "limited",
         ],
         min_sources=0,
     ),

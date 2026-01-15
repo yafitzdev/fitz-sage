@@ -38,9 +38,7 @@ class CSVParser:
     """
 
     plugin_name: str = field(default="csv", repr=False)
-    supported_extensions: Set[str] = field(
-        default_factory=lambda: {".csv", ".tsv"}, repr=False
-    )
+    supported_extensions: Set[str] = field(default_factory=lambda: {".csv", ".tsv"}, repr=False)
     max_rows: int = 100000  # Safety limit for very large CSV files
     encoding: str = "utf-8"
 
@@ -104,9 +102,7 @@ class CSVParser:
 
         # Safety check for very large files
         if len(normalized_rows) > self.max_rows:
-            logger.warning(
-                f"CSV file has {len(normalized_rows)} rows, limiting to {self.max_rows}"
-            )
+            logger.warning(f"CSV file has {len(normalized_rows)} rows, limiting to {self.max_rows}")
             normalized_rows = normalized_rows[: self.max_rows]
 
         # Create stable table ID from file path

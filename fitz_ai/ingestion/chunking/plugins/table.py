@@ -46,9 +46,7 @@ class TableChunker:
     """
 
     plugin_name: str = field(default="table", repr=False)
-    supported_extensions: List[str] = field(
-        default_factory=lambda: [".csv", ".tsv"], repr=False
-    )
+    supported_extensions: List[str] = field(default_factory=lambda: [".csv", ".tsv"], repr=False)
 
     @property
     def chunker_id(self) -> str:
@@ -75,9 +73,7 @@ class TableChunker:
             List of Chunk objects (one per table), each containing schema info
         """
         if not document.tables:
-            logger.warning(
-                f"TableChunker received document with no tables: {document.source}"
-            )
+            logger.warning(f"TableChunker received document with no tables: {document.source}")
             return []
 
         chunks: List[Chunk] = []
@@ -121,9 +117,7 @@ class TableChunker:
                 )
             )
 
-        logger.debug(
-            f"Created {len(chunks)} schema chunks for {len(document.tables)} tables"
-        )
+        logger.debug(f"Created {len(chunks)} schema chunks for {len(document.tables)} tables")
         return chunks
 
 

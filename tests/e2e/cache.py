@@ -45,7 +45,8 @@ class ResponseCache:
     def _init_db(self) -> None:
         """Initialize SQLite database."""
         conn = sqlite3.connect(CACHE_DB)
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS cache (
                 cache_key TEXT PRIMARY KEY,
                 scenario_id TEXT,
@@ -56,7 +57,8 @@ class ResponseCache:
                 created_at TEXT,
                 accessed_at TEXT
             )
-        """)
+        """
+        )
         conn.commit()
         conn.close()
 
@@ -200,7 +202,11 @@ class ResponseCache:
         count = cur.fetchone()[0]
         conn.close()
 
-        hit_rate = (self._hits / (self._hits + self._misses) * 100) if (self._hits + self._misses) > 0 else 0
+        hit_rate = (
+            (self._hits / (self._hits + self._misses) * 100)
+            if (self._hits + self._misses) > 0
+            else 0
+        )
 
         return {
             "enabled": True,

@@ -76,7 +76,9 @@ class E2ERunResult:
 class TieredRunResult:
     """Result of tiered test execution."""
 
-    results: dict[str, tuple[ScenarioResult, str]] = field(default_factory=dict)  # id -> (result, tier)
+    results: dict[str, tuple[ScenarioResult, str]] = field(
+        default_factory=dict
+    )  # id -> (result, tier)
     tier_names: list[str] = field(default_factory=list)
     cache_stats: dict = field(default_factory=dict)
     total_duration_s: float = 0.0
@@ -128,7 +130,9 @@ class TieredRunResult:
         print(f"  Duration: {self.total_duration_s:.1f}s")
 
         if self.cache_stats:
-            print(f"  Cache: {self.cache_stats.get('hits', 0)} hits, {self.cache_stats.get('misses', 0)} misses")
+            print(
+                f"  Cache: {self.cache_stats.get('hits', 0)} hits, {self.cache_stats.get('misses', 0)} misses"
+            )
         print("=" * 60)
 
 
@@ -509,9 +513,7 @@ class E2ERunner:
         except Exception as e:
             logger.warning(f"Failed to delete table store: {e}")
 
-    def run_scenario(
-        self, scenario: TestScenario, use_cache: bool = True
-    ) -> ScenarioResult:
+    def run_scenario(self, scenario: TestScenario, use_cache: bool = True) -> ScenarioResult:
         """
         Run a single test scenario.
 
@@ -717,7 +719,9 @@ class E2ERunner:
                     still_failing.append(scenario)
                     status = "FAIL"
 
-                logger.info(f"  [{status}] {scenario.id}: {scenario.name} ({result.duration_ms:.0f}ms)")
+                logger.info(
+                    f"  [{status}] {scenario.id}: {scenario.name} ({result.duration_ms:.0f}ms)"
+                )
 
             passed_this_tier = len(remaining) - len(still_failing)
             logger.info(f"Tier '{tier_name}': {passed_this_tier}/{len(remaining)} passed")

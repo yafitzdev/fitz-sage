@@ -82,7 +82,9 @@ jobs:
         env:
           PYTHONUTF8: 1
         run: |
-          pytest tests/ -v --tb=short --ignore=tests/integration/
+          # Only run unit tests - skip e2e, chaos, security, performance, load tests
+          # These require real API keys and external services
+          pytest tests/unit/ -v --tb=short
 
       - name: Run smoketest (mocked, no external services)
         env:
@@ -143,7 +145,8 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest tests/ --cov=fitz --cov-report=xml --cov-report=term-missing
+          # Only unit tests for coverage - skip tests requiring API keys
+          pytest tests/unit/ --cov=fitz_ai --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
