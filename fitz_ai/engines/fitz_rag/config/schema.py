@@ -19,6 +19,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from fitz_ai.cloud.config import CloudConfig
+
 # =============================================================================
 # Plugin Configuration
 # =============================================================================
@@ -585,6 +587,12 @@ class FitzRagConfig(BaseModel):
     multihop: MultihopConfig = Field(
         default_factory=MultihopConfig,
         description="Multi-hop retrieval configuration for complex reasoning chains",
+    )
+
+    # Fitz Cloud (Query-Time RAG Optimizer)
+    cloud: CloudConfig | None = Field(
+        default=None,
+        description="Fitz Cloud configuration for caching and model routing",
     )
 
     model_config = ConfigDict(extra="forbid")
