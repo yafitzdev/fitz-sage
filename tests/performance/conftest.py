@@ -92,8 +92,8 @@ def measure_perf() -> Callable:
 
 # Performance thresholds (adjust based on your requirements)
 PERF_THRESHOLDS = {
-    "query_p95_ms": 5000,        # 5 seconds max for p95
-    "query_p99_ms": 10000,       # 10 seconds max for p99
+    "query_p95_ms": 5000,  # 5 seconds max for p95
+    "query_p99_ms": 10000,  # 10 seconds max for p99
     "ingestion_mb_per_doc": 50,  # Max 50MB memory per document
-    "retrieval_p95_ms": 500,     # 500ms for retrieval only (no LLM)
+    "retrieval_p95_ms": 500,  # 500ms for retrieval only (no LLM)
 }

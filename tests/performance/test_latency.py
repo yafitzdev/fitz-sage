@@ -30,7 +30,7 @@ class TestQueryLatency:
 
         metrics = measure_perf(query, iterations=5, warmup=1)
 
-        print(f"\nSimple Query Latency:")
+        print("\nSimple Query Latency:")
         print(f"  p50: {metrics.p50:.0f}ms")
         print(f"  p95: {metrics.p95:.0f}ms")
         print(f"  p99: {metrics.p99:.0f}ms")
@@ -50,7 +50,7 @@ class TestQueryLatency:
 
         metrics = measure_perf(query, iterations=5, warmup=1)
 
-        print(f"\nComplex Query Latency:")
+        print("\nComplex Query Latency:")
         print(f"  p50: {metrics.p50:.0f}ms")
         print(f"  p95: {metrics.p95:.0f}ms")
         print(f"  p99: {metrics.p99:.0f}ms")
@@ -70,7 +70,7 @@ class TestQueryLatency:
 
         metrics = measure_perf(query, iterations=3, warmup=1)
 
-        print(f"\nLong Query Latency:")
+        print("\nLong Query Latency:")
         print(f"  p50: {metrics.p50:.0f}ms")
         print(f"  p95: {metrics.p95:.0f}ms")
 
@@ -91,7 +91,7 @@ class TestRetrievalLatency:
 
         metrics = measure_perf(retrieve, iterations=10, warmup=2)
 
-        print(f"\nRetrieval-Only Latency:")
+        print("\nRetrieval-Only Latency:")
         print(f"  p50: {metrics.p50:.0f}ms")
         print(f"  p95: {metrics.p95:.0f}ms")
 
@@ -116,12 +116,12 @@ class TestMemoryUsage:
 
         metrics = measure_perf(query, iterations=20, warmup=2)
 
-        print(f"\nMemory Usage Across 20 Queries:")
+        print("\nMemory Usage Across 20 Queries:")
         print(f"  Avg delta: {metrics.avg_memory_mb:.1f}MB")
         print(f"  Peak delta: {metrics.peak_memory_mb:.1f}MB")
 
         # Memory should not grow significantly per query
         # (some variance is normal due to GC timing)
-        assert metrics.peak_memory_mb < 100, (
-            f"Memory grew {metrics.peak_memory_mb:.1f}MB - potential leak"
-        )
+        assert (
+            metrics.peak_memory_mb < 100
+        ), f"Memory grew {metrics.peak_memory_mb:.1f}MB - potential leak"

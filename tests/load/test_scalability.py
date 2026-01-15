@@ -56,14 +56,14 @@ every letter of the alphabet and is used for testing purposes.
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
-            docs = self.generate_documents(doc_count, tmp_path)
+            _docs = self.generate_documents(doc_count, tmp_path)
 
             gc.collect()
             mem_before = psutil.Process().memory_info().rss / 1024 / 1024
             start = time.perf_counter()
 
             # Ingest to a test collection
-            collection_name = f"scale_test_{doc_count}"
+            _collection_name = f"scale_test_{doc_count}"
             # Would need to call run_diff_ingest with full setup
             pass
 
@@ -105,7 +105,7 @@ class TestConcurrentQueries:
                 result = self.runner.pipeline.run(query)
                 elapsed = time.perf_counter() - start
                 return (query, elapsed, result is not None)
-            except Exception as e:
+            except Exception:
                 elapsed = time.perf_counter() - start
                 return (query, elapsed, False)
 
@@ -122,9 +122,9 @@ class TestConcurrentQueries:
             if success:
                 successes += 1
 
-        assert successes == len(queries), (
-            f"Only {successes}/{len(queries)} concurrent queries succeeded"
-        )
+        assert successes == len(
+            queries
+        ), f"Only {successes}/{len(queries)} concurrent queries succeeded"
 
     @pytest.mark.parametrize("num_queries", [10, 25, 50])
     def test_sequential_throughput(self, num_queries):

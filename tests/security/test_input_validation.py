@@ -33,7 +33,11 @@ class TestMalformedInputs:
         except (RuntimeError, ValueError) as e:
             # Empty query may raise an error from embedding API
             # This is acceptable as long as it's a handled error, not a crash
-            assert "empty" in str(e).lower() or "invalid" in str(e).lower() or "texts" in str(e).lower()
+            assert (
+                "empty" in str(e).lower()
+                or "invalid" in str(e).lower()
+                or "texts" in str(e).lower()
+            )
 
     def test_whitespace_only_query(self):
         """Whitespace-only query should be handled."""
@@ -109,6 +113,7 @@ class TestInputLengthLimits:
     def test_many_short_queries_dont_leak_memory(self):
         """Rapid short queries shouldn't cause memory issues."""
         import gc
+
         import psutil
 
         process = psutil.Process()
@@ -143,9 +148,7 @@ class TestRepeatedPatterns:
 
     def test_repeated_spaces(self):
         """Excessive spaces should be normalized."""
-        result = self.runner.pipeline.run(
-            "What    is      TechCorp      Industries?"
-        )
+        result = self.runner.pipeline.run("What    is      TechCorp      Industries?")
         assert result is not None
 
     def test_newlines_in_query(self):

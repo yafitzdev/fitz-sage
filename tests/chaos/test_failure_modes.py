@@ -14,7 +14,7 @@ Run with: pytest tests/chaos/ -v -s -m chaos
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -89,9 +89,7 @@ class TestRetrievalFailures:
     def test_empty_retrieval_handling(self):
         """Query returning no results should be handled."""
         # Query for something that definitely won't match
-        result = self.runner.pipeline.run(
-            "xyzzy12345 nonexistent query that matches nothing"
-        )
+        result = self.runner.pipeline.run("xyzzy12345 nonexistent query that matches nothing")
 
         # Should return a response without crashing
         # The system may say "no information" or return a minimal response
@@ -172,9 +170,9 @@ class TestPartialFailures:
             side_effect=malformed_response,
         ):
             try:
-                result = self.runner.pipeline.run("What is TechCorp?")
+                _result = self.runner.pipeline.run("What is TechCorp?")
                 # Should handle None response gracefully
-            except Exception as e:
+            except Exception:
                 # Handled exception is acceptable
                 pass
 
@@ -198,11 +196,11 @@ class TestResourceExhaustion:
             side_effect=oom_simulation,
         ):
             try:
-                result = self.runner.pipeline.run("What is TechCorp?")
+                _result = self.runner.pipeline.run("What is TechCorp?")
             except MemoryError:
                 # MemoryError is acceptable - system didn't crash uncontrollably
                 pass
-            except Exception as e:
+            except Exception:
                 # Other handled exceptions are fine
                 pass
 

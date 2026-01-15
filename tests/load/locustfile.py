@@ -63,6 +63,7 @@ class DirectRAGUser(User):
             e2e_config_path = project_root / "tests" / "e2e" / "e2e_config.yaml"
 
             import yaml
+
             with open(e2e_config_path) as f:
                 e2e_config = yaml.safe_load(f)
 
