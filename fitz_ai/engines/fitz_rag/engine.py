@@ -25,7 +25,7 @@ from fitz_ai.core import (
 from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
 from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import RGSAnswer
 from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
-from fitz_ai.logging import get_logger
+from fitz_ai.logging.logger import get_logger
 
 if TYPE_CHECKING:
     from fitz_ai.cloud.client import CacheLookupResult
@@ -71,12 +71,9 @@ class FitzRagEngine:
                               components cannot be initialized
         """
         try:
-            # Use the factory method to create RAGPipeline from config
-            # This properly initializes all components (retrieval, llm, rgs, context)
-            self._pipeline = RAGPipeline.from_config(config)
             self._config = config
 
-            # Initialize cloud client if enabled
+            # Initialize cloud client if enabled (must be before pipeline creation)
             self._cloud_client: CloudClient | None = None
             if config.cloud and config.cloud.enabled:
                 config.cloud.validate_config()
@@ -89,6 +86,11 @@ class FitzRagEngine:
                 self._cloud_client = CloudClient(config.cloud, org_id)
                 logger.info("Fitz Cloud enabled", extra={"org_id": org_id[:8]})
 
+            # Use the factory method to create RAGPipeline from config
+            # This properly initializes all components (retrieval, llm, rgs, context)
+            # Pass cloud_client to enable cache operations
+            self._pipeline = RAGPipeline.from_config(config, cloud_client=self._cloud_client)
+
         except Exception as e:
             raise ConfigurationError(f"Failed to initialize Fitz RAG engine: {e}") from e
 
@@ -98,10 +100,11 @@ class FitzRagEngine:
 
         Flow:
         1. Validate query
-        2. Check cloud cache (if enabled) - COMING SOON
-        3. Run RAG pipeline (retrieve → generate)
-        4. Store in cloud cache (if enabled)
-        5. Return answer
+        2. Run RAG pipeline (retrieve → cache check → generate → cache store)
+        3. Return answer
+
+        Cache operations (lookup and storage) are handled transparently within
+        the RAG pipeline when cloud is enabled.
 
         Args:
             query: Query object with the question and optional constraints
@@ -117,13 +120,6 @@ class FitzRagEngine:
         # Validate query
         if not query.text or not query.text.strip():
             raise QueryError("Query text cannot be empty")
-
-        # TODO: Check cloud cache (requires embedder access)
-        # if self._cloud_client:
-        #     cache_result = self._check_cloud_cache(query.text)
-        #     if cache_result.hit:
-        #         logger.info("Cloud cache hit")
-        #         return cache_result.answer
 
         try:
             # Run the RAG pipeline
@@ -148,10 +144,6 @@ class FitzRagEngine:
                 },
             )
 
-            # Store in cloud cache (if enabled)
-            if self._cloud_client:
-                self._store_in_cloud_cache(query.text, answer, rgs_answer)
-
             return answer
 
         except Exception as e:
@@ -163,25 +155,6 @@ class FitzRagEngine:
                 raise GenerationError(f"Generation failed: {e}") from e
             else:
                 raise KnowledgeError(f"RAG pipeline error: {e}") from e
-
-    def _store_in_cloud_cache(self, query_text: str, answer: Answer, rgs_answer: RGSAnswer) -> None:
-        """
-        Store answer in cloud cache.
-
-        Note: For MVP, we're skipping cache storage since we need:
-        - Query embedding (requires access to embedder)
-        - Retrieval fingerprint (requires chunk IDs)
-        - Collection version hash
-
-        This will be implemented when we add cache lookup.
-        """
-        # TODO: Implement cache storage
-        # Need to:
-        # 1. Get query embedding from embedder
-        # 2. Compute retrieval fingerprint from chunk IDs
-        # 3. Get collection version
-        # 4. Call cloud_client.store_cache()
-        logger.debug("Cloud cache storage not yet implemented")
 
     @property
     def config(self) -> FitzRagConfig:

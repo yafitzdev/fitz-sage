@@ -14,7 +14,7 @@ from fitz_ai.cloud.cache_key import CacheVersions, compute_cache_key
 from fitz_ai.cloud.config import CloudConfig
 from fitz_ai.cloud.crypto import CacheEncryption, EncryptedBlob
 from fitz_ai.core import Answer
-from fitz_ai.logging import get_logger
+from fitz_ai.logging.logger import get_logger
 
 logger = get_logger(__name__)
 

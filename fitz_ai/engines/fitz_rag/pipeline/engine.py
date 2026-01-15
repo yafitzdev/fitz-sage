@@ -51,6 +51,9 @@ from fitz_ai.vector_db.registry import get_vector_db_plugin
 
 logger = get_logger(__name__)
 
+# Fitz Cloud optimizer version for cache key computation
+CLOUD_OPTIMIZER_VERSION = "1.0"
+
 
 # =============================================================================
 # RAGPipeline
@@ -75,6 +78,8 @@ class RAGPipeline:
         query_router: QueryRouter | None = None,
         keyword_matcher: KeywordMatcher | None = None,
         hop_controller: HopController | None = None,
+        embedder=None,  # Embedder for cloud cache query embeddings
+        cloud_client=None,  # CloudClient for cloud cache operations
     ):
         self.retrieval = retrieval
         self.chat = chat
@@ -83,6 +88,8 @@ class RAGPipeline:
         self.query_router = query_router
         self.keyword_matcher = keyword_matcher
         self.hop_controller = hop_controller
+        self.embedder = embedder
+        self.cloud_client = cloud_client
 
         # Default constraints: ConflictAware + InsufficientEvidence + CausalAttribution
         # Uses semantic embedding similarity for language-agnostic detection.
@@ -140,6 +147,13 @@ class RAGPipeline:
             logger.error(f"{PIPELINE} Retrieval failed: {exc}")
             raise PipelineError("Retrieval failed") from exc
 
+        # Step 1.25: Check cloud cache (early return on hit)
+        if self.cloud_client and self.embedder:
+            cached_answer = self._check_cloud_cache(query, raw_chunks)
+            if cached_answer:
+                logger.info(f"{PIPELINE} Cloud cache hit, returning cached answer")
+                return cached_answer
+
         # Step 1.5: Apply keyword filtering (if vocabulary exists)
         if self.keyword_matcher:
             filtered_chunks = self.keyword_matcher.filter_chunks(query, raw_chunks)
@@ -187,6 +201,11 @@ class RAGPipeline:
         try:
             answer = self.rgs.build_answer(raw, chunks, mode=answer_mode)
             logger.info(f"{PIPELINE} Pipeline run completed (mode={answer_mode.value})")
+
+            # Step 8: Store in cloud cache
+            if self.cloud_client and self.embedder:
+                self._store_in_cloud_cache(query, raw_chunks, answer)
+
             return answer
         except Exception as exc:
             logger.error(f"{PIPELINE} Failed to structure RGS answer: {exc}")
@@ -225,12 +244,200 @@ class RAGPipeline:
             user=prompt.user,
         )
 
+    def _get_collection_version(self) -> str:
+        """Compute collection version hash from ingestion state."""
+        from fitz_ai.ingestion.state import IngestStateManager
+        import hashlib
+
+        try:
+            manager = IngestStateManager()
+            manager.load()
+
+            # Get collection name from retrieval config
+            collection = (
+                self.retrieval.collection
+                if hasattr(self.retrieval, "collection")
+                else "default"
+            )
+
+            file_hashes = []
+            for root_entry in manager.state.roots.values():
+                for file_entry in root_entry.files.values():
+                    if file_entry.is_active() and file_entry.collection == collection:
+                        meta = ":".join(
+                            [
+                                file_entry.content_hash,
+                                file_entry.chunker_id,
+                                file_entry.parser_id,
+                                file_entry.embedding_id,
+                            ]
+                        )
+                        file_hashes.append(meta)
+
+            collection_state = ":".join(sorted(file_hashes))
+            return hashlib.sha256(collection_state.encode()).hexdigest()[:16]
+        except Exception:
+            return "unknown"
+
+    def _get_llm_model_id(self) -> str:
+        """Get LLM model identifier from chat client."""
+        # Chat plugins store model in self.params dict
+        try:
+            if hasattr(self.chat, "params") and hasattr(self.chat, "plugin_name"):
+                params = getattr(self.chat, "params", {})
+                model = params.get("model")
+                plugin_name = getattr(self.chat, "plugin_name", None)
+                if model and plugin_name:
+                    return f"{plugin_name}:{model}"
+        except (AttributeError, KeyError):
+            pass
+        return "unknown"
+
+    def _answer_to_rgs_answer(self, answer) -> "RGSAnswer":
+        """Convert standard Answer to RGSAnswer format."""
+        from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
+            RGSAnswer,
+            RGSSourceRef,
+        )
+
+        sources = [
+            RGSSourceRef(
+                source_id=prov.source_id,
+                index=idx,
+                doc_id=prov.source_id,
+                content=prov.excerpt or "",
+                metadata=prov.metadata,
+            )
+            for idx, prov in enumerate(answer.provenance)
+        ]
+
+        return RGSAnswer(
+            answer=answer.text,
+            sources=sources,
+            mode=answer.mode,
+        )
+
+    def _check_cloud_cache(self, query: str, raw_chunks: list) -> "RGSAnswer | None":
+        """
+        Check cloud cache for existing answer.
+
+        Returns cached RGSAnswer if hit, None if miss.
+        Also caches query embedding for reuse in _store_in_cloud_cache.
+        """
+        if not self.cloud_client or not self.embedder:
+            return None
+
+        from fitz_ai.cloud.cache_key import CacheVersions, compute_retrieval_fingerprint
+        import fitz_ai
+
+        try:
+            # 1. Get query embedding (cache for reuse in storage)
+            query_embedding = self.embedder.embed(query)
+            self._cached_query_embedding = query_embedding
+
+            # 2. Compute retrieval fingerprint from chunk IDs
+            chunk_ids = [chunk.id for chunk in raw_chunks]
+            retrieval_fingerprint = compute_retrieval_fingerprint(chunk_ids)
+
+            # 3. Get collection version (lazy compute)
+            if not hasattr(self, "_collection_version"):
+                self._collection_version = self._get_collection_version()
+
+            # 4. Build cache versions
+            versions = CacheVersions(
+                optimizer=CLOUD_OPTIMIZER_VERSION,
+                engine=fitz_ai.__version__,
+                collection=self._collection_version,
+                llm_model=self._get_llm_model_id(),
+                prompt_template="default",
+            )
+
+            # 5. Lookup cache
+            result = self.cloud_client.lookup_cache(
+                query_text=query,
+                query_embedding=query_embedding,
+                retrieval_fingerprint=retrieval_fingerprint,
+                versions=versions,
+            )
+
+            if result.hit:
+                # Convert Answer back to RGSAnswer
+                return self._answer_to_rgs_answer(result.answer)
+
+            return None
+        except Exception as e:
+            logger.warning(f"{PIPELINE} Cloud cache lookup failed: {e}")
+            return None
+
+    def _store_in_cloud_cache(self, query: str, raw_chunks: list, rgs_answer: "RGSAnswer") -> None:
+        """Store answer in cloud cache for future lookups."""
+        if not self.cloud_client or not self.embedder:
+            return
+
+        from fitz_ai.cloud.cache_key import CacheVersions, compute_retrieval_fingerprint
+        from fitz_ai.core import Answer, Provenance
+        import fitz_ai
+
+        try:
+            # 1. Reuse cached query embedding from _check_cloud_cache if available
+            query_embedding = getattr(self, "_cached_query_embedding", None)
+            if query_embedding is None:
+                query_embedding = self.embedder.embed(query)
+
+            # 2. Compute retrieval fingerprint
+            chunk_ids = [chunk.id for chunk in raw_chunks]
+            retrieval_fingerprint = compute_retrieval_fingerprint(chunk_ids)
+
+            # 3. Get versions (reuse cached collection version)
+            if not hasattr(self, "_collection_version"):
+                self._collection_version = self._get_collection_version()
+
+            versions = CacheVersions(
+                optimizer=CLOUD_OPTIMIZER_VERSION,
+                engine=fitz_ai.__version__,
+                collection=self._collection_version,
+                llm_model=self._get_llm_model_id(),
+                prompt_template="default",
+            )
+
+            # 4. Convert RGSAnswer to Answer
+            provenance = [
+                Provenance(
+                    source_id=src.source_id,
+                    excerpt=src.content,
+                    metadata=src.metadata,
+                )
+                for src in rgs_answer.sources
+            ]
+
+            answer = Answer(
+                text=rgs_answer.answer,
+                provenance=provenance,
+                mode=rgs_answer.mode,
+                metadata={"engine": "fitz_rag"},
+            )
+
+            # 5. Store in cache
+            stored = self.cloud_client.store_cache(
+                query_text=query,
+                query_embedding=query_embedding,
+                retrieval_fingerprint=retrieval_fingerprint,
+                versions=versions,
+                answer=answer,
+            )
+
+            if stored:
+                logger.info(f"{PIPELINE} Answer stored in cloud cache")
+        except Exception as e:
+            logger.warning(f"{PIPELINE} Failed to store in cache: {e}")
+
     @classmethod
     def from_config(
         cls,
         cfg: FitzRagConfig,
         constraints: Sequence[ConstraintPlugin] | None = None,
         enable_keywords: bool = True,
+        cloud_client=None,  # CloudClient for cloud cache operations
     ) -> "RAGPipeline":
         """
         Create a RAGPipeline from configuration.
@@ -392,6 +599,8 @@ class RAGPipeline:
             query_router=query_router,
             keyword_matcher=keyword_matcher,
             hop_controller=hop_controller,
+            embedder=embedder,
+            cloud_client=cloud_client,
         )
 
     @classmethod
