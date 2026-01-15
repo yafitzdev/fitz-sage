@@ -72,7 +72,7 @@ class CloudClient:
         self.client = httpx.Client(
             base_url=config.base_url,
             headers={
-                "Authorization": f"Bearer {config.api_key}",
+                "X-API-Key": config.api_key,
                 "Content-Type": "application/json",
             },
             timeout=config.timeout,
@@ -206,7 +206,7 @@ class CloudClient:
             "cache_key": cache_key,
             "query_embedding": query_embedding,
             "encrypted_blob": base64.b64encode(blob.ciphertext).decode(),
-            "timestamp": blob.timestamp,
+            "timestamp": str(blob.timestamp),  # Backend expects string
             "versions": {
                 "optimizer": versions.optimizer,
                 "engine": versions.engine,
