@@ -16,6 +16,7 @@ class CloudConfig(BaseModel):
         cloud:
           enabled: true
           api_key: "fitz_xxx..."
+          org_id: "your-org-uuid"  # Can also use FITZ_ORG_ID env var
           org_key: "64-char-hex-string"
           base_url: "https://api.fitz-ai.cloud/v1"
     """
@@ -28,6 +29,11 @@ class CloudConfig(BaseModel):
     api_key: Optional[str] = Field(
         default=None,
         description="Fitz Cloud API key (fitz_xxx format)",
+    )
+
+    org_id: Optional[str] = Field(
+        default=None,
+        description="Organization ID (UUID). Can also be set via FITZ_ORG_ID env var.",
     )
 
     org_key: Optional[str] = Field(

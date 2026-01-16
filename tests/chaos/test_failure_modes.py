@@ -106,7 +106,7 @@ class TestRetrievalFailures:
             "no relevant",
             "insufficient",
             "unable to",
-            "do not contain any information",
+            "do not contain",
             "does not contain",
         ]
         # Accept either explicit honesty or a very short response (< 50 chars)

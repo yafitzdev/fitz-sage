@@ -18,6 +18,9 @@ from fitz_ai.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Fitz Cloud requires 1536-dimensional embeddings (OpenAI text-embedding-3-small standard)
+REQUIRED_EMBEDDING_DIM = 1536
+
 
 @dataclass
 class RoutingAdvice:
@@ -67,6 +70,7 @@ class CloudClient:
         self.config = config
         self.org_id = org_id
         self.encryption = CacheEncryption(config.org_key) if config.org_key else None
+        self._dimension_warning_logged = False  # Track if we've warned about dimension mismatch
 
         # HTTP client
         self.client = httpx.Client(
@@ -98,6 +102,18 @@ class CloudClient:
             CacheLookupResult with hit status, answer (if hit), or routing advice (if miss)
         """
         if not self.config.enabled or not self.encryption:
+            return CacheLookupResult(hit=False)
+
+        # Validate embedding dimension
+        embedding_dim = len(query_embedding)
+        if embedding_dim != REQUIRED_EMBEDDING_DIM:
+            if not self._dimension_warning_logged:
+                logger.warning(
+                    f"Cloud cache requires {REQUIRED_EMBEDDING_DIM}-dimensional embeddings "
+                    f"(OpenAI text-embedding-3-small). Your embedding has {embedding_dim} dimensions. "
+                    "Cloud cache disabled. Local RAG continues normally."
+                )
+                self._dimension_warning_logged = True
             return CacheLookupResult(hit=False)
 
         cache_key = compute_cache_key(query_text, retrieval_fingerprint, versions)
@@ -179,6 +195,18 @@ class CloudClient:
             True if stored successfully
         """
         if not self.config.enabled or not self.encryption:
+            return False
+
+        # Validate embedding dimension
+        embedding_dim = len(query_embedding)
+        if embedding_dim != REQUIRED_EMBEDDING_DIM:
+            if not self._dimension_warning_logged:
+                logger.warning(
+                    f"Cloud cache requires {REQUIRED_EMBEDDING_DIM}-dimensional embeddings "
+                    f"(OpenAI text-embedding-3-small). Your embedding has {embedding_dim} dimensions. "
+                    "Cache storage skipped. Local RAG continues normally."
+                )
+                self._dimension_warning_logged = True
             return False
 
         cache_key = compute_cache_key(query_text, retrieval_fingerprint, versions)

@@ -2,7 +2,7 @@
 """
 Navigation index artifact generator.
 
-Generates a file → purpose mapping for quick navigation.
+Generates a file -> purpose mapping for quick navigation.
 Helps answer "where is X?" questions.
 """
 
@@ -27,7 +27,7 @@ requires_llm = False
 
 class Generator:
     """
-    Generates a navigation index: file → purpose mapping.
+    Generates a navigation index: file -> purpose mapping.
 
     This artifact helps answer "where is X?" questions.
     """
@@ -39,7 +39,7 @@ class Generator:
     def generate(self, analysis: ProjectAnalysis) -> Artifact:
         """Generate navigation index artifact."""
         lines = ["# Navigation Index", ""]
-        lines.append("File → Purpose mapping for quick navigation.")
+        lines.append("File -> Purpose mapping for quick navigation.")
         lines.append("")
 
         by_dir: Dict[str, List[Dict[str, Any]]] = {}
@@ -65,7 +65,7 @@ class Generator:
 
             for file in sorted(by_dir[dir_path], key=lambda f: f["name"]):
                 purpose = self._get_purpose(file)
-                lines.append(f"- `{file['name']}` → {purpose}")
+                lines.append(f"- `{file['name']}` -> {purpose}")
 
             lines.append("")
 

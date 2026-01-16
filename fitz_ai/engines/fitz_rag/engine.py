@@ -77,11 +77,11 @@ class FitzRagEngine:
             self._cloud_client: CloudClient | None = None
             if config.cloud and config.cloud.enabled:
                 config.cloud.validate_config()
-                # Get org_id from environment or config
-                org_id = os.environ.get("FITZ_ORG_ID")
+                # Get org_id from config first, then environment variable
+                org_id = config.cloud.org_id or os.environ.get("FITZ_ORG_ID")
                 if not org_id:
                     raise ConfigurationError(
-                        "FITZ_ORG_ID environment variable required when cloud is enabled"
+                        "cloud.org_id or FITZ_ORG_ID environment variable required when cloud is enabled"
                     )
                 self._cloud_client = CloudClient(config.cloud, org_id)
                 logger.info("Fitz Cloud enabled", extra={"org_id": org_id[:8]})

@@ -125,6 +125,7 @@ docs/blog
 docs/limitations
 docs/roadmap
 docs/archive
+docs/todo
 
 # Claude Code temp files
 tmpclaude-*-cwd

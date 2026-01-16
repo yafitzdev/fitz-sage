@@ -30,7 +30,7 @@ class ChatClient(Protocol):
 
 class NavigationIndexGenerator:
     """
-    Generates a navigation index: file → purpose mapping.
+    Generates a navigation index: file -> purpose mapping.
 
     This artifact helps answer "where is X?" questions.
     Uses LLM to summarize each file's purpose in one line.
@@ -44,7 +44,7 @@ class NavigationIndexGenerator:
     def generate(self, analysis: ProjectAnalysis) -> Artifact:
         """Generate navigation index artifact."""
         lines = ["# Navigation Index", ""]
-        lines.append("File → Purpose mapping for quick navigation.")
+        lines.append("File -> Purpose mapping for quick navigation.")
         lines.append("")
 
         # Group by directory
@@ -71,7 +71,7 @@ class NavigationIndexGenerator:
 
             for file in sorted(by_dir[dir_path], key=lambda f: f["name"]):
                 purpose = self._get_purpose(file)
-                lines.append(f"- `{file['name']}` → {purpose}")
+                lines.append(f"- `{file['name']}` -> {purpose}")
 
             lines.append("")
 
@@ -232,9 +232,9 @@ class DependencySummaryGenerator:
             for pkg, deps in sorted(pkg_deps.items()):
                 if deps:
                     deps_str = ", ".join(sorted(deps))
-                    lines.append(f"- `{pkg}` → {deps_str}")
+                    lines.append(f"- `{pkg}` -> {deps_str}")
                 else:
-                    lines.append(f"- `{pkg}` → (no internal dependencies)")
+                    lines.append(f"- `{pkg}` -> (no internal dependencies)")
             lines.append("")
 
         # Add import statistics

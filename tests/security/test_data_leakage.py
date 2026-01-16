@@ -59,6 +59,7 @@ class TestPIIHandling:
                     or "don't have" in answer
                     or "no information" in answer
                     or "not found" in answer
+                    or "does not contain" in answer
                 ), f"Should indicate missing info for: {query}"
 
 

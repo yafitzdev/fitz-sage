@@ -127,7 +127,7 @@ class TestFaissGetCollectionStats:
 
         assert stats["points_count"] == 0
         assert stats["vectors_count"] == 0
-        assert stats["status"] == "ready"
+        assert stats["status"] == "not_found"  # Non-existent collection
 
     def test_stats_with_data(self, tmp_path: Path):
         """Test stats for collection with data."""
@@ -340,8 +340,8 @@ class TestFaissFlush:
 
         db.flush()  # Should not raise
 
-        # No files should be created
-        assert not (tmp_path / "index.faiss").exists()
+        # No files should be created (per-collection storage)
+        assert not (tmp_path / "docs" / "index.faiss").exists()
 
 
 class TestFaissDeferPersist:
@@ -356,11 +356,12 @@ class TestFaissDeferPersist:
         # First upsert without defer
         db.upsert("docs", [{"id": "1", "vector": [0.1, 0.2], "payload": {}}])
 
-        # Record when file was last modified
+        # Record when file was last modified (per-collection storage)
         import time
 
+        collection_index = tmp_path / "docs" / "index.faiss"
         time.sleep(0.01)
-        mtime1 = (tmp_path / "index.faiss").stat().st_mtime
+        mtime1 = collection_index.stat().st_mtime
 
         # Upsert with defer - should NOT update file
         time.sleep(0.01)
@@ -370,7 +371,7 @@ class TestFaissDeferPersist:
             defer_persist=True,
         )
 
-        mtime2 = (tmp_path / "index.faiss").stat().st_mtime
+        mtime2 = collection_index.stat().st_mtime
 
         # File modification time should be unchanged
         assert mtime1 == mtime2

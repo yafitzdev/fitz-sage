@@ -71,7 +71,7 @@ def test_local_faiss_vector_db_upsert_search_and_persist(tmp_path: Path):
     assert "i" in results[0].payload
 
     # Persist and reload
-    db._save()  # Explicit save (auto-save happens on upsert too)
+    db.flush()  # Explicit save (auto-save happens on upsert too)
 
     # Create new instance - should load from disk
     db_reloaded = FaissLocalVectorDB(path=tmp_path, persist=True)
@@ -87,18 +87,18 @@ def test_local_faiss_vector_db_upsert_search_and_persist(tmp_path: Path):
 
 
 def test_local_faiss_dimension_auto_detection(tmp_path: Path):
-    """Test that dimension is correctly auto-detected."""
+    """Test that dimension is correctly auto-detected per collection."""
     db = FaissLocalVectorDB(path=tmp_path)
 
-    # Initially no dimension
-    assert db._dim is None
+    # Initially no collections
+    assert len(db._collections) == 0
 
     # Upsert with 128-dim vectors
     points = [{"id": "1", "vector": [0.1] * 128, "payload": {}}]
     db.upsert("col", points)
 
-    # Dimension should now be set
-    assert db._dim == 128
+    # Dimension should now be set for the collection
+    assert db._collections["col"].dim == 128
 
 
 def test_local_faiss_dimension_mismatch_error(tmp_path: Path):

@@ -8,8 +8,18 @@ Provides consistent output formatting for query results.
 from __future__ import annotations
 
 import os
+import sys
 
 from .console import RICH, Markdown, Panel, Table, console
+
+
+def _sanitize_for_display(text: str) -> str:
+    """Sanitize text for Windows terminal display (replace problematic Unicode)."""
+    if sys.platform == "win32":
+        # Replace common Unicode arrows with ASCII
+        text = text.replace("→", "->").replace("←", "<-")
+        text = text.replace("⟶", "-->").replace("⟵", "<--")
+    return text
 
 
 def display_answer(answer, show_sources: bool = True) -> None:
@@ -87,6 +97,7 @@ def display_answer(answer, show_sources: bool = True) -> None:
                 # Excerpt
                 excerpt = content[:70] + "..." if len(content) > 70 else content
                 excerpt = excerpt.replace("\n", " ").replace("\r", " ")
+                excerpt = _sanitize_for_display(excerpt)
 
                 table.add_row(str(i), display_name, chunk_str, vector_str, rerank_str, excerpt)
 
@@ -186,6 +197,7 @@ def display_sources(chunks, max_sources: int = 5, indent: int = 0) -> None:
             content = getattr(chunk, "content", str(chunk))
             excerpt = content[:70] + "..." if len(content) > 70 else content
             excerpt = excerpt.replace("\n", " ").replace("\r", " ")
+            excerpt = _sanitize_for_display(excerpt)
 
             table.add_row(str(i), filename, chunk_str, vector_str, rerank_str, excerpt)
 

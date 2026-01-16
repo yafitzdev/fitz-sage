@@ -43,13 +43,15 @@ def test_local_faiss_vector_db_uses_fitz_paths_default(tmp_path):
         # Directory should exist now
         assert expected_path.exists()
 
-        # Verify persistence files were created
-        assert (expected_path / "index.faiss").exists()
-        assert (expected_path / "payloads.npy").exists()
-        assert (expected_path / "dim.txt").exists()
+        # Verify persistence files were created (per-collection storage)
+        collection_path = expected_path / "default"
+        assert collection_path.exists()
+        assert (collection_path / "index.faiss").exists()
+        assert (collection_path / "payloads.npy").exists()
+        assert (collection_path / "dim.txt").exists()
 
         # Verify dimension was saved
-        saved_dim = int((expected_path / "dim.txt").read_text())
+        saved_dim = int((collection_path / "dim.txt").read_text())
         assert saved_dim == 3
 
         # Reload and verify data persisted
@@ -68,9 +70,9 @@ def test_local_faiss_vector_db_custom_path_override(tmp_path):
     # Add data
     db.upsert("test", [{"id": "1", "vector": [1.0, 2.0], "payload": {}}])
 
-    # Should be in custom path
+    # Should be in custom path (per-collection storage)
     assert custom_path.exists()
-    assert (custom_path / "index.faiss").exists()
+    assert (custom_path / "test" / "index.faiss").exists()
 
 
 def test_local_faiss_persist_disabled(tmp_path):
@@ -79,8 +81,8 @@ def test_local_faiss_persist_disabled(tmp_path):
 
     db.upsert("test", [{"id": "1", "vector": [1.0, 2.0], "payload": {}}])
 
-    # No files should be created (except maybe directory)
-    assert not (tmp_path / "index.faiss").exists()
+    # No files should be created (per-collection storage)
+    assert not (tmp_path / "test" / "index.faiss").exists()
 
     # Data should still be in memory
     assert db.count() == 1
@@ -110,7 +112,7 @@ def test_local_faiss_reload_from_disk(tmp_path):
     db2 = FaissLocalVectorDB(path=tmp_path, persist=True)
 
     assert db2.count() == 2
-    assert db2._dim == 4
+    assert db2._collections["collection"].dim == 4
 
     # Search should work
     results = db2.search("collection", [1.0, 0.0, 0.0, 0.0], limit=1)
