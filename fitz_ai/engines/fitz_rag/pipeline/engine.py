@@ -80,9 +80,11 @@ class RAGPipeline:
         hop_controller: HopController | None = None,
         embedder=None,  # Embedder for cloud cache query embeddings
         cloud_client=None,  # CloudClient for cloud cache operations
+        fast_chat=None,  # Fast tier chat for cloud routing optimization
     ):
         self.retrieval = retrieval
-        self.chat = chat
+        self.chat = chat  # Smart tier (default)
+        self.fast_chat = fast_chat  # Fast tier (for simple queries via cloud routing)
         self.rgs = rgs
         self.context = context or ContextPipeline()
         self.query_router = query_router
@@ -113,10 +115,12 @@ class RAGPipeline:
         multihop_status = (
             f"enabled (max {hop_controller.max_hops})" if hop_controller else "disabled"
         )
+        cloud_routing_status = "enabled" if cloud_client and fast_chat else "disabled"
         logger.info(
             f"{PIPELINE} RAGPipeline initialized with {retrieval.plugin_name} retrieval, "
             f"{len(self.constraints)} constraint(s), routing={routing_status}, "
-            f"keywords={keyword_status}, multihop={multihop_status}"
+            f"keywords={keyword_status}, multihop={multihop_status}, "
+            f"cloud_routing={cloud_routing_status}"
         )
 
     def run(self, query: str) -> RGSAnswer:
@@ -191,8 +195,11 @@ class RAGPipeline:
             {"role": "user", "content": prompt.user},
         ]
 
+        # Select chat model based on cloud routing advice (fail-open: default to smart tier)
+        chat_client = self._select_chat_for_routing()
+
         try:
-            raw = self.chat.chat(messages)
+            raw = chat_client.chat(messages)
         except Exception as exc:
             logger.error(f"{PIPELINE} LLM chat failed: {exc}")
             raise LLMError("LLM chat operation failed") from exc
@@ -243,6 +250,32 @@ class RAGPipeline:
             system=modified_system,
             user=prompt.user,
         )
+
+    def _select_chat_for_routing(self):
+        """
+        Select chat client based on cloud routing advice.
+
+        Fail-open design:
+        - No routing advice → use smart tier (self.chat)
+        - No fast_chat available → use smart tier (self.chat)
+        - recommended_model="fast" → use fast tier (self.fast_chat)
+        - recommended_model="smart" or None → use smart tier (self.chat)
+        """
+        # Default: use smart tier
+        if not hasattr(self, "_routing_advice") or self._routing_advice is None:
+            return self.chat
+
+        # Check if routing recommends fast tier and we have fast_chat available
+        recommended = self._routing_advice.recommended_model
+        if recommended == "fast" and self.fast_chat is not None:
+            model_name = getattr(self.fast_chat, "params", {}).get("model", "unknown")
+            logger.info(
+                f"{PIPELINE} Using fast tier model '{model_name}' per cloud routing advice"
+            )
+            return self.fast_chat
+
+        # Default to smart tier
+        return self.chat
 
     def _get_collection_version(self) -> str:
         """Compute collection version hash from ingestion state."""
@@ -323,7 +356,11 @@ class RAGPipeline:
 
         Returns cached RGSAnswer if hit, None if miss.
         Also caches query embedding for reuse in _store_in_cloud_cache.
+        On cache miss, stores routing advice in self._routing_advice for model selection.
         """
+        # Reset routing advice (fail-open: default to None = use smart tier)
+        self._routing_advice = None
+
         if not self.cloud_client or not self.embedder:
             return None
 
@@ -352,17 +389,34 @@ class RAGPipeline:
                 prompt_template="default",
             )
 
-            # 5. Lookup cache
+            # 5. Get chunk embeddings for routing advice (Pro+ tiers)
+            chunk_embeddings = None
+            if hasattr(raw_chunks[0], "embedding") if raw_chunks else False:
+                chunk_embeddings = [
+                    chunk.embedding for chunk in raw_chunks if hasattr(chunk, "embedding")
+                ]
+
+            # 6. Lookup cache
             result = self.cloud_client.lookup_cache(
                 query_text=query,
                 query_embedding=query_embedding,
                 retrieval_fingerprint=retrieval_fingerprint,
                 versions=versions,
+                chunk_embeddings=chunk_embeddings,
             )
 
             if result.hit:
                 # Convert Answer back to RGSAnswer
                 return self._answer_to_rgs_answer(result.answer)
+
+            # Cache miss: store routing advice for model selection
+            if result.routing:
+                self._routing_advice = result.routing
+                if result.routing.recommended_model:
+                    logger.info(
+                        f"{PIPELINE} Cloud routing advice: complexity={result.routing.complexity}, "
+                        f"recommended_model={result.routing.recommended_model}"
+                    )
 
             return None
         except Exception as e:
@@ -601,6 +655,7 @@ class RAGPipeline:
             hop_controller=hop_controller,
             embedder=embedder,
             cloud_client=cloud_client,
+            fast_chat=fast_chat,  # For cloud routing optimization
         )
 
     @classmethod

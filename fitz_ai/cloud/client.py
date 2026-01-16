@@ -88,6 +88,7 @@ class CloudClient:
         query_embedding: list[float],
         retrieval_fingerprint: str,
         versions: CacheVersions,
+        chunk_embeddings: Optional[list[list[float]]] = None,
     ) -> CacheLookupResult:
         """
         Look up cached answer.
@@ -97,6 +98,7 @@ class CloudClient:
             query_embedding: Query embedding vector
             retrieval_fingerprint: Hash of chunk IDs
             versions: Version info
+            chunk_embeddings: Optional chunk embeddings for routing advice (Pro+ tiers)
 
         Returns:
             CacheLookupResult with hit status, answer (if hit), or routing advice (if miss)
@@ -130,6 +132,10 @@ class CloudClient:
                 "prompt_template": versions.prompt_template,
             },
         }
+
+        # Add chunk embeddings for routing advice (Pro+ feature)
+        if chunk_embeddings:
+            payload["chunk_embeddings"] = chunk_embeddings
 
         try:
             response = self.client.post("/cache/lookup", json=payload)
