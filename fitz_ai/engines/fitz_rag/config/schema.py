@@ -392,6 +392,51 @@ class MultihopConfig(BaseModel):
 
 
 # =============================================================================
+# Structured Data Configuration
+# =============================================================================
+
+
+class StructuredConfig(BaseModel):
+    """
+    Configuration for structured data (tables/CSV) handling.
+
+    When enabled, queries are routed to either semantic (RAG) or structured (SQL)
+    paths based on LLM classification. Structured queries execute SQL via metadata
+    filtering and results are converted to natural language sentences.
+
+    Example YAML:
+        structured:
+          enabled: true
+          schema_match_threshold: 0.5
+          confidence_threshold: 0.6
+
+    Attributes:
+        enabled: Enable structured data handling (default: False).
+        schema_match_threshold: Minimum similarity for table schema matching (default: 0.5).
+        confidence_threshold: Minimum LLM confidence to route to structured (default: 0.6).
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable structured data handling (tables/CSV queries)",
+    )
+    schema_match_threshold: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Minimum similarity score for table schema matching",
+    )
+    confidence_threshold: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        description="Minimum LLM confidence to route query to structured path",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
+# =============================================================================
 # Query Routing Configuration
 # =============================================================================
 
@@ -587,6 +632,12 @@ class FitzRagConfig(BaseModel):
     multihop: MultihopConfig = Field(
         default_factory=MultihopConfig,
         description="Multi-hop retrieval configuration for complex reasoning chains",
+    )
+
+    # Structured data (tables/CSV queries via SQL)
+    structured: StructuredConfig = Field(
+        default_factory=StructuredConfig,
+        description="Structured data configuration for table/CSV queries",
     )
 
     # Fitz Cloud (Query-Time RAG Optimizer)
