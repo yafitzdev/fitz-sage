@@ -80,7 +80,7 @@ class DirectRAGUser(User):
                 },
             }
 
-            cfg = FitzRagConfig.from_dict(config_dict)
+            cfg = FitzRagConfig(**config_dict)
             DirectRAGUser._pipeline = RAGPipeline.from_config(cfg)
 
         self.pipeline = DirectRAGUser._pipeline

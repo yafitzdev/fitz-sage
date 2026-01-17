@@ -17,7 +17,7 @@ from fitz_ai.core.guardrails import (
     SemanticMatcher,
     create_default_constraints,
 )
-from fitz_ai.engines.fitz_rag.config import FitzRagConfig, load_config
+from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 from fitz_ai.engines.fitz_rag.exceptions import (
     LLMError,
     PipelineError,
@@ -857,17 +857,47 @@ class RAGPipeline:
     @classmethod
     def from_dict(cls, config_dict: dict) -> "RAGPipeline":
         """Create a RAGPipeline from a configuration dictionary."""
-        cfg = FitzRagConfig.from_dict(config_dict)
+        cfg = FitzRagConfig(**config_dict)
         return cls.from_config(cfg)
 
     @classmethod
     def from_yaml(cls, config_path: str) -> "RAGPipeline":
         """Create a RAGPipeline from a YAML configuration file."""
-        cfg = load_config(config_path)
+        import yaml
+        from pathlib import Path
+
+        with Path(config_path).open("r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+
+        # Unwrap fitz_rag key if present
+        if "fitz_rag" in raw:
+            config_dict = raw["fitz_rag"]
+        else:
+            config_dict = raw
+
+        cfg = FitzRagConfig(**config_dict)
         return cls.from_config(cfg)
 
 
 def create_pipeline_from_yaml(path: str | None = None) -> RAGPipeline:
     """Create a RAGPipeline from a YAML config file."""
-    cfg = load_config(path)
+    if path is None:
+        from fitz_ai.config import load_engine_config
+
+        cfg = load_engine_config("fitz_rag")
+    else:
+        import yaml
+        from pathlib import Path
+
+        with Path(path).open("r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+
+        # Unwrap fitz_rag key if present
+        if "fitz_rag" in raw:
+            config_dict = raw["fitz_rag"]
+        else:
+            config_dict = raw
+
+        cfg = FitzRagConfig(**config_dict)
+
     return RAGPipeline.from_config(cfg)

@@ -112,7 +112,7 @@ class fitz:
             ConfigurationError: If config cannot be loaded/created.
             ValueError: If source path doesn't exist or no documents found.
         """
-        from fitz_ai.core.config import load_config_dict
+        import yaml
         from fitz_ai.ingestion.chunking.router import ChunkingRouter
         from fitz_ai.ingestion.diff.scanner import FileScanner
         from fitz_ai.ingestion.parser import ParserRouter
@@ -129,7 +129,13 @@ class fitz:
         self._ensure_config()
 
         # Load config
-        config = load_config_dict(self.config_path)
+        with self.config_path.open("r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+
+        if "fitz_rag" in raw:
+            config = raw["fitz_rag"]
+        else:
+            config = raw
 
         # Get plugin configs
         embedding_config = config.get("embedding", {})
@@ -238,7 +244,8 @@ class fitz:
             ConfigurationError: If not configured.
             ValueError: If question is empty.
         """
-        from fitz_ai.engines.fitz_rag.config import load_config
+        import yaml
+        from fitz_ai.engines.fitz_rag.config import FitzRagConfig
         from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 
         if not question or not question.strip():
@@ -248,7 +255,15 @@ class fitz:
         self._ensure_config()
 
         # Load typed config
-        config = load_config(str(self.config_path))
+        with self.config_path.open("r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+
+        if "fitz_rag" in raw:
+            config_dict = raw["fitz_rag"]
+        else:
+            config_dict = raw
+
+        config = FitzRagConfig(**config_dict)
 
         # Override collection to match this Fitz instance
         config.retrieval.collection = self._collection
@@ -336,11 +351,12 @@ logging:
 
     def _build_chunking_config(self, config: Dict[str, Any]):
         """Build ChunkingRouterConfig from config dict."""
+        import yaml
+        from pathlib import Path as _Path
         from fitz_ai.engines.fitz_rag.config import (
             ChunkingRouterConfig,
             ExtensionChunkerConfig,
         )
-        from fitz_ai.engines.fitz_rag.config import load_config_dict as load_default_config_dict
 
         chunking_cfg = config.get("chunking") or config.get("ingest", {}).get("chunking")
 
@@ -362,7 +378,10 @@ logging:
             )
 
         # Fall back to package defaults
-        default_config = load_default_config_dict()
+        defaults_path = _Path(__file__).parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
+        with defaults_path.open("r", encoding="utf-8") as f:
+            default_config = yaml.safe_load(f) or {}
+
         default_ingest = default_config.get("ingest", {})
         default_chunking = default_ingest.get("chunking", {}).get("default", {})
 

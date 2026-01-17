@@ -8,8 +8,9 @@ All other entry points (CLI, API, etc.) should route through this runtime.
 
 from typing import Any, Dict, Optional
 
+from fitz_ai.config import load_engine_config
 from fitz_ai.core import Answer, Constraints, Provenance
-from fitz_ai.engines.fitz_rag.config import FitzRagConfig, load_config
+from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 
 
@@ -36,7 +37,21 @@ def run_fitz_rag(
         Answer object with generated text and source provenance
     """
     if config is None:
-        config = load_config(config_path)
+        if config_path is None:
+            config = load_engine_config("fitz_rag")
+        else:
+            import yaml
+            from pathlib import Path
+
+            with Path(config_path).open("r", encoding="utf-8") as f:
+                raw = yaml.safe_load(f) or {}
+
+            if "fitz_rag" in raw:
+                config_dict = raw["fitz_rag"]
+            else:
+                config_dict = raw
+
+            config = FitzRagConfig(**config_dict)
 
     pipeline = RAGPipeline.from_config(config)
     rag_answer = pipeline.run(query)
@@ -82,7 +97,21 @@ def create_fitz_rag_engine(
         Initialized RAGPipeline instance
     """
     if config is None:
-        config = load_config(config_path)
+        if config_path is None:
+            config = load_engine_config("fitz_rag")
+        else:
+            import yaml
+            from pathlib import Path
+
+            with Path(config_path).open("r", encoding="utf-8") as f:
+                raw = yaml.safe_load(f) or {}
+
+            if "fitz_rag" in raw:
+                config_dict = raw["fitz_rag"]
+            else:
+                config_dict = raw
+
+            config = FitzRagConfig(**config_dict)
 
     return RAGPipeline.from_config(config)
 
@@ -105,16 +134,30 @@ def _register_fitz_rag_engine():
     def fitz_rag_factory(config):
         """Factory for creating Fitz RAG engine."""
         if config is None:
-            config = load_config(None)
+            config = load_engine_config("fitz_rag")
         elif isinstance(config, dict):
-            config = FitzRagConfig.from_dict(config)
+            config = FitzRagConfig(**config)
 
         # Return FitzRagEngine which implements KnowledgeEngine protocol
         return FitzRagEngine(config)
 
     def fitz_rag_config_loader(config_path):
         """Load config for fitz_rag engine."""
-        return load_config(config_path)
+        if config_path is None:
+            return load_engine_config("fitz_rag")
+        else:
+            import yaml
+            from pathlib import Path
+
+            with Path(config_path).open("r", encoding="utf-8") as f:
+                raw = yaml.safe_load(f) or {}
+
+            if "fitz_rag" in raw:
+                config_dict = raw["fitz_rag"]
+            else:
+                config_dict = raw
+
+            return FitzRagConfig(**config_dict)
 
     # Define capabilities
     capabilities = EngineCapabilities(

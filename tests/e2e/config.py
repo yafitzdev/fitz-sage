@@ -33,7 +33,7 @@ def get_tier_config(tier_name: str, base_config: dict[str, Any] | None = None) -
         base_config: Base e2e config (loaded if not provided)
 
     Returns:
-        Complete config dict ready for FitzRagConfig.from_dict()
+        Complete config dict ready for FitzRagConfig(**config_dict)
     """
     if base_config is None:
         base_config = load_e2e_config()

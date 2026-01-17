@@ -323,7 +323,7 @@ class E2ERunner:
             },
         }
 
-        cfg = FitzRagConfig.from_dict(config_dict)
+        cfg = FitzRagConfig(**config_dict)
         # Disable default constraints for E2E tests to isolate retrieval testing
         # (constraints=[] prevents InsufficientEvidence/ConflictAware from blocking)
         # Disable keywords - auto-detected vocabulary filters out valid results on small corpus

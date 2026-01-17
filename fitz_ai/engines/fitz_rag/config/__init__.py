@@ -3,55 +3,28 @@
 Configuration for Fitz RAG engine.
 
 This package provides:
-- FitzRagConfig: The main configuration schema
-- load_config: Configuration loader function
-- Supporting schemas (PluginConfig, RetrievalConfig, IngestConfig, etc.)
+- FitzRagConfig: The main configuration schema (Pydantic model)
+- Flat, simplified schema with string plugin specs
 
 Usage:
-    >>> from fitz_ai.engines.fitz_rag.config import load_config, FitzRagConfig
-    >>> config = load_config("config.yaml")
+    >>> from fitz_ai.config import load_engine_config
+    >>> config = load_engine_config("fitz_rag")
+    >>> config.chat  # "cohere" or "anthropic/claude-sonnet-4"
 """
 
-from .loader import (
-    DEFAULT_CONFIG_PATH,
-    get_default_config_path,
-    get_user_config_path,
-    load_config,
-    load_config_dict,
-)
-from .schema import (  # Main config; RAG sub-configs; Ingestion configs
-    ChunkingRouterConfig,
-    ExtensionChunkerConfig,
-    FitzRagConfig,
-    IngestConfig,
-    IngesterConfig,
-    LoggingConfig,
-    PluginConfig,
-    RerankConfig,
-    RetrievalConfig,
-    RGSConfig,
-    StructuredConfig,
-)
+from pathlib import Path
+
+from .schema import ChunkingRouterConfig, ExtensionChunkerConfig, FitzRagConfig
+
+
+def get_default_config_path() -> Path:
+    """Get the path to the default configuration file."""
+    return Path(__file__).parent / "default.yaml"
+
 
 __all__ = [
-    # Main config
     "FitzRagConfig",
-    "load_config",
-    "load_config_dict",
-    "get_default_config_path",
-    "get_user_config_path",
-    # RAG sub-configs
-    "PluginConfig",
-    "RetrievalConfig",
-    "RerankConfig",
-    "RGSConfig",
-    "LoggingConfig",
-    "StructuredConfig",
-    # Ingestion configs
-    "IngestConfig",
-    "IngesterConfig",
     "ChunkingRouterConfig",
     "ExtensionChunkerConfig",
-    # Constants
-    "DEFAULT_CONFIG_PATH",
+    "get_default_config_path",
 ]

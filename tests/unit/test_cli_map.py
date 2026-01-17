@@ -203,9 +203,10 @@ class TestMapNoCollections:
 
         config_path = tmp_path / "fitz.yaml"
         config = {
-            "vector_db": {"plugin_name": "local_faiss"},
-            "retrieval": {"collection": "test"},
-            "embedding": {},
+            "chat": "cohere",
+            "embedding": "cohere",
+            "vector_db": "local_faiss",
+            "collection": "test",
         }
         config_path.write_text(yaml.dump(config))
 
@@ -246,9 +247,10 @@ class TestMapNoChunks:
 
         config_path = tmp_path / "fitz.yaml"
         config = {
-            "vector_db": {"plugin_name": "local_faiss"},
-            "retrieval": {"collection": "test"},
-            "embedding": {},
+            "chat": "cohere",
+            "embedding": "cohere",
+            "vector_db": "local_faiss",
+            "collection": "test",
         }
         config_path.write_text(yaml.dump(config))
 

@@ -47,9 +47,9 @@ class FitzRagEngine:
     KnowledgeEngine protocol.
 
     Examples:
-        >>> from fitz_ai.engines.fitz_rag.config import load_config
+        >>> from fitz_ai.config import load_engine_config
         >>>
-        >>> config = load_config("fitz.yaml")
+        >>> config = load_engine_config("fitz_rag")
         >>> engine = FitzRagEngine(config)
         >>>
         >>> query = Query(text="What is quantum computing?")
@@ -172,7 +172,17 @@ class FitzRagEngine:
         Returns:
             Configured FitzRagEngine instance
         """
-        from fitz_ai.engines.fitz_rag.config import load_config
+        import yaml
+        from pathlib import Path
 
-        config = load_config(config_path)
+        with Path(config_path).open("r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+
+        # Unwrap fitz_rag key if present
+        if "fitz_rag" in raw:
+            config_dict = raw["fitz_rag"]
+        else:
+            config_dict = raw
+
+        config = FitzRagConfig(**config_dict)
         return cls(config)

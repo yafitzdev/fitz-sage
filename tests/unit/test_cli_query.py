@@ -52,10 +52,11 @@ class TestQueryHelpers:
         config_dir.mkdir()
         config_path = config_dir / "fitz_rag.yaml"
         config = {
-            "chat": {"plugin_name": "cohere"},
-            "embedding": {"plugin_name": "cohere"},
-            "vector_db": {"plugin_name": "local_faiss"},
-            "retrieval": {"plugin_name": "dense", "collection": "test"},
+            "chat": "cohere",
+            "embedding": "cohere",
+            "vector_db": "local_faiss",
+            "retrieval_plugin": "dense",
+            "collection": "test",
         }
         config_path.write_text(yaml.dump(config))
 
@@ -67,8 +68,8 @@ class TestQueryHelpers:
 
             raw, typed = load_fitz_rag_config()
 
-        assert raw["chat"]["plugin_name"] == "cohere"
-        assert typed.retrieval.collection == "test"
+        assert raw["chat"] == "cohere"
+        assert typed.collection == "test"
 
     def test_get_collections_returns_list(self):
         """Test get_collections returns collection list."""
@@ -107,14 +108,12 @@ class TestQueryExecution:
 
         config_path = tmp_path / "fitz.yaml"
         config = {
-            "chat": {"plugin_name": "cohere", "kwargs": {"model": "command"}},
-            "embedding": {
-                "plugin_name": "cohere",
-                "kwargs": {"model": "embed-english-v3.0"},
-            },
-            "vector_db": {"plugin_name": "local_faiss", "kwargs": {}},
-            "retrieval": {"plugin_name": "dense", "collection": "test", "top_k": 5},
-            "rerank": {"enabled": False},
+            "chat": "cohere/command",
+            "embedding": "cohere/embed-english-v3.0",
+            "vector_db": "local_faiss",
+            "retrieval_plugin": "dense",
+            "collection": "test",
+            "top_k": 5,
         }
         config_path.write_text(yaml.dump(config))
 
@@ -127,6 +126,7 @@ class TestQueryExecution:
 
         mock_vdb = MagicMock()
         mock_vdb.list_collections.return_value = ["test"]
+        mock_vdb.count.return_value = 10  # Non-zero count to avoid empty collection warning
 
         with (
             patch("fitz_ai.cli.context.FitzPaths.engine_config", return_value=config_path),
@@ -149,10 +149,11 @@ class TestQueryOptions:
 
         config_path = tmp_path / "fitz.yaml"
         config = {
-            "chat": {"plugin_name": "cohere"},
-            "embedding": {"plugin_name": "cohere"},
-            "vector_db": {"plugin_name": "local_faiss"},
-            "retrieval": {"plugin_name": "dense", "collection": "default"},
+            "chat": "cohere",
+            "embedding": "cohere",
+            "vector_db": "local_faiss",
+            "retrieval_plugin": "dense",
+            "collection": "default",
         }
         config_path.write_text(yaml.dump(config))
 
@@ -165,6 +166,7 @@ class TestQueryOptions:
 
         mock_vdb = MagicMock()
         mock_vdb.list_collections.return_value = ["custom"]
+        mock_vdb.count.return_value = 10  # Non-zero count to avoid empty collection warning
 
         with (
             patch("fitz_ai.cli.context.FitzPaths.engine_config", return_value=config_path),

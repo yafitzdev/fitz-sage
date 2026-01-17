@@ -17,10 +17,10 @@ Examples:
 
     Advanced usage:
     >>> from fitz_ai.engines.fitz_rag import FitzRagEngine
-    >>> from fitz_ai.engines.fitz_rag.config import load_config
+    >>> from fitz_ai.config import load_engine_config
     >>> from fitz_ai.core import Query
     >>>
-    >>> config = load_config("my_config.yaml")
+    >>> config = load_engine_config("fitz_rag")
     >>> engine = FitzRagEngine(config)
     >>>
     >>> query = Query(text="Explain entanglement")

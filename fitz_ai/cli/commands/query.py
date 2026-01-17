@@ -166,9 +166,10 @@ def _warn_if_collection_missing(collection: str, typed_config) -> None:
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     try:
-        # Get vector DB client from config
-        vdb_config = typed_config.vector_db
-        client = get_vector_db_plugin(vdb_config.plugin_name, **vdb_config.kwargs)
+        # Get vector DB client from config (V2 flat structure)
+        client = get_vector_db_plugin(
+            typed_config.vector_db, **typed_config.vector_db_kwargs
+        )
 
         # Get available collections
         collections = client.list_collections()

@@ -432,12 +432,13 @@ def get_default_engine() -> str:
     """
     # Check user config first
     try:
-        from fitz_ai.core.config import load_config_dict
+        import yaml
         from fitz_ai.core.paths import FitzPaths
 
         config_path = FitzPaths.config()
         if config_path.exists():
-            config = load_config_dict(config_path)
+            with config_path.open("r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
             if "default_engine" in config:
                 return config["default_engine"]
     except Exception as e:
@@ -445,9 +446,13 @@ def get_default_engine() -> str:
 
     # Fall back to package default (single source of truth)
     try:
-        from fitz_ai.engines.fitz_rag.config import load_config_dict as load_default_config
+        import yaml
+        from pathlib import Path
 
-        default_config = load_default_config()
+        defaults_path = Path(__file__).parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
+        with defaults_path.open("r", encoding="utf-8") as f:
+            default_config = yaml.safe_load(f) or {}
+
         if "default_engine" in default_config:
             return default_config["default_engine"]
     except Exception as e:

@@ -1,23 +1,16 @@
 # fitz_ai/config/loader.py
 """
-Layered configuration loading for Fitz engines.
-
-This module implements the config merge strategy:
-    1. Package defaults (fitz_ai/config/defaults/<engine>.yaml) - always loaded
-    2. User config (.fitz/config/<engine>.yaml) - overrides defaults
-
-The result is a complete config where every value is guaranteed to exist.
-CLI code never needs fallback logic - just read the values.
+Configuration loading for Fitz engines.
 
 Usage:
     from fitz_ai.config.loader import load_engine_config
 
-    # Returns merged config - defaults + user overrides
+    # Returns Pydantic config model - defaults + user overrides
     config = load_engine_config("fitz_rag")
 
-    # Values are guaranteed to exist
-    chat_plugin = config["chat"]["plugin_name"]
-    embedding_model = config["embedding"]["kwargs"]["model"]
+    # Values are typed and validated
+    chat_plugin = config.chat  # "cohere" or "anthropic/claude-sonnet-4"
+    top_k = config.top_k  # int, validated >= 1
 """
 
 from __future__ import annotations
@@ -92,19 +85,8 @@ def deep_merge(base: dict, override: dict) -> dict:
 # =============================================================================
 
 
-def load_engine_defaults(engine: str) -> dict[str, Any]:
-    """
-    Load package defaults for an engine.
-
-    Args:
-        engine: Engine name (e.g., "fitz_rag")
-
-    Returns:
-        Default configuration dictionary (unwrapped from engine key)
-
-    Raises:
-        FileNotFoundError: If no defaults exist for this engine
-    """
+def _load_defaults(engine: str) -> dict[str, Any]:
+    """Load package defaults for an engine (unwrapped)."""
     defaults_path = _get_defaults_path(engine)
 
     if not defaults_path.exists():
@@ -115,8 +97,7 @@ def load_engine_defaults(engine: str) -> dict[str, Any]:
     with defaults_path.open("r", encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
 
-    # Engine defaults are nested under engine name (e.g., fitz_rag: {...})
-    # User configs are flat. Unwrap to match user config structure.
+    # Unwrap engine key if present (e.g., fitz_rag: {...})
     if engine in raw:
         defaults = raw[engine]
     else:
@@ -126,18 +107,8 @@ def load_engine_defaults(engine: str) -> dict[str, Any]:
     return defaults
 
 
-def load_user_config(engine: str) -> dict[str, Any] | None:
-    """
-    Load user configuration for an engine.
-
-    Looks in .fitz/config/<engine>.yaml
-
-    Args:
-        engine: Engine name (e.g., "fitz_rag")
-
-    Returns:
-        User configuration dictionary, or None if no user config exists
-    """
+def _load_user_config(engine: str) -> dict[str, Any] | None:
+    """Load user config for an engine, or None if not found."""
     user_path = FitzPaths.engine_config(engine)
 
     if not user_path.exists():
@@ -154,44 +125,54 @@ def load_user_config(engine: str) -> dict[str, Any] | None:
         return None
 
 
-def load_engine_config(engine: str) -> dict[str, Any]:
+def load_engine_config(engine: str):
     """
-    Load complete configuration for an engine.
+    Load configuration for an engine.
 
-    Merges package defaults with user overrides.
-    The result is guaranteed to have all required values.
-
-    Merge order:
-        1. Package defaults (fitz_ai/config/defaults/<engine>.yaml)
-        2. User config (.fitz/config/<engine>.yaml) - overrides defaults
+    Returns a validated Pydantic model with defaults + user overrides.
 
     Args:
         engine: Engine name (e.g., "fitz_rag")
 
     Returns:
-        Complete merged configuration dictionary
+        Pydantic config model (e.g., FitzRagConfig)
+
+    Raises:
+        FileNotFoundError: If no defaults exist
+        ImportError: If engine config schema not available
+        ValidationError: If config is invalid
 
     Examples:
         >>> config = load_engine_config("fitz_rag")
-        >>> config["chat"]["plugin_name"]  # always exists
-        'cohere'
-        >>> config["retrieval"]["top_k"]  # always exists
-        5
+        >>> config.chat  # str: "cohere" or "anthropic/claude-sonnet-4"
+        >>> config.top_k  # int: validated >= 1
     """
-    # Load defaults (required)
-    defaults = load_engine_defaults(engine)
+    # Import engine-specific schema
+    if engine == "fitz_rag":
+        from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
+
+        ConfigModel = FitzRagConfig
+    else:
+        raise ImportError(f"Config schema not available for engine '{engine}'")
+
+    # Load defaults
+    defaults = _load_defaults(engine)
 
     # Load user config (optional)
-    user_config = load_user_config(engine)
+    user_config = _load_user_config(engine)
 
-    if user_config is None:
+    if user_config is not None:
+        # Merge user config over defaults
+        merged = deep_merge(defaults, user_config)
+        logger.debug(f"Merged config for {engine}: defaults + user overrides")
+    else:
+        merged = defaults
         logger.debug(f"Using defaults only for {engine}")
-        return defaults
 
-    # Merge: user overrides defaults
-    merged = deep_merge(defaults, user_config)
-    logger.debug(f"Merged config for {engine}: defaults + user overrides")
-    return merged
+    # Validate and return Pydantic model
+    config_model = ConfigModel(**merged)
+    logger.debug(f"Validated config for {engine}")
+    return config_model
 
 
 def get_config_source(engine: str) -> str:
@@ -217,8 +198,6 @@ def get_config_source(engine: str) -> str:
 
 __all__ = [
     "load_engine_config",
-    "load_engine_defaults",
-    "load_user_config",
     "deep_merge",
     "get_config_source",
 ]

@@ -2,96 +2,118 @@
 #
 # Default configuration for Fitz RAG engine.
 #
-# Fitz RAG uses dense retrieval with optional reranking to find relevant
-# chunks, then synthesizes answers with citation support.
+# This config uses:
+# - String plugin specs: "provider" or "provider/model"
+# - None for disabled features
+# - Sensible defaults that work out of the box
 #
-# This default uses:
-#   - Cohere for chat, embedding, and rerank (requires COHERE_API_KEY)
-#   - Local FAISS for vector storage (no external service needed)
+# Minimal 3-line config example:
+#   chat: anthropic/claude-sonnet-4
+#   embedding: openai/text-embedding-3-small
+#   collection: my_docs
 
 fitz_rag:
 
   # ===========================================================================
-  # Default Engine
+  # Core Plugins (Required)
   # ===========================================================================
 
-  default_engine: fitz_rag
+  # Chat: "provider" or "provider/model"
+  # Examples: "cohere", "anthropic/claude-sonnet-4", "openai/gpt-4"
+  chat: cohere
+
+  # Embedding: "provider" or "provider/model"
+  # Examples: "cohere", "openai/text-embedding-3-small", "voyage/voyage-2"
+  embedding: cohere
+
+  # Vector DB: "provider"
+  # Examples: "local_faiss", "qdrant", "pinecone", "weaviate"
+  vector_db: local_faiss
 
   # ===========================================================================
-  # Chat
-  # ===========================================================================
-  # Model tiers (smart/fast) and defaults are defined in the plugin YAML.
-
-  chat:
-    plugin_name: cohere
-
-  # ===========================================================================
-  # Embedding
+  # Optional Features (None = Disabled)
   # ===========================================================================
 
-  embedding:
-    plugin_name: cohere
+  # Reranker: "provider" or "provider/model"
+  # Set to null to disable reranking
+  # Examples: "cohere", "cohere/rerank-english-v3.0", null
+  rerank: cohere
+
+  # Vision/VLM for image parsing: "provider" or "provider/model"
+  # Set to null to disable vision (figures shown as "[Figure]")
+  # Examples: "openai/gpt-4o", "anthropic/claude-sonnet-4", null
+  vision: null
 
   # ===========================================================================
-  # Vector Database
+  # Retrieval Configuration
   # ===========================================================================
 
-  vector_db:
-    plugin_name: local_faiss
+  # Retrieval pipeline: "dense", "dense_rerank", etc.
+  retrieval_plugin: dense
+
+  # Vector DB collection name (required)
+  collection: default
+
+  # Number of chunks to retrieve
+  top_k: 5
+
+  # Fetch project artifacts with every query (navigation index, etc.)
+  fetch_artifacts: false
 
   # ===========================================================================
-  # Retrieval
+  # Generation Configuration
   # ===========================================================================
 
-  retrieval:
-    plugin_name: dense
-    collection: default
-    top_k: 5
+  # Enable citation markers ([S1], [S2], etc.)
+  enable_citations: true
+
+  # Only generate answers from provided context
+  strict_grounding: true
+
+  # Maximum chunks in generation context
+  max_chunks: 8
+
+  # Include query in generation prompt
+  include_query_in_context: true
+
+  # Maximum answer length (null = no limit)
+  max_answer_chars: null
 
   # ===========================================================================
-  # Reranker
+  # Chunking Configuration
   # ===========================================================================
 
-  rerank:
-    enabled: true
-    plugin_name: cohere
+  # Default chunk size in tokens
+  chunk_size: 512
+
+  # Chunk overlap in tokens
+  chunk_overlap: 0
+
+  # Parser: "docling" (no VLM) or "docling_vision" (with VLM)
+  parser: docling
 
   # ===========================================================================
-  # RGS (Retrieval-Guided Synthesis)
+  # Cloud Configuration (Optional)
   # ===========================================================================
 
-  rgs:
-    enable_citations: true
-    strict_grounding: true
-    max_chunks: 8
+  # Cloud cache (null = disabled)
+  cloud: null
 
   # ===========================================================================
   # Logging
   # ===========================================================================
 
-  logging:
-    level: INFO
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  log_level: INFO
 
   # ===========================================================================
-  # Ingestion
+  # Advanced: Plugin kwargs override
   # ===========================================================================
-  # Chunker defaults are defined in each plugin.
-  # Override here only if you want different settings.
+  # These are optional overrides for plugin initialization.
+  # Most users don't need to set these.
 
-  ingest:
-    ingester:
-      plugin_name: local
-
-    chunking:
-      default:
-        plugin_name: recursive
-      by_extension:
-        .py:
-          plugin_name: python_code
-        .md:
-          plugin_name: markdown
-        .pdf:
-          plugin_name: pdf_sections
-      warn_on_fallback: true
-
-    collection: default
+  chat_kwargs: {}
+  embedding_kwargs: {}
+  vector_db_kwargs: {}
+  rerank_kwargs: {}
+  vision_kwargs: {}

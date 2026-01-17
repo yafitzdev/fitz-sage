@@ -32,7 +32,7 @@ sys.path.insert(0, str(project_root))
 
 from fitz_ai.core import Query
 from fitz_ai.engines.fitz_rag import FitzRagEngine
-from fitz_ai.engines.fitz_rag.config import load_config
+from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 
 
 def test_cache_flow():
@@ -59,7 +59,16 @@ def test_cache_flow():
     print(f"✓ Config file: {config_path}")
 
     try:
-        config = load_config(config_path)
+        import yaml
+        with Path(config_path).open("r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+
+        if "fitz_rag" in raw:
+            config_dict = raw["fitz_rag"]
+        else:
+            config_dict = raw
+
+        config = FitzRagConfig(**config_dict)
     except Exception as e:
         print(f"❌ ERROR: Failed to load config: {e}")
         return False

@@ -547,12 +547,11 @@ def _run_ingestion(
 
     Returns dict with 'documents', 'chunks', and 'hierarchy_summaries' counts.
     """
-    from fitz_ai.core.config import load_config_dict
+    import yaml
     from fitz_ai.engines.fitz_rag.config import (
         ChunkingRouterConfig,
         ExtensionChunkerConfig,
     )
-    from fitz_ai.engines.fitz_rag.config import load_config_dict as load_default_config_dict
     from fitz_ai.ingestion.chunking.router import ChunkingRouter
     from fitz_ai.ingestion.diff.scanner import FileScanner
     from fitz_ai.ingestion.enrichment.config import HierarchyConfig
@@ -565,7 +564,13 @@ def _run_ingestion(
 
     # Load config from engine-specific path
     config_path = FitzPaths.engine_config("fitz_rag")
-    config = load_config_dict(config_path)
+    with config_path.open("r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f) or {}
+
+    if "fitz_rag" in raw:
+        config = raw["fitz_rag"]
+    else:
+        config = raw
 
     # Get plugin configs
     embedding_config = config.get("embedding", {})
@@ -629,7 +634,10 @@ def _run_ingestion(
         )
     else:
         # Fall back to package defaults from default.yaml
-        default_config = load_default_config_dict()
+        defaults_path = Path(__file__).parent.parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
+        with defaults_path.open("r", encoding="utf-8") as f:
+            default_config = yaml.safe_load(f) or {}
+
         default_ingest = default_config.get("ingest", {})
         default_chunking = default_ingest.get("chunking", {}).get("default", {})
         chunking_config = ChunkingRouterConfig(
@@ -728,12 +736,21 @@ def _run_query(
 
     Returns an RGSAnswer object.
     """
-    from fitz_ai.engines.fitz_rag.config import load_config
+    import yaml
+    from fitz_ai.engines.fitz_rag.config import FitzRagConfig
     from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 
     # Load typed config from engine-specific path
     config_path = FitzPaths.engine_config("fitz_rag")
-    typed_config = load_config(config_path)
+    with config_path.open("r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f) or {}
+
+    if "fitz_rag" in raw:
+        config_dict = raw["fitz_rag"]
+    else:
+        config_dict = raw
+
+    typed_config = FitzRagConfig(**config_dict)
 
     # Override collection
     typed_config.retrieval.collection = collection

@@ -13,10 +13,10 @@ Usage:
     # Load merged config (defaults + user overrides)
     config = load_engine_config("fitz_rag")
 
-    # Access values directly - no need for .get() with fallbacks
-    chat_plugin = config["chat"]["plugin_name"]  # always exists
+    # Access typed and validated config
+    chat_plugin = config.chat  # "cohere" or "provider/model"
 """
 
-from fitz_ai.config.loader import load_engine_config, load_engine_defaults
+from fitz_ai.config.loader import load_engine_config
 
-__all__ = ["load_engine_config", "load_engine_defaults"]
+__all__ = ["load_engine_config"]

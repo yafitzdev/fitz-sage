@@ -2,667 +2,309 @@
 """
 Configuration schema for Fitz RAG engine.
 
-This is the SINGLE source of truth for Fitz RAG configuration.
+Philosophy:
+- Convention over configuration: sensible defaults for 80% use cases
+- Plugin strings: "provider" or "provider/model" format
+- None = disabled: No enabled flags, just set to None
+- Flat structure: Minimal nesting
 
-Schema hierarchy:
-- FitzRagConfig: The main config consumed by the engine
-- PluginConfig: Generic plugin configuration block
-- RetrievalConfig: Step-based retrieval configuration
-- RerankConfig: Reranker settings
-- RGSConfig: Retrieval-guided synthesis settings
-- LoggingConfig: Logging settings
+Example minimal config (3 lines):
+```yaml
+chat: anthropic/claude-sonnet-4
+embedding: openai/text-embedding-3-small
+collection: my_docs
+```
+
+Example with all features:
+```yaml
+chat: cohere/command-r-plus
+embedding: cohere/embed-english-v3.0
+vector_db: qdrant
+rerank: cohere/rerank-english-v3.0
+vision: openai/gpt-4o
+collection: my_docs
+top_k: 10
+enable_citations: true
+strict_grounding: true
+```
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
-from fitz_ai.cloud.config import CloudConfig
+try:
+    from fitz_ai.cloud.config import CloudConfig
+except ImportError:
+    CloudConfig = None  # Cloud is optional
+
 
 # =============================================================================
-# Plugin Configuration
+# Base Config with Common Settings
 # =============================================================================
 
 
-class PluginConfig(BaseModel):
-    """
-    Generic plugin configuration block.
-
-    Used for chat, embedding, vector_db, and other pluggable components.
-
-    Examples:
-        >>> config = PluginConfig(
-        ...     plugin_name="openai",
-        ...     kwargs={"model": "gpt-4", "temperature": 0.2}
-        ... )
-    """
-
-    plugin_name: str = Field(..., description="Plugin name in the central registry")
-    kwargs: dict[str, Any] = Field(default_factory=dict, description="Plugin init kwargs")
+class BasePluginConfig(BaseModel):
+    """Base class to avoid repeating model_config."""
 
     model_config = ConfigDict(extra="forbid")
 
 
 # =============================================================================
-# Ingestion Configuration
+# Simplified Main Configuration
 # =============================================================================
 
 
-class IngesterConfig(BaseModel):
-    """Configuration for the ingestion plugin."""
+class FitzRagConfig(BasePluginConfig):
+    """
+    Fitz RAG configuration with sensible defaults.
 
-    plugin_name: str = Field(..., description="Ingester plugin name")
-    kwargs: dict[str, Any] = Field(default_factory=dict, description="Ingester init kwargs")
+    Philosophy:
+    - Strings for plugins: "cohere" or "cohere/command-r-plus"
+    - None = disabled: No enabled flags
+    - Flat structure: Minimal nesting
+    - Defaults for common cases: Works out of the box
 
-    model_config = ConfigDict(extra="forbid")
+    Minimal config (3 lines):
+    ```yaml
+    chat: anthropic/claude-sonnet-4
+    embedding: openai/text-embedding-3-small
+    collection: my_docs
+    ```
+
+    Full config example:
+    ```yaml
+    # Core plugins (required)
+    chat: cohere/command-r-plus
+    embedding: cohere/embed-english-v3.0
+    vector_db: local_faiss
+
+    # Optional features (None = disabled)
+    rerank: cohere/rerank-english-v3.0
+    vision: null
+
+    # Retrieval
+    retrieval_plugin: dense
+    collection: my_docs
+    top_k: 5
+
+    # Generation
+    enable_citations: true
+    strict_grounding: true
+    max_chunks: 8
+
+    # Chunking
+    chunk_size: 512
+    parser: docling
+
+    # Cloud (optional)
+    cloud: null
+    ```
+    """
+
+    # ==========================================================================
+    # Core Plugins (Required)
+    # ==========================================================================
+
+    chat: str = Field(
+        default="cohere",
+        description="Chat plugin: 'provider' or 'provider/model' (e.g., 'anthropic/claude-sonnet-4')",
+    )
+
+    embedding: str = Field(
+        default="cohere",
+        description="Embedding plugin: 'provider' or 'provider/model' (e.g., 'openai/text-embedding-3-small')",
+    )
+
+    vector_db: str = Field(
+        default="local_faiss",
+        description="Vector DB plugin: 'local_faiss', 'qdrant', 'pinecone', etc.",
+    )
+
+    # ==========================================================================
+    # Optional Features (None = Disabled)
+    # ==========================================================================
+
+    rerank: str | None = Field(
+        default=None,
+        description="Reranker plugin: 'provider' or 'provider/model'. None = disabled.",
+    )
+
+    vision: str | None = Field(
+        default=None,
+        description="Vision/VLM plugin for image parsing: 'provider' or 'provider/model'. None = disabled.",
+    )
+
+    # ==========================================================================
+    # Retrieval Configuration
+    # ==========================================================================
+
+    retrieval_plugin: str = Field(
+        default="dense",
+        description="Retrieval pipeline plugin: 'dense', 'dense_rerank', etc.",
+    )
+
+    collection: str = Field(
+        ...,
+        description="Vector DB collection name (required)",
+    )
+
+    top_k: int = Field(
+        default=5,
+        ge=1,
+        description="Number of chunks to retrieve",
+    )
+
+    fetch_artifacts: bool = Field(
+        default=False,
+        description="Fetch project artifacts (navigation index, etc.) with every query",
+    )
+
+    # ==========================================================================
+    # Generation Configuration (Flattened from RGSConfig)
+    # ==========================================================================
+
+    enable_citations: bool = Field(
+        default=True,
+        description="Enable citation markers in answers ([S1], [S2], etc.)",
+    )
+
+    strict_grounding: bool = Field(
+        default=True,
+        description="Only generate answers based on provided context",
+    )
+
+    max_chunks: int = Field(
+        default=8,
+        ge=1,
+        description="Maximum chunks to include in generation context",
+    )
+
+    include_query_in_context: bool = Field(
+        default=True,
+        description="Include the query in the generation prompt",
+    )
+
+    max_answer_chars: int | None = Field(
+        default=None,
+        description="Maximum answer length in characters. None = no limit.",
+    )
+
+    # ==========================================================================
+    # Chunking Configuration (Simplified)
+    # ==========================================================================
+
+    chunk_size: int = Field(
+        default=512,
+        ge=50,
+        description="Default chunk size in tokens",
+    )
+
+    chunk_overlap: int = Field(
+        default=0,
+        ge=0,
+        description="Chunk overlap in tokens",
+    )
+
+    parser: str = Field(
+        default="docling",
+        description="Parser plugin: 'docling' (no VLM) or 'docling_vision' (with VLM)",
+    )
+
+    # ==========================================================================
+    # Cloud Configuration (Optional)
+    # ==========================================================================
+
+    cloud: CloudConfig | None = Field(
+        default=None,
+        description="Cloud cache configuration. None = disabled.",
+    )
+
+    # ==========================================================================
+    # Logging
+    # ==========================================================================
+
+    log_level: str = Field(
+        default="INFO",
+        description="Logging level: DEBUG, INFO, WARNING, ERROR",
+    )
+
+    # ==========================================================================
+    # Advanced: Plugin kwargs override
+    # ==========================================================================
+
+    chat_kwargs: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional kwargs for chat plugin",
+    )
+
+    embedding_kwargs: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional kwargs for embedding plugin",
+    )
+
+    vector_db_kwargs: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional kwargs for vector DB plugin",
+    )
+
+    rerank_kwargs: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional kwargs for reranker plugin",
+    )
+
+    vision_kwargs: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional kwargs for vision plugin",
+    )
+
+
+# =============================================================================
+# Chunking Router Configuration (Helper Classes)
+# =============================================================================
 
 
 class ExtensionChunkerConfig(BaseModel):
-    """
-    Configuration for a chunker assigned to a specific file extension.
+    """Configuration for a chunker plugin (used by ChunkingRouter)."""
 
-    Example:
-        >>> ExtensionChunkerConfig(
-        ...     plugin_name="markdown",
-        ...     kwargs={"max_tokens": 800, "preserve_headers": True}
-        ... )
+    plugin_name: str = Field(
+        description="Chunker plugin name (e.g., 'recursive', 'simple')",
+    )
 
-    With VLM parser:
-        >>> ExtensionChunkerConfig(
-        ...     parser="docling_vision",
-        ...     plugin_name="recursive",
-        ...     kwargs={"chunk_size": 1000}
-        ... )
-    """
-
-    parser: str = Field(default="docling", description="Parser plugin: docling or docling_vision")
-    plugin_name: str = Field(..., description="Chunker plugin name")
-    kwargs: dict[str, Any] = Field(default_factory=dict, description="Chunker-specific parameters")
+    kwargs: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Plugin-specific configuration",
+    )
 
     model_config = ConfigDict(extra="forbid")
 
 
 class ChunkingRouterConfig(BaseModel):
-    """
-    Configuration for the ChunkingRouter.
-
-    Supports file-type specific chunking with a default fallback.
-
-    Attributes:
-        default: Default chunker for extensions not in by_extension.
-        by_extension: Mapping of file extensions to chunker configs.
-        warn_on_fallback: Whether to log warnings when using default chunker.
-
-    Example YAML:
-        chunking:
-          default:
-            plugin_name: simple
-            kwargs:
-              chunk_size: 1000
-              chunk_overlap: 0
-
-          by_extension:
-            .md:
-              plugin_name: markdown
-              kwargs:
-                max_tokens: 800
-            .py:
-              plugin_name: python_code
-              kwargs:
-                chunk_by: function
-            .pdf:
-              plugin_name: pdf_sections
-              kwargs:
-                max_section_chars: 2000
-
-          warn_on_fallback: true
-    """
+    """Configuration for the ChunkingRouter."""
 
     default: ExtensionChunkerConfig = Field(
-        ..., description="Default chunker for unknown extensions"
+        description="Default chunker for all extensions",
     )
+
     by_extension: dict[str, ExtensionChunkerConfig] = Field(
         default_factory=dict,
-        description="Mapping of extensions to chunker configs",
+        description="Extension-specific chunker overrides",
     )
+
     warn_on_fallback: bool = Field(
-        default=True,
-        description="Log warning when using default chunker for unknown extension",
+        default=False,
+        description="Warn when using default chunker",
     )
 
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("by_extension", mode="before")
-    @classmethod
-    def normalize_extensions(cls, v: dict[str, Any]) -> dict[str, Any]:
-        """Ensure all extension keys start with a dot and are lowercase."""
-        if not isinstance(v, dict):
-            return v
-
+    def model_post_init(self, __context):
+        """Normalize extension keys to lowercase with dot prefix."""
         normalized = {}
-        for ext, config in v.items():
-            norm_ext = ext.lower()
-            if not norm_ext.startswith("."):
-                norm_ext = f".{norm_ext}"
-            normalized[norm_ext] = config
-
-        return normalized
-
-
-class IngestConfig(BaseModel):
-    """
-    Configuration for the ingestion pipeline.
-
-    Example YAML:
-        ingest:
-          ingester:
-            plugin_name: local
-            kwargs: {}
-
-          chunking:
-            default:
-              plugin_name: simple
-              kwargs:
-                chunk_size: 1000
-            by_extension:
-              .md:
-                plugin_name: markdown
-                kwargs:
-                  max_tokens: 800
-
-          collection: my_docs
-    """
-
-    ingester: IngesterConfig = Field(..., description="Ingestion plugin config")
-    chunking: ChunkingRouterConfig = Field(..., description="Chunking router config")
-    collection: str = Field(..., description="Target vector DB collection")
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# =============================================================================
-# Retrieval Configuration
-# =============================================================================
-
-
-class RetrievalConfig(BaseModel):
-    """
-    Retrieval configuration.
-
-    References a YAML-based retrieval plugin that defines the step pipeline.
-    Plugin files live in: fitz_ai/engines/fitz_rag/retrieval/runtime/plugins/*.yaml
-
-    Example YAML:
-    ```yaml
-    retrieval:
-      plugin_name: dense        # References dense.yaml
-      collection: my_docs
-      top_k: 5
-      fetch_artifacts: true     # Include project artifacts in every query
-    ```
-
-    Available plugins:
-    - dense: Standard vector search with optional reranking
-    - dense_rerank: Vector search + rerank + threshold + dedupe
-    """
-
-    plugin_name: str = Field(
-        default="dense", description="Retrieval plugin name (references YAML file)"
-    )
-    collection: str = Field(..., description="Vector DB collection name")
-    top_k: int = Field(default=5, ge=1, description="Final number of chunks to return")
-    fetch_artifacts: bool = Field(
-        default=False,
-        description="Fetch artifacts (navigation index, etc.) with every query",
-    )
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# =============================================================================
-# Rerank Configuration
-# =============================================================================
-
-
-class RerankConfig(BaseModel):
-    """
-    Reranker configuration.
-
-    Reranking is optional but can significantly improve retrieval quality.
-    When enabled, provides the reranker dependency for rerank steps.
-    """
-
-    enabled: bool = False
-    plugin_name: str | None = None
-    kwargs: dict[str, Any] = Field(default_factory=dict)
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# =============================================================================
-# Vision Configuration
-# =============================================================================
-
-
-class VisionConfig(BaseModel):
-    """
-    Vision/VLM configuration for describing figures and images.
-
-    When enabled during ingestion, figures/images detected by Docling are
-    sent to a vision model for description. The descriptions are stored
-    as searchable text content instead of "[Figure]" placeholders.
-
-    API keys are resolved from environment variables - same as chat/embedding:
-    - OpenAI: OPENAI_API_KEY
-    - Anthropic: ANTHROPIC_API_KEY
-    - Ollama: No API key required (local)
-
-    Example YAML:
-        vision:
-          enabled: true
-          plugin_name: openai    # or "anthropic", "ollama"
-          kwargs:
-            model: gpt-4o        # or "claude-sonnet-4-20250514", "llama3.2-vision"
-
-    Available models by provider:
-    - OpenAI: gpt-4o, gpt-4o-mini
-    - Anthropic: claude-sonnet-4-20250514, claude-haiku-4-20250514
-    - Ollama: llama3.2-vision, llava, bakllava
-    """
-
-    enabled: bool = Field(
-        default=False,
-        description="Enable vision for figure/image description during ingestion",
-    )
-    plugin_name: str | None = Field(
-        default=None,
-        description="Vision plugin name (openai, anthropic, ollama)",
-    )
-    kwargs: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Vision plugin kwargs (model, temperature, etc.)",
-    )
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# =============================================================================
-# RGS Configuration
-# =============================================================================
-
-
-class RGSConfig(BaseModel):
-    """
-    Retrieval-Guided Synthesis configuration.
-
-    Controls how the LLM generates answers from retrieved context.
-    """
-
-    enable_citations: bool = True
-    strict_grounding: bool = True
-    answer_style: str | None = None
-    max_chunks: int = Field(default=8, ge=1)
-    max_answer_chars: int | None = None
-    include_query_in_context: bool = True
-    source_label_prefix: str = "S"
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# =============================================================================
-# Logging Configuration
-# =============================================================================
-
-
-class LoggingConfig(BaseModel):
-    """Logging configuration."""
-
-    level: str = "INFO"
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# =============================================================================
-# Entity Graph Configuration
-# =============================================================================
-
-
-class EntityGraphConfig(BaseModel):
-    """
-    Entity graph configuration for related chunk discovery.
-
-    When enabled (default), the entity graph is used to expand retrieval results
-    with related chunks that share entities (people, companies, concepts, etc.).
-
-    This enables "multi-hop" style retrieval without LLM calls at query time.
-
-    Example YAML:
-        entity_graph:
-          enabled: true
-          max_expansion: 10
-    """
-
-    enabled: bool = Field(
-        default=True,
-        description="Enable entity-based retrieval expansion (default: True)",
-    )
-    max_expansion: int = Field(
-        default=10,
-        ge=0,
-        le=50,
-        description="Maximum related chunks to add per query (default: 10)",
-    )
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# =============================================================================
-# Multi-Hop Retrieval Configuration
-# =============================================================================
-
-
-class MultihopConfig(BaseModel):
-    """
-    Multi-hop retrieval configuration for complex reasoning chains.
-
-    When fast_chat is available, multi-hop retrieval iteratively retrieves
-    evidence until sufficient information is found to answer the query.
-
-    This handles complex queries like "What does Sarah's company's competitor make?"
-    where the entity graph alone may not find all needed information.
-
-    Multi-hop is always on (baked in) but naturally stops after 1 hop when
-    evidence is sufficient. Set max_hops=1 to effectively disable multi-hop.
-
-    Example YAML:
-        multihop:
-          max_hops: 2
-    """
-
-    max_hops: int = Field(
-        default=2,
-        ge=1,
-        le=5,
-        description="Maximum retrieval iterations (1 = no multi-hop, 2 = one follow-up)",
-    )
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# =============================================================================
-# Structured Data Configuration
-# =============================================================================
-
-
-class StructuredConfig(BaseModel):
-    """
-    Configuration for structured data (tables/CSV) handling.
-
-    When enabled, queries are routed to either semantic (RAG) or structured (SQL)
-    paths based on LLM classification. Structured queries execute SQL via metadata
-    filtering and results are converted to natural language sentences.
-
-    Example YAML:
-        structured:
-          enabled: true
-          schema_match_threshold: 0.5
-          confidence_threshold: 0.6
-
-    Attributes:
-        enabled: Enable structured data handling (default: False).
-        schema_match_threshold: Minimum similarity for table schema matching (default: 0.5).
-        confidence_threshold: Minimum LLM confidence to route to structured (default: 0.6).
-    """
-
-    enabled: bool = Field(
-        default=False,
-        description="Enable structured data handling (tables/CSV queries)",
-    )
-    schema_match_threshold: float = Field(
-        default=0.5,
-        ge=0.0,
-        le=1.0,
-        description="Minimum similarity score for table schema matching",
-    )
-    confidence_threshold: float = Field(
-        default=0.6,
-        ge=0.0,
-        le=1.0,
-        description="Minimum LLM confidence to route query to structured path",
-    )
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# =============================================================================
-# Query Routing Configuration
-# =============================================================================
-
-
-class QueryRoutingConfig(BaseModel):
-    """
-    Query routing configuration for hierarchical retrieval.
-
-    When enabled, global queries (summaries, trends, overviews) are routed
-    to L2 corpus summaries instead of L0 chunks.
-
-    Uses semantic embeddings for language-agnostic query classification.
-
-    Example YAML:
-        routing:
-          enabled: true
-          threshold: 0.7
-    """
-
-    enabled: bool = Field(
-        default=True,
-        description="Enable query routing to hierarchy levels (default: True)",
-    )
-    threshold: float = Field(
-        default=0.7,
-        ge=0.0,
-        le=1.0,
-        description="Similarity threshold for global query detection (default: 0.7)",
-    )
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# =============================================================================
-# Enrichment Configuration
-# =============================================================================
-
-
-class SummaryConfig(BaseModel):
-    """
-    Configuration for chunk-level summaries.
-
-    Summaries are LLM-generated descriptions that improve search relevance.
-    WARNING: Makes 1 LLM call per chunk - expensive for large codebases.
-    """
-
-    enabled: bool = Field(default=False, description="Generate summaries (opt-in)")
-    provider: str | None = Field(default=None, description="LLM provider override")
-    model: str | None = Field(default=None, description="Model override")
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class ArtifactConfig(BaseModel):
-    """
-    Configuration for project-level artifacts.
-
-    Artifacts are high-level project summaries generated by plugins.
-    """
-
-    auto: bool = Field(default=True, description="Auto-discover applicable plugins")
-    enabled: list[str] = Field(default_factory=list, description="Explicit plugins to run")
-    disabled: list[str] = Field(default_factory=list, description="Plugins to skip")
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class EnrichmentConfig(BaseModel):
-    """
-    Configuration for content enrichment during ingestion.
-
-    Enrichment is always on - it's baked into the ingestion pipeline.
-    This extracts keywords, entities, and generates hierarchical summaries
-    for improved retrieval.
-
-    Example YAML:
-        enrichment:
-          summary:
-            enabled: true  # Opt-in: per-chunk summaries (expensive)
-          artifacts:
-            auto: true
-            disabled:
-              - architecture_narrative
-
-    Attributes:
-        summary: Chunk-level summary configuration (opt-in, expensive).
-        artifacts: Project-level artifact configuration.
-    """
-
-    summary: SummaryConfig = Field(
-        default_factory=SummaryConfig,
-        description="Chunk-level summary configuration",
-    )
-    artifacts: ArtifactConfig = Field(
-        default_factory=ArtifactConfig,
-        description="Project-level artifact configuration",
-    )
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# =============================================================================
-# Main Configuration
-# =============================================================================
-
-
-class FitzRagConfig(BaseModel):
-    """
-    Complete configuration for Fitz RAG engine.
-
-    This is the ONLY config class that the Fitz RAG engine consumes.
-    It contains all settings needed to build and run the RAG pipeline.
-
-    Examples:
-        Load from YAML:
-        >>> from fitz_ai.engines.fitz_rag.config import load_config
-        >>> config = load_config("config.yaml")
-
-        Create from dict:
-        >>> config = FitzRagConfig.from_dict({
-        ...     "chat": {"plugin_name": "openai", "kwargs": {"model": "gpt-4"}},
-        ...     "embedding": {"plugin_name": "openai", "kwargs": {}},
-        ...     "vector_db": {"plugin_name": "qdrant", "kwargs": {}},
-        ...     "retrieval": {"collection": "docs", "top_k": 5},
-        ... })
-
-        With explicit steps:
-        >>> config = FitzRagConfig.from_dict({
-        ...     "chat": {"plugin_name": "cohere", "kwargs": {}},
-        ...     "embedding": {"plugin_name": "cohere", "kwargs": {}},
-        ...     "vector_db": {"plugin_name": "qdrant", "kwargs": {}},
-        ...     "retrieval": {
-        ...         "collection": "docs",
-        ...         "steps": [
-        ...             {"type": "vector_search", "k": 25},
-        ...             {"type": "rerank", "k": 10},
-        ...             {"type": "threshold", "threshold": 0.5},
-        ...             {"type": "limit", "k": 5},
-        ...         ]
-        ...     },
-        ...     "rerank": {"enabled": True, "plugin_name": "cohere"},
-        ... })
-    """
-
-    # Required plugins
-    chat: PluginConfig = Field(..., description="Chat/LLM plugin configuration")
-    embedding: PluginConfig = Field(..., description="Embedding plugin configuration")
-    vector_db: PluginConfig = Field(..., description="Vector database plugin configuration")
-
-    # Retrieval (new step-based config)
-    retrieval: RetrievalConfig = Field(..., description="Retrieval pipeline configuration")
-
-    # Optional components
-    rerank: RerankConfig = Field(default_factory=RerankConfig, description="Reranker configuration")
-    vision: VisionConfig = Field(
-        default_factory=VisionConfig, description="Vision/VLM configuration"
-    )
-    rgs: RGSConfig = Field(default_factory=RGSConfig, description="RGS configuration")
-    logging: LoggingConfig = Field(
-        default_factory=LoggingConfig, description="Logging configuration"
-    )
-
-    # Ingestion (optional - only needed when ingesting documents)
-    ingest: IngestConfig | None = Field(
-        default=None, description="Ingestion pipeline configuration"
-    )
-
-    # Chunking (optional - can be at top level for convenience, used by fitz ingest)
-    chunking: ChunkingRouterConfig | None = Field(
-        default=None,
-        description="Chunking configuration (top-level for CLI convenience)",
-    )
-
-    # Enrichment (optional - generates LLM descriptions for better retrieval)
-    enrichment: EnrichmentConfig = Field(
-        default_factory=EnrichmentConfig,
-        description="Enrichment configuration for improved retrieval",
-    )
-
-    # Query routing (routes global queries to L2 summaries)
-    routing: QueryRoutingConfig = Field(
-        default_factory=QueryRoutingConfig,
-        description="Query routing configuration for hierarchical retrieval",
-    )
-
-    # Entity graph (related chunk discovery via shared entities)
-    entity_graph: EntityGraphConfig = Field(
-        default_factory=EntityGraphConfig,
-        description="Entity graph configuration for related chunk discovery",
-    )
-
-    # Multi-hop retrieval (iterative evidence gathering)
-    multihop: MultihopConfig = Field(
-        default_factory=MultihopConfig,
-        description="Multi-hop retrieval configuration for complex reasoning chains",
-    )
-
-    # Structured data (tables/CSV queries via SQL)
-    structured: StructuredConfig = Field(
-        default_factory=StructuredConfig,
-        description="Structured data configuration for table/CSV queries",
-    )
-
-    # Fitz Cloud (Query-Time RAG Optimizer)
-    cloud: CloudConfig | None = Field(
-        default=None,
-        description="Fitz Cloud configuration for caching and model routing",
-    )
-
-    model_config = ConfigDict(extra="forbid")
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "FitzRagConfig":
-        """
-        Create config from a dictionary.
-
-        Uses Pydantic's validation to create a config instance.
-        Filters out global settings that don't belong to this engine.
-
-        Args:
-            data: Configuration dictionary
-
-        Returns:
-            Validated FitzRagConfig instance
-        """
-        # Global settings that are NOT part of this engine's config
-        global_settings = {"default_engine"}
-        filtered = {k: v for k, v in data.items() if k not in global_settings}
-        return cls.model_validate(filtered)
+        for ext, config in self.by_extension.items():
+            ext_lower = ext.lower()
+            normalized_ext = ext_lower if ext_lower.startswith(".") else f".{ext_lower}"
+            normalized[normalized_ext] = config
+        self.by_extension = normalized

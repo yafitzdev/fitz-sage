@@ -33,9 +33,15 @@ logger = get_logger(__name__)
 
 def _load_default_config() -> dict:
     """Load the default configuration from default.yaml."""
-    from fitz_ai.engines.fitz_rag.config import load_config_dict
+    import yaml
+    from pathlib import Path
 
-    return load_config_dict()
+    # Load from package defaults
+    defaults_path = Path(__file__).parent.parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
+    with defaults_path.open("r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f) or {}
+
+    return raw
 
 
 # =============================================================================

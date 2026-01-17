@@ -158,20 +158,20 @@ class CLIContext:
         Returns:
             CLIContext with all values populated from merged config.
         """
-        # Load merged config (defaults + user overrides)
-        merged_config = load_engine_config(engine)
+        # Load merged config (defaults + user overrides) - returns Pydantic model
+        typed_config = load_engine_config(engine)
+
+        # Convert to dict for _from_config
+        config_dict = typed_config.model_dump()
 
         # Get config source info
         source = get_config_source(engine)
         user_config_path = FitzPaths.engine_config(engine)
         has_user = user_config_path.exists()
 
-        # Load typed config if possible
-        typed_config = cls._load_typed_config(merged_config, engine)
-
-        # Extract all values from merged config
+        # Extract all values from config dict
         return cls._from_config(
-            config=merged_config,
+            config=config_dict,
             typed=typed_config,
             path=user_config_path if has_user else None,
             source=source,
@@ -185,7 +185,7 @@ class CLIContext:
             try:
                 from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 
-                return FitzRagConfig.from_dict(config)
+                return FitzRagConfig(**config)
             except Exception as e:
                 logger.debug(f"Could not load typed config: {e}")
                 return None
@@ -203,26 +203,18 @@ class CLIContext:
         """
         Extract all values from merged config.
 
-        Since config is merged (defaults + user), all values are guaranteed to exist.
-        No .get() fallbacks needed - values come from defaults if not overridden.
+        V2 config has flat structure, not nested sections.
         """
-        # Get config sections - guaranteed to exist from defaults
-        chat = config.get("chat", {})
-        emb = config.get("embedding", {})
-        vdb = config.get("vector_db", {})
-        ret = config.get("retrieval", {})
-        rerank = config.get("rerank", {})
-        rgs = config.get("rgs", {})
-
-        # Extract plugin names
-        chat_plugin_name = chat.get("plugin_name", "")
-        emb_plugin_name = emb.get("plugin_name", "")
-        rerank_plugin_name = rerank.get("plugin_name", "")
+        # V2 flat structure: top-level plugin strings
+        chat_plugin_name = cls._parse_plugin_string(config.get("chat", ""))
+        emb_plugin_name = cls._parse_plugin_string(config.get("embedding", ""))
+        vdb_plugin_name = config.get("vector_db", "local_faiss")
+        rerank_plugin_name = cls._parse_plugin_string(config.get("rerank"))
 
         # Load plugin specs to get model defaults
-        chat_models = cls._get_chat_models(chat, chat_plugin_name)
-        emb_model = cls._get_embedding_model(emb, emb_plugin_name)
-        rerank_model = cls._get_rerank_model(rerank, rerank_plugin_name)
+        chat_models = cls._get_chat_models_v2(config.get("chat", ""), config.get("chat_kwargs", {}))
+        emb_model = cls._get_embedding_model_v2(config.get("embedding", ""), config.get("embedding_kwargs", {}))
+        rerank_model = cls._get_rerank_model_v2(config.get("rerank"), config.get("rerank_kwargs", {}))
 
         return cls(
             raw_config=config,
@@ -238,20 +230,103 @@ class CLIContext:
             embedding_plugin=emb_plugin_name,
             embedding_model=emb_model,
             # Vector DB
-            vector_db_plugin=vdb.get("plugin_name", ""),
-            vector_db_kwargs=vdb.get("kwargs", {}),
+            vector_db_plugin=vdb_plugin_name,
+            vector_db_kwargs=config.get("vector_db_kwargs", {}),
             # Retrieval
-            retrieval_plugin=ret.get("plugin_name", ""),
-            retrieval_collection=ret.get("collection", "default"),
-            retrieval_top_k=ret.get("top_k", 5),
+            retrieval_plugin=config.get("retrieval_plugin", "dense"),
+            retrieval_collection=config.get("collection", "default"),
+            retrieval_top_k=config.get("top_k", 5),
             # Rerank
-            rerank_enabled=rerank.get("enabled", False),
+            rerank_enabled=config.get("rerank") is not None,
             rerank_plugin=rerank_plugin_name,
             rerank_model=rerank_model,
             # RGS
-            rgs_citations=rgs.get("enable_citations", True),
-            rgs_strict_grounding=rgs.get("strict_grounding", True),
+            rgs_citations=config.get("enable_citations", True),
+            rgs_strict_grounding=config.get("strict_grounding", True),
         )
+
+    @staticmethod
+    def _parse_plugin_string(plugin: str | None) -> str:
+        """
+        Parse plugin string to get provider name.
+
+        V2 format: "provider" or "provider/model"
+        Returns just the provider name.
+        """
+        if not plugin:
+            return ""
+        # Split on "/" and take first part
+        return plugin.split("/")[0]
+
+    @staticmethod
+    def _get_chat_models_v2(plugin_string: str, chat_kwargs: dict) -> dict:
+        """Get chat model names from V2 config or plugin defaults."""
+        from fitz_ai.llm.loader import load_plugin
+
+        if not plugin_string:
+            return {}
+
+        # User-specified models take precedence
+        if "models" in chat_kwargs:
+            return chat_kwargs["models"]
+
+        # Extract provider name
+        provider = plugin_string.split("/")[0]
+
+        # Fall back to plugin defaults
+        try:
+            spec = load_plugin("chat", provider)
+            return spec.defaults.get("models", {})
+        except Exception:
+            return {}
+
+    @staticmethod
+    def _get_embedding_model_v2(plugin_string: str, emb_kwargs: dict) -> str:
+        """Get embedding model from V2 config or plugin defaults."""
+        from fitz_ai.llm.loader import load_plugin
+
+        if not plugin_string:
+            return ""
+
+        # User-specified model takes precedence
+        if "model" in emb_kwargs:
+            return emb_kwargs["model"]
+
+        # If plugin_string is "provider/model", extract model
+        if "/" in plugin_string:
+            return plugin_string.split("/", 1)[1]
+
+        # Fall back to plugin defaults
+        provider = plugin_string
+        try:
+            spec = load_plugin("embedding", provider)
+            return spec.defaults.get("model", "")
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _get_rerank_model_v2(plugin_string: str | None, rerank_kwargs: dict) -> str:
+        """Get rerank model from V2 config or plugin defaults."""
+        from fitz_ai.llm.loader import load_plugin
+
+        if not plugin_string:
+            return ""
+
+        # User-specified model takes precedence
+        if "model" in rerank_kwargs:
+            return rerank_kwargs["model"]
+
+        # If plugin_string is "provider/model", extract model
+        if "/" in plugin_string:
+            return plugin_string.split("/", 1)[1]
+
+        # Fall back to plugin defaults
+        provider = plugin_string
+        try:
+            spec = load_plugin("rerank", provider)
+            return spec.defaults.get("model", "")
+        except Exception:
+            return ""
 
     @staticmethod
     def _get_chat_models(chat: dict, plugin_name: str) -> dict:
@@ -400,7 +475,7 @@ class CLIContext:
         if collection:
             self.retrieval_collection = collection
             if self.typed_config is not None:
-                self.typed_config.retrieval.collection = collection
+                self.typed_config.collection = collection  # V2: flat structure
             return collection
 
         # Get available collections
@@ -424,7 +499,7 @@ class CLIContext:
         # Keep ctx and typed_config in sync
         self.retrieval_collection = selected
         if self.typed_config is not None:
-            self.typed_config.retrieval.collection = selected
+            self.typed_config.collection = selected  # V2: flat structure
 
         return selected
 

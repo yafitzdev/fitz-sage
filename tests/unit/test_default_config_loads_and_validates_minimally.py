@@ -3,7 +3,8 @@
 Test that the default config can be loaded and validated.
 """
 
-from fitz_ai.engines.fitz_rag.config import FitzRagConfig, load_config
+from fitz_ai.config import load_engine_config
+from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 
 
 def test_default_config_loads_and_validates_base_schema():
@@ -15,18 +16,14 @@ def test_default_config_loads_and_validates_base_schema():
     - all required fields are present
     """
 
-    cfg = load_config()
+    cfg = load_engine_config("fitz_rag")
 
     assert isinstance(cfg, FitzRagConfig)
 
-    # Core plugin configs - uses 'chat' not 'llm'
-    assert cfg.chat.plugin_name
-    assert cfg.embedding.plugin_name
-    assert cfg.vector_db.plugin_name
+    # Core plugins (string specs)
+    assert cfg.chat
+    assert cfg.embedding
+    assert cfg.vector_db
 
-    # Retrieval (YAML plugin reference)
-    assert cfg.retrieval.plugin_name
-    assert cfg.retrieval.collection
-
-    # RGS config exists
-    assert cfg.rgs is not None
+    # Collection is required
+    assert cfg.collection
