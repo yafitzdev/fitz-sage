@@ -59,6 +59,8 @@ dependencies = [
     "typing-extensions>=4.7",
     "typer>=0.9",
     "jinja2>=3.1",
+    # Cryptography for Fitz Cloud encryption (AES-256-GCM)
+    "cryptography>=41.0",
     # FAISS included by default for zero-friction quickstart
     "faiss-cpu>=1.7.0",
     # Docling for advanced document parsing (PDF, DOCX, PPTX, images)
@@ -89,6 +91,22 @@ clara = [
     "accelerate>=0.24",
     "bitsandbytes>=0.41",
     "peft>=0.10",
+]
+
+# LangChain integration for Fitz Cloud
+langchain = [
+    "langchain-core>=0.2.0",
+]
+
+# LlamaIndex integration for Fitz Cloud
+llamaindex = [
+    "llama-index-core>=0.10.0",
+]
+
+# All framework integrations
+integrations = [
+    "langchain-core>=0.2.0",
+    "llama-index-core>=0.10.0",
 ]
 
 # REST API server
@@ -128,6 +146,8 @@ all = [
     "accelerate>=0.24",
     "bitsandbytes>=0.41",
     "peft>=0.10",
+    "langchain-core>=0.2.0",
+    "llama-index-core>=0.10.0",
 ]
 
 

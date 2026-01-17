@@ -323,6 +323,7 @@ class TestComparisonNoChat:
             collection="test",
             chat=None,  # No chat client
             k=10,
+            include_derived=False,  # Disable derived collection search
         )
 
         # Even with comparison pattern, should do single search
