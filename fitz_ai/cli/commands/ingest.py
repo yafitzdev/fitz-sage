@@ -6,10 +6,14 @@ Usage:
     fitz ingest              # Interactive mode
     fitz ingest ./src        # Ingest specific directory
     fitz ingest ./src -y     # Non-interactive with defaults
+    fitz ingest "my text"    # Direct text ingestion
 """
 
 from __future__ import annotations
 
+import hashlib
+import uuid
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import typer
@@ -117,6 +121,154 @@ def _parse_artifact_selection(
         requested = [a.strip() for a in artifacts_arg.split(",")]
         # Filter to valid names
         return [a for a in requested if a in available]
+
+
+def _is_direct_text(source: str) -> bool:
+    """
+    Determine if source is direct text rather than a file path.
+
+    Returns True if:
+    - Source doesn't exist as a path
+    - Source doesn't look like a path (no slashes, backslashes, or common extensions)
+    - Source contains spaces or looks like natural language
+
+    Returns:
+        True if source should be treated as direct text
+    """
+    # Check if it exists as a file/directory
+    path = Path(source)
+    if path.exists():
+        return False
+
+    # Common file extensions that indicate a path (even if file doesn't exist)
+    path_extensions = {
+        ".txt", ".md", ".csv", ".json", ".yaml", ".yml", ".py", ".js", ".ts",
+        ".html", ".css", ".xml", ".pdf", ".doc", ".docx", ".xls", ".xlsx"
+    }
+
+    # Check if it looks like a path
+    source_lower = source.lower()
+
+    # Has path separators
+    if "/" in source or "\\" in source:
+        return False
+
+    # Has a file extension
+    if any(source_lower.endswith(ext) for ext in path_extensions):
+        return False
+
+    # Looks like a relative path (starts with . or ~)
+    if source.startswith(".") or source.startswith("~"):
+        return False
+
+    # If it has spaces and no path-like characters, it's likely text
+    # Or if it's longer than typical filenames
+    if " " in source or len(source) > 100:
+        return True
+
+    # Default to treating as path (let the path validation fail later)
+    return False
+
+
+def _ingest_direct_text(
+    text: str,
+    collection: str,
+    ctx: CLIContext,
+    config: dict,
+) -> None:
+    """
+    Ingest direct text into the vector database.
+
+    Args:
+        text: The text to ingest
+        collection: Collection name
+        ctx: CLI context
+        config: Raw config dict
+    """
+    from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
+    from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
+    from fitz_ai.llm.registry import get_llm_plugin
+    from fitz_ai.vector_db.registry import get_vector_db_plugin
+
+    ui.header("Fitz Ingest", "Direct text ingestion")
+    ui.info(f"Collection: {collection}")
+
+    # Generate a unique ID for this text
+    text_hash = hashlib.sha256(text.encode()).hexdigest()[:12]
+    doc_id = f"text_{text_hash}"
+
+    # Show preview
+    preview = text[:100] + "..." if len(text) > 100 else text
+    ui.info(f"Text: {preview}")
+    print()
+
+    # Get components
+    embedding_kwargs = config.get("embedding", {}).get("kwargs", {})
+    embedder = get_llm_plugin(
+        plugin_type="embedding",
+        plugin_name=ctx.embedding_plugin,
+        **embedding_kwargs,
+    )
+
+    vector_client = get_vector_db_plugin(ctx.vector_db_plugin)
+
+    # Create a ParsedDocument from the text
+    document = ParsedDocument(
+        source="direct_input",
+        elements=[DocumentElement(type=ElementType.TEXT, content=text)],
+        metadata={"doc_id": doc_id, "source_type": "direct_text"},
+    )
+
+    # Chunk the text (use simple chunker)
+    chunker = SimpleChunker(chunk_size=1000, chunk_overlap=100)
+    chunks = chunker.chunk(document)
+
+    # If text is small enough, it might be a single chunk or empty
+    if not chunks:
+        # Text was too small or empty - create a single chunk manually
+        from fitz_ai.core.chunk import Chunk
+
+        chunks = [
+            Chunk(
+                id=f"{doc_id}:0",
+                doc_id=doc_id,
+                chunk_index=0,
+                content=text,
+                metadata={"source_file": "direct_input", "doc_id": doc_id},
+            )
+        ]
+
+    ui.step(1, 3, f"Created {len(chunks)} chunk(s)")
+
+    # Embed chunks
+    ui.step(2, 3, "Embedding...")
+    chunk_texts = [chunk.content for chunk in chunks]
+    embeddings = embedder.embed(chunk_texts)
+
+    # Build points for vector DB
+    points = []
+    for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+        point_id = f"{doc_id}_chunk_{i}"
+        points.append({
+            "id": point_id,
+            "vector": embedding,
+            "payload": {
+                "text": chunk.content,
+                "source": "direct_input",
+                "doc_id": doc_id,
+                "chunk_index": i,
+                "total_chunks": len(chunks),
+                "original_text": text if len(text) <= 500 else None,
+            },
+        })
+
+    # Upsert to vector DB
+    ui.step(3, 3, "Storing...")
+    vector_client.upsert(collection, points)
+
+    print()
+    ui.success(f"Ingested {len(chunks)} chunk(s) into '{collection}'")
+    ui.info(f"Document ID: {doc_id}")
 
 
 def _build_chunking_router_config(config: dict):
@@ -296,7 +448,7 @@ def _run_engine_specific_ingest(
 def command(
     source: Optional[str] = typer.Argument(
         None,
-        help="Source path (file or directory). Prompts if not provided.",
+        help="Source path (file/directory) or direct text. Prompts if not provided.",
     ),
     collection: Optional[str] = typer.Option(
         None,
@@ -345,9 +497,27 @@ def command(
         fitz ingest ./src -a all -y  # Non-interactive with all artifacts
         fitz ingest ./docs -e graphrag  # Use GraphRAG engine
         fitz ingest ./docs -e clara     # Use CLaRa engine
+        fitz ingest "my boss likes red cars"  # Direct text ingestion
     """
     # =========================================================================
-    # Header
+    # Direct Text Detection (before header to provide correct title)
+    # =========================================================================
+
+    if source is not None and _is_direct_text(source):
+        # Load context for collection and config
+        ctx = CLIContext.load()
+        config = ctx.raw_config
+
+        # Get collection name
+        if collection is None:
+            collection = ctx.retrieval_collection
+
+        # Ingest direct text and return
+        _ingest_direct_text(source, collection, ctx, config)
+        return
+
+    # =========================================================================
+    # Header (for file/directory ingestion)
     # =========================================================================
 
     ui.header("Fitz Ingest", "Upload documents to vector database")
