@@ -49,6 +49,21 @@ from fitz_ai.retrieval.vocabulary import KeywordMatcher, create_matcher_from_sto
 from fitz_ai.tabular.store import get_table_store
 from fitz_ai.vector_db.registry import get_vector_db_plugin
 
+# Structured data imports (optional, fail gracefully if not available)
+try:
+    from fitz_ai.structured import (
+        DerivedStore,
+        QueryRouter as StructuredQueryRouter,
+        ResultFormatter,
+        SchemaStore,
+        SQLGenerator,
+        StructuredExecutor,
+        StructuredRoute,
+    )
+    STRUCTURED_AVAILABLE = True
+except ImportError:
+    STRUCTURED_AVAILABLE = False
+
 logger = get_logger(__name__)
 
 # Fitz Cloud optimizer version for cache key computation
@@ -81,6 +96,12 @@ class RAGPipeline:
         embedder=None,  # Embedder for cloud cache query embeddings
         cloud_client=None,  # CloudClient for cloud cache operations
         fast_chat=None,  # Fast tier chat for cloud routing optimization
+        # Structured data components (optional)
+        structured_router=None,  # StructuredQueryRouter for query classification
+        structured_executor=None,  # StructuredExecutor for SQL execution
+        sql_generator=None,  # SQLGenerator for NL → SQL
+        result_formatter=None,  # ResultFormatter for results → NL
+        derived_store=None,  # DerivedStore for sentence storage
     ):
         self.retrieval = retrieval
         self.chat = chat  # Smart tier (default)
@@ -92,6 +113,13 @@ class RAGPipeline:
         self.hop_controller = hop_controller
         self.embedder = embedder
         self.cloud_client = cloud_client
+
+        # Structured data components
+        self.structured_router = structured_router
+        self.structured_executor = structured_executor
+        self.sql_generator = sql_generator
+        self.result_formatter = result_formatter
+        self.derived_store = derived_store
 
         # Default constraints: ConflictAware + InsufficientEvidence + CausalAttribution
         # Uses semantic embedding similarity for language-agnostic detection.
@@ -116,16 +144,22 @@ class RAGPipeline:
             f"enabled (max {hop_controller.max_hops})" if hop_controller else "disabled"
         )
         cloud_routing_status = "enabled" if cloud_client and fast_chat else "disabled"
+        structured_status = "enabled" if structured_router else "disabled"
         logger.info(
             f"{PIPELINE} RAGPipeline initialized with {retrieval.plugin_name} retrieval, "
             f"{len(self.constraints)} constraint(s), routing={routing_status}, "
             f"keywords={keyword_status}, multihop={multihop_status}, "
-            f"cloud_routing={cloud_routing_status}"
+            f"cloud_routing={cloud_routing_status}, structured={structured_status}"
         )
 
     def run(self, query: str) -> RGSAnswer:
         """Execute the RAG pipeline for a query."""
         logger.info(f"{PIPELINE} Running pipeline for query='{query[:50]}...'")
+
+        # Step -1: Check for structured query (tables/CSV)
+        # If structured, execute SQL and ingest derived sentences before retrieval
+        if self.structured_router:
+            self._handle_structured_prefetch(query)
 
         # Step 0: Route query to appropriate retrieval target
         filter_override = None
@@ -236,6 +270,107 @@ class RAGPipeline:
                 continue
 
         return results
+
+    def _handle_structured_prefetch(self, query: str) -> None:
+        """
+        Handle structured data pre-fetch for table/CSV queries.
+
+        Routes query to structured path if applicable, executes SQL via metadata
+        filtering, formats results as natural language, and ingests derived
+        sentences for semantic retrieval.
+
+        This is a pre-fetch step - derived sentences are added before retrieval
+        so they can be included in the semantic search results.
+        """
+        if not STRUCTURED_AVAILABLE:
+            logger.warning(f"{PIPELINE} Structured module not available, skipping")
+            return
+
+        if not self.structured_router:
+            return
+
+        try:
+            # Route the query
+            route = self.structured_router.route(query)
+
+            # Only handle structured routes
+            if not isinstance(route, StructuredRoute):
+                logger.debug(f"{PIPELINE} Query routed to semantic path: {route.reason}")
+                return
+
+            logger.info(
+                f"{PIPELINE} Query routed to structured path: "
+                f"table={route.primary_table.table_name}, confidence={route.confidence:.2f}"
+            )
+
+            # Generate SQL queries
+            if not self.sql_generator:
+                logger.warning(f"{PIPELINE} No SQL generator configured, skipping structured")
+                return
+
+            generation_result = self.sql_generator.generate(query, route.tables)
+            if generation_result.error:
+                logger.warning(f"{PIPELINE} SQL generation failed: {generation_result.error}")
+                return
+
+            if not generation_result.queries:
+                logger.debug(f"{PIPELINE} No SQL queries generated")
+                return
+
+            logger.info(f"{PIPELINE} Generated {len(generation_result.queries)} SQL queries")
+
+            # Execute queries and format results
+            if not self.structured_executor or not self.result_formatter:
+                logger.warning(f"{PIPELINE} Missing executor or formatter, skipping structured")
+                return
+
+            derived_sentences = []
+            for sql_query in generation_result.queries:
+                try:
+                    # Execute SQL via metadata filtering
+                    exec_result = self.structured_executor.execute(sql_query)
+                    if not exec_result.is_success:
+                        logger.warning(f"{PIPELINE} SQL execution failed: {exec_result.error}")
+                        continue
+
+                    # Format result as natural language
+                    formatted = self.result_formatter.format(exec_result)
+                    derived_sentences.append((
+                        formatted.sentence,
+                        sql_query.raw_sql or str(sql_query),
+                        sql_query.table,
+                    ))
+
+                    logger.debug(f"{PIPELINE} Formatted result: {formatted.sentence[:50]}...")
+
+                except Exception as e:
+                    logger.warning(f"{PIPELINE} SQL execution/formatting failed: {e}")
+                    continue
+
+            # Ingest derived sentences
+            if derived_sentences and self.derived_store:
+                for sentence, sql, table in derived_sentences:
+                    # Get table version from route
+                    table_schema = next(
+                        (t for t in route.tables if t.table_name == table), None
+                    )
+                    table_version = table_schema.version if table_schema else "unknown"
+
+                    self.derived_store.ingest(
+                        sentence=sentence,
+                        source_table=table,
+                        source_query=sql,
+                        table_version=table_version,
+                    )
+
+                logger.info(
+                    f"{PIPELINE} Ingested {len(derived_sentences)} derived sentences "
+                    f"from structured query"
+                )
+
+        except Exception as e:
+            # Fail-safe: log error but don't block semantic retrieval
+            logger.warning(f"{PIPELINE} Structured handling failed: {e}")
 
     def _apply_answer_mode_to_prompt(self, prompt, answer_mode: AnswerMode):
         """Prepend answer mode instruction to system prompt."""
@@ -642,6 +777,61 @@ class RAGPipeline:
                 f"{PIPELINE} Multi-hop retrieval enabled (max {cfg.multihop.max_hops} hops)"
             )
 
+        # Structured data components (tables/CSV queries via SQL)
+        structured_router = None
+        structured_executor = None
+        sql_generator = None
+        result_formatter = None
+        derived_store = None
+
+        if STRUCTURED_AVAILABLE and cfg.structured.enabled:
+            try:
+                # Schema store for table discovery
+                schema_store = SchemaStore(
+                    vector_db=vector_client,
+                    embedding=embedder,
+                    base_collection=cfg.retrieval.collection,
+                )
+
+                # Structured query router (LLM-based classification)
+                structured_router = StructuredQueryRouter(
+                    schema_store=schema_store,
+                    chat_client=fast_chat,
+                    schema_match_threshold=cfg.structured.schema_match_threshold,
+                    structured_confidence_threshold=cfg.structured.confidence_threshold,
+                )
+
+                # SQL generator (NL → SQL via LLM)
+                sql_generator = SQLGenerator(chat_client=fast_chat)
+
+                # SQL executor (via metadata filtering)
+                structured_executor = StructuredExecutor(
+                    vector_db=vector_client,
+                    base_collection=cfg.retrieval.collection,
+                )
+
+                # Result formatter (SQL results → NL sentences)
+                result_formatter = ResultFormatter(chat_client=fast_chat)
+
+                # Derived store (sentence storage with provenance)
+                derived_store = DerivedStore(
+                    vector_db=vector_client,
+                    embedding=embedder,
+                    base_collection=cfg.retrieval.collection,
+                )
+
+                logger.info(
+                    f"{PIPELINE} Structured data handling enabled for "
+                    f"collection='{cfg.retrieval.collection}'"
+                )
+            except Exception as e:
+                logger.warning(f"{PIPELINE} Failed to initialize structured components: {e}")
+                structured_router = None
+        elif cfg.structured.enabled and not STRUCTURED_AVAILABLE:
+            logger.warning(
+                f"{PIPELINE} Structured enabled in config but structured module not available"
+            )
+
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
         return cls(
             retrieval=retrieval,
@@ -656,6 +846,12 @@ class RAGPipeline:
             embedder=embedder,
             cloud_client=cloud_client,
             fast_chat=fast_chat,  # For cloud routing optimization
+            # Structured data components
+            structured_router=structured_router,
+            structured_executor=structured_executor,
+            sql_generator=sql_generator,
+            result_formatter=result_formatter,
+            derived_store=derived_store,
         )
 
     @classmethod

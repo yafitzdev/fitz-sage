@@ -26,6 +26,15 @@ from fitz_ai.engines.fitz_rag.exceptions import EmbeddingError, VectorSearchErro
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
 
+# Try to import derived collection helpers (optional dependency)
+try:
+    from fitz_ai.structured.constants import get_derived_collection
+    from fitz_ai.structured.derived import FIELD_CONTENT, FIELD_DERIVED, FIELD_SOURCE_TABLE
+
+    DERIVED_AVAILABLE = True
+except ImportError:
+    DERIVED_AVAILABLE = False
+
 from .base import (
     ChatClient,
     Embedder,
@@ -94,6 +103,7 @@ class VectorSearchStep(RetrievalStep):
     max_entity_expansion: int = 10
     filter_conditions: dict[str, Any] = field(default_factory=dict)
     rrf_k: int = 60  # RRF constant (higher = more weight to lower ranks)
+    include_derived: bool = True  # Include derived sentences from structured queries
 
     # Lazy-loaded sparse index for hybrid search
     _sparse_index: Any = field(default=None, init=False, repr=False)
@@ -151,6 +161,12 @@ class VectorSearchStep(RetrievalStep):
 
         # Search with all query variations and merge with RRF
         results = self._expanded_search(query_variations)
+
+        # Search derived collection for pre-computed structured results
+        if self.include_derived:
+            query_vector = self._embed(query)
+            derived_results = self._search_derived(query_vector)
+            results = self._merge_derived_results(results, derived_results)
 
         # Always include table schema chunks - they may not match semantically
         # but TableQueryStep needs them to execute SQL queries
@@ -225,6 +241,12 @@ class VectorSearchStep(RetrievalStep):
             f"{RETRIEVER} VectorSearchStep: retrieved {len(all_results)} unique chunks "
             f"from {len(search_queries)} queries"
         )
+
+        # Search derived collection for pre-computed structured results
+        if self.include_derived:
+            query_vector = self._embed(query)
+            derived_results = self._search_derived(query_vector)
+            all_results = self._merge_derived_results(all_results, derived_results)
 
         # Ensure table schema chunks are included
         all_results = self._ensure_table_chunks(all_results)
@@ -322,6 +344,12 @@ Return ONLY a JSON array of strings, no explanation. Example: ["query 1", "query
             f"{RETRIEVER} VectorSearchStep: retrieved {len(all_results)} unique chunks "
             f"from {len(search_queries)} comparison queries"
         )
+
+        # Search derived collection for pre-computed structured results
+        if self.include_derived:
+            query_vector = self._embed(query)
+            derived_results = self._search_derived(query_vector)
+            all_results = self._merge_derived_results(all_results, derived_results)
 
         # Ensure table schema chunks are included
         all_results = self._ensure_table_chunks(all_results)
@@ -583,6 +611,124 @@ Return ONLY a JSON object:
             results.append(chunk)
 
         return results
+
+    # -------------------------------------------------------------------------
+    # Derived Collection Search
+    # -------------------------------------------------------------------------
+
+    def _search_derived(self, query_vector: list[float]) -> list[Chunk]:
+        """
+        Search the derived collection for pre-computed structured query results.
+
+        Derived sentences are natural language answers generated from SQL queries
+        on structured data, stored for semantic retrieval alongside original chunks.
+
+        Args:
+            query_vector: Query embedding
+
+        Returns:
+            List of chunks from derived collection with metadata marking them as derived
+        """
+        if not self.include_derived or not DERIVED_AVAILABLE:
+            return []
+
+        derived_collection = get_derived_collection(self.collection)
+
+        try:
+            # Check if collection exists by attempting search
+            hits = self.client.search(
+                collection_name=derived_collection,
+                query_vector=query_vector,
+                limit=self.k,
+                with_payload=True,
+                query_filter=self.filter_conditions if self.filter_conditions else None,
+            )
+        except Exception as e:
+            # Collection may not exist yet - this is fine
+            logger.debug(f"{RETRIEVER} Derived collection search skipped: {e}")
+            return []
+
+        if not hits:
+            return []
+
+        # Convert derived hits to Chunk objects
+        results: list[Chunk] = []
+        for idx, hit in enumerate(hits):
+            payload = getattr(hit, "payload", None) or getattr(hit, "metadata", None) or {}
+            if not isinstance(payload, dict):
+                payload = {}
+
+            # Build metadata for derived chunk
+            source_table = payload.get(FIELD_SOURCE_TABLE, "")
+            content = payload.get(FIELD_CONTENT, "")
+
+            metadata = {
+                **payload,
+                "from_derived": True,
+                "is_derived": True,  # Marker for downstream processing
+                "source_table": source_table,
+                "vector_score": getattr(hit, "score", None),
+            }
+
+            chunk = Chunk(
+                id=f"derived_{getattr(hit, 'id', idx)}",
+                doc_id=f"table:{source_table}" if source_table else "derived",
+                content=content,
+                chunk_index=0,
+                metadata=metadata,
+            )
+            results.append(chunk)
+
+        if results:
+            logger.debug(
+                f"{RETRIEVER} Derived search: found {len(results)} pre-computed results"
+            )
+
+        return results
+
+    def _merge_derived_results(
+        self, main_results: list[Chunk], derived_results: list[Chunk]
+    ) -> list[Chunk]:
+        """
+        Merge derived results with main results, deduplicating by content.
+
+        Derived results are placed at the front since they contain pre-computed
+        answers to structured queries that are likely highly relevant.
+
+        Args:
+            main_results: Results from main collection search
+            derived_results: Results from derived collection search
+
+        Returns:
+            Merged and deduplicated results
+        """
+        if not derived_results:
+            return main_results
+
+        # Track seen content to avoid duplicates
+        seen_content = set()
+        merged = []
+
+        # Add derived results first (higher priority)
+        for chunk in derived_results:
+            content_key = chunk.content.strip().lower()[:200]  # Use first 200 chars as key
+            if content_key not in seen_content:
+                seen_content.add(content_key)
+                merged.append(chunk)
+
+        # Add main results, skipping duplicates
+        for chunk in main_results:
+            content_key = chunk.content.strip().lower()[:200]
+            if content_key not in seen_content:
+                seen_content.add(content_key)
+                merged.append(chunk)
+
+        logger.debug(
+            f"{RETRIEVER} Merged {len(derived_results)} derived + "
+            f"{len(main_results)} main → {len(merged)} total"
+        )
+
+        return merged
 
     # -------------------------------------------------------------------------
     # Hybrid Search (Dense + Sparse with RRF Fusion)
@@ -940,6 +1086,12 @@ Return ONLY a JSON object:
 
                 results.append(chunk)
 
+        # Search derived collection for pre-computed structured results
+        if self.include_derived:
+            query_vector = self._embed(query)
+            derived_results = self._search_derived(query_vector)
+            results = self._merge_derived_results(results, derived_results)
+
         # Ensure table schema chunks are included
         results = self._ensure_table_chunks(results)
 
@@ -1071,6 +1223,12 @@ Return ONLY a JSON object:
 
             # Search with all variations and merge with RRF
             results = self._expanded_search(query_variations)
+
+            # Search derived collection for pre-computed structured results
+            if self.include_derived:
+                query_vector = self._embed(query)
+                derived_results = self._search_derived(query_vector)
+                results = self._merge_derived_results(results, derived_results)
 
             # Always include table schema chunks for potential SQL aggregations
             results = self._ensure_table_chunks(results)

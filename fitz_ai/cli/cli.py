@@ -6,9 +6,11 @@ Commands:
     fitz quickstart    Zero-friction RAG in one command (START HERE)
     fitz init          Setup wizard (for custom configuration)
     fitz ingest        Ingest documents
+    fitz ingest-table  Ingest CSV/Excel as structured table
     fitz query         Query knowledge base
     fitz chat          Interactive conversation with your knowledge base
     fitz collections   Manage collections (list, info, delete)
+    fitz tables        Manage structured tables (list, info, delete)
     fitz map           Visualize knowledge base as interactive graph
     fitz serve         Start the REST API server
     fitz config        View configuration
@@ -210,6 +212,28 @@ def plugin(
     )
 
 
+@app.command("ingest-table")
+def ingest_table(
+    source: Path = typer.Argument(..., help="Path to CSV or Excel file."),
+    table_name: Optional[str] = typer.Option(None, "--table", "-t", help="Table name."),
+    primary_key: Optional[str] = typer.Option(None, "--pk", help="Primary key column."),
+    collection: Optional[str] = typer.Option(None, "--collection", "-c", help="Collection name."),
+    sheet: Optional[str] = typer.Option(None, "--sheet", "-s", help="Excel sheet name."),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing table."),
+) -> None:
+    """Ingest a CSV or Excel file as a structured table for SQL-like queries."""
+    from fitz_ai.cli.commands import tables as mod
+
+    mod.ingest_table_command(
+        source=source,
+        table_name=table_name,
+        primary_key=primary_key,
+        collection=collection,
+        sheet=sheet,
+        force=force,
+    )
+
+
 # =============================================================================
 # SUBCOMMAND GROUPS
 # =============================================================================
@@ -220,8 +244,10 @@ def plugin(
 def _register_subcommands() -> None:
     """Register subcommand groups with lazy imports."""
     from fitz_ai.cli.commands.keywords import app as keywords_app
+    from fitz_ai.cli.commands.tables import app as tables_app
 
     app.add_typer(keywords_app, name="keywords")
+    app.add_typer(tables_app, name="tables")
 
 
 _register_subcommands()

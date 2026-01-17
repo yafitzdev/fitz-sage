@@ -362,6 +362,84 @@ class SchemaStore:
             logger.warning(f"Failed to list tables: {e}")
             return []
 
+    def get_schema(self, table_name: str) -> TableSchema | None:
+        """
+        Get a specific table schema by name.
+
+        Alias for get_table() for consistency.
+
+        Args:
+            table_name: Name of the table
+
+        Returns:
+            TableSchema if found, None otherwise
+        """
+        return self.get_table(table_name)
+
+    def get_all_schemas(self) -> list[TableSchema]:
+        """
+        Get all registered table schemas.
+
+        Returns:
+            List of TableSchema objects
+        """
+        try:
+            results = self._vector_db.search(
+                collection_name=self._schema_collection,
+                query_vector=[0.0] * 1536,  # Dummy vector
+                limit=1000,
+                with_payload=True,
+            )
+
+            schemas = []
+            for result in results:
+                payload = getattr(result, "payload", None) or result.get("payload", {})
+                if "table_name" in payload:
+                    try:
+                        schema = TableSchema.from_payload(payload)
+                        schemas.append(schema)
+                    except Exception as e:
+                        logger.warning(f"Failed to parse schema: {e}")
+                        continue
+
+            return schemas
+
+        except Exception as e:
+            logger.warning(f"Failed to get all schemas: {e}")
+            return []
+
+    def delete_schema(self, table_name: str) -> bool:
+        """
+        Delete a table schema.
+
+        Args:
+            table_name: Name of the table to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        try:
+            # Check if schema exists
+            existing = self.get_table(table_name)
+            if existing is None:
+                return False
+
+            # Use delete method if available
+            if hasattr(self._vector_db, "delete"):
+                self._vector_db.delete(
+                    self._schema_collection,
+                    {"points": [table_name]},
+                )
+                logger.info(f"Deleted table schema: {table_name}")
+                return True
+
+            logger.warning(f"Vector DB doesn't support delete operation")
+            return False
+
+        except Exception as e:
+            logger.warning(f"Failed to delete schema {table_name}: {e}")
+            return False
+
     def clear(self) -> None:
         """Clear all schemas (delete the schema collection)."""
         try:

@@ -30,6 +30,7 @@ from .schema import (  # Main config; RAG sub-configs; Ingestion configs
     RerankConfig,
     RetrievalConfig,
     RGSConfig,
+    StructuredConfig,
 )
 
 __all__ = [
@@ -45,6 +46,7 @@ __all__ = [
     "RerankConfig",
     "RGSConfig",
     "LoggingConfig",
+    "StructuredConfig",
     # Ingestion configs
     "IngestConfig",
     "IngesterConfig",
