@@ -1,14 +1,5 @@
 # fitz_ai/core/chunk.py
-"""
-Chunk - Core data model for fitz-ai.
-
-The Chunk is the fundamental unit of knowledge in fitz-ai. All engines,
-ingestion pipelines, and vector stores work with chunks.
-
-This module provides:
-- Chunk: The canonical Pydantic model
-- ChunkLike: Protocol for duck-typed chunk handling
-"""
+"""Chunk - fundamental unit of knowledge. See docs/api_reference.md for examples."""
 
 from __future__ import annotations
 
@@ -19,12 +10,7 @@ from pydantic import BaseModel, Field
 
 @runtime_checkable
 class ChunkLike(Protocol):
-    """
-    Protocol for chunk-like objects.
-
-    Use this when you need duck-typed chunk handling without
-    requiring the concrete Chunk class.
-    """
+    """Protocol for duck-typed chunk handling."""
 
     @property
     def id(self) -> str: ...
@@ -43,16 +29,7 @@ class ChunkLike(Protocol):
 
 
 class Chunk(BaseModel):
-    """
-    Canonical chunk model used across the entire fitz stack.
-
-    A chunk is a segment of a document with:
-    - Unique identifier
-    - Reference to parent document
-    - Position within the document
-    - Text content
-    - Optional metadata
-    """
+    """Canonical chunk model: document segment with ID, content, and metadata."""
 
     id: str = Field(..., description="Chunk ID")
     doc_id: str = Field(..., description="Parent document ID")
