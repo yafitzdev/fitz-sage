@@ -35,14 +35,7 @@ try:
 except ImportError:
     DERIVED_AVAILABLE = False
 
-from .base import (
-    ChatClient,
-    Embedder,
-    EntityGraphClient,
-    KeywordMatcherClient,
-    RetrievalStep,
-    VectorClient,
-)
+from .base import RetrievalStep
 
 logger = get_logger(__name__)
 
@@ -91,12 +84,12 @@ class VectorSearchStep(RetrievalStep):
         r"\bwhich\s+(?:is|has|one)\s+(?:better|faster|slower|higher|lower)\b",
     )
 
-    client: VectorClient
-    embedder: Embedder
+    client: Any  # Vector database client (duck-typed)
+    embedder: Any  # Embedding service (duck-typed)
     collection: str
-    chat: ChatClient | None = None
-    keyword_matcher: KeywordMatcherClient | None = None
-    entity_graph: EntityGraphClient | None = None
+    chat: Any | None = None  # Chat client for query expansion (duck-typed, optional)
+    keyword_matcher: Any | None = None  # Keyword matcher for filtering (duck-typed, optional)
+    entity_graph: Any | None = None  # Entity graph for expansion (duck-typed, optional)
     k: int = 25
     min_query_length: int = 300
     max_queries: int = 5

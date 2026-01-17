@@ -16,7 +16,7 @@ from .models import Keyword
 from .variations import normalize_for_matching
 
 if TYPE_CHECKING:
-    from fitz_ai.core.chunk import ChunkLike
+    from fitz_ai.core.chunk import Chunk
 
 logger = get_logger(__name__)
 
@@ -89,7 +89,7 @@ class KeywordMatcher:
     def filter_chunks(
         self,
         query: str,
-        chunks: Sequence["ChunkLike"],
+        chunks: Sequence["Chunk"],
     ) -> list["ChunkLike"]:
         """
         Filter chunks to those containing matched keywords.

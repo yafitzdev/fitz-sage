@@ -15,7 +15,9 @@ from fitz_ai.engines.fitz_rag.exceptions import RerankError
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
 
-from .base import Reranker, RetrievalStep
+from typing import Any
+
+from .base import RetrievalStep
 
 logger = get_logger(__name__)
 
@@ -39,7 +41,7 @@ class RerankStep(RetrievalStep):
         k: Number of chunks to return after reranking (default: 10)
     """
 
-    reranker: Reranker
+    reranker: Any  # Reranking service (duck-typed)
     k: int = 10  # Return top k after reranking
 
     def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:

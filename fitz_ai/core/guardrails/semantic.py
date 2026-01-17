@@ -21,10 +21,9 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Sequence
+from typing import Callable, Sequence
 
-if TYPE_CHECKING:
-    from fitz_ai.core.chunk import ChunkLike
+from fitz_ai.core.chunk import Chunk
 
 # Type alias for embedder function
 EmbedderFunc = Callable[[str], list[float]]
@@ -300,11 +299,11 @@ class SemanticMatcher:
         similarity = self.max_similarity_to_concepts(text, "assertion", ASSERTION_CONCEPTS)
         return similarity >= self.assertion_threshold
 
-    def count_causal_chunks(self, chunks: Sequence["ChunkLike"]) -> int:
+    def count_causal_chunks(self, chunks: Sequence[Chunk]) -> int:
         """Count chunks containing causal language."""
         return sum(1 for chunk in chunks if self.has_causal_language(chunk.content))
 
-    def count_assertion_chunks(self, chunks: Sequence["ChunkLike"]) -> int:
+    def count_assertion_chunks(self, chunks: Sequence[Chunk]) -> int:
         """Count chunks containing assertions."""
         return sum(1 for chunk in chunks if self.has_assertion(chunk.content))
 
@@ -364,7 +363,7 @@ class SemanticMatcher:
 
     def find_conflicts(
         self,
-        chunks: Sequence["ChunkLike"],
+        chunks: Sequence[Chunk],
     ) -> list[tuple[str, str, str]]:
         """
         Find all conflicting claim pairs across chunks.

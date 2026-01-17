@@ -14,7 +14,7 @@ Usage:
     from fitz_ai.ingestion.enrichment import EnrichmentPipeline, EnrichmentConfig
 
     pipeline = EnrichmentPipeline.from_config(
-        config=EnrichmentConfig.from_dict(config_dict.get("enrichment", {})),
+        config=EnrichmentConfig.model_validate(config_dict.get("enrichment", {})),
         project_root=Path("/path/to/project"),
         chat_client=my_llm_client,
         collection="my_collection",  # For keyword vocabulary
@@ -181,7 +181,7 @@ class EnrichmentPipeline:
         if config is None:
             config = EnrichmentConfig()
         elif isinstance(config, dict):
-            config = EnrichmentConfig.from_dict(config)
+            config = EnrichmentConfig.model_validate(config)
 
         return cls(
             config=config,

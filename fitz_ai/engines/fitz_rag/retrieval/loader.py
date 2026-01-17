@@ -20,13 +20,7 @@ if TYPE_CHECKING:
 import yaml
 
 from fitz_ai.engines.fitz_rag.retrieval.steps import (
-    ChatClient,
-    Embedder,
-    EntityGraphClient,
-    KeywordMatcherClient,
-    Reranker,
     RetrievalStep,
-    VectorClient,
     get_step_class,
 )
 from fitz_ai.logging.logger import get_logger
@@ -107,13 +101,13 @@ class RetrievalDependencies:
     These are injected when building the pipeline.
     """
 
-    vector_client: VectorClient
-    embedder: Embedder
+    vector_client: Any  # Vector database client (duck-typed)
+    embedder: Any  # Embedding service (duck-typed)
     collection: str
-    reranker: Reranker | None = None
-    chat: ChatClient | None = None  # Fast-tier chat for multi-query expansion
-    keyword_matcher: KeywordMatcherClient | None = None  # Exact keyword matching
-    entity_graph: EntityGraphClient | None = None  # Entity graph for related chunk discovery
+    reranker: Any | None = None  # Reranking service (duck-typed, optional)
+    chat: Any | None = None  # Fast-tier chat for multi-query expansion (duck-typed, optional)
+    keyword_matcher: Any | None = None  # Exact keyword matching (duck-typed, optional)
+    entity_graph: Any | None = None  # Entity graph for related chunk discovery (duck-typed, optional)
     max_entity_expansion: int = 10  # Max related chunks per query
     table_store: Any | None = None  # TableStore for CSV file queries
 

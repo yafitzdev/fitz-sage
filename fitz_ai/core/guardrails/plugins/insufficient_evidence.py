@@ -19,16 +19,14 @@ It only enforces: "Is there explicit evidence to justify a decisive answer?"
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Sequence
+from typing import Sequence
 
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
 from ..base import ConstraintResult
 from ..semantic import SemanticMatcher
-
-if TYPE_CHECKING:
-    from fitz_ai.core.chunk import ChunkLike
 
 logger = get_logger(__name__)
 
@@ -67,7 +65,7 @@ class InsufficientEvidenceConstraint:
     def apply(
         self,
         query: str,
-        chunks: Sequence["ChunkLike"],
+        chunks: Sequence[Chunk],
     ) -> ConstraintResult:
         """
         Check if there is sufficient evidence to answer the query.

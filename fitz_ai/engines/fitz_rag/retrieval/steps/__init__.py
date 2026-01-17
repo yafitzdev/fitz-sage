@@ -29,15 +29,7 @@ Usage:
 """
 
 from .artifact_fetch import ArtifactClient, ArtifactFetchStep
-from .base import (
-    ChatClient,
-    Embedder,
-    EntityGraphClient,
-    KeywordMatcherClient,
-    Reranker,
-    RetrievalStep,
-    VectorClient,
-)
+from .base import RetrievalStep
 from .dedupe import DedupeStep
 from .freshness import FreshnessStep
 from .limit import LimitStep
@@ -81,14 +73,8 @@ def list_available_steps() -> list[str]:
 
 
 __all__ = [
-    # Base classes and protocols
+    # Base classes
     "RetrievalStep",
-    "VectorClient",
-    "Embedder",
-    "Reranker",
-    "ChatClient",
-    "KeywordMatcherClient",
-    "EntityGraphClient",
     "ArtifactClient",
     # Step classes
     "VectorSearchStep",

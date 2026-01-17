@@ -7,22 +7,20 @@ This module provides the function that orchestrates constraint evaluation.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Sequence
+from typing import Sequence
 
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
 from .base import ConstraintPlugin, ConstraintResult
-
-if TYPE_CHECKING:
-    from fitz_ai.core.chunk import ChunkLike
 
 logger = get_logger(__name__)
 
 
 def apply_constraints(
     query: str,
-    chunks: Sequence["ChunkLike"],
+    chunks: Sequence[Chunk],
     constraints: Sequence[ConstraintPlugin],
 ) -> ConstraintResult:
     """

@@ -12,7 +12,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Protocol, runtime_checkable
 
-from fitz_ai.core.chunk import ChunkLike
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import VECTOR_DB
 
@@ -47,7 +47,7 @@ class VectorDBClient(Protocol):
 # =============================================================================
 
 
-def compute_chunk_hash(chunk: ChunkLike) -> str:
+def compute_chunk_hash(chunk: Chunk) -> str:
     """
     Compute a stable hash for a chunk.
 
@@ -64,7 +64,7 @@ def compute_chunk_hash(chunk: ChunkLike) -> str:
 
 
 def chunks_to_points(
-    chunks: Iterable[ChunkLike],
+    chunks: Iterable[Chunk],
     vectors: Iterable[List[float]],
 ) -> List[Dict[str, Any]]:
     """
@@ -140,7 +140,7 @@ class VectorDBWriter:
     def upsert(
         self,
         collection: str,
-        chunks: Iterable[ChunkLike],
+        chunks: Iterable[Chunk],
         vectors: Iterable[List[float]],
     ) -> None:
         """

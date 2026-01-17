@@ -33,13 +33,10 @@ from .registry import (
 from .steps import (
     STEP_REGISTRY,
     DedupeStep,
-    Embedder,
     LimitStep,
-    Reranker,
     RerankStep,
     RetrievalStep,
     ThresholdStep,
-    VectorClient,
     VectorSearchStep,
     get_step_class,
     list_available_steps,
@@ -59,10 +56,6 @@ __all__ = [
     "ThresholdStep",
     "LimitStep",
     "DedupeStep",
-    # Protocols
-    "VectorClient",
-    "Embedder",
-    "Reranker",
     # Registry
     "STEP_REGISTRY",
     "get_step_class",

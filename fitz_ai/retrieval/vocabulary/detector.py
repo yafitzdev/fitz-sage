@@ -25,7 +25,7 @@ from .models import Keyword
 from .variations import generate_variations
 
 if TYPE_CHECKING:
-    from fitz_ai.core.chunk import ChunkLike
+    from fitz_ai.core.chunk import Chunk
 
 logger = get_logger(__name__)
 
@@ -147,7 +147,7 @@ class KeywordDetector:
 
     def detect_from_chunks(
         self,
-        chunks: Sequence["ChunkLike"],
+        chunks: Sequence["Chunk"],
     ) -> list[Keyword]:
         """
         Detect keywords from a list of chunks.
@@ -249,7 +249,7 @@ class KeywordDetector:
 
 
 def suggest_keywords(
-    chunks: Sequence["ChunkLike"],
+    chunks: Sequence["Chunk"],
     min_occurrences: int = 2,
 ) -> list[Keyword]:
     """

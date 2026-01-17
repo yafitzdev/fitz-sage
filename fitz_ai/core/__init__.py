@@ -50,7 +50,7 @@ Examples:
 from .answer import Answer
 
 # Core data models
-from .chunk import Chunk, ChunkLike
+from .chunk import Chunk
 
 # Query constraints
 from .constraints import Constraints
@@ -99,7 +99,6 @@ __all__ = [
     "Provenance",
     "Constraints",
     "Chunk",
-    "ChunkLike",
     # Epistemic Guardrails
     "ConstraintResult",
     "ConstraintPluginProtocol",

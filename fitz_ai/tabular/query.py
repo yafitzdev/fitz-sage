@@ -28,10 +28,10 @@ import re
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.engines.fitz_rag.retrieval.steps.base import ChatClient, RetrievalStep
+from fitz_ai.engines.fitz_rag.retrieval.steps.base import RetrievalStep
 
 from .models import ParsedTable
 
@@ -64,7 +64,7 @@ class TableQueryStep(RetrievalStep):
         table_store: Optional TableStore for fetching stored tables (CSV files).
     """
 
-    chat: ChatClient
+    chat: Any  # Chat client for LLM calls (duck-typed)
     max_results: int = 100
     table_store: "TableStore | None" = field(default=None)
 

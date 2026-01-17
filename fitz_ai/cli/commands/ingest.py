@@ -743,7 +743,7 @@ def command(
                 get_artifact_registry,
             )
 
-            enrichment_config = EnrichmentConfig.from_dict(enrichment_cfg)
+            enrichment_config = EnrichmentConfig.model_validate(enrichment_cfg)
 
             # Check if any selected artifact requires LLM
             # Hierarchy always requires LLM for summarization

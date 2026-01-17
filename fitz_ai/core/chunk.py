@@ -3,29 +3,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Protocol, runtime_checkable
+from typing import Any, Dict
 
 from pydantic import BaseModel, Field
-
-
-@runtime_checkable
-class ChunkLike(Protocol):
-    """Protocol for duck-typed chunk handling."""
-
-    @property
-    def id(self) -> str: ...
-
-    @property
-    def doc_id(self) -> str: ...
-
-    @property
-    def chunk_index(self) -> int: ...
-
-    @property
-    def content(self) -> str: ...
-
-    @property
-    def metadata(self) -> Dict[str, Any] | None: ...
 
 
 class Chunk(BaseModel):
@@ -38,4 +18,4 @@ class Chunk(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Chunk metadata")
 
 
-__all__ = ["Chunk", "ChunkLike"]
+__all__ = ["Chunk"]

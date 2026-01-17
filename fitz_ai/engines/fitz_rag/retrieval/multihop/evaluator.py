@@ -7,7 +7,7 @@ Uses LLM to judge whether retrieved evidence is sufficient to answer the query.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
@@ -16,13 +16,6 @@ if TYPE_CHECKING:
     from fitz_ai.core.chunk import Chunk
 
 logger = get_logger(__name__)
-
-
-@runtime_checkable
-class ChatClient(Protocol):
-    """Protocol for chat services."""
-
-    def chat(self, messages: list[dict[str, Any]]) -> str: ...
 
 
 class EvidenceEvaluator:
@@ -36,7 +29,7 @@ class EvidenceEvaluator:
     when uncertain, as getting more context is cheap compared to hallucination.
     """
 
-    def __init__(self, chat: ChatClient, max_context_chars: int = 5000):
+    def __init__(self, chat: Any, max_context_chars: int = 5000):  # chat is duck-typed
         """
         Initialize the evaluator.
 

@@ -22,12 +22,12 @@ Config structure in .fitz/config.yaml:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any
 
+from pydantic import BaseModel, Field
 
-@dataclass
-class ArtifactConfig:
+
+class ArtifactConfig(BaseModel):
     """
     Configuration for project-level artifacts.
 
@@ -42,12 +42,11 @@ class ArtifactConfig:
     """
 
     auto: bool = True
-    enabled: list[str] = field(default_factory=list)
-    disabled: list[str] = field(default_factory=list)
+    enabled: list[str] = Field(default_factory=list)
+    disabled: list[str] = Field(default_factory=list)
 
 
-@dataclass
-class HierarchyRule:
+class HierarchyRule(BaseModel):
     """
     A single hierarchy rule for grouping and summarizing chunks.
 
@@ -70,8 +69,7 @@ class HierarchyRule:
     corpus_prompt: str | None = None
 
 
-@dataclass
-class HierarchyConfig:
+class HierarchyConfig(BaseModel):
     """
     Configuration for hierarchical enrichment.
 
@@ -108,11 +106,10 @@ class HierarchyConfig:
     max_clusters: int = 10  # Upper bound for auto-detection
     group_prompt: str | None = None  # Uses DEFAULT_GROUP_PROMPT if None
     corpus_prompt: str | None = None  # Uses DEFAULT_CORPUS_PROMPT if None
-    rules: list[HierarchyRule] = field(default_factory=list)  # Power user
+    rules: list[HierarchyRule] = Field(default_factory=list)  # Power user
 
 
-@dataclass
-class EnrichmentConfig:
+class EnrichmentConfig(BaseModel):
     """
     Configuration for the enrichment pipeline.
 
@@ -138,75 +135,8 @@ class EnrichmentConfig:
                 prompt: "Summarize sentiment and themes"
     """
 
-    artifacts: ArtifactConfig = field(default_factory=ArtifactConfig)
-    hierarchy: HierarchyConfig = field(default_factory=HierarchyConfig)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "EnrichmentConfig":
-        """Create config from dictionary (e.g., from YAML)."""
-        if not data:
-            return cls()
-
-        artifacts_data = data.get("artifacts", {})
-        hierarchy_data = data.get("hierarchy", {})
-
-        # Parse hierarchy rules
-        hierarchy_rules = []
-        for rule_data in hierarchy_data.get("rules", []):
-            hierarchy_rules.append(
-                HierarchyRule(
-                    name=rule_data.get("name", "unnamed"),
-                    paths=rule_data.get("paths", []),
-                    group_by=rule_data.get("group_by", ""),
-                    prompt=rule_data.get("prompt", "Summarize this group."),
-                    corpus_prompt=rule_data.get("corpus_prompt"),
-                )
-            )
-
-        return cls(
-            artifacts=ArtifactConfig(
-                auto=artifacts_data.get("auto", True),
-                enabled=artifacts_data.get("enabled", []),
-                disabled=artifacts_data.get("disabled", []),
-            ),
-            hierarchy=HierarchyConfig(
-                grouping_strategy=hierarchy_data.get("grouping_strategy", "metadata"),
-                group_by=hierarchy_data.get("group_by", "source_file"),
-                n_clusters=hierarchy_data.get("n_clusters"),
-                max_clusters=hierarchy_data.get("max_clusters", 10),
-                group_prompt=hierarchy_data.get("group_prompt"),
-                corpus_prompt=hierarchy_data.get("corpus_prompt"),
-                rules=hierarchy_rules,
-            ),
-        )
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
-        return {
-            "artifacts": {
-                "auto": self.artifacts.auto,
-                "enabled": self.artifacts.enabled,
-                "disabled": self.artifacts.disabled,
-            },
-            "hierarchy": {
-                "grouping_strategy": self.hierarchy.grouping_strategy,
-                "group_by": self.hierarchy.group_by,
-                "n_clusters": self.hierarchy.n_clusters,
-                "max_clusters": self.hierarchy.max_clusters,
-                "group_prompt": self.hierarchy.group_prompt,
-                "corpus_prompt": self.hierarchy.corpus_prompt,
-                "rules": [
-                    {
-                        "name": rule.name,
-                        "paths": rule.paths,
-                        "group_by": rule.group_by,
-                        "prompt": rule.prompt,
-                        "corpus_prompt": rule.corpus_prompt,
-                    }
-                    for rule in self.hierarchy.rules
-                ],
-            },
-        }
+    artifacts: ArtifactConfig = Field(default_factory=ArtifactConfig)
+    hierarchy: HierarchyConfig = Field(default_factory=HierarchyConfig)
 
 
 __all__ = [

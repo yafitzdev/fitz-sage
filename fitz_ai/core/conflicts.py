@@ -20,11 +20,10 @@ from __future__ import annotations
 
 from typing import Sequence
 
-# Re-export ChunkLike from its canonical location
-from fitz_ai.core.chunk import ChunkLike
+from fitz_ai.core.chunk import Chunk
 
 
-def find_conflicts(chunks: Sequence[ChunkLike]) -> list[tuple[str, str, str, str]]:
+def find_conflicts(chunks: Sequence[Chunk]) -> list[tuple[str, str, str, str]]:
     """
     Backward-compatible conflict detection stub.
 

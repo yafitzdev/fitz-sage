@@ -8,7 +8,7 @@ Uses LLM to generate follow-up questions that would fill gaps in evidence.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
@@ -17,13 +17,6 @@ if TYPE_CHECKING:
     from fitz_ai.core.chunk import Chunk
 
 logger = get_logger(__name__)
-
-
-@runtime_checkable
-class ChatClient(Protocol):
-    """Protocol for chat services."""
-
-    def chat(self, messages: list[dict[str, Any]]) -> str: ...
 
 
 class BridgeExtractor:
@@ -41,7 +34,7 @@ class BridgeExtractor:
 
     def __init__(
         self,
-        chat: ChatClient,
+        chat: Any,  # Chat client (duck-typed)
         max_questions: int = 2,
         max_context_chars: int = 5000,
     ):

@@ -262,7 +262,7 @@ Required class structure:
 ```python
 from dataclasses import dataclass
 from typing import Sequence
-from fitz_ai.core.chunk import ChunkLike
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.core.guardrails.base import ConstraintResult
 
 @dataclass
@@ -277,7 +277,7 @@ class MyConstraint:
     def apply(
         self,
         query: str,
-        chunks: Sequence[ChunkLike],
+        chunks: Sequence[Chunk],
     ) -> ConstraintResult:
         '''
         Evaluate if chunks support answering the query.

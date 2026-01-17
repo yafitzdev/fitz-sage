@@ -17,14 +17,7 @@ from fitz_ai.engines.fitz_rag.retrieval.loader import (
 )
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_rag.retrieval.steps import (
-        ChatClient,
-        Embedder,
-        EntityGraphClient,
-        KeywordMatcherClient,
-        Reranker,
-        VectorClient,
-    )
+    pass
 
 
 class PluginNotFoundError(Exception):
@@ -35,13 +28,13 @@ class PluginNotFoundError(Exception):
 
 def get_retrieval_plugin(
     plugin_name: str,
-    vector_client: "VectorClient",
-    embedder: "Embedder",
+    vector_client: Any,  # Vector database client (duck-typed)
+    embedder: Any,  # Embedding service (duck-typed)
     collection: str,
-    reranker: "Reranker | None" = None,
-    chat: "ChatClient | None" = None,
-    keyword_matcher: "KeywordMatcherClient | None" = None,
-    entity_graph: "EntityGraphClient | None" = None,
+    reranker: Any | None = None,  # Reranking service (duck-typed, optional)
+    chat: Any | None = None,  # Chat client (duck-typed, optional)
+    keyword_matcher: Any | None = None,  # Keyword matcher (duck-typed, optional)
+    entity_graph: Any | None = None,  # Entity graph (duck-typed, optional)
     max_entity_expansion: int = 10,
     table_store: Any | None = None,
     top_k: int = 5,

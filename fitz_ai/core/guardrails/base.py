@@ -10,10 +10,9 @@ This is a core platform capability supporting epistemic honesty.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, Protocol, Sequence, runtime_checkable
+from typing import Any, Dict, Protocol, Sequence, runtime_checkable
 
-if TYPE_CHECKING:
-    from fitz_ai.core.chunk import ChunkLike
+from fitz_ai.core.chunk import Chunk
 
 
 @dataclass(frozen=True)
@@ -71,7 +70,7 @@ class ConstraintPlugin(Protocol):
     def apply(
         self,
         query: str,
-        chunks: Sequence["ChunkLike"],
+        chunks: Sequence[Chunk],
     ) -> ConstraintResult:
         """
         Apply the constraint to retrieved context.
