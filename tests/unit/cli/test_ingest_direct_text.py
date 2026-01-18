@@ -5,7 +5,7 @@ Tests for direct text ingestion in the ingest command.
 
 import pytest
 
-from fitz_ai.cli.commands.ingest import _is_direct_text
+from fitz_ai.cli.commands.ingest_helpers import is_direct_text as _is_direct_text
 
 
 class TestIsDirectText:

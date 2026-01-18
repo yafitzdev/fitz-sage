@@ -47,7 +47,7 @@ class TestIngestCommand:
         mock_ingest.return_value = MagicMock(new_chunks=0, updated_chunks=0, deleted_chunks=0)
 
         with (
-            patch("fitz_ai.cli.commands.ingest.CLIContext.load", return_value=mock_ctx),
+            patch("fitz_ai.cli.commands.ingest_runner.CLIContext.load", return_value=mock_ctx),
             patch("fitz_ai.ingestion.diff.run_diff_ingest", mock_ingest),
         ):
             result = runner.invoke(app, ["ingest", str(tmp_path), "-y"])
@@ -80,8 +80,8 @@ class TestIngestHelpers:
     """Tests for ingest helper functions."""
 
     def test_suggest_collection_name_from_dir(self, tmp_path):
-        """Test _suggest_collection_name suggests name from directory."""
-        from fitz_ai.cli.commands.ingest import _suggest_collection_name
+        """Test suggest_collection_name suggests name from directory."""
+        from fitz_ai.cli.commands.ingest_helpers import suggest_collection_name as _suggest_collection_name
 
         test_dir = tmp_path / "My-Project"
         test_dir.mkdir()
@@ -91,8 +91,8 @@ class TestIngestHelpers:
         assert name == "my_project"
 
     def test_suggest_collection_name_from_file(self, tmp_path):
-        """Test _suggest_collection_name suggests name from file's parent."""
-        from fitz_ai.cli.commands.ingest import _suggest_collection_name
+        """Test suggest_collection_name suggests name from file's parent."""
+        from fitz_ai.cli.commands.ingest_helpers import suggest_collection_name as _suggest_collection_name
 
         test_file = tmp_path / "docs" / "readme.md"
         test_file.parent.mkdir(parents=True)
@@ -103,16 +103,16 @@ class TestIngestHelpers:
         assert name == "docs"
 
     def test_is_code_project_detects_python_project(self, tmp_path):
-        """Test _is_code_project detects Python projects via pyproject.toml."""
-        from fitz_ai.cli.commands.ingest import _is_code_project
+        """Test is_code_project detects Python projects via pyproject.toml."""
+        from fitz_ai.cli.commands.ingest_helpers import is_code_project as _is_code_project
 
         (tmp_path / "pyproject.toml").write_text("[project]\nname = 'test'")
 
         assert _is_code_project(str(tmp_path)) is True
 
     def test_is_code_project_returns_false_for_docs(self, tmp_path):
-        """Test _is_code_project returns False for docs-only folders."""
-        from fitz_ai.cli.commands.ingest import _is_code_project
+        """Test is_code_project returns False for docs-only folders."""
+        from fitz_ai.cli.commands.ingest_helpers import is_code_project as _is_code_project
 
         (tmp_path / "readme.md").write_text("# Documentation")
         (tmp_path / "guide.txt").write_text("User guide")
@@ -120,8 +120,8 @@ class TestIngestHelpers:
         assert _is_code_project(str(tmp_path)) is False
 
     def test_parse_artifact_selection_all(self):
-        """Test _parse_artifact_selection with 'all'."""
-        from fitz_ai.cli.commands.ingest import _parse_artifact_selection
+        """Test parse_artifact_selection with 'all'."""
+        from fitz_ai.cli.commands.ingest_helpers import parse_artifact_selection as _parse_artifact_selection
 
         available = ["navigation_index", "interface_catalog"]
         result = _parse_artifact_selection("all", available)
@@ -129,16 +129,16 @@ class TestIngestHelpers:
         assert result == available
 
     def test_parse_artifact_selection_none(self):
-        """Test _parse_artifact_selection with 'none'."""
-        from fitz_ai.cli.commands.ingest import _parse_artifact_selection
+        """Test parse_artifact_selection with 'none'."""
+        from fitz_ai.cli.commands.ingest_helpers import parse_artifact_selection as _parse_artifact_selection
 
         result = _parse_artifact_selection("none", ["a", "b"])
 
         assert result == []
 
     def test_parse_artifact_selection_comma_list(self):
-        """Test _parse_artifact_selection with comma-separated list."""
-        from fitz_ai.cli.commands.ingest import _parse_artifact_selection
+        """Test parse_artifact_selection with comma-separated list."""
+        from fitz_ai.cli.commands.ingest_helpers import parse_artifact_selection as _parse_artifact_selection
 
         available = ["navigation_index", "interface_catalog", "other"]
         result = _parse_artifact_selection("navigation_index,interface_catalog", available)
@@ -146,8 +146,8 @@ class TestIngestHelpers:
         assert result == ["navigation_index", "interface_catalog"]
 
     def test_parse_artifact_selection_filters_invalid(self):
-        """Test _parse_artifact_selection filters invalid names."""
-        from fitz_ai.cli.commands.ingest import _parse_artifact_selection
+        """Test parse_artifact_selection filters invalid names."""
+        from fitz_ai.cli.commands.ingest_helpers import parse_artifact_selection as _parse_artifact_selection
 
         available = ["valid_one", "valid_two"]
         result = _parse_artifact_selection("valid_one,invalid", available)
@@ -160,7 +160,7 @@ class TestIngestAdapters:
 
     def test_vector_db_writer_adapter_upsert(self):
         """Test VectorDBWriterAdapter.upsert calls client."""
-        from fitz_ai.cli.commands.ingest import VectorDBWriterAdapter
+        from fitz_ai.cli.commands.ingest_adapters import VectorDBWriterAdapter
 
         mock_client = MagicMock()
         adapter = VectorDBWriterAdapter(mock_client)
@@ -172,7 +172,7 @@ class TestIngestAdapters:
 
     def test_vector_db_writer_adapter_flush(self):
         """Test VectorDBWriterAdapter.flush calls client."""
-        from fitz_ai.cli.commands.ingest import VectorDBWriterAdapter
+        from fitz_ai.cli.commands.ingest_adapters import VectorDBWriterAdapter
 
         mock_client = MagicMock()
         adapter = VectorDBWriterAdapter(mock_client)
@@ -187,7 +187,7 @@ class TestBuildChunkingRouterConfig:
 
     def test_build_default_config(self):
         """Test building config with defaults."""
-        from fitz_ai.cli.commands.ingest import _build_chunking_router_config
+        from fitz_ai.cli.commands.ingest_config import build_chunking_router_config as _build_chunking_router_config
 
         config = {
             "chunking": {
@@ -204,7 +204,7 @@ class TestBuildChunkingRouterConfig:
 
     def test_build_config_with_extensions(self):
         """Test building config with per-extension chunkers."""
-        from fitz_ai.cli.commands.ingest import _build_chunking_router_config
+        from fitz_ai.cli.commands.ingest_config import build_chunking_router_config as _build_chunking_router_config
 
         config = {
             "chunking": {
@@ -224,7 +224,7 @@ class TestBuildChunkingRouterConfig:
 
     def test_build_config_empty(self):
         """Test building config with empty input."""
-        from fitz_ai.cli.commands.ingest import _build_chunking_router_config
+        from fitz_ai.cli.commands.ingest_config import build_chunking_router_config as _build_chunking_router_config
 
         result = _build_chunking_router_config({})
 
