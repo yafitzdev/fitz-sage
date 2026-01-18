@@ -155,89 +155,44 @@ class ClaraEngine:
             raise ConfigurationError(f"Failed to initialize CLaRa engine: {e}") from e
 
     def _initialize_model(self) -> None:
-        """Load the CLaRa model with quantization."""
-        import warnings
+        """
+        Load the CLaRa model with quantization.
 
-        # Suppress progress bars and warnings
-        _original_env = {
-            "TQDM_DISABLE": os.environ.get("TQDM_DISABLE"),
-            "HF_HUB_DISABLE_PROGRESS_BARS": os.environ.get("HF_HUB_DISABLE_PROGRESS_BARS"),
-            "TRANSFORMERS_NO_ADVISORY_WARNINGS": os.environ.get(
-                "TRANSFORMERS_NO_ADVISORY_WARNINGS"
-            ),
-            "TOKENIZERS_PARALLELISM": os.environ.get("TOKENIZERS_PARALLELISM"),
-        }
-        os.environ["TQDM_DISABLE"] = "1"
-        os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
-        os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
-        os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        Note: This method loads the CLaRa model directly without suppressing library output.
+        If transformers/torch logging is too verbose, configure your application's logging
+        once at startup rather than per-model initialization.
+        """
+        model_config = self._config.model
+        self._model_path = _ensure_clara_model_available(model_config.model_name_or_path)
 
-        # Suppress verbose loggers
-        _loggers_to_quiet = [
-            "transformers",
-            "transformers.modeling_utils",
-            "accelerate",
-            "peft",
-            "huggingface_hub",
-            "modeling_clara",
-            "torch",
-            "bitsandbytes",
-        ]
-        _original_levels = {}
-        for name in _loggers_to_quiet:
-            _logger = logging.getLogger(name)
-            _original_levels[name] = _logger.level
-            _logger.setLevel(logging.CRITICAL)
+        # Add model path for custom module loading
+        model_parent = str(self._model_path)
+        if model_parent not in sys.path:
+            sys.path.insert(0, model_parent)
 
-        # Redirect stdout/stderr during model load
-        import io
+        from modeling_clara import CLaRa
 
-        _orig_stdout, _orig_stderr = sys.stdout, sys.stderr
-        sys.stdout, sys.stderr = io.StringIO(), io.StringIO()
+        # Determine quantization (4-bit by default)
+        quantization = "no"
+        if model_config.load_in_4bit:
+            quantization = "int4"
+        elif model_config.load_in_8bit:
+            quantization = "int8"
 
-        try:
-            model_config = self._config.model
-            self._model_path = _ensure_clara_model_available(model_config.model_name_or_path)
+        # Load model directly - trust the library to behave reasonably
+        self._model = CLaRa.from_pretrained(
+            str(self._model_path),
+            quantization=quantization,
+            device_map="auto",
+        )
 
-            # Add model path for custom module loading
-            model_parent = str(self._model_path)
-            if model_parent not in sys.path:
-                sys.path.insert(0, model_parent)
-
-            from modeling_clara import CLaRa
-
-            # Determine quantization (4-bit by default now)
-            quantization = "no"
-            if model_config.load_in_4bit:
-                quantization = "int4"
-            elif model_config.load_in_8bit:
-                quantization = "int8"
-
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore")
-                self._model = CLaRa.from_pretrained(
-                    str(self._model_path),
-                    quantization=quantization,
-                    device_map="auto",
-                )
-
-            self._model.eval()
-
-        finally:
-            sys.stdout, sys.stderr = _orig_stdout, _orig_stderr
-            for key, val in _original_env.items():
-                if val is None:
-                    os.environ.pop(key, None)
-                else:
-                    os.environ[key] = val
-            for name, level in _original_levels.items():
-                logging.getLogger(name).setLevel(level)
+        self._model.eval()
 
         if torch.cuda.is_available():
             mem_gb = torch.cuda.memory_allocated() / 1024**3
-            logger.info(f"CLaRa model loaded (4-bit). GPU memory: {mem_gb:.2f} GB")
+            logger.info(f"CLaRa model loaded ({quantization}). GPU memory: {mem_gb:.2f} GB")
         else:
-            logger.info("CLaRa model loaded on CPU")
+            logger.info(f"CLaRa model loaded ({quantization}) on CPU")
 
     def _compress_document(self, text: str) -> Tuple[torch.Tensor, torch.Tensor]:
         """
