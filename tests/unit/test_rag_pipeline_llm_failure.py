@@ -13,6 +13,7 @@ from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
     RGS,
     RGSConfig,
 )
+from fitz_ai.engines.fitz_rag.pipeline.components import PipelineComponents
 from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 
 
@@ -42,11 +43,12 @@ class FailingLLM:
 
 
 def test_rag_pipeline_llm_failure():
-    pipe = RAGPipeline(
+    components = PipelineComponents(
         retrieval=MockRetrievalPipeline(),
         chat=FailingLLM(),
         rgs=RGS(RGSConfig()),
     )
+    pipe = RAGPipeline(components)
 
     with pytest.raises(LLMError):
         pipe.run("Any query")

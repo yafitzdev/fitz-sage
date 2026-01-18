@@ -33,6 +33,13 @@ from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
 from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
     RGSConfig as RGSRuntimeConfig,
 )
+from fitz_ai.engines.fitz_rag.pipeline.components import (
+    CloudComponents,
+    GuardrailComponents,
+    PipelineComponents,
+    RoutingComponents,
+    StructuredComponents,
+)
 from fitz_ai.engines.fitz_rag.pipeline.pipeline import ContextPipeline
 from fitz_ai.engines.fitz_rag.retrieval.multihop import (
     BridgeExtractor,
@@ -82,52 +89,26 @@ class RAGPipeline:
     Flow: retrieval → constraints → context-processing → rgs → llm → answer
     """
 
-    def __init__(
-        self,
-        retrieval,  # RetrievalPipelineFromYaml
-        chat,
-        rgs: RGS,
-        context: ContextPipeline | None = None,
-        constraints: Sequence[ConstraintPlugin] | None = None,
-        semantic_matcher: SemanticMatcher | None = None,
-        query_router: QueryRouter | None = None,
-        keyword_matcher: KeywordMatcher | None = None,
-        hop_controller: HopController | None = None,
-        embedder=None,  # Embedder for cloud cache query embeddings
-        cloud_client=None,  # CloudClient for cloud cache operations
-        fast_chat=None,  # Fast tier chat for cloud routing optimization
-        # Structured data components (optional)
-        structured_router=None,  # StructuredQueryRouter for query classification
-        structured_executor=None,  # StructuredExecutor for SQL execution
-        sql_generator=None,  # SQLGenerator for NL → SQL
-        result_formatter=None,  # ResultFormatter for results → NL
-        derived_store=None,  # DerivedStore for sentence storage
-    ):
-        self.retrieval = retrieval
-        self.chat = chat  # Smart tier (default)
-        self.fast_chat = fast_chat  # Fast tier (for simple queries via cloud routing)
-        self.rgs = rgs
-        self.context = context or ContextPipeline()
-        self.query_router = query_router
-        self.keyword_matcher = keyword_matcher
-        self.hop_controller = hop_controller
-        self.embedder = embedder
-        self.cloud_client = cloud_client
+    def __init__(self, components: PipelineComponents):
+        """
+        Initialize RAG pipeline with component groups.
 
-        # Structured data components
-        self.structured_router = structured_router
-        self.structured_executor = structured_executor
-        self.sql_generator = sql_generator
-        self.result_formatter = result_formatter
-        self.derived_store = derived_store
+        Args:
+            components: Grouped pipeline dependencies
+        """
+        # Required core
+        self.retrieval = components.retrieval
+        self.chat = components.chat
+        self.rgs = components.rgs
+        self.context = components.context or ContextPipeline()
 
-        # Default constraints: ConflictAware + InsufficientEvidence + CausalAttribution
-        # Uses semantic embedding similarity for language-agnostic detection.
-        # Users can override by passing constraints=[] to disable
-        if constraints is None:
+        # Unpack guardrail components
+        guardrails = components.guardrails or GuardrailComponents()
+        semantic_matcher = guardrails.semantic_matcher
+
+        # Set up constraints with defaults
+        if guardrails.constraints is None:
             if semantic_matcher is None:
-                # No constraints if no semantic matcher provided
-                # (caller should use from_config which provides embedder)
                 self.constraints: list[ConstraintPlugin] = []
                 logger.warning(
                     f"{PIPELINE} No semantic_matcher provided, constraints disabled. "
@@ -136,17 +117,40 @@ class RAGPipeline:
             else:
                 self.constraints = create_default_constraints(semantic_matcher)
         else:
-            self.constraints = list(constraints)
+            self.constraints = list(guardrails.constraints)
 
-        routing_status = "enabled" if query_router and query_router.enabled else "disabled"
-        keyword_status = "enabled" if keyword_matcher else "disabled"
-        multihop_status = (
-            f"enabled (max {hop_controller.max_hops})" if hop_controller else "disabled"
+        # Unpack routing components
+        routing = components.routing or RoutingComponents()
+        self.query_router = routing.query_router
+        self.keyword_matcher = routing.keyword_matcher
+        self.hop_controller = routing.hop_controller
+
+        # Unpack cloud components
+        cloud = components.cloud or CloudComponents()
+        self.embedder = cloud.embedder
+        self.cloud_client = cloud.client
+        self.fast_chat = cloud.fast_chat
+
+        # Unpack structured components
+        structured = components.structured or StructuredComponents()
+        self.structured_router = structured.router
+        self.structured_executor = structured.executor
+        self.sql_generator = structured.sql_generator
+        self.result_formatter = structured.result_formatter
+        self.derived_store = structured.derived_store
+
+        # Log initialization status
+        routing_status = (
+            "enabled" if self.query_router and self.query_router.enabled else "disabled"
         )
-        cloud_routing_status = "enabled" if cloud_client and fast_chat else "disabled"
-        structured_status = "enabled" if structured_router else "disabled"
+        keyword_status = "enabled" if self.keyword_matcher else "disabled"
+        multihop_status = (
+            f"enabled (max {self.hop_controller.max_hops})" if self.hop_controller else "disabled"
+        )
+        cloud_routing_status = "enabled" if cloud.is_enabled() else "disabled"
+        structured_status = "enabled" if structured.is_enabled() else "disabled"
         logger.info(
-            f"{PIPELINE} RAGPipeline initialized with {retrieval.plugin_name} retrieval, "
+            f"{PIPELINE} RAGPipeline initialized with {self.retrieval.plugin_name} retrieval, "
             f"{len(self.constraints)} constraint(s), routing={routing_status}, "
             f"keywords={keyword_status}, multihop={multihop_status}, "
             f"cloud_routing={cloud_routing_status}, structured={structured_status}"
@@ -833,26 +837,37 @@ class RAGPipeline:
             )
 
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
-        return cls(
+
+        # Build component groups
+        components = PipelineComponents(
             retrieval=retrieval,
             chat=chat_plugin,
             rgs=rgs,
             context=ContextPipeline(),
-            constraints=constraints,
-            semantic_matcher=semantic_matcher,
-            query_router=query_router,
-            keyword_matcher=keyword_matcher,
-            hop_controller=hop_controller,
-            embedder=embedder,
-            cloud_client=cloud_client,
-            fast_chat=fast_chat,  # For cloud routing optimization
-            # Structured data components
-            structured_router=structured_router,
-            structured_executor=structured_executor,
-            sql_generator=sql_generator,
-            result_formatter=result_formatter,
-            derived_store=derived_store,
+            guardrails=GuardrailComponents(
+                constraints=constraints,
+                semantic_matcher=semantic_matcher,
+            ),
+            routing=RoutingComponents(
+                query_router=query_router,
+                keyword_matcher=keyword_matcher,
+                hop_controller=hop_controller,
+            ),
+            cloud=CloudComponents(
+                embedder=embedder,
+                client=cloud_client,
+                fast_chat=fast_chat,
+            ),
+            structured=StructuredComponents(
+                router=structured_router,
+                executor=structured_executor,
+                sql_generator=sql_generator,
+                result_formatter=result_formatter,
+                derived_store=derived_store,
+            ),
         )
+
+        return cls(components)
 
     @classmethod
     def from_dict(cls, config_dict: dict) -> "RAGPipeline":

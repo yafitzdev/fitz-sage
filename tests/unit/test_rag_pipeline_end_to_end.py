@@ -11,6 +11,7 @@ from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
     RGSAnswer,
     RGSConfig,
 )
+from fitz_ai.engines.fitz_rag.pipeline.components import PipelineComponents
 from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 
 # =============================================================================
@@ -66,11 +67,13 @@ def test_pipeline_end_to_end():
 
     rgs = RGS(config=RGSConfig(max_chunks=3))
 
-    pipe = RAGPipeline(
+    components = PipelineComponents(
         retrieval=MockRetrievalPipeline(),
         chat=DummyLLM(),
         rgs=rgs,
     )
+
+    pipe = RAGPipeline(components)
 
     answer = pipe.run("Why is the sky blue?")
 
