@@ -258,14 +258,112 @@ def select_indexed_columns(
     return indexed
 
 
+# =============================================================================
+# Typed Models for SQL Execution
+# =============================================================================
+
+
+from dataclasses import dataclass, field
+from typing import TypedDict
+
+
+class RowRecord(TypedDict, total=False):
+    """
+    Row record from SQL query results.
+
+    Contains column values plus optional nested row data.
+    """
+
+    __row_data: dict[str, Any]  # Nested row structure for complex queries
+
+
+@dataclass
+class TableRow:
+    """A row from a table with typed access."""
+
+    data: dict[str, Any]
+    row_id: str | None = None
+
+    def get(self, column: str, default: Any = None) -> Any:
+        """Get a column value with optional default."""
+        return self.data.get(column, default)
+
+    def __getitem__(self, column: str) -> Any:
+        """Get a column value by key."""
+        return self.data[column]
+
+
+@dataclass
+class AggregationResult:
+    """Result from an aggregation query (COUNT, SUM, AVG, etc.)."""
+
+    value: Any
+    function: str  # COUNT, SUM, AVG, MIN, MAX
+    column: str | None = None
+
+
+@dataclass
+class GroupByResult:
+    """Result from a GROUP BY query."""
+
+    groups: dict[str, list[dict[str, Any]]]
+    aggregations: dict[str, Any] = field(default_factory=dict)
+    group_by_columns: list[str] = field(default_factory=list)
+
+
+class SQLFilterCondition(TypedDict, total=False):
+    """
+    SQL filter condition converted to Qdrant format.
+
+    Examples:
+        {"key": "name", "match": {"value": "Alice"}}
+        {"key": "age", "range": {"gte": 18}}
+    """
+
+    key: str
+    match: dict[str, Any]
+    range: dict[str, Any]
+
+
+@dataclass
+class SQLFilter:
+    """
+    Complete SQL filter specification.
+
+    Represents a WHERE clause converted to Qdrant filter format.
+    """
+
+    conditions: list[SQLFilterCondition] = field(default_factory=list)
+    operator: str = "AND"  # AND, OR
+
+    def to_qdrant_filter(self) -> dict[str, Any]:
+        """Convert to Qdrant filter format."""
+        if not self.conditions:
+            return {}
+
+        if self.operator == "AND":
+            return {"must": self.conditions}
+        else:
+            return {"should": self.conditions}
+
+
 __all__ = [
+    # Type constants
     "TYPE_STRING",
     "TYPE_NUMBER",
     "TYPE_DATE",
     "TYPE_BOOLEAN",
+    # Type inference functions
     "infer_type",
     "infer_column_type",
     "coerce_value",
     "is_indexable_column",
     "select_indexed_columns",
+    # Typed models
+    "RowRecord",
+    "TableRow",
+    "AggregationResult",
+    "GroupByResult",
+    "SQLFilterCondition",
+    "SQLFilter",
 ]

@@ -18,11 +18,13 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from fitz_ai.llm.types import Message, TransformResult
+
 
 class MessageTransformer(Protocol):
     """Protocol for message transformation."""
 
-    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+    def transform(self, messages: list[Message]) -> TransformResult:
         """Transform messages into provider-specific format.
 
         Returns a dict that will be merged into the request payload.
@@ -52,7 +54,7 @@ class OpenAIChatTransform:
     }
     """
 
-    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+    def transform(self, messages: list[Message]) -> TransformResult:
         return {"messages": messages}
 
 
@@ -81,7 +83,7 @@ class CohereChatTransform:
     }
     """
 
-    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+    def transform(self, messages: list[Message]) -> TransformResult:
         # Cohere v2 API accepts OpenAI-compatible format directly
         return {"messages": messages}
 
@@ -110,9 +112,9 @@ class AnthropicChatTransform:
     }
     """
 
-    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+    def transform(self, messages: list[Message]) -> TransformResult:
         system_content = ""
-        user_messages: list[dict[str, Any]] = []
+        user_messages: list[dict[str, str]] = []
 
         for msg in messages:
             role = msg.get("role", "")
@@ -123,7 +125,7 @@ class AnthropicChatTransform:
             elif role in ("user", "assistant"):
                 user_messages.append({"role": role, "content": content})
 
-        result: dict[str, Any] = {"messages": user_messages}
+        result: TransformResult = {"messages": user_messages}
 
         if system_content:
             result["system"] = system_content
@@ -160,8 +162,8 @@ class GeminiChatTransform:
         "assistant": "model",
     }
 
-    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
-        system_instruction = None
+    def transform(self, messages: list[Message]) -> TransformResult:
+        system_instruction: dict[str, Any] | None = None
         contents: list[dict[str, Any]] = []
 
         for msg in messages:
@@ -173,7 +175,7 @@ class GeminiChatTransform:
             elif role in self.ROLE_MAP:
                 contents.append({"role": self.ROLE_MAP[role], "parts": [{"text": content}]})
 
-        result: dict[str, Any] = {"contents": contents}
+        result: TransformResult = {"contents": contents}
 
         if system_instruction:
             result["system_instruction"] = system_instruction
@@ -203,7 +205,7 @@ class OllamaChatTransform:
     }
     """
 
-    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+    def transform(self, messages: list[Message]) -> TransformResult:
         # Ollama accepts OpenAI-compatible format
         return {"messages": messages}
 
@@ -239,8 +241,8 @@ class CohereVisionTransform:
     }
     """
 
-    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
-        transformed = []
+    def transform(self, messages: list[Message]) -> TransformResult:
+        transformed: list[dict[str, Any]] = []
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
@@ -249,7 +251,7 @@ class CohereVisionTransform:
 
             if image_base64 or image_url:
                 # Vision message with image (OpenAI-compatible format)
-                content_parts = [{"type": "text", "text": content}]
+                content_parts: list[dict[str, Any]] = [{"type": "text", "text": content}]
                 if image_base64:
                     content_parts.append(
                         {
@@ -292,8 +294,8 @@ class OpenAIVisionTransform:
     }
     """
 
-    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
-        transformed = []
+    def transform(self, messages: list[Message]) -> TransformResult:
+        transformed: list[dict[str, Any]] = []
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
@@ -302,7 +304,7 @@ class OpenAIVisionTransform:
 
             if image_base64 or image_url:
                 # Vision message with image
-                content_parts = [{"type": "text", "text": content}]
+                content_parts: list[dict[str, Any]] = [{"type": "text", "text": content}]
                 if image_base64:
                     # Detect image type from base64 header or default to png
                     content_parts.append(
@@ -347,7 +349,7 @@ class AnthropicVisionTransform:
     }
     """
 
-    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+    def transform(self, messages: list[Message]) -> TransformResult:
         system_content = ""
         user_messages: list[dict[str, Any]] = []
 
@@ -361,7 +363,7 @@ class AnthropicVisionTransform:
             elif role in ("user", "assistant"):
                 if image_base64 and role == "user":
                     # Vision message with image
-                    content_parts = [
+                    content_parts: list[dict[str, Any]] = [
                         {
                             "type": "image",
                             "source": {
@@ -376,7 +378,7 @@ class AnthropicVisionTransform:
                 else:
                     user_messages.append({"role": role, "content": content})
 
-        result: dict[str, Any] = {"messages": user_messages}
+        result: TransformResult = {"messages": user_messages}
         if system_content:
             result["system"] = system_content
 
@@ -402,8 +404,8 @@ class OllamaVisionTransform:
     }
     """
 
-    def transform(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
-        transformed = []
+    def transform(self, messages: list[Message]) -> TransformResult:
+        transformed: list[dict[str, Any]] = []
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
