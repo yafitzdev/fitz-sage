@@ -5,8 +5,6 @@ Tests for FAISS with default configuration.
 Verifies that FaissLocalVectorDB works correctly with FitzPaths defaults.
 """
 
-from unittest.mock import patch
-
 import pytest
 
 pytest.importorskip("faiss")
@@ -23,8 +21,8 @@ def test_local_faiss_vector_db_uses_fitz_paths_default(tmp_path):
     """
     # Override FitzPaths to use temp directory
     fake_workspace = tmp_path / ".fitz"
-
-    with patch.object(FitzPaths, "workspace", return_value=fake_workspace):
+    FitzPaths.set_workspace(fake_workspace)
+    try:
         # Create DB with no path specified - should use FitzPaths default
         db = FaissLocalVectorDB()
 
@@ -57,6 +55,8 @@ def test_local_faiss_vector_db_uses_fitz_paths_default(tmp_path):
         # Reload and verify data persisted
         db_reloaded = FaissLocalVectorDB()
         assert db_reloaded.count() == 3
+    finally:
+        FitzPaths.reset()
 
 
 def test_local_faiss_vector_db_custom_path_override(tmp_path):

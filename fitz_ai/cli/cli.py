@@ -23,6 +23,11 @@ NOTE: Commands use lazy loading - heavy imports only happen when a command is in
 
 from __future__ import annotations
 
+# Platform configuration - must run before any HuggingFace imports
+from fitz_ai.core.platform import configure_huggingface_windows
+
+configure_huggingface_windows()
+
 from pathlib import Path
 from typing import Optional
 

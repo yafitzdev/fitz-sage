@@ -87,10 +87,9 @@ class TestSqliteTableStore:
     @pytest.fixture
     def temp_workspace(self, tmp_path):
         """Create temporary workspace."""
-        old_workspace = FitzPaths._workspace_override
         FitzPaths.set_workspace(tmp_path / ".fitz")
         yield tmp_path / ".fitz"
-        FitzPaths._workspace_override = old_workspace
+        FitzPaths.reset()
 
     @pytest.fixture
     def store(self, temp_workspace):
@@ -176,10 +175,9 @@ class TestTableCache:
     @pytest.fixture
     def temp_workspace(self, tmp_path):
         """Create temporary workspace."""
-        old_workspace = FitzPaths._workspace_override
         FitzPaths.set_workspace(tmp_path / ".fitz")
         yield tmp_path / ".fitz"
-        FitzPaths._workspace_override = old_workspace
+        FitzPaths.reset()
 
     @pytest.fixture
     def cache(self, temp_workspace):

@@ -1,0 +1,235 @@
+# fitz_ai/core/paths/__init__.py
+"""
+Central path management for Fitz.
+
+ALL components that need file paths should use this module.
+No hardcoded paths anywhere else in the codebase.
+
+Usage:
+    from fitz_ai.core.paths import FitzPaths
+
+    config_path = FitzPaths.config()
+    vector_db_path = FitzPaths.vector_db()
+
+    # Override workspace for testing
+    FitzPaths.set_workspace("/tmp/test_fitz")
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Optional
+
+from . import cache as _cache
+from . import config as _config
+from . import indices as _indices
+from . import ingestion as _ingestion
+from . import plugins as _plugins
+from . import storage as _storage
+from .workspace import WorkspaceManager
+
+
+class FitzPaths:
+    """
+    Central path management for Fitz.
+
+    Facade class that delegates to domain-specific modules.
+    All methods are classmethods for static access.
+    """
+
+    # Workspace management - delegate to WorkspaceManager
+    @classmethod
+    def set_workspace(cls, path: Optional[str | Path]) -> None:
+        """Override the workspace root."""
+        WorkspaceManager.set_workspace(path)
+
+    @classmethod
+    def reset(cls) -> None:
+        """Reset to default workspace (CWD)."""
+        WorkspaceManager.reset()
+
+    @classmethod
+    def workspace(cls) -> Path:
+        """The .fitz workspace directory."""
+        return WorkspaceManager.workspace()
+
+    @classmethod
+    def ensure_workspace(cls) -> Path:
+        """Get workspace path and create it if it doesn't exist."""
+        return WorkspaceManager.ensure_workspace()
+
+    # Configuration
+    @classmethod
+    def config(cls) -> Path:
+        """Default config file path: {workspace}/config.yaml"""
+        return _config.config()
+
+    @classmethod
+    def config_dir(cls) -> Path:
+        """Config directory: {workspace}/config/"""
+        return _config.config_dir()
+
+    @classmethod
+    def engine_config(cls, engine_name: str) -> Path:
+        """Engine-specific config: {workspace}/config/{engine_name}.yaml"""
+        return _config.engine_config(engine_name)
+
+    @classmethod
+    def ensure_config_dir(cls) -> Path:
+        """Get config directory and create it if it doesn't exist."""
+        return _config.ensure_config_dir()
+
+    # Vector DB / Storage
+    @classmethod
+    def vector_db(cls, collection: Optional[str] = None) -> Path:
+        """Local vector database storage path."""
+        return _storage.vector_db(collection)
+
+    @classmethod
+    def ensure_vector_db(cls, collection: Optional[str] = None) -> Path:
+        """Get vector DB path and create it if it doesn't exist."""
+        return _storage.ensure_vector_db(collection)
+
+    @classmethod
+    def graphrag_storage(cls, collection: str) -> Path:
+        """GraphRAG knowledge graph storage path."""
+        return _storage.graphrag_storage(collection)
+
+    @classmethod
+    def ensure_graphrag_storage(cls) -> Path:
+        """Get graphrag directory and create it if it doesn't exist."""
+        return _storage.ensure_graphrag_storage()
+
+    @classmethod
+    def clara_storage(cls, collection: str) -> Path:
+        """CLaRA compressed representations storage path."""
+        return _storage.clara_storage(collection)
+
+    @classmethod
+    def ensure_clara_storage(cls, collection: str) -> Path:
+        """Get clara collection directory and create it if it doesn't exist."""
+        return _storage.ensure_clara_storage(collection)
+
+    # Indices
+    @classmethod
+    def vocabulary(cls, collection: Optional[str] = None) -> Path:
+        """Auto-detected keyword vocabulary file."""
+        return _indices.vocabulary(collection)
+
+    @classmethod
+    def sparse_index(cls, collection: str) -> Path:
+        """Sparse (TF-IDF) index for hybrid search."""
+        return _indices.sparse_index(collection)
+
+    @classmethod
+    def ensure_sparse_index_dir(cls) -> Path:
+        """Get sparse index directory and create it if it doesn't exist."""
+        return _indices.ensure_sparse_index_dir()
+
+    @classmethod
+    def entity_graph(cls, collection: str) -> Path:
+        """Entity graph database for a collection."""
+        return _indices.entity_graph(collection)
+
+    @classmethod
+    def ensure_entity_graph_dir(cls) -> Path:
+        """Get entity graph directory and create it if it doesn't exist."""
+        return _indices.ensure_entity_graph_dir()
+
+    # Ingestion
+    @classmethod
+    def ingest_state(cls) -> Path:
+        """Ingestion state file for incremental ingestion."""
+        return _ingestion.ingest_state()
+
+    @classmethod
+    def table_registry(cls, collection: str) -> Path:
+        """Table chunk IDs registry for a collection."""
+        return _ingestion.table_registry(collection)
+
+    @classmethod
+    def ensure_table_registry_dir(cls) -> Path:
+        """Get tables directory and create it if it doesn't exist."""
+        return _ingestion.ensure_table_registry_dir()
+
+    # Cache
+    @classmethod
+    def cache(cls) -> Path:
+        """Cache directory root."""
+        return _cache.cache()
+
+    @classmethod
+    def knowledge_map(cls) -> Path:
+        """Knowledge map state file for visualization caching."""
+        return _cache.knowledge_map()
+
+    @classmethod
+    def knowledge_map_html(cls) -> Path:
+        """Default output path for knowledge map HTML visualization."""
+        return _cache.knowledge_map_html()
+
+    # User Plugins
+    @classmethod
+    def user_home(cls) -> Path:
+        """User's fitz home directory: ~/.fitz/"""
+        return _plugins.user_home()
+
+    @classmethod
+    def user_plugins(cls) -> Path:
+        """User plugins directory: ~/.fitz/plugins/"""
+        return _plugins.user_plugins()
+
+    @classmethod
+    def user_llm_plugins(cls, plugin_type: str) -> Path:
+        """User LLM plugins: ~/.fitz/plugins/llm/{plugin_type}/"""
+        return _plugins.user_llm_plugins(plugin_type)
+
+    @classmethod
+    def user_vector_db_plugins(cls) -> Path:
+        """User vector DB plugins: ~/.fitz/plugins/vector_db/"""
+        return _plugins.user_vector_db_plugins()
+
+    @classmethod
+    def user_chunking_plugins(cls) -> Path:
+        """User chunking plugins: ~/.fitz/plugins/chunking/"""
+        return _plugins.user_chunking_plugins()
+
+    @classmethod
+    def user_constraint_plugins(cls) -> Path:
+        """User constraint plugins: ~/.fitz/plugins/constraint/"""
+        return _plugins.user_constraint_plugins()
+
+    @classmethod
+    def ensure_user_plugins(cls) -> Path:
+        """Create user plugins directory structure if it doesn't exist."""
+        return _plugins.ensure_user_plugins()
+
+
+# Convenience functions
+def get_workspace() -> Path:
+    """Convenience function to get workspace path."""
+    return FitzPaths.workspace()
+
+
+def get_vector_db_path(collection: Optional[str] = None) -> Path:
+    """Convenience function to get vector DB path."""
+    return FitzPaths.vector_db(collection)
+
+
+def get_config_path() -> Path:
+    """Convenience function to get config path."""
+    return FitzPaths.config()
+
+
+def get_ingest_state_path() -> Path:
+    """Convenience function to get ingest state path."""
+    return FitzPaths.ingest_state()
+
+
+__all__ = [
+    "FitzPaths",
+    "get_workspace",
+    "get_vector_db_path",
+    "get_config_path",
+    "get_ingest_state_path",
+]
