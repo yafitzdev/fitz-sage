@@ -13,6 +13,7 @@ from __future__ import annotations
 import typer
 
 from fitz_ai.cli.context import CLIContext
+from fitz_ai.cli.services import InitService
 from fitz_ai.cli.ui import RICH, console, get_first_available, ui
 from fitz_ai.core.registry import (
     available_chunking_plugins,
@@ -25,6 +26,9 @@ from fitz_ai.runtime import get_default_engine, get_engine_registry
 
 logger = get_logger(__name__)
 
+# Service instance for business logic
+_init_service = InitService()
+
 
 # =============================================================================
 # Default Config Loading
@@ -33,15 +37,7 @@ logger = get_logger(__name__)
 
 def _load_default_config() -> dict:
     """Load the default configuration from default.yaml."""
-    import yaml
-    from pathlib import Path
-
-    # Load from package defaults
-    defaults_path = Path(__file__).parent.parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
-    with defaults_path.open("r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f) or {}
-
-    return raw
+    return _init_service.load_default_config()
 
 
 # =============================================================================
@@ -51,9 +47,7 @@ def _load_default_config() -> dict:
 
 def detect_system():
     """Detect all available services and API keys."""
-    from fitz_ai.core.detect import detect_system_status
-
-    return detect_system_status()
+    return _init_service.detect_system()
 
 
 # =============================================================================
@@ -63,49 +57,7 @@ def detect_system():
 
 def _filter_available_plugins(plugins: list[str], plugin_type: str, system) -> list[str]:
     """Filter plugins to only those that are available."""
-    available = []
-
-    for plugin in plugins:
-        plugin_lower = plugin.lower()
-
-        # Ollama plugins require Ollama
-        if "ollama" in plugin_lower:
-            if system.ollama.available:
-                available.append(plugin)
-            continue
-
-        # Qdrant requires Qdrant
-        if "qdrant" in plugin_lower:
-            if system.qdrant.available:
-                available.append(plugin)
-            continue
-
-        # FAISS requires faiss
-        if "faiss" in plugin_lower:
-            if system.faiss.available:
-                available.append(plugin)
-            continue
-
-        # API-based plugins require API keys
-        if "cohere" in plugin_lower:
-            if system.api_keys.get("cohere", type("", (), {"available": False})).available:
-                available.append(plugin)
-            continue
-
-        if "openai" in plugin_lower or "azure" in plugin_lower:
-            if system.api_keys.get("openai", type("", (), {"available": False})).available:
-                available.append(plugin)
-            continue
-
-        if "anthropic" in plugin_lower:
-            if system.api_keys.get("anthropic", type("", (), {"available": False})).available:
-                available.append(plugin)
-            continue
-
-        # Default: include unknown plugins
-        available.append(plugin)
-
-    return available
+    return _init_service.filter_available_plugins(plugins, plugin_type, system)
 
 
 # =============================================================================
