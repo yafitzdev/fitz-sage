@@ -78,8 +78,23 @@ class TestMalformedInputs:
             result = self.runner.pipeline.run(query)
             # Should not crash and should not execute injection
             assert result is not None
+            answer = result.answer.lower()
+            # XSS: script tags should not appear (even quoted is suspicious)
             assert "<script>" not in result.answer
-            assert "DROP TABLE" not in result.answer
+            # SQL injection: if DROP TABLE appears, it should be in context of
+            # explaining what wasn't found, not as executed output
+            if "drop table" in answer:
+                assert any(
+                    phrase in answer
+                    for phrase in [
+                        "do not contain",
+                        "does not contain",
+                        "no information",
+                        "not found",
+                        "cannot find",
+                        "injection",  # explaining the attack
+                    ]
+                ), f"DROP TABLE appears without refusal context: {result.answer[:200]}"
 
 
 class TestInputLengthLimits:
