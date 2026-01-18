@@ -156,6 +156,30 @@ class RAGPipeline:
             f"cloud_routing={cloud_routing_status}, structured={structured_status}"
         )
 
+    def _wrap_step(self, name: str, fn, *args, error_class=None, **kwargs):
+        """
+        Execute pipeline step with consistent error handling.
+
+        Args:
+            name: Human-readable step name for logging
+            fn: Function to execute
+            *args: Positional arguments for fn
+            error_class: Exception class to raise on failure (default: PipelineError)
+            **kwargs: Keyword arguments for fn
+
+        Returns:
+            Result of fn(*args, **kwargs)
+
+        Raises:
+            error_class: If fn raises any exception
+        """
+        error_class = error_class or PipelineError
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:
+            logger.error(f"{PIPELINE} {name} failed: {exc}")
+            raise error_class(f"{name} failed") from exc
+
     def run(self, query: str) -> RGSAnswer:
         """Execute the RAG pipeline for a query."""
         logger.info(f"{PIPELINE} Running pipeline for query='{query[:50]}...'")
@@ -174,7 +198,7 @@ class RAGPipeline:
                 logger.info(f"{PIPELINE} Query routed to L2 corpus summaries (global intent)")
 
         # Step 1: Retrieve relevant chunks (using multi-hop or single retrieval)
-        try:
+        def _do_retrieval():
             if self.hop_controller:
                 raw_chunks, hop_metadata = self.hop_controller.retrieve(
                     query, filter_override=filter_override
@@ -183,11 +207,11 @@ class RAGPipeline:
                     f"{PIPELINE} Multi-hop retrieval: {hop_metadata.total_hops} hop(s), "
                     f"{len(raw_chunks)} total chunks"
                 )
+                return raw_chunks
             else:
-                raw_chunks = self.retrieval.retrieve(query, filter_override=filter_override)
-        except Exception as exc:
-            logger.error(f"{PIPELINE} Retrieval failed: {exc}")
-            raise PipelineError("Retrieval failed") from exc
+                return self.retrieval.retrieve(query, filter_override=filter_override)
+
+        raw_chunks = self._wrap_step("Retrieval", _do_retrieval)
 
         # Step 1.25: Check cloud cache (early return on hit)
         if self.cloud_client and self.embedder:
@@ -213,19 +237,14 @@ class RAGPipeline:
         logger.info(f"{PIPELINE} Answer mode resolved: {answer_mode.value}")
 
         # Step 4: Process context (dedupe, group, merge, pack)
-        try:
-            chunks = self.context.process(raw_chunks)
-        except Exception as exc:
-            logger.error(f"{PIPELINE} Context processing failed: {exc}")
-            raise PipelineError("Context processing failed") from exc
+        chunks = self._wrap_step("Context processing", self.context.process, raw_chunks)
 
         # Step 5: Build RGS prompt with answer mode instruction
-        try:
+        def _build_prompt():
             prompt = self.rgs.build_prompt(query, chunks)
-            prompt = self._apply_answer_mode_to_prompt(prompt, answer_mode)
-        except Exception as exc:
-            logger.error(f"{PIPELINE} Failed to build RGS prompt: {exc}")
-            raise RGSGenerationError("Failed to build RGS prompt") from exc
+            return self._apply_answer_mode_to_prompt(prompt, answer_mode)
+
+        prompt = self._wrap_step("Build RGS prompt", _build_prompt, error_class=RGSGenerationError)
 
         # Step 6: Generate answer via LLM
         messages = [
@@ -235,15 +254,10 @@ class RAGPipeline:
 
         # Select chat model based on cloud routing advice (fail-open: default to smart tier)
         chat_client = self._select_chat_for_routing()
-
-        try:
-            raw = chat_client.chat(messages)
-        except Exception as exc:
-            logger.error(f"{PIPELINE} LLM chat failed: {exc}")
-            raise LLMError("LLM chat operation failed") from exc
+        raw = self._wrap_step("LLM chat", chat_client.chat, messages, error_class=LLMError)
 
         # Step 7: Structure the answer with mode
-        try:
+        def _build_answer():
             answer = self.rgs.build_answer(raw, chunks, mode=answer_mode)
             logger.info(f"{PIPELINE} Pipeline run completed (mode={answer_mode.value})")
 
@@ -252,9 +266,8 @@ class RAGPipeline:
                 self._store_in_cloud_cache(query, raw_chunks, answer)
 
             return answer
-        except Exception as exc:
-            logger.error(f"{PIPELINE} Failed to structure RGS answer: {exc}")
-            raise RGSGenerationError("Failed to build RGS answer") from exc
+
+        return self._wrap_step("Build RGS answer", _build_answer, error_class=RGSGenerationError)
 
     def _apply_all_constraints(
         self,
