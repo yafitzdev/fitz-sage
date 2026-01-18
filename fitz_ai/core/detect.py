@@ -383,14 +383,20 @@ def detect_ollama() -> ServiceStatus:
             details="httpx not installed",
         )
 
+    from fitz_ai.core.constants import (
+        OLLAMA_API_TAGS_PATH,
+        OLLAMA_DEFAULT_PORT,
+        OLLAMA_HEALTH_TIMEOUT,
+    )
+
     hosts_to_try = ["localhost", "127.0.0.1"]
-    port = 11434
+    port = OLLAMA_DEFAULT_PORT
 
     for host in hosts_to_try:
         try:
             response = httpx.get(
-                f"http://{host}:{port}/api/tags",
-                timeout=2.0,
+                f"http://{host}:{port}{OLLAMA_API_TAGS_PATH}",
+                timeout=OLLAMA_HEALTH_TIMEOUT,
             )
             if response.status_code == 200:
                 data = response.json()

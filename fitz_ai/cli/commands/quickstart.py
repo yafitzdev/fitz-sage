@@ -313,8 +313,17 @@ def _check_ollama() -> dict:
     }
 
     # Check if Ollama is running
+    from fitz_ai.core.constants import (
+        OLLAMA_API_TAGS_PATH,
+        OLLAMA_HEALTH_TIMEOUT,
+        ollama_url,
+    )
+
     try:
-        response = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
+        response = httpx.get(
+            f"{ollama_url()}{OLLAMA_API_TAGS_PATH}",
+            timeout=OLLAMA_HEALTH_TIMEOUT,
+        )
         if response.status_code != 200:
             return result
         result["running"] = True

@@ -51,6 +51,21 @@ logger = logging.getLogger(__name__)
 
 ModelTier = Literal["smart", "fast", "balanced"]
 
+# Fallback chains: primary tier → fallback tiers in order
+_TIER_FALLBACKS: dict[ModelTier, tuple[ModelTier, ...]] = {
+    "smart": ("balanced", "fast"),
+    "balanced": ("fast", "smart"),
+    "fast": ("balanced", "smart"),
+}
+
+# Warning messages for fallback scenarios
+_FALLBACK_WARNINGS: dict[tuple[ModelTier, ModelTier], str] = {
+    ("smart", "balanced"): "Query responses may be lower quality.",
+    ("smart", "fast"): "Query responses may be lower quality.",
+    ("balanced", "smart"): "This may be costlier than intended.",
+    ("fast", "smart"): "Enrichment may be slower and costlier.",
+}
+
 
 def _resolve_model_from_tier(
     defaults: dict[str, Any],
@@ -71,11 +86,6 @@ def _resolve_model_from_tier(
         - fast: Best speed for background tasks (enrichment, summaries)
         - balanced: Cost-effective with good quality (evaluation, bulk tasks)
 
-    Fallback Priority (when requested tier not configured):
-        - fast → balanced → smart
-        - balanced → fast → smart
-        - smart → balanced → fast
-
     Args:
         defaults: Plugin defaults from YAML spec
         tier: Requested tier ("smart", "fast", or "balanced"), defaults to "smart"
@@ -85,92 +95,32 @@ def _resolve_model_from_tier(
     Returns:
         Model name to use, or None if no tier-based resolution needed
     """
-    # If user explicitly provided a model, use it (no tier logic)
     if "model" in user_kwargs:
         return None
 
-    # Look up models: user config overrides > plugin defaults
     user_models = user_kwargs.get("models", {})
     default_models = defaults.get("models", {})
-
-    # Merge: user models override defaults
     models = {**default_models, **user_models}
 
     if not models:
-        # No tier-based models defined - use single model if available
         return defaults.get("model")
 
-    smart_model = models.get("smart")
-    fast_model = models.get("fast")
-    balanced_model = models.get("balanced")
+    effective_tier: ModelTier = tier or "smart"
 
-    # Default to "smart" tier if not specified
-    effective_tier = tier or "smart"
+    # Try primary tier first
+    if model := models.get(effective_tier):
+        return model
 
-    # Resolve based on tier with fallback chains
-    # Fallback priority: fast → balanced → smart
-    if effective_tier == "smart":
-        if smart_model:
-            return smart_model
-        # Fallback: balanced → fast
-        if balanced_model:
-            if tier is not None:
-                warnings.warn(
-                    f"[{plugin_name}] No 'smart' model configured, using 'balanced' model. "
-                    f"Query responses may be lower quality.",
-                    UserWarning,
-                    stacklevel=4,
-                )
-            return balanced_model
-        if fast_model:
-            if tier is not None:
-                warnings.warn(
-                    f"[{plugin_name}] No 'smart' model configured, using 'fast' model. "
-                    f"Query responses may be lower quality.",
-                    UserWarning,
-                    stacklevel=4,
-                )
-            return fast_model
-
-    elif effective_tier == "balanced":
-        if balanced_model:
-            return balanced_model
-        # Fallback: fast → smart
-        if fast_model:
-            warnings.warn(
-                f"[{plugin_name}] No 'balanced' model configured, using 'fast' model.",
-                UserWarning,
-                stacklevel=4,
-            )
-            return fast_model
-        if smart_model:
-            warnings.warn(
-                f"[{plugin_name}] No 'balanced' model configured, using 'smart' model. "
-                f"This may be costlier than intended.",
-                UserWarning,
-                stacklevel=4,
-            )
-            return smart_model
-
-    elif effective_tier == "fast":
-        if fast_model:
-            return fast_model
-        # Fallback: balanced → smart
-        if balanced_model:
-            warnings.warn(
-                f"[{plugin_name}] No 'fast' model configured, using 'balanced' model.",
-                UserWarning,
-                stacklevel=4,
-            )
-            return balanced_model
-        if smart_model:
-            warnings.warn(
-                f"[{plugin_name}] No 'fast' model configured, using 'smart' model. "
-                f"Enrichment may be slower and costlier.",
-                UserWarning,
-                stacklevel=4,
-            )
-            return smart_model
+    # Try fallbacks in order
+    for fallback_tier in _TIER_FALLBACKS[effective_tier]:
+        if model := models.get(fallback_tier):
+            if tier is not None:  # Only warn if tier was explicitly requested
+                extra = _FALLBACK_WARNINGS.get((effective_tier, fallback_tier), "")
+                msg = f"[{plugin_name}] No '{effective_tier}' model configured, using '{fallback_tier}' model."
+                if extra:
+                    msg = f"{msg} {extra}"
+                warnings.warn(msg, UserWarning, stacklevel=4)
+            return model
 
     return None
 

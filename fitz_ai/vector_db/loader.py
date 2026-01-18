@@ -51,8 +51,9 @@ def _string_to_uuid(s: str) -> str:
     Uses UUID5 with a fixed namespace for determinism - same input
     always produces the same UUID.
     """
-    namespace = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
-    return str(uuid.uuid5(namespace, s))
+    from fitz_ai.core.constants import UUID_NAMESPACE_DNS
+
+    return str(uuid.uuid5(UUID_NAMESPACE_DNS, s))
 
 
 class VectorDBSpec:
