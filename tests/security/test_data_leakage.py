@@ -60,6 +60,7 @@ class TestPIIHandling:
                     or "no information" in answer
                     or "not found" in answer
                     or "does not contain" in answer
+                    or "do not contain" in answer
                 ), f"Should indicate missing info for: {query}"
 
 
@@ -96,6 +97,7 @@ class TestAccessBoundaries:
                 "no information",
                 "cannot find",
                 "proprietary",  # Indicates sensitive/restricted info
+                "don't have access",  # Grounding refusal
             ]
         )
         has_substantial_info = len(answer) > 50  # Not just "I don't know"

@@ -13,53 +13,44 @@ import pytest
 
 from fitz_ai.cloud.cache_key import CacheVersions
 from fitz_ai.core import Answer, Provenance
+from fitz_ai.engines.fitz_rag.config.schema import PluginKwargs
 from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import RGSAnswer, RGSSourceRef
 from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 
 
 @pytest.fixture
 def mock_config():
-    """Create mock FitzRagConfig."""
+    """Create mock FitzRagConfig using flat schema with real PluginKwargs."""
     config = Mock()
 
-    # Chat config
-    config.chat = Mock()
-    config.chat.plugin_name = "openai"
-    config.chat.kwargs = {"model": "gpt-4"}
+    # Core plugins (string format in new flat schema)
+    config.chat = "openai"
+    config.embedding = "openai"
+    config.vector_db = "qdrant"
 
-    # Embedding config
-    config.embedding = Mock()
-    config.embedding.plugin_name = "openai"
-    config.embedding.kwargs = {}
+    # Plugin kwargs (real PluginKwargs, not dicts)
+    config.chat_kwargs = PluginKwargs(model="gpt-4")
+    config.embedding_kwargs = PluginKwargs()
+    config.vector_db_kwargs = PluginKwargs()
+    config.rerank_kwargs = PluginKwargs()
+    config.vision_kwargs = PluginKwargs()
 
-    # Vector DB config
-    config.vector_db = Mock()
-    config.vector_db.plugin_name = "qdrant"
-    config.vector_db.kwargs = {}
+    # Optional plugins (None = disabled)
+    config.rerank = None
+    config.vision = None
 
-    # Retrieval config
-    config.retrieval = Mock()
-    config.retrieval.plugin_name = "dense"
-    config.retrieval.collection = "test_collection"
-    config.retrieval.top_k = 5
-    config.retrieval.fetch_artifacts = False
+    # Retrieval settings (flat)
+    config.retrieval_plugin = "dense"
+    config.collection = "test_collection"
+    config.top_k = 5
+    config.fetch_artifacts = False
 
-    # Other configs
-    config.rerank = Mock(enabled=False)
-    config.vision = Mock(enabled=False)
-    config.rgs = Mock(
-        enable_citations=True,
-        strict_grounding=True,
-        answer_style=None,
-        max_chunks=8,
-        max_answer_chars=None,
-        include_query_in_context=True,
-        source_label_prefix="S",
-    )
-    config.routing = Mock(enabled=False, threshold=0.7)
-    config.entity_graph = Mock(enabled=False, max_expansion=10)
-    config.multihop = Mock(max_hops=1)
-    config.enrichment = Mock()
+    # RGS settings (flattened)
+    config.enable_citations = True
+    config.strict_grounding = True
+    config.max_chunks = 8
+    config.max_answer_chars = None
+    config.include_query_in_context = True
 
     return config
 

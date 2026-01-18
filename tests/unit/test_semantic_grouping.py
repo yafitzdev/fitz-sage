@@ -163,12 +163,10 @@ class TestHierarchyConfigSemantic:
         assert config.max_clusters == 10
 
     def test_config_from_dict(self):
-        """Test config from dict."""
-        config = EnrichmentConfig.from_dict(
+        """Test config from dict using Pydantic model_validate."""
+        config = EnrichmentConfig.model_validate(
             {
-                "enabled": True,
                 "hierarchy": {
-                    "enabled": True,
                     "grouping_strategy": "semantic",
                     "n_clusters": 5,
                     "max_clusters": 15,
@@ -181,18 +179,16 @@ class TestHierarchyConfigSemantic:
         assert config.hierarchy.max_clusters == 15
 
     def test_config_to_dict(self):
-        """Test config serialization."""
-        config = EnrichmentConfig.from_dict(
+        """Test config serialization using Pydantic model_dump."""
+        config = EnrichmentConfig.model_validate(
             {
-                "enabled": True,
                 "hierarchy": {
-                    "enabled": True,
                     "grouping_strategy": "semantic",
                 },
             }
         )
 
-        d = config.to_dict()
+        d = config.model_dump()
         assert d["hierarchy"]["grouping_strategy"] == "semantic"
 
 
@@ -290,11 +286,9 @@ class TestEnrichmentPipelineSemantic:
         mock_chat = MagicMock()
         mock_embedder = MagicMock()
 
-        config = EnrichmentConfig.from_dict(
+        config = EnrichmentConfig.model_validate(
             {
-                "enabled": True,
                 "hierarchy": {
-                    "enabled": True,
                     "grouping_strategy": "semantic",
                 },
             }

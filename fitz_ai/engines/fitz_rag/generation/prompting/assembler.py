@@ -20,6 +20,8 @@ class PromptConfig:
     system_base: str | None = None
     system_grounding: str | None = None
     system_safety: str | None = None
+    system_meta_refusal: str | None = None
+    system_injection_guard: str | None = None
 
     context_header: str | None = None
     context_item: str | None = None
@@ -59,6 +61,12 @@ class PromptAssembler:
 
         if strict_grounding:
             parts.append(self.slot("system_safety"))
+
+        # Always refuse meta-questions about sessions/previous queries
+        parts.append(self.slot("system_meta_refusal"))
+
+        # Guard against prompt injection attacks
+        parts.append(self.slot("system_injection_guard"))
 
         if enable_citations:
             parts.append(f"Use citations like [{source_label_prefix}1], [{source_label_prefix}2].")

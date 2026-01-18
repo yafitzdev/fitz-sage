@@ -11,6 +11,7 @@ import json
 from typing import TYPE_CHECKING
 
 from fitz_ai.engines.fitz_rag.protocols import ChatClient
+from fitz_ai.engines.fitz_rag.retrieval.multihop.utils import build_context_from_chunks
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
 
@@ -62,7 +63,7 @@ class BridgeExtractor:
         Returns:
             List of bridge questions (empty if no clear gaps)
         """
-        context = self._build_context(chunks)
+        context = build_context_from_chunks(chunks, max_chars=self.max_context_chars)
 
         prompt = f"""You're helping answer a question. The current evidence is missing information.
 
@@ -88,20 +89,6 @@ If no clear gaps, return: []
             logger.debug(f"{RETRIEVER} No bridge questions generated")
 
         return questions
-
-    def _build_context(self, chunks: list["Chunk"]) -> str:
-        """Build context string from chunks, respecting max length."""
-        context_parts: list[str] = []
-        total_chars = 0
-
-        for chunk in chunks:
-            content = chunk.content[:500]  # Truncate individual chunks
-            if total_chars + len(content) > self.max_context_chars:
-                break
-            context_parts.append(content)
-            total_chars += len(content) + 2  # +2 for newlines
-
-        return "\n\n".join(context_parts)
 
     def _parse_response(self, response: str) -> list[str]:
         """Parse JSON array from response."""

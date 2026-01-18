@@ -308,19 +308,22 @@ class E2ERunner:
         logger.info("E2E Setup: Building RAG pipeline")
 
         config_dict = {
-            "chat": {"plugin_name": chat_plugin, "kwargs": chat_kwargs},
-            "embedding": {"plugin_name": embedding_plugin, "kwargs": embedding_kwargs},
-            "vector_db": {"plugin_name": vector_db_plugin, "kwargs": vector_db_kwargs},
-            "retrieval": {
-                "plugin_name": "dense",
-                "collection": self.collection,
-                "top_k": 40,  # Higher for better recall with local embeddings
-            },
-            "multihop": {"max_hops": 2},
-            "rgs": {
-                "strict_grounding": False,  # Allow more flexible answers in tests
-                "max_chunks": 50,  # Higher limit to accommodate aggregation queries (3x multiplier)
-            },
+            # Core plugins (string format per new schema)
+            "chat": chat_plugin,
+            "embedding": embedding_plugin,
+            "vector_db": vector_db_plugin,
+            # Required field
+            "collection": self.collection,
+            # Retrieval settings (flat structure)
+            "retrieval_plugin": "dense",
+            "top_k": 40,  # Higher for better recall with local embeddings
+            # Generation settings (flat, not nested under rgs)
+            "strict_grounding": False,  # Allow more flexible answers in tests
+            "max_chunks": 50,  # Higher limit to accommodate aggregation queries (3x multiplier)
+            # Plugin kwargs
+            "chat_kwargs": chat_kwargs,
+            "embedding_kwargs": embedding_kwargs,
+            "vector_db_kwargs": vector_db_kwargs,
         }
 
         cfg = FitzRagConfig(**config_dict)

@@ -7,6 +7,7 @@ from typing import Any
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder, VectorClient
+from fitz_ai.engines.fitz_rag.retrieval.steps.utils import parse_json_list
 
 from .base import BaseVectorSearch
 
@@ -168,26 +169,4 @@ Text:
 Return ONLY a JSON array of strings, no explanation. Example: ["query 1", "query 2", "query 3"]"""
 
         response = self.chat.chat([{"role": "user", "content": prompt}])
-        return self._parse_json_list(response)
-
-    def _parse_json_list(self, response: str) -> list[str]:
-        """Parse JSON list from LLM response, with fallback."""
-        import json
-
-        try:
-            text = response.strip()
-            if text.startswith("```"):
-                parts = text.split("```")
-                if len(parts) >= 2:
-                    text = parts[1].strip()
-                    if text.startswith("json"):
-                        text = text[4:].strip()
-            result = json.loads(text)
-            if isinstance(result, list):
-                return [str(q) for q in result[: self.max_queries]]
-        except json.JSONDecodeError:
-            pass
-
-        # Fallback: split by newlines
-        lines = [q.strip() for q in response.strip().split("\n") if q.strip()]
-        return lines[: self.max_queries]
+        return parse_json_list(response, max_items=self.max_queries)

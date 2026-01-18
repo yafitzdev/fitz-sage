@@ -122,8 +122,15 @@ class CLIContext:
     @property
     def vector_db_display(self) -> str:
         """Vector DB info for display."""
-        host = getattr(self.vector_db_kwargs, "host", None) or ""
-        port = getattr(self.vector_db_kwargs, "port", None) or ""
+        # Handle both dict and PluginKwargs object
+        kwargs = self.vector_db_kwargs
+        if isinstance(kwargs, dict):
+            host = kwargs.get("host", "")
+            port = kwargs.get("port", "")
+        else:
+            host = getattr(kwargs, "host", None) or ""
+            port = getattr(kwargs, "port", None) or ""
+
         if host:
             return f"{self.vector_db_plugin} ({host}:{port})"
         return self.vector_db_plugin or "?"
