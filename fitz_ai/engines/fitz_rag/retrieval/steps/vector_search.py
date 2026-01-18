@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder, VectorClient
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
 
@@ -82,10 +83,10 @@ class VectorSearchStep(RetrievalStep):
         r"\bwhich\s+(?:is|has|one)\s+(?:better|faster|slower|higher|lower)\b",
     )
 
-    client: Any
-    embedder: Any
+    client: VectorClient
+    embedder: Embedder
     collection: str
-    chat: Any | None = None
+    chat: ChatClient | None = None
     keyword_matcher: Any | None = None
     entity_graph: Any | None = None
     k: int = 25

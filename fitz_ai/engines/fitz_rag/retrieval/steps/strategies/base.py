@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder, VectorClient
 
 
 class SearchStrategy(ABC):
@@ -42,8 +43,8 @@ class BaseVectorSearch(SearchStrategy):
 
     def __init__(
         self,
-        client: Any,
-        embedder: Any,
+        client: VectorClient,
+        embedder: Embedder,
         collection: str,
         k: int = 25,
         filter_conditions: dict[str, Any] | None = None,

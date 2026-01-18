@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder, VectorClient
 
 from .base import BaseVectorSearch
 
@@ -20,10 +21,10 @@ class SemanticSearch(BaseVectorSearch):
 
     def __init__(
         self,
-        client: Any,
-        embedder: Any,
+        client: VectorClient,
+        embedder: Embedder,
         collection: str,
-        chat: Any | None = None,
+        chat: ChatClient | None = None,
         k: int = 25,
         min_query_length: int = 300,
         max_queries: int = 5,
