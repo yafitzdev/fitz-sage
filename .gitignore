@@ -131,3 +131,5 @@ docs/todo
 tmpclaude-*-cwd
 .mcp.json
 openapi.json
+.claudeignore
+tags

@@ -173,7 +173,6 @@ def coerce_value(value: Any, target_type: str) -> Any:
 
 
 def is_indexable_column(
-    column_name: str,
     column_type: str,
     unique_ratio: float,
     is_primary_key: bool = False,
@@ -189,7 +188,6 @@ def is_indexable_column(
     - Strings with low cardinality (enums) are indexed
 
     Args:
-        column_name: Name of the column
         column_type: Type of the column
         unique_ratio: Ratio of unique values to total rows (0.0-1.0)
         is_primary_key: Whether this is the primary key
@@ -251,7 +249,7 @@ def select_indexed_columns(
         non_null = [v for v in values if v is not None and v != ""]
         unique_ratio = len(set(non_null)) / len(non_null) if non_null else 0.0
 
-        if is_indexable_column(name, col_type, unique_ratio, is_primary_key=False):
+        if is_indexable_column(col_type, unique_ratio, is_primary_key=False):
             indexed.append(name)
 
         if len(indexed) >= max_indexed + 1:  # +1 for PK

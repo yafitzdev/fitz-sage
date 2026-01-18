@@ -213,7 +213,6 @@ class HybridSearch:
         self,
         query: str,
         graph: KnowledgeGraph,
-        local_weight: float = 0.5,
     ) -> str:
         """
         Search using both local and global methods.
@@ -221,7 +220,6 @@ class HybridSearch:
         Args:
             query: Search query
             graph: Knowledge graph
-            local_weight: Weight for local vs global (0-1)
 
         Returns:
             Combined context string

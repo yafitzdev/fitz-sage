@@ -206,32 +206,32 @@ class TestIsIndexableColumn:
 
     def test_primary_key_always_indexed(self):
         """Primary key is always indexed."""
-        assert is_indexable_column("id", TYPE_STRING, 1.0, is_primary_key=True)
-        assert is_indexable_column("pk", TYPE_NUMBER, 1.0, is_primary_key=True)
+        assert is_indexable_column(TYPE_STRING, 1.0, is_primary_key=True)
+        assert is_indexable_column(TYPE_NUMBER, 1.0, is_primary_key=True)
 
     def test_boolean_always_indexed(self):
         """Boolean columns are always indexed."""
-        assert is_indexable_column("is_active", TYPE_BOOLEAN, 0.5)
-        assert is_indexable_column("enabled", TYPE_BOOLEAN, 0.1)
+        assert is_indexable_column(TYPE_BOOLEAN, 0.5)
+        assert is_indexable_column(TYPE_BOOLEAN, 0.1)
 
     def test_date_always_indexed(self):
         """Date columns are always indexed."""
-        assert is_indexable_column("created_at", TYPE_DATE, 0.9)
-        assert is_indexable_column("hire_date", TYPE_DATE, 0.5)
+        assert is_indexable_column(TYPE_DATE, 0.9)
+        assert is_indexable_column(TYPE_DATE, 0.5)
 
     def test_number_indexed_when_moderate_cardinality(self):
         """Numbers indexed when not too unique or constant."""
-        assert is_indexable_column("level", TYPE_NUMBER, 0.1)  # Low cardinality
-        assert is_indexable_column("salary", TYPE_NUMBER, 0.5)  # Moderate
-        assert not is_indexable_column("amount", TYPE_NUMBER, 0.95)  # Too unique
-        assert not is_indexable_column("constant", TYPE_NUMBER, 0.001)  # Almost constant
+        assert is_indexable_column(TYPE_NUMBER, 0.1)  # Low cardinality
+        assert is_indexable_column(TYPE_NUMBER, 0.5)  # Moderate
+        assert not is_indexable_column(TYPE_NUMBER, 0.95)  # Too unique
+        assert not is_indexable_column(TYPE_NUMBER, 0.001)  # Almost constant
 
     def test_string_indexed_when_low_cardinality(self):
         """Strings indexed when they look like enums."""
-        assert is_indexable_column("department", TYPE_STRING, 0.1)  # Enum-like
-        assert is_indexable_column("status", TYPE_STRING, 0.05)  # Enum-like
-        assert not is_indexable_column("name", TYPE_STRING, 0.9)  # Too unique
-        assert not is_indexable_column("email", TYPE_STRING, 1.0)  # All unique
+        assert is_indexable_column(TYPE_STRING, 0.1)  # Enum-like
+        assert is_indexable_column(TYPE_STRING, 0.05)  # Enum-like
+        assert not is_indexable_column(TYPE_STRING, 0.9)  # Too unique
+        assert not is_indexable_column(TYPE_STRING, 1.0)  # All unique
 
 
 class TestSelectIndexedColumns:
