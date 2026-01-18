@@ -122,8 +122,8 @@ class CLIContext:
     @property
     def vector_db_display(self) -> str:
         """Vector DB info for display."""
-        host = self.vector_db_kwargs.get("host", "")
-        port = self.vector_db_kwargs.get("port", "")
+        host = getattr(self.vector_db_kwargs, "host", None) or ""
+        port = getattr(self.vector_db_kwargs, "port", None) or ""
         if host:
             return f"{self.vector_db_plugin} ({host}:{port})"
         return self.vector_db_plugin or "?"
@@ -399,7 +399,13 @@ class CLIContext:
         """Get vector DB client instance."""
         from fitz_ai.vector_db.registry import get_vector_db_plugin
 
-        return get_vector_db_plugin(self.vector_db_plugin, **self.vector_db_kwargs)
+        # Convert PluginKwargs to dict, excluding None values
+        # Handle both PluginKwargs model and plain dict (for mocks/backwards compat)
+        if hasattr(self.vector_db_kwargs, "model_dump"):
+            kwargs = {k: v for k, v in self.vector_db_kwargs.model_dump().items() if v is not None}
+        else:
+            kwargs = self.vector_db_kwargs if isinstance(self.vector_db_kwargs, dict) else {}
+        return get_vector_db_plugin(self.vector_db_plugin, **kwargs)
 
     def get_collections(self) -> list[str]:
         """Get list of collections from vector DB."""

@@ -167,9 +167,19 @@ def _warn_if_collection_missing(collection: str, typed_config) -> None:
 
     try:
         # Get vector DB client from config (V2 flat structure)
-        client = get_vector_db_plugin(
-            typed_config.vector_db, **typed_config.vector_db_kwargs
-        )
+        # Convert PluginKwargs to dict, excluding None values
+        # Handle both PluginKwargs model and plain dict (for mocks/backwards compat)
+        if hasattr(typed_config.vector_db_kwargs, "model_dump"):
+            vdb_kwargs = {
+                k: v for k, v in typed_config.vector_db_kwargs.model_dump().items() if v is not None
+            }
+        else:
+            vdb_kwargs = (
+                typed_config.vector_db_kwargs
+                if isinstance(typed_config.vector_db_kwargs, dict)
+                else {}
+            )
+        client = get_vector_db_plugin(typed_config.vector_db, **vdb_kwargs)
 
         # Get available collections
         collections = client.list_collections()

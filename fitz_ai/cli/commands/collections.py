@@ -27,6 +27,13 @@ def _get_available_vector_dbs(ctx: CLIContext) -> List[Dict[str, Any]]:
     configured = ctx.vector_db_plugin
     configured_kwargs = ctx.vector_db_kwargs
 
+    # Convert PluginKwargs to dict, excluding None values
+    # Handle both PluginKwargs model and plain dict (for mocks/backwards compat)
+    if hasattr(configured_kwargs, "model_dump"):
+        kwargs_dict = {k: v for k, v in configured_kwargs.model_dump().items() if v is not None}
+    else:
+        kwargs_dict = configured_kwargs if isinstance(configured_kwargs, dict) else {}
+
     # Get all available plugins
     available = available_vector_db_plugins()
 
@@ -34,7 +41,7 @@ def _get_available_vector_dbs(ctx: CLIContext) -> List[Dict[str, Any]]:
     for plugin in available:
         entry = {
             "name": plugin,
-            "kwargs": configured_kwargs if plugin == configured else {},
+            "kwargs": kwargs_dict if plugin == configured else {},
             "is_configured": plugin == configured,
         }
         result.append(entry)

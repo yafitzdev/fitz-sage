@@ -14,7 +14,12 @@ Usage:
 
 from pathlib import Path
 
-from .schema import ChunkingRouterConfig, ExtensionChunkerConfig, FitzRagConfig
+from .schema import (
+    ChunkingRouterConfig,
+    ExtensionChunkerConfig,
+    FitzRagConfig,
+    PluginKwargs,
+)
 
 
 def get_default_config_path() -> Path:
@@ -26,5 +31,6 @@ __all__ = [
     "FitzRagConfig",
     "ChunkingRouterConfig",
     "ExtensionChunkerConfig",
+    "PluginKwargs",
     "get_default_config_path",
 ]

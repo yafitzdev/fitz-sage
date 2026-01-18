@@ -48,8 +48,8 @@ def _show_config_summary(ctx: CLIContext) -> None:
         table.add_row("Embedding", ctx.embedding_plugin or "?", ctx.embedding_model)
 
         # Vector DB
-        vdb_host = ctx.vector_db_kwargs.get("host", "")
-        vdb_port = ctx.vector_db_kwargs.get("port", "")
+        vdb_host = getattr(ctx.vector_db_kwargs, "host", None) or ""
+        vdb_port = getattr(ctx.vector_db_kwargs, "port", None) or ""
         vdb_details = f"{vdb_host}:{vdb_port}" if vdb_host else ""
         table.add_row("Vector DB", ctx.vector_db_plugin or "?", vdb_details)
 
