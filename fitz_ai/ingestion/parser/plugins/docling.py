@@ -263,8 +263,16 @@ class DoclingParser:
             )
 
         elif label == DocItemLabel.TABLE:
-            # Export table as markdown for content
+            # Build clean table from structured grid data (avoids markdown formatting)
             try:
+                table_md = self._build_table_from_grid(item)
+                if table_md:
+                    return DocumentElement(
+                        type=ElementType.TABLE,
+                        content=table_md,
+                        metadata={"rows": len(item.data.grid) if item.data else 0},
+                    )
+                # Fallback to export_to_markdown if grid extraction fails
                 table_md = item.export_to_markdown(doc=doc)
                 return DocumentElement(
                     type=ElementType.TABLE,
@@ -371,6 +379,64 @@ class DoclingParser:
         if hasattr(item, "orig") and item.orig:
             return item.orig.strip()
         return ""
+
+    def _build_table_from_grid(self, item) -> str | None:
+        """
+        Build clean markdown table from Docling's structured grid data.
+
+        This bypasses export_to_markdown() which adds unwanted markdown formatting
+        (bold headers, etc.) that breaks downstream SQL generation.
+
+        Args:
+            item: Docling table item with item.data.grid structured data.
+
+        Returns:
+            Clean markdown table string, or None if grid is empty/invalid.
+        """
+        if not item.data or not item.data.grid:
+            return None
+
+        grid = item.data.grid
+        if not grid or len(grid) < 1:
+            return None
+
+        rows: list[str] = []
+        num_cols = 0
+
+        for row in grid:
+            # Extract text from each cell
+            cells: list[str] = []
+            for cell in row:
+                # Docling cells have 'text' attribute
+                if hasattr(cell, "text"):
+                    cells.append(cell.text.strip() if cell.text else "")
+                else:
+                    # Fallback for unexpected cell types
+                    cells.append(str(cell).strip() if cell else "")
+
+            if cells:
+                num_cols = max(num_cols, len(cells))
+                rows.append("| " + " | ".join(cells) + " |")
+
+        if not rows:
+            return None
+
+        # Ensure all rows have same number of columns (pad if needed)
+        normalized_rows: list[str] = []
+        for row in rows:
+            # Count columns in this row
+            cols_in_row = row.count("|") - 1
+            if cols_in_row < num_cols:
+                # Pad with empty cells
+                padding = " |" * (num_cols - cols_in_row)
+                row = row[:-1] + padding + "|"
+            normalized_rows.append(row)
+
+        # Build separator row after header
+        separator = "|" + "|".join(["---"] * num_cols) + "|"
+
+        # Combine: header, separator, data rows
+        return "\n".join([normalized_rows[0], separator] + normalized_rows[1:])
 
     def _describe_image_with_vlm(self, item) -> str | None:
         """
