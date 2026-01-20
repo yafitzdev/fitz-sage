@@ -35,6 +35,7 @@ class Feature(Enum):
     QUERY_EXPANSION = "query_expansion"
     TEMPORAL = "temporal"
     AGGREGATION = "aggregation"
+    FIGURE_RETRIEVAL = "figure_retrieval"
 
 
 @dataclass
@@ -1551,6 +1552,45 @@ PDF_DOCX_SCENARIOS: list[TestScenario] = [
         query="What AI or machine learning technologies do Nexus Robotics and CloudScale use?",
         # Nexus: PathSense AI, CloudScale: ML inference
         must_contain_any=["PathSense", "ML inference", "machine learning"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Figure/Picture Retrieval Tests (Quantum Computing Report PDF)
+    # =========================================================================
+    TestScenario(
+        id="E145",
+        name="Figure: chart data retrieval",
+        feature=Feature.FIGURE_RETRIEVAL,
+        query="What is the projected quantum computing market size in 2028?",
+        # Figure 1 shows $42.7 billion by 2028
+        must_contain_any=["42.7", "billion", "2028"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E146",
+        name="Figure: caption information",
+        feature=Feature.FIGURE_RETRIEVAL,
+        query="What is the CAGR for the quantum computing market shown in the figure?",
+        # Figure caption mentions 72.3% CAGR
+        must_contain_any=["72.3%", "72.3", "CAGR"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E147",
+        name="Figure: market growth context",
+        feature=Feature.FIGURE_RETRIEVAL,
+        query="According to the market analysis figure, what was the quantum computing market size in 2024?",
+        # Figure shows $4.8 billion in 2024
+        must_contain_any=["4.8", "billion", "2024"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E148",
+        name="Figure: related content retrieval",
+        feature=Feature.BASIC_RETRIEVAL,
+        query="What are the key drivers for quantum computing market growth?",
+        # Text around the figure discusses drivers
+        must_contain_any=["pharmaceutical", "financial", "cryptography", "supply chain"],
         min_sources=1,
     ),
 ]

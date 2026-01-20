@@ -121,9 +121,18 @@ class DoclingParser:
         """Lazy-load the DocumentConverter."""
         if self._converter is None:
             try:
-                from docling.document_converter import DocumentConverter
+                from docling.document_converter import DocumentConverter, PdfFormatOption
+                from docling.datamodel.pipeline_options import PdfPipelineOptions
 
-                self._converter = DocumentConverter()
+                # Enable picture image extraction if VLM is configured
+                if self.vision_client is not None:
+                    pipeline_options = PdfPipelineOptions()
+                    pipeline_options.generate_picture_images = True
+                    self._converter = DocumentConverter(
+                        format_options={"pdf": PdfFormatOption(pipeline_options=pipeline_options)}
+                    )
+                else:
+                    self._converter = DocumentConverter()
             except ImportError as e:
                 raise ImportError(
                     "Docling is required for this parser. Install it with: pip install docling"
@@ -293,8 +302,8 @@ class DoclingParser:
                         caption = cap_ref.text
                         break
 
-            # Try VLM description if available
-            vlm_description = self._describe_image_with_vlm(item)
+            # Try VLM description if available (pass doc for image extraction)
+            vlm_description = self._describe_image_with_vlm(item, doc)
 
             # Build content: VLM description > caption > placeholder
             if vlm_description:
@@ -438,12 +447,13 @@ class DoclingParser:
         # Combine: header, separator, data rows
         return "\n".join([normalized_rows[0], separator] + normalized_rows[1:])
 
-    def _describe_image_with_vlm(self, item) -> str | None:
+    def _describe_image_with_vlm(self, item, doc) -> str | None:
         """
         Use VLM to describe an image from a Docling picture item.
 
         Args:
             item: Docling picture item with potential image data.
+            doc: Docling document (needed to extract image via get_image).
 
         Returns:
             Description string if successful, None otherwise.
@@ -451,22 +461,23 @@ class DoclingParser:
         if self.vision_client is None:
             return None
 
-        # Try to get image data from the item
-        image_data = getattr(item, "image", None)
-        if image_data is None:
-            return None
-
         try:
-            # Convert image to base64
-            # Docling stores images as PIL Image objects or as ImageRef
-            if hasattr(image_data, "pil_image"):
-                # ImageRef with PIL image
-                pil_image = image_data.pil_image
-            elif hasattr(image_data, "save"):
-                # Direct PIL Image
-                pil_image = image_data
-            else:
-                logger.debug(f"Unknown image data type: {type(image_data)}")
+            # Primary method: use item.get_image(doc) which returns PIL Image
+            pil_image = None
+            if hasattr(item, "get_image"):
+                pil_image = item.get_image(doc)
+
+            # Fallback: try item.image attribute
+            if pil_image is None:
+                image_data = getattr(item, "image", None)
+                if image_data is not None:
+                    if hasattr(image_data, "pil_image"):
+                        pil_image = image_data.pil_image
+                    elif hasattr(image_data, "save"):
+                        pil_image = image_data
+
+            if pil_image is None:
+                logger.debug("No image data available for VLM description")
                 return None
 
             # Convert PIL image to base64 PNG

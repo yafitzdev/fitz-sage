@@ -47,7 +47,7 @@ health_check:
 endpoint:
   path: "/api/chat"
   method: "POST"
-  timeout: 180
+  timeout: 300  # 5 minutes - VLM may take longer on first call while loading model
 
 # =============================================================================
 # DEFAULTS
