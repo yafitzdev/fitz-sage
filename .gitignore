@@ -101,6 +101,7 @@ secrets.yaml
 test_docs/
 .test_output/
 .e2e_cache.db
+.e2e_cache/
 
 # Vector DB data (local development)
 qdrant_data/

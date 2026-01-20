@@ -40,6 +40,7 @@ class ScenarioResult:
     answer_text: str
     duration_ms: float
     error: Optional[str] = None
+    chunk_ids: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -534,10 +535,10 @@ class E2ERunner:
 
         start_time = time.time()
 
-        # Check cache first (using query as key, empty chunk_ids for simplicity)
+        # Check cache first (file-based, one .txt per scenario)
         # Cache hit only returns if the cached result passed - failed results aren't cached
         if use_cache and self.cache.enabled:
-            cached = self.cache.get(scenario.query, [])
+            cached = self.cache.get(scenario.query, [], scenario_id=scenario.id)
             if cached and cached.get("passed"):
                 logger.debug(f"Cache hit for scenario {scenario.id} (tier={cached.get('tier')})")
                 duration_ms = (time.time() - start_time) * 1000
@@ -556,10 +557,14 @@ class E2ERunner:
         # Cache miss or disabled - run the pipeline
         error = None
         answer_text = ""
+        chunk_ids: list[str] = []
 
         try:
             answer = self.pipeline.run(scenario.query)
             answer_text = answer.answer
+            # Extract chunk IDs from sources/provenance
+            sources = getattr(answer, "sources", None) or getattr(answer, "provenance", [])
+            chunk_ids = [s.source_id for s in sources if hasattr(s, "source_id")]
             validation = validate_answer(answer, scenario)
         except Exception as e:
             logger.error(f"Scenario {scenario.id} failed with error: {e}")
@@ -576,7 +581,7 @@ class E2ERunner:
         if use_cache and self.cache.enabled and validation.passed:
             self.cache.set(
                 query=scenario.query,
-                chunk_ids=[],  # Simplified key - just query-based
+                chunk_ids=chunk_ids,
                 scenario_id=scenario.id,
                 answer_text=answer_text[:500] if answer_text else "",
                 passed=True,
@@ -589,6 +594,7 @@ class E2ERunner:
             answer_text=answer_text[:500] if answer_text else "",
             duration_ms=duration_ms,
             error=error,
+            chunk_ids=chunk_ids,
         )
 
     def run_all(self, scenarios: list[TestScenario] | None = None) -> E2ERunResult:
@@ -660,12 +666,12 @@ class E2ERunner:
         logger.info(f"E2E Tiered Run: Cache enabled = {self.cache.enabled}")
         start_time = time.time()
 
-        # Phase 0: Check cache for previously passed results
+        # Phase 0: Check cache for previously passed results (file-based)
         if self.cache.enabled:
             logger.info("\n--- Checking cache ---")
             still_need_run = []
             for scenario in remaining:
-                cached = self.cache.get(scenario.query, [])
+                cached = self.cache.get(scenario.query, [], scenario_id=scenario.id)
                 if cached and cached.get("passed"):
                     # Return cached result
                     result = ScenarioResult(
@@ -712,7 +718,7 @@ class E2ERunner:
                     if self.cache.enabled:
                         self.cache.set(
                             query=scenario.query,
-                            chunk_ids=[],
+                            chunk_ids=result.chunk_ids,
                             scenario_id=scenario.id,
                             answer_text=result.answer_text,
                             passed=True,
