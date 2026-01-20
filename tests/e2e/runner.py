@@ -118,13 +118,22 @@ class TieredRunResult:
         print("=" * 60)
 
         tier_counts = self.tier_summary()
-        for tier, count in tier_counts.items():
-            if tier == "cached":
-                print(f"  Cached (skipped LLM):  {count}")
-            elif tier == "failed_all":
-                print(f"  Failed all tiers:      {count}")
-            else:
-                print(f"  Passed with '{tier}':    {count}")
+        cached_count = tier_counts.get("cached", 0)
+        failed_all_count = tier_counts.get("failed_all", 0)
+
+        # Show cache hits first
+        if cached_count > 0:
+            print(f"  Cached (skipped LLM):  {cached_count}")
+
+        # Show each tier's passes (always show all tiers for clarity)
+        for tier in self.tier_names:
+            count = tier_counts.get(tier, 0)
+            print(f"  {tier.capitalize()} tier passed:   {count}")
+
+        # Show failures with explicit tier info
+        if failed_all_count > 0:
+            tiers_tried = " -> ".join(self.tier_names) if self.tier_names else "none"
+            print(f"  Failed ALL tiers:      {failed_all_count}  (tried: {tiers_tried})")
 
         print("-" * 60)
         print(f"  Total: {self.total_passed}/{self.total} passed ({self.pass_rate:.1f}%)")
@@ -168,6 +177,7 @@ class E2ERunner:
         self.vector_client = None
         self._setup_complete = False
         self._current_tier: str | None = None
+        self._tiered_results: TieredRunResult | None = None
 
         # Initialize cache
         cache_config = get_cache_config()
@@ -176,6 +186,20 @@ class E2ERunner:
             ttl_days=cache_config.get("ttl_days", 30),
             enabled=use_cache and cache_config.get("enabled", True),
         )
+
+    def get_tiered_result(self, scenario_id: str) -> tuple[ScenarioResult, str] | None:
+        """
+        Get pre-computed result for a scenario from tiered execution.
+
+        Args:
+            scenario_id: The scenario ID to look up
+
+        Returns:
+            Tuple of (ScenarioResult, tier_name) if tiered results exist, None otherwise
+        """
+        if self._tiered_results is None:
+            return None
+        return self._tiered_results.results.get(scenario_id)
 
     def setup(self, tier_name: str | None = None) -> float:
         """

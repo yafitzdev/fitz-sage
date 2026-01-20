@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import pytest
 
-from .conftest import get_tiered_result
 from .reporter import E2EReporter
 from .scenarios import SCENARIOS
 
@@ -54,7 +53,7 @@ def test_scenario(e2e_runner, scenario):
     In single-tier mode: runs scenario directly with first tier.
     """
     # Check if we have pre-computed tiered results
-    tiered_result = get_tiered_result(scenario.id)
+    tiered_result = e2e_runner.get_tiered_result(scenario.id)
 
     if tiered_result is not None:
         # Use pre-computed result from tiered execution

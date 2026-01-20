@@ -19,19 +19,17 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Callable
 
 import pytest
 
-from .runner import FIXTURES_DIR, E2ERunner, TieredRunResult
-from .scenarios import SCENARIOS
+from .runner import FIXTURES_DIR, E2ERunner
+from .scenarios import SCENARIOS, TestScenario
 
 # Set workspace to project root so FitzPaths finds storage paths
 # (vocabulary, entity graph, table cache, etc.)
 # Note: LLM config is now loaded from tests/e2e/e2e_config.yaml, not .fitz/config/
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-
-# Global storage for tiered results (populated once per session)
-_tiered_results: TieredRunResult | None = None
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -44,55 +42,70 @@ def set_workspace():
     FitzPaths.reset()
 
 
+def create_tiered_runner(
+    fixtures_dir: Path,
+    scenarios: list[TestScenario],
+    suite_name: str = "E2E",
+) -> Callable[[], E2ERunner]:
+    """
+    Factory to create tiered E2E runner setup logic.
+
+    This is a helper that returns a generator function for use in fixtures.
+    The actual fixture must be created in the test module with the appropriate scope.
+
+    Args:
+        fixtures_dir: Path to test fixtures
+        scenarios: List of test scenarios to run
+        suite_name: Name for the test suite (shown in header)
+
+    Returns:
+        Generator function that yields the configured runner
+
+    Usage in test modules:
+        @pytest.fixture(scope="module")
+        def my_runner(set_workspace):
+            yield from create_tiered_runner(MY_FIXTURES_DIR, MY_SCENARIOS, "My Suite")()
+    """
+
+    def runner_generator():
+        runner = E2ERunner(fixtures_dir=fixtures_dir, use_cache=True)
+        runner.setup()
+
+        # Run tiered execution unless disabled
+        use_tiered = os.environ.get("E2E_SINGLE_TIER", "0") != "1"
+
+        if use_tiered:
+            print("\n" + "=" * 60)
+            print(f"{suite_name} TESTS - TIERED EXECUTION")
+            print("(local -> cloud fallback)")
+            print("Set E2E_SINGLE_TIER=1 to disable")
+            print("=" * 60 + "\n")
+
+            runner._tiered_results = runner.run_tiered(scenarios)
+        else:
+            runner._tiered_results = None
+
+        yield runner
+        runner.teardown()
+
+    return runner_generator
+
+
 @pytest.fixture(scope="session")
 def e2e_runner(set_workspace):
     """
-    Session-scoped E2E runner fixture.
+    Session-scoped E2E runner fixture for main retrieval tests.
 
     By default, runs ALL scenarios through tiered execution (local -> cloud)
-    during setup. Individual tests then just look up their pre-computed result.
+    during setup. Individual tests then just look up their pre-computed result
+    via runner.get_tiered_result(scenario_id).
 
     Set E2E_SINGLE_TIER=1 to disable tiered mode.
-
-    Usage:
-        def test_something(e2e_runner):
-            result = e2e_runner.run_scenario(scenario)
-            assert result.validation.passed
     """
-    global _tiered_results
-
-    runner = E2ERunner(fixtures_dir=FIXTURES_DIR)
-    runner.setup()
-
-    # Run tiered execution unless disabled
-    use_tiered = os.environ.get("E2E_SINGLE_TIER", "0") != "1"
-
-    if use_tiered:
-        print("\n" + "=" * 60)
-        print("TIERED E2E EXECUTION (local -> cloud fallback)")
-        print("Set E2E_SINGLE_TIER=1 to disable")
-        print("=" * 60 + "\n")
-
-        _tiered_results = runner.run_tiered(SCENARIOS)
-
-        # Store results on runner for lookup
-        runner._tiered_results = _tiered_results
-    else:
-        runner._tiered_results = None
-
-    yield runner
-    runner.teardown()
+    yield from create_tiered_runner(FIXTURES_DIR, SCENARIOS, "MAIN E2E")()
 
 
 @pytest.fixture(scope="module")
 def fixtures_path() -> Path:
     """Return the path to E2E test fixtures."""
     return FIXTURES_DIR
-
-
-def get_tiered_result(scenario_id: str):
-    """Get pre-computed result for a scenario from tiered execution."""
-    global _tiered_results
-    if _tiered_results is None:
-        return None
-    return _tiered_results.results.get(scenario_id)

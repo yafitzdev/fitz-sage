@@ -15,12 +15,11 @@ Tiered Execution:
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 
-from .runner import E2ERunner, TieredRunResult
+from .conftest import create_tiered_runner
 from .scenarios import PDF_DOCX_SCENARIOS
 
 # Mark all tests in this module as e2e_parser (slow)
@@ -29,49 +28,19 @@ pytestmark = pytest.mark.e2e_parser
 # Fixtures directory with PDF/DOCX files
 FIXTURES_PARSER_DIR = Path(__file__).parent / "fixtures_parser"
 
-# Global storage for tiered results (populated once per module)
-_pdf_docx_tiered_results: TieredRunResult | None = None
-
 
 @pytest.fixture(scope="module")
-def pdf_docx_runner():
+def pdf_docx_runner(set_workspace):
     """
     Module-scoped runner for PDF/DOCX retrieval tests.
 
+    Uses shared tiered runner factory from conftest.py.
     Runs ALL scenarios through tiered execution (local -> cloud) during setup.
-    Individual tests then look up their pre-computed result.
+    Individual tests then look up their pre-computed result via runner.get_tiered_result().
     """
-    global _pdf_docx_tiered_results
-
-    runner = E2ERunner(fixtures_dir=FIXTURES_PARSER_DIR, use_cache=True)
-    runner.setup()
-
-    # Run tiered execution unless disabled
-    use_tiered = os.environ.get("E2E_SINGLE_TIER", "0") != "1"
-
-    if use_tiered:
-        print("\n" + "=" * 60)
-        print("PDF/DOCX E2E TESTS - TIERED EXECUTION")
-        print("(local -> cloud fallback)")
-        print("Set E2E_SINGLE_TIER=1 to disable")
-        print("=" * 60 + "\n")
-
-        _pdf_docx_tiered_results = runner.run_tiered(PDF_DOCX_SCENARIOS)
-        runner._tiered_results = _pdf_docx_tiered_results
-    else:
-        _pdf_docx_tiered_results = None
-        runner._tiered_results = None
-
-    yield runner
-    runner.teardown()
-
-
-def _get_tiered_result(scenario_id: str):
-    """Get pre-computed result for a scenario from tiered execution."""
-    global _pdf_docx_tiered_results
-    if _pdf_docx_tiered_results is None:
-        return None
-    return _pdf_docx_tiered_results.results.get(scenario_id)
+    yield from create_tiered_runner(
+        FIXTURES_PARSER_DIR, PDF_DOCX_SCENARIOS, "PDF/DOCX E2E"
+    )()
 
 
 @pytest.mark.parametrize(
@@ -87,7 +56,7 @@ def test_pdf_docx_scenario(pdf_docx_runner, scenario):
     In single-tier mode: runs scenario directly with first tier.
     """
     # Check if we have pre-computed tiered results
-    tiered_result = _get_tiered_result(scenario.id)
+    tiered_result = pdf_docx_runner.get_tiered_result(scenario.id)
 
     if tiered_result is not None:
         # Use pre-computed result from tiered execution
