@@ -204,6 +204,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
     "e2e: marks tests as end-to-end tests requiring real LLM and ingestion",
+    "e2e_parser: marks tests as parser e2e tests (PDF/DOCX parsing)",
     "performance: marks tests as performance benchmarks",
     "scalability: marks tests as scalability tests (large corpus, concurrent)",
     "security: marks tests as security tests (injection, leakage, validation)",
