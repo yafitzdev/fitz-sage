@@ -19,9 +19,9 @@ tiers:
       plugin_name: local_ollama
       kwargs:
         models:
-          smart: qwen2.5:3b
-          fast: qwen2.5:3b
-          balanced: qwen2.5:3b
+          smart: qwen2.5:7b
+          fast: qwen2.5:7b
+          balanced: qwen2.5:7b
 
   - name: cloud
     chat:

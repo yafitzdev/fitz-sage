@@ -271,7 +271,9 @@ Return ONLY the SQL query, no explanation."""
             except sqlite3.Error as e:
                 logger.warning(f"SQL execution failed: {e}")
                 conn.close()
-                return self._augment_chunk_error(chunk, sql, str(e))
+                # Return original chunk instead of error-augmented one
+                # This prevents SQL errors from confusing the LLM during answer generation
+                return chunk
 
             conn.close()
 

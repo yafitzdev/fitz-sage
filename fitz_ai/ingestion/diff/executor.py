@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, runtime_checkable
 
+from fitz_ai.core.chunk import Chunk
 from fitz_ai.ingestion.chunking.router import ChunkingRouter
 from fitz_ai.ingestion.diff.differ import Differ, FileCandidate
 from fitz_ai.ingestion.diff.scanner import FileScanner
@@ -409,8 +410,8 @@ class DiffIngestExecutor:
         # Flush vector DB once after all upserts
         if hasattr(self._vdb_writer, "flush"):
             self._vdb_writer.flush()
-        elif hasattr(self._vdb_writer, "_client") and hasattr(self._vdb_writer._client, "flush"):
-            self._vdb_writer._client.flush()
+        elif hasattr(self._vdb_writer, "client") and hasattr(self._vdb_writer.client, "flush"):
+            self._vdb_writer.client.flush()
 
         # Phase 4: Auto-detect vocabulary keywords from all ingested chunks
         if all_prepared:
@@ -525,8 +526,22 @@ class DiffIngestExecutor:
         chunker = self._chunking_router.get_chunker(candidate.ext)
         chunks = chunker.chunk(parsed_doc)
 
-        # Add extracted table chunks to regular chunks
-        chunks.extend(table_chunks)
+        # Add extracted table chunks to regular chunks with unique indices
+        # Table chunks are created with chunk_index=0 by default, which would cause
+        # ID collisions when compute_chunk_id() hashes the index. Re-assign indices
+        # starting after the max index from regular chunks.
+        if table_chunks:
+            max_index = max(c.chunk_index for c in chunks) if chunks else -1
+            for i, table_chunk in enumerate(table_chunks):
+                # Create new chunk with updated index to avoid mutation
+                new_chunk = Chunk(
+                    id=table_chunk.id,
+                    doc_id=table_chunk.doc_id,
+                    content=table_chunk.content,
+                    chunk_index=max_index + 1 + i,
+                    metadata=table_chunk.metadata,
+                )
+                chunks.append(new_chunk)
 
         # Check for empty content
         if not chunks:
