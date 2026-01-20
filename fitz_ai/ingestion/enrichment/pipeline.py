@@ -38,7 +38,7 @@ from fitz_ai.ingestion.enrichment.artifacts.registry import (
     ArtifactRegistry,
 )
 from fitz_ai.ingestion.enrichment.base import ContentType
-from fitz_ai.ingestion.enrichment.chunk import ChunkEnricher, create_default_enricher
+from fitz_ai.ingestion.enrichment.bus import ChunkEnricher, create_default_enricher
 from fitz_ai.ingestion.enrichment.config import EnrichmentConfig
 from fitz_ai.ingestion.enrichment.hierarchy.enricher import HierarchyEnricher
 from fitz_ai.ingestion.enrichment.models import EnrichmentResult

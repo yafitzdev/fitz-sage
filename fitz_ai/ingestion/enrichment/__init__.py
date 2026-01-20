@@ -5,7 +5,8 @@ Enrichment module for enhancing document ingestion.
 This module provides:
 - EnrichmentPipeline: Unified entry point for all enrichment operations
 - EnrichmentConfig: Configuration for enrichment behavior
-- Chunk summaries: LLM-generated descriptions for better search
+- ChunkEnricher: Bus for per-chunk metadata extraction
+- HierarchyEnricher: Multi-level summarization
 - Artifacts: Project-level insights (navigation index, interface catalog, etc.)
 
 Architecture:
@@ -14,19 +15,13 @@ Architecture:
     │            (single entry point for all enrichment)           │
     └─────────────────────────────────────────────────────────────┘
                                │
-           ┌───────────────────┴───────────────────┐
-           │                                       │
-           ▼                                       ▼
-    ┌──────────────┐                       ┌──────────────┐
-    │   Summary    │                       │  Artifacts   │
-    │  (chunks)    │                       │  (project)   │
-    └──────────────┘                       └──────────────┘
-           │                                       │
-           ▼                                       ▼
-    ┌──────────────┐                       ┌──────────────┐
-    │   Context    │                       │   Plugins    │
-    │   Builders   │                       │ (per type)   │
-    └──────────────┘                       └──────────────┘
+           ┌───────────────────┼───────────────────┐
+           │                   │                   │
+           ▼                   ▼                   ▼
+    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+    │ ChunkEnricher│    │  Hierarchy   │    │  Artifacts   │
+    │    (bus)     │    │  Enricher    │    │  (project)   │
+    └──────────────┘    └──────────────┘    └──────────────┘
 
 Usage:
     from fitz_ai.ingestion.enrichment import EnrichmentPipeline, EnrichmentConfig
@@ -42,19 +37,6 @@ Usage:
     result = pipeline.enrich(chunks)
     enriched_chunks = result.chunks    # Chunks with summaries in metadata
     artifacts = result.artifacts        # Corpus-level artifacts
-
-    # Or use individual methods if needed
-    artifacts = pipeline.generate_artifacts()
-    description = pipeline.summarize_chunk(content, file_path, content_hash)
-
-Plugin System:
-    - Artifact plugins: fitz_ai/ingestion/enrichment/artifacts/plugins/
-    - Context plugins: fitz_ai/ingestion/enrichment/context/plugins/
-
-    Each plugin is auto-discovered and must define:
-    - plugin_name: str
-    - plugin_type: str ("artifact" or "context")
-    - supported_types or supported_extensions
 """
 
 # Artifact components
@@ -85,12 +67,10 @@ from fitz_ai.ingestion.enrichment.base import (
 )
 
 # Chunk enrichment bus
-from fitz_ai.ingestion.enrichment.chunk import (
+from fitz_ai.ingestion.enrichment.bus import (
     ChunkEnricher,
-    EnrichmentModule,
-    EntityModule,
-    KeywordModule,
-    SummaryModule,
+    ChunkEnrichmentResult,
+    EnrichmentBatchResult,
     create_default_enricher,
 )
 
@@ -100,12 +80,6 @@ from fitz_ai.ingestion.enrichment.config import (
     EnrichmentConfig,
     HierarchyConfig,
     HierarchyRule,
-)
-from fitz_ai.ingestion.enrichment.context.registry import (
-    ContextRegistry,
-    get_context_plugin,
-    get_context_registry,
-    list_context_plugins,
 )
 
 # Hierarchy components
@@ -120,15 +94,25 @@ from fitz_ai.ingestion.enrichment.models import (
     EnrichmentResult,
 )
 
+# Modules
+from fitz_ai.ingestion.enrichment.modules import (
+    EnrichmentModule,
+    EntityModule,
+    KeywordModule,
+    SummaryModule,
+)
+
 # Pipeline (main entry point)
 from fitz_ai.ingestion.enrichment.pipeline import (
     EnrichmentPipeline,
 )
 
-# Summary components
-from fitz_ai.ingestion.enrichment.summary import (
-    ChunkSummarizer,
-    SummaryCache,
+# Registry
+from fitz_ai.ingestion.enrichment.registry import (
+    DEFAULT_MODULES,
+    get_default_modules,
+    get_module_by_name,
+    list_available_modules,
 )
 
 __all__ = [
@@ -143,11 +127,19 @@ __all__ = [
     "EnrichmentResult",
     # Chunk Enrichment Bus
     "ChunkEnricher",
+    "ChunkEnrichmentResult",
+    "EnrichmentBatchResult",
+    "create_default_enricher",
+    # Modules
     "EnrichmentModule",
     "SummaryModule",
     "KeywordModule",
     "EntityModule",
-    "create_default_enricher",
+    # Module Registry
+    "DEFAULT_MODULES",
+    "get_default_modules",
+    "get_module_by_name",
+    "list_available_modules",
     # Base types
     "ContentType",
     "EnrichmentContext",
@@ -155,9 +147,6 @@ __all__ = [
     "DocumentEnrichmentContext",
     "ContextBuilder",
     "Enricher",
-    # Summary (legacy - now handled by ChunkEnricher)
-    "ChunkSummarizer",
-    "SummaryCache",
     # Hierarchy
     "HierarchyEnricher",
     "ChunkMatcher",
@@ -168,13 +157,9 @@ __all__ = [
     "ArtifactGenerator",
     "ProjectAnalysis",
     "ProjectAnalyzer",
-    # Registries
+    # Artifact Registry
     "ArtifactRegistry",
     "get_artifact_registry",
     "get_artifact_plugin",
     "list_artifact_plugins",
-    "ContextRegistry",
-    "get_context_registry",
-    "get_context_plugin",
-    "list_context_plugins",
 ]

@@ -1,4 +1,4 @@
-# fitz_ai/ingestion/enrichment/chunk/enricher.py
+# fitz_ai/ingestion/enrichment/bus.py
 """
 Chunk Enrichment Bus - Unified per-chunk enrichment with extensible modules.
 
@@ -24,197 +24,22 @@ from __future__ import annotations
 
 import json
 import logging
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any
+
+from fitz_ai.ingestion.enrichment.modules import (
+    ChatClient,
+    EnrichmentModule,
+    EntityModule,
+    KeywordModule,
+    SummaryModule,
+)
 
 if TYPE_CHECKING:
     from fitz_ai.core.chunk import Chunk
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# Protocols
-# =============================================================================
-
-
-@runtime_checkable
-class ChatClient(Protocol):
-    """Protocol for LLM chat clients."""
-
-    def chat(self, messages: list[dict[str, str]]) -> str: ...
-
-
-# =============================================================================
-# Enrichment Module Interface
-# =============================================================================
-
-
-class EnrichmentModule(ABC):
-    """
-    Base class for enrichment modules.
-
-    Each module defines:
-    - What to extract (prompt_instruction)
-    - How to parse the result (parse_result)
-    - Where to store it (apply_to_chunk or collect separately)
-
-    To add a new enrichment:
-    1. Subclass EnrichmentModule
-    2. Implement the abstract methods
-    3. Add to ChunkEnricher's module list
-    """
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Unique identifier for this module."""
-        ...
-
-    @property
-    @abstractmethod
-    def json_key(self) -> str:
-        """Key in the JSON response for this module's output."""
-        ...
-
-    @abstractmethod
-    def prompt_instruction(self) -> str:
-        """
-        Return the instruction to include in the prompt.
-
-        Should describe what to extract and the expected format.
-        """
-        ...
-
-    @abstractmethod
-    def parse_result(self, data: Any) -> Any:
-        """
-        Parse and validate the module's output from the JSON response.
-
-        Args:
-            data: The value from response[json_key]
-
-        Returns:
-            Parsed/validated result
-        """
-        ...
-
-    def apply_to_chunk(self, chunk: "Chunk", result: Any) -> None:
-        """
-        Apply the enrichment result to a chunk's metadata.
-
-        Override this if the module should attach data to chunks.
-        Default implementation does nothing (for modules like keywords
-        that collect data separately).
-        """
-        pass
-
-
-# =============================================================================
-# Built-in Modules
-# =============================================================================
-
-
-class SummaryModule(EnrichmentModule):
-    """Extracts a searchable summary for each chunk."""
-
-    @property
-    def name(self) -> str:
-        return "summary"
-
-    @property
-    def json_key(self) -> str:
-        return "summary"
-
-    def prompt_instruction(self) -> str:
-        return (
-            '"summary": A 2-3 sentence description of what this content does/contains '
-            "and when someone would search for it. Be specific, not vague."
-        )
-
-    def parse_result(self, data: Any) -> str:
-        if isinstance(data, str):
-            return data.strip()
-        return str(data).strip() if data else ""
-
-    def apply_to_chunk(self, chunk: "Chunk", result: Any) -> None:
-        if result:
-            chunk.metadata["summary"] = result
-
-
-class KeywordModule(EnrichmentModule):
-    """
-    Extracts exact-match keywords/identifiers.
-
-    Keywords are collected separately (not attached to chunks) and
-    saved to VocabularyStore for exact-match retrieval.
-    """
-
-    @property
-    def name(self) -> str:
-        return "keywords"
-
-    @property
-    def json_key(self) -> str:
-        return "keywords"
-
-    def prompt_instruction(self) -> str:
-        return (
-            '"keywords": Array of exact identifiers someone might search for verbatim: '
-            "IDs (TC-1234, JIRA-567), function/class names (getUserById, AuthService), "
-            "constants (MAX_RETRIES, API_KEY), version numbers (v2.0.1), error codes, "
-            "API endpoints, etc. Only specific searchable terms, not generic words. "
-            "Return empty array if none found."
-        )
-
-    def parse_result(self, data: Any) -> list[str]:
-        if isinstance(data, list):
-            return [str(item).strip() for item in data if item]
-        return []
-
-    # Keywords don't attach to chunks - they're collected separately
-
-
-class EntityModule(EnrichmentModule):
-    """Extracts named entities (people, organizations, concepts, etc.)."""
-
-    @property
-    def name(self) -> str:
-        return "entities"
-
-    @property
-    def json_key(self) -> str:
-        return "entities"
-
-    def prompt_instruction(self) -> str:
-        return (
-            '"entities": Array of named entities as objects with "name" and "type" fields. '
-            "Types: person, organization, product, technology, concept. "
-            'Example: [{"name": "John Smith", "type": "person"}, '
-            '{"name": "PostgreSQL", "type": "technology"}]. '
-            "Return empty array if none found."
-        )
-
-    def parse_result(self, data: Any) -> list[dict[str, str]]:
-        if not isinstance(data, list):
-            return []
-
-        entities = []
-        for item in data:
-            if isinstance(item, dict) and "name" in item:
-                entities.append(
-                    {
-                        "name": str(item.get("name", "")),
-                        "type": str(item.get("type", "unknown")),
-                    }
-                )
-        return entities
-
-    def apply_to_chunk(self, chunk: "Chunk", result: Any) -> None:
-        if result:
-            chunk.metadata["entities"] = result
 
 
 # =============================================================================
@@ -457,10 +282,6 @@ def create_default_enricher(chat_client: ChatClient) -> ChunkEnricher:
 
 
 __all__ = [
-    "EnrichmentModule",
-    "SummaryModule",
-    "KeywordModule",
-    "EntityModule",
     "ChunkEnricher",
     "ChunkEnrichmentResult",
     "EnrichmentBatchResult",
