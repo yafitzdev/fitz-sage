@@ -11,6 +11,138 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.0] - 2026-01-21
+
+### 🎉 Highlights
+
+**Structured Data Module** - Complete rewrite of structured/tabular data handling with SQL generation, derived fields, schema detection, and unified vector+structured query routing. Enables natural language queries over CSV/tables with automatic SQL generation and result formatting.
+
+**Fitz Cloud Integration** - Full integration with Fitz Cloud for query-time RAG optimization. Supports encrypted cache lookup/storage, model routing, and retrieval fingerprinting for cache keys.
+
+**VLM Figure Description** - Docling parser now supports Vision Language Model (VLM) integration for automatic figure/chart description. When configured with a vision provider, images detected in documents are described by the VLM instead of showing "[Figure]" placeholders.
+
+**Direct Text Ingestion** - Ingest text directly from command line without files: `fitz ingest "Your text here"`. Auto-detects text vs file paths.
+
+**Architecture Overhaul** - Major refactoring to eliminate anti-patterns: typed models replace `dict[str, Any]`, god classes split into focused modules, global state eliminated, and Protocol-based type hints throughout. Test consolidation following DHH principles.
+
+### 🚀 Added
+
+#### Structured Data Module (`fitz_ai/structured/`)
+- `schema.py` - Schema detection and field type inference (458 lines)
+- `sql_generator.py` - Natural language to SQL translation (415 lines)
+- `executor.py` - Safe SQL execution with sandboxing (404 lines)
+- `derived.py` - Derived field computation (ratios, aggregates) (438 lines)
+- `router.py` - Intelligent query routing (vector vs structured) (239 lines)
+- `formatter.py` - Result formatting for LLM consumption (199 lines)
+- `ingestion.py` - CSV/table ingestion with schema extraction (305 lines)
+- `types.py` - Type definitions and protocols (369 lines)
+- `constants.py` - SQL templates and constants (64 lines)
+- `fitz tables` CLI command for table management (525 lines)
+- Structured E2E test suite (989 lines)
+- Vector search integration for derived fields
+
+#### Direct Text Ingestion (`fitz_ai/cli/commands/ingest_direct.py`)
+- `ingest_direct_text()` - Ingest text strings directly
+- `is_direct_text()` - Auto-detect text vs file path
+- `fitz ingest "Your text here"` - CLI support
+- Automatic doc_id generation
+
+#### Fitz Cloud (`fitz_ai/cloud/`)
+- `CloudClient` - HTTP client for Fitz Cloud API
+- Query-time RAG optimizer integration
+- Model routing from cloud configuration
+- Encrypted cache lookup and storage in RAGPipeline
+- `retrieval_fingerprint` for deterministic cache keys
+- `X-API-Key` header authentication
+
+#### VLM Figure Description (`fitz_ai/ingestion/parser/plugins/docling.py`)
+- `_describe_image_with_vlm()` - Sends detected figures to VLM for description
+- `generate_picture_images=True` option in Docling pipeline
+- PIL image extraction via `item.get_image(doc)`
+- VLM call statistics tracking (`vlm_calls`, `vlm_errors`)
+- 300s timeout for VLM calls (model loading on first call)
+
+#### Docling Grid-Based Table Extraction
+- `_build_table_from_grid()` - Extracts clean markdown tables from Docling's structured grid data
+- Bypasses `export_to_markdown()` which adds unwanted bold formatting
+- Proper column normalization and separator generation
+
+#### Framework Integrations
+- LangChain retriever abstraction layer
+
+#### Figure E2E Tests (`tests/e2e/`)
+- `FIGURE_RETRIEVAL` feature type in scenarios
+- `figure_test.pdf` fixture with embedded bar chart
+- 4 new scenarios (E145-E148) for figure content retrieval
+
+### 🔄 Changed
+
+#### Architecture Refactoring
+- **Typed Models** - Replaced `dict[str, Any]` anti-pattern with proper dataclasses and typed models throughout codebase
+- **Split `ingest.py`** (1,005 lines) into focused modules under `cli/commands/ingest/`
+- **Split `init.py`** (1,033 lines) into focused modules under `cli/commands/init/`
+- **Split `FitzPaths`** god class - Eliminated global state mutations
+- **Protocol Type Hints** - Added Protocol-based type hints for documentation
+- **`PluginKwargs`** - Typed class replacing `**kwargs` anti-pattern
+- **Exception Handling** - Consolidated repeated exception handling in RAGPipeline
+- **ClaraEngine** - Eliminated global state pollution
+
+#### CLI Services Extraction
+- `cli/services/ingest_service.py` - Extracted ingestion orchestration logic (319 lines)
+- `cli/services/init_service.py` - Extracted initialization logic (275 lines)
+- Clean separation of CLI presentation from business logic
+
+#### Test Consolidation (DHH-style)
+- Consolidated 12 granular RGS tests into `test_rgs_consolidated.py` (189 lines)
+- Consolidated 6 context pipeline tests into `test_context_pipeline_consolidated.py` (106 lines)
+- Removed ~300 lines of fragmented test files
+- Each test file now tests a complete behavior, not implementation details
+
+#### API Improvements
+- Extracted API error decorator for consistent error handling
+- Simplified tier resolution logic
+- Added constants for magic values
+
+#### Documentation
+- `docs/api_reference.md` - New comprehensive API reference (233 lines)
+
+#### Enrichment System
+- E2E test rework for enrichment validation
+
+### 🗑️ Removed
+
+#### Consolidated Test Files (DHH-style cleanup)
+- `test_context_pipeline_cross_file_dedupe.py`
+- `test_context_pipeline_markdown_integrity.py`
+- `test_context_pipeline_ordering.py`
+- `test_context_pipeline_pack_boundary.py`
+- `test_context_pipeline_unknown_group.py`
+- `test_context_pipeline_weird_inputs.py`
+- `test_rgs_chunk_id_fallback.py`
+- `test_rgs_chunk_limit.py`
+- `test_rgs_exclude_query.py`
+- `test_rgs_max_chunks_limit.py`
+- `test_rgs_metadata_format.py`
+- `test_rgs_metadata_truncation.py`
+- `test_rgs_no_citations.py`
+- `test_rgs_prompt_core_logic.py`
+- `test_rgs_prompt_slots.py`
+- `test_rgs_strict_grounding_instruction.py`
+
+### 🐛 Fixed
+
+- **Table Markdown Formatting** - Tables no longer have bold headers (`**Column**`) that break downstream SQL generation
+- **Security Test Assertion** - Fixed flaky security test assertion
+- **Retrieval Latency Threshold** - Increased threshold for CI variance tolerance
+
+### 📦 Configuration
+
+#### VLM Configuration (`fitz_ai/llm/vision/local_ollama.yaml`)
+- Increased endpoint timeout from 180s to 300s for VLM model loading
+- Recommended model: `minicpm-v` for 16GB VRAM GPUs
+
+---
+
 ## [0.5.2] - 2026-01-13
 
 ### 🎉 Highlights
@@ -966,7 +1098,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.5...v0.5.0
