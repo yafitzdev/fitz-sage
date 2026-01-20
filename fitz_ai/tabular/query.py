@@ -71,11 +71,13 @@ class TableQueryStep(RetrievalStep):
     COLUMN_SELECT_PROMPT = """Given this table schema and question, which columns are needed to answer?
 
 Table columns: {columns}
+Sample data: {samples}
 Question: {question}
 
 Return ONLY a JSON array of column names needed. Example: ["col1", "col2"]
 Rules:
 - Include columns needed for filtering AND for displaying results
+- Look at sample data to find which columns contain relevant values for the question
 - For "who/which/what" questions, ALWAYS include identifying columns (name, id, title, etc.)
 - For numeric comparisons (highest, lowest, average), include the numeric column
 - When in doubt, include more columns rather than fewer"""
@@ -238,8 +240,9 @@ Return ONLY the SQL query, no explanation."""
                 f"{table.column_count} cols, {table.row_count} rows"
             )
 
-            # 2. LLM selects relevant columns
-            needed_cols = self._select_columns(query, table.headers)
+            # 2. LLM selects relevant columns (with sample data for context)
+            sample_for_selection = table.rows[:3] if table.rows else []
+            needed_cols = self._select_columns(query, table.headers, sample_for_selection)
             logger.debug(f"Selected columns: {needed_cols}")
 
             # 3. Prune to needed columns only
@@ -555,10 +558,22 @@ Results ({len(results)} rows):
             },
         )
 
-    def _select_columns(self, query: str, columns: list[str]) -> list[str]:
+    def _select_columns(
+        self, query: str, columns: list[str], sample_rows: list[list[str]] | None = None
+    ) -> list[str]:
         """Use LLM to select relevant columns."""
+        # Format sample data for prompt
+        samples_str = "(no sample data)"
+        if sample_rows:
+            sample_lines = []
+            for row in sample_rows[:3]:
+                row_str = " | ".join(f"{col}={val}" for col, val in zip(columns, row))
+                sample_lines.append(row_str)
+            samples_str = "\n".join(sample_lines)
+
         prompt = self.COLUMN_SELECT_PROMPT.format(
             columns=columns,
+            samples=samples_str,
             question=query,
         )
         response = self.chat.chat([{"role": "user", "content": prompt}])

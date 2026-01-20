@@ -150,7 +150,24 @@ class TableExtractor:
 
         # Split by pipe and strip each cell
         cells = [cell.strip() for cell in line.split("|")]
+        # Strip markdown formatting (bold, italic) from cells
+        cells = [self._strip_markdown(c) for c in cells]
         return [c for c in cells if c]  # Remove empty cells
+
+    def _strip_markdown(self, text: str) -> str:
+        """Strip common markdown formatting from text."""
+        # Strip bold (**text** or __text__)
+        text = text.strip()
+        if text.startswith("**") and text.endswith("**"):
+            text = text[2:-2]
+        elif text.startswith("__") and text.endswith("__"):
+            text = text[2:-2]
+        # Strip italic (*text* or _text_) - be careful not to strip partial bold
+        elif text.startswith("*") and text.endswith("*") and not text.startswith("**"):
+            text = text[1:-1]
+        elif text.startswith("_") and text.endswith("_") and not text.startswith("__"):
+            text = text[1:-1]
+        return text.strip()
 
     def _is_separator_row(self, line: str) -> bool:
         """Check if line is a table separator (---|---|---)."""
