@@ -24,8 +24,8 @@ import pytest
 # Mark all tests in this module as e2e_parser
 pytestmark = pytest.mark.e2e_parser
 
-# Fixtures directory
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
+# Fixtures directory (separate from main e2e fixtures to avoid slow ingestion)
+FIXTURES_DIR = Path(__file__).parent / "fixtures_parser"
 
 
 # =============================================================================

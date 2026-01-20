@@ -28,6 +28,7 @@ SUPPORTED_EXTENSIONS: Set[str] = {
     ".txt",
     ".py",
     ".pdf",
+    ".docx",
     ".csv",
     ".tsv",
 }

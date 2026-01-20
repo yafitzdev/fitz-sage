@@ -1354,6 +1354,17 @@ SCENARIOS: list[TestScenario] = [
         must_contain_any=["7", "seven", "Carol", "James", "Grace"],
         min_sources=1,
     ),
+]
+
+
+# =============================================================================
+# PDF/DOCX Document Scenarios (Slow E2E - separate from main tests)
+# =============================================================================
+# These scenarios test PDF and DOCX parsing + retrieval.
+# Run with: pytest -m e2e_parser
+# Excluded from main e2e tests to keep them fast.
+
+PDF_DOCX_SCENARIOS: list[TestScenario] = [
     # =========================================================================
     # PDF Document Queries (Nexus Robotics Q4 2025 Report)
     # =========================================================================
