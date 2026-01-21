@@ -33,7 +33,7 @@ jobs:
 
       - name: Install linting tools
         run: |
-          pip install ruff black isort
+          pip install ruff black==24.10.0 isort
 
       - name: Check formatting with Black
         run: black --check --diff .
