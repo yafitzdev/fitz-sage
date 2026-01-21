@@ -230,6 +230,7 @@ class fitz:
         self,
         question: str,
         top_k: Optional[int] = None,
+        conversation_context: Optional[Any] = None,
     ) -> Answer:
         """
         Ask a question about the ingested documents.
@@ -237,6 +238,8 @@ class fitz:
         Args:
             question: The question to ask.
             top_k: Override the number of chunks to retrieve.
+            conversation_context: Optional ConversationContext for query rewriting.
+                Enables conversational pronoun resolution (e.g., "their" → "TechCorp's").
 
         Returns:
             Answer object with text and provenance.
@@ -282,14 +285,14 @@ class fitz:
 
         # Run query
         logger.info(f"Querying: {question[:50]}...")
-        rgs_answer = self._pipeline.run(question)
+        rgs_answer = self._pipeline.run(question, conversation_context=conversation_context)
 
         # Convert RGSAnswer to core Answer
         return self._convert_to_answer(rgs_answer)
 
-    def query(self, question: str, **kwargs) -> Answer:
+    def query(self, question: str, conversation_context: Optional[Any] = None, **kwargs) -> Answer:
         """Alias for ask(). Provided for API consistency."""
-        return self.ask(question, **kwargs)
+        return self.ask(question, conversation_context=conversation_context, **kwargs)
 
     def _ensure_config(self) -> None:
         """Ensure configuration file exists, creating if needed."""

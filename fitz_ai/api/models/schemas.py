@@ -22,6 +22,10 @@ class QueryRequest(BaseModel):
     question: str = Field(..., description="The question to ask", min_length=1)
     collection: str = Field("default", description="Collection to query")
     top_k: Optional[int] = Field(None, description="Number of chunks to retrieve", ge=1)
+    conversation_history: List["ChatMessage"] = Field(
+        default_factory=list,
+        description="Optional conversation history for query rewriting (resolves pronouns like 'their' → 'TechCorp')",
+    )
 
 
 class QueryResponse(BaseModel):

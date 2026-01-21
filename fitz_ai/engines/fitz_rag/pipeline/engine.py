@@ -183,8 +183,14 @@ class RAGPipeline:
             logger.error(f"{PIPELINE} {name} failed: {exc}")
             raise error_class(f"{name} failed") from exc
 
-    def run(self, query: str) -> RGSAnswer:
-        """Execute the RAG pipeline for a query."""
+    def run(self, query: str, conversation_context=None) -> RGSAnswer:
+        """
+        Execute the RAG pipeline for a query.
+
+        Args:
+            query: The user's question
+            conversation_context: Optional ConversationContext for query rewriting
+        """
         logger.info(f"{PIPELINE} Running pipeline for query='{query[:50]}...'")
 
         # Step -1: Check for structured query (tables/CSV)
@@ -212,7 +218,11 @@ class RAGPipeline:
                 )
                 return raw_chunks
             else:
-                return self.retrieval.retrieve(query, filter_override=filter_override)
+                return self.retrieval.retrieve(
+                    query,
+                    filter_override=filter_override,
+                    conversation_context=conversation_context,
+                )
 
         raw_chunks = self._wrap_step("Retrieval", _do_retrieval)
 
