@@ -36,6 +36,7 @@ class Feature(Enum):
     TEMPORAL = "temporal"
     AGGREGATION = "aggregation"
     FIGURE_RETRIEVAL = "figure_retrieval"
+    HYDE = "hyde"
 
 
 @dataclass
@@ -1353,6 +1354,63 @@ SCENARIOS: list[TestScenario] = [
         query="How many employees earn over $100,000?",
         # Need to count from CSV: Carol (105k), Grace (110k), James (145k), Karen (125k), Leo (135k), Maria (115k), Peter (140k) = 7
         must_contain_any=["7", "seven", "Carol", "James", "Grace"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # HyDE (Hypothetical Document Embeddings)
+    # =========================================================================
+    TestScenario(
+        id="E150",
+        name="HyDE: abstract conceptual query",
+        feature=Feature.HYDE,
+        query="What is the philosophy behind TechCorp's approach to sustainable transportation?",
+        # HyDE helps bridge abstract query to concrete docs about EV mission
+        must_contain_any=["electric", "sustainable", "green", "emission", "environment"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E151",
+        name="HyDE: how does it work explanation",
+        feature=Feature.HYDE,
+        query="How does the authentication flow ensure security?",
+        # HyDE generates explanatory passages about auth security
+        must_contain_any=["JWT", "token", "session", "password", "encrypt"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E152",
+        name="HyDE: domain expertise bridge",
+        feature=Feature.HYDE,
+        query="What architectural patterns ensure high availability in the system?",
+        # HyDE bridges technical jargon to concrete microservices docs
+        must_contain_any=["replica", "failover", "redundan", "load", "cluster"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E153",
+        name="HyDE: vague conceptual question",
+        feature=Feature.HYDE,
+        query="What makes TechCorp different from traditional automakers?",
+        # HyDE generates passages about EV vs traditional distinctions
+        must_contain_any=["electric", "battery", "software", "AutoMotors", "gasoline"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E154",
+        name="HyDE: implicit requirements query",
+        feature=Feature.HYDE,
+        query="What would I need to know before buying a TechCorp vehicle?",
+        # HyDE generates buyer-focused passages about specs, price, warranty
+        must_contain_any=["price", "range", "warranty", "charging", "battery"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E155",
+        name="HyDE: edge case short abstract query",
+        feature=Feature.HYDE,
+        query="TechCorp innovation strategy",
+        # HyDE helps even with short queries that need context expansion
+        must_contain_any=["R&D", "research", "technology", "Gigafactory", "Project Alpha"],
         min_sources=1,
     ),
 ]
