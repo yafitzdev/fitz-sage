@@ -305,6 +305,22 @@ class HierarchyEnricher:
                 logger.debug("[HIERARCHY] Skipping _ungrouped in simple mode")
                 continue
 
+            # Skip LLM call for trivial groups (too few chunks or too little content)
+            total_content = sum(len(c.content) for c in group_chunks)
+            if (
+                len(group_chunks) < self._config.min_group_chunks
+                or total_content < self._config.min_group_content
+            ):
+                logger.debug(
+                    f"[HIERARCHY] Skipping L1 summary for '{group_key}': "
+                    f"{len(group_chunks)} chunks, {total_content} chars "
+                    f"(min: {self._config.min_group_chunks} chunks, {self._config.min_group_content} chars)"
+                )
+                # Still attach minimal metadata without LLM call
+                for chunk in group_chunks:
+                    chunk.metadata["hierarchy_group"] = group_key
+                continue
+
             summary_content, assessment = self._generate_simple_group_summary(
                 group_key=group_key,
                 chunks=group_chunks,
@@ -501,6 +517,23 @@ Write a high-level overview (3-5 paragraphs) synthesizing the key insights.
         for group_key, group_chunks in groups.items():
             if group_key == "_ungrouped":
                 logger.debug(f"[HIERARCHY] Skipping _ungrouped for rule '{rule.name}'")
+                continue
+
+            # Skip LLM call for trivial groups (too few chunks or too little content)
+            total_content = sum(len(c.content) for c in group_chunks)
+            if (
+                len(group_chunks) < self._config.min_group_chunks
+                or total_content < self._config.min_group_content
+            ):
+                logger.debug(
+                    f"[HIERARCHY] Skipping L1 summary for '{group_key}' (rule '{rule.name}'): "
+                    f"{len(group_chunks)} chunks, {total_content} chars "
+                    f"(min: {self._config.min_group_chunks} chunks, {self._config.min_group_content} chars)"
+                )
+                # Still attach minimal metadata without LLM call
+                for chunk in group_chunks:
+                    chunk.metadata["hierarchy_group"] = group_key
+                    chunk.metadata["hierarchy_rule"] = rule.name
                 continue
 
             summary_content, assessment = self._generate_group_summary(

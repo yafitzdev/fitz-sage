@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
+from fitz_ai.ingestion.enrichment.config import HierarchyConfig
 
 
 class TestEnrichmentPipelineChunkEnrichment:
@@ -45,7 +46,11 @@ class TestEnrichmentPipelineChunkEnrichment:
 
     def test_enrich_extracts_entities(self, tmp_path):
         """ChunkEnricher extracts entities as part of batch enrichment."""
-        config = EnrichmentConfig()
+        # Use min thresholds=0 to disable threshold for small test content
+        config = EnrichmentConfig(
+            min_batch_content=0,
+            hierarchy=HierarchyConfig(min_group_chunks=1, min_group_content=0),
+        )
 
         mock_chat = MagicMock()
         # ChunkEnricher expects batch response with summary, keywords, entities
@@ -94,7 +99,11 @@ class TestEnrichmentPipelineChunkEnrichment:
 
     def test_enrich_extracts_all_enrichments(self, tmp_path):
         """ChunkEnricher extracts summary, keywords, and entities together."""
-        config = EnrichmentConfig()
+        # Use min thresholds=0 to disable threshold for small test content
+        config = EnrichmentConfig(
+            min_batch_content=0,
+            hierarchy=HierarchyConfig(min_group_chunks=1, min_group_content=0),
+        )
 
         mock_chat = MagicMock()
         mock_chat.chat.return_value = json.dumps(

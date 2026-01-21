@@ -108,7 +108,10 @@ class EnrichmentPipeline:
             logger.warning("[ENRICHMENT] No chat client provided, chunk enrichment disabled")
             return
 
-        self._chunk_enricher = create_default_enricher(self._chat_client)
+        self._chunk_enricher = create_default_enricher(
+            self._chat_client,
+            min_batch_content=self.config.min_batch_content,
+        )
         logger.info(
             f"[ENRICHMENT] Chunk enricher initialized with modules: "
             f"{[m.name for m in self._chunk_enricher.modules]}"

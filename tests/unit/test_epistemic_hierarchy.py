@@ -216,7 +216,7 @@ class TestHierarchyEnricherEpistemic:
 
     def test_simple_mode_adds_epistemic_metadata(self):
         """Test that simple mode adds epistemic metadata to original chunks."""
-        config = HierarchyConfig(group_by="source")
+        config = HierarchyConfig(group_by="source", min_group_chunks=1, min_group_content=0)
 
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "This is a summary."
@@ -264,7 +264,7 @@ class TestHierarchyEnricherEpistemic:
 
         from .mock_embedder import create_deterministic_embedder
 
-        config = HierarchyConfig(group_by="source")
+        config = HierarchyConfig(group_by="source", min_group_chunks=1, min_group_content=0)
 
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "Summary acknowledging conflicts."
@@ -308,7 +308,7 @@ class TestHierarchyEnricherEpistemic:
 
     def test_corpus_summary_includes_epistemic_aggregates(self):
         """Test that corpus summary has aggregated epistemic metadata."""
-        config = HierarchyConfig(group_by="source")
+        config = HierarchyConfig(group_by="source", min_group_chunks=1, min_group_content=0)
 
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "Summary content."

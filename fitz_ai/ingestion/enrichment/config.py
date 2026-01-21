@@ -106,6 +106,10 @@ class HierarchyConfig(BaseModel):
     corpus_prompt: str | None = None  # Uses DEFAULT_CORPUS_PROMPT if None
     rules: list[HierarchyRule] = Field(default_factory=list)  # Power user
 
+    # Minimum thresholds to skip LLM calls for trivial groups
+    min_group_chunks: int = 2  # Skip L1 summary if group has fewer chunks
+    min_group_content: int = 1000  # Skip L1 summary if total content below this (chars)
+
 
 class EnrichmentConfig(BaseModel):
     """
@@ -117,6 +121,7 @@ class EnrichmentConfig(BaseModel):
     Attributes:
         artifacts: Project-level artifact configuration
         hierarchy: Hierarchical summarization configuration
+        min_batch_content: Minimum content chars to trigger chunk enrichment LLM call
 
     Example in .fitz/config.yaml:
         enrichment:
@@ -135,6 +140,9 @@ class EnrichmentConfig(BaseModel):
 
     artifacts: ArtifactConfig = Field(default_factory=ArtifactConfig)
     hierarchy: HierarchyConfig = Field(default_factory=HierarchyConfig)
+
+    # Minimum thresholds to skip LLM calls for trivial batches
+    min_batch_content: int = 500  # Skip chunk enrichment if batch content below this (chars)
 
 
 __all__ = [

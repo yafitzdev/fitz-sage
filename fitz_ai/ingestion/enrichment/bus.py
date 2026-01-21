@@ -95,6 +95,7 @@ class ChunkEnricher:
     modules: list[EnrichmentModule] = field(default_factory=list)
     batch_size: int = 15  # Chunks per LLM call
     max_content_length: int = 1500  # Truncate long chunks
+    min_batch_content: int = 500  # Skip LLM call if total batch content below this
 
     def __post_init__(self) -> None:
         if not self.modules:
@@ -153,6 +154,14 @@ class ChunkEnricher:
 
     def _enrich_batch(self, batch: list["Chunk"]) -> list[ChunkEnrichmentResult]:
         """Enrich a single batch of chunks with one LLM call."""
+        # Skip LLM call if batch content is too small to be worth it
+        total_content = sum(len(chunk.content) for chunk in batch)
+        if total_content < self.min_batch_content:
+            logger.debug(
+                f"[ENRICH] Skipping batch: {total_content} chars < {self.min_batch_content} min"
+            )
+            return [ChunkEnrichmentResult(chunk_index=i) for i in range(len(batch))]
+
         prompt = self._build_prompt(batch)
         messages = [{"role": "user", "content": prompt}]
 
@@ -269,8 +278,16 @@ class ChunkEnricher:
 # =============================================================================
 
 
-def create_default_enricher(chat_client: ChatClient) -> ChunkEnricher:
-    """Create an enricher with default modules."""
+def create_default_enricher(
+    chat_client: ChatClient,
+    min_batch_content: int = 500,
+) -> ChunkEnricher:
+    """Create an enricher with default modules.
+
+    Args:
+        chat_client: LLM chat client for enrichment
+        min_batch_content: Minimum total content in batch to trigger LLM call (default: 500 chars)
+    """
     return ChunkEnricher(
         chat_client=chat_client,
         modules=[
@@ -278,6 +295,7 @@ def create_default_enricher(chat_client: ChatClient) -> ChunkEnricher:
             KeywordModule(),
             EntityModule(),
         ],
+        min_batch_content=min_batch_content,
     )
 
 
