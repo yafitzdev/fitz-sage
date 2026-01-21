@@ -37,6 +37,7 @@ class Feature(Enum):
     AGGREGATION = "aggregation"
     FIGURE_RETRIEVAL = "figure_retrieval"
     HYDE = "hyde"
+    QUERY_REWRITING = "query_rewriting"
 
 
 @dataclass
@@ -1411,6 +1412,99 @@ SCENARIOS: list[TestScenario] = [
         query="TechCorp innovation strategy",
         # HyDE helps even with short queries that need context expansion
         must_contain_any=["R&D", "research", "technology", "Gigafactory", "Project Alpha"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Query Rewriting (Conversational Context Resolution)
+    # =========================================================================
+    TestScenario(
+        id="E156",
+        name="Query rewriting: typo correction",
+        feature=Feature.QUERY_REWRITING,
+        query="What is the price of the Modle X1OO?",
+        # "Modle X1OO" should be corrected to "Model X100"
+        must_contain_any=["45,000", "$45", "X100"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E157",
+        name="Query rewriting: filler word removal",
+        feature=Feature.QUERY_REWRITING,
+        query="So like, uhh, what does TechCorp basically manufacture, you know?",
+        # Filler words removed, core question preserved
+        must_contain_any=["electric", "vehicle", "battery", "EV"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E158",
+        name="Query rewriting: complex phrasing simplification",
+        feature=Feature.QUERY_REWRITING,
+        query="I was wondering if you could perhaps tell me about the individual who currently holds the position of chief executive officer at the company known as TechCorp Industries?",
+        # Simplified to find CEO info
+        must_contain=["Sarah Chen"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E159",
+        name="Query rewriting: question to statement optimization",
+        feature=Feature.QUERY_REWRITING,
+        query="What is the definition and overview of the Model Y200?",
+        # Question rewritten to match document language
+        must_contain_any=["Y200", "55,000", "400", "premium"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E160",
+        name="Query rewriting: multiple typos and noise",
+        feature=Feature.QUERY_REWRITING,
+        query="uhm wher is TechCrp headquaters locatd at??",
+        # Multiple issues: filler, typos in "TechCorp", "headquarters", "located"
+        must_contain=["Austin"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E161",
+        name="Query rewriting: informal to formal",
+        feature=Feature.QUERY_REWRITING,
+        query="yo whats the deal with that greendrive company",
+        # Informal query about GreenDrive
+        must_contain_any=["GreenDrive", "hydrogen", "fuel cell", "San Jose"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E162",
+        name="Query rewriting: abbreviated terms",
+        feature=Feature.QUERY_REWRITING,
+        query="TC CEO edu background?",
+        # "TC" = TechCorp, "edu" = education
+        must_contain_any=["Sarah Chen", "MIT", "PhD"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E163",
+        name="Query rewriting: run-on question",
+        feature=Feature.QUERY_REWRITING,
+        query="I need to know about batteries and also ranges and prices for all the cars",
+        # Run-on converted to structured retrieval
+        must_contain_any=["75 kWh", "100 kWh", "50 kWh", "300", "400", "200"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E164",
+        name="Query rewriting: mixed case and spacing issues",
+        feature=Feature.QUERY_REWRITING,
+        query="WHAT   is   the   warranty   on   TECHCORP   batteries???",
+        # Normalize spacing, case
+        must_contain_any=["8-year", "8 year", "150,000", "warranty"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E165",
+        name="Query rewriting: incomplete sentence",
+        feature=Feature.QUERY_REWRITING,
+        query="sarah chen previous job before",
+        # Incomplete query about Sarah Chen's previous employment
+        must_contain_any=["AutoMotors", "VP", "Engineering"],
         min_sources=1,
     ),
 ]
