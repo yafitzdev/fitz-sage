@@ -178,6 +178,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 | [**aggregation-queries**](docs/features/aggregation-queries.md) | "List all the test cases that failed" | ❌ Partial list — No mechanism for comprehensive retrieval | ✅ Aggregation query handling |
 | [**freshness-authority**](docs/features/freshness-authority.md) | "What does the official spec say?" | ❌ Returns notes — Can't distinguish authoritative vs informal sources | ✅ Freshness/authority boosting |
 | [**query-expansion**](docs/features/query-expansion.md) | "How do I fetch the db config?" | ❌ No matches — User says "fetch", docs say "retrieve"; "db" vs "database" | ✅ Query expansion |
+| [**query-rewriting**](docs/features/query-rewriting.md) | "Tell me more about it" *(after discussing TechCorp)* | ❌ Lost context — Pronouns like "it" reference nothing, retrieval fails | ✅ Conversational context resolution |
 | [**hyde**](docs/features/hyde.md) | "What's TechCorp's approach to sustainability?" | ❌ Poor recall — Abstract queries don't embed close to concrete documents | ✅ Hypothetical document generation |
 | [**code-aware-chunking**](docs/features/code-aware-chunking.md) | "How does the auth module work?" *(code)* | ❌ Broken code fragments — Naive chunking splits functions mid-body | ✅ Complete functions |
 
