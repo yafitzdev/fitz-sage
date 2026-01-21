@@ -3,6 +3,7 @@
 Vector Search Step - Intelligent retrieval from vector database.
 
 Embeds query and searches for top-k candidates. Automatically applies:
+- Query rewriting (conversational context, clarity, retrieval optimization)
 - Aggregation query handling (list all, count, enumerate queries)
 - Temporal query handling (time-based comparisons and period filtering)
 - Query expansion (synonym/acronym variations) for improved recall
@@ -97,6 +98,9 @@ class VectorSearchStep(RetrievalStep):
     rrf_k: int = 60
     include_derived: bool = True
 
+    # Conversation context for query rewriting (optional)
+    conversation_context: Any | None = None
+
     # Lazy-loaded detectors
     _temporal_detector: Any = field(default=None, init=False, repr=False)
     _aggregation_detector: Any = field(default=None, init=False, repr=False)
@@ -110,37 +114,49 @@ class VectorSearchStep(RetrievalStep):
     # Lazy-loaded HyDE generator
     _hyde_generator: Any = field(default=None, init=False, repr=False)
 
+    # Lazy-loaded query rewriter
+    _query_rewriter: Any = field(default=None, init=False, repr=False)
+
+    # Current rewrite result (for strategies to access)
+    _current_rewrite: Any = field(default=None, init=False, repr=False)
+
     def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
         """
         Execute vector search with automatic query routing.
 
-        Routing logic:
+        Flow:
+        0. Query rewriting (conversational, clarity, retrieval optimization)
         1. Aggregation queries → AggregationSearch
         2. Temporal queries → TemporalSearch
         3. Comparison queries → ComparisonSearch
         4. Standard queries → SemanticSearch
         """
-        # Check for aggregation query first
-        aggregation_result = self._check_aggregation_query(query)
+        # Step 0: Rewrite query if rewriter is available
+        rewrite_result = self._rewrite_query(query)
+        effective_query = rewrite_result.rewritten_query
+        self._current_rewrite = rewrite_result
+
+        # Check for aggregation query first (uses effective query)
+        aggregation_result = self._check_aggregation_query(effective_query)
         if aggregation_result is not None:
             strategy = self._get_aggregation_strategy()
-            return strategy.execute(query, chunks, aggregation_result)
+            return strategy.execute(effective_query, chunks, aggregation_result)
 
         # Check for temporal query
-        temporal_result = self._check_temporal_query(query)
+        temporal_result = self._check_temporal_query(effective_query)
         if temporal_result is not None:
             intent, references, temporal_queries = temporal_result
             strategy = self._get_temporal_strategy()
-            return strategy.execute(query, chunks, intent, references, temporal_queries)
+            return strategy.execute(effective_query, chunks, intent, references, temporal_queries)
 
         # Check for comparison query
-        if self.chat is not None and self._is_comparison_query(query):
+        if self.chat is not None and self._is_comparison_query(effective_query):
             strategy = self._get_comparison_strategy()
-            return strategy.execute(query, chunks)
+            return strategy.execute(effective_query, chunks)
 
-        # Default: semantic search
+        # Default: semantic search (pass rewrite result for query variations)
         strategy = self._get_semantic_strategy()
-        return strategy.execute(query, chunks)
+        return strategy.execute(query, chunks, rewrite_result=rewrite_result)
 
     def _get_hyde_generator(self):
         """Lazy-load HyDE generator when chat is available."""
@@ -155,6 +171,36 @@ class VectorSearchStep(RetrievalStep):
                 self._hyde_generator = None
 
         return self._hyde_generator
+
+    def _get_query_rewriter(self):
+        """Lazy-load query rewriter when chat is available."""
+        if self._query_rewriter is None and self.chat is not None:
+            try:
+                from fitz_ai.retrieval.rewriter import QueryRewriter
+
+                self._query_rewriter = QueryRewriter(chat=self.chat)
+                logger.debug(f"{RETRIEVER} Query rewriter initialized")
+            except Exception as e:
+                logger.debug(f"{RETRIEVER} Failed to load query rewriter: {e}")
+                self._query_rewriter = None
+
+        return self._query_rewriter
+
+    def _rewrite_query(self, query: str):
+        """Rewrite query if rewriter is available."""
+        rewriter = self._get_query_rewriter()
+        if rewriter is None:
+            # Return a no-op result
+            from fitz_ai.retrieval.rewriter.types import RewriteResult, RewriteType
+
+            return RewriteResult(
+                original_query=query,
+                rewritten_query=query,
+                rewrite_type=RewriteType.NONE,
+                confidence=1.0,
+            )
+
+        return rewriter.rewrite(query, self.conversation_context)
 
     def _get_semantic_strategy(self) -> SemanticSearch:
         """Lazy-load semantic search strategy."""

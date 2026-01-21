@@ -13,6 +13,7 @@ from .base import BaseVectorSearch
 
 if TYPE_CHECKING:
     from fitz_ai.retrieval.hyde import HydeGenerator
+    from fitz_ai.retrieval.rewriter.types import RewriteResult
 
 
 class SemanticSearch(BaseVectorSearch):
@@ -55,7 +56,12 @@ class SemanticSearch(BaseVectorSearch):
         self.max_queries = max_queries
         self.hyde_generator = hyde_generator
 
-    def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
+    def execute(
+        self,
+        query: str,
+        chunks: list[Chunk],
+        rewrite_result: "RewriteResult | None" = None,
+    ) -> list[Chunk]:
         """Execute semantic search with optional multi-query expansion."""
         from fitz_ai.logging.logger import get_logger
         from fitz_ai.logging.tags import RETRIEVER
@@ -68,7 +74,7 @@ class SemanticSearch(BaseVectorSearch):
         if use_multi_query:
             results = self._multi_search(query)
         else:
-            results = self._single_search(query)
+            results = self._single_search(query, rewrite_result)
 
         # Preserve pre-existing chunks
         if chunks:
@@ -79,7 +85,11 @@ class SemanticSearch(BaseVectorSearch):
 
         return results
 
-    def _single_search(self, query: str) -> list[Chunk]:
+    def _single_search(
+        self,
+        query: str,
+        rewrite_result: "RewriteResult | None" = None,
+    ) -> list[Chunk]:
         """Standard single-query search with expansion and hybrid fusion."""
         from fitz_ai.logging.logger import get_logger
         from fitz_ai.logging.tags import RETRIEVER
@@ -90,10 +100,21 @@ class SemanticSearch(BaseVectorSearch):
             f"{RETRIEVER} SemanticSearch: single search, k={self.k}, collection={self.collection}"
         )
 
-        # Expand query to variations (synonyms, acronyms)
-        query_variations = self._get_query_variations(query)
+        # Start with base queries from rewrite result (original + rewritten + disambiguated)
+        if rewrite_result and rewrite_result.was_rewritten:
+            base_queries = rewrite_result.all_query_variations
+            logger.debug(
+                f"{RETRIEVER} Query rewrite: using {len(base_queries)} query variations"
+            )
+        else:
+            base_queries = [query]
 
-        # HyDE: add hypothetical documents for improved recall
+        # Expand each base query with synonyms/acronyms
+        query_variations = []
+        for q in base_queries:
+            query_variations.extend(self._get_query_variations(q))
+
+        # HyDE: add hypothetical documents for improved recall (use original query)
         if self.hyde_generator:
             hypotheses = self.hyde_generator.generate(query)
             query_variations.extend(hypotheses)

@@ -1,0 +1,34 @@
+Analyze and rewrite this query for optimal document retrieval.
+{history_section}
+## Current Query
+{query}
+
+## Instructions
+Perform the following transformations as needed:
+
+1. **Conversational Resolution**: If there's conversation history, resolve any pronouns (it, they, this, that, their) or references to previous topics into explicit terms.
+
+2. **Clarity**: Fix obvious typos, remove filler words (uhh, like, basically, you know), and simplify overly complex phrasing.
+
+3. **Retrieval Optimization**: Convert questions into statement form that matches how documents typically describe things:
+   - "What is X?" -> "X definition overview"
+   - "How do I Y?" -> "Y procedure steps guide"
+   - "Why does Z happen?" -> "Z cause reason explanation"
+
+4. **Ambiguity Detection**: If the query could have multiple distinct meanings, flag it as ambiguous and provide 2-3 possible interpretations.
+
+## Response Format
+Return ONLY a JSON object with no additional text:
+{{
+  "rewritten_query": "the improved query for retrieval",
+  "rewrite_type": "none|conversational|clarity|retrieval|combined",
+  "confidence": 0.0-1.0,
+  "is_ambiguous": true|false,
+  "disambiguated_queries": ["interpretation 1", "interpretation 2"]
+}}
+
+Rules:
+- If no rewrite is needed, set rewrite_type to "none" and return the original query unchanged
+- For ambiguous queries, set is_ambiguous to true and provide 2-3 possible interpretations in disambiguated_queries
+- Keep the rewritten query concise but complete
+- Preserve the user's core intent

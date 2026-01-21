@@ -18,8 +18,17 @@ from fitz_ai.cli.context import CLIContext
 from fitz_ai.cli.ui import RICH, console, display_sources, ui
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.logging.logger import get_logger
+from fitz_ai.retrieval.rewriter.types import ConversationContext, ConversationMessage
 
 logger = get_logger(__name__)
+
+
+def _history_to_context(history: List[Dict[str, str]]) -> ConversationContext:
+    """Convert chat history to ConversationContext for query rewriting."""
+    messages = [
+        ConversationMessage(role=msg["role"], content=msg["content"]) for msg in history
+    ]
+    return ConversationContext(history=messages)
 
 
 # =============================================================================
@@ -216,9 +225,10 @@ def _run_collection_chat(collection: Optional[str]) -> None:
             if not user_input.strip():
                 continue
 
-            # Retrieve chunks for current question
+            # Retrieve chunks for current question (with conversation context for rewriting)
             try:
-                chunks = pipeline.retrieval.retrieve(user_input)
+                context = _history_to_context(history) if history else None
+                chunks = pipeline.retrieval.retrieve(user_input, conversation_context=context)
             except Exception as e:
                 ui.error(f"Retrieval failed: {e}")
                 logger.debug("Retrieval error", exc_info=True)

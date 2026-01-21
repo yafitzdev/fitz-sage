@@ -392,26 +392,35 @@ class RetrievalPipelineFromYaml:
     description: str
     steps: list[RetrievalStep]
 
-    def retrieve(self, query: str, filter_override: dict[str, Any] | None = None) -> list:
+    def retrieve(
+        self,
+        query: str,
+        filter_override: dict[str, Any] | None = None,
+        conversation_context: Any | None = None,
+    ) -> list:
         """
         Execute the retrieval pipeline.
 
         Args:
             query: Query string
             filter_override: Optional filter to apply to vector search (for query routing)
+            conversation_context: Optional conversation history for query rewriting
         """
         from fitz_ai.core.chunk import Chunk
         from fitz_ai.engines.fitz_rag.retrieval.steps.vector_search import VectorSearchStep
 
         logger.info(f"{RETRIEVER} Running {self.plugin_name} pipeline ({len(self.steps)} steps)")
 
-        # Apply filter override to vector search steps if provided
-        if filter_override:
-            for step in self.steps:
-                if isinstance(step, VectorSearchStep):
+        # Apply filter override and conversation context to vector search steps
+        for step in self.steps:
+            if isinstance(step, VectorSearchStep):
+                if filter_override:
                     step.filter_conditions = filter_override
                     logger.debug(f"{RETRIEVER} Applied filter override to {step.name}")
-                    break
+                if conversation_context:
+                    step.conversation_context = conversation_context
+                    logger.debug(f"{RETRIEVER} Applied conversation context to {step.name}")
+                break
 
         chunks: list[Chunk] = []
 
