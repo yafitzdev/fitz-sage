@@ -58,12 +58,7 @@ from fitz_ai.ingestion.enrichment.artifacts.registry import (
 
 # Base types
 from fitz_ai.ingestion.enrichment.base import (
-    CodeEnrichmentContext,
     ContentType,
-    ContextBuilder,
-    DocumentEnrichmentContext,
-    Enricher,
-    EnrichmentContext,
 )
 
 # Chunk enrichment bus
@@ -142,11 +137,6 @@ __all__ = [
     "list_available_modules",
     # Base types
     "ContentType",
-    "EnrichmentContext",
-    "CodeEnrichmentContext",
-    "DocumentEnrichmentContext",
-    "ContextBuilder",
-    "Enricher",
     # Hierarchy
     "HierarchyEnricher",
     "ChunkMatcher",
