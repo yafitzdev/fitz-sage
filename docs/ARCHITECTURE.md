@@ -33,8 +33,8 @@ High-level system design of Fitz.
 │  Engine Layer                                                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────────────────────┐  ┌─────────────────────────────────┐   │
-│  │  FitzRAG Engine                 │  │  CLaRa Engine                   │   │
-│  │  Traditional RAG pipeline       │  │  Compression-native (future)    │   │
+│  │  FitzRAG Engine                 │  │  Custom Engines                 │   │
+│  │  Traditional RAG pipeline       │  │  (extensible via registry)      │   │
 │  │  - Retrieval                    │  │                                 │   │
 │  │  - Constraints (guardrails)     │  │                                 │   │
 │  │  - Generation                   │  │                                 │   │
@@ -87,7 +87,7 @@ Strict import rules enforce separation of concerns:
                                │
                     ┌─────────────────────┐
                     │  engines/           │
-                    │  FitzRAG, CLaRa     │
+                    │  FitzRAG + custom   │
                     │  Orchestrate layers │
                     └─────────────────────┘
                                ▲
@@ -353,10 +353,9 @@ fitz_ai/
 │   └── guardrails/plugins/      # Epistemic guardrails (Python)
 │
 ├── engines/                     # Engine implementations
-│   ├── fitz_rag/
-│   │   ├── engine.py            # Main RAG engine
-│   │   └── retrieval/plugins/   # Retrieval plugins (YAML)
-│   └── clara/                   # Future compression engine
+│   └── fitz_rag/
+│       ├── engine.py            # Main RAG engine
+│       └── retrieval/plugins/   # Retrieval plugins (YAML)
 │
 ├── llm/                         # LLM service layer
 │   ├── chat/                    # Chat plugins (YAML)

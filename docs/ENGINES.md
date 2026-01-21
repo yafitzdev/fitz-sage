@@ -141,11 +141,8 @@ from fitz import run
 # Default: Fitz RAG
 answer = run("What is X?", engine="fitz_rag")
 
-# Alternative: GraphRAG (knowledge graph-based)
-answer = run("What is X?", engine="graphrag")
-
-# Alternative: CLaRa (compression-native, requires GPU)
-answer = run("What is X?", engine="clara")
+# Custom engine (see CUSTOM_ENGINES.md)
+answer = run("What is X?", engine="my_custom_engine")
 ```
 
 ### Available Engines
@@ -153,8 +150,8 @@ answer = run("What is X?", engine="clara")
 | Engine | Description | Status |
 |--------|-------------|--------|
 | `fitz_rag` | Traditional RAG with epistemic guardrails | Production |
-| `graphrag` | Knowledge graph-based retrieval | Available |
-| `clara` | Apple's compression-native RAG (GPU required) | Experimental |
+
+Custom engines can be registered via the engine registry. See [CUSTOM_ENGINES.md](CUSTOM_ENGINES.md).
 
 ---
 

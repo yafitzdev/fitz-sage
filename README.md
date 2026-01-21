@@ -133,7 +133,7 @@ You can—but you'll hit walls fast.
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."*
 
 **Swap engines, keep everything else ⚙️**
-> RAG is evolving fast—GraphRAG, HyDE, ColBERT, whatever's next. Fitz lets you switch engines in one line. Your ingested data stays. Your queries stay. No migration, no re-ingestion, no new API to learn. Frameworks lock you in; Fitz lets you move.
+> RAG is evolving fast—HyDE, ColBERT, agentic RAG, whatever's next. Fitz lets you switch engines in one line. Your ingested data stays. Your queries stay. No migration, no re-ingestion, no new API to learn. Frameworks lock you in; Fitz lets you move.
 
 **Queries that actually work 📊**
 > Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1001", multi-query decomposition for complex questions, AST-aware chunking for code, and SQL execution for tabular data. No configuration—it just works.
@@ -142,7 +142,7 @@ You can—but you'll hit walls fast.
 >
 >1. [x] **Local execution possible.** FAISS and Ollama support, no API keys required to start.
 >2. [x] **Plugin-based architecture.** Swap LLMs, vector databases, rerankers, and retrieval pipelines via YAML config.
->3. [x] **Multiple engines.** Supports FitzRAG, GraphRAG and CLaRa out of the box—swap engines in one line.
+>3. [x] **Extensible engine system.** FitzRAG built-in, with a clean registry for adding custom engines.
 >4. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
 >5. [x] **Full provenance.** Every answer traces back to the exact chunk and document.
 >6. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
@@ -281,12 +281,12 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 >                           ▼
 >        ┌─────────────────────────────────────┐
 >        │       engine="..."                  │
->        │  ┌─────────┐ ┌───────┐ ┌─────────┐  │
->        │  │ fitz    │ │ clara │ │ graph   │  │
->        │  │  _rag   │ │       │ │  _rag   │  │
->        │  └────┬────┘ └───┬───┘ └────┬────┘  │
->        │       └──────────┼──────────┘       │
->        └──────────────────┼──────────────────┘
+>        │  ┌─────────┐ ┌─────────┐            │
+>        │  │ fitz    │ │ custom  │  ...       │
+>        │  │  _rag   │ │ engine  │            │
+>        │  └────┬────┘ └────┬────┘            │
+>        │       └───────────┘                 │
+>        └──────────────────┬──────────────────┘
 >                           │
 >                           ▼
 >        ┌─────────────────────────────────────┐
@@ -297,8 +297,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 >
 >```python
 >answer = run("What are the payment terms?", engine="fitz_rag")
->answer = run("What are the payment terms?", engine="clara")
->answer = run("What are the payment terms?", engine="graph_rag")  # future
+>answer = run("What are the payment terms?", engine="custom")  # your engine
 >```
 >
 >No migration. No re-ingestion. No new API to learn.
@@ -552,9 +551,9 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 │  API: /query | /chat | /ingest | /collections | /health       │
 ├───────────────────────────────────────────────────────────────┤
 │  Engines                                                      │
-│  ┌───────────┐  ┌───────────┐  ┌────────────┐                 │
-│  │  FitzRAG  │  │   CLaRa   │  │  GraphRAG  │  (pluggable)    │
-│  └───────────┘  └───────────┘  └────────────┘                 │
+│  ┌───────────┐  ┌────────────┐                                │
+│  │  FitzRAG  │  │  Custom... │  (extensible registry)         │
+│  └───────────┘  └────────────┘                                │
 ├───────────────────────────────────────────────────────────────┤
 │  Plugin System (all YAML-defined)                             │
 │  ┌────────┐ ┌───────────┐ ┌────────┐ ┌──────────┐             │

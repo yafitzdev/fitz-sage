@@ -259,7 +259,7 @@ from fitz_ai import run, list_engines
 
 # List available engines
 engines = list_engines()
-print(engines)  # ['fitz_rag', 'clara', 'graphrag']
+print(engines)  # ['fitz_rag']
 
 # Run with specific engine
 answer = run("What is X?", engine="fitz_rag")

@@ -12,8 +12,6 @@ Fitz uses a two-file configuration structure:
 |------|---------|
 | `.fitz/config.yaml` | Global config (default engine) |
 | `.fitz/config/fitz_rag.yaml` | Engine-specific config |
-| `.fitz/config/graphrag.yaml` | GraphRAG engine config |
-| `.fitz/config/clara.yaml` | CLaRa engine config |
 
 The `.fitz/` directory is created in your project root when you run `fitz init`.
 
@@ -25,7 +23,7 @@ The `.fitz/` directory is created in your project root when you run `fitz init`.
 
 ```yaml
 # Default engine for CLI commands
-default_engine: fitz_rag  # Options: fitz_rag, graphrag, clara
+default_engine: fitz_rag  # Default engine (custom engines can be registered)
 ```
 
 | Key | Type | Default | Description |

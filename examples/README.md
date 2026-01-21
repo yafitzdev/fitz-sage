@@ -85,7 +85,7 @@ Demonstrates:
 from fitz_ai.runtime import run, list_engines
 
 # List available engines
-print(list_engines())  # ['fitz_rag', 'clara', 'graphrag']
+print(list_engines())  # ['fitz_rag']
 
 # Run a query
 answer = run("What is quantum computing?", engine="fitz_rag")

@@ -68,7 +68,7 @@ fitz ingest ./docs -y                    # Non-interactive
 fitz ingest ./docs -H                    # With hierarchical summaries
 fitz ingest ./docs --artifacts all       # Generate all artifacts
 fitz ingest ./docs -f                    # Force re-ingest all files
-fitz ingest ./docs -e graphrag           # Override engine for this command
+fitz ingest ./docs -e my_engine          # Override engine for this command
 ```
 
 **Options:**
@@ -94,7 +94,7 @@ Query the knowledge base. Uses the default engine (set via `fitz engine`).
 ```bash
 fitz query "Your question"
 fitz query "What is RAG?" -c my_collection
-fitz query "Question" -e clara           # Override engine for this query
+fitz query "Question" -e my_engine       # Override engine for this query
 ```
 
 **Options:**
@@ -173,28 +173,6 @@ This ensures queries like "What happened with TC-1001?" only return chunks menti
 
 ---
 
-### `fitz map`
-
-Visualize knowledge base as an interactive graph.
-
-```bash
-fitz map
-fitz map -c my_collection
-fitz map -o output.html --no-open
-fitz map -t 0.9                     # Higher similarity threshold
-fitz map --no-similarity-edges      # Hide similarity connections
-```
-
-**Options:**
-- `-c, --collection` - Collection name
-- `-o, --output` - Output file path
-- `--no-open` - Don't open in browser
-- `--rebuild` - Force rebuild embeddings
-- `-t, --similarity-threshold` - Minimum similarity for edges (default: 0.8)
-- `--no-similarity-edges` - Don't show similarity edges
-
----
-
 ### `fitz serve`
 
 Start the REST API server.
@@ -269,8 +247,6 @@ View or set the default engine for all commands.
 fitz engine              # Interactive engine selection
 fitz engine --list       # List available engines
 fitz engine fitz_rag     # Set default to fitz_rag
-fitz engine clara        # Set default to clara
-fitz engine graphrag     # Set default to graphrag
 ```
 
 **Options:**
@@ -281,7 +257,7 @@ All other commands (`ingest`, `query`, `chat`, etc.) will use the default engine
 Override for a single command with `--engine`:
 
 ```bash
-fitz query "question" -e clara   # Use clara just for this query
+fitz query "question" -e my_engine   # Use custom engine for this query
 ```
 
 ---
@@ -381,7 +357,6 @@ fitz query "What are the main themes?" -c my_kb
 fitz doctor --test           # Verify setup
 fitz ingest ./project -H     # Ingest with summaries
 fitz chat -c project         # Interactive exploration
-fitz map -c project          # Visualize knowledge
 ```
 
 ---

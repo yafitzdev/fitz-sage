@@ -70,8 +70,7 @@ query = Query(
 
 The `metadata` field allows passing engine-specific parameters without breaking the paradigm-agnostic interface:
 - **Fitz RAG** might use: `{"rerank": True, "top_k": 10}`
-- **CLaRa** might use: `{"uncertainty_threshold": 0.3}`
-- Future engines can define their own metadata keys
+- Custom engines can define their own metadata keys
 
 Engines should ignore unknown metadata keys gracefully.
 
@@ -136,8 +135,7 @@ answer = Answer(
 
 The `provenance` field provides attribution and allows users to verify the answer against source material. Different engines may provide different levels of provenance:
 - **Fitz RAG**: chunks retrieved from vector DB
-- **CLaRa**: documents consulted during reasoning
-- Future engines: whatever makes sense for their paradigm
+- Custom engines: whatever makes sense for their paradigm
 
 **Answer Mode:**
 
@@ -166,7 +164,7 @@ Consumers should be prepared for this to contain arbitrary data depending on the
 
 ### KnowledgeEngine
 
-Paradigm-agnostic protocol that all engines (Fitz RAG, CLaRa, future paradigms) must implement.
+Paradigm-agnostic protocol that all engines must implement.
 
 **Philosophy:**
 - Engines are black boxes that transform queries into answers
@@ -193,8 +191,7 @@ print(answer.text)
 
 How the engine generates the answer is entirely up to the implementation:
 - **Fitz RAG**: Uses retrieval + generation
-- **CLaRa**: Uses uncertainty-guided reasoning
-- Future engines might use completely different approaches
+- Custom engines might use completely different approaches
 
 **Error Handling:**
 

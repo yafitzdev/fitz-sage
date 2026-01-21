@@ -66,9 +66,8 @@ Fitz follows strict architectural principles. Please respect these when contribu
 fitz_ai/
 ├── core/              # Paradigm-agnostic contracts (Query, Answer, Provenance)
 ├── engines/           # Engine implementations
-│   ├── fitz_rag/   # Traditional RAG engine
-│   └── clara/         # CLaRa compression-native engine
-├── runtime/           # Multi-engine orchestration
+│   └── fitz_rag/      # Traditional RAG engine
+├── runtime/           # Engine orchestration
 ├── llm/               # Shared LLM service (chat, embedding, rerank)
 ├── vector_db/         # Shared vector DB service
 ├── ingest/            # Document ingestion
