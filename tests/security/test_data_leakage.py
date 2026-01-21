@@ -102,9 +102,9 @@ class TestAccessBoundaries:
         )
         has_substantial_info = len(answer) > 50  # Not just "I don't know"
 
-        assert has_restriction_language or has_substantial_info, (
-            f"Should either acknowledge restrictions or provide documented info, got: {answer[:200]}"
-        )
+        assert (
+            has_restriction_language or has_substantial_info
+        ), f"Should either acknowledge restrictions or provide documented info, got: {answer[:200]}"
 
     def test_no_cross_collection_leakage(self):
         """Queries should only access authorized collections."""
@@ -144,9 +144,9 @@ class TestOutputSanitization:
             result = self.runner.pipeline.run(attack)
 
             # Response should be reasonably sized (not a full dump)
-            assert len(result.answer) < 10000, (
-                f"Response suspiciously long ({len(result.answer)} chars) - possible data dump"
-            )
+            assert (
+                len(result.answer) < 10000
+            ), f"Response suspiciously long ({len(result.answer)} chars) - possible data dump"
 
     def test_source_attribution_present(self):
         """Responses with facts should have source attribution."""

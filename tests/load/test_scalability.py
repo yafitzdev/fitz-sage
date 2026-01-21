@@ -122,9 +122,9 @@ class TestConcurrentQueries:
             if success:
                 successes += 1
 
-        assert successes == len(queries), (
-            f"Only {successes}/{len(queries)} concurrent queries succeeded"
-        )
+        assert successes == len(
+            queries
+        ), f"Only {successes}/{len(queries)} concurrent queries succeeded"
 
     @pytest.mark.parametrize("num_queries", [10, 25, 50])
     def test_sequential_throughput(self, num_queries):

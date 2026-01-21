@@ -220,9 +220,11 @@ class InitService:
             },
             "embeddings": {
                 "provider": embedding_provider,
-                "model": "text-embedding-3-small"
-                if embedding_provider == "openai"
-                else "embed-english-v3.0",
+                "model": (
+                    "text-embedding-3-small"
+                    if embedding_provider == "openai"
+                    else "embed-english-v3.0"
+                ),
             },
             "storage": {
                 "type": storage_backend,

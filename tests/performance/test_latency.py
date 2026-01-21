@@ -35,9 +35,9 @@ class TestQueryLatency:
         print(f"  p95: {metrics.p95:.0f}ms")
         print(f"  p99: {metrics.p99:.0f}ms")
 
-        assert metrics.p95 < PERF_THRESHOLDS["query_p95_ms"], (
-            f"p95 latency {metrics.p95:.0f}ms exceeds threshold {PERF_THRESHOLDS['query_p95_ms']}ms"
-        )
+        assert (
+            metrics.p95 < PERF_THRESHOLDS["query_p95_ms"]
+        ), f"p95 latency {metrics.p95:.0f}ms exceeds threshold {PERF_THRESHOLDS['query_p95_ms']}ms"
 
     def test_complex_query_latency(self, measure_perf):
         """Multi-hop query latency."""
@@ -121,6 +121,6 @@ class TestMemoryUsage:
 
         # Memory should not grow significantly per query
         # (some variance is normal due to GC timing)
-        assert metrics.peak_memory_mb < 100, (
-            f"Memory grew {metrics.peak_memory_mb:.1f}MB - potential leak"
-        )
+        assert (
+            metrics.peak_memory_mb < 100
+        ), f"Memory grew {metrics.peak_memory_mb:.1f}MB - potential leak"
