@@ -1,0 +1,8 @@
+Generate {num_hypotheses} different hypothetical document passages that would contain the answer to this question.
+Each passage should take a slightly different angle or perspective.
+Write as if you are the author of real documents - do not include meta-phrases like "This document explains...".
+
+Question: {query}
+
+Return ONLY a JSON array of {num_hypotheses} passage strings, each 2-3 sentences.
+Example format: ["Passage about topic from angle 1...", "Passage about topic from angle 2...", "Passage about topic from angle 3..."]

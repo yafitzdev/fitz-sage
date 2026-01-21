@@ -3,11 +3,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder, VectorClient
 from fitz_ai.engines.fitz_rag.retrieval.steps.utils import parse_json_list
 
 from .base import BaseVectorSearch
+
+if TYPE_CHECKING:
+    from fitz_ai.retrieval.hyde import HydeGenerator
 
 
 class SemanticSearch(BaseVectorSearch):
@@ -27,6 +32,7 @@ class SemanticSearch(BaseVectorSearch):
         k: int = 25,
         min_query_length: int = 300,
         max_queries: int = 5,
+        hyde_generator: "HydeGenerator | None" = None,
         **kwargs,
     ):
         """
@@ -40,12 +46,14 @@ class SemanticSearch(BaseVectorSearch):
             k: Number of results to retrieve
             min_query_length: Minimum query length for multi-query expansion
             max_queries: Maximum number of expanded queries
+            hyde_generator: HyDE generator for hypothetical documents (optional)
             **kwargs: Additional arguments for BaseVectorSearch
         """
         super().__init__(client, embedder, collection, k=k, **kwargs)
         self.chat = chat
         self.min_query_length = min_query_length
         self.max_queries = max_queries
+        self.hyde_generator = hyde_generator
 
     def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
         """Execute semantic search with optional multi-query expansion."""
@@ -84,6 +92,12 @@ class SemanticSearch(BaseVectorSearch):
 
         # Expand query to variations (synonyms, acronyms)
         query_variations = self._get_query_variations(query)
+
+        # HyDE: add hypothetical documents for improved recall
+        if self.hyde_generator:
+            hypotheses = self.hyde_generator.generate(query)
+            query_variations.extend(hypotheses)
+            logger.debug(f"{RETRIEVER} HyDE: added {len(hypotheses)} hypotheses")
 
         # Search with all query variations and merge with RRF
         results = self._expanded_search(query_variations)

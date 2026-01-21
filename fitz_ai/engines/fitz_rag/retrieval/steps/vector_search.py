@@ -107,6 +107,9 @@ class VectorSearchStep(RetrievalStep):
     _temporal_strategy: TemporalSearch | None = field(default=None, init=False, repr=False)
     _comparison_strategy: ComparisonSearch | None = field(default=None, init=False, repr=False)
 
+    # Lazy-loaded HyDE generator
+    _hyde_generator: Any = field(default=None, init=False, repr=False)
+
     def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
         """
         Execute vector search with automatic query routing.
@@ -139,6 +142,20 @@ class VectorSearchStep(RetrievalStep):
         strategy = self._get_semantic_strategy()
         return strategy.execute(query, chunks)
 
+    def _get_hyde_generator(self):
+        """Lazy-load HyDE generator when chat is available."""
+        if self._hyde_generator is None and self.chat is not None:
+            try:
+                from fitz_ai.retrieval.hyde import HydeGenerator
+
+                self._hyde_generator = HydeGenerator(chat=self.chat)
+                logger.debug(f"{RETRIEVER} HyDE generator initialized")
+            except Exception as e:
+                logger.debug(f"{RETRIEVER} Failed to load HyDE generator: {e}")
+                self._hyde_generator = None
+
+        return self._hyde_generator
+
     def _get_semantic_strategy(self) -> SemanticSearch:
         """Lazy-load semantic search strategy."""
         if self._semantic_strategy is None:
@@ -156,6 +173,7 @@ class VectorSearchStep(RetrievalStep):
                 entity_graph=self.entity_graph,
                 max_entity_expansion=self.max_entity_expansion,
                 include_derived=self.include_derived,
+                hyde_generator=self._get_hyde_generator(),
             )
         return self._semantic_strategy
 
