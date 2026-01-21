@@ -433,6 +433,7 @@ def get_default_engine() -> str:
     # Check user config first
     try:
         import yaml
+
         from fitz_ai.core.paths import FitzPaths
 
         config_path = FitzPaths.config()
@@ -446,10 +447,13 @@ def get_default_engine() -> str:
 
     # Fall back to package default (single source of truth)
     try:
-        import yaml
         from pathlib import Path
 
-        defaults_path = Path(__file__).parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
+        import yaml
+
+        defaults_path = (
+            Path(__file__).parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
+        )
         with defaults_path.open("r", encoding="utf-8") as f:
             default_config = yaml.safe_load(f) or {}
 

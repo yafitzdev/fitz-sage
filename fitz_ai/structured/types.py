@@ -9,8 +9,9 @@ for type conversion and validation.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, TypedDict
 
 # Type constants
 TYPE_STRING = "string"
@@ -261,10 +262,6 @@ def select_indexed_columns(
 # =============================================================================
 # Typed Models for SQL Execution
 # =============================================================================
-
-
-from dataclasses import dataclass, field
-from typing import TypedDict
 
 
 class RowRecord(TypedDict, total=False):

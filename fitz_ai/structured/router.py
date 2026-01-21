@@ -9,7 +9,7 @@ should be routed to structured data (SQL) or semantic search (RAG).
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from fitz_ai.logging.logger import get_logger
@@ -80,9 +80,7 @@ def _format_schemas_for_prompt(schemas: list[TableSchema]) -> str:
 
     lines = []
     for schema in schemas:
-        cols = ", ".join(
-            f"{c.name} ({c.type})" for c in schema.columns
-        )
+        cols = ", ".join(f"{c.name} ({c.type})" for c in schema.columns)
         lines.append(f"- {schema.table_name}: {cols} ({schema.row_count} rows)")
 
     return "\n".join(lines)
@@ -95,7 +93,7 @@ def _parse_classification_response(response: str) -> dict[str, Any]:
     if response.startswith("```"):
         lines = response.split("\n")
         # Remove first and last lines (code block markers)
-        lines = [l for l in lines if not l.startswith("```")]
+        lines = [line for line in lines if not line.startswith("```")]
         response = "\n".join(lines)
 
     try:
@@ -179,14 +177,10 @@ class QueryRouter:
                 confidence=confidence,
             )
 
-        logger.debug(
-            f"Routing to semantic: {reason} (confidence={confidence:.2f})"
-        )
+        logger.debug(f"Routing to semantic: {reason} (confidence={confidence:.2f})")
         return SemanticRoute(reason=reason or "LLM classified as semantic query")
 
-    def _classify_query(
-        self, query: str, schemas: list[TableSchema]
-    ) -> dict[str, Any]:
+    def _classify_query(self, query: str, schemas: list[TableSchema]) -> dict[str, Any]:
         """
         Use LLM to semantically classify the query.
 
@@ -204,9 +198,7 @@ class QueryRouter:
         )
 
         try:
-            response = self._chat.chat([
-                {"role": "user", "content": prompt}
-            ])
+            response = self._chat.chat([{"role": "user", "content": prompt}])
             return _parse_classification_response(response)
 
         except Exception as e:

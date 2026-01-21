@@ -28,10 +28,10 @@ from fitz_ai.core.platform import configure_huggingface_windows
 
 configure_huggingface_windows()
 
-from pathlib import Path
-from typing import Optional
+from pathlib import Path  # noqa: E402
+from typing import Optional  # noqa: E402
 
-import typer
+import typer  # noqa: E402
 
 app = typer.Typer(
     name="fitz",

@@ -2,6 +2,7 @@
 """Consolidated RGS tests - all RGS configuration and behavior scenarios."""
 
 import pytest
+
 from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
     RGS,
     RGSConfig,
@@ -22,8 +23,7 @@ from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
             ],
             "ok",
             lambda ans, prompt: (
-                ans.sources[0].source_id == "chunk_1"
-                and ans.sources[1].source_id == "chunk_2"
+                ans.sources[0].source_id == "chunk_1" and ans.sources[1].source_id == "chunk_2"
             ),
         ),
         # Max chunks limit: respects max_chunks setting

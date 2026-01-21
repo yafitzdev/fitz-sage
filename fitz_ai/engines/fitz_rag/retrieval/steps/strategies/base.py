@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder, VectorClient
+from fitz_ai.engines.fitz_rag.protocols import Embedder, VectorClient
 
 
 class SearchStrategy(ABC):
@@ -390,9 +390,7 @@ class BaseVectorSearch(SearchStrategy):
             results.append(chunk)
 
         if results:
-            logger.debug(
-                f"{RETRIEVER} Derived search: found {len(results)} pre-computed results"
-            )
+            logger.debug(f"{RETRIEVER} Derived search: found {len(results)} pre-computed results")
 
         return results
 

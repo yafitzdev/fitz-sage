@@ -199,9 +199,7 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
         chat_model_balanced = get_default_model("chat", chat_choice, "balanced")
         embedding_choice = get_default_or_first(avail_embedding, default_embedding)
         embedding_model = get_default_model("embedding", embedding_choice)
-        rerank_choice = (
-            get_default_or_first(avail_rerank, default_rerank) if avail_rerank else None
-        )
+        rerank_choice = get_default_or_first(avail_rerank, default_rerank) if avail_rerank else None
         rerank_model = get_default_model("rerank", rerank_choice) if rerank_choice else ""
         vector_db_choice = get_default_or_first(avail_vector_db, default_vector_db)
         retrieval_choice = get_default_or_first(avail_retrieval, default_retrieval)

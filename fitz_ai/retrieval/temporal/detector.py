@@ -60,9 +60,7 @@ class TemporalDetector:
     QUARTER_PATTERN: str = r"\b[Qq][1-4]\s*(?:20\d{2})?\b"
     YEAR_PATTERN: str = r"\b20[12]\d\b"
     VERSION_PATTERN: str = r"\b[Vv](?:ersion\s*)?(\d+(?:\.\d+)*)\b"
-    MONTH_PATTERN: str = (
-        r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*(?:20\d{2})?\b"
-    )
+    MONTH_PATTERN: str = r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*(?:20\d{2})?\b"
     DATE_PATTERN: str = r"\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b"
 
     # Relative time expressions

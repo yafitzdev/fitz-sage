@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -607,8 +607,10 @@ class TestSQLGenerationAndExecution:
         )
         # Explicitly index department for filtering
         ingester.ingest_table(
-            "employees", rows, "employee_id",
-            indexed_columns=["employee_id", "department", "salary"]
+            "employees",
+            rows,
+            "employee_id",
+            indexed_columns=["employee_id", "department", "salary"],
         )
 
         executor = StructuredExecutor(
@@ -698,9 +700,7 @@ class TestDerivedSentences:
         assert formatted.sentence is not None
         assert len(formatted.sentence) > 0
 
-    def test_store_derived_sentence(
-        self, mock_vector_db, mock_embedder, test_csv, test_collection
-    ):
+    def test_store_derived_sentence(self, mock_vector_db, mock_embedder, test_csv, test_collection):
         """Test storing derived sentences in __derived collection."""
         from fitz_ai.structured.constants import get_derived_collection
         from fitz_ai.structured.derived import DerivedStore
@@ -809,7 +809,7 @@ class TestFullPipelineFlow:
         from fitz_ai.structured.ingestion import StructuredIngester
         from fitz_ai.structured.router import QueryRouter, StructuredRoute
         from fitz_ai.structured.schema import SchemaStore
-        from fitz_ai.structured.sql_generator import SQLGenerator, SQLQuery
+        from fitz_ai.structured.sql_generator import SQLQuery
 
         # Step 1: Ingest CSV
         with open(test_csv) as f:
@@ -828,8 +828,10 @@ class TestFullPipelineFlow:
         )
         # Explicitly index department for filtering
         schema = ingester.ingest_table(
-            "employees", rows, "employee_id",
-            indexed_columns=["employee_id", "department", "salary"]
+            "employees",
+            rows,
+            "employee_id",
+            indexed_columns=["employee_id", "department", "salary"],
         )
 
         # Step 2: Route query

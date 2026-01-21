@@ -121,8 +121,8 @@ class DoclingParser:
         """Lazy-load the DocumentConverter."""
         if self._converter is None:
             try:
-                from docling.document_converter import DocumentConverter, PdfFormatOption
                 from docling.datamodel.pipeline_options import PdfPipelineOptions
+                from docling.document_converter import DocumentConverter, PdfFormatOption
 
                 # Enable picture image extraction if VLM is configured
                 if self.vision_client is not None:

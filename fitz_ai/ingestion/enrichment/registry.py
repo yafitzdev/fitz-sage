@@ -17,7 +17,7 @@ from fitz_ai.ingestion.enrichment.modules import (
 )
 
 if TYPE_CHECKING:
-    from fitz_ai.ingestion.enrichment.modules.base import ChatClient
+    pass
 
 
 # Default modules in order of execution

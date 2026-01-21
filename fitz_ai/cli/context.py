@@ -220,8 +220,12 @@ class CLIContext:
 
         # Load plugin specs to get model defaults
         chat_models = cls._get_chat_models_v2(config.get("chat", ""), config.get("chat_kwargs", {}))
-        emb_model = cls._get_embedding_model_v2(config.get("embedding", ""), config.get("embedding_kwargs", {}))
-        rerank_model = cls._get_rerank_model_v2(config.get("rerank"), config.get("rerank_kwargs", {}))
+        emb_model = cls._get_embedding_model_v2(
+            config.get("embedding", ""), config.get("embedding_kwargs", {})
+        )
+        rerank_model = cls._get_rerank_model_v2(
+            config.get("rerank"), config.get("rerank_kwargs", {})
+        )
 
         return cls(
             raw_config=config,

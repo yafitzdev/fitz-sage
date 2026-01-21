@@ -50,10 +50,12 @@ class MockVectorDBClient:
         self.delete_calls: list[dict[str, Any]] = []
 
     def upsert(self, collection_name: str, points: list[dict[str, Any]]) -> None:
-        self.upsert_calls.append({
-            "collection": collection_name,
-            "points": points,
-        })
+        self.upsert_calls.append(
+            {
+                "collection": collection_name,
+                "points": points,
+            }
+        )
         if collection_name not in self.collections:
             self.collections[collection_name] = []
 
@@ -114,10 +116,7 @@ class MockVectorDBClient:
         end = offset + limit
         batch = points[start:end]
 
-        records = [
-            MockScrollRecord(id=p["id"], payload=p.get("payload", {}))
-            for p in batch
-        ]
+        records = [MockScrollRecord(id=p["id"], payload=p.get("payload", {})) for p in batch]
         next_offset = end if end < len(points) else None
 
         return records, next_offset
@@ -127,10 +126,12 @@ class MockVectorDBClient:
         collection_name: str,
         points_selector: dict[str, Any],
     ) -> int:
-        self.delete_calls.append({
-            "collection": collection_name,
-            "selector": points_selector,
-        })
+        self.delete_calls.append(
+            {
+                "collection": collection_name,
+                "selector": points_selector,
+            }
+        )
 
         if collection_name not in self.collections:
             return 0
@@ -138,8 +139,7 @@ class MockVectorDBClient:
         ids_to_delete = set(points_selector.get("points", []))
         original_count = len(self.collections[collection_name])
         self.collections[collection_name] = [
-            p for p in self.collections[collection_name]
-            if p["id"] not in ids_to_delete
+            p for p in self.collections[collection_name] if p["id"] not in ids_to_delete
         ]
         return original_count - len(self.collections[collection_name])
 
@@ -239,9 +239,7 @@ class TestDerivedStore:
         assert len(embedding.calls) == 1
         assert embedding.calls[0] == ["There are 42 employees."]
 
-    def test_ingest_creates_embedding(
-        self, store: DerivedStore, vector_db: MockVectorDBClient
-    ):
+    def test_ingest_creates_embedding(self, store: DerivedStore, vector_db: MockVectorDBClient):
         """Test that ingest creates embedding for sentence."""
         store.ingest(
             sentence="Test sentence.",
@@ -298,9 +296,7 @@ class TestDerivedStore:
 
         assert records == []
 
-    def test_invalidate_table(
-        self, store: DerivedStore, vector_db: MockVectorDBClient
-    ):
+    def test_invalidate_table(self, store: DerivedStore, vector_db: MockVectorDBClient):
         """Test invalidating all derived sentences for a table."""
         # Ingest some sentences
         store.ingest("S1", "table1", "Q1", "v1")
@@ -317,9 +313,7 @@ class TestDerivedStore:
         deleted = store.invalidate("nonexistent")
         assert deleted == 0
 
-    def test_invalidate_stale(
-        self, store: DerivedStore, vector_db: MockVectorDBClient
-    ):
+    def test_invalidate_stale(self, store: DerivedStore, vector_db: MockVectorDBClient):
         """Test invalidating stale sentences by version."""
         # Ingest with old version
         store.ingest("Old sentence.", "data", "Q1", "v1")
@@ -331,9 +325,7 @@ class TestDerivedStore:
 
         assert deleted == 1
 
-    def test_get_by_table(
-        self, store: DerivedStore, vector_db: MockVectorDBClient
-    ):
+    def test_get_by_table(self, store: DerivedStore, vector_db: MockVectorDBClient):
         """Test retrieving all derived sentences for a table."""
         store.ingest("S1 for T1.", "table1", "Q1", "v1")
         store.ingest("S2 for T1.", "table1", "Q2", "v1")

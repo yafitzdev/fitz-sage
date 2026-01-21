@@ -2,6 +2,7 @@
 """Consolidated Context Pipeline tests - all context pipeline behavior scenarios."""
 
 import pytest
+
 from fitz_ai.engines.fitz_rag.pipeline.pipeline import ContextPipeline
 
 
@@ -21,8 +22,7 @@ from fitz_ai.engines.fitz_rag.pipeline.pipeline import ContextPipeline
             lambda out: (
                 len(out) == 3
                 and [c.doc_id for c in out] == ["unknown", "unknown", "unknown"]
-                and [c.content for c in out]
-                == ["Hello WORLD", "  hello   world ", "HELLO WORLD "]
+                and [c.content for c in out] == ["Hello WORLD", "  hello   world ", "HELLO WORLD "]
             ),
         ),
         # Markdown integrity: pipeline emits non-empty context even with truncation

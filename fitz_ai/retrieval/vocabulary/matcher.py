@@ -90,7 +90,7 @@ class KeywordMatcher:
         self,
         query: str,
         chunks: Sequence["Chunk"],
-    ) -> list["ChunkLike"]:
+    ) -> list["Chunk"]:
         """
         Filter chunks to those containing matched keywords.
 
@@ -125,7 +125,7 @@ class KeywordMatcher:
 
     def _chunk_matches_all(
         self,
-        chunk: "ChunkLike",
+        chunk: "Chunk",
         keywords: list[Keyword],
     ) -> bool:
         """Check if chunk contains all keywords."""
@@ -150,7 +150,7 @@ class KeywordMatcher:
 
     def chunk_matches_any(
         self,
-        chunk: "ChunkLike",
+        chunk: "Chunk",
         keywords: list[Keyword] | None = None,
     ) -> bool:
         """
@@ -174,7 +174,7 @@ class KeywordMatcher:
 
     def get_matching_keywords(
         self,
-        chunk: "ChunkLike",
+        chunk: "Chunk",
     ) -> list[Keyword]:
         """
         Get all keywords that appear in a chunk.

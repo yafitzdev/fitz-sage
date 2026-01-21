@@ -516,9 +516,7 @@ class FaissLocalVectorDB:
     def count(self, collection: Optional[str] = None) -> int:
         """Return the number of vectors."""
         if collection is None:
-            return sum(
-                c.index.ntotal for c in self._collections.values() if c.index
-            )
+            return sum(c.index.ntotal for c in self._collections.values() if c.index)
 
         if collection not in self._collections:
             return 0

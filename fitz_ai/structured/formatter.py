@@ -108,7 +108,7 @@ class ResultFormatter:
 
         try:
             response = self._chat.chat([{"role": "user", "content": prompt}])
-            sentence = response.strip().strip('"\'')
+            sentence = response.strip().strip("\"'")
 
             logger.debug(f"Formatted result for {query.table}: {sentence[:50]}...")
 
@@ -169,9 +169,17 @@ class ResultFormatter:
             if "COUNT" in key.upper():
                 parts.append(f"count is {value}")
             elif "SUM" in key.upper():
-                parts.append(f"total is {value:,}" if isinstance(value, (int, float)) else f"total is {value}")
+                parts.append(
+                    f"total is {value:,}"
+                    if isinstance(value, (int, float))
+                    else f"total is {value}"
+                )
             elif "AVG" in key.upper():
-                parts.append(f"average is {value:,.2f}" if isinstance(value, float) else f"average is {value}")
+                parts.append(
+                    f"average is {value:,.2f}"
+                    if isinstance(value, float)
+                    else f"average is {value}"
+                )
             elif "MIN" in key.upper():
                 parts.append(f"minimum is {value}")
             elif "MAX" in key.upper():

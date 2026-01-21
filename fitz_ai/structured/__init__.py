@@ -23,28 +23,15 @@ from fitz_ai.structured.constants import (
     get_tables_collection,
     make_row_id,
 )
-from fitz_ai.structured.ingestion import (
-    MissingPrimaryKeyError,
-    StructuredIngester,
-    TableTooLargeError,
-)
-from fitz_ai.structured.schema import (
-    ColumnSchema,
-    SchemaSearchResult,
-    SchemaStore,
-    TableSchema,
-)
-from fitz_ai.structured.router import (
-    ChatClient,
-    QueryRouter,
-    RouteDecision,
-    SemanticRoute,
-    StructuredRoute,
-)
-from fitz_ai.structured.sql_generator import (
-    GenerationResult,
-    SQLGenerator,
-    SQLQuery,
+from fitz_ai.structured.derived import (
+    FIELD_CONTENT,
+    FIELD_DERIVED,
+    FIELD_GENERATED_AT,
+    FIELD_SOURCE_QUERY,
+    FIELD_SOURCE_TABLE,
+    FIELD_TABLE_VERSION,
+    DerivedRecord,
+    DerivedStore,
 )
 from fitz_ai.structured.executor import (
     ExecutionResult,
@@ -56,15 +43,28 @@ from fitz_ai.structured.formatter import (
     ResultFormatter,
     format_multiple_results,
 )
-from fitz_ai.structured.derived import (
-    FIELD_CONTENT,
-    FIELD_DERIVED,
-    FIELD_GENERATED_AT,
-    FIELD_SOURCE_QUERY,
-    FIELD_SOURCE_TABLE,
-    FIELD_TABLE_VERSION,
-    DerivedRecord,
-    DerivedStore,
+from fitz_ai.structured.ingestion import (
+    MissingPrimaryKeyError,
+    StructuredIngester,
+    TableTooLargeError,
+)
+from fitz_ai.structured.router import (
+    ChatClient,
+    QueryRouter,
+    RouteDecision,
+    SemanticRoute,
+    StructuredRoute,
+)
+from fitz_ai.structured.schema import (
+    ColumnSchema,
+    SchemaSearchResult,
+    SchemaStore,
+    TableSchema,
+)
+from fitz_ai.structured.sql_generator import (
+    GenerationResult,
+    SQLGenerator,
+    SQLQuery,
 )
 from fitz_ai.structured.types import (
     TYPE_BOOLEAN,

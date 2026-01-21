@@ -438,19 +438,19 @@ Return ONLY the SQL query, no explanation."""
                 test_conn.close()
 
                 logger.debug(
-                    f"Multi-table SQL validated successfully{' (retry '+str(attempt)+')' if attempt > 0 else ''}"
+                    f"Multi-table SQL validated successfully{' (retry ' + str(attempt) + ')' if attempt > 0 else ''}"
                 )
                 return sql  # Success!
 
             except sqlite3.Error as e:
                 previous_error = str(e)
                 logger.warning(
-                    f"Multi-table SQL validation failed (attempt {attempt+1}/{max_retries+1}): {previous_error}"
+                    f"Multi-table SQL validation failed (attempt {attempt + 1}/{max_retries + 1}): {previous_error}"
                 )
 
                 if attempt == max_retries:
                     logger.error(
-                        f"Multi-table SQL generation failed after {max_retries+1} attempts"
+                        f"Multi-table SQL generation failed after {max_retries + 1} attempts"
                     )
                     return sql
 
@@ -611,19 +611,19 @@ Results ({len(results)} rows):
                 test_conn.close()
 
                 logger.debug(
-                    f"SQL validated successfully{' (retry '+str(attempt)+')' if attempt > 0 else ''}"
+                    f"SQL validated successfully{' (retry ' + str(attempt) + ')' if attempt > 0 else ''}"
                 )
                 return sql  # Success!
 
             except sqlite3.Error as e:
                 previous_error = str(e)
                 logger.warning(
-                    f"SQL validation failed (attempt {attempt+1}/{max_retries+1}): {previous_error}"
+                    f"SQL validation failed (attempt {attempt + 1}/{max_retries + 1}): {previous_error}"
                 )
 
                 if attempt == max_retries:
                     # Give up, return the SQL anyway (will fail with proper error later)
-                    logger.error(f"SQL generation failed after {max_retries+1} attempts")
+                    logger.error(f"SQL generation failed after {max_retries + 1} attempts")
                     return sql
 
         return sql  # Fallback (should not reach here)

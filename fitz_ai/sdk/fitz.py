@@ -113,6 +113,7 @@ class fitz:
             ValueError: If source path doesn't exist or no documents found.
         """
         import yaml
+
         from fitz_ai.ingestion.chunking.router import ChunkingRouter
         from fitz_ai.ingestion.diff.scanner import FileScanner
         from fitz_ai.ingestion.parser import ParserRouter
@@ -245,6 +246,7 @@ class fitz:
             ValueError: If question is empty.
         """
         import yaml
+
         from fitz_ai.engines.fitz_rag.config import FitzRagConfig
         from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 
@@ -351,8 +353,10 @@ logging:
 
     def _build_chunking_config(self, config: Dict[str, Any]):
         """Build ChunkingRouterConfig from config dict."""
-        import yaml
         from pathlib import Path as _Path
+
+        import yaml
+
         from fitz_ai.engines.fitz_rag.config import (
             ChunkingRouterConfig,
             ExtensionChunkerConfig,
@@ -378,7 +382,9 @@ logging:
             )
 
         # Fall back to package defaults
-        defaults_path = _Path(__file__).parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
+        defaults_path = (
+            _Path(__file__).parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
+        )
         with defaults_path.open("r", encoding="utf-8") as f:
             default_config = yaml.safe_load(f) or {}
 

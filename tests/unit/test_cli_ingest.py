@@ -81,7 +81,9 @@ class TestIngestHelpers:
 
     def test_suggest_collection_name_from_dir(self, tmp_path):
         """Test suggest_collection_name suggests name from directory."""
-        from fitz_ai.cli.commands.ingest_helpers import suggest_collection_name as _suggest_collection_name
+        from fitz_ai.cli.commands.ingest_helpers import (
+            suggest_collection_name as _suggest_collection_name,
+        )
 
         test_dir = tmp_path / "My-Project"
         test_dir.mkdir()
@@ -92,7 +94,9 @@ class TestIngestHelpers:
 
     def test_suggest_collection_name_from_file(self, tmp_path):
         """Test suggest_collection_name suggests name from file's parent."""
-        from fitz_ai.cli.commands.ingest_helpers import suggest_collection_name as _suggest_collection_name
+        from fitz_ai.cli.commands.ingest_helpers import (
+            suggest_collection_name as _suggest_collection_name,
+        )
 
         test_file = tmp_path / "docs" / "readme.md"
         test_file.parent.mkdir(parents=True)
@@ -121,7 +125,9 @@ class TestIngestHelpers:
 
     def test_parse_artifact_selection_all(self):
         """Test parse_artifact_selection with 'all'."""
-        from fitz_ai.cli.commands.ingest_helpers import parse_artifact_selection as _parse_artifact_selection
+        from fitz_ai.cli.commands.ingest_helpers import (
+            parse_artifact_selection as _parse_artifact_selection,
+        )
 
         available = ["navigation_index", "interface_catalog"]
         result = _parse_artifact_selection("all", available)
@@ -130,7 +136,9 @@ class TestIngestHelpers:
 
     def test_parse_artifact_selection_none(self):
         """Test parse_artifact_selection with 'none'."""
-        from fitz_ai.cli.commands.ingest_helpers import parse_artifact_selection as _parse_artifact_selection
+        from fitz_ai.cli.commands.ingest_helpers import (
+            parse_artifact_selection as _parse_artifact_selection,
+        )
 
         result = _parse_artifact_selection("none", ["a", "b"])
 
@@ -138,7 +146,9 @@ class TestIngestHelpers:
 
     def test_parse_artifact_selection_comma_list(self):
         """Test parse_artifact_selection with comma-separated list."""
-        from fitz_ai.cli.commands.ingest_helpers import parse_artifact_selection as _parse_artifact_selection
+        from fitz_ai.cli.commands.ingest_helpers import (
+            parse_artifact_selection as _parse_artifact_selection,
+        )
 
         available = ["navigation_index", "interface_catalog", "other"]
         result = _parse_artifact_selection("navigation_index,interface_catalog", available)
@@ -147,7 +157,9 @@ class TestIngestHelpers:
 
     def test_parse_artifact_selection_filters_invalid(self):
         """Test parse_artifact_selection filters invalid names."""
-        from fitz_ai.cli.commands.ingest_helpers import parse_artifact_selection as _parse_artifact_selection
+        from fitz_ai.cli.commands.ingest_helpers import (
+            parse_artifact_selection as _parse_artifact_selection,
+        )
 
         available = ["valid_one", "valid_two"]
         result = _parse_artifact_selection("valid_one,invalid", available)
@@ -187,7 +199,9 @@ class TestBuildChunkingRouterConfig:
 
     def test_build_default_config(self):
         """Test building config with defaults."""
-        from fitz_ai.cli.commands.ingest_config import build_chunking_router_config as _build_chunking_router_config
+        from fitz_ai.cli.commands.ingest_config import (
+            build_chunking_router_config as _build_chunking_router_config,
+        )
 
         config = {
             "chunking": {
@@ -204,7 +218,9 @@ class TestBuildChunkingRouterConfig:
 
     def test_build_config_with_extensions(self):
         """Test building config with per-extension chunkers."""
-        from fitz_ai.cli.commands.ingest_config import build_chunking_router_config as _build_chunking_router_config
+        from fitz_ai.cli.commands.ingest_config import (
+            build_chunking_router_config as _build_chunking_router_config,
+        )
 
         config = {
             "chunking": {
@@ -224,7 +240,9 @@ class TestBuildChunkingRouterConfig:
 
     def test_build_config_empty(self):
         """Test building config with empty input."""
-        from fitz_ai.cli.commands.ingest_config import build_chunking_router_config as _build_chunking_router_config
+        from fitz_ai.cli.commands.ingest_config import (
+            build_chunking_router_config as _build_chunking_router_config,
+        )
 
         result = _build_chunking_router_config({})
 

@@ -155,12 +155,14 @@ def list_tables(
 
     tables = []
     for schema in schemas:
-        tables.append({
-            "name": schema.table_name,
-            "column_count": len(schema.columns),
-            "row_count": schema.row_count,
-            "primary_key": schema.primary_key,
-        })
+        tables.append(
+            {
+                "name": schema.table_name,
+                "column_count": len(schema.columns),
+                "row_count": schema.row_count,
+                "primary_key": schema.primary_key,
+            }
+        )
 
     ui.success(f"Found {len(tables)} table(s)")
     print()
@@ -213,7 +215,6 @@ def delete_table(
     """Delete a structured table and its data."""
     from fitz_ai.cli.context import CLIContext
     from fitz_ai.structured.constants import get_tables_collection
-    from fitz_ai.structured.derived import FIELD_SOURCE_TABLE
 
     collection = _get_collection(collection)
 
@@ -242,9 +243,7 @@ def delete_table(
     tables_collection = get_tables_collection(collection)
     try:
         # Build filter for this table's rows
-        filter_condition = {
-            "must": [{"key": "__table", "match": {"value": table_name}}]
-        }
+        filter_condition = {"must": [{"key": "__table", "match": {"value": table_name}}]}
 
         # Scroll to find all row IDs
         row_ids = []
@@ -445,7 +444,9 @@ def ingest_table_command(
             # Use first column with unique values
             for col in headers:
                 values = [row.get(col) for row in rows]
-                if len(set(values)) == len(values) and all(v is not None and v != "" for v in values):
+                if len(set(values)) == len(values) and all(
+                    v is not None and v != "" for v in values
+                ):
                     primary_key = col
                     ui.info(f"Using first unique column as primary key: {primary_key}")
                     break
@@ -496,7 +497,9 @@ def ingest_table_command(
         )
     except TableTooLargeError as e:
         ui.error(f"Table too large: {e}")
-        ui.info("Maximum supported rows: 10,000. Consider using a proper database for larger datasets.")
+        ui.info(
+            "Maximum supported rows: 10,000. Consider using a proper database for larger datasets."
+        )
         raise typer.Exit(1)
     except MissingPrimaryKeyError as e:
         ui.error(f"Primary key error: {e}")
@@ -516,7 +519,7 @@ def ingest_table_command(
 
     print()
     ui.info("You can now query this table with natural language:")
-    ui.info(f"  fitz query \"How many rows are in {table_name}?\" -c {collection}")
+    ui.info(f'  fitz query "How many rows are in {table_name}?" -c {collection}')
 
 
 # Export for main CLI registration

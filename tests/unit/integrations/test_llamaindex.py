@@ -178,9 +178,7 @@ class TestFitzQueryEngine:
     @patch("fitz_ai.integrations.llamaindex.query_engine.FitzOptimizer")
     def test_was_cache_hit_property(self, mock_optimizer_class):
         """was_cache_hit property reflects last query."""
-        engine, _, _, _ = create_test_engine(
-            mock_optimizer_class, cache_hit=True, answer="Cached"
-        )
+        engine, _, _, _ = create_test_engine(mock_optimizer_class, cache_hit=True, answer="Cached")
 
         query_bundle = QueryBundle(query_str="test")
         engine._query(query_bundle)
@@ -203,7 +201,7 @@ class TestFitzQueryEngine:
             org_key="a" * 64,
             embedding_fn=lambda x: [1.0] * 1536,
             llm_model="gpt-4o",
-        ) as engine:
+        ) as engine:  # noqa: F841
             pass
 
         mock_optimizer.close.assert_called_once()

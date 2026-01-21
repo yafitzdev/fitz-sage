@@ -9,13 +9,12 @@ VIP chunks (score=1.0) are excluded from reranking and always included.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.fitz_rag.exceptions import RerankError
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
-
-from typing import Any
 
 from .base import RetrievalStep
 

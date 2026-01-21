@@ -38,9 +38,7 @@ def pdf_docx_runner(set_workspace):
     Runs ALL scenarios through tiered execution (local -> cloud) during setup.
     Individual tests then look up their pre-computed result via runner.get_tiered_result().
     """
-    yield from create_tiered_runner(
-        FIXTURES_PARSER_DIR, PDF_DOCX_SCENARIOS, "PDF/DOCX E2E"
-    )()
+    yield from create_tiered_runner(FIXTURES_PARSER_DIR, PDF_DOCX_SCENARIOS, "PDF/DOCX E2E")()
 
 
 @pytest.mark.parametrize(

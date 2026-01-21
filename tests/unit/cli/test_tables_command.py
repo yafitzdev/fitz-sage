@@ -4,11 +4,7 @@ Tests for the tables CLI command module.
 """
 
 import csv
-import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from fitz_ai.structured.schema import ColumnSchema, TableSchema
 

@@ -182,9 +182,7 @@ class E2EReporter:
         for feature, stats in sorted(by_feature.items()):
             rate = (stats["passed"] / stats["total"] * 100) if stats["total"] > 0 else 0
             status = "OK" if stats["failed"] == 0 else "!!"
-            print(
-                f"  [{status}] {feature:<25} " f"{stats['passed']}/{stats['total']} ({rate:.0f}%)"
-            )
+            print(f"  [{status}] {feature:<25} {stats['passed']}/{stats['total']} ({rate:.0f}%)")
         print()
 
         # Scenario details

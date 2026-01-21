@@ -221,7 +221,7 @@ class TestFitzOptimizer:
         with FitzOptimizer(
             api_key="fitz_test_key_12345",
             org_key="a" * 64,
-        ) as optimizer:
+        ) as optimizer:  # noqa: F841
             pass
 
         mock_client.close.assert_called_once()

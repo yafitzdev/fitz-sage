@@ -2,6 +2,7 @@
 """Test config loading."""
 
 import pytest
+
 from fitz_ai.config.loader import load_engine_config
 
 
@@ -30,8 +31,9 @@ def test_load_config_from_defaults():
 
 def test_config_required_field():
     """Test that collection field is required."""
-    from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
     from pydantic import ValidationError
+
+    from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
 
     # Missing required 'collection' field
     with pytest.raises(ValidationError):
@@ -40,8 +42,9 @@ def test_config_required_field():
 
 def test_config_validation():
     """Test config validation (Pydantic)."""
-    from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
     from pydantic import ValidationError
+
+    from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
 
     # Invalid top_k (must be >= 1)
     with pytest.raises(ValidationError):
@@ -49,9 +52,7 @@ def test_config_validation():
 
     # Invalid chunk_size (must be >= 50)
     with pytest.raises(ValidationError):
-        FitzRagConfig(
-            chat="cohere", embedding="cohere", collection="test", chunk_size=10
-        )
+        FitzRagConfig(chat="cohere", embedding="cohere", collection="test", chunk_size=10)
 
 
 def test_config_none_for_disabled():

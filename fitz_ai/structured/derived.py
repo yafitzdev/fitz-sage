@@ -15,7 +15,6 @@ from typing import Any, Protocol, runtime_checkable
 
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.structured.constants import (
-    DERIVED_COLLECTION_SUFFIX,
     get_derived_collection,
 )
 
@@ -44,9 +43,7 @@ class EmbeddingClient(Protocol):
 class VectorDBClient(Protocol):
     """Protocol for vector DB operations."""
 
-    def upsert(
-        self, collection_name: str, points: list[dict[str, Any]]
-    ) -> None:
+    def upsert(self, collection_name: str, points: list[dict[str, Any]]) -> None:
         """Upsert points to collection."""
         ...
 
@@ -189,9 +186,7 @@ class DerivedStore:
 
         self._vector_db.upsert(self._collection, [point])
 
-        logger.info(
-            f"Ingested derived sentence from {source_table}: {sentence[:50]}..."
-        )
+        logger.info(f"Ingested derived sentence from {source_table}: {sentence[:50]}...")
 
         return record
 
@@ -235,18 +230,18 @@ class DerivedStore:
         # Build points
         points = []
         for record, vector in zip(records, vectors):
-            points.append({
-                "id": record.id,
-                "vector": vector,
-                "payload": record.to_payload(),
-            })
+            points.append(
+                {
+                    "id": record.id,
+                    "vector": vector,
+                    "payload": record.to_payload(),
+                }
+            )
 
         # Store in vector DB
         self._vector_db.upsert(self._collection, points)
 
-        logger.info(
-            f"Ingested {len(records)} derived sentences from {source_table}"
-        )
+        logger.info(f"Ingested {len(records)} derived sentences from {source_table}")
 
         return records
 
@@ -307,9 +302,7 @@ class DerivedStore:
                 collection_name=self._collection,
                 points_selector={"points": ids_to_delete},
             )
-            logger.info(
-                f"Invalidated {deleted} derived sentences for {table_name}"
-            )
+            logger.info(f"Invalidated {deleted} derived sentences for {table_name}")
             return deleted
         except Exception as e:
             logger.error(f"Failed to invalidate derived sentences: {e}")
@@ -372,9 +365,7 @@ class DerivedStore:
                 collection_name=self._collection,
                 points_selector={"points": ids_to_delete},
             )
-            logger.info(
-                f"Invalidated {deleted} stale derived sentences for {table_name}"
-            )
+            logger.info(f"Invalidated {deleted} stale derived sentences for {table_name}")
             return deleted
         except Exception as e:
             logger.error(f"Failed to invalidate stale sentences: {e}")

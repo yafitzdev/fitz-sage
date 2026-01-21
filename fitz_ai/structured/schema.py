@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from fitz_ai.logging.logger import get_logger
@@ -433,7 +433,7 @@ class SchemaStore:
                 logger.info(f"Deleted table schema: {table_name}")
                 return True
 
-            logger.warning(f"Vector DB doesn't support delete operation")
+            logger.warning("Vector DB doesn't support delete operation")
             return False
 
         except Exception as e:

@@ -50,4 +50,4 @@ def find_conflicts(chunks: Sequence[Chunk]) -> list[tuple[str, str, str, str]]:
     return []
 
 
-__all__ = ["ChunkLike", "find_conflicts"]
+__all__ = ["find_conflicts"]

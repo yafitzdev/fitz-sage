@@ -146,7 +146,6 @@ def _run_fitz_rag_ingest(
 ) -> None:
     """Run the fitz_rag ingestion flow."""
     from fitz_ai.ingestion.chunking.router import ChunkingRouter
-    from fitz_ai.ingestion.diff import run_diff_ingest
     from fitz_ai.ingestion.parser import ParserRouter
     from fitz_ai.ingestion.state import IngestStateManager
     from fitz_ai.llm.registry import get_llm_plugin

@@ -7,11 +7,10 @@ Tests the cache helper methods and cache operations in isolation.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
-from fitz_ai.cloud.cache_key import CacheVersions
 from fitz_ai.core import Answer, Provenance
 from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import RGSAnswer, RGSSourceRef
 from fitz_ai.engines.fitz_rag.pipeline.engine import CLOUD_OPTIMIZER_VERSION

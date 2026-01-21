@@ -47,12 +47,14 @@ class MockVectorDBClient:
         with_payload: bool = True,
     ) -> tuple[list[MockScrollRecord], int | None]:
         """Return mock rows."""
-        self.scroll_calls.append({
-            "collection": collection_name,
-            "limit": limit,
-            "offset": offset,
-            "filter": scroll_filter,
-        })
+        self.scroll_calls.append(
+            {
+                "collection": collection_name,
+                "limit": limit,
+                "offset": offset,
+                "filter": scroll_filter,
+            }
+        )
 
         # Filter rows by table if filter specifies it
         filtered_rows = self.rows
@@ -84,51 +86,61 @@ class TestConditionToFilter:
 
     def test_equality(self):
         """Test equality condition."""
-        result = _condition_to_filter({
-            "column": "department",
-            "op": "=",
-            "value": "engineering",
-        })
+        result = _condition_to_filter(
+            {
+                "column": "department",
+                "op": "=",
+                "value": "engineering",
+            }
+        )
 
         assert result == {"key": "department", "match": {"value": "engineering"}}
 
     def test_greater_than(self):
         """Test greater than condition."""
-        result = _condition_to_filter({
-            "column": "salary",
-            "op": ">",
-            "value": 100000,
-        })
+        result = _condition_to_filter(
+            {
+                "column": "salary",
+                "op": ">",
+                "value": 100000,
+            }
+        )
 
         assert result == {"key": "salary", "range": {"gt": 100000}}
 
     def test_less_than_or_equal(self):
         """Test less than or equal condition."""
-        result = _condition_to_filter({
-            "column": "level",
-            "op": "<=",
-            "value": 5,
-        })
+        result = _condition_to_filter(
+            {
+                "column": "level",
+                "op": "<=",
+                "value": 5,
+            }
+        )
 
         assert result == {"key": "level", "range": {"lte": 5}}
 
     def test_between(self):
         """Test BETWEEN condition."""
-        result = _condition_to_filter({
-            "column": "salary",
-            "op": "BETWEEN",
-            "value": [50000, 100000],
-        })
+        result = _condition_to_filter(
+            {
+                "column": "salary",
+                "op": "BETWEEN",
+                "value": [50000, 100000],
+            }
+        )
 
         assert result == {"key": "salary", "range": {"gte": 50000, "lte": 100000}}
 
     def test_in(self):
         """Test IN condition."""
-        result = _condition_to_filter({
-            "column": "department",
-            "op": "IN",
-            "value": ["eng", "sales"],
-        })
+        result = _condition_to_filter(
+            {
+                "column": "department",
+                "op": "IN",
+                "value": ["eng", "sales"],
+            }
+        )
 
         assert "should" in result
         assert len(result["should"]) == 2

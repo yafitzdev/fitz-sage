@@ -12,7 +12,6 @@ import os
 from typing import TYPE_CHECKING
 
 from fitz_ai.cloud import CloudClient
-from fitz_ai.cloud.cache_key import CacheVersions, compute_retrieval_fingerprint
 from fitz_ai.core import (
     Answer,
     ConfigurationError,
@@ -28,7 +27,7 @@ from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 from fitz_ai.logging.logger import get_logger
 
 if TYPE_CHECKING:
-    from fitz_ai.cloud.client import CacheLookupResult
+    pass
 
 logger = get_logger(__name__)
 
@@ -172,8 +171,9 @@ class FitzRagEngine:
         Returns:
             Configured FitzRagEngine instance
         """
-        import yaml
         from pathlib import Path
+
+        import yaml
 
         with Path(config_path).open("r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}

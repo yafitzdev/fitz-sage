@@ -114,7 +114,7 @@ class SparseIndex:
                 index.chunk_ids = json.load(f)
 
             logger.debug(
-                f"Loaded sparse index for '{collection}': " f"{len(index.chunk_ids)} documents"
+                f"Loaded sparse index for '{collection}': {len(index.chunk_ids)} documents"
             )
 
         except Exception as e:

@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import pytest
-
 from fitz_ai.structured.types import (
     TYPE_BOOLEAN,
     TYPE_DATE,

@@ -91,18 +91,20 @@ def ingest_direct_text(
     points = []
     for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
         point_id = f"{doc_id}_chunk_{i}"
-        points.append({
-            "id": point_id,
-            "vector": embedding,
-            "payload": {
-                "text": chunk.content,
-                "source": "direct_input",
-                "doc_id": doc_id,
-                "chunk_index": i,
-                "total_chunks": len(chunks),
-                "original_text": text if len(text) <= 500 else None,
-            },
-        })
+        points.append(
+            {
+                "id": point_id,
+                "vector": embedding,
+                "payload": {
+                    "text": chunk.content,
+                    "source": "direct_input",
+                    "doc_id": doc_id,
+                    "chunk_index": i,
+                    "total_chunks": len(chunks),
+                    "original_text": text if len(text) <= 500 else None,
+                },
+            }
+        )
 
     # Upsert to vector DB
     ui.step(3, 3, "Storing...")

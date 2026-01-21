@@ -15,7 +15,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    pass
+    from fitz_ai.llm.types import ChatClient, Embedder, Reranker
+    from fitz_ai.retrieval.entity_graph.types import EntityGraphClient
+    from fitz_ai.retrieval.vocabulary.types import KeywordMatcherClient
+    from fitz_ai.vector_db.types import VectorClient
 
 import yaml
 
@@ -107,7 +110,9 @@ class RetrievalDependencies:
     reranker: Any | None = None  # Reranking service (duck-typed, optional)
     chat: Any | None = None  # Fast-tier chat for multi-query expansion (duck-typed, optional)
     keyword_matcher: Any | None = None  # Exact keyword matching (duck-typed, optional)
-    entity_graph: Any | None = None  # Entity graph for related chunk discovery (duck-typed, optional)
+    entity_graph: Any | None = (
+        None  # Entity graph for related chunk discovery (duck-typed, optional)
+    )
     max_entity_expansion: int = 10  # Max related chunks per query
     table_store: Any | None = None  # TableStore for CSV file queries
 

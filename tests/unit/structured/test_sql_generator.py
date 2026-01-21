@@ -32,15 +32,17 @@ class MockChatClient:
         if self.response:
             return json.dumps(self.response)
         # Default response
-        return json.dumps({
-            "queries": [
-                {
-                    "sql": "SELECT COUNT(*) FROM employees WHERE department = 'engineering'",
-                    "table": "employees",
-                    "description": "Count engineering employees"
-                }
-            ]
-        })
+        return json.dumps(
+            {
+                "queries": [
+                    {
+                        "sql": "SELECT COUNT(*) FROM employees WHERE department = 'engineering'",
+                        "table": "employees",
+                        "description": "Count engineering employees",
+                    }
+                ]
+            }
+        )
 
 
 @pytest.fixture
@@ -301,12 +303,14 @@ class TestSQLGenerator:
 
     def test_generate_multiple_queries(self, employees_schema: TableSchema):
         """Test generating multiple queries."""
-        client = MockChatClient(response={
-            "queries": [
-                {"sql": "SELECT COUNT(*) FROM employees", "table": "employees"},
-                {"sql": "SELECT AVG(salary) FROM employees", "table": "employees"},
-            ]
-        })
+        client = MockChatClient(
+            response={
+                "queries": [
+                    {"sql": "SELECT COUNT(*) FROM employees", "table": "employees"},
+                    {"sql": "SELECT AVG(salary) FROM employees", "table": "employees"},
+                ]
+            }
+        )
         generator = SQLGenerator(client)
 
         result = generator.generate("Stats about employees", [employees_schema])

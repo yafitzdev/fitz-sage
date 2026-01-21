@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import pytest
@@ -215,6 +214,7 @@ class TestFallbackFormatting:
 
     def test_fallback_on_exception(self):
         """Test fallback formatting when chat client raises exception."""
+
         class FailingClient:
             def chat(self, messages):
                 raise RuntimeError("LLM unavailable")
@@ -241,6 +241,7 @@ class TestFallbackFormatting:
 
     def test_fallback_sum_formatting(self):
         """Test fallback formatting for SUM."""
+
         class FailingClient:
             def chat(self, messages):
                 raise RuntimeError("LLM unavailable")
@@ -267,6 +268,7 @@ class TestFallbackFormatting:
 
     def test_fallback_avg_formatting(self):
         """Test fallback formatting for AVG."""
+
         class FailingClient:
             def chat(self, messages):
                 raise RuntimeError("LLM unavailable")
@@ -292,6 +294,7 @@ class TestFallbackFormatting:
 
     def test_fallback_empty_result(self):
         """Test fallback formatting for empty result."""
+
         class FailingClient:
             def chat(self, messages):
                 raise RuntimeError("LLM unavailable")

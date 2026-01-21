@@ -39,9 +39,7 @@ class TestInitCommand:
         }
 
         with (
-            patch(
-                "fitz_ai.cli.commands.init_wizard.detect_system", return_value=mock_system
-            ),
+            patch("fitz_ai.cli.commands.init_wizard.detect_system", return_value=mock_system),
             patch(
                 "fitz_ai.cli.commands.init_wizard.available_llm_plugins",
                 side_effect=lambda t: ["cohere"] if t in ["chat", "embedding"] else [],
@@ -58,9 +56,7 @@ class TestInitCommand:
                 "fitz_ai.cli.commands.init_wizard.available_chunking_plugins",
                 return_value=["simple"],
             ),
-            patch(
-                "fitz_ai.cli.commands.init_wizard.load_default_config", return_value={}
-            ),
+            patch("fitz_ai.cli.commands.init_wizard.load_default_config", return_value={}),
         ):
             result = runner.invoke(app, ["init", "-y", "--show"])
 
@@ -373,16 +369,12 @@ class TestInitValidation:
         mock_system.api_keys = {}
 
         with (
-            patch(
-                "fitz_ai.cli.commands.init_wizard.detect_system", return_value=mock_system
-            ),
+            patch("fitz_ai.cli.commands.init_wizard.detect_system", return_value=mock_system),
             patch(
                 "fitz_ai.cli.commands.init_wizard.get_default_engine",
                 return_value="fitz_rag",
             ),
-            patch(
-                "fitz_ai.cli.commands.init_wizard.available_llm_plugins", return_value=[]
-            ),
+            patch("fitz_ai.cli.commands.init_wizard.available_llm_plugins", return_value=[]),
             patch(
                 "fitz_ai.cli.commands.init_wizard.available_vector_db_plugins",
                 return_value=["local_faiss"],
@@ -395,9 +387,7 @@ class TestInitValidation:
                 "fitz_ai.cli.commands.init_wizard.available_chunking_plugins",
                 return_value=["simple"],
             ),
-            patch(
-                "fitz_ai.cli.commands.init_wizard.load_default_config", return_value={}
-            ),
+            patch("fitz_ai.cli.commands.init_wizard.load_default_config", return_value={}),
         ):
             result = runner.invoke(app, ["init", "-y"])
 
@@ -413,9 +403,7 @@ class TestInitValidation:
         mock_system.api_keys = {"cohere": MagicMock(available=True)}
 
         with (
-            patch(
-                "fitz_ai.cli.commands.init_wizard.detect_system", return_value=mock_system
-            ),
+            patch("fitz_ai.cli.commands.init_wizard.detect_system", return_value=mock_system),
             patch(
                 "fitz_ai.cli.commands.init_wizard.get_default_engine",
                 return_value="fitz_rag",
@@ -436,9 +424,7 @@ class TestInitValidation:
                 "fitz_ai.cli.commands.init_wizard.available_chunking_plugins",
                 return_value=["simple"],
             ),
-            patch(
-                "fitz_ai.cli.commands.init_wizard.load_default_config", return_value={}
-            ),
+            patch("fitz_ai.cli.commands.init_wizard.load_default_config", return_value={}),
         ):
             result = runner.invoke(app, ["init", "-y"])
 

@@ -244,7 +244,7 @@ class TestFitzRAGChain:
             llm_model="gpt-4o",
         )
 
-        result = chain.invoke({})  # No question
+        _ = chain.invoke({})  # No question - test LLM invocation path
 
         # LLM was called (uncached path)
         mock_llm.invoke.assert_called_once()
@@ -298,7 +298,7 @@ class TestFitzRAGChain:
             org_key="a" * 64,
             embedding_fn=lambda x: [1.0] * 1536,
             llm_model="gpt-4o",
-        ) as chain:
+        ) as chain:  # noqa: F841
             pass
 
         mock_optimizer.close.assert_called_once()

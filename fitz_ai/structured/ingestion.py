@@ -49,9 +49,7 @@ class MissingPrimaryKeyError(Exception):
     def __init__(self, table_name: str, primary_key: str):
         self.table_name = table_name
         self.primary_key = primary_key
-        super().__init__(
-            f"Primary key column '{primary_key}' not found in table '{table_name}'"
-        )
+        super().__init__(f"Primary key column '{primary_key}' not found in table '{table_name}'")
 
 
 @runtime_checkable
@@ -210,9 +208,7 @@ class StructuredIngester:
         logger.info(f"Deleted table '{table_name}': {deleted} rows")
         return deleted
 
-    def _infer_types(
-        self, column_names: list[str], rows: list[dict[str, Any]]
-    ) -> list[str]:
+    def _infer_types(self, column_names: list[str], rows: list[dict[str, Any]]) -> list[str]:
         """Infer column types from sample rows."""
         types = []
         for col_name in column_names:
@@ -268,9 +264,7 @@ class StructuredIngester:
                     if col_name in row:
                         col_schema = schema.get_column(col_name)
                         if col_schema:
-                            payload[col_name] = coerce_value(
-                                row[col_name], col_schema.type
-                            )
+                            payload[col_name] = coerce_value(row[col_name], col_schema.type)
 
                 # Store full row data
                 payload[FIELD_ROW_DATA] = row

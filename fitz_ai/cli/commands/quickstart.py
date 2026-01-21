@@ -557,6 +557,7 @@ def _run_ingestion(
     Returns dict with 'documents', 'chunks', and 'hierarchy_summaries' counts.
     """
     import yaml
+
     from fitz_ai.engines.fitz_rag.config import (
         ChunkingRouterConfig,
         ExtensionChunkerConfig,
@@ -643,7 +644,9 @@ def _run_ingestion(
         )
     else:
         # Fall back to package defaults from default.yaml
-        defaults_path = Path(__file__).parent.parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
+        defaults_path = (
+            Path(__file__).parent.parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
+        )
         with defaults_path.open("r", encoding="utf-8") as f:
             default_config = yaml.safe_load(f) or {}
 
@@ -746,6 +749,7 @@ def _run_query(
     Returns an RGSAnswer object.
     """
     import yaml
+
     from fitz_ai.engines.fitz_rag.config import FitzRagConfig
     from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 

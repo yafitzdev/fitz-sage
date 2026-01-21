@@ -118,8 +118,23 @@ def is_direct_text(source: str) -> bool:
 
     # Common file extensions that indicate a path (even if file doesn't exist)
     path_extensions = {
-        ".txt", ".md", ".csv", ".json", ".yaml", ".yml", ".py", ".js", ".ts",
-        ".html", ".css", ".xml", ".pdf", ".doc", ".docx", ".xls", ".xlsx"
+        ".txt",
+        ".md",
+        ".csv",
+        ".json",
+        ".yaml",
+        ".yml",
+        ".py",
+        ".js",
+        ".ts",
+        ".html",
+        ".css",
+        ".xml",
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
     }
 
     # Check if it looks like a path

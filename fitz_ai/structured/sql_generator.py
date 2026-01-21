@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from fitz_ai.logging.logger import get_logger
@@ -51,10 +51,7 @@ class SQLQuery:
     def is_aggregation(self) -> bool:
         """Check if this is an aggregation query."""
         agg_keywords = ["COUNT", "SUM", "AVG", "MIN", "MAX", "GROUP_CONCAT"]
-        return any(
-            any(kw in col.upper() for kw in agg_keywords)
-            for col in self.select
-        )
+        return any(any(kw in col.upper() for kw in agg_keywords) for col in self.select)
 
     @property
     def aggregation_type(self) -> str | None:
@@ -137,7 +134,7 @@ def _parse_sql_response(response: str) -> list[dict[str, Any]]:
     # Remove markdown code blocks
     if response.startswith("```"):
         lines = response.split("\n")
-        lines = [l for l in lines if not l.startswith("```")]
+        lines = [line for line in lines if not line.startswith("```")]
         response = "\n".join(lines)
 
     try:
@@ -162,7 +159,9 @@ def _parse_where_clause(sql: str) -> list[dict[str, Any]]:
     conditions = []
 
     # Extract WHERE clause
-    where_match = re.search(r"\bWHERE\b\s+(.+?)(?:\bGROUP BY\b|\bORDER BY\b|\bLIMIT\b|$)", sql, re.IGNORECASE)
+    where_match = re.search(
+        r"\bWHERE\b\s+(.+?)(?:\bGROUP BY\b|\bORDER BY\b|\bLIMIT\b|$)", sql, re.IGNORECASE
+    )
     if not where_match:
         return conditions
 
@@ -171,14 +170,19 @@ def _parse_where_clause(sql: str) -> list[dict[str, Any]]:
     # Handle BETWEEN first (before splitting by AND, since BETWEEN uses AND internally)
     between_pattern = re.compile(
         r"(\w+)\s+BETWEEN\s+['\"]?([^'\"]+?)['\"]?\s+AND\s+['\"]?([^'\"]+?)['\"]?(?=\s+AND\s+|\s*$)",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     for match in between_pattern.finditer(where_clause):
-        conditions.append({
-            "column": match.group(1),
-            "op": "BETWEEN",
-            "value": [_parse_value(match.group(2).strip()), _parse_value(match.group(3).strip())],
-        })
+        conditions.append(
+            {
+                "column": match.group(1),
+                "op": "BETWEEN",
+                "value": [
+                    _parse_value(match.group(2).strip()),
+                    _parse_value(match.group(3).strip()),
+                ],
+            }
+        )
 
     # Remove BETWEEN clauses from where_clause for further processing
     remaining = between_pattern.sub("", where_clause).strip()
@@ -198,31 +202,37 @@ def _parse_where_clause(sql: str) -> list[dict[str, Any]]:
         in_match = re.match(r"(\w+)\s+IN\s*\(([^)]+)\)", part, re.IGNORECASE)
         if in_match:
             values = [_parse_value(v.strip().strip("'\"")) for v in in_match.group(2).split(",")]
-            conditions.append({
-                "column": in_match.group(1),
-                "op": "IN",
-                "value": values,
-            })
+            conditions.append(
+                {
+                    "column": in_match.group(1),
+                    "op": "IN",
+                    "value": values,
+                }
+            )
             continue
 
         # Handle LIKE
         like_match = re.match(r"(\w+)\s+LIKE\s+['\"]([^'\"]+)['\"]", part, re.IGNORECASE)
         if like_match:
-            conditions.append({
-                "column": like_match.group(1),
-                "op": "LIKE",
-                "value": like_match.group(2),
-            })
+            conditions.append(
+                {
+                    "column": like_match.group(1),
+                    "op": "LIKE",
+                    "value": like_match.group(2),
+                }
+            )
             continue
 
         # Handle comparison operators
         comp_match = re.match(r"(\w+)\s*(>=|<=|!=|<>|=|>|<)\s*['\"]?([^'\"]+)['\"]?", part)
         if comp_match:
-            conditions.append({
-                "column": comp_match.group(1),
-                "op": comp_match.group(2),
-                "value": _parse_value(comp_match.group(3).strip()),
-            })
+            conditions.append(
+                {
+                    "column": comp_match.group(1),
+                    "op": comp_match.group(2),
+                    "value": _parse_value(comp_match.group(3).strip()),
+                }
+            )
 
     return conditions
 

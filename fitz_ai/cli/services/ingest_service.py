@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 
 @dataclass
@@ -169,7 +168,7 @@ class IngestService:
 
         # Load engine config
         registry = get_engine_registry()
-        engine_meta = registry.get_metadata(engine_name)
+        _ = registry.get_metadata(engine_name)  # Validate engine exists
 
         if engine_name == "fitz_rag":
             # Load config

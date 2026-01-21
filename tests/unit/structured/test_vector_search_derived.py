@@ -3,14 +3,13 @@
 Tests for VectorSearchStep integration with derived collection.
 """
 
-import pytest
 from dataclasses import dataclass
 from typing import Any
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.fitz_rag.retrieval.steps.vector_search import (
-    VectorSearchStep,
     DERIVED_AVAILABLE,
+    VectorSearchStep,
 )
 
 

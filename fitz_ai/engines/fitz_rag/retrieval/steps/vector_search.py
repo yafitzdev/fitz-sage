@@ -35,10 +35,10 @@ from .strategies import (
 
 # Check if derived collection support is available
 try:
-    from fitz_ai.structured.constants import get_derived_collection
-    from fitz_ai.structured.derived import FIELD_CONTENT, FIELD_DERIVED, FIELD_SOURCE_TABLE
+    from fitz_ai.structured import constants as _struct_constants  # noqa: F401
 
     DERIVED_AVAILABLE = True
+    del _struct_constants  # Clean up namespace
 except ImportError:
     DERIVED_AVAILABLE = False
 

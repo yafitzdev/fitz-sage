@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder, VectorClient
 from fitz_ai.engines.fitz_rag.retrieval.steps.utils import parse_json_list

@@ -30,9 +30,9 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from fitz_ai.core import Query
-from fitz_ai.engines.fitz_rag import FitzRagEngine
-from fitz_ai.engines.fitz_rag.config import FitzRagConfig
+from fitz_ai.core import Query  # noqa: E402
+from fitz_ai.engines.fitz_rag import FitzRagEngine  # noqa: E402
+from fitz_ai.engines.fitz_rag.config import FitzRagConfig  # noqa: E402
 
 
 def test_cache_flow():
@@ -60,6 +60,7 @@ def test_cache_flow():
 
     try:
         import yaml
+
         with Path(config_path).open("r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
 

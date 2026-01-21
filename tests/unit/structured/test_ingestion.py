@@ -52,8 +52,7 @@ class MockVectorDBClient:
         for point in points:
             if point["id"] in existing_ids:
                 self.collections[collection] = [
-                    p if p["id"] != point["id"] else point
-                    for p in self.collections[collection]
+                    p if p["id"] != point["id"] else point for p in self.collections[collection]
                 ]
             else:
                 self.collections[collection].append(point)
@@ -137,9 +136,7 @@ class TestStructuredIngester:
         assert schema.row_count == 0
         assert len(schema.columns) == 0
 
-    def test_ingest_simple_table(
-        self, ingester: StructuredIngester, mock_db: MockVectorDBClient
-    ):
+    def test_ingest_simple_table(self, ingester: StructuredIngester, mock_db: MockVectorDBClient):
         """Test ingesting a simple table."""
         rows = [
             {"id": "1", "name": "Alice", "age": 30},
@@ -196,9 +193,7 @@ class TestStructuredIngester:
         assert schema.get_column("name").indexed is False
         assert schema.get_column("level").indexed is False
 
-    def test_row_payload_structure(
-        self, ingester: StructuredIngester, mock_db: MockVectorDBClient
-    ):
+    def test_row_payload_structure(self, ingester: StructuredIngester, mock_db: MockVectorDBClient):
         """Test that row payloads have correct structure."""
         rows = [
             {"id": "emp1", "name": "Alice", "salary": 100000},
@@ -258,9 +253,7 @@ class TestStructuredIngester:
 
         assert exc_info.value.primary_key == "id"
 
-    def test_ingest_registers_schema(
-        self, ingester: StructuredIngester, schema_store: SchemaStore
-    ):
+    def test_ingest_registers_schema(self, ingester: StructuredIngester, schema_store: SchemaStore):
         """Test that ingestion registers schema for discovery."""
         rows = [
             {"id": "1", "name": "Test"},
@@ -277,9 +270,7 @@ class TestStructuredIngester:
         assert retrieved is not None
         assert retrieved.table_name == "test_table"
 
-    def test_ingest_type_coercion(
-        self, ingester: StructuredIngester, mock_db: MockVectorDBClient
-    ):
+    def test_ingest_type_coercion(self, ingester: StructuredIngester, mock_db: MockVectorDBClient):
         """Test that indexed columns are type-coerced."""
         rows = [
             {"id": "1", "amount": "1000", "active": "yes"},  # String values
@@ -302,9 +293,7 @@ class TestStructuredIngester:
         # active should be coerced to boolean
         assert payload["active"] is True
 
-    def test_ingest_batching(
-        self, ingester: StructuredIngester, mock_db: MockVectorDBClient
-    ):
+    def test_ingest_batching(self, ingester: StructuredIngester, mock_db: MockVectorDBClient):
         """Test that large tables are upserted in batches."""
         # Create 250 rows (should be 3 batches of 100)
         rows = [{"id": str(i), "value": i} for i in range(250)]
@@ -317,9 +306,7 @@ class TestStructuredIngester:
 
         # Count upsert calls to tables collection
         tables_coll = get_tables_collection("test_collection")
-        table_upserts = [
-            call for call in mock_db.upsert_calls if call[0] == tables_coll
-        ]
+        table_upserts = [call for call in mock_db.upsert_calls if call[0] == tables_coll]
 
         # Should have multiple batches
         assert len(table_upserts) == 3  # 100 + 100 + 50

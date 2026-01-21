@@ -8,7 +8,7 @@ and performs client-side aggregation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from fitz_ai.logging.logger import get_logger
@@ -30,9 +30,7 @@ class QueryLimitExceededError(Exception):
     def __init__(self, scanned: int, limit: int = MAX_SCAN_ROWS):
         self.scanned = scanned
         self.limit = limit
-        super().__init__(
-            f"Query would scan {scanned} rows, exceeding limit of {limit}"
-        )
+        super().__init__(f"Query would scan {scanned} rows, exceeding limit of {limit}")
 
 
 @runtime_checkable
@@ -105,9 +103,7 @@ def _condition_to_filter(condition: dict[str, Any]) -> dict[str, Any] | None:
 
     # IN (multiple match conditions with should)
     if op == "IN" and isinstance(value, list):
-        return {
-            "should": [{"key": column, "match": {"value": v}} for v in value]
-        }
+        return {"should": [{"key": column, "match": {"value": v}} for v in value]}
 
     # LIKE (partial match - limited support)
     if op == "LIKE":
@@ -243,9 +239,7 @@ def _parse_aggregation(select_expr: str) -> tuple[str, str]:
     return "", select_expr.strip()
 
 
-def _execute_aggregations(
-    rows: list[dict[str, Any]], query: SQLQuery
-) -> dict[str, Any]:
+def _execute_aggregations(rows: list[dict[str, Any]], query: SQLQuery) -> dict[str, Any]:
     """Execute aggregations on fetched rows."""
     results = {}
 
@@ -272,9 +266,7 @@ def _execute_aggregations(
     return results
 
 
-def _execute_group_by(
-    rows: list[dict[str, Any]], query: SQLQuery
-) -> dict[str, Any]:
+def _execute_group_by(rows: list[dict[str, Any]], query: SQLQuery) -> dict[str, Any]:
     """Execute GROUP BY aggregations."""
     if not query.group_by:
         return _execute_aggregations(rows, query)

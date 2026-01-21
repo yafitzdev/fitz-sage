@@ -298,7 +298,9 @@ class TestFullCacheFlow:
         pipeline.rgs.build_answer = Mock(
             return_value=RGSAnswer(
                 answer="Generated answer",
-                sources=[RGSSourceRef(source_id="s", index=0, doc_id="d", content="c", metadata={})],
+                sources=[
+                    RGSSourceRef(source_id="s", index=0, doc_id="d", content="c", metadata={})
+                ],
                 mode=None,
             )
         )
@@ -320,7 +322,7 @@ class TestCacheKeyDeterminism:
 
     def test_same_query_same_chunks_same_key(self):
         """Same query with same chunks should produce same cache key."""
-        from fitz_ai.cloud.cache_key import compute_cache_key, CacheVersions
+        from fitz_ai.cloud.cache_key import compute_cache_key
 
         versions = CacheVersions(
             optimizer="1.0",
@@ -337,7 +339,7 @@ class TestCacheKeyDeterminism:
 
     def test_different_query_different_key(self):
         """Different queries should produce different cache keys."""
-        from fitz_ai.cloud.cache_key import compute_cache_key, CacheVersions
+        from fitz_ai.cloud.cache_key import compute_cache_key
 
         versions = CacheVersions(
             optimizer="1.0",
@@ -354,7 +356,7 @@ class TestCacheKeyDeterminism:
 
     def test_different_chunks_different_key(self):
         """Different chunks should produce different cache keys."""
-        from fitz_ai.cloud.cache_key import compute_cache_key, CacheVersions
+        from fitz_ai.cloud.cache_key import compute_cache_key
 
         versions = CacheVersions(
             optimizer="1.0",
@@ -371,7 +373,7 @@ class TestCacheKeyDeterminism:
 
     def test_different_version_different_key(self):
         """Different versions should produce different cache keys."""
-        from fitz_ai.cloud.cache_key import compute_cache_key, CacheVersions
+        from fitz_ai.cloud.cache_key import compute_cache_key
 
         versions1 = CacheVersions(
             optimizer="1.0",

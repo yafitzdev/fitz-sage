@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from fitz_ai.cloud.cache_key import CacheVersions, compute_retrieval_fingerprint
 from fitz_ai.cloud.client import REQUIRED_EMBEDDING_DIM, CloudClient

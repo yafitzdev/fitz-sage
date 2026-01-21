@@ -66,8 +66,7 @@ class MockVectorDBClient:
         for point in points:
             if point["id"] in existing_ids:
                 self.collections[collection] = [
-                    p if p["id"] != point["id"] else point
-                    for p in self.collections[collection]
+                    p if p["id"] != point["id"] else point for p in self.collections[collection]
                 ]
             else:
                 self.collections[collection].append(point)
@@ -90,10 +89,7 @@ class MockVectorDBClient:
             scored.append((score, point))
 
         scored.sort(key=lambda x: x[0], reverse=True)
-        return [
-            MockSearchResult(score=s, payload=p.get("payload", {}))
-            for s, p in scored[:limit]
-        ]
+        return [MockSearchResult(score=s, payload=p.get("payload", {})) for s, p in scored[:limit]]
 
     def retrieve(self, collection_name: str, ids: list[str], with_payload: bool = True):
         if collection_name not in self.collections:
@@ -142,28 +138,49 @@ class MockChatClient:
 
         # Structured patterns
         structured_patterns = [
-            "how many", "count", "total", "sum", "average", "list all",
-            "show all", "top", "highest", "lowest", "maximum", "minimum",
-            "above", "below", "more than", "less than", "between",
-            "headcount", "tally", "enumerate", "breakdown",
+            "how many",
+            "count",
+            "total",
+            "sum",
+            "average",
+            "list all",
+            "show all",
+            "top",
+            "highest",
+            "lowest",
+            "maximum",
+            "minimum",
+            "above",
+            "below",
+            "more than",
+            "less than",
+            "between",
+            "headcount",
+            "tally",
+            "enumerate",
+            "breakdown",
         ]
 
         for pattern in structured_patterns:
             if pattern in prompt_lower:
-                return json.dumps({
-                    "route": "structured",
-                    "confidence": 0.85,
-                    "query_type": "aggregation",
-                    "reason": f"Query contains '{pattern}' pattern"
-                })
+                return json.dumps(
+                    {
+                        "route": "structured",
+                        "confidence": 0.85,
+                        "query_type": "aggregation",
+                        "reason": f"Query contains '{pattern}' pattern",
+                    }
+                )
 
         # Default to semantic
-        return json.dumps({
-            "route": "semantic",
-            "confidence": 0.9,
-            "query_type": "",
-            "reason": "Query asks for explanation or concept"
-        })
+        return json.dumps(
+            {
+                "route": "semantic",
+                "confidence": 0.9,
+                "query_type": "",
+                "reason": "Query asks for explanation or concept",
+            }
+        )
 
 
 @pytest.fixture
@@ -365,19 +382,19 @@ class TestQueryRouter:
         assert len(chat_client.calls) == 1
         assert "employees" in chat_client.calls[0][0]["content"].lower()
 
-    def test_low_confidence_routes_to_semantic(
-        self, schema_store: SchemaStore
-    ):
+    def test_low_confidence_routes_to_semantic(self, schema_store: SchemaStore):
         """Test that low confidence classification routes to semantic."""
         # Create chat client that returns low confidence
-        low_conf_client = MockChatClient(responses={
-            "employees": {
-                "route": "structured",
-                "confidence": 0.4,  # Below threshold
-                "query_type": "aggregation",
-                "reason": "Uncertain classification"
+        low_conf_client = MockChatClient(
+            responses={
+                "employees": {
+                    "route": "structured",
+                    "confidence": 0.4,  # Below threshold
+                    "query_type": "aggregation",
+                    "reason": "Uncertain classification",
+                }
             }
-        })
+        )
 
         router = QueryRouter(
             schema_store=schema_store,

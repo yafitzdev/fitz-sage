@@ -52,11 +52,7 @@ class InitService:
     def load_default_config(self) -> dict:
         """Load the default configuration from package."""
         defaults_path = (
-            Path(__file__).parent.parent.parent
-            / "engines"
-            / "fitz_rag"
-            / "config"
-            / "default.yaml"
+            Path(__file__).parent.parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
         )
         with defaults_path.open("r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
@@ -100,9 +96,7 @@ class InitService:
                 continue
 
             if "anthropic" in plugin_lower:
-                if (
-                    system.api_keys.get("anthropic", type("", (), {"available": False})).available
-                ):
+                if system.api_keys.get("anthropic", type("", (), {"available": False})).available:
                     available.append(plugin)
                 continue
 
@@ -226,7 +220,9 @@ class InitService:
             },
             "embeddings": {
                 "provider": embedding_provider,
-                "model": "text-embedding-3-small" if embedding_provider == "openai" else "embed-english-v3.0",
+                "model": "text-embedding-3-small"
+                if embedding_provider == "openai"
+                else "embed-english-v3.0",
             },
             "storage": {
                 "type": storage_backend,

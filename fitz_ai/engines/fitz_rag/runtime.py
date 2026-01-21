@@ -40,8 +40,9 @@ def run_fitz_rag(
         if config_path is None:
             config = load_engine_config("fitz_rag")
         else:
-            import yaml
             from pathlib import Path
+
+            import yaml
 
             with Path(config_path).open("r", encoding="utf-8") as f:
                 raw = yaml.safe_load(f) or {}
@@ -100,8 +101,9 @@ def create_fitz_rag_engine(
         if config_path is None:
             config = load_engine_config("fitz_rag")
         else:
-            import yaml
             from pathlib import Path
+
+            import yaml
 
             with Path(config_path).open("r", encoding="utf-8") as f:
                 raw = yaml.safe_load(f) or {}
@@ -146,8 +148,9 @@ def _register_fitz_rag_engine():
         if config_path is None:
             return load_engine_config("fitz_rag")
         else:
-            import yaml
             from pathlib import Path
+
+            import yaml
 
             with Path(config_path).open("r", encoding="utf-8") as f:
                 raw = yaml.safe_load(f) or {}

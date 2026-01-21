@@ -182,7 +182,11 @@ def parser_run_results(parsed_pdf, parsed_docx):
         ("docx_extracts_tables", "DOCX", lambda: _check_docx_tables(parsed_docx)),
         ("docx_extracts_text_content", "DOCX", lambda: _check_docx_text(parsed_docx)),
         # Integration checks
-        ("both_formats_consistent", "Integration", lambda: _check_consistency(parsed_pdf, parsed_docx)),
+        (
+            "both_formats_consistent",
+            "Integration",
+            lambda: _check_consistency(parsed_pdf, parsed_docx),
+        ),
     ]
 
     print("--- Running parser checks ---\n")

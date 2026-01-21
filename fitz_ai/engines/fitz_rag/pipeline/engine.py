@@ -52,7 +52,7 @@ from fitz_ai.llm.registry import get_llm_plugin
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE, VECTOR_DB
 from fitz_ai.retrieval.entity_graph import EntityGraphStore
-from fitz_ai.retrieval.vocabulary import KeywordMatcher, create_matcher_from_store
+from fitz_ai.retrieval.vocabulary import create_matcher_from_store
 from fitz_ai.tabular.store import get_table_store
 from fitz_ai.vector_db.registry import get_vector_db_plugin
 
@@ -60,13 +60,16 @@ from fitz_ai.vector_db.registry import get_vector_db_plugin
 try:
     from fitz_ai.structured import (
         DerivedStore,
-        QueryRouter as StructuredQueryRouter,
+    )
+    from fitz_ai.structured import QueryRouter as StructuredQueryRouter
+    from fitz_ai.structured import (
         ResultFormatter,
         SchemaStore,
         SQLGenerator,
         StructuredExecutor,
         StructuredRoute,
     )
+
     STRUCTURED_AVAILABLE = True
 except ImportError:
     STRUCTURED_AVAILABLE = False
@@ -352,11 +355,13 @@ class RAGPipeline:
 
                     # Format result as natural language
                     formatted = self.result_formatter.format(exec_result)
-                    derived_sentences.append((
-                        formatted.sentence,
-                        sql_query.raw_sql or str(sql_query),
-                        sql_query.table,
-                    ))
+                    derived_sentences.append(
+                        (
+                            formatted.sentence,
+                            sql_query.raw_sql or str(sql_query),
+                            sql_query.table,
+                        )
+                    )
 
                     logger.debug(f"{PIPELINE} Formatted result: {formatted.sentence[:50]}...")
 
@@ -368,9 +373,7 @@ class RAGPipeline:
             if derived_sentences and self.derived_store:
                 for sentence, sql, table in derived_sentences:
                     # Get table version from route
-                    table_schema = next(
-                        (t for t in route.tables if t.table_name == table), None
-                    )
+                    table_schema = next((t for t in route.tables if t.table_name == table), None)
                     table_version = table_schema.version if table_schema else "unknown"
 
                     self.derived_store.ingest(
@@ -421,9 +424,7 @@ class RAGPipeline:
         recommended = self._routing_advice.recommended_model
         if recommended == "fast" and self.fast_chat is not None:
             model_name = getattr(self.fast_chat, "params", {}).get("model", "unknown")
-            logger.info(
-                f"{PIPELINE} Using fast tier model '{model_name}' per cloud routing advice"
-            )
+            logger.info(f"{PIPELINE} Using fast tier model '{model_name}' per cloud routing advice")
             return self.fast_chat
 
         # Default to smart tier
@@ -431,8 +432,9 @@ class RAGPipeline:
 
     def _get_collection_version(self) -> str:
         """Compute collection version hash from ingestion state."""
-        from fitz_ai.ingestion.state import IngestStateManager
         import hashlib
+
+        from fitz_ai.ingestion.state import IngestStateManager
 
         try:
             manager = IngestStateManager()
@@ -440,9 +442,7 @@ class RAGPipeline:
 
             # Get collection name from retrieval config
             collection = (
-                self.retrieval.collection
-                if hasattr(self.retrieval, "collection")
-                else "default"
+                self.retrieval.collection if hasattr(self.retrieval, "collection") else "default"
             )
 
             file_hashes = []
@@ -516,8 +516,8 @@ class RAGPipeline:
         if not self.cloud_client or not self.embedder:
             return None
 
-        from fitz_ai.cloud.cache_key import CacheVersions, compute_retrieval_fingerprint
         import fitz_ai
+        from fitz_ai.cloud.cache_key import CacheVersions, compute_retrieval_fingerprint
 
         try:
             # 1. Get query embedding (cache for reuse in storage)
@@ -580,9 +580,9 @@ class RAGPipeline:
         if not self.cloud_client or not self.embedder:
             return
 
+        import fitz_ai
         from fitz_ai.cloud.cache_key import CacheVersions, compute_retrieval_fingerprint
         from fitz_ai.core import Answer, Provenance
-        import fitz_ai
 
         try:
             # 1. Reuse cached query embedding from _check_cloud_cache if available
@@ -656,7 +656,9 @@ class RAGPipeline:
         logger.info(f"{PIPELINE} Constructing RAGPipeline from config")
 
         # Vector DB
-        vector_db_kwargs = {k: v for k, v in cfg.vector_db_kwargs.model_dump().items() if v is not None}
+        vector_db_kwargs = {
+            k: v for k, v in cfg.vector_db_kwargs.model_dump().items() if v is not None
+        }
         vector_client = get_vector_db_plugin(cfg.vector_db, **vector_db_kwargs)
         logger.info(f"{VECTOR_DB} Using vector DB plugin='{cfg.vector_db}'")
 
@@ -669,12 +671,12 @@ class RAGPipeline:
             **chat_kwargs,
         )
         model_name = getattr(chat_plugin, "params", {}).get("model", "unknown")
-        logger.info(
-            f"{PIPELINE} Using chat plugin='{cfg.chat}' model='{model_name}' (smart tier)"
-        )
+        logger.info(f"{PIPELINE} Using chat plugin='{cfg.chat}' model='{model_name}' (smart tier)")
 
         # Embedding
-        embedding_kwargs = {k: v for k, v in cfg.embedding_kwargs.model_dump().items() if v is not None}
+        embedding_kwargs = {
+            k: v for k, v in cfg.embedding_kwargs.model_dump().items() if v is not None
+        }
         embedder = get_llm_plugin(
             plugin_type="embedding",
             plugin_name=cfg.embedding,
@@ -685,7 +687,9 @@ class RAGPipeline:
         # Rerank (optional - None means disabled in flat schema)
         reranker = None
         if cfg.rerank:
-            rerank_kwargs = {k: v for k, v in cfg.rerank_kwargs.model_dump().items() if v is not None}
+            rerank_kwargs = {
+                k: v for k, v in cfg.rerank_kwargs.model_dump().items() if v is not None
+            }
             reranker = get_llm_plugin(
                 plugin_type="rerank",
                 plugin_name=cfg.rerank,
@@ -798,9 +802,7 @@ class RAGPipeline:
                 extractor=extractor,
                 max_hops=max_hops,
             )
-            logger.info(
-                f"{PIPELINE} Multi-hop retrieval enabled (max {max_hops} hops)"
-            )
+            logger.info(f"{PIPELINE} Multi-hop retrieval enabled (max {max_hops} hops)")
 
         # Structured data components (tables/CSV queries via SQL)
         # Default: enabled=True
@@ -848,8 +850,7 @@ class RAGPipeline:
                 )
 
                 logger.info(
-                    f"{PIPELINE} Structured data handling enabled for "
-                    f"collection='{cfg.collection}'"
+                    f"{PIPELINE} Structured data handling enabled for collection='{cfg.collection}'"
                 )
             except Exception as e:
                 logger.warning(f"{PIPELINE} Failed to initialize structured components: {e}")
@@ -897,8 +898,9 @@ class RAGPipeline:
     @classmethod
     def from_yaml(cls, config_path: str) -> "RAGPipeline":
         """Create a RAGPipeline from a YAML configuration file."""
-        import yaml
         from pathlib import Path
+
+        import yaml
 
         with Path(config_path).open("r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
@@ -920,8 +922,9 @@ def create_pipeline_from_yaml(path: str | None = None) -> RAGPipeline:
 
         cfg = load_engine_config("fitz_rag")
     else:
-        import yaml
         from pathlib import Path
+
+        import yaml
 
         with Path(path).open("r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
