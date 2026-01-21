@@ -121,7 +121,6 @@ RELEASE_CHECKLIST.md
 rag_test_corpus
 CLAUDE.md
 .claude
-clara_model_cache
 docs/blog
 docs/limitations
 docs/roadmap

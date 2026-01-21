@@ -59,7 +59,7 @@ def run(
         >>> print(answer.text)
 
         Specific engine:
-        >>> answer = run("Explain X", engine="clara")
+        >>> answer = run("Explain X", engine="custom")
 
         With constraints:
         >>> from fitz_ai.core import Constraints
@@ -140,8 +140,8 @@ def create_engine(
         >>> answer2 = engine.answer(q2)
 
         Create specific engine:
-        >>> clara_engine = create_engine("clara")
-        >>> answer = clara_engine.answer(query)
+        >>> custom_engine = create_engine("custom")
+        >>> answer = custom_engine.answer(query)
     """
     # Get the registry
     registry = get_engine_registry()
@@ -167,7 +167,7 @@ def list_engines() -> list[str]:
     Examples:
         >>> engines = list_engines()
         >>> print(f"Available: {', '.join(engines)}")
-        ['fitz_rag', 'clara', 'custom']
+        ['fitz_rag']
     """
     registry = get_engine_registry()
     return registry.list()
@@ -184,7 +184,6 @@ def list_engines_with_info() -> Dict[str, str]:
         >>> for name, desc in list_engines_with_info().items():
         ...     print(f"{name}: {desc}")
         fitz_rag: Retrieval-augmented generation
-        clara: Citation-attributed reasoning
     """
     registry = get_engine_registry()
     return registry.list_with_descriptions()

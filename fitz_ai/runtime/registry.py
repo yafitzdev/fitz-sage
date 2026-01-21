@@ -4,7 +4,7 @@ Engine Registry - Central registry for all knowledge engines.
 
 This module provides a registry pattern for discovering and instantiating
 knowledge engines. It enables the platform to support multiple engines
-(Fitz RAG, CLaRa, custom engines) without hardcoding engine names.
+(Fitz RAG, custom engines) without hardcoding engine names.
 
 Philosophy:
     - Engines register themselves on import
@@ -77,7 +77,7 @@ class EngineRegistration:
     """
 
     name: str
-    """Unique name for this engine (e.g., 'fitz_rag', 'clara')."""
+    """Unique name for this engine (e.g., 'fitz_rag')."""
 
     factory: Callable[[Any], KnowledgeEngine]
     """

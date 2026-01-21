@@ -2,7 +2,7 @@
 Quickstart Example - Using the new Fitz Engine API
 
 This example demonstrates the new paradigm-agnostic engine interface.
-The code is cleaner and more forward-compatible with future engines (CLaRa, etc.).
+The code is cleaner and more forward-compatible with custom engines.
 """
 
 from fitz_ai.core import Constraints, Query

@@ -11,7 +11,6 @@ Commands:
     fitz chat          Interactive conversation with your knowledge base
     fitz collections   Manage collections (list, info, delete)
     fitz tables        Manage structured tables (list, info, delete)
-    fitz map           Visualize knowledge base as interactive graph
     fitz serve         Start the REST API server
     fitz config        View configuration
     fitz doctor        System diagnostics
@@ -124,32 +123,6 @@ def collections() -> None:
     from fitz_ai.cli.commands import collections as mod
 
     mod.command()
-
-
-@app.command("map")
-def map_cmd(
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file path."),
-    collection: Optional[str] = typer.Option(None, "--collection", "-c", help="Collection name."),
-    no_open: bool = typer.Option(False, "--no-open", help="Don't open in browser."),
-    rebuild: bool = typer.Option(False, "--rebuild", help="Force rebuild embeddings."),
-    similarity_threshold: float = typer.Option(
-        0.8, "--similarity-threshold", "-t", help="Minimum similarity for edges."
-    ),
-    no_similarity_edges: bool = typer.Option(
-        False, "--no-similarity-edges", help="Don't show similarity edges."
-    ),
-) -> None:
-    """Visualize knowledge base as interactive graph."""
-    from fitz_ai.cli.commands import map as mod
-
-    mod.command(
-        output=output,
-        collection=collection,
-        no_open=no_open,
-        rebuild=rebuild,
-        similarity_threshold=similarity_threshold,
-        no_similarity_edges=no_similarity_edges,
-    )
 
 
 @app.command("serve")

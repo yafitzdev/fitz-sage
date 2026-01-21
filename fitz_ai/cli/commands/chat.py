@@ -5,7 +5,7 @@ Chat command - Conversational RAG interface.
 Usage:
     fitz chat                     # Interactive mode (prompts for collection)
     fitz chat -c my_collection    # Specify collection directly
-    fitz chat --engine clara      # Use different engine (not yet supported)
+    fitz chat --engine custom     # Use a custom engine
 """
 
 from __future__ import annotations

@@ -17,7 +17,6 @@ Usage:
 
     # For engine-specific loading, use the engine's loader:
     from fitz_ai.engines.fitz_rag.config.loader import load_config as load_rag_config
-    from fitz_ai.engines.clara.config.loader import load_clara_config
 
 Design principles:
     - Generic utilities only - no engine imports

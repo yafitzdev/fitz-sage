@@ -90,26 +90,6 @@ class FitzPaths:
         """Get vector DB path and create it if it doesn't exist."""
         return _storage.ensure_vector_db(collection)
 
-    @classmethod
-    def graphrag_storage(cls, collection: str) -> Path:
-        """GraphRAG knowledge graph storage path."""
-        return _storage.graphrag_storage(collection)
-
-    @classmethod
-    def ensure_graphrag_storage(cls) -> Path:
-        """Get graphrag directory and create it if it doesn't exist."""
-        return _storage.ensure_graphrag_storage()
-
-    @classmethod
-    def clara_storage(cls, collection: str) -> Path:
-        """CLaRA compressed representations storage path."""
-        return _storage.clara_storage(collection)
-
-    @classmethod
-    def ensure_clara_storage(cls, collection: str) -> Path:
-        """Get clara collection directory and create it if it doesn't exist."""
-        return _storage.ensure_clara_storage(collection)
-
     # Indices
     @classmethod
     def vocabulary(cls, collection: Optional[str] = None) -> Path:

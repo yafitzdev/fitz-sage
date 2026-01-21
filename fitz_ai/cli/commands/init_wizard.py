@@ -19,119 +19,11 @@ from fitz_ai.runtime import get_default_engine, get_engine_registry
 
 from .init_config import (
     copy_engine_default_config,
-    generate_clara_config,
     generate_fitz_rag_config,
     generate_global_config,
-    generate_graphrag_config,
 )
 from .init_detector import detect_system, filter_available_plugins, load_default_config
 from .init_models import get_default_model, get_default_or_first, prompt_model
-
-
-def _run_graphrag_wizard(system, non_interactive: bool) -> str:
-    """Run GraphRAG-specific configuration wizard.
-
-    Returns:
-        Generated GraphRAG config YAML string.
-    """
-    # Show detection results
-    for name, key_status in system.api_keys.items():
-        ui.status(name.capitalize(), key_status.available)
-    ui.status("Ollama", system.ollama.available)
-
-    # Build available provider lists
-    llm_providers = []
-    embedding_providers = []
-
-    if system.api_keys.get("cohere", type("", (), {"available": False})).available:
-        llm_providers.append("cohere")
-        embedding_providers.append("cohere")
-    if system.api_keys.get("openai", type("", (), {"available": False})).available:
-        llm_providers.append("openai")
-        embedding_providers.append("openai")
-    if system.api_keys.get("anthropic", type("", (), {"available": False})).available:
-        llm_providers.append("anthropic")
-    if system.ollama.available:
-        llm_providers.append("ollama")
-        embedding_providers.append("ollama")
-
-    if not llm_providers:
-        ui.error("No LLM providers available!")
-        ui.info("Set an API key (COHERE_API_KEY, OPENAI_API_KEY) or start Ollama.")
-        raise typer.Exit(1)
-
-    if not embedding_providers:
-        ui.error("No embedding providers available!")
-        ui.info("Set an API key (COHERE_API_KEY, OPENAI_API_KEY) or start Ollama.")
-        raise typer.Exit(1)
-
-    if non_interactive:
-        llm_choice = llm_providers[0]
-        embedding_choice = embedding_providers[0]
-        storage_choice = "memory"
-    else:
-        ui.section("Configuration")
-
-        llm_choice = ui.prompt_numbered_choice("LLM provider", llm_providers, llm_providers[0])
-        print()
-        embedding_choice = ui.prompt_numbered_choice(
-            "Embedding provider", embedding_providers, embedding_providers[0]
-        )
-        print()
-        storage_backends = ["memory", "file"]
-        storage_choice = ui.prompt_numbered_choice("Storage backend", storage_backends, "memory")
-
-    return generate_graphrag_config(
-        llm_provider=llm_choice,
-        embedding_provider=embedding_choice,
-        storage_backend=storage_choice,
-    )
-
-
-def _run_clara_wizard(non_interactive: bool) -> str:
-    """Run Clara-specific configuration wizard.
-
-    Returns:
-        Generated Clara config YAML string.
-    """
-    if non_interactive:
-        variant_choice = "e2e"
-        device_choice = "cuda"
-        compression_choice = 16
-    else:
-        ui.section("Configuration")
-
-        # Model variant
-        variant_descs = [
-            "e2e - Full retrieval + generation (recommended)",
-            "instruct - Instruction-tuned",
-            "base - Compression only",
-        ]
-        selected = ui.prompt_numbered_choice("Model variant", variant_descs, variant_descs[0])
-        variant_choice = selected.split(" - ")[0]
-
-        # Device
-        print()
-        devices = ["cuda", "cpu"]
-        device_choice = ui.prompt_numbered_choice("Device", devices, "cuda")
-
-        # Compression rate
-        print()
-        rate_descs = [
-            "4 - Lowest compression, highest quality",
-            "16 - Balanced (recommended)",
-            "32 - Higher compression",
-            "64 - High compression",
-            "128 - Maximum compression",
-        ]
-        selected = ui.prompt_numbered_choice("Compression rate", rate_descs, rate_descs[1])
-        compression_choice = int(selected.split(" - ")[0])
-
-    return generate_clara_config(
-        model_variant=variant_choice,
-        device=device_choice,
-        compression_rate=compression_choice,
-    )
 
 
 def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
@@ -423,22 +315,9 @@ def command(
     caps = registry.get_capabilities(default_engine)
 
     if not caps.supports_collections:
-        # Non-collection engines (GraphRAG, Clara, etc.)
+        # Non-collection engines - use default config from registry
         global_config_yaml = generate_global_config(default_engine)
-        engine_config_yaml = None
-
-        # Engine-specific wizards
-        if default_engine == "graphrag":
-            ui.section("Detecting System")
-            system = detect_system()
-            engine_config_yaml = _run_graphrag_wizard(system, non_interactive)
-
-        elif default_engine == "clara":
-            engine_config_yaml = _run_clara_wizard(non_interactive)
-
-        else:
-            # Unknown engine - copy default
-            engine_config_yaml = copy_engine_default_config(default_engine, registry)
+        engine_config_yaml = copy_engine_default_config(default_engine, registry)
 
         # Show config
         ui.section("Generated Configuration")

@@ -48,7 +48,6 @@ class Provenance:
     This should be stable and allow the source to be retrieved later.
     Format is engine-specific:
     - Fitz RAG: might be "chunk_id" or "doc_id:chunk_idx"
-    - CLaRa: might be "document_id"
     - Custom engines: whatever makes sense
     """
 

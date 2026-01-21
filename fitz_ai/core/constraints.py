@@ -39,8 +39,7 @@ class Constraints:
     Maximum number of sources to use for answer generation.
 
     For Fitz RAG: limits number of chunks retrieved
-    For CLaRa: might limit number of documents consulted
-    For other engines: interpret as makes sense
+    For custom engines: interpret as makes sense
 
     If None, engine uses its default value.
     """
@@ -57,7 +56,6 @@ class Constraints:
 
     The exact semantics are engine-specific:
     - Fitz RAG: applies as vector DB metadata filters
-    - CLaRa: might filter document corpus
     - Custom engines: define their own filter logic
 
     Engines should ignore unknown filter keys gracefully.

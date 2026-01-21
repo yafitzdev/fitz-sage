@@ -206,46 +206,6 @@ class InitService:
         with config_path.open("r", encoding="utf-8") as f:
             return f.read()
 
-    def generate_graphrag_config(
-        self,
-        llm_provider: str,
-        embedding_provider: str,
-        storage_backend: str = "memory",
-    ) -> str:
-        """Generate GraphRAG engine config."""
-        config = {
-            "llm": {
-                "provider": llm_provider,
-                "model": "gpt-4o-mini" if llm_provider == "openai" else "command-r",
-            },
-            "embeddings": {
-                "provider": embedding_provider,
-                "model": (
-                    "text-embedding-3-small"
-                    if embedding_provider == "openai"
-                    else "embed-english-v3.0"
-                ),
-            },
-            "storage": {
-                "type": storage_backend,
-            },
-        }
-        return yaml.dump(config, sort_keys=False, default_flow_style=False)
-
-    def generate_clara_config(
-        self,
-        variant: str = "e2e",
-        device: str = "cuda",
-        compression_rate: int = 16,
-    ) -> str:
-        """Generate Clara engine config."""
-        config = {
-            "variant": variant,
-            "device": device,
-            "compression_rate": compression_rate,
-        }
-        return yaml.dump(config, sort_keys=False, default_flow_style=False)
-
     def write_config(self, global_config: str, engine_config: str | None, engine_name: str) -> None:
         """Write configuration files to disk."""
         from fitz_ai.core.paths import FitzPaths

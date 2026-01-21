@@ -8,7 +8,7 @@ Usage:
     fitz query                          # Interactive mode
     fitz query "What is RAG?"           # Direct query
     fitz query -c my_collection         # Specify collection
-    fitz query --engine clara           # Use CLaRa engine
+    fitz query --engine custom          # Use a custom engine
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ def command(
     Examples:
         fitz query                         # Interactive mode
         fitz query "What is RAG?"          # Direct query
-        fitz query "question" -e clara     # Use CLaRa engine
+        fitz query "question" -e custom    # Use a custom engine
         fitz query "question" -c my_coll   # Specify collection (fitz_rag)
     """
     # =========================================================================
@@ -124,7 +124,7 @@ def command(
         _show_documents_required_message(engine, caps)
         raise typer.Exit(0)
 
-    # Engines with persistent ingest support (graphrag, clara)
+    # Engines with persistent ingest support
     if caps.supports_persistent_ingest:
         _run_persistent_ingest_query(question, collection, engine)
     # Engines with collection support use collection-based query
@@ -219,7 +219,7 @@ def _warn_if_collection_missing(collection: str, typed_config) -> None:
 def _run_persistent_ingest_query(
     question: Optional[str], collection: Optional[str], engine_name: str
 ) -> None:
-    """Run query using an engine with persistent ingest support (graphrag, clara)."""
+    """Run query using an engine with persistent ingest support."""
 
     # Get list of available collections via registry (no hardcoded imports)
     registry = get_engine_registry()

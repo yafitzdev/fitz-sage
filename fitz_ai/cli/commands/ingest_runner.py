@@ -83,8 +83,7 @@ def command(
         fitz ingest ./src -a navigation_index,interface_catalog  # Specific artifacts
         fitz ingest ./src -f         # Force re-ingest
         fitz ingest ./src -a all -y  # Non-interactive with all artifacts
-        fitz ingest ./docs -e graphrag  # Use GraphRAG engine
-        fitz ingest ./docs -e clara     # Use CLaRa engine
+        fitz ingest ./docs -e custom    # Use a custom engine
         fitz ingest "my boss likes red cars"  # Direct text ingestion
     """
     # =========================================================================

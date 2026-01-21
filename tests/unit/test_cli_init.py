@@ -313,49 +313,6 @@ class TestGenerateConfig:
         assert config["chunking"]["default"]["kwargs"]["chunk_size"] == 500
         assert config["chunking"]["default"]["kwargs"]["chunk_overlap"] == 100
 
-    def test_copy_engine_default_config_graphrag(self):
-        """Test copy_engine_default_config returns graphrag default config."""
-        pytest.importorskip("networkx", reason="networkx not installed")
-        import yaml
-
-        # Ensure graphrag is registered
-        import fitz_ai.engines.graphrag  # noqa: F401
-        from fitz_ai.cli.commands.init_config import copy_engine_default_config
-        from fitz_ai.runtime import get_engine_registry
-
-        registry = get_engine_registry()
-        config_str = copy_engine_default_config("graphrag", registry)
-
-        assert config_str is not None
-        config = yaml.safe_load(config_str)
-
-        assert "graphrag" in config
-        assert "extraction" in config["graphrag"]
-        assert "community" in config["graphrag"]
-        assert "search" in config["graphrag"]
-
-    def test_copy_engine_default_config_clara(self):
-        """Test copy_engine_default_config returns clara default config."""
-        pytest.importorskip("torch", reason="torch not installed")
-        import yaml
-
-        # Ensure clara is registered
-        import fitz_ai.engines.clara  # noqa: F401
-        from fitz_ai.cli.commands.init_config import copy_engine_default_config
-        from fitz_ai.runtime import get_engine_registry
-
-        registry = get_engine_registry()
-        config_str = copy_engine_default_config("clara", registry)
-
-        assert config_str is not None
-        config = yaml.safe_load(config_str)
-
-        assert "clara" in config
-        assert "model" in config["clara"]
-        assert "compression" in config["clara"]
-        assert "retrieval" in config["clara"]
-        assert "generation" in config["clara"]
-
 
 class TestInitValidation:
     """Tests for init validation logic."""

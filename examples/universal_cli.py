@@ -20,7 +20,7 @@ app = typer.Typer(help="Universal Fitz CLI")
 def query_command(
     question: str = typer.Argument(..., help="Question to ask"),
     engine: str = typer.Option(
-        "fitz_rag", "--engine", "-e", help="Engine to use (fitz_rag, clara, etc.)"
+        "fitz_rag", "--engine", "-e", help="Engine to use (fitz_rag, custom, etc.)"
     ),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config file"),
     max_sources: Optional[int] = typer.Option(None, "--max-sources", help="Maximum sources to use"),
@@ -33,7 +33,7 @@ def query_command(
         fitz query "What is quantum computing?"
 
         # Specific engine
-        fitz query "Explain X" --engine clara
+        fitz query "Explain X" --engine custom
 
         # With constraints
         fitz query "What is Y?" --max-sources 5

@@ -85,7 +85,6 @@ DEFAULT_LAYOUT_EXCLUDES = {
     "dist",
     "build",
     "node_modules",
-    "clara_model_cache",
 }
 
 

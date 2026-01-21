@@ -3,7 +3,7 @@
 Fitz - Local-First RAG Framework & Engine Platform
 
 Fitz is a paradigm-agnostic knowledge engine platform that supports multiple
-approaches to knowledge retrieval and synthesis (Fitz RAG, CLaRa, custom engines).
+approaches to knowledge retrieval and synthesis (Fitz RAG, custom engines).
 
 Quick Start:
     >>> from fitz import run

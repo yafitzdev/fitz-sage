@@ -18,12 +18,12 @@ Examples:
     >>> answer = run("What is quantum computing?")
 
     Specific engine:
-    >>> answer = run("Explain X", engine="clara")
+    >>> answer = run("Explain X", engine="custom")
 
     List engines:
     >>> from fitz_ai.runtime import list_engines
     >>> print(list_engines())
-    ['fitz_rag', 'clara']
+    ['fitz_rag']
 
     Create reusable engine:
     >>> from fitz_ai.runtime import create_engine
@@ -32,7 +32,7 @@ Examples:
 
     Check capabilities:
     >>> from fitz_ai.runtime import get_engine_registry
-    >>> caps = get_engine_registry().get_capabilities("clara")
+    >>> caps = get_engine_registry().get_capabilities("fitz_rag")
     >>> if caps.requires_documents_at_query:
     ...     print("This engine needs documents loaded first")
 """
