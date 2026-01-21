@@ -136,8 +136,8 @@ class IngestionPipeline:
                 f"{len(all_chunks)} chunks, {len(artifacts)} artifacts"
             )
 
-        # Embed and store chunks
-        vectors = [self.embedder.embed(c.content) for c in all_chunks]
+        # Embed and store chunks (with contextual embeddings)
+        vectors = [self.embedder.embed(self._get_embedding_text(c)) for c in all_chunks]
         self.writer.upsert(
             collection=self.collection,
             chunks=all_chunks,
@@ -159,6 +159,21 @@ class IngestionPipeline:
 
         logger.info(f"{PIPELINE} Ingestion finished, written={total_written}")
         return total_written
+
+    def _get_embedding_text(self, chunk: "Chunk") -> str:
+        """
+        Get text for embedding with contextual prefix.
+
+        Prepends the chunk summary (if available) to the content for contextual
+        embeddings. This helps disambiguate pronouns and references by providing
+        document context in the embedding.
+
+        See: Anthropic's "Contextual Retrieval" approach.
+        """
+        summary = chunk.metadata.get("summary", "")
+        if summary:
+            return f"{summary}\n\n{chunk.content}"
+        return chunk.content
 
     def _process_table_file(self, file_path: Path) -> "Chunk | None":
         """

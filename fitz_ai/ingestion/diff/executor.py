@@ -294,7 +294,7 @@ class DiffIngestExecutor:
             summary.enriched = sum(1 for c in enrich_result.chunks if c.metadata.get("summary"))
             logger.info(f"Enriched {len(all_chunks)} chunks in {enrich_time:.2f}s")
 
-        # Build texts to embed (use summary if available, otherwise content)
+        # Build texts to embed (contextual embeddings: summary + content)
         all_texts: List[str] = []
         for candidate, file_data in all_prepared:
             for chunk_data in file_data["chunk_data"]:
@@ -302,8 +302,12 @@ class DiffIngestExecutor:
                 # Get summary from chunk metadata (set by ChunkEnricher)
                 chunk_summary = chunk.metadata.get("summary")
                 chunk_data["description"] = chunk_summary
-                # Embed summary if available, otherwise content
-                text_to_embed = chunk_summary if chunk_summary else chunk.content
+                # Contextual embedding: prepend summary as context prefix
+                # See: Anthropic's "Contextual Retrieval" approach
+                if chunk_summary:
+                    text_to_embed = f"{chunk_summary}\n\n{chunk.content}"
+                else:
+                    text_to_embed = chunk.content
                 all_texts.append(text_to_embed)
 
         # Phase 1.75: Hierarchy enrichment (generates group + corpus summaries)
