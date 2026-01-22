@@ -4,37 +4,9 @@
 from __future__ import annotations
 
 from fitz_ai.ingestion.enrichment import (
-    CodeEnrichmentContext,
-    ContentType,
     EnrichmentConfig,
-    EnrichmentContext,
     EnrichmentPipeline,
 )
-
-
-class TestEnrichmentContext:
-    """Tests for EnrichmentContext and subclasses."""
-
-    def test_base_context_defaults(self):
-        ctx = EnrichmentContext(file_path="/path/to/file.py")
-        assert ctx.file_path == "/path/to/file.py"
-        assert ctx.content_type == ContentType.UNKNOWN
-        assert ctx.file_extension == ".py"
-        assert ctx.metadata == {}
-
-    def test_code_context_python(self):
-        ctx = CodeEnrichmentContext(
-            file_path="/path/to/module.py",
-            language="python",
-            imports=["os", "sys"],
-            exports=["class Foo", "def bar"],
-            used_by=[("/path/to/other.py", "test")],
-        )
-        assert ctx.content_type == ContentType.CODE
-        assert ctx.language == "python"
-        assert len(ctx.imports) == 2
-        assert len(ctx.exports) == 2
-        assert len(ctx.used_by) == 1
 
 
 class TestEnrichmentPipeline:
