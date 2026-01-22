@@ -15,6 +15,7 @@ class RewriteType(Enum):
     CONVERSATIONAL = "conversational"  # Resolved pronouns/references
     CLARITY = "clarity"  # Fixed typos, simplified
     RETRIEVAL = "retrieval"  # Optimized for retrieval
+    DECOMPOSITION = "decomposition"  # Compound query split into parts
     COMBINED = "combined"  # Multiple rewrites applied
 
 
@@ -66,6 +67,8 @@ class RewriteResult:
     confidence: float  # 0.0 to 1.0
     is_ambiguous: bool = False
     disambiguated_queries: List[str] = field(default_factory=list)
+    is_compound: bool = False
+    decomposed_queries: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -84,6 +87,11 @@ class RewriteResult:
         if self.was_rewritten:
             variations.append(self.rewritten_query)
 
+        # Add decomposed queries for compound queries (multiple topics)
+        if self.is_compound and self.decomposed_queries:
+            variations.extend(self.decomposed_queries)
+
+        # Add disambiguated queries for ambiguous queries (multiple meanings)
         if self.is_ambiguous and self.disambiguated_queries:
             variations.extend(self.disambiguated_queries)
 

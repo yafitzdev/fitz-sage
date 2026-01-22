@@ -100,8 +100,9 @@ class SemanticSearch(BaseVectorSearch):
             f"{RETRIEVER} SemanticSearch: single search, k={self.k}, collection={self.collection}"
         )
 
-        # Start with base queries from rewrite result (original + rewritten + disambiguated)
-        if rewrite_result and rewrite_result.was_rewritten:
+        # Start with base queries from rewrite result (original + rewritten + decomposed + disambiguated)
+        # Check for any variations: rewritten, compound decomposition, or ambiguity
+        if rewrite_result and len(rewrite_result.all_query_variations) > 1:
             base_queries = rewrite_result.all_query_variations
             logger.debug(
                 f"{RETRIEVER} Query rewrite: using {len(base_queries)} query variations"

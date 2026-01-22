@@ -77,16 +77,24 @@ class FreshnessStep(RetrievalStep):
         ]
     )
 
+    def _has_keyword(self, query_words: set[str], keywords: list[str]) -> bool:
+        """Check if any keyword appears as a whole word in query."""
+        return bool(query_words & set(keywords))
+
     def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
         """Apply freshness/authority adjustments based on query intent."""
         if not chunks:
             return chunks
 
-        query_lower = query.lower()
+        # Tokenize query into words for whole-word matching
+        # This avoids false positives like "now" in "know"
+        import re
 
-        # Detect intent from query keywords
-        boost_recency = any(kw in query_lower for kw in self.recency_keywords)
-        boost_authority = any(kw in query_lower for kw in self.authority_keywords)
+        query_words = set(re.findall(r"\b\w+\b", query.lower()))
+
+        # Detect intent from query keywords (whole word match only)
+        boost_recency = self._has_keyword(query_words, self.recency_keywords)
+        boost_authority = self._has_keyword(query_words, self.authority_keywords)
 
         if not boost_recency and not boost_authority:
             # No adjustment needed - pass through

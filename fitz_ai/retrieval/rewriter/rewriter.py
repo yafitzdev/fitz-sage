@@ -156,6 +156,8 @@ class QueryRewriter:
             confidence = float(result.get("confidence", 0.5))
             is_ambiguous = result.get("is_ambiguous", False)
             disambiguated = result.get("disambiguated_queries", [])
+            is_compound = result.get("is_compound", False)
+            decomposed = result.get("decomposed_queries", [])
 
             # Map rewrite type
             type_mapping = {
@@ -163,6 +165,7 @@ class QueryRewriter:
                 "conversational": RewriteType.CONVERSATIONAL,
                 "clarity": RewriteType.CLARITY,
                 "retrieval": RewriteType.RETRIEVAL,
+                "decomposition": RewriteType.DECOMPOSITION,
                 "combined": RewriteType.COMBINED,
             }
             rewrite_type = type_mapping.get(rewrite_type_str.lower(), RewriteType.NONE)
@@ -179,6 +182,8 @@ class QueryRewriter:
                 confidence=confidence,
                 is_ambiguous=is_ambiguous,
                 disambiguated_queries=disambiguated[:3],  # Limit to 3
+                is_compound=is_compound,
+                decomposed_queries=decomposed[:5],  # Limit to 5
             )
 
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
