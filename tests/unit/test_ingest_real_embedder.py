@@ -5,6 +5,8 @@ Test ingestion with the configured embedder to diagnose slowness.
 Uses local Ollama embedder from tests/test_config.yaml for fast execution.
 
 Run with: pytest tests/unit/test_ingest_real_embedder.py -v -s --log-cli-level=INFO
+
+NOTE: These tests require a running Ollama instance and are marked as integration tests.
 """
 
 import logging
@@ -16,6 +18,9 @@ import pytest
 
 from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.source.base import SourceFile
+
+# Mark all tests in this module as integration tests (require Ollama)
+pytestmark = pytest.mark.integration
 
 # Enable all logging
 logging.basicConfig(level=logging.DEBUG)

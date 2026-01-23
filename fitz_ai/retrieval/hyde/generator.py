@@ -67,9 +67,7 @@ class HydeGenerator:
             response = self.chat.chat(messages)
             hypotheses = self._parse_response(response)
 
-            logger.debug(
-                f"{RETRIEVER} HyDE: generated {len(hypotheses)} hypotheses for query"
-            )
+            logger.debug(f"{RETRIEVER} HyDE: generated {len(hypotheses)} hypotheses for query")
 
             return hypotheses
 
@@ -99,9 +97,7 @@ class HydeGenerator:
                 if isinstance(parsed, list):
                     # Filter to strings only, limit to num_hypotheses
                     hypotheses = [
-                        str(h).strip()
-                        for h in parsed
-                        if isinstance(h, str) and h.strip()
+                        str(h).strip() for h in parsed if isinstance(h, str) and h.strip()
                     ]
                     return hypotheses[: self.num_hypotheses]
 
