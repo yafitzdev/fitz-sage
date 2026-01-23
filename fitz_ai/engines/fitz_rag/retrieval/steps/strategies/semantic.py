@@ -156,11 +156,13 @@ class SemanticSearch(BaseVectorSearch):
             f"{search_queries}"
         )
 
+        # Batch embed all search queries in one API call
+        query_vectors = self._embed_batch(search_queries) if search_queries else []
+
         all_results: list[Chunk] = []
         seen_ids: set[str] = set()
 
-        for sq in search_queries:
-            query_vector = self._embed(sq)
+        for sq, query_vector in zip(search_queries, query_vectors):
             hits = self._search(query_vector)
             sub_results = self._hits_to_chunks(hits)
 

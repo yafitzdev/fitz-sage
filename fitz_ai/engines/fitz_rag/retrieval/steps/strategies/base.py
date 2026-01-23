@@ -93,6 +93,22 @@ class BaseVectorSearch(SearchStrategy):
         except Exception as exc:
             raise EmbeddingError(f"Failed to embed query: {query!r}") from exc
 
+    def _embed_batch(self, queries: list[str]) -> list[list[float]]:
+        """Embed multiple queries in a single API call for efficiency."""
+        from fitz_ai.engines.fitz_rag.exceptions import EmbeddingError
+
+        if not queries:
+            return []
+
+        try:
+            # Use batch embedding if available (reduces API round-trips)
+            if hasattr(self.embedder, "embed_batch"):
+                return self.embedder.embed_batch(queries)
+            # Fallback to sequential embedding
+            return [self.embedder.embed(q) for q in queries]
+        except Exception as exc:
+            raise EmbeddingError(f"Failed to batch embed {len(queries)} queries") from exc
+
     def _search(self, query_vector: list[float]) -> list[Any]:
         """Search vector DB."""
         from fitz_ai.engines.fitz_rag.exceptions import VectorSearchError
@@ -282,7 +298,11 @@ class BaseVectorSearch(SearchStrategy):
         return results
 
     def _expanded_search(self, query_variations: list[str]) -> list[Chunk]:
-        """Search with multiple query variations and merge with RRF."""
+        """Search with multiple query variations and merge with RRF.
+
+        Uses batch embedding to reduce API round-trips when multiple
+        query variations are provided (e.g., from synonym expansion).
+        """
         from fitz_ai.logging.logger import get_logger
         from fitz_ai.logging.tags import RETRIEVER
 
@@ -294,12 +314,14 @@ class BaseVectorSearch(SearchStrategy):
             query_vector = self._embed(query)
             return self._hybrid_search(query, query_vector)
 
+        # Batch embed all variations in one API call (major latency optimization)
+        query_vectors = self._embed_batch(query_variations)
+
         # Multiple queries - search each and merge with RRF
         rrf_scores: dict[str, float] = {}
         chunk_lookup: dict[str, Chunk] = {}
 
-        for variation in query_variations:
-            query_vector = self._embed(variation)
+        for variation, query_vector in zip(query_variations, query_vectors):
             results = self._hybrid_search(variation, query_vector)
 
             # Add RRF scores

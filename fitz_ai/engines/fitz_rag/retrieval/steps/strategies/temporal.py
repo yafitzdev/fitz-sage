@@ -53,29 +53,36 @@ class TemporalSearch(BaseVectorSearch):
         # Track which temporal references each chunk matches
         chunk_temporal_tags: dict[str, list[str]] = {}
 
+        # Collect all variations with their temporal query index for batch embedding
+        all_variations: list[tuple[int, str]] = []  # (temporal_query_idx, variation)
         for idx, tq in enumerate(temporal_queries):
-            # Expand each temporal query with synonyms/acronyms
             query_variations = self._get_query_variations(tq)
-
             for variation in query_variations:
-                query_vector = self._embed(variation)
-                results = self._hybrid_search(variation, query_vector)
+                all_variations.append((idx, variation))
 
-                # Add RRF scores
-                for rank, chunk in enumerate(results, start=1):
-                    rrf_delta = 1.0 / (self.rrf_k + rank)
-                    if chunk.id in rrf_scores:
-                        rrf_scores[chunk.id] += rrf_delta
-                    else:
-                        rrf_scores[chunk.id] = rrf_delta
-                        chunk_lookup[chunk.id] = chunk
-                        chunk_temporal_tags[chunk.id] = []
+        # Batch embed all variations in one API call
+        variation_texts = [v[1] for v in all_variations]
+        all_vectors = self._embed_batch(variation_texts) if variation_texts else []
 
-                    # Tag with temporal reference if this is a focused query
-                    if idx > 0 and idx <= len(references):
-                        ref = references[idx - 1]
-                        if ref.text not in chunk_temporal_tags.get(chunk.id, []):
-                            chunk_temporal_tags.setdefault(chunk.id, []).append(ref.text)
+        # Process each variation with its embedding
+        for (idx, variation), query_vector in zip(all_variations, all_vectors):
+            results = self._hybrid_search(variation, query_vector)
+
+            # Add RRF scores
+            for rank, chunk in enumerate(results, start=1):
+                rrf_delta = 1.0 / (self.rrf_k + rank)
+                if chunk.id in rrf_scores:
+                    rrf_scores[chunk.id] += rrf_delta
+                else:
+                    rrf_scores[chunk.id] = rrf_delta
+                    chunk_lookup[chunk.id] = chunk
+                    chunk_temporal_tags[chunk.id] = []
+
+                # Tag with temporal reference if this is a focused query
+                if idx > 0 and idx <= len(references):
+                    ref = references[idx - 1]
+                    if ref.text not in chunk_temporal_tags.get(chunk.id, []):
+                        chunk_temporal_tags.setdefault(chunk.id, []).append(ref.text)
 
         # Sort by combined RRF score
         sorted_ids = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)

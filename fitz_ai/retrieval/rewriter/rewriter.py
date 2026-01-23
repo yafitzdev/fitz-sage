@@ -8,12 +8,14 @@ Rewrites queries for:
 - Retrieval optimization (question -> statement form)
 - Ambiguity detection and disambiguation
 
-Uses a single LLM call for efficiency.
+Uses a single LLM call for efficiency. Includes heuristics to skip
+rewriting for simple queries that don't benefit from it.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -29,6 +31,25 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+# Pronouns that typically need conversation context to resolve
+_CONTEXT_PRONOUNS = re.compile(
+    r"\b(it|its|they|them|their|theirs|this|that|these|those|he|she|his|her|hers)\b",
+    re.IGNORECASE,
+)
+
+# Compound query indicators (suggest multiple topics)
+_COMPOUND_INDICATORS = re.compile(
+    r"\b(and also|as well as|along with|in addition to|plus|additionally)\b"
+    r"|\band\b.*\band\b",  # Multiple "and"s suggest compound
+    re.IGNORECASE,
+)
+
+# Simple question starters that typically don't need rewriting
+_SIMPLE_QUESTION = re.compile(
+    r"^(what|where|who|when|which|how|is|are|does|do|can|will|was|were)\s",
+    re.IGNORECASE,
+)
 
 
 def _load_prompt(name: str) -> str:
@@ -48,17 +69,66 @@ class QueryRewriter:
     3. Retrieval optimization
     4. Ambiguity detection
 
-    Uses fast-tier chat model for efficiency.
+    Uses fast-tier chat model for efficiency. Includes heuristics to skip
+    LLM calls for simple queries that don't benefit from rewriting.
     """
 
     chat: "ChatClient"
     prompt_template: str | None = field(default=None, repr=False)
     min_query_length: int = 3  # Skip rewriting for very short queries
+    max_simple_query_words: int = 15  # Queries under this word count may skip rewriting
+    max_simple_query_chars: int = 100  # Queries under this char count may skip rewriting
 
     def __post_init__(self):
         """Load default prompt template if not provided."""
         if self.prompt_template is None:
             self.prompt_template = _load_prompt("rewrite")
+
+    def _needs_rewriting(
+        self,
+        query: str,
+        context: ConversationContext | None,
+    ) -> tuple[bool, str]:
+        """
+        Fast heuristic to determine if query likely needs LLM rewriting.
+
+        Returns (needs_rewriting, reason) tuple.
+
+        Rewriting is skipped for simple queries that:
+        - Have no conversation context to resolve
+        - Are short and direct
+        - Don't contain compound indicators
+        - Don't have pronouns needing resolution
+        """
+        # Always rewrite if conversation context is provided and non-empty
+        if context and not context.is_empty():
+            return True, "has_conversation_context"
+
+        # Check for pronouns that might reference conversation context
+        if _CONTEXT_PRONOUNS.search(query):
+            return True, "has_context_pronouns"
+
+        # Check for compound query indicators
+        if _COMPOUND_INDICATORS.search(query):
+            return True, "has_compound_indicators"
+
+        # Long queries may benefit from clarity simplification
+        word_count = len(query.split())
+        if word_count > self.max_simple_query_words:
+            return True, "long_query"
+        if len(query) > self.max_simple_query_chars:
+            return True, "long_query"
+
+        # Simple question forms typically don't need rewriting
+        if _SIMPLE_QUESTION.match(query) and word_count <= self.max_simple_query_words:
+            return False, "simple_question"
+
+        # Default: skip rewriting for short, simple queries
+        if word_count <= 8:
+            return False, "short_query"
+
+        # Default to rewriting for medium-length queries
+        return True, "medium_query"
 
     def rewrite(
         self,
@@ -82,6 +152,18 @@ class QueryRewriter:
                 rewritten_query=query,
                 rewrite_type=RewriteType.NONE,
                 confidence=1.0,
+            )
+
+        # Fast heuristic check - skip LLM call for simple queries
+        needs_rewrite, reason = self._needs_rewriting(query, context)
+        if not needs_rewrite:
+            logger.debug(f"{RETRIEVER} Query rewrite skipped: {reason}")
+            return RewriteResult(
+                original_query=query,
+                rewritten_query=query,
+                rewrite_type=RewriteType.NONE,
+                confidence=1.0,
+                metadata={"skipped_reason": reason},
             )
 
         # Build prompt
