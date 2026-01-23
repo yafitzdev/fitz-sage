@@ -200,9 +200,8 @@ def build_pipeline_from_spec(
     if deps.chat is not None:
         steps = _inject_table_query_step(steps, deps)
 
-    # Auto-inject freshness step before final limit/threshold
-    # This is "always on" but only activates when query signals recency/authority intent
-    steps = _inject_freshness_step(steps, deps)
+    # NOTE: Freshness detection is now handled by the unified detection system
+    # in VectorSearchStep via DetectionOrchestrator.
 
     return steps
 
@@ -237,35 +236,6 @@ def _inject_table_query_step(
     result = steps[: vector_search_idx + 1] + [table_query_step] + steps[vector_search_idx + 1 :]
 
     logger.debug(f"{RETRIEVER} Auto-injected table_query step after vector_search")
-
-    return result
-
-
-def _inject_freshness_step(
-    steps: list[RetrievalStep],
-    deps: RetrievalDependencies,
-) -> list[RetrievalStep]:
-    """
-    Inject freshness step before limit/threshold.
-
-    Freshness boosting is "always on" but only activates when query
-    contains recency or authority intent keywords. This is baked-in
-    retrieval intelligence, not a plugin configuration.
-    """
-    from fitz_ai.engines.fitz_rag.retrieval.steps import FreshnessStep, LimitStep, ThresholdStep
-
-    # Find insertion point: before limit or threshold (whichever comes first)
-    insertion_idx = len(steps)  # Default to end
-    for i, step in enumerate(steps):
-        if isinstance(step, (LimitStep, ThresholdStep)):
-            insertion_idx = i
-            break
-
-    # Build and insert freshness step
-    freshness_step = FreshnessStep()
-    result = steps[:insertion_idx] + [freshness_step] + steps[insertion_idx:]
-
-    logger.debug(f"{RETRIEVER} Auto-injected freshness step at position {insertion_idx}")
 
     return result
 

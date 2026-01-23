@@ -186,7 +186,7 @@ class BaseVectorSearch(SearchStrategy):
         return self._sparse_index
 
     def _get_query_expander(self):
-        """Lazy-load query expander."""
+        """Lazy-load expansion detector."""
         from fitz_ai.logging.logger import get_logger
         from fitz_ai.logging.tags import RETRIEVER
 
@@ -194,12 +194,12 @@ class BaseVectorSearch(SearchStrategy):
 
         if self._query_expander is None:
             try:
-                from fitz_ai.retrieval.expansion import QueryExpander
+                from fitz_ai.retrieval.detection import ExpansionDetector
 
-                self._query_expander = QueryExpander()
-                logger.debug(f"{RETRIEVER} Query expander initialized")
+                self._query_expander = ExpansionDetector()
+                logger.debug(f"{RETRIEVER} Expansion detector initialized")
             except Exception as e:
-                logger.debug(f"{RETRIEVER} Failed to load query expander: {e}")
+                logger.debug(f"{RETRIEVER} Failed to load expansion detector: {e}")
                 self._query_expander = None
 
         return self._query_expander
@@ -211,12 +211,15 @@ class BaseVectorSearch(SearchStrategy):
 
         logger = get_logger(__name__)
 
-        expander = self._get_query_expander()
-        if expander is None:
+        detector = self._get_query_expander()
+        if detector is None:
             return [query]
 
         try:
-            return expander.expand(query)
+            result = detector.detect(query)
+            if result.detected:
+                return [query] + result.transformations
+            return [query]
         except Exception as e:
             logger.debug(f"{RETRIEVER} Query expansion failed: {e}")
             return [query]

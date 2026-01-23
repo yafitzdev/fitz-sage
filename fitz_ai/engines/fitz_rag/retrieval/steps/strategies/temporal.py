@@ -3,11 +3,24 @@
 
 from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.core.chunk import Chunk
 
 from .base import BaseVectorSearch
+
+if TYPE_CHECKING:
+    from fitz_ai.retrieval.detection import DetectionResult
+
+
+@dataclass
+class _TemporalRef:
+    """Simple temporal reference for internal use."""
+
+    text: str
+    ref_type: str
+    normalized: str | None = None
 
 
 class TemporalSearch(BaseVectorSearch):
@@ -22,9 +35,7 @@ class TemporalSearch(BaseVectorSearch):
         self,
         query: str,
         chunks: list[Chunk],
-        intent: Any,
-        references: list,
-        temporal_queries: list[str],
+        detection_result: "DetectionResult[Any]",
     ) -> list[Chunk]:
         """
         Execute search with temporal awareness.
@@ -32,9 +43,7 @@ class TemporalSearch(BaseVectorSearch):
         Args:
             query: Original query
             chunks: Pre-existing chunks
-            intent: TemporalIntent enum value
-            references: List of TemporalReference objects
-            temporal_queries: List of queries to search
+            detection_result: DetectionResult from unified detector
 
         Returns:
             Merged and temporally-aware chunks
@@ -43,6 +52,29 @@ class TemporalSearch(BaseVectorSearch):
         from fitz_ai.logging.tags import RETRIEVER
 
         logger = get_logger(__name__)
+
+        # Extract temporal data from DetectionResult
+        raw_refs = detection_result.metadata.get("references", [])
+        references = []
+        for r in raw_refs:
+            if isinstance(r, dict):
+                references.append(
+                    _TemporalRef(
+                        text=r.get("text", ""),
+                        ref_type=r.get("type", "unknown"),
+                        normalized=r.get("normalized"),
+                    )
+                )
+            elif isinstance(r, str):
+                # Handle case where LLM returns simple string references
+                references.append(
+                    _TemporalRef(text=r, ref_type="unknown", normalized=None)
+                )
+
+        # Temporal queries are in transformations (includes original as first)
+        temporal_queries = detection_result.transformations or [query]
+        if not temporal_queries:
+            temporal_queries = [query]
 
         logger.debug(f"{RETRIEVER} TemporalSearch: {len(temporal_queries)} temporal queries")
 

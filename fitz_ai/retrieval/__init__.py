@@ -3,18 +3,19 @@
 Retrieval intelligence infrastructure.
 
 This package contains query-time retrieval components:
+- detection: LLM-based query classification and dict-based expansion
 - sparse: BM25/TF-IDF sparse index for hybrid search
-- expansion: Query expansion with synonyms and acronyms
-- temporal: Temporal query detection and handling
-- aggregation: Aggregation query detection (list all, count, enumerate)
 - entity_graph: Entity-based related chunk discovery
 - vocabulary: Keyword vocabulary for exact matching
 """
 
-from fitz_ai.retrieval.aggregation import (
-    AggregationDetector,
-    AggregationIntent,
-    AggregationResult,
+from fitz_ai.retrieval.detection import (
+    AggregationType,
+    DetectionOrchestrator,
+    DetectionResult,
+    DetectionSummary,
+    ExpansionDetector,
+    TemporalIntent,
 )
 from fitz_ai.retrieval.entity_graph import EntityGraphStore
 from fitz_ai.retrieval.vocabulary import (
@@ -27,10 +28,13 @@ from fitz_ai.retrieval.vocabulary import (
 )
 
 __all__ = [
-    # Aggregation
-    "AggregationDetector",
-    "AggregationIntent",
-    "AggregationResult",
+    # Detection
+    "AggregationType",
+    "DetectionOrchestrator",
+    "DetectionResult",
+    "DetectionSummary",
+    "ExpansionDetector",
+    "TemporalIntent",
     # Entity graph
     "EntityGraphStore",
     # Vocabulary

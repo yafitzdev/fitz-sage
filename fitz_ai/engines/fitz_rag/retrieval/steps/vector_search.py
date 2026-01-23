@@ -17,9 +17,8 @@ These features are baked in - not configurable via plugins.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder, VectorClient
@@ -33,6 +32,9 @@ from .strategies import (
     SemanticSearch,
     TemporalSearch,
 )
+
+if TYPE_CHECKING:
+    from fitz_ai.retrieval.detection import DetectionOrchestrator, DetectionSummary
 
 # Check if derived collection support is available
 try:
@@ -73,17 +75,6 @@ class VectorSearchStep(RetrievalStep):
         include_derived: Include derived sentences from structured queries (default: True)
     """
 
-    # Comparison patterns
-    COMPARISON_PATTERNS: ClassVar[tuple[str, ...]] = (
-        r"\bvs\.?\b",
-        r"\bversus\b",
-        r"\bcompare[ds]?\b",
-        r"\bcomparing\b",
-        r"\bdifference\s+between\b",
-        r"\bhow\s+does\s+.+\s+compare\b",
-        r"\bwhich\s+(?:is|has|one)\s+(?:better|faster|slower|higher|lower)\b",
-    )
-
     client: VectorClient
     embedder: Embedder
     collection: str
@@ -101,9 +92,10 @@ class VectorSearchStep(RetrievalStep):
     # Conversation context for query rewriting (optional)
     conversation_context: Any | None = None
 
-    # Lazy-loaded detectors
-    _temporal_detector: Any = field(default=None, init=False, repr=False)
-    _aggregation_detector: Any = field(default=None, init=False, repr=False)
+    # Lazy-loaded unified detection orchestrator
+    _detection_orchestrator: "DetectionOrchestrator | None" = field(
+        default=None, init=False, repr=False
+    )
 
     # Lazy-loaded strategies
     _semantic_strategy: SemanticSearch | None = field(default=None, init=False, repr=False)
@@ -126,37 +118,36 @@ class VectorSearchStep(RetrievalStep):
 
         Flow:
         0. Query rewriting (conversational, clarity, retrieval optimization)
-        1. Aggregation queries → AggregationSearch
-        2. Temporal queries → TemporalSearch
-        3. Comparison queries → ComparisonSearch
-        4. Standard queries → SemanticSearch
+        1. Run unified detection
+        2. Route to specialized strategy based on detection
         """
         # Step 0: Rewrite query if rewriter is available
         rewrite_result = self._rewrite_query(query)
         effective_query = rewrite_result.rewritten_query
         self._current_rewrite = rewrite_result
 
-        # Check for aggregation query first (uses effective query)
-        aggregation_result = self._check_aggregation_query(effective_query)
-        if aggregation_result is not None:
+        # Step 1: Run unified detection
+        detection = self._get_detection_summary(effective_query)
+
+        # Step 2: Route to strategy based on detection
+        # Check aggregation first (highest priority for list/count queries)
+        if detection.has_aggregation_intent:
             strategy = self._get_aggregation_strategy()
-            return strategy.execute(effective_query, chunks, aggregation_result)
+            return strategy.execute(effective_query, chunks, detection.aggregation)
 
-        # Check for temporal query
-        temporal_result = self._check_temporal_query(effective_query)
-        if temporal_result is not None:
-            intent, references, temporal_queries = temporal_result
+        # Check temporal queries
+        if detection.has_temporal_intent:
             strategy = self._get_temporal_strategy()
-            return strategy.execute(effective_query, chunks, intent, references, temporal_queries)
+            return strategy.execute(effective_query, chunks, detection.temporal)
 
-        # Check for comparison query
-        if self.chat is not None and self._is_comparison_query(effective_query):
+        # Check comparison queries (requires chat for LLM expansion)
+        if self.chat is not None and detection.has_comparison_intent:
             strategy = self._get_comparison_strategy()
-            return strategy.execute(effective_query, chunks)
+            return strategy.execute(effective_query, chunks, detection.comparison)
 
-        # Default: semantic search (pass rewrite result for query variations)
+        # Default: semantic search (pass rewrite result and detection for enhancements)
         strategy = self._get_semantic_strategy()
-        return strategy.execute(query, chunks, rewrite_result=rewrite_result)
+        return strategy.execute(query, chunks, rewrite_result=rewrite_result, detection=detection)
 
     def _get_hyde_generator(self):
         """Lazy-load HyDE generator when chat is available."""
@@ -201,6 +192,22 @@ class VectorSearchStep(RetrievalStep):
             )
 
         return rewriter.rewrite(query, self.conversation_context)
+
+    def _get_detection_orchestrator(self) -> "DetectionOrchestrator":
+        """Lazy-load the unified detection orchestrator with LLM classification."""
+        if self._detection_orchestrator is None:
+            from fitz_ai.retrieval.detection import DetectionOrchestrator
+
+            # Pass chat client for LLM-based detection
+            self._detection_orchestrator = DetectionOrchestrator(chat_client=self.chat)
+            logger.debug(f"{RETRIEVER} Detection orchestrator initialized (LLM: {self.chat is not None})")
+
+        return self._detection_orchestrator
+
+    def _get_detection_summary(self, query: str) -> "DetectionSummary":
+        """Run unified detection on the query."""
+        orchestrator = self._get_detection_orchestrator()
+        return orchestrator.detect_for_retrieval(query)
 
     def _get_semantic_strategy(self) -> SemanticSearch:
         """Lazy-load semantic search strategy."""
@@ -275,93 +282,6 @@ class VectorSearchStep(RetrievalStep):
                 include_derived=self.include_derived,
             )
         return self._comparison_strategy
-
-    def _is_comparison_query(self, query: str) -> bool:
-        """Detect if query is asking for a comparison."""
-        query_lower = query.lower()
-        for pattern in self.COMPARISON_PATTERNS:
-            if re.search(pattern, query_lower):
-                return True
-        return False
-
-    def _get_temporal_detector(self):
-        """Lazy-load temporal detector."""
-        if self._temporal_detector is None:
-            try:
-                from fitz_ai.retrieval.temporal import TemporalDetector
-
-                self._temporal_detector = TemporalDetector()
-                logger.debug(f"{RETRIEVER} Temporal detector initialized")
-            except Exception as e:
-                logger.debug(f"{RETRIEVER} Failed to load temporal detector: {e}")
-                self._temporal_detector = None
-
-        return self._temporal_detector
-
-    def _check_temporal_query(self, query: str):
-        """Check if query has temporal intent."""
-        detector = self._get_temporal_detector()
-        if detector is None:
-            return None
-
-        try:
-            from fitz_ai.retrieval.temporal import TemporalIntent
-
-            intent, references = detector.detect(query)
-
-            if intent == TemporalIntent.NONE:
-                return None
-
-            # Generate sub-queries for temporal coverage
-            temporal_queries = detector.generate_temporal_queries(query, intent, references)
-
-            logger.debug(
-                f"{RETRIEVER} Temporal query detected: intent={intent.value}, "
-                f"refs={[r.text for r in references]}, queries={len(temporal_queries)}"
-            )
-
-            return intent, references, temporal_queries
-
-        except Exception as e:
-            logger.debug(f"{RETRIEVER} Temporal detection failed: {e}")
-            return None
-
-    def _get_aggregation_detector(self):
-        """Lazy-load aggregation detector."""
-        if self._aggregation_detector is None:
-            try:
-                from fitz_ai.retrieval.aggregation import AggregationDetector
-
-                self._aggregation_detector = AggregationDetector()
-                logger.debug(f"{RETRIEVER} Aggregation detector initialized")
-            except Exception as e:
-                logger.debug(f"{RETRIEVER} Failed to load aggregation detector: {e}")
-                self._aggregation_detector = None
-
-        return self._aggregation_detector
-
-    def _check_aggregation_query(self, query: str):
-        """Check if query has aggregation intent."""
-        detector = self._get_aggregation_detector()
-        if detector is None:
-            return None
-
-        try:
-            result = detector.detect(query)
-
-            if not result.detected:
-                return None
-
-            logger.debug(
-                f"{RETRIEVER} Aggregation query detected: type={result.intent.type.name}, "
-                f"target='{result.intent.target}', multiplier={result.fetch_multiplier}"
-            )
-
-            return result
-
-        except Exception as e:
-            logger.debug(f"{RETRIEVER} Aggregation detection failed: {e}")
-            return None
 
     # -------------------------------------------------------------------------
     # Test compatibility methods - delegate to strategies

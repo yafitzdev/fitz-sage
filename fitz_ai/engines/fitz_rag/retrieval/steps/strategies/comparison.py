@@ -3,11 +3,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder, VectorClient
 from fitz_ai.engines.fitz_rag.retrieval.steps.utils import parse_json_list
 
 from .base import BaseVectorSearch
+
+if TYPE_CHECKING:
+    from fitz_ai.retrieval.detection import DetectionResult
 
 
 class ComparisonSearch(BaseVectorSearch):
@@ -42,7 +47,12 @@ class ComparisonSearch(BaseVectorSearch):
         self.chat = chat
         self.max_queries = max_queries
 
-    def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
+    def execute(
+        self,
+        query: str,
+        chunks: list[Chunk],
+        detection_result: "DetectionResult[Any] | None" = None,
+    ) -> list[Chunk]:
         """Handle comparison queries by ensuring both entities are retrieved."""
         from fitz_ai.logging.logger import get_logger
         from fitz_ai.logging.tags import RETRIEVER

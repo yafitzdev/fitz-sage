@@ -3,11 +3,14 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.core.chunk import Chunk
 
 from .base import BaseVectorSearch
+
+if TYPE_CHECKING:
+    from fitz_ai.retrieval.detection import DetectionResult
 
 
 class AggregationSearch(BaseVectorSearch):
@@ -18,14 +21,16 @@ class AggregationSearch(BaseVectorSearch):
     coverage by fetching more results and using multiple variations.
     """
 
-    def execute(self, query: str, chunks: list[Chunk], aggregation_result: Any) -> list[Chunk]:
+    def execute(
+        self, query: str, chunks: list[Chunk], detection_result: "DetectionResult[Any]"
+    ) -> list[Chunk]:
         """
         Execute search optimized for aggregation queries.
 
         Args:
             query: Original query
             chunks: Pre-existing chunks
-            aggregation_result: AggregationResult from detector
+            detection_result: DetectionResult from unified detector
 
         Returns:
             Comprehensive set of chunks for aggregation
@@ -35,14 +40,17 @@ class AggregationSearch(BaseVectorSearch):
 
         logger = get_logger(__name__)
 
+        # Extract aggregation metadata from DetectionResult
+        fetch_multiplier = detection_result.metadata.get("fetch_multiplier", 3)
+        target = detection_result.metadata.get("target", "items")
+        augmented_query = detection_result.metadata.get("augmented_query")
+        agg_type_name = detection_result.intent.name if detection_result.intent else "LIST"
+
         # Calculate expanded k for comprehensive coverage
         base_k = self.k
-        expanded_k = base_k * aggregation_result.fetch_multiplier
+        expanded_k = base_k * fetch_multiplier
 
-        logger.debug(
-            f"{RETRIEVER} AggregationSearch: k={base_k}→{expanded_k}, "
-            f"target='{aggregation_result.intent.target}'"
-        )
+        logger.debug(f"{RETRIEVER} AggregationSearch: k={base_k}→{expanded_k}, target='{target}'")
 
         # Temporarily increase k for this search
         original_k = self.k
@@ -50,7 +58,7 @@ class AggregationSearch(BaseVectorSearch):
 
         try:
             # Use augmented query for better retrieval
-            search_query = aggregation_result.augmented_query or query
+            search_query = augmented_query or query
 
             # Get query variations (synonyms, acronyms)
             query_variations = self._get_query_variations(search_query)
@@ -84,8 +92,8 @@ class AggregationSearch(BaseVectorSearch):
 
             # Tag results with aggregation metadata
             for chunk in results:
-                chunk.metadata["aggregation_type"] = aggregation_result.intent.type.name
-                chunk.metadata["aggregation_target"] = aggregation_result.intent.target
+                chunk.metadata["aggregation_type"] = agg_type_name
+                chunk.metadata["aggregation_target"] = target
 
             logger.debug(
                 f"{RETRIEVER} AggregationSearch: {len(query_variations)} variations → "

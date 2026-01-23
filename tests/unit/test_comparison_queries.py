@@ -1,9 +1,9 @@
-# tests/test_comparison_queries.py
+# tests/unit/test_comparison_queries.py
 """
-Tests for comparison query handling in VectorSearchStep.
+Tests for comparison query handling.
 
-Comparison queries (e.g., "CAN vs SPI") are detected by pattern matching
-and expanded via LLM to ensure both compared entities are retrieved.
+Comparison queries are detected by LLM classification and expanded
+via LLM to ensure both compared entities are retrieved.
 """
 
 import json
@@ -13,45 +13,68 @@ import pytest
 
 from fitz_ai.engines.fitz_rag.retrieval.steps.strategies.comparison import ComparisonSearch
 from fitz_ai.engines.fitz_rag.retrieval.steps.vector_search import VectorSearchStep
+from fitz_ai.retrieval.detection import DetectionOrchestrator
 
 
 class TestComparisonDetection:
-    """Test comparison pattern detection."""
+    """Test comparison detection via LLM classification."""
 
     @pytest.fixture
-    def step(self):
-        """Create a step with mock dependencies."""
-        return VectorSearchStep(
-            client=MagicMock(),
-            embedder=MagicMock(),
-            collection="test",
-            chat=MagicMock(),
+    def mock_chat(self):
+        """Create a mock chat client that returns comparison detection."""
+        mock = MagicMock()
+        return mock
+
+    def test_comparison_detected_with_llm(self, mock_chat):
+        """Test that LLM classification detects comparison queries."""
+        # LLM returns classification with comparison detected
+        mock_chat.chat.return_value = json.dumps(
+            {
+                "temporal": {"detected": False},
+                "aggregation": {"detected": False},
+                "comparison": {
+                    "detected": True,
+                    "entities": ["CAN", "SPI"],
+                    "comparison_queries": ["CAN protocol", "SPI protocol", "CAN vs SPI"],
+                },
+                "freshness": {"boost_recency": False, "boost_authority": False},
+                "rewriter": {"needs_context": False, "is_compound": False},
+            }
         )
 
-    @pytest.mark.parametrize(
-        "query,expected",
-        [
-            # Should detect as comparison
-            ("CAN vs SPI", True),
-            ("CAN vs. SPI", True),
-            ("CAN versus SPI", True),
-            ("Compare CAN and SPI", True),
-            ("compared to the previous version", True),
-            ("difference between v2.3.0 and v2.3.1", True),
-            ("How does module A compare to module B?", True),
-            ("which has lower latency", True),
-            ("which is better for real-time", True),
-            # Should NOT detect as comparison
-            ("What is CAN?", False),
-            ("Tell me about SPI protocol", False),
-            ("CAN bus error handling", False),
-            ("The module comparison report", False),  # "comparison" as noun, not verb
-            ("version 2.3.0 release notes", False),
-        ],
-    )
-    def test_comparison_detection(self, step, query, expected):
-        """Test that comparison patterns are correctly detected."""
-        assert step._is_comparison_query(query) == expected
+        orchestrator = DetectionOrchestrator(chat_client=mock_chat)
+        summary = orchestrator.detect_for_retrieval("CAN vs SPI")
+
+        assert summary.has_comparison_intent
+        assert summary.comparison_entities == ["CAN", "SPI"]
+        assert "CAN protocol" in summary.comparison_queries
+
+    def test_comparison_not_detected_for_regular_query(self, mock_chat):
+        """Test that regular queries don't trigger comparison detection."""
+        mock_chat.chat.return_value = json.dumps(
+            {
+                "temporal": {"detected": False},
+                "aggregation": {"detected": False},
+                "comparison": {"detected": False, "entities": [], "comparison_queries": []},
+                "freshness": {"boost_recency": False, "boost_authority": False},
+                "rewriter": {"needs_context": False, "is_compound": False},
+            }
+        )
+
+        orchestrator = DetectionOrchestrator(chat_client=mock_chat)
+        summary = orchestrator.detect_for_retrieval("What is CAN?")
+
+        assert not summary.has_comparison_intent
+
+    def test_detection_without_chat_client(self):
+        """Test that detection without chat client skips LLM classification."""
+        orchestrator = DetectionOrchestrator(chat_client=None)
+        summary = orchestrator.detect_for_retrieval("CAN vs SPI")
+
+        # Without chat client, no LLM classification happens
+        assert not summary.has_comparison_intent
+        assert not summary.has_temporal_intent
+        assert not summary.has_aggregation_intent
 
 
 class TestComparisonExpansion:
@@ -214,17 +237,6 @@ class TestComparisonSearchIntegration:
             k=10,
         )
 
-    def test_comparison_search_retrieves_both_entities(self, step_with_full_mocks):
-        """Test that comparison search retrieves chunks for both entities."""
-        chunks = step_with_full_mocks.execute("CAN vs SPI", [])
-
-        # Should retrieve chunks (deduplication may reduce count)
-        # Mock setup returns same hit for both searches, so dedupe leaves 1
-        assert len(chunks) >= 1
-        # At least one should contain relevant content
-        contents = [c.content for c in chunks]
-        assert any("CAN" in c or "protocol" in c for c in contents)
-
     def test_comparison_search_deduplicates_results(self):
         """Test that comparison search deduplicates results across queries."""
         mock_chat = MagicMock()
@@ -237,6 +249,7 @@ class TestComparisonSearchIntegration:
 
         mock_embedder = MagicMock()
         mock_embedder.embed.return_value = [1.0, 0.0, 0.0]
+        mock_embedder.embed_batch.return_value = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 
         # Same chunk returned by both searches
         mock_hit = MagicMock()
@@ -247,7 +260,7 @@ class TestComparisonSearchIntegration:
         mock_client = MagicMock()
         mock_client.search.return_value = [mock_hit]  # Same result for both
 
-        step = VectorSearchStep(
+        strategy = ComparisonSearch(
             client=mock_client,
             embedder=mock_embedder,
             collection="test",
@@ -255,92 +268,74 @@ class TestComparisonSearchIntegration:
             k=10,
         )
 
-        chunks = step.execute("A vs B", [])
+        # Execute comparison search
+        chunks = strategy.execute("A vs B", [])
 
         # Should deduplicate - only 1 chunk even though searched twice
         assert len(chunks) == 1
 
-    def test_comparison_bypasses_length_threshold(self):
-        """Test that comparison detection bypasses min_query_length."""
+
+class TestLLMClassifier:
+    """Test the LLM classifier directly."""
+
+    def test_classifier_parses_json_response(self):
+        """Test that classifier parses valid JSON responses."""
+        from fitz_ai.retrieval.detection.llm_classifier import LLMClassifier
+
         mock_chat = MagicMock()
         mock_chat.chat.return_value = json.dumps(
             {
-                "entities": ["A", "B"],
-                "queries": ["A info", "B info"],
+                "temporal": {"detected": True, "intent": "COMPARISON"},
+                "aggregation": {"detected": False},
+                "comparison": {"detected": True, "entities": ["A", "B"]},
+                "freshness": {"boost_recency": True, "boost_authority": False},
+                "rewriter": {"needs_context": False, "is_compound": False},
             }
         )
 
-        mock_embedder = MagicMock()
-        mock_embedder.embed.return_value = [1.0, 0.0, 0.0]
+        classifier = LLMClassifier(chat_client=mock_chat)
+        result = classifier.classify("A vs B from last month")
 
-        mock_hit = MagicMock()
-        mock_hit.id = "chunk1"
-        mock_hit.score = 0.9
-        mock_hit.payload = {"content": "test", "source": "doc"}
+        assert result["temporal"]["detected"] is True
+        assert result["comparison"]["detected"] is True
+        assert result["freshness"]["boost_recency"] is True
 
-        mock_client = MagicMock()
-        mock_client.search.return_value = [mock_hit]
+    def test_classifier_handles_markdown_code_blocks(self):
+        """Test that classifier extracts JSON from markdown code blocks."""
+        from fitz_ai.retrieval.detection.llm_classifier import LLMClassifier
 
-        step = VectorSearchStep(
-            client=mock_client,
-            embedder=mock_embedder,
-            collection="test",
-            chat=mock_chat,
-            k=10,
-            min_query_length=1000,  # Very high threshold
-        )
-
-        # Short query that matches comparison pattern
-        short_query = "A vs B"  # Only 6 chars, way below 1000
-        assert len(short_query) < step.min_query_length
-
-        # Should still trigger comparison search, not single search
-        chunks = step.execute(short_query, [])
-
-        # Should return results (comparison logic may or may not call chat depending on implementation)
-        assert chunks is not None
-        assert isinstance(chunks, list)
-
-
-class TestComparisonNoChat:
-    """Test behavior when chat client is not available."""
-
-    def test_comparison_detection_works_without_chat(self):
-        """Test that comparison pattern detection works regardless of chat presence.
-
-        The _is_comparison_query() method should still detect comparison patterns
-        even when chat is None. However, the actual comparison expansion requires
-        chat, so VectorSearchStep.execute() checks for chat before using
-        ComparisonSearch strategy.
-        """
-        step = VectorSearchStep(
-            client=MagicMock(),
-            embedder=MagicMock(),
-            collection="test",
-            chat=None,  # No chat client
-            k=10,
-        )
-
-        # Pattern detection should work regardless of chat
-        assert step._is_comparison_query("CAN vs SPI")
-        assert step._is_comparison_query("Compare module A and module B")
-        assert step._is_comparison_query("What is the difference between v1 and v2?")
-        assert not step._is_comparison_query("What is CAN protocol?")
-
-    def test_comparison_strategy_requires_chat(self):
-        """Test that ComparisonSearch requires chat for query expansion."""
-        # ComparisonSearch requires chat and will use it for expansion
         mock_chat = MagicMock()
-        mock_chat.chat.return_value = '{"entities": ["A", "B"], "queries": ["A info", "B info"]}'
+        mock_chat.chat.return_value = """Here's the classification:
 
-        strategy = ComparisonSearch(
-            client=MagicMock(),
-            embedder=MagicMock(),
-            collection="test",
-            chat=mock_chat,
-        )
+```json
+{
+    "temporal": {"detected": false},
+    "aggregation": {"detected": true, "type": "LIST"},
+    "comparison": {"detected": false},
+    "freshness": {"boost_recency": false, "boost_authority": false},
+    "rewriter": {"needs_context": false, "is_compound": false}
+}
+```
 
-        # Expansion should call the chat client
-        queries = strategy._expand_comparison_query("A vs B")
-        assert mock_chat.chat.called
-        assert len(queries) >= 1
+The query is asking for a list."""
+
+        classifier = LLMClassifier(chat_client=mock_chat)
+        result = classifier.classify("list all test cases")
+
+        assert result["aggregation"]["detected"] is True
+        assert result["aggregation"]["type"] == "LIST"
+
+    def test_classifier_returns_empty_on_failure(self):
+        """Test that classifier returns empty result on parse failure."""
+        from fitz_ai.retrieval.detection.llm_classifier import LLMClassifier
+
+        mock_chat = MagicMock()
+        mock_chat.chat.return_value = "This is not valid JSON at all"
+
+        classifier = LLMClassifier(chat_client=mock_chat)
+        result = classifier.classify("some query")
+
+        # Should return empty classification
+        assert result["temporal"]["detected"] is False
+        assert result["aggregation"]["detected"] is False
+        assert result["comparison"]["detected"] is False

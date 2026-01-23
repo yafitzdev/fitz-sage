@@ -12,6 +12,7 @@ from fitz_ai.engines.fitz_rag.retrieval.steps.utils import parse_json_list
 from .base import BaseVectorSearch
 
 if TYPE_CHECKING:
+    from fitz_ai.retrieval.detection import DetectionSummary
     from fitz_ai.retrieval.hyde import HydeGenerator
     from fitz_ai.retrieval.rewriter.types import RewriteResult
 
@@ -61,6 +62,7 @@ class SemanticSearch(BaseVectorSearch):
         query: str,
         chunks: list[Chunk],
         rewrite_result: "RewriteResult | None" = None,
+        detection: "DetectionSummary | None" = None,
     ) -> list[Chunk]:
         """Execute semantic search with optional multi-query expansion."""
         from fitz_ai.logging.logger import get_logger
