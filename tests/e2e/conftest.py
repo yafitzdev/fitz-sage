@@ -6,7 +6,7 @@ Provides the E2E runner as a session-scoped fixture that handles
 setup (ingestion) and teardown (collection cleanup) automatically.
 
 Configuration:
-- LLM/embedding config is loaded from tests/e2e/e2e_config.yaml
+- All tests use tests/test_config.yaml (same as unit, load, etc.)
 - FitzPaths workspace is set to project root for vocabulary/entity graph storage
 
 Tiered Execution:
@@ -28,7 +28,7 @@ from .scenarios import SCENARIOS, TestScenario
 
 # Set workspace to project root so FitzPaths finds storage paths
 # (vocabulary, entity graph, table cache, etc.)
-# Note: LLM config is now loaded from tests/e2e/e2e_config.yaml, not .fitz/config/
+# Note: LLM config is loaded from tests/test_config.yaml, not .fitz/config/
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 

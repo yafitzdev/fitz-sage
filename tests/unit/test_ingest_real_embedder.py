@@ -1,8 +1,10 @@
-# tests/test_ingest_real_embedder.py
+# tests/unit/test_ingest_real_embedder.py
 """
-Test ingestion with the REAL Cohere embedder to diagnose slowness.
+Test ingestion with the configured embedder to diagnose slowness.
 
-Run with: pytest tests/test_ingest_real_embedder.py -v -s --log-cli-level=INFO
+Uses local Ollama embedder from tests/test_config.yaml for fast execution.
+
+Run with: pytest tests/unit/test_ingest_real_embedder.py -v -s --log-cli-level=INFO
 """
 
 import logging
@@ -70,27 +72,21 @@ def test_files(tmp_path: Path):
     return tmp_path, files
 
 
-def test_with_real_cohere_embedder(tmp_path: Path, test_files):
+def test_with_real_embedder(tmp_path: Path, test_files):
     """
-    Test with the REAL Cohere embedder.
+    Test with the configured embedder from test_config.yaml.
 
-    Run: pytest tests/test_ingest_real_embedder.py::test_with_real_cohere_embedder -v -s --log-cli-level=INFO
+    Run: pytest tests/unit/test_ingest_real_embedder.py::test_with_real_embedder -v -s --log-cli-level=INFO
     """
-    import os
-
     from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
     from fitz_ai.ingestion.chunking.router import ChunkingRouter
     from fitz_ai.ingestion.diff.executor import DiffIngestExecutor
     from fitz_ai.ingestion.state import IngestStateManager
 
-    # Check for API key
-    if not os.environ.get("COHERE_API_KEY"):
-        pytest.skip("COHERE_API_KEY not set - skipping real API test")
-
     source_path, files = test_files
 
     print(f"\n{'=' * 70}")
-    print(f"TEST: Real Cohere embedder with {len(files)} files")
+    print(f"TEST: Real embedder with {len(files)} files")
     print(f"{'=' * 70}\n")
 
     # Setup
@@ -104,16 +100,12 @@ def test_with_real_cohere_embedder(tmp_path: Path, test_files):
         warn_on_fallback=False,
     )
 
-    # Get REAL Cohere embedder
-    from fitz_ai.llm.registry import get_llm_plugin
+    # Get embedder from test config (local Ollama by default)
+    from tests.conftest import get_test_embedder
 
-    print("[TEST] Creating real Cohere embedder...")
+    print("[TEST] Creating embedder from test config...")
     t0 = time.perf_counter()
-    embedder = get_llm_plugin(
-        plugin_type="embedding",
-        plugin_name="cohere",
-        model="embed-english-v3.0",
-    )
+    embedder = get_test_embedder()
     print(f"[TEST] Embedder created in {time.perf_counter() - t0:.2f}s")
 
     writer = TracingVectorDBWriter()
@@ -126,7 +118,7 @@ def test_with_real_cohere_embedder(tmp_path: Path, test_files):
         parser_router=parser_router,
         chunking_router=router,
         collection="test_collection",
-        embedding_id="cohere:embed-english-v3.0",
+        embedding_id="local_ollama:nomic-embed-text",
     )
 
     # Run ingestion
@@ -150,24 +142,15 @@ def test_embedder_batch_directly(tmp_path: Path):
     """
     Test the embedder's embed_batch directly to isolate the issue.
 
-    Run: pytest tests/test_ingest_real_embedder.py::test_embedder_batch_directly -v -s --log-cli-level=INFO
+    Run: pytest tests/unit/test_ingest_real_embedder.py::test_embedder_batch_directly -v -s --log-cli-level=INFO
     """
-    import os
-
-    if not os.environ.get("COHERE_API_KEY"):
-        pytest.skip("COHERE_API_KEY not set")
-
-    from fitz_ai.llm.registry import get_llm_plugin
+    from tests.conftest import get_test_embedder
 
     print(f"\n{'=' * 70}")
     print("TEST: Direct embed_batch() call")
     print(f"{'=' * 70}\n")
 
-    embedder = get_llm_plugin(
-        plugin_type="embedding",
-        plugin_name="cohere",
-        model="embed-english-v3.0",
-    )
+    embedder = get_test_embedder()
 
     # Create test texts
     texts = [f"This is test document number {i}. " * 20 for i in range(50)]
@@ -196,24 +179,15 @@ def test_embedder_single_vs_batch(tmp_path: Path):
     """
     Compare single embed() vs embed_batch() to verify batching helps.
 
-    Run: pytest tests/test_ingest_real_embedder.py::test_embedder_single_vs_batch -v -s --log-cli-level=INFO
+    Run: pytest tests/unit/test_ingest_real_embedder.py::test_embedder_single_vs_batch -v -s --log-cli-level=INFO
     """
-    import os
-
-    if not os.environ.get("COHERE_API_KEY"):
-        pytest.skip("COHERE_API_KEY not set")
-
-    from fitz_ai.llm.registry import get_llm_plugin
+    from tests.conftest import get_test_embedder
 
     print(f"\n{'=' * 70}")
     print("TEST: Single embed() vs embed_batch()")
     print(f"{'=' * 70}\n")
 
-    embedder = get_llm_plugin(
-        plugin_type="embedding",
-        plugin_name="cohere",
-        model="embed-english-v3.0",
-    )
+    embedder = get_test_embedder()
 
     texts = [f"Test document {i}. " * 10 for i in range(10)]
 

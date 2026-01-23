@@ -206,7 +206,7 @@ class E2ERunner:
         Set up the test environment.
 
         Creates collection, ingests fixtures, builds pipeline.
-        Uses e2e_config.yaml for test-specific configuration.
+        Uses tests/test_config.yaml (same as all other tests).
 
         Args:
             tier_name: Which tier to initialize with (default: first tier)
@@ -235,24 +235,24 @@ class E2ERunner:
 
         start_time = time.time()
 
-        # Load e2e test config
+        # Load test config (same as all other tests)
         e2e_config = load_e2e_config()
         tier_names = get_tier_names(e2e_config)
         tier_name = tier_name or tier_names[0]  # Default to first tier
 
-        logger.info(f"E2E Setup: Using e2e_config.yaml (tier: {tier_name})")
+        logger.info(f"E2E Setup: Using test_config.yaml (tier: {tier_name})")
         logger.info(f"E2E Setup: Available tiers: {tier_names}")
 
-        # Get tier-specific config
+        # Get tier-specific config (returns nested structure for compatibility)
         tier_config = get_tier_config(tier_name, e2e_config)
 
-        # Get plugin names from config
+        # Get plugin names from tier config
         chat_plugin = tier_config["chat"]["plugin_name"]
         chat_kwargs = tier_config["chat"].get("kwargs", {})
-        embedding_plugin = e2e_config["embedding"]["plugin_name"]
-        embedding_kwargs = e2e_config["embedding"].get("kwargs", {})
-        vector_db_plugin = e2e_config["vector_db"]["plugin_name"]
-        vector_db_kwargs = e2e_config["vector_db"].get("kwargs", {})
+        embedding_plugin = tier_config["embedding"]["plugin_name"]
+        embedding_kwargs = tier_config["embedding"].get("kwargs", {})
+        vector_db_plugin = tier_config["vector_db"]["plugin_name"]
+        vector_db_kwargs = tier_config["vector_db"].get("kwargs", {})
 
         logger.info(
             f"E2E Setup: Using chat={chat_plugin}, embedding={embedding_plugin}, vector_db={vector_db_plugin}"
@@ -423,10 +423,10 @@ class E2ERunner:
         from fitz_ai.vector_db.registry import get_vector_db_plugin
 
         try:
-            # Need vector client to delete collection - use e2e config
-            e2e_config = load_e2e_config()
-            vector_db_plugin = e2e_config["vector_db"]["plugin_name"]
-            vector_db_kwargs = e2e_config["vector_db"].get("kwargs", {})
+            # Need vector client to delete collection - use test config
+            config = load_e2e_config()
+            vector_db_plugin = config["vector_db"]
+            vector_db_kwargs = config.get("vector_db_kwargs", {})
 
             temp_client = get_vector_db_plugin(vector_db_plugin, **vector_db_kwargs)
 

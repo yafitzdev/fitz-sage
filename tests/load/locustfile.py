@@ -59,25 +59,23 @@ class DirectRAGUser(User):
             project_root = Path(__file__).parent.parent.parent
             FitzPaths.set_workspace(project_root / ".fitz")
 
-            # Load e2e config for consistent setup
-            e2e_config_path = project_root / "tests" / "e2e" / "e2e_config.yaml"
+            # Load test config (same as all other tests)
+            from tests.conftest import load_test_config
 
-            import yaml
-
-            with open(e2e_config_path) as f:
-                e2e_config = yaml.safe_load(f)
+            test_config = load_test_config()
 
             # Use first tier (local) for load testing
-            tier = e2e_config["tiers"][0]
+            tier = test_config["tiers"][0]
             config_dict = {
                 "chat": tier["chat"],
-                "embedding": e2e_config["embedding"],
-                "vector_db": e2e_config["vector_db"],
-                "retrieval": {
-                    "plugin_name": "dense",
-                    "collection": "e2e_test_collection",
-                    "top_k": 20,
-                },
+                "embedding": test_config["embedding"],
+                "vector_db": test_config["vector_db"],
+                "chat_kwargs": tier.get("chat_kwargs", {}),
+                "embedding_kwargs": test_config.get("embedding_kwargs", {}),
+                "vector_db_kwargs": test_config.get("vector_db_kwargs", {}),
+                "retrieval_plugin": "dense",
+                "collection": "e2e_test_collection",
+                "top_k": 20,
             }
 
             cfg = FitzRagConfig(**config_dict)

@@ -1,26 +1,25 @@
 # tests/e2e/config.py
-"""E2E test configuration loader."""
+"""E2E test configuration loader.
+
+Uses the centralized tests/test_config.yaml (same as all other tests).
+"""
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-import yaml
-
-E2E_CONFIG_PATH = Path(__file__).parent / "e2e_config.yaml"
+from tests.conftest import load_test_config
 
 
 def load_e2e_config() -> dict[str, Any]:
-    """Load e2e test configuration."""
-    with open(E2E_CONFIG_PATH) as f:
-        return yaml.safe_load(f)
+    """Load test configuration (same as all other tests)."""
+    return load_test_config()
 
 
 def get_tier_names(config: dict[str, Any] | None = None) -> list[str]:
     """Get list of tier names in order."""
     if config is None:
-        config = load_e2e_config()
+        config = load_test_config()
     return [tier["name"] for tier in config.get("tiers", [])]
 
 
@@ -30,13 +29,13 @@ def get_tier_config(tier_name: str, base_config: dict[str, Any] | None = None) -
 
     Args:
         tier_name: Name of the tier (e.g., "local", "cloud")
-        base_config: Base e2e config (loaded if not provided)
+        base_config: Base config (loaded if not provided)
 
     Returns:
-        Complete config dict ready for FitzRagConfig(**config_dict)
+        Config dict with chat/embedding/vector_db settings for the tier
     """
     if base_config is None:
-        base_config = load_e2e_config()
+        base_config = load_test_config()
 
     tiers = base_config.get("tiers", [])
     tier = next((t for t in tiers if t["name"] == tier_name), None)
@@ -44,19 +43,19 @@ def get_tier_config(tier_name: str, base_config: dict[str, Any] | None = None) -
         available = [t["name"] for t in tiers]
         raise ValueError(f"Unknown tier: {tier_name}. Available: {available}")
 
+    # Build tier config matching the expected structure
     return {
-        "chat": tier["chat"],
-        "embedding": base_config["embedding"],
-        "vector_db": base_config["vector_db"],
-        "retrieval": {
-            "plugin_name": "dense",
-            "collection": None,  # Set by runner
-            "top_k": 20,
+        "chat": {
+            "plugin_name": tier["chat"],
+            "kwargs": tier.get("chat_kwargs", {}),
         },
-        "multihop": {"max_hops": 2},
-        "rgs": {
-            "strict_grounding": False,
-            "max_chunks": 50,
+        "embedding": {
+            "plugin_name": base_config["embedding"],
+            "kwargs": base_config.get("embedding_kwargs", {}),
+        },
+        "vector_db": {
+            "plugin_name": base_config["vector_db"],
+            "kwargs": base_config.get("vector_db_kwargs", {}),
         },
     }
 
@@ -64,5 +63,5 @@ def get_tier_config(tier_name: str, base_config: dict[str, Any] | None = None) -
 def get_cache_config(config: dict[str, Any] | None = None) -> dict[str, Any]:
     """Get cache configuration."""
     if config is None:
-        config = load_e2e_config()
+        config = load_test_config()
     return config.get("cache", {"enabled": False, "max_entries": 1000, "ttl_days": 30})

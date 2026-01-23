@@ -38,14 +38,15 @@ pytest --cov=fitz_ai --cov-report=html
 
 ```
 tests/
+├── test_config.yaml      # Unified test config (all tests use this)
+├── conftest.py           # Root fixtures and config loaders
 ├── unit/                 # Fast, isolated unit tests (~80 files)
 │   ├── test_*.py         # Component/function tests
 │   └── tabular/          # Tabular data processing tests
 ├── e2e/                  # End-to-end correctness tests
 │   ├── fixtures/         # Test documents (md, csv, py, etc.)
 │   ├── scenarios.py      # 122 test scenarios
-│   ├── runner.py         # E2E test runner with tiered execution
-│   └── e2e_config.yaml   # Test-specific LLM/embedding config
+│   └── runner.py         # E2E test runner with tiered execution
 ├── performance/          # Latency and throughput benchmarks
 │   ├── test_latency.py   # Query latency (p50/p95/p99)
 │   └── conftest.py       # Performance measurement fixtures
