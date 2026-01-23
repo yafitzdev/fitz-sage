@@ -34,10 +34,15 @@ class MockEmbeddingClient:
 
     def __init__(self, dim: int = 4):
         self.dim = dim
-        self.calls: list[list[str]] = []
+        self.calls: list[str] = []
+        self.batch_calls: list[list[str]] = []
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        self.calls.append(texts)
+    def embed(self, text: str) -> list[float]:
+        self.calls.append(text)
+        return [0.1] * self.dim
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        self.batch_calls.append(texts)
         return [[0.1 * i] * self.dim for i in range(len(texts))]
 
 
@@ -237,7 +242,7 @@ class TestDerivedStore:
         assert record.source_table == "employees"
         assert len(vector_db.upsert_calls) == 1
         assert len(embedding.calls) == 1
-        assert embedding.calls[0] == ["There are 42 employees."]
+        assert embedding.calls[0] == "There are 42 employees."
 
     def test_ingest_creates_embedding(self, store: DerivedStore, vector_db: MockVectorDBClient):
         """Test that ingest creates embedding for sentence."""
@@ -282,8 +287,8 @@ class TestDerivedStore:
         )
 
         assert len(records) == 3
-        assert len(embedding.calls) == 1
-        assert len(embedding.calls[0]) == 3  # All sentences embedded together
+        assert len(embedding.batch_calls) == 1
+        assert len(embedding.batch_calls[0]) == 3  # All sentences embedded together
 
     def test_ingest_batch_empty(self, store: DerivedStore):
         """Test ingesting empty list."""

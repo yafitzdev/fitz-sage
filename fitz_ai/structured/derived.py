@@ -34,8 +34,12 @@ FIELD_CONTENT = "content"
 class EmbeddingClient(Protocol):
     """Protocol for embedding generation."""
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        """Generate embeddings for texts."""
+    def embed(self, text: str) -> list[float]:
+        """Generate embedding for a single text."""
+        ...
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings for multiple texts."""
         ...
 
 
@@ -174,8 +178,7 @@ class DerivedStore:
         )
 
         # Generate embedding for sentence
-        vectors = self._embedding.embed([sentence])
-        vector = vectors[0] if vectors else []
+        vector = self._embedding.embed(sentence)
 
         # Store in vector DB
         point = {
@@ -225,7 +228,7 @@ class DerivedStore:
             records.append(record)
 
         # Generate embeddings for all sentences
-        vectors = self._embedding.embed([r.content for r in records])
+        vectors = self._embedding.embed_batch([r.content for r in records])
 
         # Build points
         points = []

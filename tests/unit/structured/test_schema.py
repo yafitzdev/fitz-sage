@@ -23,17 +23,14 @@ class MockEmbeddingClient:
 
     def __init__(self, dim: int = 4):
         self.dim = dim
-        self.calls: list[list[str]] = []
+        self.calls: list[str] = []
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        """Generate deterministic embeddings based on text hash."""
-        self.calls.append(texts)
-        embeddings = []
-        for text in texts:
-            # Create deterministic embedding from text
-            h = hash(text) % 1000
-            embeddings.append([h / 1000.0] * self.dim)
-        return embeddings
+    def embed(self, text: str) -> list[float]:
+        """Generate deterministic embedding based on text hash."""
+        self.calls.append(text)
+        # Create deterministic embedding from text
+        h = hash(text) % 1000
+        return [h / 1000.0] * self.dim
 
 
 @dataclass
@@ -293,7 +290,7 @@ class TestSchemaStore:
 
         # Verify embedding was called
         assert len(store._embedding.calls) == 1
-        assert "employees:" in store._embedding.calls[0][0]
+        assert "employees:" in store._embedding.calls[0]
 
         # Verify stored in vector DB
         assert store._schema_collection in store._vector_db.collections

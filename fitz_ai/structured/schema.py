@@ -214,15 +214,15 @@ class SchemaStore:
         """
         # Generate searchable text and embedding
         search_text = schema.to_search_text()
-        embeddings = self._embedding.embed([search_text])
+        embedding = self._embedding.embed(search_text)
 
-        if not embeddings or not embeddings[0]:
+        if not embedding:
             raise ValueError(f"Failed to generate embedding for table {schema.table_name}")
 
         # Upsert to schema collection
         point = {
             "id": schema.table_name,
-            "vector": embeddings[0],
+            "vector": embedding,
             "payload": schema.to_payload(),
         }
 
@@ -296,9 +296,9 @@ class SchemaStore:
             List of matching schemas with scores
         """
         # Embed the query
-        embeddings = self._embedding.embed([query])
+        embedding = self._embedding.embed(query)
 
-        if not embeddings or not embeddings[0]:
+        if not embedding:
             logger.warning("Failed to generate query embedding for schema search")
             return []
 
@@ -306,7 +306,7 @@ class SchemaStore:
         try:
             results = self._vector_db.search(
                 collection_name=self._schema_collection,
-                query_vector=embeddings[0],
+                query_vector=embedding,
                 limit=limit,
                 with_payload=True,
             )

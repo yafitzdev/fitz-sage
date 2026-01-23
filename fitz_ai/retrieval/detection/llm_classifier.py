@@ -31,7 +31,7 @@ Return this exact structure:
   {module_fragments}
 }}
 
-Be generous with detection - it's better to trigger a strategy that helps than to miss it.'''
+Only set detected=true when the query CLEARLY matches the criteria. Default to detected=false unless there is explicit evidence.'''
 
 
 class ChatProtocol(Protocol):

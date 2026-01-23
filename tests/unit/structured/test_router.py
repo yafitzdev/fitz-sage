@@ -34,22 +34,19 @@ class MockEmbeddingClient:
     def __init__(self, dim: int = 4):
         self.dim = dim
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        """Generate embeddings that create predictable similarity."""
-        embeddings = []
-        for text in texts:
-            text_lower = text.lower()
-            vec = [0.1] * self.dim
+    def embed(self, text: str) -> list[float]:
+        """Generate embedding that creates predictable similarity."""
+        text_lower = text.lower()
+        vec = [0.1] * self.dim
 
-            if "employee" in text_lower or "salary" in text_lower:
-                vec[0] = 0.9
-            if "product" in text_lower or "price" in text_lower:
-                vec[1] = 0.9
-            if "order" in text_lower or "revenue" in text_lower:
-                vec[2] = 0.9
+        if "employee" in text_lower or "salary" in text_lower:
+            vec[0] = 0.9
+        if "product" in text_lower or "price" in text_lower:
+            vec[1] = 0.9
+        if "order" in text_lower or "revenue" in text_lower:
+            vec[2] = 0.9
 
-            embeddings.append(vec)
-        return embeddings
+        return vec
 
 
 class MockVectorDBClient:
