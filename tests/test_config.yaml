@@ -1,10 +1,10 @@
 # tests/test_config.yaml
 # Unified test configuration - ALL tests use this
 
-# Embedding (local Ollama - bge-m3 has 16k context vs 8k for nomic)
+# Embedding (local Ollama)
 embedding: local_ollama
 embedding_kwargs:
-  model: bge-m3
+  model: nomic-embed-text
 
 # Vector DB
 vector_db: local_faiss

@@ -197,7 +197,6 @@ class RAGPipeline:
             return RGSAnswer(
                 answer="Please provide a question to search for.",
                 sources=[],
-                metadata={"error": "empty_query"},
             )
 
         logger.info(f"{PIPELINE} Running pipeline for query='{query[:50]}...'")
