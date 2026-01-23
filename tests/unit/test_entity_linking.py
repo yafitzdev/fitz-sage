@@ -41,12 +41,24 @@ class TestEntityLinkingPipelineIntegration:
             chat_client=mock_chat,
         )
 
+        # Chunk content must be >= min_batch_content (500 chars) to trigger LLM call
+        long_content = """
+UserService uses OAuth2 for authentication. The UserService class provides
+comprehensive user management functionality including registration, login,
+password reset, and session management. It integrates with the OAuth2
+authorization framework to enable secure third-party authentication flows.
+The service implements the repository pattern for data persistence and
+uses dependency injection for loose coupling with external services.
+It supports multiple authentication providers including Google, GitHub,
+and Microsoft. Error handling is centralized through custom exception classes.
+"""
+
         chunks = [
             Chunk(
                 id="c1",
                 doc_id="d1",
                 chunk_index=0,
-                content="UserService uses OAuth2 for authentication",
+                content=long_content.strip(),
                 metadata={"source_file": "auth.py"},
             )
         ]

@@ -1,35 +1,24 @@
 # tests/test_config.yaml
-# Unified test configuration - ALL tests use this (e2e, unit, load, etc.)
-#
-# Uses local Ollama for fast execution (no cloud API calls).
-# Structure matches .fitz/config/ format.
+# Unified test configuration - ALL tests use this
 
-# Core plugins (string format per actual config schema)
-chat: local_ollama
+# Embedding (local Ollama)
 embedding: local_ollama
-vector_db: local_faiss
-
-# Plugin kwargs
-chat_kwargs:
-  models:
-    smart: qwen2.5:7b
-    fast: qwen2.5:1.5b
-    balanced: qwen2.5:3b
-
 embedding_kwargs:
   model: nomic-embed-text
 
+# Vector DB
+vector_db: local_faiss
 vector_db_kwargs: {}
 
-# Tiered fallback for E2E tests (local -> cloud)
+# Tiered chat execution (local -> cloud fallback)
 tiers:
   - name: local
     chat: local_ollama
     chat_kwargs:
       models:
         smart: qwen2.5:7b
-        fast: qwen2.5:1.5b
-        balanced: qwen2.5:3b
+        fast: qwen2.5:7b
+        balanced: qwen2.5:7b
 
   - name: cloud
     chat: cohere
@@ -39,7 +28,7 @@ tiers:
         fast: command-r7b-12-2024
         balanced: command-r-08-2024
 
-# Response cache settings (for E2E)
+# Response cache (E2E)
 cache:
   enabled: true
   max_entries: 1000

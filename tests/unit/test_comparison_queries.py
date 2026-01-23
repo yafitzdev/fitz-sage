@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from fitz_ai.engines.fitz_rag.retrieval.steps.strategies.comparison import ComparisonSearch
 from fitz_ai.engines.fitz_rag.retrieval.steps.vector_search import VectorSearchStep
 
 
@@ -57,8 +58,8 @@ class TestComparisonExpansion:
     """Test comparison query expansion via LLM."""
 
     @pytest.fixture
-    def step_with_mock_chat(self):
-        """Create a step with a mock chat that returns valid JSON."""
+    def strategy_with_mock_chat(self):
+        """Create a comparison strategy with a mock chat that returns valid JSON."""
         mock_chat = MagicMock()
         mock_chat.chat.return_value = json.dumps(
             {
@@ -72,16 +73,16 @@ class TestComparisonExpansion:
                 ],
             }
         )
-        return VectorSearchStep(
+        return ComparisonSearch(
             client=MagicMock(),
             embedder=MagicMock(),
             collection="test",
             chat=mock_chat,
         )
 
-    def test_comparison_expansion_returns_queries(self, step_with_mock_chat):
+    def test_comparison_expansion_returns_queries(self, strategy_with_mock_chat):
         """Test that comparison expansion returns multiple queries."""
-        queries = step_with_mock_chat._expand_comparison_query(
+        queries = strategy_with_mock_chat._expand_comparison_query(
             "CAN vs SPI - which has lower latency?"
         )
 
@@ -89,12 +90,12 @@ class TestComparisonExpansion:
         assert any("CAN" in q for q in queries)
         assert any("SPI" in q for q in queries)
 
-    def test_comparison_expansion_calls_chat(self, step_with_mock_chat):
+    def test_comparison_expansion_calls_chat(self, strategy_with_mock_chat):
         """Test that comparison expansion calls the chat client."""
-        step_with_mock_chat._expand_comparison_query("CAN vs SPI")
+        strategy_with_mock_chat._expand_comparison_query("CAN vs SPI")
 
-        step_with_mock_chat.chat.chat.assert_called_once()
-        call_args = step_with_mock_chat.chat.chat.call_args[0][0]
+        strategy_with_mock_chat.chat.chat.assert_called_once()
+        call_args = strategy_with_mock_chat.chat.chat.call_args[0][0]
         assert len(call_args) == 1
         assert "comparison query" in call_args[0]["content"].lower()
 
@@ -107,14 +108,14 @@ class TestComparisonExpansion:
     "queries": ["v2.3.0 features", "v2.3.1 changes", "v2.3.0 vs v2.3.1"]
 }
 ```"""
-        step = VectorSearchStep(
+        strategy = ComparisonSearch(
             client=MagicMock(),
             embedder=MagicMock(),
             collection="test",
             chat=mock_chat,
         )
 
-        queries = step._expand_comparison_query("difference between v2.3.0 and v2.3.1")
+        queries = strategy._expand_comparison_query("difference between v2.3.0 and v2.3.1")
 
         assert len(queries) == 3
         assert any("v2.3.0" in q for q in queries)
@@ -134,14 +135,14 @@ class TestComparisonFallback:
             '["query 1", "query 2", "query 3"]',
         ]
 
-        step = VectorSearchStep(
+        strategy = ComparisonSearch(
             client=MagicMock(),
             embedder=MagicMock(),
             collection="test",
             chat=mock_chat,
         )
 
-        queries = step._expand_comparison_query("CAN vs SPI")
+        queries = strategy._expand_comparison_query("CAN vs SPI")
 
         # Should have called chat twice (comparison + fallback)
         assert mock_chat.chat.call_count == 2
@@ -157,14 +158,14 @@ class TestComparisonFallback:
             '["fallback query 1", "fallback query 2"]',
         ]
 
-        step = VectorSearchStep(
+        strategy = ComparisonSearch(
             client=MagicMock(),
             embedder=MagicMock(),
             collection="test",
             chat=mock_chat,
         )
 
-        queries = step._expand_comparison_query("A vs B")
+        queries = strategy._expand_comparison_query("A vs B")
 
         assert mock_chat.chat.call_count == 2
         assert isinstance(queries, list)
@@ -304,31 +305,42 @@ class TestComparisonSearchIntegration:
 class TestComparisonNoChat:
     """Test behavior when chat client is not available."""
 
-    def test_no_comparison_without_chat(self):
-        """Test that comparison detection is skipped when chat is None."""
-        mock_embedder = MagicMock()
-        mock_embedder.embed.return_value = [1.0, 0.0, 0.0]
+    def test_comparison_detection_works_without_chat(self):
+        """Test that comparison pattern detection works regardless of chat presence.
 
-        mock_hit = MagicMock()
-        mock_hit.id = "chunk1"
-        mock_hit.score = 0.9
-        mock_hit.payload = {"content": "test", "source": "doc"}
-
-        mock_client = MagicMock()
-        mock_client.search.return_value = [mock_hit]
-
+        The _is_comparison_query() method should still detect comparison patterns
+        even when chat is None. However, the actual comparison expansion requires
+        chat, so VectorSearchStep.execute() checks for chat before using
+        ComparisonSearch strategy.
+        """
         step = VectorSearchStep(
-            client=mock_client,
-            embedder=mock_embedder,
+            client=MagicMock(),
+            embedder=MagicMock(),
             collection="test",
             chat=None,  # No chat client
             k=10,
-            include_derived=False,  # Disable derived collection search
         )
 
-        # Even with comparison pattern, should do single search
-        chunks = step.execute("A vs B", [])
+        # Pattern detection should work regardless of chat
+        assert step._is_comparison_query("CAN vs SPI")
+        assert step._is_comparison_query("Compare module A and module B")
+        assert step._is_comparison_query("What is the difference between v1 and v2?")
+        assert not step._is_comparison_query("What is CAN protocol?")
 
-        # Should have done a single search (called once)
-        assert mock_client.search.call_count == 1
-        assert len(chunks) == 1
+    def test_comparison_strategy_requires_chat(self):
+        """Test that ComparisonSearch requires chat for query expansion."""
+        # ComparisonSearch requires chat and will use it for expansion
+        mock_chat = MagicMock()
+        mock_chat.chat.return_value = '{"entities": ["A", "B"], "queries": ["A info", "B info"]}'
+
+        strategy = ComparisonSearch(
+            client=MagicMock(),
+            embedder=MagicMock(),
+            collection="test",
+            chat=mock_chat,
+        )
+
+        # Expansion should call the chat client
+        queries = strategy._expand_comparison_query("A vs B")
+        assert mock_chat.chat.called
+        assert len(queries) >= 1

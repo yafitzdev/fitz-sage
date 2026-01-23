@@ -50,11 +50,13 @@ def get_test_chat(tier: str = "smart"):
     from fitz_ai.llm.registry import get_llm_plugin
 
     config = load_test_config()
+    # Get chat config from first tier (local)
+    first_tier = config["tiers"][0]
     return get_llm_plugin(
         plugin_type="chat",
-        plugin_name=config["chat"],
+        plugin_name=first_tier["chat"],
         tier=tier,
-        **config.get("chat_kwargs", {}),
+        **first_tier.get("chat_kwargs", {}),
     )
 
 

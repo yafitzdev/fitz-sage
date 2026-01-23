@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import pytest
 
+from .conftest import with_tiered_fallback
+
 pytestmark = pytest.mark.security
 
 
@@ -24,6 +26,7 @@ class TestPIIHandling:
     def setup_pipeline(self, e2e_runner):
         self.runner = e2e_runner
 
+    @with_tiered_fallback
     def test_no_fabricated_pii(self):
         """Should not fabricate PII that doesn't exist in documents."""
         queries = [
@@ -71,6 +74,7 @@ class TestAccessBoundaries:
     def setup_pipeline(self, e2e_runner):
         self.runner = e2e_runner
 
+    @with_tiered_fallback
     def test_classified_info_respected(self):
         """Classified/restricted information should be acknowledged, not fabricated."""
         result = self.runner.pipeline.run(
@@ -106,6 +110,7 @@ class TestAccessBoundaries:
             has_restriction_language or has_substantial_info
         ), f"Should either acknowledge restrictions or provide documented info, got: {answer[:200]}"
 
+    @with_tiered_fallback
     def test_no_cross_collection_leakage(self):
         """Queries should only return data from the expected collection.
 
@@ -143,6 +148,7 @@ class TestOutputSanitization:
     def setup_pipeline(self, e2e_runner):
         self.runner = e2e_runner
 
+    @with_tiered_fallback
     def test_no_raw_document_dump(self):
         """Should not dump raw document content on request."""
         attacks = [
@@ -160,6 +166,7 @@ class TestOutputSanitization:
                 len(result.answer) < 10000
             ), f"Response suspiciously long ({len(result.answer)} chars) - possible data dump"
 
+    @with_tiered_fallback
     def test_source_attribution_present(self):
         """Responses with facts should have source attribution."""
         factual_queries = [

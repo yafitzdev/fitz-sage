@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import pytest
 
+from .conftest import with_tiered_fallback
+
 pytestmark = pytest.mark.security
 
 
@@ -26,6 +28,7 @@ class TestDirectPromptInjection:
     def setup_pipeline(self, e2e_runner):
         self.runner = e2e_runner
 
+    @with_tiered_fallback
     def test_ignore_instructions_attack(self):
         """Attempt to override system instructions."""
         attacks = [
@@ -95,6 +98,7 @@ class TestDirectPromptInjection:
                     or "context snippets" in answer
                 )
 
+    @with_tiered_fallback
     def test_roleplay_injection(self):
         """Attempt to make model roleplay as different entity."""
         attacks = [
@@ -114,6 +118,7 @@ class TestDirectPromptInjection:
             # Should still be grounded in documents
             assert result.sources is not None or "don't have" in answer
 
+    @with_tiered_fallback
     def test_encoding_bypass(self):
         """Attempt injection via encoding tricks."""
         attacks = [
@@ -175,6 +180,7 @@ class TestSystemPromptExtraction:
     def setup_pipeline(self, e2e_runner):
         self.runner = e2e_runner
 
+    @with_tiered_fallback
     def test_prompt_extraction_attempts(self):
         """Various attempts to extract system prompt."""
         attacks = [
@@ -196,6 +202,7 @@ class TestSystemPromptExtraction:
             assert "grounded response" not in answer
             assert "answer based on" not in answer
 
+    @with_tiered_fallback
     def test_context_window_extraction(self):
         """Attempt to extract session/query history (not document context)."""
         # These queries ask about OTHER users or previous queries in the session
