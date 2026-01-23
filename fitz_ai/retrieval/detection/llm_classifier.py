@@ -1,66 +1,35 @@
 # fitz_ai/retrieval/detection/llm_classifier.py
 """
-LLM-based query classification for detection.
+LLM-based query classification using detection modules.
 
-Replaces regex-based detection with a single LLM call that classifies
-all detection categories at once. More robust and handles edge cases
-that regex patterns miss.
+Combines all module prompt fragments into a single LLM call,
+then distributes results to each module for parsing.
+
+Similar to the enrichment bus, but for query-time classification.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from typing import Any, Protocol
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Protocol
 
 from fitz_ai.logging.logger import get_logger
 
+if TYPE_CHECKING:
+    from .modules.base import DetectionModule
+    from .protocol import DetectionCategory, DetectionResult
+
 logger = get_logger(__name__)
 
-CLASSIFICATION_PROMPT = '''Classify this search query. Return JSON only.
+PROMPT_HEADER = '''Classify this search query. Return JSON only.
 
 Query: "{query}"
 
 Return this exact structure:
 {{
-  "temporal": {{
-    "detected": true/false,
-    "intent": "COMPARISON" | "TREND" | "POINT_IN_TIME" | "RANGE" | "SEQUENCE" | null,
-    "references": [],
-    "time_focused_queries": []
-  }},
-  "aggregation": {{
-    "detected": true/false,
-    "type": "LIST" | "COUNT" | "UNIQUE" | null,
-    "target": null,
-    "fetch_multiplier": 1
-  }},
-  "comparison": {{
-    "detected": true/false,
-    "entities": [],
-    "comparison_queries": []
-  }},
-  "freshness": {{
-    "boost_recency": true/false,
-    "boost_authority": true/false
-  }},
-  "rewriter": {{
-    "needs_context": true/false,
-    "is_compound": true/false,
-    "decomposed_queries": []
-  }}
+  {module_fragments}
 }}
-
-Rules:
-- temporal: time periods, versions, dates, quarters, "between X and Y", "since", "before", "last week/month/year"
-- temporal.intent: COMPARISON="between X and Y", TREND="over time/history", POINT_IN_TIME="as of/in Q1", RANGE="from X to Y", SEQUENCE="first/then/after"
-- aggregation: "list all", "how many", "count", "enumerate", "what are all the", "show me all"
-- aggregation.type: LIST="list/show/enumerate", COUNT="how many/count", UNIQUE="unique/distinct"
-- comparison: "vs", "versus", "compare", "difference between", "differ", "which is better", "how does X compare to Y", "X or Y"
-- freshness.boost_recency: "latest", "recent", "new", "current", "updated", "newest"
-- freshness.boost_authority: "official", "recommended", "best practice", "standard", "proper way"
-- rewriter.needs_context: contains "it", "this", "that", "they", "the same" without clear referent in query
-- rewriter.is_compound: multiple distinct questions, "and also", semicolons separating topics
 
 Be generous with detection - it's better to trigger a strategy that helps than to miss it.'''
 
@@ -76,31 +45,47 @@ class ChatProtocol(Protocol):
 @dataclass
 class LLMClassifier:
     """
-    Single LLM call to classify query into all detection categories.
+    Module-based LLM classifier.
 
-    Replaces 7 separate regex-based detectors with one fast LLM call.
+    Combines all module prompt fragments into one LLM call,
+    then distributes results to each module for parsing.
     """
 
     chat_client: ChatProtocol
+    modules: list["DetectionModule"] = field(default_factory=list)
 
-    def classify(self, query: str) -> dict[str, Any]:
+    def __post_init__(self):
+        """Load default modules if none provided."""
+        if not self.modules:
+            from .modules import DEFAULT_MODULES
+
+            self.modules = list(DEFAULT_MODULES)
+
+    def classify(self, query: str) -> dict["DetectionCategory", "DetectionResult[Any]"]:
         """
-        Classify query into all detection categories.
+        Classify query using all modules in one LLM call.
 
         Args:
             query: User's query string
 
         Returns:
-            Dict with classification results for all categories
+            Dict mapping DetectionCategory to DetectionResult
         """
-        prompt = CLASSIFICATION_PROMPT.format(query=query)
+        prompt = self._build_prompt(query)
 
         try:
             response = self.chat_client.chat([{"role": "user", "content": prompt}])
-            return self._parse_response(response)
+            raw_results = self._parse_response(response)
+            return self._distribute_to_modules(raw_results)
         except Exception as e:
             logger.warning(f"LLM classification failed: {e}")
-            return self._empty_classification()
+            return self._empty_results()
+
+    def _build_prompt(self, query: str) -> str:
+        """Build combined prompt from all module fragments."""
+        fragments = [m.prompt_fragment() for m in self.modules]
+        combined = ",\n  ".join(fragments)
+        return PROMPT_HEADER.format(query=query, module_fragments=combined)
 
     def _parse_response(self, response: str) -> dict[str, Any]:
         """Parse JSON from LLM response, handling markdown code blocks."""
@@ -128,7 +113,6 @@ class LLMClassifier:
         # Try to find JSON object in text
         start = text.find("{")
         if start >= 0:
-            # Find matching closing brace
             depth = 0
             for i, char in enumerate(text[start:], start):
                 if char == "{":
@@ -142,14 +126,20 @@ class LLMClassifier:
                             break
 
         logger.warning(f"Failed to parse LLM response as JSON: {text[:100]}...")
-        return self._empty_classification()
+        return {}
 
-    def _empty_classification(self) -> dict[str, Any]:
-        """Return empty classification (no detection)."""
-        return {
-            "temporal": {"detected": False},
-            "aggregation": {"detected": False},
-            "comparison": {"detected": False},
-            "freshness": {"boost_recency": False, "boost_authority": False},
-            "rewriter": {"needs_context": False, "is_compound": False},
-        }
+    def _distribute_to_modules(
+        self, raw_results: dict[str, Any]
+    ) -> dict["DetectionCategory", "DetectionResult[Any]"]:
+        """Distribute parsed results to each module."""
+        results = {}
+        for module in self.modules:
+            module_data = raw_results.get(module.json_key, {})
+            if not isinstance(module_data, dict):
+                module_data = {}
+            results[module.category] = module.parse_result(module_data)
+        return results
+
+    def _empty_results(self) -> dict["DetectionCategory", "DetectionResult[Any]"]:
+        """Return empty results for all modules."""
+        return {module.category: module.not_detected() for module in self.modules}

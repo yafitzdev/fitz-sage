@@ -280,6 +280,7 @@ class TestLLMClassifier:
 
     def test_classifier_parses_json_response(self):
         """Test that classifier parses valid JSON responses."""
+        from fitz_ai.retrieval.detection import DetectionCategory
         from fitz_ai.retrieval.detection.llm_classifier import LLMClassifier
 
         mock_chat = MagicMock()
@@ -296,12 +297,14 @@ class TestLLMClassifier:
         classifier = LLMClassifier(chat_client=mock_chat)
         result = classifier.classify("A vs B from last month")
 
-        assert result["temporal"]["detected"] is True
-        assert result["comparison"]["detected"] is True
-        assert result["freshness"]["boost_recency"] is True
+        # Result is keyed by DetectionCategory enum
+        assert result[DetectionCategory.TEMPORAL].detected is True
+        assert result[DetectionCategory.COMPARISON].detected is True
+        assert result[DetectionCategory.FRESHNESS].metadata["boost_recency"] is True
 
     def test_classifier_handles_markdown_code_blocks(self):
         """Test that classifier extracts JSON from markdown code blocks."""
+        from fitz_ai.retrieval.detection import DetectionCategory
         from fitz_ai.retrieval.detection.llm_classifier import LLMClassifier
 
         mock_chat = MagicMock()
@@ -322,11 +325,16 @@ The query is asking for a list."""
         classifier = LLMClassifier(chat_client=mock_chat)
         result = classifier.classify("list all test cases")
 
-        assert result["aggregation"]["detected"] is True
-        assert result["aggregation"]["type"] == "LIST"
+        # Result is keyed by DetectionCategory enum
+        assert result[DetectionCategory.AGGREGATION].detected is True
+        # intent contains the parsed AggregationType enum
+        from fitz_ai.retrieval.detection import AggregationType
+
+        assert result[DetectionCategory.AGGREGATION].intent == AggregationType.LIST
 
     def test_classifier_returns_empty_on_failure(self):
         """Test that classifier returns empty result on parse failure."""
+        from fitz_ai.retrieval.detection import DetectionCategory
         from fitz_ai.retrieval.detection.llm_classifier import LLMClassifier
 
         mock_chat = MagicMock()
@@ -335,7 +343,7 @@ The query is asking for a list."""
         classifier = LLMClassifier(chat_client=mock_chat)
         result = classifier.classify("some query")
 
-        # Should return empty classification
-        assert result["temporal"]["detected"] is False
-        assert result["aggregation"]["detected"] is False
-        assert result["comparison"]["detected"] is False
+        # Should return not-detected for all categories
+        assert result[DetectionCategory.TEMPORAL].detected is False
+        assert result[DetectionCategory.AGGREGATION].detected is False
+        assert result[DetectionCategory.COMPARISON].detected is False

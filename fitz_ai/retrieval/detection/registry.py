@@ -1,43 +1,26 @@
 # fitz_ai/retrieval/detection/registry.py
 """
-Detection orchestrator and registry.
+Detection orchestrator using module-based LLM classification.
 
-Uses LLM classification for robust query detection instead of brittle regex patterns.
+Similar to the enrichment bus pattern - each module contributes its
+prompt fragment and parsing logic, but all are combined into one LLM call.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from fitz_ai.logging.logger import get_logger
 
 from .llm_classifier import LLMClassifier
+from .modules import AggregationType, TemporalIntent
 from .protocol import DetectionCategory, DetectionResult
 
 if TYPE_CHECKING:
     from .llm_classifier import ChatProtocol
 
 logger = get_logger(__name__)
-
-
-class TemporalIntent(Enum):
-    """Temporal query intent types."""
-
-    COMPARISON = "COMPARISON"
-    TREND = "TREND"
-    POINT_IN_TIME = "POINT_IN_TIME"
-    RANGE = "RANGE"
-    SEQUENCE = "SEQUENCE"
-
-
-class AggregationType(Enum):
-    """Aggregation query types."""
-
-    LIST = "LIST"
-    COUNT = "COUNT"
-    UNIQUE = "UNIQUE"
 
 
 @dataclass
@@ -140,7 +123,10 @@ class DetectionSummary:
 @dataclass
 class DetectionOrchestrator:
     """
-    Orchestrates detection using LLM classification.
+    Orchestrates detection using module-based LLM classification.
+
+    Similar to the enrichment bus - modules define prompt fragments and
+    parsing, but all are combined into a single LLM call.
 
     Usage:
         orchestrator = DetectionOrchestrator(chat_client=chat)
@@ -151,20 +137,20 @@ class DetectionOrchestrator:
             ...
     """
 
-    chat_client: ChatProtocol | None = None
+    chat_client: "ChatProtocol | None" = None
 
     # Lazy-loaded classifier and expansion detector
     _classifier: LLMClassifier | None = field(default=None, init=False, repr=False)
     _expansion_detector: Any = field(default=None, init=False, repr=False)
 
     def _ensure_classifier(self) -> LLMClassifier | None:
-        """Lazy-load LLM classifier."""
+        """Lazy-load LLM classifier with all modules."""
         if self._classifier is None and self.chat_client is not None:
             self._classifier = LLMClassifier(chat_client=self.chat_client)
         return self._classifier
 
     def _get_expansion_detector(self) -> Any:
-        """Lazy-load expansion detector."""
+        """Lazy-load expansion detector (dict-based, not LLM)."""
         if self._expansion_detector is None:
             from .detectors.expansion import ExpansionDetector
 
@@ -175,8 +161,8 @@ class DetectionOrchestrator:
         """
         Run detection optimized for retrieval routing.
 
-        Uses LLM classification for robust detection, with dict-based
-        expansion for query variations.
+        Uses module-based LLM classification for robust detection,
+        with dict-based expansion for query variations.
 
         Args:
             query: User's query string
@@ -187,135 +173,37 @@ class DetectionOrchestrator:
         classifier = self._ensure_classifier()
 
         if classifier:
-            classification = classifier.classify(query)
+            # Single LLM call, results distributed to modules
+            results = classifier.classify(query)
         else:
-            classification = {}
+            results = {}
             logger.debug("No chat client available, skipping LLM classification")
 
-        # Get expansion result from dict-based detector
+        # Get expansion result from dict-based detector (not LLM)
         expansion_detector = self._get_expansion_detector()
         expansion_result = expansion_detector.detect(query)
 
         return DetectionSummary(
-            temporal=self._build_temporal_result(classification.get("temporal", {})),
-            aggregation=self._build_aggregation_result(classification.get("aggregation", {})),
-            comparison=self._build_comparison_result(classification.get("comparison", {})),
-            freshness=self._build_freshness_result(classification.get("freshness", {})),
+            temporal=results.get(
+                DetectionCategory.TEMPORAL,
+                DetectionResult.not_detected(DetectionCategory.TEMPORAL),
+            ),
+            aggregation=results.get(
+                DetectionCategory.AGGREGATION,
+                DetectionResult.not_detected(DetectionCategory.AGGREGATION),
+            ),
+            comparison=results.get(
+                DetectionCategory.COMPARISON,
+                DetectionResult.not_detected(DetectionCategory.COMPARISON),
+            ),
+            freshness=results.get(
+                DetectionCategory.FRESHNESS,
+                DetectionResult.not_detected(DetectionCategory.FRESHNESS),
+            ),
             expansion=expansion_result,
-            rewriter=self._build_rewriter_result(classification.get("rewriter", {})),
+            rewriter=results.get(
+                DetectionCategory.REWRITER,
+                DetectionResult.not_detected(DetectionCategory.REWRITER),
+            ),
             vocabulary=DetectionResult.not_detected(DetectionCategory.VOCABULARY),
-        )
-
-    def _build_temporal_result(self, data: dict[str, Any]) -> DetectionResult[TemporalIntent]:
-        """Build temporal detection result from LLM classification."""
-        if not data.get("detected", False):
-            return DetectionResult.not_detected(DetectionCategory.TEMPORAL)
-
-        # Parse intent
-        intent_str = data.get("intent")
-        intent = None
-        if intent_str:
-            try:
-                intent = TemporalIntent(intent_str)
-            except ValueError:
-                pass
-
-        return DetectionResult(
-            detected=True,
-            category=DetectionCategory.TEMPORAL,
-            confidence=0.9,
-            intent=intent,
-            matches=[],
-            metadata={
-                "references": data.get("references", []),
-            },
-            transformations=data.get("time_focused_queries", []),
-        )
-
-    def _build_aggregation_result(
-        self, data: dict[str, Any]
-    ) -> DetectionResult[AggregationType]:
-        """Build aggregation detection result from LLM classification."""
-        if not data.get("detected", False):
-            return DetectionResult.not_detected(DetectionCategory.AGGREGATION)
-
-        # Parse type
-        type_str = data.get("type")
-        agg_type = None
-        if type_str:
-            try:
-                agg_type = AggregationType(type_str)
-            except ValueError:
-                pass
-
-        return DetectionResult(
-            detected=True,
-            category=DetectionCategory.AGGREGATION,
-            confidence=0.9,
-            intent=agg_type,
-            matches=[],
-            metadata={
-                "target": data.get("target"),
-                "fetch_multiplier": data.get("fetch_multiplier", 3),
-            },
-            transformations=[],
-        )
-
-    def _build_comparison_result(self, data: dict[str, Any]) -> DetectionResult[None]:
-        """Build comparison detection result from LLM classification."""
-        if not data.get("detected", False):
-            return DetectionResult.not_detected(DetectionCategory.COMPARISON)
-
-        return DetectionResult(
-            detected=True,
-            category=DetectionCategory.COMPARISON,
-            confidence=0.9,
-            intent=None,
-            matches=[],
-            metadata={
-                "entities": data.get("entities", []),
-            },
-            transformations=data.get("comparison_queries", []),
-        )
-
-    def _build_freshness_result(self, data: dict[str, Any]) -> DetectionResult[None]:
-        """Build freshness detection result from LLM classification."""
-        boost_recency = data.get("boost_recency", False)
-        boost_authority = data.get("boost_authority", False)
-
-        if not boost_recency and not boost_authority:
-            return DetectionResult.not_detected(DetectionCategory.FRESHNESS)
-
-        return DetectionResult(
-            detected=True,
-            category=DetectionCategory.FRESHNESS,
-            confidence=0.9,
-            intent=None,
-            matches=[],
-            metadata={
-                "boost_recency": boost_recency,
-                "boost_authority": boost_authority,
-            },
-            transformations=[],
-        )
-
-    def _build_rewriter_result(self, data: dict[str, Any]) -> DetectionResult[None]:
-        """Build rewriter detection result from LLM classification."""
-        needs_context = data.get("needs_context", False)
-        is_compound = data.get("is_compound", False)
-
-        if not needs_context and not is_compound:
-            return DetectionResult.not_detected(DetectionCategory.REWRITER)
-
-        return DetectionResult(
-            detected=True,
-            category=DetectionCategory.REWRITER,
-            confidence=0.9,
-            intent=None,
-            matches=[],
-            metadata={
-                "needs_context": needs_context,
-                "is_compound": is_compound,
-            },
-            transformations=data.get("decomposed_queries", []),
         )

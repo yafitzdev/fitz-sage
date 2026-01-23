@@ -1,17 +1,16 @@
 # fitz_ai/retrieval/detection/__init__.py
 """
-Unified detection system for query pattern matching.
+Unified detection system using module-based LLM classification.
 
-Uses LLM classification for robust detection:
-- Temporal queries (time periods, versions, dates)
-- Aggregation queries (list, count, unique)
-- Comparison queries (vs, compare, difference)
-- Freshness signals (recency, authority keywords)
-- Rewriter signals (pronouns, compound queries)
+Similar to the enrichment bus pattern:
+- Each module defines its prompt fragment and parsing logic
+- All modules are combined into a single LLM call
+- Results are distributed to modules for parsing
 
-Dict-based expansion for query variations:
-- Synonym substitution
-- Acronym expansion
+To add a new detection category:
+1. Create a module in modules/ (inherit from DetectionModule)
+2. Implement category, json_key, prompt_fragment(), parse_result()
+3. Add to DEFAULT_MODULES in modules/__init__.py
 
 Usage:
     from fitz_ai.retrieval.detection import DetectionOrchestrator
@@ -26,13 +25,19 @@ Usage:
 
 from .detectors import ExpansionDetector
 from .llm_classifier import LLMClassifier
-from .protocol import DetectionCategory, DetectionResult, Match
-from .registry import (
+from .modules import (
+    DEFAULT_MODULES,
+    AggregationModule,
     AggregationType,
-    DetectionOrchestrator,
-    DetectionSummary,
+    ComparisonModule,
+    DetectionModule,
+    FreshnessModule,
+    RewriterModule,
     TemporalIntent,
+    TemporalModule,
 )
+from .protocol import DetectionCategory, DetectionResult, Match
+from .registry import DetectionOrchestrator, DetectionSummary
 
 __all__ = [
     # Orchestration
@@ -47,6 +52,15 @@ __all__ = [
     "Match",
     # LLM Classifier
     "LLMClassifier",
-    # Detectors
+    # Module system
+    "DEFAULT_MODULES",
+    "DetectionModule",
+    # Modules
+    "AggregationModule",
+    "ComparisonModule",
+    "FreshnessModule",
+    "RewriterModule",
+    "TemporalModule",
+    # Dict-based detectors
     "ExpansionDetector",
 ]
