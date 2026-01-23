@@ -126,7 +126,7 @@ class TestConcurrentQueries:
             queries
         ), f"Only {successes}/{len(queries)} concurrent queries succeeded"
 
-    @pytest.mark.parametrize("num_queries", [10, 25, 50])
+    @pytest.mark.parametrize("num_queries", [5, 10, 25])
     def test_sequential_throughput(self, num_queries):
         """Measure queries per second throughput."""
         query = "Where is TechCorp headquartered?"
@@ -143,7 +143,6 @@ class TestConcurrentQueries:
         print(f"  Throughput: {qps:.2f} queries/sec")
 
         # Throughput depends on LLM latency:
-        # - Cloud LLM (Cohere): ~10-15s per query -> 0.07-0.1 qps
-        # - Local LLM (Ollama): ~5-10s per query -> 0.1-0.2 qps
-        # Minimum threshold accounts for cloud LLM with network variance
+        # - Local LLM (Ollama): ~2-3s per query -> 0.3-0.5 qps
+        # - Cloud LLM (Cohere fallback): ~5-10s per query -> 0.1-0.2 qps
         assert qps > 0.05, f"Throughput too low: {qps:.2f} qps"

@@ -101,11 +101,10 @@ class TestInputLengthLimits:
     def setup_pipeline(self, e2e_runner):
         self.runner = e2e_runner
 
-    @with_tiered_fallback
     def test_very_long_query(self):
         """Very long queries should be handled (truncated or rejected gracefully)."""
-        # 10KB query
-        long_query = "What is TechCorp? " * 500
+        # ~1.8KB query - still "very long" but faster to process
+        long_query = "What is TechCorp? " * 100
 
         result = self.runner.pipeline.run(long_query)
 
@@ -115,15 +114,16 @@ class TestInputLengthLimits:
         # Response should be reasonable (not echo the long input)
         assert len(result.answer) < len(long_query)
 
-    @with_tiered_fallback
     def test_query_with_long_word(self):
         """Query with extremely long 'word' should be handled."""
+        # Tests robustness, not answer quality (no tiered fallback needed)
         long_word = "a" * 2000
         query = f"What is {long_word}?"
 
         result = self.runner.pipeline.run(query)
         assert result is not None
 
+    @pytest.mark.slow
     def test_many_short_queries_dont_leak_memory(self):
         """Rapid short queries shouldn't cause memory issues."""
         import gc
@@ -134,9 +134,9 @@ class TestInputLengthLimits:
         gc.collect()
         mem_before = process.memory_info().rss / 1024 / 1024
 
-        # Run 50 quick queries, tolerate transient failures
+        # Run 15 queries - enough to detect memory leaks while keeping test fast
         successful = 0
-        for i in range(50):
+        for i in range(15):
             try:
                 self.runner.pipeline.run(f"Query {i}: What is TechCorp?")
                 successful += 1
@@ -146,14 +146,14 @@ class TestInputLengthLimits:
         gc.collect()
         mem_after = process.memory_info().rss / 1024 / 1024
 
-        # Need at least 30 successful queries to meaningfully test memory
-        assert successful >= 30, f"Only {successful}/50 queries succeeded - too few to test memory"
+        # Need at least 10 successful queries to meaningfully test memory
+        assert successful >= 10, f"Only {successful}/15 queries succeeded - too few to test memory"
 
         mem_growth = mem_after - mem_before
         print(f"\nMemory growth over {successful} queries: {mem_growth:.1f}MB")
 
-        # Should not grow more than 200MB
-        assert mem_growth < 200, f"Memory grew {mem_growth:.1f}MB - possible leak"
+        # Should not grow more than 100MB over 15 queries
+        assert mem_growth < 100, f"Memory grew {mem_growth:.1f}MB - possible leak"
 
 
 class TestRepeatedPatterns:

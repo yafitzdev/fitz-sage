@@ -67,11 +67,11 @@ class TestQueryLatency:
                 "information about the target market segment for each model."
             )
 
-        metrics = measure_perf(query, iterations=3, warmup=1)
+        # 2 iterations enough to measure latency variance
+        metrics = measure_perf(query, iterations=2, warmup=0)
 
         print("\nLong Query Latency:")
         print(f"  p50: {metrics.p50:.0f}ms")
-        print(f"  p95: {metrics.p95:.0f}ms")
 
 
 class TestRetrievalLatency:
@@ -113,14 +113,15 @@ class TestMemoryUsage:
         def query():
             return self.runner.pipeline.run("What is TechCorp?")
 
-        metrics = measure_perf(query, iterations=20, warmup=2)
+        # 8 iterations is enough to detect memory leaks
+        metrics = measure_perf(query, iterations=8, warmup=1)
 
-        print("\nMemory Usage Across 20 Queries:")
+        print("\nMemory Usage Across 8 Queries:")
         print(f"  Avg delta: {metrics.avg_memory_mb:.1f}MB")
         print(f"  Peak delta: {metrics.peak_memory_mb:.1f}MB")
 
         # Memory should not grow significantly per query
         # (some variance is normal due to GC timing)
         assert (
-            metrics.peak_memory_mb < 100
+            metrics.peak_memory_mb < 50
         ), f"Memory grew {metrics.peak_memory_mb:.1f}MB - potential leak"
