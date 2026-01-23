@@ -191,6 +191,15 @@ class RAGPipeline:
             query: The user's question
             conversation_context: Optional ConversationContext for query rewriting
         """
+        # Early validation: empty or whitespace-only queries
+        if not query or not query.strip():
+            logger.warning(f"{PIPELINE} Empty query received, returning empty answer")
+            return RGSAnswer(
+                answer="Please provide a question to search for.",
+                sources=[],
+                metadata={"error": "empty_query"},
+            )
+
         logger.info(f"{PIPELINE} Running pipeline for query='{query[:50]}...'")
 
         # Step -1: Check for structured query (tables/CSV)

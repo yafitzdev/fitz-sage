@@ -26,7 +26,6 @@ class TestMalformedInputs:
     def setup_pipeline(self, e2e_runner):
         self.runner = e2e_runner
 
-    @pytest.mark.skip(reason="Pipeline doesn't handle empty queries before embedding - needs fix in RAGPipeline.run()")
     @with_tiered_fallback
     def test_empty_query(self):
         """Empty query should be handled gracefully."""

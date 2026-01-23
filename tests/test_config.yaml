@@ -1,10 +1,10 @@
 # tests/test_config.yaml
 # Unified test configuration - ALL tests use this
 
-# Embedding (local Ollama)
+# Embedding (local Ollama - bge-m3 has 16k context vs 8k for nomic)
 embedding: local_ollama
 embedding_kwargs:
-  model: nomic-embed-text
+  model: bge-m3
 
 # Vector DB
 vector_db: local_faiss
@@ -17,8 +17,8 @@ tiers:
     chat_kwargs:
       models:
         smart: qwen2.5:7b
-        fast: qwen2.5:7b
-        balanced: qwen2.5:7b
+        fast: qwen2.5:1.5b
+        balanced: qwen2.5:3b
 
   - name: cloud
     chat: cohere

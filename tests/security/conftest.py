@@ -42,7 +42,7 @@ def with_tiered_fallback(test_fn: Callable) -> Callable:
 
                 # Success - return
                 return
-            except (AssertionError, RuntimeError, ValueError, TypeError) as e:
+            except (AssertionError, RuntimeError) as e:
                 last_error = e
                 # Continue to next tier
 
@@ -92,7 +92,7 @@ def tiered_pipeline(e2e_runner):
                     last_error = AssertionError(
                         f"{error_msg or 'Assertion failed'} (tier={tier_name}): {last_answer[:200]}"
                     )
-            except (RuntimeError, ValueError, TypeError) as e:
+            except RuntimeError as e:
                 last_error = e
 
         raise last_error or AssertionError(f"All tiers failed: {last_answer[:200]}")
