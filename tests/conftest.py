@@ -83,7 +83,7 @@ def test_config():
 # =============================================================================
 
 # Import e2e fixtures so they're available to performance/security/chaos tests
-from tests.e2e.conftest import *  # noqa: F401, F403
+from tests.e2e.conftest import *  # noqa: E402, F401, F403
 
 # Import unit test fixtures
-from tests.unit.conftest import *  # noqa: F401, F403
+from tests.unit.conftest import *  # noqa: E402, F401, F403

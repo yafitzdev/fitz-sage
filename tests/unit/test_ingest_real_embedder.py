@@ -5,6 +5,8 @@ Test ingestion with the configured embedder to diagnose slowness.
 Uses local Ollama embedder from tests/test_config.yaml for fast execution.
 
 Run with: pytest tests/unit/test_ingest_real_embedder.py -v -s --log-cli-level=INFO
+
+NOTE: These tests require a running Ollama instance and are skipped if unavailable.
 """
 
 import logging
@@ -16,6 +18,23 @@ import pytest
 
 from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.source.base import SourceFile
+
+
+def _ollama_available() -> bool:
+    """Check if Ollama is running and accessible."""
+    try:
+        import httpx
+
+        response = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
+        return response.status_code == 200
+    except Exception:
+        return False
+
+
+# Skip all tests in this module if Ollama is not available
+pytestmark = pytest.mark.skipif(
+    not _ollama_available(), reason="Ollama not available (requires local Ollama instance)"
+)
 
 # Enable all logging
 logging.basicConfig(level=logging.DEBUG)

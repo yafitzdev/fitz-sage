@@ -74,10 +74,7 @@ class RewriteResult:
     @property
     def was_rewritten(self) -> bool:
         """Check if query was actually rewritten."""
-        return (
-            self.rewrite_type != RewriteType.NONE
-            and self.rewritten_query != self.original_query
-        )
+        return self.rewrite_type != RewriteType.NONE and self.rewritten_query != self.original_query
 
     @property
     def all_query_variations(self) -> List[str]:

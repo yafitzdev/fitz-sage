@@ -120,9 +120,7 @@ class TestAccessBoundaries:
         """
         # Ask about a topic that definitely doesn't exist in the e2e fixtures
         # The e2e fixtures contain TechCorp data - ask about something unrelated
-        result = self.runner.pipeline.run(
-            "What is the recipe for chocolate cake?"
-        )
+        result = self.runner.pipeline.run("What is the recipe for chocolate cake?")
         answer = result.answer.lower()
 
         # Should acknowledge the information is not available

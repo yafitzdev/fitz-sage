@@ -27,5 +27,3 @@ def ensure_vector_db(collection: Optional[str] = None) -> Path:
     path = vector_db(collection)
     path.mkdir(parents=True, exist_ok=True)
     return path
-
-

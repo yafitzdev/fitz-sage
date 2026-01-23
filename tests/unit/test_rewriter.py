@@ -22,7 +22,6 @@ from fitz_ai.retrieval.rewriter import (
     RewriteType,
 )
 
-
 # ---------------------------------------------------------------------------
 # Test Fixtures
 # ---------------------------------------------------------------------------
@@ -32,7 +31,9 @@ from fitz_ai.retrieval.rewriter import (
 class MockChatClient:
     """Mock chat client for testing."""
 
-    response: str = '{"rewritten_query": "test query", "rewrite_type": "none", "confidence": 1.0, "is_ambiguous": false, "disambiguated_queries": []}'
+    response: str = (
+        '{"rewritten_query": "test query", "rewrite_type": "none", "confidence": 1.0, "is_ambiguous": false, "disambiguated_queries": []}'
+    )
     calls: list = None
 
     def __post_init__(self):

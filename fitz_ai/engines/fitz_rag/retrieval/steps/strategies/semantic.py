@@ -104,9 +104,7 @@ class SemanticSearch(BaseVectorSearch):
         # Check for any variations: rewritten, compound decomposition, or ambiguity
         if rewrite_result and len(rewrite_result.all_query_variations) > 1:
             base_queries = rewrite_result.all_query_variations
-            logger.debug(
-                f"{RETRIEVER} Query rewrite: using {len(base_queries)} query variations"
-            )
+            logger.debug(f"{RETRIEVER} Query rewrite: using {len(base_queries)} query variations")
         else:
             base_queries = [query]
 

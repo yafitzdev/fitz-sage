@@ -25,9 +25,7 @@ logger = get_logger(__name__)
 
 def _history_to_context(history: List[Dict[str, str]]) -> ConversationContext:
     """Convert chat history to ConversationContext for query rewriting."""
-    messages = [
-        ConversationMessage(role=msg["role"], content=msg["content"]) for msg in history
-    ]
+    messages = [ConversationMessage(role=msg["role"], content=msg["content"]) for msg in history]
     return ConversationContext(history=messages)
 
 

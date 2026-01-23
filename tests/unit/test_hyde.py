@@ -14,7 +14,6 @@ from dataclasses import dataclass
 
 from fitz_ai.retrieval.hyde import HydeGenerator
 
-
 # ---------------------------------------------------------------------------
 # Test Fixtures
 # ---------------------------------------------------------------------------
@@ -100,9 +99,7 @@ class TestHydeGenerator:
 
     def test_limits_to_num_hypotheses(self):
         """Test that results are limited to num_hypotheses."""
-        mock_chat = MockChatClient(
-            response='["P1", "P2", "P3", "P4", "P5", "P6"]'
-        )
+        mock_chat = MockChatClient(response='["P1", "P2", "P3", "P4", "P5", "P6"]')
         generator = HydeGenerator(chat=mock_chat, num_hypotheses=3)
 
         hypotheses = generator.generate("Test")
@@ -175,9 +172,7 @@ class TestResponseParsing:
 
     def test_parse_filters_empty_strings(self):
         """Test that empty strings are filtered from results."""
-        mock_chat = MockChatClient(
-            response='["Valid passage", "", "Another valid"]'
-        )
+        mock_chat = MockChatClient(response='["Valid passage", "", "Another valid"]')
         generator = HydeGenerator(chat=mock_chat, num_hypotheses=3)
 
         hypotheses = generator.generate("Test")
@@ -213,9 +208,7 @@ This is the second passage with different perspective on the matter."""
 
     def test_parse_handles_non_string_items(self):
         """Test that non-string items in array are converted."""
-        mock_chat = MockChatClient(
-            response='["Valid string", 123, true, {"key": "value"}]'
-        )
+        mock_chat = MockChatClient(response='["Valid string", 123, true, {"key": "value"}]')
         generator = HydeGenerator(chat=mock_chat, num_hypotheses=4)
 
         hypotheses = generator.generate("Test")
