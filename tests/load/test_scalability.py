@@ -117,8 +117,8 @@ class TestConcurrentQueries:
         print("\nConcurrent Query Results:")
         successes = 0
         for query, elapsed, success in results:
-            status = "✓" if success else "✗"
-            print(f"  {status} {query[:40]}... ({elapsed:.2f}s)")
+            status = "PASS" if success else "FAIL"
+            print(f"  [{status}] {query[:40]}... ({elapsed:.2f}s)")
             if success:
                 successes += 1
 
