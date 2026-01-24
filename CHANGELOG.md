@@ -11,6 +11,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.2] - 2026-01-24
+
+### 🎉 Highlights
+
+**Unified LLM-Based Query Classification** - Consolidated all scattered query detection systems (temporal, aggregation, comparison, freshness, expansion) into a single unified detection module. One LLM call now classifies all query intents instead of separate regex-based detectors. More accurate classification with lower latency.
+
+### 🚀 Added
+
+#### Unified Detection System (`fitz_ai/retrieval/detection/`)
+- `LLMClassifier` - Combines all detection modules into one LLM call
+- `DetectionOrchestrator` - Unified registry with `DetectionSummary` result
+- `DetectionModule` ABC - Modular detection with `prompt_fragment()` and `parse_result()`
+- Detection modules: `TemporalModule`, `AggregationModule`, `ComparisonModule`, `FreshnessModule`, `RewriterModule`
+- `ExpansionDetector` - Dict-based synonym/acronym expansion (non-LLM, fast)
+- `DetectionResult` dataclass with confidence scores and metadata
+- `DetectionCategory` enum for type-safe detection types
+
+### 🔄 Changed
+
+- **Query classification is now LLM-based** - More accurate than regex patterns, handles edge cases better
+- **VectorSearchStep** - Now uses `DetectionOrchestrator` for all query classification
+- **Retrieval strategies** - Updated to receive `DetectionResult` instead of legacy detector outputs
+
+### 🗑️ Removed
+
+#### Legacy Detection Systems (consolidated into unified detection)
+- `fitz_ai/retrieval/aggregation/` - Replaced by `detection/modules/aggregation.py`
+- `fitz_ai/retrieval/temporal/` - Replaced by `detection/modules/temporal.py`
+- `fitz_ai/retrieval/expansion/` - Replaced by `detection/detectors/expansion.py`
+- `fitz_ai/engines/fitz_rag/retrieval/steps/freshness.py` - Replaced by `detection/modules/freshness.py`
+
+### 📚 Documentation
+
+- Updated feature docs to reflect unified detection system
+- CLAUDE.md already documented the new detection architecture
+
+---
+
 ## [0.6.1] - 2026-01-23
 
 ### 🎉 Highlights
@@ -1179,7 +1217,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.1...v0.5.2

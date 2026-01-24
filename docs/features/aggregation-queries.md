@@ -66,32 +66,30 @@ Query: "List all the people mentioned in the documents"
 
 ## Technical Details
 
-- **Module**: `fitz_ai/retrieval/aggregation/`
-- **Integration**: Baked into `VectorSearchStep` (runs first, before temporal/comparison)
+- **Module**: `fitz_ai/retrieval/detection/modules/aggregation.py`
+- **Integration**: Part of unified `DetectionOrchestrator` in `VectorSearchStep`
 - **No configuration**: Always active, no opt-out
 
-### Detection Patterns
+### LLM-Based Detection
 
-The detector uses regex patterns with confidence scores:
+Detection uses a unified LLM classifier (one call for all detection types). The `AggregationModule` contributes its prompt fragment to the combined classification:
 
 ```python
-# COUNT (highest priority)
-r"\bhow\s+many\b"              # 0.95 confidence
-r"\b(count|total|number)\s+(of|the)\b"  # 0.90 confidence
+# AggregationModule identifies:
+# - COUNT: "how many", "count", "number of"
+# - UNIQUE: "different types", "distinct", "kinds of"
+# - LIST: "list all", "enumerate", "what are the"
 
-# UNIQUE
-r"\b(different|distinct|unique)\s+(types?|kinds?)\b"  # 0.95 confidence
-r"\bwhat\s+(types?|kinds?)\s+of\b"  # 0.90 confidence
-
-# LIST
-r"\b(list|enumerate|show)\s+(all|every)\b"  # 0.95 confidence
-r"\bwhat\s+are\s+(all\s+)?(the\s+)?"  # 0.85 confidence
+# Returns DetectionResult with:
+# - aggregation_type: COUNT | UNIQUE | LIST
+# - target: what's being aggregated (e.g., "test cases")
+# - fetch_multiplier: 3x-4x depending on type
 ```
 
-### Query Augmentation
+### Query Handling
 
-Each aggregation type gets a different augmentation:
+Each aggregation type triggers expanded retrieval:
 
-- **COUNT**: `"(include all instances for accurate count)"`
-- **UNIQUE**: `"(include all different types and categories)"`
-- **LIST**: `"(include complete list of all {target})"`
+- **COUNT**: 4x fetch multiplier for accurate counting
+- **UNIQUE**: 3x fetch multiplier to find all distinct items
+- **LIST**: 3x fetch multiplier for comprehensive listing

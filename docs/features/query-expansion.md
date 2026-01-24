@@ -70,8 +70,10 @@ Expanded queries:   ["How do I fetch employee data?",
 
 ## Files
 
-- **Expander module:** `fitz_ai/retrieval/expansion/`
+- **Expansion detector:** `fitz_ai/retrieval/detection/detectors/expansion.py`
 - **Integration:** `fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py`
+
+Note: Query expansion uses dictionary-based matching (not LLM) for fast, deterministic results. Synonyms and acronyms are defined in the `SYNONYMS` and `ACRONYMS` dicts in `expansion.py`.
 
 ## Benefits
 
@@ -104,4 +106,6 @@ Typical overhead: 2-4x search time for 3-5 variations. Worth it for improved rec
 
 ## Dependencies
 
-None beyond Python standard library. Uses regex for word replacement.
+- No LLM required (dictionary-based expansion)
+- Fast, deterministic synonym/acronym matching
+- To add new synonyms or acronyms, edit the dicts in `detection/detectors/expansion.py`

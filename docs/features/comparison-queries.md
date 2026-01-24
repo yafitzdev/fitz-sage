@@ -28,17 +28,19 @@ Both entity sets merged → complete comparison data
 
 ## How It Works
 
-### Comparison Detection
+### LLM-Based Comparison Detection
 
-Regex patterns identify comparison queries:
+Detection uses a unified LLM classifier (one call for all detection types). The `ComparisonModule` identifies comparison queries and extracts entities:
 
 ```python
-COMPARISON_PATTERNS = [
-    r"(\w+)\s+vs\.?\s+(\w+)",           # "X vs Y"
-    r"compare\s+(\w+)\s+(?:and|to)\s+(\w+)",  # "compare X and Y"
-    r"difference between\s+(\w+)\s+and\s+(\w+)",  # "difference between X and Y"
-    r"(\w+)\s+versus\s+(\w+)",          # "X versus Y"
-]
+# ComparisonModule identifies:
+# - "X vs Y", "compare X and Y", "difference between X and Y"
+# - Returns: entities being compared, comparison context
+
+# Example DetectionResult:
+# - detected: True
+# - comparison_entities: ["React", "Vue"]
+# - comparison_queries: ["React performance", "Vue performance"]
 ```
 
 ### Entity Extraction
@@ -76,17 +78,18 @@ COMPARISON_PATTERNS = [
 
 No configuration required. Feature is baked into the retrieval pipeline.
 
-Internal parameters in `ComparisonDetector`:
+Internal parameters:
 - `min_entity_length`: Minimum characters for valid entity (default: 2)
 - `max_entities`: Maximum entities to extract (default: 2)
 
 ## Files
 
-- **Comparison detection & expansion:** `fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py`
-  - `_is_comparison_query()` - Pattern matching
-  - `_comparison_search()` - Multi-entity retrieval
-  - `_expand_comparison_query()` - Entity extraction & sub-query generation
-- **Ingestion:** No ingestion changes (operates at query time only)
+- **Detection module:** `fitz_ai/retrieval/detection/modules/comparison.py`
+- **Orchestrator:** `fitz_ai/retrieval/detection/registry.py`
+- **Strategy:** `fitz_ai/engines/fitz_rag/retrieval/steps/strategies/comparison.py`
+- **Integration:** `fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py`
+
+Detection is now LLM-based via the unified `DetectionOrchestrator`. The `ComparisonModule` extracts entities and generates entity-specific sub-queries.
 
 ## Benefits
 
@@ -155,9 +158,8 @@ Internal parameters in `ComparisonDetector`:
 
 ## Dependencies
 
-- No external dependencies
-- Pure Python implementation
-- Regex-based detection
+- Requires chat LLM client for detection (unified `DetectionOrchestrator`)
+- Part of the combined LLM classification call (no additional latency)
 
 ## Performance Considerations
 

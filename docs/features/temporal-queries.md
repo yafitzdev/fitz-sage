@@ -91,9 +91,11 @@ Results from all sub-queries are merged using RRF:
 
 ## Files
 
-- **Temporal module:** `fitz_ai/retrieval/temporal/`
-- **Detector:** `fitz_ai/retrieval/temporal/detector.py`
+- **Detection module:** `fitz_ai/retrieval/detection/modules/temporal.py`
+- **Orchestrator:** `fitz_ai/retrieval/detection/registry.py`
 - **Integration:** `fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py`
+
+Detection is now LLM-based via the unified `DetectionOrchestrator`. The `TemporalModule` contributes its prompt fragment and parses `TemporalIntent` (CHANGE, COMPARISON, PERIOD, BEFORE, AFTER) from the combined LLM response.
 
 ## Benefits
 
@@ -122,4 +124,5 @@ Results from all sub-queries are merged using RRF:
 
 ## Dependencies
 
-None beyond Python standard library. Uses regex for pattern matching.
+- Requires chat LLM client for detection (unified `DetectionOrchestrator`)
+- Part of the combined LLM classification call (no additional latency)

@@ -71,10 +71,10 @@ During ingestion, source authority is inferred from file paths:
 
 No configuration required. Feature is baked into the retrieval pipeline.
 
-Weights can be adjusted in `FreshnessStep` if needed:
-- `recency_weight`: Default 0.15 (max boost for very recent docs)
-- `authority_weight`: Default 0.15 (max boost for spec docs)
-- `recency_half_life_days`: Default 90 (days until recency score halves)
+Default weights:
+- `recency_weight`: 0.15 (max boost for very recent docs)
+- `authority_weight`: 0.15 (max boost for spec docs)
+- `recency_half_life_days`: 90 (days until recency score halves)
 
 ## Intent Keywords
 
@@ -86,9 +86,11 @@ Weights can be adjusted in `FreshnessStep` if needed:
 
 ## Implementation
 
+- **Detection module:** `fitz_ai/retrieval/detection/modules/freshness.py`
 - **Metadata ingestion:** `fitz_ai/ingestion/source/plugins/filesystem.py`
-- **Freshness step:** `fitz_ai/engines/fitz_rag/retrieval/steps/freshness.py`
-- **Auto-injection:** `fitz_ai/engines/fitz_rag/retrieval/loader.py`
+- **Orchestrator:** `fitz_ai/retrieval/detection/registry.py`
+
+Detection is now LLM-based via the unified `DetectionOrchestrator`. The `FreshnessModule` determines `boost_recency` and `boost_authority` flags from query intent.
 
 ## Benefits
 
