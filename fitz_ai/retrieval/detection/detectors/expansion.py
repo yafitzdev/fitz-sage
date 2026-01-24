@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any
 
 from fitz_ai.logging.logger import get_logger
 
