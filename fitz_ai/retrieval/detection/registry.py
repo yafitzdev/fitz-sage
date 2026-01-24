@@ -57,16 +57,12 @@ class DetectionSummary:
     @property
     def boost_recency(self) -> bool:
         """True if recency boosting should be applied."""
-        return self.freshness.detected and self.freshness.metadata.get(
-            "boost_recency", False
-        )
+        return self.freshness.detected and self.freshness.metadata.get("boost_recency", False)
 
     @property
     def boost_authority(self) -> bool:
         """True if authority boosting should be applied."""
-        return self.freshness.detected and self.freshness.metadata.get(
-            "boost_authority", False
-        )
+        return self.freshness.detected and self.freshness.metadata.get("boost_authority", False)
 
     @property
     def query_variations(self) -> list[str]:

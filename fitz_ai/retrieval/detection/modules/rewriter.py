@@ -22,13 +22,13 @@ class RewriterModule(DetectionModule):
         return "rewriter"
 
     def prompt_fragment(self) -> str:
-        return '''"rewriter": {
+        return """"rewriter": {
     "needs_context": true/false,
     "is_compound": true/false,
     "decomposed_queries": []
   }
   // needs_context: contains "it", "this", "that", "they", "the same" without clear referent in query
-  // is_compound: multiple distinct questions, "and also", semicolons separating topics'''
+  // is_compound: multiple distinct questions, "and also", semicolons separating topics"""
 
     def parse_result(self, data: dict[str, Any]) -> DetectionResult[None]:
         needs_context = data.get("needs_context", False)

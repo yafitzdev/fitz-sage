@@ -67,9 +67,7 @@ class TemporalSearch(BaseVectorSearch):
                 )
             elif isinstance(r, str):
                 # Handle case where LLM returns simple string references
-                references.append(
-                    _TemporalRef(text=r, ref_type="unknown", normalized=None)
-                )
+                references.append(_TemporalRef(text=r, ref_type="unknown", normalized=None))
 
         # Temporal queries are in transformations (includes original as first)
         temporal_queries = detection_result.transformations or [query]

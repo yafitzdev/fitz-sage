@@ -200,7 +200,9 @@ class VectorSearchStep(RetrievalStep):
 
             # Pass chat client for LLM-based detection
             self._detection_orchestrator = DetectionOrchestrator(chat_client=self.chat)
-            logger.debug(f"{RETRIEVER} Detection orchestrator initialized (LLM: {self.chat is not None})")
+            logger.debug(
+                f"{RETRIEVER} Detection orchestrator initialized (LLM: {self.chat is not None})"
+            )
 
         return self._detection_orchestrator
 

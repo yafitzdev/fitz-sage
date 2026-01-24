@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-PROMPT_HEADER = '''Classify this search query. Return JSON only.
+PROMPT_HEADER = """Classify this search query. Return JSON only.
 
 Query: "{query}"
 
@@ -31,7 +31,7 @@ Return this exact structure:
   {module_fragments}
 }}
 
-Only set detected=true when the query CLEARLY matches the criteria. Default to detected=false unless there is explicit evidence.'''
+Only set detected=true when the query CLEARLY matches the criteria. Default to detected=false unless there is explicit evidence."""
 
 
 class ChatProtocol(Protocol):
