@@ -22,12 +22,14 @@ class ComparisonModule(DetectionModule):
         return "comparison"
 
     def prompt_fragment(self) -> str:
-        return '''"comparison": {
+        return """"comparison": {
     "detected": true/false,
     "entities": [],
     "comparison_queries": []
   }
-  // comparison: "vs", "versus", "compare", "difference between", "differ", "which is better", "how does X compare to Y", "X or Y"'''
+  // comparison: "vs", "versus", "compare", "difference between", "differ", "which is better", "how does X compare to Y", "X or Y"
+  // entities: extract the 2+ things being compared
+  // comparison_queries: generate 2-3 search queries per entity PLUS 1 query with both entities"""
 
     def parse_result(self, data: dict[str, Any]) -> DetectionResult[None]:
         if not data.get("detected", False):

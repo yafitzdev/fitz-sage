@@ -59,11 +59,25 @@ class ComparisonSearch(BaseVectorSearch):
 
         logger = get_logger(__name__)
 
-        search_queries = self._expand_comparison_query(query)
-        logger.info(
-            f"{RETRIEVER} ComparisonSearch: expanded to {len(search_queries)} queries: "
-            f"{search_queries}"
-        )
+        # Use comparison_queries from detection result if available
+        search_queries = []
+        if detection_result and detection_result.transformations:
+            search_queries = detection_result.transformations
+            logger.info(
+                f"{RETRIEVER} ComparisonSearch: using {len(search_queries)} queries from detection"
+            )
+        else:
+            # Fall back to LLM expansion if no detection result
+            search_queries = self._expand_comparison_query(query)
+            logger.info(
+                f"{RETRIEVER} ComparisonSearch: expanded to {len(search_queries)} queries via LLM"
+            )
+
+        # Always include the original query
+        if query not in search_queries:
+            search_queries = [query] + search_queries
+
+        logger.debug(f"{RETRIEVER} ComparisonSearch: search queries: {search_queries}")
 
         # Batch embed all comparison queries in one API call
         query_vectors = self._embed_batch(search_queries) if search_queries else []

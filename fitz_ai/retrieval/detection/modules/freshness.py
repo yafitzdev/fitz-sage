@@ -22,12 +22,13 @@ class FreshnessModule(DetectionModule):
         return "freshness"
 
     def prompt_fragment(self) -> str:
-        return '''"freshness": {
+        return """"freshness": {
     "boost_recency": true/false,
     "boost_authority": true/false
   }
   // boost_recency: "latest", "recent", "new", "current", "updated", "newest"
-  // boost_authority: "official", "recommended", "best practice", "standard", "proper way"'''
+  // boost_authority: "official", "recommended", "best practice", "standard", "proper way"
+"""
 
     def parse_result(self, data: dict[str, Any]) -> DetectionResult[None]:
         boost_recency = data.get("boost_recency", False)

@@ -33,14 +33,15 @@ class TemporalModule(DetectionModule):
         return "temporal"
 
     def prompt_fragment(self) -> str:
-        return '''"temporal": {
+        return """"temporal": {
     "detected": true/false,
     "intent": "COMPARISON" | "TREND" | "POINT_IN_TIME" | "RANGE" | "SEQUENCE" | null,
     "references": [],
     "time_focused_queries": []
   }
   // temporal: time periods, versions, dates, quarters, "between X and Y", "since", "before", "last week/month/year"
-  // intent: COMPARISON="between X and Y", TREND="over time/history", POINT_IN_TIME="as of/in Q1", RANGE="from X to Y", SEQUENCE="first/then/after"'''
+  // intent: COMPARISON="between X and Y", TREND="over time/history", POINT_IN_TIME="as of/in Q1", RANGE="from X to Y", SEQUENCE="first/then/after"
+  // time_focused_queries: generate queries focused on each time period mentioned"""
 
     def parse_result(self, data: dict[str, Any]) -> DetectionResult[TemporalIntent]:
         if not data.get("detected", False):

@@ -31,14 +31,15 @@ class AggregationModule(DetectionModule):
         return "aggregation"
 
     def prompt_fragment(self) -> str:
-        return '''"aggregation": {
+        return """"aggregation": {
     "detected": true/false,
     "type": "LIST" | "COUNT" | "UNIQUE" | null,
     "target": null,
     "fetch_multiplier": 1
   }
   // aggregation: "list all", "how many", "count", "enumerate", "what are all the", "show me all"
-  // type: LIST="list/show/enumerate", COUNT="how many/count", UNIQUE="unique/distinct"'''
+  // type: LIST="list/show/enumerate", COUNT="how many/count", UNIQUE="unique/distinct"
+  // fetch_multiplier: 3 for LIST/UNIQUE, 4 for COUNT"""
 
     def parse_result(self, data: dict[str, Any]) -> DetectionResult[AggregationType]:
         if not data.get("detected", False):
