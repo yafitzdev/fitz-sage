@@ -7,7 +7,7 @@ embedding_kwargs:
   model: nomic-embed-text
 
 # Vector DB
-vector_db: local_faiss
+vector_db: pgvector
 vector_db_kwargs: {}
 
 # Tiered chat execution (local -> cloud fallback)

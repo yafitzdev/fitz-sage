@@ -27,8 +27,8 @@ fitz_rag:
   embedding: cohere
 
   # Vector DB: "provider"
-  # Examples: "local_faiss", "qdrant", "pinecone", "weaviate"
-  vector_db: local_faiss
+  # Examples: "pgvector" (default), "qdrant", "pinecone", "weaviate"
+  vector_db: pgvector
 
   # ===========================================================================
   # Optional Features (None = Disabled)
@@ -114,6 +114,14 @@ fitz_rag:
 
   chat_kwargs: {}
   embedding_kwargs: {}
-  vector_db_kwargs: {}
+
+  # pgvector settings
+  vector_db_kwargs:
+    mode: local  # "local" (pgserver) or "external" (connection_string)
+    # data_dir: null  # Uses ~/.fitz/pgdata/ by default
+    # connection_string: null  # For external mode: postgresql://user:pass@host:5432/db
+    hnsw_m: 16  # HNSW max connections per layer
+    hnsw_ef_construction: 64  # HNSW construction ef
+
   rerank_kwargs: {}
   vision_kwargs: {}

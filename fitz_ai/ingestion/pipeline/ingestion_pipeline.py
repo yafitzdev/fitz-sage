@@ -14,7 +14,7 @@ from fitz_ai.logging.tags import PIPELINE
 from fitz_ai.tabular.models import create_schema_chunk_for_stored_table
 from fitz_ai.tabular.parser import can_parse as is_table_file
 from fitz_ai.tabular.parser import parse_csv
-from fitz_ai.tabular.store import SqliteTableStore
+from fitz_ai.tabular.store import PostgresTableStore
 from fitz_ai.vector_db.writer import VectorDBWriter
 
 if TYPE_CHECKING:
@@ -65,8 +65,8 @@ class IngestionPipeline:
 
         self.collection = config.collection
 
-        # Table storage (defaults to local SQLite)
-        self.table_store = table_store or SqliteTableStore(config.collection)
+        # Table storage (defaults to PostgreSQL via pgvector)
+        self.table_store = table_store or PostgresTableStore(config.collection)
 
     def run(self, source: str) -> int:
         logger.info(f"{PIPELINE} Starting ingestion pipeline")

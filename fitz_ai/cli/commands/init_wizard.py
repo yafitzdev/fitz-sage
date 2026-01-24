@@ -72,7 +72,7 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
     # Plugin defaults
     default_chat = default_config.get("chat", {}).get("plugin_name", "cohere")
     default_embedding = default_config.get("embedding", {}).get("plugin_name", "cohere")
-    default_vector_db = default_config.get("vector_db", {}).get("plugin_name", "local_faiss")
+    default_vector_db = default_config.get("vector_db", {}).get("plugin_name", "pgvector")
     default_retrieval = default_config.get("retrieval", {}).get("plugin_name", "dense")
     default_rerank = default_config.get("rerank", {}).get("plugin_name", "cohere")
 

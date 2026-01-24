@@ -202,7 +202,7 @@ class fitz:
         # Step 4: Store in vector DB
         logger.info("Storing vectors...")
         vdb_plugin = get_vector_db_plugin(
-            vector_db_config.get("plugin_name", "local_faiss"),
+            vector_db_config.get("plugin_name", "pgvector"),
             **vector_db_config.get("kwargs", {}),
         )
 
@@ -327,7 +327,7 @@ embedding:
     model: embed-english-v3.0
 
 vector_db:
-  plugin_name: local_faiss
+  plugin_name: pgvector
   kwargs: {{}}
 
 retrieval:

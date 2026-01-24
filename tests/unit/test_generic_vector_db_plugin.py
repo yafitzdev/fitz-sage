@@ -477,24 +477,24 @@ class TestCreateVectorDBPlugin:
 
     def test_local_plugin_loads_python_class(self):
         """Local plugins load the specified Python class."""
-        # Check if the local_faiss.yaml file exists
+        # Check if the pgvector.yaml file exists
         plugins_dir = Path(__file__).parent.parent / "plugins"
-        local_faiss_yaml = plugins_dir / "local_faiss.yaml"
+        pgvector_yaml = plugins_dir / "pgvector.yaml"
 
-        if not local_faiss_yaml.exists():
-            pytest.skip("local_faiss.yaml not found in plugins directory")
+        if not pgvector_yaml.exists():
+            pytest.skip("pgvector.yaml not found in plugins directory")
 
-        # This will fail if faiss is not installed, which is expected
+        # This will fail if pgvector/psycopg is not installed, which is expected
         # The test validates that the loader attempts to load the class
         try:
-            plugin = create_vector_db_plugin("local_faiss")
-            assert plugin.plugin_name == "local_faiss" or plugin.plugin_name == "local-faiss"
+            plugin = create_vector_db_plugin("pgvector")
+            assert plugin.plugin_name == "pgvector"
         except ImportError:
-            # faiss not installed - that's fine, we tested the path
-            pytest.skip("faiss not installed")
+            # pgvector not installed - that's fine, we tested the path
+            pytest.skip("pgvector not installed")
         except ValueError as e:
             if "not found" in str(e):
-                pytest.skip("local_faiss plugin not installed")
+                pytest.skip("pgvector plugin not installed")
             raise
 
 

@@ -22,3 +22,4 @@ PIPELINE = "[PIPELINE]"
 CLI = "[CLI]"
 RGS = "[RGS]"  # retrieval-guided synthesis
 VECTOR_SEARCH = "[VECTOR_SEARCH]"
+STORAGE = "[STORAGE]"

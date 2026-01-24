@@ -30,7 +30,7 @@ class TestInitCommand:
         mock_system = MagicMock()
         mock_system.ollama.available = False
         mock_system.qdrant.available = False
-        mock_system.faiss.available = True
+        mock_system.pgvector.available = True
         mock_system.api_keys = {
             "cohere": MagicMock(available=True),
             "openai": MagicMock(available=False),
@@ -45,7 +45,7 @@ class TestInitCommand:
             ),
             patch(
                 "fitz_ai.cli.commands.init_wizard.available_vector_db_plugins",
-                return_value=["local_faiss"],
+                return_value=["pgvector"],
             ),
             patch(
                 "fitz_ai.cli.commands.init_wizard.available_retrieval_plugins",
@@ -91,17 +91,17 @@ class TestInitHelpers:
 
         assert "local_ollama" not in result
 
-    def test_filter_available_plugins_faiss(self):
+    def test_filter_available_plugins_pgvector(self):
         """Test filter_available_plugins includes FAISS when available."""
         from fitz_ai.cli.commands.init_detector import filter_available_plugins
 
         mock_system = MagicMock()
-        mock_system.faiss.available = True
+        mock_system.pgvector.available = True
 
-        plugins = ["local_faiss", "qdrant"]
+        plugins = ["pgvector", "qdrant"]
         result = filter_available_plugins(plugins, "vector_db", mock_system)
 
-        assert "local_faiss" in result
+        assert "pgvector" in result
 
     def test_filter_available_plugins_api_keys(self):
         """Test filter_available_plugins checks API keys."""
@@ -110,7 +110,7 @@ class TestInitHelpers:
         mock_system = MagicMock()
         mock_system.ollama.available = False
         mock_system.qdrant.available = False
-        mock_system.faiss.available = False
+        mock_system.pgvector.available = False
         mock_system.api_keys = {
             "cohere": MagicMock(available=True),
             "openai": MagicMock(available=False),
@@ -178,7 +178,7 @@ class TestGenerateConfig:
             embedding_model="embed-english-v3.0",
             rerank=None,
             rerank_model="",
-            vector_db="local_faiss",
+            vector_db="pgvector",
             retrieval="dense",
             qdrant_host="localhost",
             qdrant_port=6333,
@@ -194,7 +194,7 @@ class TestGenerateConfig:
         assert config["chat"]["kwargs"]["models"]["smart"] == "command-a-03-2025"
         assert config["chat"]["kwargs"]["models"]["fast"] == "command-r7b-12-2024"
         assert config["embedding"]["plugin_name"] == "cohere"
-        assert config["vector_db"]["plugin_name"] == "local_faiss"
+        assert config["vector_db"]["plugin_name"] == "pgvector"
         assert config["retrieval"]["plugin_name"] == "dense"
 
     def test_generate_fitz_rag_config_with_rerank(self):
@@ -211,7 +211,7 @@ class TestGenerateConfig:
             embedding_model="embed-english-v3.0",
             rerank="cohere",
             rerank_model="rerank-v3.5",
-            vector_db="local_faiss",
+            vector_db="pgvector",
             retrieval="dense",
             qdrant_host="localhost",
             qdrant_port=6333,
@@ -240,7 +240,7 @@ class TestGenerateConfig:
             embedding_model="",
             rerank=None,
             rerank_model="",
-            vector_db="local_faiss",
+            vector_db="pgvector",
             retrieval="dense",
             qdrant_host="localhost",
             qdrant_port=6333,
@@ -297,7 +297,7 @@ class TestGenerateConfig:
             embedding_model="",
             rerank=None,
             rerank_model="",
-            vector_db="local_faiss",
+            vector_db="pgvector",
             retrieval="dense",
             qdrant_host="localhost",
             qdrant_port=6333,
@@ -321,7 +321,7 @@ class TestInitValidation:
         mock_system = MagicMock()
         mock_system.ollama.available = False
         mock_system.qdrant.available = False
-        mock_system.faiss.available = True
+        mock_system.pgvector.available = True
         mock_system.api_keys = {}
 
         with (
@@ -333,7 +333,7 @@ class TestInitValidation:
             patch("fitz_ai.cli.commands.init_wizard.available_llm_plugins", return_value=[]),
             patch(
                 "fitz_ai.cli.commands.init_wizard.available_vector_db_plugins",
-                return_value=["local_faiss"],
+                return_value=["pgvector"],
             ),
             patch(
                 "fitz_ai.cli.commands.init_wizard.available_retrieval_plugins",
@@ -355,7 +355,7 @@ class TestInitValidation:
         mock_system = MagicMock()
         mock_system.ollama.available = False
         mock_system.qdrant.available = False
-        mock_system.faiss.available = False
+        mock_system.pgvector.available = False
         mock_system.api_keys = {"cohere": MagicMock(available=True)}
 
         with (

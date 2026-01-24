@@ -186,7 +186,7 @@ class IngestStateManager:
             parser_id: Parser ID used (e.g., "md.v1").
             embedding_id: Embedding ID used (e.g., "cohere:embed-english-v3.0").
             enricher_id: Enricher ID used (e.g., "llm:gpt-4o-mini:v1"), None if not enriched.
-            vector_db_id: Vector DB plugin used (e.g., "qdrant", "local_faiss").
+            vector_db_id: Vector DB plugin used (e.g., "qdrant", "pgvector").
             collection: Collection the file was ingested into.
         """
         root_entry = self._ensure_root(root)

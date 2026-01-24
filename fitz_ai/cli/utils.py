@@ -47,7 +47,7 @@ def get_collections(config: dict) -> List[str]:
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     try:
-        vdb_plugin = config.get("vector_db", {}).get("plugin_name", "local_faiss")
+        vdb_plugin = config.get("vector_db", {}).get("plugin_name", "pgvector")
         vdb_kwargs = config.get("vector_db", {}).get("kwargs", {})
         vdb = get_vector_db_plugin(vdb_plugin, **vdb_kwargs)
         return sorted(vdb.list_collections())
@@ -70,7 +70,7 @@ def get_vector_db_client(config: dict):
     """
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
-    vdb_plugin = config.get("vector_db", {}).get("plugin_name", "local_faiss")
+    vdb_plugin = config.get("vector_db", {}).get("plugin_name", "pgvector")
     vdb_kwargs = config.get("vector_db", {}).get("kwargs", {})
     return get_vector_db_plugin(vdb_plugin, **vdb_kwargs)
 

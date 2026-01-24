@@ -33,13 +33,13 @@ def get_vector_db() -> Any:
 
     if not config_path.exists():
         # Return local FAISS with defaults if no config
-        return get_vector_db_plugin("local_faiss")
+        return get_vector_db_plugin("pgvector")
 
     config = load_config_dict(config_path)
     vdb_config = config.get("vector_db", {})
 
     return get_vector_db_plugin(
-        vdb_config.get("plugin_name", "local_faiss"),
+        vdb_config.get("plugin_name", "pgvector"),
         **vdb_config.get("kwargs", {}),
     )
 

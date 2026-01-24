@@ -204,7 +204,7 @@ class TestCreateProviderConfig:
         assert config["chat"]["plugin_name"] == "local_ollama"
         assert config["embedding"]["plugin_name"] == "local_ollama"
 
-    def test_config_uses_local_faiss(self, tmp_path):
+    def test_config_uses_pgvector(self, tmp_path):
         """Test that config uses local FAISS."""
         import yaml
 
@@ -215,7 +215,7 @@ class TestCreateProviderConfig:
 
         config = yaml.safe_load(config_path.read_text())
 
-        assert config["vector_db"]["plugin_name"] == "local_faiss"
+        assert config["vector_db"]["plugin_name"] == "pgvector"
 
     def test_creates_parent_directories(self, tmp_path):
         """Test that parent directories are created."""

@@ -66,7 +66,7 @@ class SystemStatus:
 
     ollama: ServiceStatus
     qdrant: ServiceStatus
-    faiss: ServiceStatus
+    pgvector: ServiceStatus
     api_keys: dict[str, ApiKeyStatus]
 
     @property
@@ -98,9 +98,9 @@ class SystemStatus:
         """Return the best available vector database."""
         if self.qdrant.available:
             return "qdrant"
-        if self.faiss.available:
-            return "faiss"
-        return "faiss"  # Default fallback
+        if self.pgvector.available:
+            return "pgvector"
+        return "pgvector"  # Default fallback
 
     @property
     def best_rerank(self) -> Optional[str]:
@@ -506,26 +506,27 @@ def detect_qdrant() -> ServiceStatus:
     )
 
 
-def detect_faiss() -> ServiceStatus:
+def detect_pgvector() -> ServiceStatus:
     """
-    Check if FAISS is installed.
+    Check if pgvector/psycopg is installed.
 
     Returns:
-        ServiceStatus with available=True if faiss can be imported
+        ServiceStatus with available=True if psycopg can be imported
     """
     try:
-        import faiss  # noqa: F401
+        import psycopg  # noqa: F401
+        import pgvector  # noqa: F401
 
         return ServiceStatus(
-            name="FAISS",
+            name="pgvector",
             available=True,
-            details="Installed (local vector DB)",
+            details="Installed (PostgreSQL vector DB)",
         )
     except ImportError:
         return ServiceStatus(
-            name="FAISS",
+            name="pgvector",
             available=False,
-            details="Not installed (pip install faiss-cpu)",
+            details="Not installed (pip install psycopg pgvector pgserver)",
         )
 
 
@@ -581,7 +582,7 @@ def detect_system_status() -> SystemStatus:
     return SystemStatus(
         ollama=detect_ollama(),
         qdrant=detect_qdrant(),
-        faiss=detect_faiss(),
+        pgvector=detect_pgvector(),
         api_keys={
             "cohere": detect_api_key("cohere"),
             "openai": detect_api_key("openai"),

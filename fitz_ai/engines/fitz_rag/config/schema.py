@@ -144,7 +144,7 @@ class FitzRagConfig(BasePluginConfig):
     # Core plugins (required)
     chat: cohere/command-r-plus
     embedding: cohere/embed-english-v3.0
-    vector_db: local_faiss
+    vector_db: pgvector
 
     # Optional features (None = disabled)
     rerank: cohere/rerank-english-v3.0
@@ -184,8 +184,8 @@ class FitzRagConfig(BasePluginConfig):
     )
 
     vector_db: str = Field(
-        default="local_faiss",
-        description="Vector DB plugin: 'local_faiss', 'qdrant', 'pinecone', etc.",
+        default="pgvector",
+        description="Vector DB plugin: 'pgvector' (default), 'qdrant', 'pinecone', etc.",
     )
 
     # ==========================================================================

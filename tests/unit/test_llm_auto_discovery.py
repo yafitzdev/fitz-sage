@@ -31,7 +31,7 @@ def test_vector_db_has_separate_registry():
 
     result = available_vector_db_plugins()
     assert isinstance(result, list)
-    # Should have at least qdrant or local-faiss
+    # Should have at least qdrant or pgvector
     assert len(result) > 0
 
 

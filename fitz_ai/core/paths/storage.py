@@ -27,3 +27,23 @@ def ensure_vector_db(collection: Optional[str] = None) -> Path:
     path = vector_db(collection)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def pgdata(collection: Optional[str] = None) -> Path:
+    """
+    PostgreSQL data directory for pgserver.
+
+    Location: {workspace}/pgdata/
+    Or with collection: {workspace}/pgdata/{collection}/
+    """
+    base = workspace() / "pgdata"
+    if collection:
+        return base / collection
+    return base
+
+
+def ensure_pgdata(collection: Optional[str] = None) -> Path:
+    """Get pgdata path and create it if it doesn't exist."""
+    path = pgdata(collection)
+    path.mkdir(parents=True, exist_ok=True)
+    return path

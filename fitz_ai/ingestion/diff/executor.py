@@ -148,7 +148,7 @@ class DiffIngestExecutor:
             chunking_router: Router for file-type specific chunking.
             collection: Vector DB collection name.
             embedding_id: Current embedding configuration ID.
-            vector_db_id: Vector DB plugin name (e.g., "qdrant", "local_faiss").
+            vector_db_id: Vector DB plugin name (e.g., "qdrant", "pgvector").
             enrichment_pipeline: Optional unified enrichment pipeline.
                                 Handles both chunk summaries and project artifacts.
             table_store: Optional table storage backend for CSV/table files.
@@ -174,7 +174,7 @@ class DiffIngestExecutor:
             vector_client = getattr(vector_db_writer, "_client", None)
             self._table_store = get_table_store(
                 collection=collection,
-                vector_db_plugin=vector_db_id or "local_faiss",
+                vector_db_plugin=vector_db_id or "pgvector",
                 vector_plugin_instance=vector_client,
             )
 
@@ -819,7 +819,7 @@ def run_diff_ingest(
         chunking_router: Router for file-type specific chunking.
         collection: Vector DB collection name.
         embedding_id: Current embedding configuration ID.
-        vector_db_id: Vector DB plugin name (e.g., "qdrant", "local_faiss").
+        vector_db_id: Vector DB plugin name (e.g., "qdrant", "pgvector").
         enrichment_pipeline: Optional unified enrichment pipeline.
         force: If True, ingest everything regardless of state.
         on_progress: Optional callback(current, total, file_path) for progress updates.

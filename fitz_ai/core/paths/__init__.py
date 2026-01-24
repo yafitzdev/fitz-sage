@@ -90,6 +90,17 @@ class FitzPaths:
         """Get vector DB path and create it if it doesn't exist."""
         return _storage.ensure_vector_db(collection)
 
+    # PostgreSQL data (pgserver)
+    @classmethod
+    def pgdata(cls, collection: Optional[str] = None) -> Path:
+        """PostgreSQL data directory for pgserver."""
+        return _storage.pgdata(collection)
+
+    @classmethod
+    def ensure_pgdata(cls, collection: Optional[str] = None) -> Path:
+        """Get pgdata path and create it if it doesn't exist."""
+        return _storage.ensure_pgdata(collection)
+
     # Indices
     @classmethod
     def vocabulary(cls, collection: Optional[str] = None) -> Path:

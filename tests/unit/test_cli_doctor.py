@@ -250,7 +250,7 @@ class TestDoctorConnectionTests:
         ):
             from fitz_ai.cli.commands.doctor import _test_vector_db
 
-            ctx = self._make_ctx(vector_db_plugin="local_faiss")
+            ctx = self._make_ctx(vector_db_plugin="pgvector")
             ok, detail = _test_vector_db(ctx)
 
         assert ok is True
@@ -298,7 +298,7 @@ class TestDoctorTestMode:
         config = {
             "chat": {"plugin_name": "cohere"},
             "embedding": {"plugin_name": "cohere"},
-            "vector_db": {"plugin_name": "local_faiss"},
+            "vector_db": {"plugin_name": "pgvector"},
             "rerank": {"enabled": False},
         }
         config_path.write_text(yaml.dump(config))
@@ -308,8 +308,8 @@ class TestDoctorTestMode:
         mock_system.ollama.details = "not running"
         mock_system.qdrant.available = False
         mock_system.qdrant.details = "not running"
-        mock_system.faiss.available = True
-        mock_system.faiss.details = "installed"
+        mock_system.pgvector.available = True
+        mock_system.pgvector.details = "installed"
         mock_system.api_keys = {}
 
         mock_plugin = MagicMock()

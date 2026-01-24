@@ -50,7 +50,7 @@ class TestChatHelpers:
         mock_ctx.raw_config = {
             "chat": {"plugin_name": "cohere"},
             "embedding": {"plugin_name": "cohere"},
-            "vector_db": {"plugin_name": "local_faiss"},
+            "vector_db": {"plugin_name": "pgvector"},
             "retrieval": {"plugin_name": "dense", "collection": "test"},
         }
         mock_ctx.typed_config = MagicMock()
@@ -75,7 +75,7 @@ class TestChatHelpers:
         ):
             from fitz_ai.cli.utils import get_collections
 
-            collections = get_collections({"vector_db": {"plugin_name": "local_faiss"}})
+            collections = get_collections({"vector_db": {"plugin_name": "pgvector"}})
 
         assert collections == ["apple", "middle", "zebra"]
 

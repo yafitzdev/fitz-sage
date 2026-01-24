@@ -28,7 +28,7 @@ class TestCollectionsCommand:
         """Test that collections starts and shows header with defaults."""
         # CLIContext.load() always succeeds with package defaults
         mock_ctx = MagicMock()
-        mock_ctx.vector_db_plugin = "local_faiss"
+        mock_ctx.vector_db_plugin = "pgvector"
         mock_ctx.vector_db_kwargs = {}
 
         # Mock vector DB client returned by require_vector_db_client
@@ -37,7 +37,7 @@ class TestCollectionsCommand:
         mock_ctx.require_vector_db_client.return_value = mock_vdb
 
         # Mock to return only one available DB (skips selection prompt)
-        mock_available = [{"name": "local_faiss", "kwargs": {}, "is_configured": True}]
+        mock_available = [{"name": "pgvector", "kwargs": {}, "is_configured": True}]
 
         with (
             patch("fitz_ai.cli.commands.collections.CLIContext.load", return_value=mock_ctx),
@@ -59,7 +59,7 @@ class TestCollectionsHelpers:
     def test_cli_context_loads_config(self):
         """Test CLIContext loads config."""
         mock_ctx = MagicMock()
-        mock_ctx.vector_db_plugin = "local_faiss"
+        mock_ctx.vector_db_plugin = "pgvector"
 
         with patch("fitz_ai.cli.context.CLIContext.load", return_value=mock_ctx):
             from fitz_ai.cli.context import CLIContext
@@ -67,24 +67,24 @@ class TestCollectionsHelpers:
             ctx = CLIContext.load()
 
         assert ctx is not None
-        assert ctx.vector_db_plugin == "local_faiss"
+        assert ctx.vector_db_plugin == "pgvector"
 
     def test_get_available_vector_dbs(self):
         """Test _get_available_vector_dbs returns sorted list."""
         mock_ctx = MagicMock()
-        mock_ctx.vector_db_plugin = "local_faiss"
+        mock_ctx.vector_db_plugin = "pgvector"
         mock_ctx.vector_db_kwargs = {}
 
         with patch(
             "fitz_ai.vector_db.registry.available_vector_db_plugins",
-            return_value=["qdrant", "local_faiss"],
+            return_value=["qdrant", "pgvector"],
         ):
             from fitz_ai.cli.commands.collections import _get_available_vector_dbs
 
             result = _get_available_vector_dbs(mock_ctx)
 
         # Configured one should be first
-        assert result[0]["name"] == "local_faiss"
+        assert result[0]["name"] == "pgvector"
         assert result[0]["is_configured"] is True
 
 
@@ -152,7 +152,7 @@ class TestCollectionsNoCollections:
         import yaml
 
         config_path = tmp_path / "fitz.yaml"
-        config = {"vector_db": {"plugin_name": "local_faiss"}}
+        config = {"vector_db": {"plugin_name": "pgvector"}}
         config_path.write_text(yaml.dump(config))
 
         mock_client = MagicMock()
@@ -169,7 +169,7 @@ class TestCollectionsNoCollections:
             ),
             patch(
                 "fitz_ai.vector_db.registry.available_vector_db_plugins",
-                return_value=["local_faiss"],
+                return_value=["pgvector"],
             ),
         ):
             result = runner.invoke(app, ["collections"])
@@ -185,7 +185,7 @@ class TestCollectionsWithData:
         import yaml
 
         config_path = tmp_path / "fitz.yaml"
-        config = {"vector_db": {"plugin_name": "local_faiss"}}
+        config = {"vector_db": {"plugin_name": "pgvector"}}
         config_path.write_text(yaml.dump(config))
 
         mock_client = MagicMock()
@@ -206,7 +206,7 @@ class TestCollectionsWithData:
             ),
             patch(
                 "fitz_ai.vector_db.registry.available_vector_db_plugins",
-                return_value=["local_faiss"],
+                return_value=["pgvector"],
             ),
         ):
             # Select "Exit" (option 3 - after docs, code)
@@ -220,7 +220,7 @@ class TestCollectionsWithData:
         import yaml
 
         config_path = tmp_path / "fitz.yaml"
-        config = {"vector_db": {"plugin_name": "local_faiss"}}
+        config = {"vector_db": {"plugin_name": "pgvector"}}
         config_path.write_text(yaml.dump(config))
 
         mock_record = MagicMock()
@@ -246,7 +246,7 @@ class TestCollectionsWithData:
             ),
             patch(
                 "fitz_ai.vector_db.registry.available_vector_db_plugins",
-                return_value=["local_faiss"],
+                return_value=["pgvector"],
             ),
             patch("fitz_ai.cli.commands.collections.RICH", False),
         ):
@@ -264,7 +264,7 @@ class TestCollectionsDelete:
         import yaml
 
         config_path = tmp_path / "fitz.yaml"
-        config = {"vector_db": {"plugin_name": "local_faiss"}}
+        config = {"vector_db": {"plugin_name": "pgvector"}}
         config_path.write_text(yaml.dump(config))
 
         mock_client = MagicMock()
@@ -282,7 +282,7 @@ class TestCollectionsDelete:
             ),
             patch(
                 "fitz_ai.vector_db.registry.available_vector_db_plugins",
-                return_value=["local_faiss"],
+                return_value=["pgvector"],
             ),
         ):
             # Select collection, select delete, answer no, exit

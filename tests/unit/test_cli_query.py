@@ -54,7 +54,7 @@ class TestQueryHelpers:
         config = {
             "chat": "cohere",
             "embedding": "cohere",
-            "vector_db": "local_faiss",
+            "vector_db": "pgvector",
             "retrieval_plugin": "dense",
             "collection": "test",
         }
@@ -82,7 +82,7 @@ class TestQueryHelpers:
         ):
             from fitz_ai.cli.utils import get_collections
 
-            collections = get_collections({"vector_db": {"plugin_name": "local_faiss"}})
+            collections = get_collections({"vector_db": {"plugin_name": "pgvector"}})
 
         assert sorted(collections) == ["coll_a", "coll_b"]
 
@@ -110,7 +110,7 @@ class TestQueryExecution:
         config = {
             "chat": "cohere/command",
             "embedding": "cohere/embed-english-v3.0",
-            "vector_db": "local_faiss",
+            "vector_db": "pgvector",
             "retrieval_plugin": "dense",
             "collection": "test",
             "top_k": 5,
@@ -151,7 +151,7 @@ class TestQueryOptions:
         config = {
             "chat": "cohere",
             "embedding": "cohere",
-            "vector_db": "local_faiss",
+            "vector_db": "pgvector",
             "retrieval_plugin": "dense",
             "collection": "default",
         }

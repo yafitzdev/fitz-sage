@@ -206,7 +206,7 @@ class Differ:
             config_provider: Provider for current config IDs (e.g., ChunkingRouter).
             parser_id_func: Function to get parser_id for an extension.
             embedding_id: Current embedding configuration ID.
-            vector_db_id: Current vector DB plugin name (e.g., "qdrant", "local_faiss").
+            vector_db_id: Current vector DB plugin name (e.g., "qdrant", "pgvector").
             collection: Target collection for ingestion.
         """
         self._state = state_reader
@@ -357,7 +357,7 @@ def compute_diff(
         embedding_id: Current embedding configuration ID.
         force: If True, ingest all files regardless of state.
         root: Root path for deletion detection.
-        vector_db_id: Current vector DB plugin name (e.g., "qdrant", "local_faiss").
+        vector_db_id: Current vector DB plugin name (e.g., "qdrant", "pgvector").
         collection: Target collection for ingestion.
 
     Returns:

@@ -17,7 +17,7 @@ class SystemStatus:
     api_keys: dict[str, Any]
     ollama: Any
     qdrant: Any
-    faiss: Any
+    pgvector: Any
 
 
 @dataclass
@@ -46,7 +46,7 @@ class InitService:
             api_keys=system.api_keys,
             ollama=system.ollama,
             qdrant=system.qdrant,
-            faiss=system.faiss,
+            pgvector=system.pgvector,
         )
 
     def load_default_config(self) -> dict:
@@ -78,9 +78,9 @@ class InitService:
                     available.append(plugin)
                 continue
 
-            # FAISS requires faiss
-            if "faiss" in plugin_lower:
-                if system.faiss.available:
+            # pgvector requires psycopg/pgvector packages
+            if "pgvector" in plugin_lower:
+                if system.pgvector.available:
                     available.append(plugin)
                 continue
 

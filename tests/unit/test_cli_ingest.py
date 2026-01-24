@@ -34,13 +34,13 @@ class TestIngestCommand:
         mock_ctx = MagicMock()
         mock_ctx.raw_config = {
             "embedding": {"plugin_name": "cohere"},
-            "vector_db": {"plugin_name": "local_faiss"},
+            "vector_db": {"plugin_name": "pgvector"},
             "retrieval": {"collection": "default"},
             "chunking": {"default": {"plugin_name": "simple", "kwargs": {"chunk_size": 1000}}},
         }
         mock_ctx.embedding_id = "cohere:embed-english-v3.0"
         mock_ctx.embedding_plugin = "cohere"
-        mock_ctx.vector_db_plugin = "local_faiss"
+        mock_ctx.vector_db_plugin = "pgvector"
         mock_ctx.retrieval_collection = "default"
 
         mock_ingest = MagicMock()
@@ -60,13 +60,13 @@ class TestIngestCommand:
         mock_ctx = MagicMock()
         mock_ctx.raw_config = {
             "embedding": {"plugin_name": "cohere"},
-            "vector_db": {"plugin_name": "local_faiss"},
+            "vector_db": {"plugin_name": "pgvector"},
             "retrieval": {"collection": "default"},
             "chunking": {"default": {"plugin_name": "simple", "kwargs": {"chunk_size": 1000}}},
         }
         mock_ctx.embedding_id = "cohere:embed-english-v3.0"
         mock_ctx.embedding_plugin = "cohere"
-        mock_ctx.vector_db_plugin = "local_faiss"
+        mock_ctx.vector_db_plugin = "pgvector"
         mock_ctx.retrieval_collection = "default"
 
         with patch("fitz_ai.cli.context.CLIContext.load", return_value=mock_ctx):

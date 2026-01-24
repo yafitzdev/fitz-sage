@@ -740,7 +740,7 @@ class RAGPipeline:
             )
 
         # Table store for CSV file queries
-        # Uses GenericTableStore for remote vector DBs, SqliteTableStore for local
+        # Uses PostgresTableStore for unified storage (vectors + tables in PostgreSQL)
         table_store = get_table_store(
             collection=cfg.collection,
             vector_db_plugin=cfg.vector_db,

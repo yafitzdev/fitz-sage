@@ -18,7 +18,7 @@ def _make_mock_context(
     *,
     chat_plugin="cohere",
     embedding_plugin="cohere",
-    vector_db_plugin="local_faiss",
+    vector_db_plugin="pgvector",
     retrieval_plugin="dense",
     retrieval_collection="default",
     has_user_config=True,
@@ -232,7 +232,7 @@ class TestConfigSummaryView:
         mock_ctx = _make_mock_context(
             chat_plugin="cohere",
             embedding_plugin="cohere",
-            vector_db_plugin="local_faiss",
+            vector_db_plugin="pgvector",
             retrieval_plugin="dense",
             has_user_config=True,
             config_path=config_path,
@@ -246,7 +246,7 @@ class TestConfigSummaryView:
 
         assert result.exit_code == 0
         assert "cohere" in result.output.lower()
-        assert "faiss" in result.output.lower()
+        assert "pgvector" in result.output.lower()
 
     def test_config_summary_shows_rerank_when_enabled(self, tmp_path):
         """Test summary shows rerank when enabled."""
@@ -281,7 +281,7 @@ class TestShowConfigSummary:
         mock_ctx.chat_model_smart = "command-r-plus"
         mock_ctx.embedding_plugin = "cohere"
         mock_ctx.embedding_model = "embed-english-v3.0"
-        mock_ctx.vector_db_plugin = "local_faiss"
+        mock_ctx.vector_db_plugin = "pgvector"
         mock_ctx.vector_db_kwargs = {}
         mock_ctx.retrieval_plugin = "dense"
         mock_ctx.retrieval_collection = "test"

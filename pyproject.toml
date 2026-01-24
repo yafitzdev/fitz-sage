@@ -61,13 +61,21 @@ dependencies = [
     "jinja2>=3.1",
     # Cryptography for Fitz Cloud encryption (AES-256-GCM)
     "cryptography>=41.0",
-    # FAISS included by default for zero-friction quickstart
-    "faiss-cpu>=1.7.0",
+    # PostgreSQL + pgvector for unified storage (vectors + tables)
+    "psycopg[binary]>=3.1",
+    "psycopg-pool>=3.1",
+    "pgvector>=0.2.0",
+    "pgserver>=0.1.0",
     # Docling for advanced document parsing (PDF, DOCX, PPTX, images)
     "docling>=2.0",
 ]
 
 [project.optional-dependencies]
+# Legacy FAISS support (for migration from older versions)
+faiss = [
+    "faiss-cpu>=1.7.0",
+]
+
 # Local LLM capabilities (Ollama)
 local = [
     "ollama>=0.1.0",
@@ -133,7 +141,7 @@ loadtest = [
     "psutil>=5.9",
 ]
 
-# Install everything at once (docling is now in core dependencies)
+# Install everything at once (core deps include pgvector now)
 all = [
     "ollama>=0.1.0",
     "qdrant-client>=1.7",

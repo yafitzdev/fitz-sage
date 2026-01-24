@@ -12,8 +12,7 @@ from fitz_ai.tabular.store.base import (
     compute_hash,
     decompress_csv,
 )
-from fitz_ai.tabular.store.generic import GenericTableStore
-from fitz_ai.tabular.store.sqlite import SqliteTableStore
+from fitz_ai.tabular.store.postgres import PostgresTableStore
 
 if TYPE_CHECKING:
     pass
@@ -21,21 +20,20 @@ if TYPE_CHECKING:
 __all__ = [
     "StoredTable",
     "TableStore",
-    "SqliteTableStore",
-    "GenericTableStore",
+    "PostgresTableStore",
     "compress_csv",
     "compute_hash",
     "decompress_csv",
     "get_table_store",
 ]
 
-# Local plugins that use SQLite table store (no remote sync)
-LOCAL_PLUGINS = {"local_faiss", "local-faiss"}
+# pgvector plugins use PostgreSQL table store
+PGVECTOR_PLUGINS = {"pgvector", "local-pgvector"}
 
 
 def get_table_store(
     collection: str,
-    vector_db_plugin: str = "local_faiss",
+    vector_db_plugin: str = "pgvector",
     vector_plugin_instance: Any = None,
 ) -> TableStore:
     """
@@ -44,20 +42,14 @@ def get_table_store(
     Args:
         collection: Collection name
         vector_db_plugin: Name of vector DB plugin being used
-        vector_plugin_instance: Vector DB plugin instance (for remote stores)
+        vector_plugin_instance: Vector DB plugin instance (unused for pgvector)
 
     Returns:
-        TableStore instance:
-        - SqliteTableStore for local plugins (FAISS)
-        - GenericTableStore for remote plugins (Qdrant, Pinecone, Weaviate, Milvus)
+        PostgresTableStore for pgvector (unified storage)
     """
-    # Local mode: use SQLite directly
-    if vector_db_plugin in LOCAL_PLUGINS:
-        return SqliteTableStore(collection)
+    # pgvector: use PostgreSQL table store (unified storage)
+    if vector_db_plugin in PGVECTOR_PLUGINS:
+        return PostgresTableStore(collection)
 
-    # Remote mode: use GenericTableStore with plugin's retrieve operation
-    if vector_plugin_instance is not None:
-        return GenericTableStore(collection, vector_plugin_instance)
-
-    # Fallback to SQLite if no plugin instance provided
-    return SqliteTableStore(collection)
+    # Default to PostgreSQL
+    return PostgresTableStore(collection)

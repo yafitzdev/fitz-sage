@@ -215,7 +215,7 @@ class CLIContext:
         # V2 flat structure: top-level plugin strings
         chat_plugin_name = cls._parse_plugin_string(config.get("chat", ""))
         emb_plugin_name = cls._parse_plugin_string(config.get("embedding", ""))
-        vdb_plugin_name = config.get("vector_db", "local_faiss")
+        vdb_plugin_name = config.get("vector_db", "pgvector")
         rerank_plugin_name = cls._parse_plugin_string(config.get("rerank"))
 
         # Load plugin specs to get model defaults
@@ -558,7 +558,7 @@ class CLIContext:
         """
         Get a single-line info string for display.
 
-        Example: "Collection: default | VectorDB: local_faiss | Chat: cohere (command-r-plus)"
+        Example: "Collection: default | VectorDB: pgvector | Chat: cohere (command-r-plus)"
         """
         parts = [
             f"Collection: {self.retrieval_collection}",

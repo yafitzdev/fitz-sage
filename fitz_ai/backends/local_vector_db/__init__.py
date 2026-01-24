@@ -1,7 +1,7 @@
 from .config import LocalVectorDBConfig
-from .faiss import FaissLocalVectorDB
+from .pgvector import PgVectorDB
 
 __all__ = [
     "LocalVectorDBConfig",
-    "FaissLocalVectorDB",
+    "PgVectorDB",
 ]

@@ -520,7 +520,7 @@ def _create_provider_config(config_path: Path, provider: str, extra: Optional[di
     config = {
         "chat": provider_cfg["chat"],
         "embedding": provider_cfg["embedding"],
-        "vector_db": {"plugin_name": "local_faiss", "kwargs": {}},
+        "vector_db": {"plugin_name": "pgvector", "kwargs": {}},
         "retrieval": {"plugin_name": "dense", "collection": "quickstart", "top_k": 5},
         "rerank": provider_cfg["rerank"],
         "rgs": {"enable_citations": True, "strict_grounding": True, "max_chunks": 8},
@@ -719,7 +719,7 @@ def _run_ingestion(
         ui.info("Storing vectors...")
 
     vdb_plugin = get_vector_db_plugin(
-        vector_db_config.get("plugin_name", "local_faiss"),
+        vector_db_config.get("plugin_name", "pgvector"),
         **vector_db_config.get("kwargs", {}),
     )
 

@@ -257,7 +257,7 @@ operations:
 #   type: local
 #
 # operations:
-#   python_class: fitz_ai.backends.local_vector_db.faiss.FaissLocalVectorDB
+#   python_class: fitz_ai.backends.local_vector_db.pgvector.PgVectorDB
 
 # =============================================================================
 # EXAMPLE: MINIMAL PLUGIN
