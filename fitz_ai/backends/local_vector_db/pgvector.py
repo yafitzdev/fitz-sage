@@ -145,27 +145,37 @@ class PgVectorDB:
         with self._manager.connection(collection) as conn:
             register_vector(conn)
 
-            # Check if table exists and get current dimension
-            result = conn.execute(
+            # Check if table exists first
+            table_exists = conn.execute(
                 """
-                SELECT atttypmod - 4 as dim
-                FROM pg_attribute
-                WHERE attrelid = 'chunks'::regclass
-                AND attname = 'vector'
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_name = 'chunks'
+                )
                 """
-            ).fetchone()
+            ).fetchone()[0]
 
-            if result:
-                # Table exists, verify dimension
-                existing_dim = result[0]
-                if existing_dim != dim:
-                    raise ValueError(
-                        f"Dimension mismatch: collection '{collection}' has dim={existing_dim}, "
-                        f"but got vectors with dim={dim}. Drop the collection to change dimensions."
-                    )
-                self._initialized_collections[collection] = existing_dim
-                logger.debug(f"{VECTOR_DB} Using existing collection '{collection}' (dim={existing_dim})")
-                return
+            if table_exists:
+                # Table exists, get and verify dimension
+                result = conn.execute(
+                    """
+                    SELECT atttypmod - 4 as dim
+                    FROM pg_attribute
+                    WHERE attrelid = 'chunks'::regclass
+                    AND attname = 'vector'
+                    """
+                ).fetchone()
+
+                if result:
+                    existing_dim = result[0]
+                    if existing_dim != dim:
+                        raise ValueError(
+                            f"Dimension mismatch: collection '{collection}' has dim={existing_dim}, "
+                            f"but got vectors with dim={dim}. Drop the collection to change dimensions."
+                        )
+                    self._initialized_collections[collection] = existing_dim
+                    logger.debug(f"{VECTOR_DB} Using existing collection '{collection}' (dim={existing_dim})")
+                    return
 
         # Table doesn't exist, create it
         with self._manager.connection(collection) as conn:
@@ -373,6 +383,11 @@ class PgVectorDB:
         with self._manager.connection(collection_name) as conn:
             register_vector(conn)
 
+            # Convert to numpy array for pgvector
+            import numpy as np
+
+            query_vec = np.array(query_vector, dtype=np.float32)
+
             # Build filter clause
             where_clause, filter_params = self._build_filter_clause(query_filter)
 
@@ -386,7 +401,7 @@ class PgVectorDB:
                     ORDER BY vector <=> %s
                     LIMIT %s
                 """
-                params = [query_vector] + filter_params + [query_vector, limit]
+                params = [query_vec] + filter_params + [query_vec, limit]
             else:
                 sql = """
                     SELECT id, 1 - (vector <=> %s) as score, payload
@@ -394,7 +409,7 @@ class PgVectorDB:
                     ORDER BY vector <=> %s
                     LIMIT %s
                 """
-                params = [query_vector, query_vector, limit]
+                params = [query_vec, query_vec, limit]
 
             cursor = conn.execute(sql, params)
             results = []
@@ -618,22 +633,28 @@ class PgVectorDB:
 
     def delete_collection(self, collection: str) -> int:
         """Delete a collection entirely."""
-        if collection not in self._initialized_collections:
+        try:
+            with self._manager.connection(collection) as conn:
+                # Count before delete
+                try:
+                    result = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()
+                    count = result[0] if result else 0
+                except Exception:
+                    count = 0
+
+                # Drop tables
+                conn.execute("DROP TABLE IF EXISTS chunks CASCADE")
+                conn.execute("DROP TABLE IF EXISTS tables CASCADE")
+                conn.commit()
+
+            if collection in self._initialized_collections:
+                del self._initialized_collections[collection]
+
+            logger.info(f"{VECTOR_DB} Deleted collection '{collection}' ({count} vectors)")
+            return count
+        except Exception as e:
+            logger.warning(f"{VECTOR_DB} Failed to delete collection '{collection}': {e}")
             return 0
-
-        with self._manager.connection(collection) as conn:
-            # Count before delete
-            result = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()
-            count = result[0] if result else 0
-
-            # Drop tables
-            conn.execute("DROP TABLE IF EXISTS chunks CASCADE")
-            conn.execute("DROP TABLE IF EXISTS tables CASCADE")
-            conn.commit()
-
-        del self._initialized_collections[collection]
-        logger.info(f"{VECTOR_DB} Deleted collection '{collection}' ({count} vectors)")
-        return count
 
     def _discover_collection(self, collection: str) -> bool:
         """Try to discover an existing collection's dimension."""

@@ -33,19 +33,25 @@ class MockEmbedder:
         self.dim = dim
         self._call_count = 0
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        """Generate deterministic embeddings based on text hash."""
-        embeddings = []
-        for text in texts:
-            # Create a deterministic but varied embedding
-            h = hashlib.md5(text.encode()).hexdigest()
-            # Use hash to seed values
-            base = [int(h[i : i + 2], 16) / 255.0 for i in range(0, min(32, self.dim * 2), 2)]
-            # Pad to full dimension
-            while len(base) < self.dim:
-                base.extend(base[: self.dim - len(base)])
-            embeddings.append(base[: self.dim])
-        return embeddings
+    def _embed_single(self, text: str) -> list[float]:
+        """Generate a deterministic embedding based on text hash."""
+        h = hashlib.md5(text.encode()).hexdigest()
+        # Use hash to seed values
+        base = [int(h[i : i + 2], 16) / 255.0 for i in range(0, min(32, self.dim * 2), 2)]
+        # Pad to full dimension
+        while len(base) < self.dim:
+            base.extend(base[: self.dim - len(base)])
+        return base[: self.dim]
+
+    def embed(self, text: str) -> list[float]:
+        """Embed a single text. Matches YAMLEmbeddingClient.embed signature."""
+        self._call_count += 1
+        return self._embed_single(text)
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Embed multiple texts. Matches YAMLEmbeddingClient.embed_batch signature."""
+        self._call_count += 1
+        return [self._embed_single(text) for text in texts]
 
 
 class MockChatClient:
@@ -741,7 +747,7 @@ class TestDerivedSentences:
         derived_collection = get_derived_collection(test_collection)
 
         # Search for the derived content
-        query_vec = mock_embedder.embed(["employees count"])[0]
+        query_vec = mock_embedder.embed("employees count")
         results = mock_vector_db.search(
             collection_name=derived_collection,
             query_vector=query_vec,
@@ -890,7 +896,7 @@ class TestFullPipelineFlow:
         from fitz_ai.structured.constants import get_derived_collection
 
         derived_collection = get_derived_collection(test_collection)
-        query_vec = mock_embedder.embed(["engineering employees count"])[0]
+        query_vec = mock_embedder.embed("engineering employees count")
 
         results = mock_vector_db.search(
             collection_name=derived_collection,

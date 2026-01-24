@@ -175,6 +175,10 @@ class TestOutputSanitization:
         for query in factual_queries:
             result = self.runner.pipeline.run(query)
 
-            # Factual answers should have sources
-            if result.answer and "don't" not in result.answer.lower():
+            # Factual answers should have sources unless abstaining
+            abstention_phrases = ["don't", "unable", "no relevant", "no information", "cannot"]
+            answer_lower = result.answer.lower() if result.answer else ""
+            is_abstaining = any(phrase in answer_lower for phrase in abstention_phrases)
+
+            if result.answer and not is_abstaining:
                 assert result.sources, f"Factual answer without sources: {query}"

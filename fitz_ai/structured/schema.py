@@ -134,8 +134,8 @@ class SchemaSearchResult:
 class EmbeddingClient(Protocol):
     """Protocol for embedding generation."""
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        """Generate embeddings for texts."""
+    def embed(self, text: str) -> list[float]:
+        """Generate embedding for a single text."""
         ...
 
 

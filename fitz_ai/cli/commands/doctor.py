@@ -82,7 +82,7 @@ def _check_dependencies() -> list[tuple[str, bool, str]]:
 def _check_optional_dependencies() -> list[tuple[str, bool, str]]:
     """Check optional Python packages."""
     packages = [
-        ("faiss", "Local vector DB", "faiss-cpu"),
+        ("psycopg", "pgvector DB", "psycopg[binary]"),
         ("qdrant_client", "Qdrant client", "qdrant-client"),
         ("cohere", "Cohere API", "cohere"),
         ("openai", "OpenAI API", "openai"),
@@ -279,11 +279,11 @@ def command(
     else:
         ui.warning("Qdrant", system.qdrant.details)
 
-    # FAISS
-    if system.faiss.available:
-        ui.status("FAISS", True, "installed")
+    # pgvector
+    if system.pgvector.available:
+        ui.status("pgvector", True, "installed")
     else:
-        ui.warning("FAISS", system.faiss.details)
+        ui.warning("pgvector", system.pgvector.details)
 
     # =========================================================================
     # API Keys

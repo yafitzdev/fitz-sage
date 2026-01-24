@@ -9,7 +9,7 @@ Usage:
 This command is a thin wrapper that:
 1. Prompts for API key if not set
 2. Creates config file if not exists (like silent `fitz init -y`)
-3. Ingests documents into FAISS
+3. Ingests documents into vector database
 4. Runs query
 
 No separate code path - just sugar on top of the normal flow.
@@ -91,7 +91,7 @@ def command(
         raise typer.Exit(1)
 
     # =========================================================================
-    # Run quickstart with fitz_rag + FAISS
+    # Run quickstart with fitz_rag + pgvector
     # =========================================================================
 
     _run_quickstart(source, question, collection, verbose)
@@ -103,7 +103,7 @@ def command(
 
 
 def _run_quickstart(source: Path, question: str, collection: str, verbose: bool) -> None:
-    """Run quickstart with fitz_rag engine and FAISS."""
+    """Run quickstart with fitz_rag engine and pgvector."""
     engine_config_path = FitzPaths.engine_config("fitz_rag")
 
     # =========================================================================
@@ -487,7 +487,7 @@ def _create_provider_config(config_path: Path, provider: str, extra: Optional[di
     """
     Create a config file for the selected provider.
 
-    Uses the selected provider for chat/embedding and local FAISS for vectors.
+    Uses the selected provider for chat/embedding and pgvector for vectors.
 
     Args:
         config_path: Path to write the config file

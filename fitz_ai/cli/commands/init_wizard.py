@@ -63,7 +63,7 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
 
     if not avail_vector_db:
         ui.error("No vector database available!")
-        ui.info("Start Qdrant or install FAISS (pip install faiss-cpu).")
+        ui.info("Start Qdrant or ensure pgvector packages are installed.")
         raise typer.Exit(1)
 
     # Load defaults from default.yaml
@@ -365,7 +365,7 @@ def command(
             else system.qdrant.details
         ),
     )
-    ui.status("FAISS", system.faiss.available)
+    ui.status("pgvector", system.pgvector.available)
 
     for name, key_status in system.api_keys.items():
         ui.status(name.capitalize(), key_status.available)
