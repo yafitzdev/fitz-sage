@@ -1,16 +1,12 @@
 # tests/test_config.yaml
 # Unified test configuration - ALL tests use this
 
-# Embedding (local Ollama)
-embedding: local_ollama
-embedding_kwargs:
-  model: nomic-embed-text
-
 # Vector DB
 vector_db: pgvector
 vector_db_kwargs: {}
 
-# Tiered chat execution (local -> cloud fallback)
+# Tiered execution (local -> cloud fallback)
+# Each tier specifies its own chat AND embedding to isolate failures
 tiers:
   - name: local
     chat: local_ollama
@@ -19,6 +15,9 @@ tiers:
         smart: qwen2.5:7b
         fast: qwen2.5:1.5b
         balanced: qwen2.5:3b
+    embedding: local_ollama
+    embedding_kwargs:
+      model: nomic-embed-text
 
   - name: cloud
     chat: cohere
@@ -27,6 +26,9 @@ tiers:
         smart: command-a-03-2025
         fast: command-r7b-12-2024
         balanced: command-r-08-2024
+    embedding: cohere
+    embedding_kwargs:
+      model: embed-v4.0
 
 # Response cache (E2E)
 cache:

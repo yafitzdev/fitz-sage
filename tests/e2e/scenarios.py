@@ -184,6 +184,7 @@ SCENARIOS: list[TestScenario] = [
             "classified",
             "restricted",
             "confidential",
+            "not contain",  # Matches "do not contain" and "does not contain"
         ],
         min_sources=0,
     ),

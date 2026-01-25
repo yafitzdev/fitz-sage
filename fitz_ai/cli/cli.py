@@ -14,6 +14,7 @@ Commands:
     fitz serve         Start the REST API server
     fitz config        View configuration
     fitz doctor        System diagnostics
+    fitz reset         Reset pgserver database (when stuck/corrupted)
     fitz engine        View or set the default engine for all commands
     fitz plugin        Generate plugins using LLM
 
@@ -159,6 +160,16 @@ def doctor(
     from fitz_ai.cli.commands import doctor as mod
 
     mod.command(verbose=verbose, test=test)
+
+
+@app.command("reset")
+def reset(
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt."),
+) -> None:
+    """Reset pgserver database (use when pgserver hangs or gets corrupted)."""
+    from fitz_ai.cli.commands import reset as mod
+
+    mod.reset(force=force)
 
 
 @app.command("engine")

@@ -128,8 +128,17 @@ class PostgresConnectionManager:
             self._started = True
             logger.info(f"{STORAGE} PostgreSQL connection manager started (mode={self.config.mode.value})")
 
-    def _start_pgserver(self) -> None:
-        """Start embedded pgserver."""
+    def _start_pgserver(self, timeout: int = 60) -> None:
+        """
+        Start embedded pgserver with timeout.
+
+        Args:
+            timeout: Maximum seconds to wait for pgserver to start (default: 60)
+
+        Raises:
+            TimeoutError: If pgserver doesn't start within timeout
+            ImportError: If pgserver package not installed
+        """
         try:
             import pgserver
         except ImportError as e:
@@ -141,8 +150,26 @@ class PostgresConnectionManager:
         data_dir = Path(data_dir)
         data_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"{STORAGE} Starting pgserver at {data_dir}")
-        self._pgserver = pgserver.get_server(str(data_dir))
+        logger.info(f"{STORAGE} Starting pgserver at {data_dir} (timeout={timeout}s)")
+
+        # Run pgserver startup with timeout to prevent hanging
+        import concurrent.futures
+
+        def _get_server():
+            return pgserver.get_server(str(data_dir))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_get_server)
+            try:
+                self._pgserver = future.result(timeout=timeout)
+            except concurrent.futures.TimeoutError:
+                # Try to clean up
+                future.cancel()
+                raise TimeoutError(
+                    f"pgserver failed to start within {timeout}s. "
+                    "Run 'fitz reset' to clear corrupted state."
+                )
+
         self._base_uri = self._pgserver.get_uri()
         logger.info(f"{STORAGE} pgserver started successfully")
 

@@ -68,10 +68,10 @@ class DirectRAGUser(User):
             tier = test_config["tiers"][0]
             config_dict = {
                 "chat": tier["chat"],
-                "embedding": test_config["embedding"],
+                "embedding": tier.get("embedding", test_config.get("embedding")),
                 "vector_db": test_config["vector_db"],
                 "chat_kwargs": tier.get("chat_kwargs", {}),
-                "embedding_kwargs": test_config.get("embedding_kwargs", {}),
+                "embedding_kwargs": tier.get("embedding_kwargs", test_config.get("embedding_kwargs", {})),
                 "vector_db_kwargs": test_config.get("vector_db_kwargs", {}),
                 "retrieval_plugin": "dense",
                 "collection": "e2e_test_collection",

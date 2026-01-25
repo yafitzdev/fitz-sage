@@ -365,10 +365,10 @@ class E2ERunner:
 
     def _rebuild_pipeline(self, tier_name: str) -> None:
         """
-        Rebuild pipeline with a different tier's chat model.
+        Rebuild pipeline with a different tier's configuration.
 
-        Only swaps the chat/LLM component - reuses existing vector client,
-        embedder, and retrieval infrastructure to avoid losing the ingested collection.
+        If the embedding changes between tiers, re-ingests with the new embedding.
+        This allows testing whether failures are due to embedding quality.
 
         Args:
             tier_name: Name of the tier to switch to
@@ -384,7 +384,23 @@ class E2ERunner:
         e2e_config = load_e2e_config()
         tier_config = get_tier_config(tier_name, e2e_config)
 
-        # Get the new chat plugin for this tier
+        # Check if embedding changed - if so, need to re-ingest
+        current_tier_config = get_tier_config(self._current_tier, e2e_config) if self._current_tier else None
+        current_embedding = current_tier_config["embedding"]["plugin_name"] if current_tier_config else None
+        new_embedding = tier_config["embedding"]["plugin_name"]
+
+        if current_embedding != new_embedding:
+            logger.info(f"E2E: Embedding changed ({current_embedding} -> {new_embedding}), re-ingesting...")
+            # Delete old collection and re-ingest with new embedding
+            self._reingest_with_tier(tier_name, tier_config)
+        else:
+            # Just swap chat model
+            self._swap_chat_model(tier_name, tier_config)
+
+    def _swap_chat_model(self, tier_name: str, tier_config: dict) -> None:
+        """Swap only the chat model, keeping existing embeddings."""
+        from fitz_ai.llm.registry import get_llm_plugin
+
         chat_plugin_name = tier_config["chat"]["plugin_name"]
         chat_kwargs = tier_config["chat"].get("kwargs", {})
 
@@ -402,16 +418,123 @@ class E2ERunner:
             **chat_kwargs,
         )
 
-        # Swap chat models in existing pipeline (keeps vector client, retrieval, etc.)
+        # Swap chat models in existing pipeline
         self.pipeline.chat = new_chat
 
-        # Update hop controller if it exists (for multi-hop queries)
+        # Update hop controller if it exists
         if self.pipeline.hop_controller is not None:
             self.pipeline.hop_controller.evaluator.chat = new_fast_chat
             self.pipeline.hop_controller.extractor.chat = new_fast_chat
 
         self._current_tier = tier_name
         logger.info(f"E2E: Switched to tier '{tier_name}' (chat={chat_plugin_name})")
+
+    def _reingest_with_tier(self, tier_name: str, tier_config: dict) -> None:
+        """Re-ingest documents with a new tier's embedding model."""
+        from fitz_ai.engines.fitz_rag.config import FitzRagConfig
+        from fitz_ai.engines.fitz_rag.config.schema import (
+            ChunkingRouterConfig,
+            ExtensionChunkerConfig,
+        )
+        from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
+        from fitz_ai.ingestion.chunking.router import ChunkingRouter
+        from fitz_ai.ingestion.diff import run_diff_ingest
+        from fitz_ai.ingestion.parser import ParserRouter
+        from fitz_ai.ingestion.state import IngestStateManager
+        from fitz_ai.llm.registry import get_llm_plugin
+
+        # Delete existing collection
+        try:
+            self.vector_client.delete_collection(self.collection)
+            logger.debug(f"Deleted old collection '{self.collection}'")
+        except Exception:
+            pass
+
+        # Get new tier's plugins
+        chat_plugin = tier_config["chat"]["plugin_name"]
+        chat_kwargs = tier_config["chat"].get("kwargs", {})
+        embedding_plugin = tier_config["embedding"]["plugin_name"]
+        embedding_kwargs = tier_config["embedding"].get("kwargs", {})
+        vector_db_plugin = tier_config["vector_db"]["plugin_name"]
+        vector_db_kwargs = tier_config["vector_db"].get("kwargs", {})
+
+        # New embedder
+        embedder = get_llm_plugin(
+            plugin_type="embedding",
+            plugin_name=embedding_plugin,
+            **embedding_kwargs,
+        )
+
+        # Parser and chunking
+        parser_router = ParserRouter(docling_parser="docling")
+        simple_chunker = ExtensionChunkerConfig(
+            plugin_name="simple",
+            kwargs={"chunk_size": 2000, "chunk_overlap": 200},
+        )
+        router_config = ChunkingRouterConfig(
+            default=simple_chunker,
+            by_extension={
+                ".md": simple_chunker,
+                ".py": simple_chunker,
+                ".txt": simple_chunker,
+            },
+        )
+        chunking_router = ChunkingRouter.from_config(router_config)
+
+        # State manager
+        state_manager = IngestStateManager()
+        state_manager.load()
+
+        # Vector DB writer adapter
+        class VectorDBWriterAdapter:
+            def __init__(self, client):
+                self._client = client
+
+            def upsert(self, collection: str, points: list, defer_persist: bool = False):
+                self._client.upsert(collection, points, defer_persist=defer_persist)
+
+            def flush(self):
+                if hasattr(self._client, "flush"):
+                    self._client.flush()
+
+        writer = VectorDBWriterAdapter(self.vector_client)
+
+        # Re-ingest
+        logger.info(f"E2E: Re-ingesting with {embedding_plugin}...")
+        run_diff_ingest(
+            source=str(self.fixtures_dir),
+            state_manager=state_manager,
+            vector_db_writer=writer,
+            embedder=embedder,
+            parser_router=parser_router,
+            chunking_router=chunking_router,
+            collection=self.collection,
+            embedding_id=embedding_plugin,
+            vector_db_id=vector_db_plugin,
+            enrichment_pipeline=None,
+            force=True,
+        )
+
+        # Rebuild pipeline
+        config_dict = {
+            "chat": chat_plugin,
+            "embedding": embedding_plugin,
+            "vector_db": vector_db_plugin,
+            "collection": self.collection,
+            "retrieval_plugin": "dense",
+            "top_k": 40,
+            "strict_grounding": False,
+            "max_chunks": 50,
+            "chat_kwargs": chat_kwargs,
+            "embedding_kwargs": embedding_kwargs,
+            "vector_db_kwargs": vector_db_kwargs,
+        }
+
+        cfg = FitzRagConfig(**config_dict)
+        self.pipeline = RAGPipeline.from_config(cfg, constraints=[], enable_keywords=False)
+
+        self._current_tier = tier_name
+        logger.info(f"E2E: Re-ingested and rebuilt pipeline for tier '{tier_name}'")
 
     def _cleanup_stale_data(self) -> None:
         """
@@ -423,10 +546,12 @@ class E2ERunner:
         from fitz_ai.vector_db.registry import get_vector_db_plugin
 
         try:
-            # Need vector client to delete collection - use test config
+            # Need vector client to delete collection - use first tier's config
             config = load_e2e_config()
-            vector_db_plugin = config["vector_db"]
-            vector_db_kwargs = config.get("vector_db_kwargs", {})
+            tier_names = get_tier_names(config)
+            tier_config = get_tier_config(tier_names[0], config)
+            vector_db_plugin = tier_config["vector_db"]["plugin_name"]
+            vector_db_kwargs = tier_config["vector_db"].get("kwargs", {})
 
             temp_client = get_vector_db_plugin(vector_db_plugin, **vector_db_kwargs)
 
