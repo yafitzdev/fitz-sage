@@ -7,12 +7,16 @@ Handles:
 - Connection pooling via psycopg_pool
 - Per-collection database creation
 - pgvector extension initialization
+- Graceful shutdown on signals (SIGTERM, SIGINT)
+- Auto-recovery from corrupted pgdata
 """
 
 from __future__ import annotations
 
 import atexit
 import re
+import shutil
+import signal
 import threading
 from contextlib import contextmanager
 from pathlib import Path
@@ -29,6 +33,50 @@ if TYPE_CHECKING:
     from psycopg_pool import ConnectionPool
 
 logger = get_logger(__name__)
+
+# Track if signal handlers have been registered
+_signal_handlers_registered = False
+_original_sigterm_handler = None
+_original_sigint_handler = None
+
+
+def _graceful_shutdown_handler(signum: int, frame: Any) -> None:
+    """Handle shutdown signals by stopping pgserver gracefully."""
+    logger.info(f"{STORAGE} Received signal {signum}, shutting down pgserver gracefully...")
+
+    # Stop the connection manager
+    if PostgresConnectionManager._instance is not None:
+        PostgresConnectionManager._instance.stop()
+
+    # Call original handler if it exists
+    original = _original_sigterm_handler if signum == signal.SIGTERM else _original_sigint_handler
+    if original is not None and callable(original):
+        original(signum, frame)
+    elif original == signal.SIG_DFL:
+        # Default behavior - re-raise signal
+        signal.signal(signum, signal.SIG_DFL)
+        signal.raise_signal(signum)
+
+
+def _register_signal_handlers() -> None:
+    """Register signal handlers for graceful shutdown."""
+    global _signal_handlers_registered, _original_sigterm_handler, _original_sigint_handler
+
+    if _signal_handlers_registered:
+        return
+
+    # Only register in main thread
+    if threading.current_thread() is not threading.main_thread():
+        return
+
+    try:
+        _original_sigterm_handler = signal.signal(signal.SIGTERM, _graceful_shutdown_handler)
+        _original_sigint_handler = signal.signal(signal.SIGINT, _graceful_shutdown_handler)
+        _signal_handlers_registered = True
+        logger.debug(f"{STORAGE} Registered signal handlers for graceful shutdown")
+    except (ValueError, OSError) as e:
+        # Signal handling not available (e.g., not main thread, or Windows limitations)
+        logger.debug(f"{STORAGE} Could not register signal handlers: {e}")
 
 # Valid collection name pattern (alphanumeric + underscore)
 COLLECTION_NAME_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
@@ -94,8 +142,9 @@ class PostgresConnectionManager:
         with cls._lock:
             if cls._instance is None:
                 cls._instance = cls(config)
-                # Register cleanup on exit
+                # Register cleanup on exit and signal handlers
                 atexit.register(cls._instance.stop)
+                _register_signal_handlers()
             elif config is not None and not cls._instance._started:
                 # Allow config update before start
                 cls._instance.config = config
@@ -128,16 +177,18 @@ class PostgresConnectionManager:
             self._started = True
             logger.info(f"{STORAGE} PostgreSQL connection manager started (mode={self.config.mode.value})")
 
-    def _start_pgserver(self, timeout: int = 60) -> None:
+    def _start_pgserver(self, timeout: int = 60, allow_recovery: bool = True) -> None:
         """
-        Start embedded pgserver with timeout.
+        Start embedded pgserver with timeout and auto-recovery.
 
         Args:
             timeout: Maximum seconds to wait for pgserver to start (default: 60)
+            allow_recovery: If True, attempt recovery by resetting pgdata on failure
 
         Raises:
             TimeoutError: If pgserver doesn't start within timeout
             ImportError: If pgserver package not installed
+            RuntimeError: If pgserver fails to start even after recovery attempt
         """
         try:
             import pgserver
@@ -158,20 +209,58 @@ class PostgresConnectionManager:
         def _get_server():
             return pgserver.get_server(str(data_dir))
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_get_server)
-            try:
-                self._pgserver = future.result(timeout=timeout)
-            except concurrent.futures.TimeoutError:
-                # Try to clean up
-                future.cancel()
-                raise TimeoutError(
-                    f"pgserver failed to start within {timeout}s. "
-                    "Run 'fitz reset' to clear corrupted state."
-                )
+        def _try_start() -> bool:
+            """Attempt to start pgserver. Returns True on success."""
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(_get_server)
+                try:
+                    self._pgserver = future.result(timeout=timeout)
+                    self._base_uri = self._pgserver.get_uri()
+                    return True
+                except concurrent.futures.TimeoutError:
+                    future.cancel()
+                    return False
+                except Exception as e:
+                    logger.warning(f"{STORAGE} pgserver startup failed: {e}")
+                    return False
 
-        self._base_uri = self._pgserver.get_uri()
-        logger.info(f"{STORAGE} pgserver started successfully")
+        # First attempt
+        if _try_start():
+            logger.info(f"{STORAGE} pgserver started successfully")
+            return
+
+        # Recovery attempt - reset pgdata and try again
+        if allow_recovery:
+            logger.warning(f"{STORAGE} pgserver failed to start, attempting auto-recovery...")
+            try:
+                # Clean up any partial state
+                if self._pgserver is not None:
+                    try:
+                        self._pgserver.cleanup()
+                    except Exception:
+                        pass
+                    self._pgserver = None
+
+                # Delete corrupted pgdata
+                if data_dir.exists():
+                    shutil.rmtree(data_dir, ignore_errors=True)
+                    logger.info(f"{STORAGE} Deleted corrupted pgdata at {data_dir}")
+
+                # Recreate directory
+                data_dir.mkdir(parents=True, exist_ok=True)
+
+                # Retry without recovery (to prevent infinite loop)
+                if _try_start():
+                    logger.info(f"{STORAGE} pgserver started successfully after recovery")
+                    return
+            except Exception as e:
+                logger.error(f"{STORAGE} Auto-recovery failed: {e}")
+
+        # All attempts failed
+        raise RuntimeError(
+            f"pgserver failed to start within {timeout}s even after recovery attempt. "
+            "Try manually running 'fitz reset' or deleting ~/.fitz/pgdata"
+        )
 
     def _get_uri(self, database: str = "postgres") -> str:
         """Get connection URI for a database."""
