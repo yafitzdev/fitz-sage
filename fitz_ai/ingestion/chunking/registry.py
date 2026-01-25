@@ -5,12 +5,23 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Type
 
-from fitz_ai.core.registry import CHUNKING_REGISTRY, PluginNotFoundError
+from fitz_ai.core.registry import (
+    CHUNKING_REGISTRY,
+    TYPED_CHUNKING_REGISTRY,
+    PluginNotFoundError,
+)
 
 
 def get_chunking_plugin(plugin_name: str) -> Type[Any]:
-    """Get a chunking plugin by name."""
-    return CHUNKING_REGISTRY.get(plugin_name)
+    """Get a chunking plugin by name from either registry."""
+    # Try default registry first (simple, recursive)
+    try:
+        return CHUNKING_REGISTRY.get(plugin_name)
+    except PluginNotFoundError:
+        pass
+
+    # Try typed registry (markdown, python_code, etc.)
+    return TYPED_CHUNKING_REGISTRY.get(plugin_name)
 
 
 def available_chunking_plugins() -> List[str]:

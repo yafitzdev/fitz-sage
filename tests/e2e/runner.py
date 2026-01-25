@@ -268,19 +268,26 @@ class E2ERunner:
             **embedding_kwargs,
         )
 
-        # Parser and chunking - use simple chunker for text
+        # Parser and chunking - use appropriate chunkers per file type
         parser_router = ParserRouter(docling_parser="docling")
-        simple_chunker = ExtensionChunkerConfig(
-            plugin_name="simple",
-            # Larger chunks to keep product sections/facts together
-            kwargs={"chunk_size": 2000, "chunk_overlap": 200},
+        markdown_chunker = ExtensionChunkerConfig(
+            plugin_name="markdown",
+            kwargs={"max_chunk_size": 1500, "min_chunk_size": 100},
+        )
+        python_chunker = ExtensionChunkerConfig(
+            plugin_name="python_code",
+            kwargs={"max_chunk_size": 1500},
+        )
+        recursive_chunker = ExtensionChunkerConfig(
+            plugin_name="recursive",
+            kwargs={"chunk_size": 1000, "chunk_overlap": 200},
         )
         router_config = ChunkingRouterConfig(
-            default=simple_chunker,
+            default=recursive_chunker,
             by_extension={
-                ".md": simple_chunker,
-                ".py": simple_chunker,
-                ".txt": simple_chunker,
+                ".md": markdown_chunker,
+                ".py": python_chunker,
+                ".txt": recursive_chunker,
             },
         )
         chunking_router = ChunkingRouter.from_config(router_config)
@@ -465,18 +472,26 @@ class E2ERunner:
             **embedding_kwargs,
         )
 
-        # Parser and chunking
+        # Parser and chunking - use appropriate chunkers per file type
         parser_router = ParserRouter(docling_parser="docling")
-        simple_chunker = ExtensionChunkerConfig(
-            plugin_name="simple",
-            kwargs={"chunk_size": 2000, "chunk_overlap": 200},
+        markdown_chunker = ExtensionChunkerConfig(
+            plugin_name="markdown",
+            kwargs={"max_chunk_size": 1500, "min_chunk_size": 100},
+        )
+        python_chunker = ExtensionChunkerConfig(
+            plugin_name="python_code",
+            kwargs={"max_chunk_size": 1500},
+        )
+        recursive_chunker = ExtensionChunkerConfig(
+            plugin_name="recursive",
+            kwargs={"chunk_size": 1000, "chunk_overlap": 200},
         )
         router_config = ChunkingRouterConfig(
-            default=simple_chunker,
+            default=recursive_chunker,
             by_extension={
-                ".md": simple_chunker,
-                ".py": simple_chunker,
-                ".txt": simple_chunker,
+                ".md": markdown_chunker,
+                ".py": python_chunker,
+                ".txt": recursive_chunker,
             },
         )
         chunking_router = ChunkingRouter.from_config(router_config)
