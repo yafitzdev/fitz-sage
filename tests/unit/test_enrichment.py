@@ -18,10 +18,10 @@ class TestEnrichmentPipeline:
         pipeline = EnrichmentPipeline(
             config=config,
             project_root=tmp_path,
-            chat_client=None,
+            chat_factory=None,
         )
 
-        assert not pipeline.chunk_enrichment_enabled  # No chat client
+        assert not pipeline.chunk_enrichment_enabled  # No chat factory
         assert pipeline.artifacts_enabled
 
     def test_pipeline_from_dict(self, tmp_path):
@@ -57,7 +57,7 @@ def my_func():
         pipeline = EnrichmentPipeline(
             config=config,
             project_root=proj,
-            chat_client=None,
+            chat_factory=None,
         )
 
         artifacts = pipeline.generate_structural_artifacts()

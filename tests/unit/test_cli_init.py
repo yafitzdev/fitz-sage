@@ -37,8 +37,19 @@ class TestInitCommand:
             "anthropic": MagicMock(available=False),
         }
 
+        # Mock CLIContext
+        mock_ctx = MagicMock()
+        mock_ctx.chat_plugin = "cohere"
+        mock_ctx.embedding_plugin = "cohere"
+        mock_ctx.vector_db_plugin = "pgvector"
+        mock_ctx.rerank_enabled = False
+        mock_ctx.retrieval_plugin = "dense"
+        mock_ctx.retrieval_collection = "default"
+        mock_ctx.parser = "simple"
+
         with (
             patch("fitz_ai.cli.commands.init_wizard.detect_system", return_value=mock_system),
+            patch("fitz_ai.cli.commands.init_wizard.CLIContext.load", return_value=mock_ctx),
             patch(
                 "fitz_ai.cli.commands.init_wizard.available_llm_plugins",
                 side_effect=lambda t: ["cohere"] if t in ["chat", "embedding"] else [],
@@ -316,6 +327,18 @@ class TestGenerateConfig:
 class TestInitValidation:
     """Tests for init validation logic."""
 
+    def _create_mock_ctx(self):
+        """Create a mock CLIContext."""
+        mock_ctx = MagicMock()
+        mock_ctx.chat_plugin = "cohere"
+        mock_ctx.embedding_plugin = "cohere"
+        mock_ctx.vector_db_plugin = "pgvector"
+        mock_ctx.rerank_enabled = False
+        mock_ctx.retrieval_plugin = "dense"
+        mock_ctx.retrieval_collection = "default"
+        mock_ctx.parser = "simple"
+        return mock_ctx
+
     def test_init_fails_without_chat_plugins(self):
         """Test init fails when no chat plugins available (fitz_rag)."""
         mock_system = MagicMock()
@@ -326,6 +349,7 @@ class TestInitValidation:
 
         with (
             patch("fitz_ai.cli.commands.init_wizard.detect_system", return_value=mock_system),
+            patch("fitz_ai.cli.commands.init_wizard.CLIContext.load", return_value=self._create_mock_ctx()),
             patch(
                 "fitz_ai.cli.commands.init_wizard.get_default_engine",
                 return_value="fitz_rag",
@@ -360,6 +384,7 @@ class TestInitValidation:
 
         with (
             patch("fitz_ai.cli.commands.init_wizard.detect_system", return_value=mock_system),
+            patch("fitz_ai.cli.commands.init_wizard.CLIContext.load", return_value=self._create_mock_ctx()),
             patch(
                 "fitz_ai.cli.commands.init_wizard.get_default_engine",
                 return_value="fitz_rag",
@@ -381,6 +406,7 @@ class TestInitValidation:
                 return_value=["simple"],
             ),
             patch("fitz_ai.cli.commands.init_wizard.load_default_config", return_value={}),
+            patch("fitz_ai.cli.commands.init_wizard.CLIContext.load", return_value=self._create_mock_ctx()),
         ):
             result = runner.invoke(app, ["init", "-y"])
 

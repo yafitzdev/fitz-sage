@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.storage import get_connection_manager
 from fitz_ai.tabular.store.postgres import (
@@ -260,15 +261,23 @@ class DirectTableQuery:
     Direct table query engine - fast path without RAG pipeline.
 
     Usage:
-        query = DirectTableQuery(chat_client=chat)
+        from fitz_ai.llm import get_chat_factory
+
+        factory = get_chat_factory("cohere")
+        query = DirectTableQuery(chat_factory=factory)
         result = query.query(Path("sales.csv"), "how many cars sold in 2005?")
         print(result.answer)
     """
 
-    chat: Any  # Chat client (duck-typed)
+    chat_factory: ChatFactory
     collection: str = "_direct_tables"
     max_results: int = 100
     _table_store: PostgresTableStore | None = field(default=None, repr=False)
+
+    # Tier assignments per task (developer decision)
+    TIER_COLUMN_SELECT: ModelTier = "fast"
+    TIER_SQL_GENERATE: ModelTier = "balanced"
+    TIER_ANSWER_GENERATE: ModelTier = "fast"
 
     COLUMN_SELECT_PROMPT = """Select columns needed to answer this question.
 
@@ -484,7 +493,8 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
             columns_with_samples="\n".join(lines),
             question=question,
         )
-        response = self.chat.chat([{"role": "user", "content": prompt}])
+        chat = self.chat_factory(self.TIER_COLUMN_SELECT)
+        response = chat.chat([{"role": "user", "content": prompt}])
         return self._parse_json_list(response, fallback=columns[:5])
 
     def _generate_sql(
@@ -512,7 +522,8 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
             max_results=self.max_results,
         ) + error_context
 
-        response = self.chat.chat([{"role": "user", "content": prompt}])
+        chat = self.chat_factory(self.TIER_SQL_GENERATE)
+        response = chat.chat([{"role": "user", "content": prompt}])
         return self._extract_sql(response)
 
     def _generate_answer(
@@ -543,7 +554,8 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
             results=results_str,
         )
 
-        return self.chat.chat([{"role": "user", "content": prompt}])
+        chat = self.chat_factory(self.TIER_ANSWER_GENERATE)
+        return chat.chat([{"role": "user", "content": prompt}])
 
     def _get_sample_data(
         self, pg_table_name: str, columns: list[str], limit: int = 3

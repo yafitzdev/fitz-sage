@@ -18,15 +18,12 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
 
 from .types import ConversationContext, RewriteResult, RewriteType
-
-if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_rag.protocols import ChatClient
 
 logger = get_logger(__name__)
 
@@ -73,8 +70,11 @@ class QueryRewriter:
     LLM calls for simple queries that don't benefit from rewriting.
     """
 
-    chat: "ChatClient"
+    chat_factory: ChatFactory
     prompt_template: str | None = field(default=None, repr=False)
+
+    # Tier for query rewriting (developer decision - fast for efficiency)
+    TIER_REWRITE: ModelTier = "fast"
     min_query_length: int = 3  # Skip rewriting for very short queries
     max_simple_query_words: int = 15  # Queries under this word count may skip rewriting
     max_simple_query_chars: int = 100  # Queries under this char count may skip rewriting
@@ -171,7 +171,8 @@ class QueryRewriter:
         messages = [{"role": "user", "content": prompt}]
 
         try:
-            response = self.chat.chat(messages)
+            chat = self.chat_factory(self.TIER_REWRITE)
+            response = chat.chat(messages)
             result = self._parse_response(response, query)
 
             if result.was_rewritten:

@@ -8,27 +8,19 @@ Helps understand how the system works at a high level.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
-
 from fitz_ai.ingestion.enrichment.artifacts.base import (
     Artifact,
     ArtifactType,
     ProjectAnalysis,
 )
 from fitz_ai.ingestion.enrichment.base import ContentType
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 
 plugin_name = "architecture_narrative"
 plugin_type = "artifact"
 description = "High-level system overview (requires LLM, adds ~5s per 20 chunks)"
 supported_types = {ContentType.PYTHON, ContentType.CODE}
 requires_llm = True
-
-
-@runtime_checkable
-class ChatClient(Protocol):
-    """Protocol for LLM chat clients."""
-
-    def chat(self, messages: list[dict[str, str]]) -> str: ...
 
 
 class Generator:
@@ -43,8 +35,11 @@ class Generator:
     artifact_type = ArtifactType.ARCHITECTURE_NARRATIVE
     supported_types = supported_types
 
-    def __init__(self, chat_client: ChatClient):
-        self._chat = chat_client
+    # Tier for narrative generation (developer decision - creative task)
+    TIER_NARRATIVE: ModelTier = "balanced"
+
+    def __init__(self, chat_factory: ChatFactory):
+        self._chat_factory = chat_factory
 
     def generate(self, analysis: ProjectAnalysis) -> Artifact:
         """Generate architecture narrative artifact."""
@@ -65,7 +60,8 @@ Be specific and technical. This will help developers understand the codebase qui
 """
 
         messages = [{"role": "user", "content": prompt}]
-        narrative = self._chat.chat(messages)
+        chat = self._chat_factory(self.TIER_NARRATIVE)
+        narrative = chat.chat(messages)
 
         lines = ["# Architecture Overview", ""]
         lines.append(narrative)

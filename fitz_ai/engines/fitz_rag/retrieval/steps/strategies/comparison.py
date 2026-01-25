@@ -6,8 +6,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder, VectorClient
+from fitz_ai.engines.fitz_rag.protocols import Embedder, VectorClient
 from fitz_ai.engines.fitz_rag.retrieval.steps.utils import parse_json_list
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 
 from .base import BaseVectorSearch
 
@@ -23,12 +24,15 @@ class ComparisonSearch(BaseVectorSearch):
     are retrieved through targeted query expansion.
     """
 
+    # Tier for comparison expansion (developer decision - fast for bulk)
+    TIER_EXPAND: ModelTier = "fast"
+
     def __init__(
         self,
         client: VectorClient,
         embedder: Embedder,
         collection: str,
-        chat: ChatClient,
+        chat_factory: ChatFactory,
         max_queries: int = 5,
         **kwargs,
     ):
@@ -39,12 +43,12 @@ class ComparisonSearch(BaseVectorSearch):
             client: Vector database client
             embedder: Embedding service
             collection: Collection name
-            chat: Chat client for query expansion (required)
+            chat_factory: Chat factory for per-task tier selection (required)
             max_queries: Maximum number of expanded queries
             **kwargs: Additional arguments for BaseVectorSearch
         """
         super().__init__(client, embedder, collection, **kwargs)
-        self.chat = chat
+        self.chat_factory = chat_factory
         self.max_queries = max_queries
 
     def execute(
@@ -149,7 +153,8 @@ Instructions:
 Return ONLY a JSON object:
 {{"entities": ["entity1", "entity2"], "queries": ["query1", "query2", ...]}}"""
 
-        response = self.chat.chat([{"role": "user", "content": prompt}])
+        chat = self.chat_factory(self.TIER_EXPAND)
+        response = chat.chat([{"role": "user", "content": prompt}])
         return self._parse_comparison_response(response, query)
 
     def _parse_comparison_response(self, response: str, original_query: str) -> list[str]:
@@ -195,5 +200,6 @@ Text:
 
 Return ONLY a JSON array of strings, no explanation. Example: ["query 1", "query 2", "query 3"]"""
 
-        response = self.chat.chat([{"role": "user", "content": prompt}])
+        chat = self.chat_factory(self.TIER_EXPAND)
+        response = chat.chat([{"role": "user", "content": prompt}])
         return parse_json_list(response, max_items=self.max_queries)

@@ -10,21 +10,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from typing import Any
 
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.structured.schema import SchemaStore, TableSchema
 
 logger = get_logger(__name__)
-
-
-@runtime_checkable
-class ChatClient(Protocol):
-    """Protocol for chat completion."""
-
-    def chat(self, messages: list[dict[str, Any]]) -> str:
-        """Send messages and get response."""
-        ...
 
 
 @dataclass
@@ -111,10 +103,13 @@ class QueryRouter:
     should be handled via SQL or RAG.
     """
 
+    # Tier for classification (developer decision - fast for routing)
+    TIER_CLASSIFY: ModelTier = "fast"
+
     def __init__(
         self,
         schema_store: SchemaStore,
-        chat_client: ChatClient,
+        chat_factory: ChatFactory,
         schema_match_threshold: float = 0.3,
         structured_confidence_threshold: float = 0.6,
     ):
@@ -123,12 +118,12 @@ class QueryRouter:
 
         Args:
             schema_store: Schema store for table discovery
-            chat_client: Chat client for semantic classification (use fast tier)
+            chat_factory: Chat factory for per-task tier selection
             schema_match_threshold: Min score for schema match
             structured_confidence_threshold: Min confidence to route to structured
         """
         self._schema_store = schema_store
-        self._chat = chat_client
+        self._chat_factory = chat_factory
         self._schema_match_threshold = schema_match_threshold
         self._confidence_threshold = structured_confidence_threshold
 
@@ -198,7 +193,8 @@ class QueryRouter:
         )
 
         try:
-            response = self._chat.chat([{"role": "user", "content": prompt}])
+            chat = self._chat_factory(self.TIER_CLASSIFY)
+            response = chat.chat([{"role": "user", "content": prompt}])
             return _parse_classification_response(response)
 
         except Exception as e:

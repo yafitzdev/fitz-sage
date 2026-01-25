@@ -36,6 +36,16 @@ class MockChatClient:
         return "Query executed successfully."
 
 
+def create_mock_factory(response: str | None = None) -> tuple:
+    """Create a mock chat factory that returns a mock client."""
+    client = MockChatClient(response)
+
+    def factory(tier: str = "fast") -> MockChatClient:
+        return client
+
+    return factory, client
+
+
 @pytest.fixture
 def count_query() -> SQLQuery:
     """Create a COUNT query."""
@@ -74,8 +84,8 @@ class TestResultFormatter:
 
     def test_format_count_result(self, count_query: SQLQuery):
         """Test formatting COUNT result."""
-        client = MockChatClient("There are 42 employees in the engineering department.")
-        formatter = ResultFormatter(client)
+        factory, client = create_mock_factory("There are 42 employees in the engineering department.")
+        formatter = ResultFormatter(factory)
 
         execution_result = ExecutionResult(
             data={"COUNT(*)": 42},
@@ -92,8 +102,8 @@ class TestResultFormatter:
 
     def test_format_sum_result(self, sum_query: SQLQuery):
         """Test formatting SUM result."""
-        client = MockChatClient("The total salary is $5,000,000.")
-        formatter = ResultFormatter(client)
+        factory, client = create_mock_factory("The total salary is $5,000,000.")
+        formatter = ResultFormatter(factory)
 
         execution_result = ExecutionResult(
             data={"SUM(salary)": 5000000},
@@ -107,8 +117,8 @@ class TestResultFormatter:
 
     def test_format_calls_chat_client(self, count_query: SQLQuery):
         """Test that formatter calls chat client."""
-        client = MockChatClient("Test response.")
-        formatter = ResultFormatter(client)
+        factory, client = create_mock_factory("Test response.")
+        formatter = ResultFormatter(factory)
 
         execution_result = ExecutionResult(
             data={"COUNT(*)": 10},
@@ -125,8 +135,8 @@ class TestResultFormatter:
 
     def test_format_includes_raw_sql(self, count_query: SQLQuery):
         """Test that result includes original SQL."""
-        client = MockChatClient("Test.")
-        formatter = ResultFormatter(client)
+        factory, client = create_mock_factory("Test.")
+        formatter = ResultFormatter(factory)
 
         execution_result = ExecutionResult(
             data={"COUNT(*)": 5},
@@ -140,8 +150,8 @@ class TestResultFormatter:
 
     def test_format_reconstructs_sql_when_no_raw(self):
         """Test SQL reconstruction when raw_sql is empty."""
-        client = MockChatClient("There are 5 items.")
-        formatter = ResultFormatter(client)
+        factory, client = create_mock_factory("There are 5 items.")
+        formatter = ResultFormatter(factory)
 
         query = SQLQuery(
             table="items",
@@ -165,8 +175,8 @@ class TestResultFormatter:
 
     def test_format_handles_group_by(self):
         """Test formatting GROUP BY results."""
-        client = MockChatClient("Engineering has 20 employees, sales has 15.")
-        formatter = ResultFormatter(client)
+        factory, client = create_mock_factory("Engineering has 20 employees, sales has 15.")
+        formatter = ResultFormatter(factory)
 
         query = SQLQuery(
             table="employees",
@@ -194,8 +204,8 @@ class TestResultFormatter:
 
     def test_format_strips_quotes(self, count_query: SQLQuery):
         """Test that formatter strips quotes from response."""
-        client = MockChatClient('"The count is 10."')
-        formatter = ResultFormatter(client)
+        factory, client = create_mock_factory('"The count is 10."')
+        formatter = ResultFormatter(factory)
 
         execution_result = ExecutionResult(
             data={"COUNT(*)": 10},
@@ -209,17 +219,25 @@ class TestResultFormatter:
         assert not result.sentence.endswith('"')
 
 
+def create_failing_factory():
+    """Create a mock factory that returns a failing client."""
+
+    class FailingClient:
+        def chat(self, messages):
+            raise RuntimeError("LLM unavailable")
+
+    def factory(tier: str = "fast") -> FailingClient:
+        return FailingClient()
+
+    return factory
+
+
 class TestFallbackFormatting:
     """Tests for fallback formatting when LLM fails."""
 
     def test_fallback_on_exception(self):
         """Test fallback formatting when chat client raises exception."""
-
-        class FailingClient:
-            def chat(self, messages):
-                raise RuntimeError("LLM unavailable")
-
-        formatter = ResultFormatter(FailingClient())
+        formatter = ResultFormatter(create_failing_factory())
 
         query = SQLQuery(
             table="items",
@@ -241,12 +259,7 @@ class TestFallbackFormatting:
 
     def test_fallback_sum_formatting(self):
         """Test fallback formatting for SUM."""
-
-        class FailingClient:
-            def chat(self, messages):
-                raise RuntimeError("LLM unavailable")
-
-        formatter = ResultFormatter(FailingClient())
+        formatter = ResultFormatter(create_failing_factory())
 
         query = SQLQuery(
             table="sales",
@@ -268,12 +281,7 @@ class TestFallbackFormatting:
 
     def test_fallback_avg_formatting(self):
         """Test fallback formatting for AVG."""
-
-        class FailingClient:
-            def chat(self, messages):
-                raise RuntimeError("LLM unavailable")
-
-        formatter = ResultFormatter(FailingClient())
+        formatter = ResultFormatter(create_failing_factory())
 
         query = SQLQuery(
             table="products",
@@ -294,12 +302,7 @@ class TestFallbackFormatting:
 
     def test_fallback_empty_result(self):
         """Test fallback formatting for empty result."""
-
-        class FailingClient:
-            def chat(self, messages):
-                raise RuntimeError("LLM unavailable")
-
-        formatter = ResultFormatter(FailingClient())
+        formatter = ResultFormatter(create_failing_factory())
 
         query = SQLQuery(
             table="empty_table",
@@ -324,8 +327,8 @@ class TestFormatMultipleResults:
 
     def test_format_multiple(self):
         """Test formatting multiple results."""
-        client = MockChatClient("Result.")
-        formatter = ResultFormatter(client)
+        factory, client = create_mock_factory("Result.")
+        formatter = ResultFormatter(factory)
 
         results = [
             ExecutionResult(
@@ -347,8 +350,8 @@ class TestFormatMultipleResults:
 
     def test_format_empty_list(self):
         """Test formatting empty list."""
-        client = MockChatClient()
-        formatter = ResultFormatter(client)
+        factory, client = create_mock_factory()
+        formatter = ResultFormatter(factory)
 
         formatted = format_multiple_results(formatter, [])
 

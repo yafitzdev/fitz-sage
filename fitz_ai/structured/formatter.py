@@ -9,21 +9,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from typing import Any
 
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.structured.executor import ExecutionResult
 
 logger = get_logger(__name__)
-
-
-@runtime_checkable
-class ChatClient(Protocol):
-    """Protocol for chat completion."""
-
-    def chat(self, messages: list[dict[str, Any]]) -> str:
-        """Send messages and get response."""
-        ...
 
 
 @dataclass
@@ -78,14 +70,17 @@ class ResultFormatter:
     Uses LLM to generate clear, concise sentences from query results.
     """
 
-    def __init__(self, chat_client: ChatClient):
+    # Tier for formatting (developer decision - fast for simple formatting)
+    TIER_FORMAT: ModelTier = "fast"
+
+    def __init__(self, chat_factory: ChatFactory):
         """
         Initialize formatter.
 
         Args:
-            chat_client: Chat client for LLM calls (use fast tier)
+            chat_factory: Chat factory for per-task tier selection
         """
-        self._chat = chat_client
+        self._chat_factory = chat_factory
 
     def format(self, execution_result: ExecutionResult) -> FormattedResult:
         """
@@ -107,7 +102,8 @@ class ResultFormatter:
         )
 
         try:
-            response = self._chat.chat([{"role": "user", "content": prompt}])
+            chat = self._chat_factory(self.TIER_FORMAT)
+            response = chat.chat([{"role": "user", "content": prompt}])
             sentence = response.strip().strip("\"'")
 
             logger.debug(f"Formatted result for {query.table}: {sentence[:50]}...")

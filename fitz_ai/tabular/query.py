@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.fitz_rag.retrieval.steps.base import RetrievalStep
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 
 from .models import ParsedTable
 from .store.postgres import PostgresTableStore, _sanitize_table_name
@@ -55,14 +56,18 @@ class TableQueryStep(RetrievalStep):
     Regular (non-table) chunks pass through unchanged.
 
     Args:
-        chat: Chat client for LLM calls (column selection + SQL generation).
+        chat_factory: Chat factory for per-task tier selection.
         max_results: Maximum number of SQL result rows to include (default: 100).
         table_store: PostgresTableStore for executing queries.
     """
 
-    chat: Any  # Chat client for LLM calls (duck-typed)
+    chat_factory: ChatFactory  # Chat factory for LLM calls
     max_results: int = 100
     table_store: "PostgresTableStore | None" = field(default=None)
+
+    # Tier for table query tasks (developer decision - balanced for SQL generation)
+    TIER_COLUMN_SELECT: ModelTier = "fast"
+    TIER_SQL_GENERATE: ModelTier = "balanced"
 
     COLUMN_SELECT_PROMPT = """Given this table schema and question, which columns are needed to answer?
 
@@ -295,7 +300,8 @@ Return ONLY the SQL query, no explanation."""
             table_schemas="\n".join(schemas),
             question=query,
         )
-        response = self.chat.chat([{"role": "user", "content": prompt}])
+        chat = self.chat_factory(self.TIER_COLUMN_SELECT)
+        response = chat.chat([{"role": "user", "content": prompt}])
         return response.strip().lower() == "yes"
 
     def _process_multi_table(self, query: str, table_chunks: list[Chunk]) -> Chunk:
@@ -410,7 +416,8 @@ Please generate corrected SQL that avoids this error."""
         )
         prompt = prompt + error_context
 
-        response = self.chat.chat([{"role": "user", "content": prompt}])
+        chat = self.chat_factory(self.TIER_SQL_GENERATE)
+        response = chat.chat([{"role": "user", "content": prompt}])
         return self._extract_sql(response)
 
     def _create_multi_table_result_chunk(
@@ -463,7 +470,8 @@ Results ({len(results)} rows):
             samples=samples_str,
             question=query,
         )
-        response = self.chat.chat([{"role": "user", "content": prompt}])
+        chat = self.chat_factory(self.TIER_COLUMN_SELECT)
+        response = chat.chat([{"role": "user", "content": prompt}])
         return self._parse_json_list(response, fallback=columns)
 
     def _generate_sql(
@@ -529,7 +537,8 @@ Please generate corrected SQL that avoids this error."""
         )
         prompt = prompt + error_context
 
-        response = self.chat.chat([{"role": "user", "content": prompt}])
+        chat = self.chat_factory(self.TIER_SQL_GENERATE)
+        response = chat.chat([{"role": "user", "content": prompt}])
         return self._extract_sql(response)
 
     def _augment_chunk(

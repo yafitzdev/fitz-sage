@@ -16,18 +16,12 @@ from __future__ import annotations
 import importlib
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Protocol, Set, Type, runtime_checkable
+from typing import Any, Dict, List, Set, Type
 
 from fitz_ai.ingestion.enrichment.base import ContentType
+from fitz_ai.llm.factory import ChatFactory
 
 logger = logging.getLogger(__name__)
-
-
-@runtime_checkable
-class ChatClient(Protocol):
-    """Protocol for LLM chat clients."""
-
-    def chat(self, messages: list[dict[str, str]]) -> str: ...
 
 
 class ArtifactPluginInfo:
@@ -49,12 +43,12 @@ class ArtifactPluginInfo:
         self.requires_llm = requires_llm
         self.description = description
 
-    def create_generator(self, chat_client: ChatClient | None = None) -> Any:
+    def create_generator(self, chat_factory: ChatFactory | None = None) -> Any:
         """Create a generator instance."""
         if self.requires_llm:
-            if chat_client is None:
-                raise ValueError(f"Plugin '{self.name}' requires an LLM client but none provided")
-            return self.generator_class(chat_client)
+            if chat_factory is None:
+                raise ValueError(f"Plugin '{self.name}' requires a chat factory but none provided")
+            return self.generator_class(chat_factory)
         return self.generator_class()
 
 
@@ -74,7 +68,7 @@ class ArtifactRegistry:
 
         # Generate artifacts
         for plugin in plugins:
-            generator = plugin.create_generator(chat_client)
+            generator = plugin.create_generator(chat_factory)
             artifact = generator.generate(analysis)
     """
 

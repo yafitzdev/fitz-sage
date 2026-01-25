@@ -45,6 +45,13 @@ class MockChatClient:
         return self.response
 
 
+def create_mock_chat_factory(mock_chat):
+    """Create a mock chat factory that returns the mock chat client."""
+    def factory(tier: str = "fast"):
+        return mock_chat
+    return factory
+
+
 # ---------------------------------------------------------------------------
 # Tests for ConversationContext
 # ---------------------------------------------------------------------------
@@ -196,7 +203,7 @@ class TestQueryRewriter:
             }
         )
         mock_chat = MockChatClient(response=response)
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
 
         # Use a query with pronoun to trigger rewriting heuristic
         result = rewriter.rewrite("Tell me about their products")
@@ -209,7 +216,7 @@ class TestQueryRewriter:
     def test_chat_called_with_prompt(self):
         """Test that chat is called with correct message structure."""
         mock_chat = MockChatClient()
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
 
         # Use a query with pronoun to trigger rewriting heuristic
         rewriter.rewrite("What does it do and how does it work")
@@ -223,7 +230,7 @@ class TestQueryRewriter:
     def test_short_query_skipped(self):
         """Test that very short queries skip rewriting."""
         mock_chat = MockChatClient()
-        rewriter = QueryRewriter(chat=mock_chat, min_query_length=5)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat), min_query_length=5)
 
         result = rewriter.rewrite("ab")
 
@@ -234,7 +241,7 @@ class TestQueryRewriter:
     def test_conversation_context_included(self):
         """Test that conversation context is included in prompt."""
         mock_chat = MockChatClient()
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
         context = ConversationContext(
             history=[
                 ConversationMessage(role="user", content="Tell me about TechCorp"),
@@ -260,7 +267,7 @@ class TestQueryRewriter:
             }
         )
         mock_chat = MockChatClient(response=response)
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
         context = ConversationContext(
             history=[
                 ConversationMessage(role="user", content="Tell me about TechCorp"),
@@ -287,7 +294,7 @@ class TestQueryRewriter:
             }
         )
         mock_chat = MockChatClient(response=response)
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
 
         # Use a compound query to trigger rewriting heuristic
         result = rewriter.rewrite("How do I use Python and also set up the environment?")
@@ -302,7 +309,7 @@ class TestQueryRewriter:
             def chat(self, messages):
                 raise RuntimeError("API error")
 
-        rewriter = QueryRewriter(chat=ErrorChat())
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(ErrorChat()))
 
         # Use query with pronoun to trigger heuristic (force LLM call)
         query = "What does their system do and how does it work?"
@@ -326,7 +333,7 @@ class TestQueryRewriter:
             }
         )
         mock_chat = MockChatClient(response=response)
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
 
         result = rewriter.rewrite(query)
 
@@ -354,7 +361,7 @@ class TestResponseParsing:
             }
         )
         mock_chat = MockChatClient(response=response)
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
 
         # Use query with pronoun to trigger heuristic
         result = rewriter.rewrite("Explain their functionality")
@@ -374,7 +381,7 @@ class TestResponseParsing:
 }
 ```"""
         mock_chat = MockChatClient(response=response)
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
 
         # Use query with pronoun to trigger heuristic
         result = rewriter.rewrite("Describe their implementation")
@@ -388,7 +395,7 @@ class TestResponseParsing:
 {"rewritten_query": "clarified query about their system", "rewrite_type": "clarity", "confidence": 0.9, "is_ambiguous": false, "disambiguated_queries": []}
 That should work better."""
         mock_chat = MockChatClient(response=response)
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
 
         # Use query with pronoun to trigger heuristic
         result = rewriter.rewrite("Explain their system")
@@ -399,7 +406,7 @@ That should work better."""
         """Test that invalid JSON returns original query."""
         response = "This is not valid JSON"
         mock_chat = MockChatClient(response=response)
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
 
         # Use query with pronoun to trigger heuristic
         query = "Explain their original query processing"
@@ -420,7 +427,7 @@ That should work better."""
             }
         )
         mock_chat = MockChatClient(response=response)
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
 
         # Use query with pronoun to trigger heuristic
         query = "Describe their original query processing"
@@ -441,7 +448,7 @@ That should work better."""
             }
         )
         mock_chat = MockChatClient(response=response)
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
 
         # Use query with pronoun to trigger heuristic
         result = rewriter.rewrite("Describe their features")
@@ -460,7 +467,7 @@ class TestPromptLoading:
     def test_default_prompt_loaded(self):
         """Test that default prompt template is loaded."""
         mock_chat = MockChatClient()
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
 
         assert rewriter.prompt_template is not None
         assert len(rewriter.prompt_template) > 0
@@ -468,7 +475,7 @@ class TestPromptLoading:
     def test_prompt_has_placeholders(self):
         """Test that default prompt has required placeholders."""
         mock_chat = MockChatClient()
-        rewriter = QueryRewriter(chat=mock_chat)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat))
 
         assert "{query}" in rewriter.prompt_template
         assert "{history_section}" in rewriter.prompt_template
@@ -477,7 +484,7 @@ class TestPromptLoading:
         """Test custom prompt template."""
         mock_chat = MockChatClient()
         custom_template = "Rewrite: {query}\n{history_section}"
-        rewriter = QueryRewriter(chat=mock_chat, prompt_template=custom_template)
+        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat), prompt_template=custom_template)
 
         # Use query with pronoun to trigger heuristic
         rewriter.rewrite("Explain their test functionality")

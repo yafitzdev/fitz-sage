@@ -25,11 +25,13 @@ Available artifact types (via plugins):
 
 Usage:
     from fitz_ai.ingestion.enrichment import EnrichmentPipeline
+    from fitz_ai.llm import get_chat_factory
 
+    factory = get_chat_factory("cohere")
     pipeline = EnrichmentPipeline.from_config(
         config=config.get("enrichment"),
         project_root=Path("/path/to/project"),
-        chat_client=llm_client,
+        chat_factory=factory,
     )
     artifacts = pipeline.generate_artifacts()
 """

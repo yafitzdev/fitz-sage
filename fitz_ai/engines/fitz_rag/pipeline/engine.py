@@ -48,6 +48,7 @@ from fitz_ai.engines.fitz_rag.retrieval.multihop import (
 )
 from fitz_ai.engines.fitz_rag.retrieval.registry import get_retrieval_plugin
 from fitz_ai.engines.fitz_rag.routing import QueryIntent, QueryRouter
+from fitz_ai.llm.factory import ChatFactory, ModelTier, get_chat_factory
 from fitz_ai.llm.registry import get_llm_plugin
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE, VECTOR_DB
@@ -92,6 +93,9 @@ class RAGPipeline:
     Flow: retrieval → constraints → context-processing → rgs → llm → answer
     """
 
+    # Tier for final answer generation (developer decision - user-facing quality)
+    TIER_ANSWER: ModelTier = "smart"
+
     def __init__(self, components: PipelineComponents):
         """
         Initialize RAG pipeline with component groups.
@@ -101,7 +105,7 @@ class RAGPipeline:
         """
         # Required core
         self.retrieval = components.retrieval
-        self.chat = components.chat
+        self.chat_factory = components.chat_factory
         self.rgs = components.rgs
         self.context = components.context or ContextPipeline()
 
@@ -132,7 +136,6 @@ class RAGPipeline:
         cloud = components.cloud or CloudComponents()
         self.embedder = cloud.embedder
         self.cloud_client = cloud.client
-        self.fast_chat = cloud.fast_chat
 
         # Unpack structured components
         structured = components.structured or StructuredComponents()
@@ -429,24 +432,23 @@ class RAGPipeline:
         Select chat client based on cloud routing advice.
 
         Fail-open design:
-        - No routing advice → use smart tier (self.chat)
-        - No fast_chat available → use smart tier (self.chat)
-        - recommended_model="fast" → use fast tier (self.fast_chat)
-        - recommended_model="smart" or None → use smart tier (self.chat)
+        - No routing advice → use smart tier
+        - recommended_model="fast" → use fast tier
+        - recommended_model="smart" or None → use smart tier
         """
         # Default: use smart tier
-        if not hasattr(self, "_routing_advice") or self._routing_advice is None:
-            return self.chat
+        tier: ModelTier = "smart"
 
-        # Check if routing recommends fast tier and we have fast_chat available
-        recommended = self._routing_advice.recommended_model
-        if recommended == "fast" and self.fast_chat is not None:
-            model_name = getattr(self.fast_chat, "params", {}).get("model", "unknown")
-            logger.info(f"{PIPELINE} Using fast tier model '{model_name}' per cloud routing advice")
-            return self.fast_chat
+        if hasattr(self, "_routing_advice") and self._routing_advice is not None:
+            recommended = self._routing_advice.recommended_model
+            if recommended == "fast":
+                tier = "fast"
+                chat = self.chat_factory(tier)
+                model_name = getattr(chat, "params", {}).get("model", "unknown")
+                logger.info(f"{PIPELINE} Using fast tier model '{model_name}' per cloud routing advice")
+                return chat
 
-        # Default to smart tier
-        return self.chat
+        return self.chat_factory(self.TIER_ANSWER)
 
     def _get_collection_version(self) -> str:
         """Compute collection version hash from ingestion state."""
@@ -486,10 +488,11 @@ class RAGPipeline:
         """Get LLM model identifier from chat client."""
         # Chat plugins store model in self.params dict
         try:
-            if hasattr(self.chat, "params") and hasattr(self.chat, "plugin_name"):
-                params = getattr(self.chat, "params", {})
+            chat = self.chat_factory(self.TIER_ANSWER)
+            if hasattr(chat, "params") and hasattr(chat, "plugin_name"):
+                params = getattr(chat, "params", {})
                 model = params.get("model")
-                plugin_name = getattr(self.chat, "plugin_name", None)
+                plugin_name = getattr(chat, "plugin_name", None)
                 if model and plugin_name:
                     return f"{plugin_name}:{model}"
         except (AttributeError, KeyError):
@@ -680,15 +683,11 @@ class RAGPipeline:
         vector_client = get_vector_db_plugin(cfg.vector_db, **vector_db_kwargs)
         logger.info(f"{VECTOR_DB} Using vector DB plugin='{cfg.vector_db}'")
 
-        # Chat LLM - use "smart" tier for user-facing query responses
+        # Chat factory for per-task tier selection
         chat_kwargs = {k: v for k, v in cfg.chat_kwargs.model_dump().items() if v is not None}
-        chat_plugin = get_llm_plugin(
-            plugin_type="chat",
-            plugin_name=cfg.chat,
-            tier="smart",
-            **chat_kwargs,
-        )
-        model_name = getattr(chat_plugin, "params", {}).get("model", "unknown")
+        chat_factory = get_chat_factory(cfg.chat, **chat_kwargs)
+        smart_chat = chat_factory("smart")
+        model_name = getattr(smart_chat, "params", {}).get("model", "unknown")
         logger.info(f"{PIPELINE} Using chat plugin='{cfg.chat}' model='{model_name}' (smart tier)")
 
         # Embedding
@@ -715,13 +714,8 @@ class RAGPipeline:
             )
             logger.info(f"{PIPELINE} Using rerank plugin='{cfg.rerank}'")
 
-        # Fast chat for multi-query expansion (uses same plugin, fast tier)
-        fast_chat = get_llm_plugin(
-            plugin_type="chat",
-            plugin_name=cfg.chat,
-            tier="fast",
-            **chat_kwargs,
-        )
+        # Log fast tier info (for multi-query expansion, detection, etc.)
+        fast_chat = chat_factory("fast")
         fast_model = getattr(fast_chat, "params", {}).get("model", "unknown")
         logger.info(
             f"{PIPELINE} Using chat plugin='{cfg.chat}' model='{fast_model}' "
@@ -774,7 +768,7 @@ class RAGPipeline:
             embedder=embedder,
             collection=cfg.collection,
             reranker=reranker,
-            chat=fast_chat,
+            chat_factory=chat_factory,
             keyword_matcher=keyword_matcher,
             entity_graph=entity_graph,
             max_entity_expansion=max_entity_expansion,
@@ -811,9 +805,9 @@ class RAGPipeline:
         # Only activated when max_hops > 1. Default disabled for simpler test setup.
         hop_controller = None
         max_hops = 1  # Default (disabled). E2E tests use max_hops=3.
-        if fast_chat and max_hops > 1:
-            evaluator = EvidenceEvaluator(chat=fast_chat)
-            extractor = BridgeExtractor(chat=fast_chat)
+        if max_hops > 1:
+            evaluator = EvidenceEvaluator(chat_factory=chat_factory)
+            extractor = BridgeExtractor(chat_factory=chat_factory)
             hop_controller = HopController(
                 retrieval_pipeline=retrieval,
                 evaluator=evaluator,
@@ -843,13 +837,13 @@ class RAGPipeline:
                 # Default thresholds: schema_match=0.7, confidence=0.5
                 structured_router = StructuredQueryRouter(
                     schema_store=schema_store,
-                    chat_client=fast_chat,
+                    chat_factory=chat_factory,
                     schema_match_threshold=0.7,
                     structured_confidence_threshold=0.5,
                 )
 
                 # SQL generator (NL -> SQL via LLM)
-                sql_generator = SQLGenerator(chat_client=fast_chat)
+                sql_generator = SQLGenerator(chat_factory=chat_factory)
 
                 # SQL executor (via metadata filtering)
                 structured_executor = StructuredExecutor(
@@ -858,7 +852,7 @@ class RAGPipeline:
                 )
 
                 # Result formatter (SQL results -> NL sentences)
-                result_formatter = ResultFormatter(chat_client=fast_chat)
+                result_formatter = ResultFormatter(chat_factory=chat_factory)
 
                 # Derived store (sentence storage with provenance)
                 derived_store = DerivedStore(
@@ -879,7 +873,7 @@ class RAGPipeline:
         # Build component groups
         components = PipelineComponents(
             retrieval=retrieval,
-            chat=chat_plugin,
+            chat_factory=chat_factory,
             rgs=rgs,
             context=ContextPipeline(),
             guardrails=GuardrailComponents(
@@ -894,7 +888,6 @@ class RAGPipeline:
             cloud=CloudComponents(
                 embedder=embedder,
                 client=cloud_client,
-                fast_chat=fast_chat,
             ),
             structured=StructuredComponents(
                 router=structured_router,

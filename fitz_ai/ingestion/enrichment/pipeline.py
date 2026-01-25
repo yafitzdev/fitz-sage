@@ -12,11 +12,13 @@ All retrieval intelligence features are baked in - no configuration needed.
 
 Usage:
     from fitz_ai.ingestion.enrichment import EnrichmentPipeline, EnrichmentConfig
+    from fitz_ai.llm import get_chat_factory
 
+    factory = get_chat_factory("cohere")
     pipeline = EnrichmentPipeline.from_config(
         config=EnrichmentConfig.model_validate(config_dict.get("enrichment", {})),
         project_root=Path("/path/to/project"),
-        chat_client=my_llm_client,
+        chat_factory=factory,
         collection="my_collection",  # For keyword vocabulary
     )
 
@@ -29,7 +31,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from fitz_ai.ingestion.enrichment.artifacts.analyzer import ProjectAnalyzer
 from fitz_ai.ingestion.enrichment.artifacts.base import Artifact, ProjectAnalysis
@@ -42,6 +44,7 @@ from fitz_ai.ingestion.enrichment.bus import ChunkEnricher, create_default_enric
 from fitz_ai.ingestion.enrichment.config import EnrichmentConfig
 from fitz_ai.ingestion.enrichment.hierarchy.enricher import HierarchyEnricher
 from fitz_ai.ingestion.enrichment.models import EnrichmentResult
+from fitz_ai.llm.factory import ChatFactory
 from fitz_ai.retrieval.entity_graph import EntityGraphStore
 from fitz_ai.retrieval.vocabulary import Keyword, VocabularyStore
 
@@ -49,13 +52,6 @@ if TYPE_CHECKING:
     from fitz_ai.core.chunk import Chunk
 
 logger = logging.getLogger(__name__)
-
-
-@runtime_checkable
-class ChatClient(Protocol):
-    """Protocol for LLM chat clients."""
-
-    def chat(self, messages: list[dict[str, str]]) -> str: ...
 
 
 class EnrichmentPipeline:
@@ -80,13 +76,13 @@ class EnrichmentPipeline:
         *,
         config: EnrichmentConfig,
         project_root: Path,
-        chat_client: ChatClient | None = None,
+        chat_factory: ChatFactory | None = None,
         embedder: object | None = None,
         collection: str | None = None,
     ):
         self.config = config
         self.project_root = Path(project_root).resolve()
-        self._chat_client = chat_client
+        self._chat_factory = chat_factory
         self._embedder = embedder
         self._collection = collection
 
@@ -104,12 +100,12 @@ class EnrichmentPipeline:
 
     def _init_chunk_enricher(self) -> None:
         """Initialize the chunk enrichment bus (always on)."""
-        if self._chat_client is None:
-            logger.warning("[ENRICHMENT] No chat client provided, chunk enrichment disabled")
+        if self._chat_factory is None:
+            logger.warning("[ENRICHMENT] No chat factory provided, chunk enrichment disabled")
             return
 
         self._chunk_enricher = create_default_enricher(
-            self._chat_client,
+            self._chat_factory,
             min_batch_content=self.config.min_batch_content,
         )
         logger.info(
@@ -119,13 +115,13 @@ class EnrichmentPipeline:
 
     def _init_hierarchy_enricher(self) -> None:
         """Initialize the hierarchy enricher (always on)."""
-        if self._chat_client is None:
-            logger.warning("[ENRICHMENT] No chat client provided, hierarchy enrichment disabled")
+        if self._chat_factory is None:
+            logger.warning("[ENRICHMENT] No chat factory provided, hierarchy enrichment disabled")
             return
 
         self._hierarchy_enricher = HierarchyEnricher(
             config=self.config.hierarchy,
-            chat_client=self._chat_client,
+            chat_factory=self._chat_factory,
             embedder=self._embedder,
         )
 
@@ -167,7 +163,7 @@ class EnrichmentPipeline:
         cls,
         config: EnrichmentConfig | Dict[str, Any] | None,
         project_root: Path,
-        chat_client: ChatClient | None = None,
+        chat_factory: ChatFactory | None = None,
         embedder: object | None = None,
         collection: str | None = None,
     ) -> "EnrichmentPipeline":
@@ -177,7 +173,7 @@ class EnrichmentPipeline:
         Args:
             config: EnrichmentConfig, dict, or None (uses defaults)
             project_root: Root directory of the project
-            chat_client: LLM client for enrichment (fast tier recommended)
+            chat_factory: Chat factory for per-task tier selection
             embedder: Embedder for semantic grouping (optional)
             collection: Collection name for keyword vocabulary
         """
@@ -189,7 +185,7 @@ class EnrichmentPipeline:
         return cls(
             config=config,
             project_root=project_root,
-            chat_client=chat_client,
+            chat_factory=chat_factory,
             embedder=embedder,
             collection=collection,
         )
@@ -244,7 +240,7 @@ class EnrichmentPipeline:
                 continue
 
             # Skip if requires LLM but none available
-            if plugin.requires_llm and self._chat_client is None:
+            if plugin.requires_llm and self._chat_factory is None:
                 logger.debug(f"Skipping {plugin.name}: requires LLM")
                 continue
 
@@ -277,7 +273,7 @@ class EnrichmentPipeline:
         artifacts: List[Artifact] = []
         for plugin in plugins:
             try:
-                generator = plugin.create_generator(self._chat_client)
+                generator = plugin.create_generator(self._chat_factory)
                 artifact = generator.generate(analysis)
                 artifacts.append(artifact)
                 logger.info(f"Generated artifact: {plugin.name}")
@@ -472,5 +468,4 @@ class EnrichmentPipeline:
 __all__ = [
     "EnrichmentPipeline",
     "EnrichmentResult",
-    "ChatClient",
 ]

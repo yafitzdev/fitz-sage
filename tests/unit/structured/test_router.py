@@ -224,18 +224,29 @@ def schema_store(employees_schema: TableSchema, products_schema: TableSchema) ->
     return store
 
 
-@pytest.fixture
-def chat_client() -> MockChatClient:
-    """Create mock chat client."""
-    return MockChatClient()
+def create_mock_chat_factory(responses: dict[str, dict] | None = None):
+    """Create a mock chat factory that returns a mock client."""
+    client = MockChatClient(responses)
+
+    def factory(tier: str = "fast") -> MockChatClient:
+        return client
+
+    return factory, client
 
 
 @pytest.fixture
-def router(schema_store: SchemaStore, chat_client: MockChatClient) -> QueryRouter:
+def chat_factory():
+    """Create mock chat factory."""
+    factory, client = create_mock_chat_factory()
+    return factory
+
+
+@pytest.fixture
+def router(schema_store: SchemaStore, chat_factory) -> QueryRouter:
     """Create query router with mocks."""
     return QueryRouter(
         schema_store=schema_store,
-        chat_client=chat_client,
+        chat_factory=chat_factory,
         schema_match_threshold=0.3,
         structured_confidence_threshold=0.6,
     )
@@ -310,11 +321,11 @@ class TestQueryRouter:
 
         assert isinstance(route, SemanticRoute)
 
-    def test_route_no_schema_match(self, schema_store: SchemaStore, chat_client: MockChatClient):
+    def test_route_no_schema_match(self, schema_store: SchemaStore, chat_factory):
         """Test routing when no schema matches."""
         router = QueryRouter(
             schema_store=schema_store,
-            chat_client=chat_client,
+            chat_factory=chat_factory,
             schema_match_threshold=0.99,  # Very high threshold
         )
 
@@ -372,17 +383,23 @@ class TestQueryRouter:
         assert router.should_use_structured("How many employees?") is True
         assert router.should_use_structured("What is deep learning?") is False
 
-    def test_chat_client_called(self, router: QueryRouter, chat_client: MockChatClient):
+    def test_chat_client_called(self, schema_store: SchemaStore):
         """Test that chat client is called for classification."""
+        factory, client = create_mock_chat_factory()
+        router = QueryRouter(
+            schema_store=schema_store,
+            chat_factory=factory,
+        )
+
         router.route("How many employees?")
 
-        assert len(chat_client.calls) == 1
-        assert "employees" in chat_client.calls[0][0]["content"].lower()
+        assert len(client.calls) == 1
+        assert "employees" in client.calls[0][0]["content"].lower()
 
     def test_low_confidence_routes_to_semantic(self, schema_store: SchemaStore):
         """Test that low confidence classification routes to semantic."""
-        # Create chat client that returns low confidence
-        low_conf_client = MockChatClient(
+        # Create chat factory that returns low confidence
+        low_conf_factory, _ = create_mock_chat_factory(
             responses={
                 "employees": {
                     "route": "structured",
@@ -395,7 +412,7 @@ class TestQueryRouter:
 
         router = QueryRouter(
             schema_store=schema_store,
-            chat_client=low_conf_client,
+            chat_factory=low_conf_factory,
             structured_confidence_threshold=0.6,
         )
 

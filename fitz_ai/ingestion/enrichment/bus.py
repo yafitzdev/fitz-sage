@@ -13,8 +13,11 @@ Architecture:
         └── (future modules)   → easily extensible
 
 Usage:
+    from fitz_ai.llm import get_chat_factory
+
+    factory = get_chat_factory("cohere")
     enricher = ChunkEnricher(
-        chat_client=fast_chat,
+        chat_factory=factory,
         modules=[SummaryModule(), KeywordModule(), EntityModule()],
     )
     enriched_chunks, keywords = enricher.enrich(chunks)
@@ -29,12 +32,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fitz_ai.ingestion.enrichment.modules import (
-    ChatClient,
     EnrichmentModule,
     EntityModule,
     KeywordModule,
     SummaryModule,
 )
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 
 if TYPE_CHECKING:
     from fitz_ai.core.chunk import Chunk
@@ -82,8 +85,11 @@ class ChunkEnricher:
     enrichment types by implementing EnrichmentModule.
 
     Usage:
+        from fitz_ai.llm import get_chat_factory
+
+        factory = get_chat_factory("cohere")
         enricher = ChunkEnricher(
-            chat_client=fast_chat,
+            chat_factory=factory,
             modules=[SummaryModule(), KeywordModule(), EntityModule()],
         )
         result = enricher.enrich(chunks)
@@ -91,11 +97,14 @@ class ChunkEnricher:
         # result.all_keywords collected for VocabularyStore
     """
 
-    chat_client: ChatClient
+    chat_factory: ChatFactory
     modules: list[EnrichmentModule] = field(default_factory=list)
     batch_size: int = 15  # Chunks per LLM call
     max_content_length: int = 1500  # Truncate long chunks
     min_batch_content: int = 500  # Skip LLM call if total batch content below this
+
+    # Tier for enrichment (developer decision - bulk background task)
+    TIER_ENRICH: ModelTier = "fast"
 
     def __post_init__(self) -> None:
         if not self.modules:
@@ -166,7 +175,8 @@ class ChunkEnricher:
         messages = [{"role": "user", "content": prompt}]
 
         try:
-            response = self.chat_client.chat(messages)
+            chat = self.chat_factory(self.TIER_ENRICH)
+            response = chat.chat(messages)
             return self._parse_response(response, len(batch))
         except Exception as e:
             logger.error(f"[ENRICH] LLM call failed: {e}")
@@ -279,17 +289,17 @@ class ChunkEnricher:
 
 
 def create_default_enricher(
-    chat_client: ChatClient,
+    chat_factory: ChatFactory,
     min_batch_content: int = 500,
 ) -> ChunkEnricher:
     """Create an enricher with default modules.
 
     Args:
-        chat_client: LLM chat client for enrichment
+        chat_factory: Chat factory for per-task tier selection
         min_batch_content: Minimum total content in batch to trigger LLM call (default: 500 chars)
     """
     return ChunkEnricher(
-        chat_client=chat_client,
+        chat_factory=chat_factory,
         modules=[
             SummaryModule(),
             KeywordModule(),

@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from fitz_ai.llm.types import ChatClient, Embedder, Reranker
+    from fitz_ai.llm.factory import ChatFactory
+    from fitz_ai.llm.types import Embedder, Reranker
     from fitz_ai.retrieval.entity_graph.types import EntityGraphClient
     from fitz_ai.retrieval.vocabulary.types import KeywordMatcherClient
     from fitz_ai.vector_db.types import VectorClient
@@ -108,7 +109,7 @@ class RetrievalDependencies:
     embedder: Any  # Embedding service (duck-typed)
     collection: str
     reranker: Any | None = None  # Reranking service (duck-typed, optional)
-    chat: Any | None = None  # Fast-tier chat for multi-query expansion (duck-typed, optional)
+    chat_factory: Any | None = None  # Chat factory for per-task tier selection
     keyword_matcher: Any | None = None  # Exact keyword matching (duck-typed, optional)
     entity_graph: Any | None = (
         None  # Entity graph for related chunk discovery (duck-typed, optional)
@@ -195,9 +196,9 @@ def build_pipeline_from_spec(
         step = _build_step(step_spec.type, params, deps)
         steps.append(step)
 
-    # Auto-inject table_query after vector_search if chat is available
+    # Auto-inject table_query after vector_search if chat_factory is available
     # This is "always on" like keyword matching and multi-query expansion
-    if deps.chat is not None:
+    if deps.chat_factory is not None:
         steps = _inject_table_query_step(steps, deps)
 
     # NOTE: Freshness detection is now handled by the unified detection system
@@ -253,7 +254,7 @@ def _build_step(
         params.setdefault("client", deps.vector_client)
         params.setdefault("embedder", deps.embedder)
         params.setdefault("collection", deps.collection)
-        params.setdefault("chat", deps.chat)  # Enables multi-query expansion
+        params.setdefault("chat_factory", deps.chat_factory)  # Enables multi-query expansion
         params.setdefault("keyword_matcher", deps.keyword_matcher)  # Enables keyword filtering
         params.setdefault("entity_graph", deps.entity_graph)  # Enables entity-based expansion
         params.setdefault("max_entity_expansion", deps.max_entity_expansion)
@@ -272,9 +273,9 @@ def _build_step(
         params.setdefault("collection", deps.collection)
 
     elif step_type == "table_query":
-        if deps.chat is None:
-            raise ValueError("Table query step requires chat dependency")
-        params.setdefault("chat", deps.chat)
+        if deps.chat_factory is None:
+            raise ValueError("Table query step requires chat_factory dependency")
+        params.setdefault("chat_factory", deps.chat_factory)
         if deps.table_store is not None:
             params.setdefault("table_store", deps.table_store)
 
@@ -288,13 +289,13 @@ def _build_step(
 
 def create_retrieval_pipeline(
     plugin_name: str,
-    vector_client: VectorClient,
-    embedder: Embedder,
+    vector_client: "VectorClient",
+    embedder: "Embedder",
     collection: str,
-    reranker: Reranker | None = None,
-    chat: ChatClient | None = None,
-    keyword_matcher: KeywordMatcherClient | None = None,
-    entity_graph: EntityGraphClient | None = None,
+    reranker: "Reranker | None" = None,
+    chat_factory: "ChatFactory | None" = None,
+    keyword_matcher: "KeywordMatcherClient | None" = None,
+    entity_graph: "EntityGraphClient | None" = None,
     max_entity_expansion: int = 10,
     table_store: Any | None = None,
     top_k: int = 5,
@@ -309,7 +310,7 @@ def create_retrieval_pipeline(
         embedder: Embedding service
         collection: Collection name
         reranker: Optional reranking service
-        chat: Optional fast-tier chat client for multi-query expansion
+        chat_factory: Optional chat factory for per-task tier selection
         keyword_matcher: Optional keyword matcher for exact term filtering
         entity_graph: Optional entity graph for related chunk discovery
         max_entity_expansion: Maximum related chunks to add per query
@@ -327,7 +328,7 @@ def create_retrieval_pipeline(
         embedder=embedder,
         collection=collection,
         reranker=reranker,
-        chat=chat,
+        chat_factory=chat_factory,
         keyword_matcher=keyword_matcher,
         entity_graph=entity_graph,
         max_entity_expansion=max_entity_expansion,

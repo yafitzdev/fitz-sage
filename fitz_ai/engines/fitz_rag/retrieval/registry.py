@@ -32,7 +32,7 @@ def get_retrieval_plugin(
     embedder: Any,  # Embedding service (duck-typed)
     collection: str,
     reranker: Any | None = None,  # Reranking service (duck-typed, optional)
-    chat: Any | None = None,  # Chat client (duck-typed, optional)
+    chat_factory: Any | None = None,  # Chat factory for per-task tier selection
     keyword_matcher: Any | None = None,  # Keyword matcher (duck-typed, optional)
     entity_graph: Any | None = None,  # Entity graph (duck-typed, optional)
     max_entity_expansion: int = 10,
@@ -49,7 +49,7 @@ def get_retrieval_plugin(
         embedder: Embedding service
         collection: Collection name
         reranker: Optional reranking service
-        chat: Optional fast-tier chat client for multi-query expansion
+        chat_factory: Optional chat factory for per-task tier selection
         keyword_matcher: Optional keyword matcher for exact term filtering
         entity_graph: Optional entity graph for related chunk discovery
         max_entity_expansion: Maximum related chunks to add per query
@@ -70,7 +70,7 @@ def get_retrieval_plugin(
             embedder=embedder,
             collection=collection,
             reranker=reranker,
-            chat=chat,
+            chat_factory=chat_factory,
             keyword_matcher=keyword_matcher,
             entity_graph=entity_graph,
             max_entity_expansion=max_entity_expansion,

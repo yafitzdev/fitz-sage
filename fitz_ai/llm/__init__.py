@@ -7,6 +7,7 @@ All LLM plugins are YAML-based. Use get_llm_plugin() to get instances.
 
 from __future__ import annotations
 
+from fitz_ai.llm.factory import ChatFactory, ModelTier, get_chat_factory
 from fitz_ai.llm.loader import (
     YAMLPluginError,
     YAMLPluginNotFoundError,
@@ -29,6 +30,10 @@ __all__ = [
     "get_llm_plugin",
     "available_llm_plugins",
     "LLMRegistryError",
+    # Factory (per-task tier selection)
+    "get_chat_factory",
+    "ChatFactory",
+    "ModelTier",
     # Loader
     "load_plugin",
     "list_plugins",

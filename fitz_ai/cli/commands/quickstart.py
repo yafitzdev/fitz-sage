@@ -582,6 +582,7 @@ def _run_ingestion(
     from fitz_ai.ingestion.enrichment.hierarchy.enricher import HierarchyEnricher
     from fitz_ai.ingestion.parser import ParserRouter
     from fitz_ai.ingestion.source.base import SourceFile
+    from fitz_ai.llm.factory import get_chat_factory
     from fitz_ai.llm.registry import get_llm_plugin
     from fitz_ai.vector_db.registry import get_vector_db_plugin
     from fitz_ai.vector_db.writer import VectorDBWriter
@@ -692,17 +693,15 @@ def _run_ingestion(
     if verbose:
         ui.info("Generating hierarchical summaries...")
 
-    # Get chat client for summarization (use fast tier)
-    chat_client = get_llm_plugin(
-        plugin_type="chat",
+    # Get chat factory for summarization
+    chat_factory = get_chat_factory(
         plugin_name=chat_config.get("plugin_name", "cohere"),
-        tier="fast",
         **chat_config.get("kwargs", {}),
     )
 
     # Create hierarchy enricher with simple mode defaults
     hierarchy_config = HierarchyConfig(group_by="source")
-    hierarchy_enricher = HierarchyEnricher(config=hierarchy_config, chat_client=chat_client)
+    hierarchy_enricher = HierarchyEnricher(config=hierarchy_config, chat_factory=chat_factory)
 
     # Enrich chunks (adds L1 summaries as metadata, returns chunks + L2 corpus summary)
     original_chunk_count = len(chunks)
@@ -812,7 +811,7 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
     """
     import yaml
 
-    from fitz_ai.llm.registry import get_llm_plugin
+    from fitz_ai.llm.factory import get_chat_factory
     from fitz_ai.tabular import DirectTableQuery
 
     engine_config_path = FitzPaths.engine_config("fitz_rag")
@@ -848,11 +847,9 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
 
     chat_config = config.get("chat", {})
 
-    # Get chat client (use fast tier for quick responses)
-    chat_client = get_llm_plugin(
-        plugin_type="chat",
+    # Get chat factory
+    chat_factory = get_chat_factory(
         plugin_name=chat_config.get("plugin_name", "cohere"),
-        tier="fast",
         **chat_config.get("kwargs", {}),
     )
 
@@ -863,7 +860,7 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
     ui.step(1, 2, f"Analyzing {source.name}...")
 
     try:
-        query_engine = DirectTableQuery(chat=chat_client)
+        query_engine = DirectTableQuery(chat_factory=chat_factory)
         result = query_engine.query(source, question)
 
         if verbose:

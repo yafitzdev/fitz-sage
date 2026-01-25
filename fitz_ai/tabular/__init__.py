@@ -42,16 +42,20 @@ Usage (Ingestion - CSV files):
         )
 
 Usage (Query via RAG):
+    from fitz_ai.llm import get_chat_factory
     from fitz_ai.tabular import TableQueryStep
 
-    step = TableQueryStep(chat=chat_client, table_store=store)
+    factory = get_chat_factory("cohere")
+    step = TableQueryStep(chat_factory=factory, table_store=store)
     augmented_chunks = step.execute(query, chunks)
 
 Usage (Direct query - fast path):
+    from fitz_ai.llm import get_chat_factory
     from fitz_ai.tabular import DirectTableQuery, is_table_file
 
     if is_table_file(file_path):
-        query = DirectTableQuery(chat=chat_client)
+        factory = get_chat_factory("cohere")
+        query = DirectTableQuery(chat_factory=factory)
         result = query.query(file_path, "how many cars sold in 2005?")
         print(result.answer)
 """

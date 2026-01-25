@@ -21,7 +21,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder, VectorClient
+from fitz_ai.engines.fitz_rag.protocols import Embedder, VectorClient
+from fitz_ai.llm.factory import ChatFactory
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
 
@@ -63,7 +64,7 @@ class VectorSearchStep(RetrievalStep):
         client: Vector database client
         embedder: Embedding service
         collection: Collection name to search
-        chat: Fast-tier chat client for query expansion (optional)
+        chat_factory: Chat factory for per-task tier selection (optional)
         keyword_matcher: Keyword matcher for filtering (optional)
         entity_graph: Entity graph for expansion (optional)
         k: Number of candidates to retrieve per query (default: 25)
@@ -78,7 +79,7 @@ class VectorSearchStep(RetrievalStep):
     client: VectorClient
     embedder: Embedder
     collection: str
-    chat: ChatClient | None = None
+    chat_factory: ChatFactory | None = None
     keyword_matcher: Any | None = None
     entity_graph: Any | None = None
     k: int = 25
@@ -140,8 +141,8 @@ class VectorSearchStep(RetrievalStep):
             strategy = self._get_temporal_strategy()
             return strategy.execute(effective_query, chunks, detection.temporal)
 
-        # Check comparison queries (requires chat for LLM expansion)
-        if self.chat is not None and detection.has_comparison_intent:
+        # Check comparison queries (requires chat_factory for LLM expansion)
+        if self.chat_factory is not None and detection.has_comparison_intent:
             strategy = self._get_comparison_strategy()
             return strategy.execute(effective_query, chunks, detection.comparison)
 
@@ -150,12 +151,12 @@ class VectorSearchStep(RetrievalStep):
         return strategy.execute(query, chunks, rewrite_result=rewrite_result, detection=detection)
 
     def _get_hyde_generator(self):
-        """Lazy-load HyDE generator when chat is available."""
-        if self._hyde_generator is None and self.chat is not None:
+        """Lazy-load HyDE generator when chat_factory is available."""
+        if self._hyde_generator is None and self.chat_factory is not None:
             try:
                 from fitz_ai.retrieval.hyde import HydeGenerator
 
-                self._hyde_generator = HydeGenerator(chat=self.chat)
+                self._hyde_generator = HydeGenerator(chat_factory=self.chat_factory)
                 logger.debug(f"{RETRIEVER} HyDE generator initialized")
             except Exception as e:
                 logger.debug(f"{RETRIEVER} Failed to load HyDE generator: {e}")
@@ -164,12 +165,12 @@ class VectorSearchStep(RetrievalStep):
         return self._hyde_generator
 
     def _get_query_rewriter(self):
-        """Lazy-load query rewriter when chat is available."""
-        if self._query_rewriter is None and self.chat is not None:
+        """Lazy-load query rewriter when chat_factory is available."""
+        if self._query_rewriter is None and self.chat_factory is not None:
             try:
                 from fitz_ai.retrieval.rewriter import QueryRewriter
 
-                self._query_rewriter = QueryRewriter(chat=self.chat)
+                self._query_rewriter = QueryRewriter(chat_factory=self.chat_factory)
                 logger.debug(f"{RETRIEVER} Query rewriter initialized")
             except Exception as e:
                 logger.debug(f"{RETRIEVER} Failed to load query rewriter: {e}")
@@ -198,10 +199,10 @@ class VectorSearchStep(RetrievalStep):
         if self._detection_orchestrator is None:
             from fitz_ai.retrieval.detection import DetectionOrchestrator
 
-            # Pass chat client for LLM-based detection
-            self._detection_orchestrator = DetectionOrchestrator(chat_client=self.chat)
+            # Pass chat factory for LLM-based detection
+            self._detection_orchestrator = DetectionOrchestrator(chat_factory=self.chat_factory)
             logger.debug(
-                f"{RETRIEVER} Detection orchestrator initialized (LLM: {self.chat is not None})"
+                f"{RETRIEVER} Detection orchestrator initialized (LLM: {self.chat_factory is not None})"
             )
 
         return self._detection_orchestrator
@@ -218,7 +219,7 @@ class VectorSearchStep(RetrievalStep):
                 client=self.client,
                 embedder=self.embedder,
                 collection=self.collection,
-                chat=self.chat,
+                chat_factory=self.chat_factory,
                 k=self.k,
                 min_query_length=self.min_query_length,
                 max_queries=self.max_queries,
@@ -273,7 +274,7 @@ class VectorSearchStep(RetrievalStep):
                 client=self.client,
                 embedder=self.embedder,
                 collection=self.collection,
-                chat=self.chat,
+                chat_factory=self.chat_factory,
                 max_queries=self.max_queries,
                 k=self.k,
                 filter_conditions=self.filter_conditions,
@@ -308,7 +309,7 @@ class VectorSearchStep(RetrievalStep):
 
     def _expand_comparison_query(self, query: str) -> list[str]:
         """Delegate to comparison strategy for backward compatibility with tests."""
-        if self.chat is None:
+        if self.chat_factory is None:
             return [query]
         strategy = self._get_comparison_strategy()
         return strategy._expand_comparison_query(query)

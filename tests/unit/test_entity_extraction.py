@@ -11,16 +11,23 @@ from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
 from fitz_ai.ingestion.enrichment.config import HierarchyConfig
 
 
+def create_mock_chat_factory(mock_chat):
+    """Create a mock chat factory that returns the mock chat client."""
+    def factory(tier: str = "fast"):
+        return mock_chat
+    return factory
+
+
 class TestEnrichmentPipelineChunkEnrichment:
     """Tests for chunk enrichment integration in EnrichmentPipeline.
 
     Entity extraction is baked into the ChunkEnricher bus along with
     summary and keyword extraction. All enrichments run automatically when
-    a chat_client is provided.
+    a chat_factory is provided.
     """
 
     def test_chunk_enrichment_enabled_with_chat_client(self, tmp_path):
-        """Chunk enrichment is enabled when chat_client is provided."""
+        """Chunk enrichment is enabled when chat_factory is provided."""
         config = EnrichmentConfig()
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "[]"
@@ -28,18 +35,18 @@ class TestEnrichmentPipelineChunkEnrichment:
         pipeline = EnrichmentPipeline(
             config=config,
             project_root=tmp_path,
-            chat_client=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
         )
 
         assert pipeline.chunk_enrichment_enabled
 
     def test_chunk_enrichment_disabled_without_chat_client(self, tmp_path):
-        """Chunk enrichment is disabled when no chat_client is provided."""
+        """Chunk enrichment is disabled when no chat_factory is provided."""
         config = EnrichmentConfig()
         pipeline = EnrichmentPipeline(
             config=config,
             project_root=tmp_path,
-            chat_client=None,
+            chat_factory=None,
         )
 
         assert not pipeline.chunk_enrichment_enabled
@@ -67,7 +74,7 @@ class TestEnrichmentPipelineChunkEnrichment:
         pipeline = EnrichmentPipeline(
             config=config,
             project_root=tmp_path,
-            chat_client=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
         )
 
         # Create test chunks
@@ -122,7 +129,7 @@ class TestEnrichmentPipelineChunkEnrichment:
         pipeline = EnrichmentPipeline(
             config=config,
             project_root=tmp_path,
-            chat_client=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
         )
 
         chunks = [

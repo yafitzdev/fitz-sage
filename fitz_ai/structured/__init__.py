@@ -49,7 +49,6 @@ from fitz_ai.structured.ingestion import (
     TableTooLargeError,
 )
 from fitz_ai.structured.router import (
-    ChatClient,
     QueryRouter,
     RouteDecision,
     SemanticRoute,
@@ -109,7 +108,6 @@ __all__ = [
     "RouteDecision",
     "SemanticRoute",
     "StructuredRoute",
-    "ChatClient",
     # SQL Generator
     "SQLGenerator",
     "SQLQuery",

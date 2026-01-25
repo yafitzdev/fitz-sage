@@ -235,9 +235,10 @@ def _run_collection_chat(collection: Optional[str]) -> None:
             # Build messages with history and context
             messages = _build_messages(history, chunks, user_input)
 
-            # Get LLM response
+            # Get LLM response (use "smart" tier for user-facing responses)
             try:
-                response = pipeline.chat.chat(messages)
+                chat = pipeline.chat_factory("smart")
+                response = chat.chat(messages)
             except Exception as e:
                 ui.error(f"LLM request failed: {e}")
                 logger.debug("LLM error", exc_info=True)

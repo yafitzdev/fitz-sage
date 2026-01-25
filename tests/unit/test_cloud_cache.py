@@ -27,10 +27,12 @@ def mock_pipeline():
     pipeline.retrieval = Mock()
     pipeline.retrieval.collection = "test_collection"
 
-    # Mock chat client with params
-    pipeline.chat = Mock()
-    pipeline.chat.plugin_name = "openai"
-    pipeline.chat.params = {"model": "gpt-4"}
+    # Mock chat_factory that returns a mock chat client with params
+    mock_chat = Mock()
+    mock_chat.plugin_name = "openai"
+    mock_chat.params = {"model": "gpt-4"}
+    pipeline.chat_factory = Mock(return_value=mock_chat)
+    pipeline.TIER_ANSWER = "smart"  # Add tier constant
 
     # Mock embedder
     pipeline.embedder = Mock()
@@ -170,13 +172,15 @@ class TestGetLlmModelId:
 
     def test_returns_unknown_if_no_params(self, mock_pipeline):
         """Should return 'unknown' if chat client has no params."""
-        delattr(mock_pipeline.chat, "params")
+        mock_chat = mock_pipeline.chat_factory()
+        delattr(mock_chat, "params")
         model_id = mock_pipeline._get_llm_model_id()
         assert model_id == "unknown"
 
     def test_returns_unknown_if_no_model_in_params(self, mock_pipeline):
         """Should return 'unknown' if params doesn't contain model."""
-        mock_pipeline.chat.params = {}
+        mock_chat = mock_pipeline.chat_factory()
+        mock_chat.params = {}
         model_id = mock_pipeline._get_llm_model_id()
         assert model_id == "unknown"
 

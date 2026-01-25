@@ -16,6 +16,13 @@ from fitz_ai.engines.fitz_rag.retrieval.steps.vector_search import VectorSearchS
 from fitz_ai.retrieval.detection import DetectionOrchestrator
 
 
+def create_mock_chat_factory(mock_chat):
+    """Create a mock chat factory that returns the mock chat client."""
+    def factory(tier: str = "fast"):
+        return mock_chat
+    return factory
+
+
 class TestComparisonDetection:
     """Test comparison detection via LLM classification."""
 
@@ -42,7 +49,7 @@ class TestComparisonDetection:
             }
         )
 
-        orchestrator = DetectionOrchestrator(chat_client=mock_chat)
+        orchestrator = DetectionOrchestrator(chat_factory=create_mock_chat_factory(mock_chat))
         summary = orchestrator.detect_for_retrieval("CAN vs SPI")
 
         assert summary.has_comparison_intent
@@ -61,17 +68,17 @@ class TestComparisonDetection:
             }
         )
 
-        orchestrator = DetectionOrchestrator(chat_client=mock_chat)
+        orchestrator = DetectionOrchestrator(chat_factory=create_mock_chat_factory(mock_chat))
         summary = orchestrator.detect_for_retrieval("What is CAN?")
 
         assert not summary.has_comparison_intent
 
-    def test_detection_without_chat_client(self):
-        """Test that detection without chat client skips LLM classification."""
-        orchestrator = DetectionOrchestrator(chat_client=None)
+    def test_detection_without_chat_factory(self):
+        """Test that detection without chat factory skips LLM classification."""
+        orchestrator = DetectionOrchestrator(chat_factory=None)
         summary = orchestrator.detect_for_retrieval("CAN vs SPI")
 
-        # Without chat client, no LLM classification happens
+        # Without chat factory, no LLM classification happens
         assert not summary.has_comparison_intent
         assert not summary.has_temporal_intent
         assert not summary.has_aggregation_intent
@@ -82,7 +89,7 @@ class TestComparisonExpansion:
 
     @pytest.fixture
     def strategy_with_mock_chat(self):
-        """Create a comparison strategy with a mock chat that returns valid JSON."""
+        """Create a comparison strategy with a mock chat factory that returns valid JSON."""
         mock_chat = MagicMock()
         mock_chat.chat.return_value = json.dumps(
             {
@@ -96,12 +103,14 @@ class TestComparisonExpansion:
                 ],
             }
         )
-        return ComparisonSearch(
+        strategy = ComparisonSearch(
             client=MagicMock(),
             embedder=MagicMock(),
             collection="test",
-            chat=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
         )
+        strategy._mock_chat = mock_chat  # Store for test access
+        return strategy
 
     def test_comparison_expansion_returns_queries(self, strategy_with_mock_chat):
         """Test that comparison expansion returns multiple queries."""
@@ -117,8 +126,8 @@ class TestComparisonExpansion:
         """Test that comparison expansion calls the chat client."""
         strategy_with_mock_chat._expand_comparison_query("CAN vs SPI")
 
-        strategy_with_mock_chat.chat.chat.assert_called_once()
-        call_args = strategy_with_mock_chat.chat.chat.call_args[0][0]
+        strategy_with_mock_chat._mock_chat.chat.assert_called_once()
+        call_args = strategy_with_mock_chat._mock_chat.chat.call_args[0][0]
         assert len(call_args) == 1
         assert "comparison query" in call_args[0]["content"].lower()
 
@@ -135,7 +144,7 @@ class TestComparisonExpansion:
             client=MagicMock(),
             embedder=MagicMock(),
             collection="test",
-            chat=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
         )
 
         queries = strategy._expand_comparison_query("difference between v2.3.0 and v2.3.1")
@@ -162,7 +171,7 @@ class TestComparisonFallback:
             client=MagicMock(),
             embedder=MagicMock(),
             collection="test",
-            chat=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
         )
 
         queries = strategy._expand_comparison_query("CAN vs SPI")
@@ -185,7 +194,7 @@ class TestComparisonFallback:
             client=MagicMock(),
             embedder=MagicMock(),
             collection="test",
-            chat=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
         )
 
         queries = strategy._expand_comparison_query("A vs B")
@@ -233,7 +242,7 @@ class TestComparisonSearchIntegration:
             client=mock_client,
             embedder=mock_embedder,
             collection="test",
-            chat=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
             k=10,
         )
 
@@ -264,7 +273,7 @@ class TestComparisonSearchIntegration:
             client=mock_client,
             embedder=mock_embedder,
             collection="test",
-            chat=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
             k=10,
         )
 
@@ -294,7 +303,7 @@ class TestLLMClassifier:
             }
         )
 
-        classifier = LLMClassifier(chat_client=mock_chat)
+        classifier = LLMClassifier(chat_factory=create_mock_chat_factory(mock_chat))
         result = classifier.classify("A vs B from last month")
 
         # Result is keyed by DetectionCategory enum
@@ -322,7 +331,7 @@ class TestLLMClassifier:
 
 The query is asking for a list."""
 
-        classifier = LLMClassifier(chat_client=mock_chat)
+        classifier = LLMClassifier(chat_factory=create_mock_chat_factory(mock_chat))
         result = classifier.classify("list all test cases")
 
         # Result is keyed by DetectionCategory enum
@@ -340,7 +349,7 @@ The query is asking for a list."""
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "This is not valid JSON at all"
 
-        classifier = LLMClassifier(chat_client=mock_chat)
+        classifier = LLMClassifier(chat_factory=create_mock_chat_factory(mock_chat))
         result = classifier.classify("some query")
 
         # Should return not-detected for all categories

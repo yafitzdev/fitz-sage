@@ -6,8 +6,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder, VectorClient
+from fitz_ai.engines.fitz_rag.protocols import Embedder, VectorClient
 from fitz_ai.engines.fitz_rag.retrieval.steps.utils import parse_json_list
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 
 from .base import BaseVectorSearch
 
@@ -25,12 +26,15 @@ class SemanticSearch(BaseVectorSearch):
     query expansion, and keyword filtering.
     """
 
+    # Tier for multi-query expansion (developer decision - fast for bulk)
+    TIER_EXPAND: ModelTier = "fast"
+
     def __init__(
         self,
         client: VectorClient,
         embedder: Embedder,
         collection: str,
-        chat: ChatClient | None = None,
+        chat_factory: ChatFactory | None = None,
         k: int = 25,
         min_query_length: int = 300,
         max_queries: int = 5,
@@ -44,7 +48,7 @@ class SemanticSearch(BaseVectorSearch):
             client: Vector database client
             embedder: Embedding service
             collection: Collection name
-            chat: Chat client for query expansion (optional)
+            chat_factory: Chat factory for per-task tier selection (optional)
             k: Number of results to retrieve
             min_query_length: Minimum query length for multi-query expansion
             max_queries: Maximum number of expanded queries
@@ -52,7 +56,7 @@ class SemanticSearch(BaseVectorSearch):
             **kwargs: Additional arguments for BaseVectorSearch
         """
         super().__init__(client, embedder, collection, k=k, **kwargs)
-        self.chat = chat
+        self.chat_factory = chat_factory
         self.min_query_length = min_query_length
         self.max_queries = max_queries
         self.hyde_generator = hyde_generator
@@ -71,7 +75,7 @@ class SemanticSearch(BaseVectorSearch):
         logger = get_logger(__name__)
 
         # Determine if we should use multi-query expansion
-        use_multi_query = self.chat is not None and len(query) >= self.min_query_length
+        use_multi_query = self.chat_factory is not None and len(query) >= self.min_query_length
 
         if use_multi_query:
             results = self._multi_search(query)
@@ -214,5 +218,6 @@ Text:
 
 Return ONLY a JSON array of strings, no explanation. Example: ["query 1", "query 2", "query 3"]"""
 
-        response = self.chat.chat([{"role": "user", "content": prompt}])
+        chat = self.chat_factory(self.TIER_EXPAND)
+        response = chat.chat([{"role": "user", "content": prompt}])
         return parse_json_list(response, max_items=self.max_queries)

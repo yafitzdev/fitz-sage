@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from fitz_ai.core.guardrails import ConstraintPlugin, SemanticMatcher
-from fitz_ai.engines.fitz_rag.protocols import ChatClient, Embedder
+from fitz_ai.engines.fitz_rag.protocols import Embedder
+from fitz_ai.llm.factory import ChatFactory
 
 
 @dataclass
@@ -39,7 +40,6 @@ class CloudComponents:
 
     embedder: Embedder | None = None  # Embedder for query embeddings
     client: Any | None = None  # CloudClient for cache operations
-    fast_chat: ChatClient | None = None  # Fast-tier chat for routing optimization
 
     def is_enabled(self) -> bool:
         """Check if cloud caching is enabled."""
@@ -82,7 +82,7 @@ class PipelineComponents:
 
     # Required core
     retrieval: Any  # RetrievalPipelineFromYaml
-    chat: ChatClient  # Chat LLM (smart tier)
+    chat_factory: ChatFactory  # Chat factory for per-task tier selection
     rgs: Any  # RGS (Retrieval-Guided Synthesis)
 
     # Optional context processor (has default)

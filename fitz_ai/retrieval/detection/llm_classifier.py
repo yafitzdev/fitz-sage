@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.logging.logger import get_logger
 
 if TYPE_CHECKING:
@@ -34,14 +35,6 @@ Return this exact structure:
 Only set detected=true when the query CLEARLY matches the criteria. Default to detected=false unless there is explicit evidence."""
 
 
-class ChatProtocol(Protocol):
-    """Protocol for chat clients."""
-
-    def chat(self, messages: list[dict[str, str]]) -> str:
-        """Send messages and get response."""
-        ...
-
-
 @dataclass
 class LLMClassifier:
     """
@@ -51,8 +44,11 @@ class LLMClassifier:
     then distributes results to each module for parsing.
     """
 
-    chat_client: ChatProtocol
+    chat_factory: ChatFactory
     modules: list["DetectionModule"] = field(default_factory=list)
+
+    # Tier for classification (developer decision)
+    TIER_CLASSIFY: ModelTier = "fast"
 
     def __post_init__(self):
         """Load default modules if none provided."""
@@ -74,7 +70,8 @@ class LLMClassifier:
         prompt = self._build_prompt(query)
 
         try:
-            response = self.chat_client.chat([{"role": "user", "content": prompt}])
+            chat = self.chat_factory(self.TIER_CLASSIFY)
+            response = chat.chat([{"role": "user", "content": prompt}])
             raw_results = self._parse_response(response)
             return self._distribute_to_modules(raw_results)
         except Exception as e:

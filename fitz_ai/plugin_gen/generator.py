@@ -30,6 +30,8 @@ from fitz_ai.plugin_gen.types import (
 )
 from fitz_ai.plugin_gen.validators import PluginValidator, format_validation_error
 
+from fitz_ai.llm.factory import ChatFactory, ModelTier, get_chat_factory
+
 logger = logging.getLogger(__name__)
 
 # Maximum retry attempts
@@ -60,30 +62,26 @@ class PluginGenerator:
     def __init__(
         self,
         chat_plugin: str = "openai",
-        tier: str = "smart",
+        tier: ModelTier = "smart",
+        chat_factory: ChatFactory | None = None,
     ):
         """
         Initialize the generator.
 
         Args:
-            chat_plugin: Chat LLM plugin to use for generation
+            chat_plugin: Chat LLM plugin to use for generation (ignored if chat_factory provided)
             tier: Model tier to use ("smart", "fast", "balanced")
+            chat_factory: Optional pre-built chat factory
         """
-        self.chat_plugin = chat_plugin
         self.tier = tier
         self.validator = PluginValidator()
+        self._chat_factory = chat_factory or get_chat_factory(chat_plugin)
         self._llm_client = None
 
     def _get_llm(self):
         """Lazy load the LLM client."""
         if self._llm_client is None:
-            from fitz_ai.llm.registry import get_llm_plugin
-
-            self._llm_client = get_llm_plugin(
-                plugin_name=self.chat_plugin,
-                plugin_type="chat",
-                tier=self.tier,
-            )
+            self._llm_client = self._chat_factory(self.tier)
         return self._llm_client
 
     def generate(

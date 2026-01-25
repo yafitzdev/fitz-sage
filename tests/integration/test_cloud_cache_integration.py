@@ -77,6 +77,7 @@ class TestFullCacheFlow:
     """Test the complete cache flow: miss → store → hit."""
 
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_vector_db_plugin")
+    @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_chat_factory")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_llm_plugin")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_retrieval_plugin")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.create_matcher_from_store")
@@ -89,6 +90,7 @@ class TestFullCacheFlow:
         mock_create_matcher,
         mock_get_retrieval,
         mock_get_llm,
+        mock_get_chat_factory,
         mock_get_vector_db,
         mock_config,
         mock_chunks,
@@ -106,9 +108,12 @@ class TestFullCacheFlow:
         mock_embedder = Mock()
         mock_embedder.embed.return_value = [0.1, 0.2, 0.3]
 
-        mock_get_llm.side_effect = lambda plugin_type, **kwargs: (
-            mock_chat if plugin_type == "chat" else mock_embedder
-        )
+        # Chat factory returns the mock chat client for any tier
+        def mock_factory(tier="fast"):
+            return mock_chat
+
+        mock_get_chat_factory.return_value = mock_factory
+        mock_get_llm.return_value = mock_embedder
 
         mock_retrieval = Mock()
         mock_retrieval.collection = "test_collection"
@@ -164,6 +169,7 @@ class TestFullCacheFlow:
         assert result.answer == "Generated answer"
 
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_vector_db_plugin")
+    @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_chat_factory")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_llm_plugin")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_retrieval_plugin")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.create_matcher_from_store")
@@ -176,6 +182,7 @@ class TestFullCacheFlow:
         mock_create_matcher,
         mock_get_retrieval,
         mock_get_llm,
+        mock_get_chat_factory,
         mock_get_vector_db,
         mock_config,
         mock_chunks,
@@ -188,9 +195,13 @@ class TestFullCacheFlow:
         mock_chat = Mock()
         mock_embedder = Mock()
         mock_embedder.embed.return_value = [0.1, 0.2, 0.3]
-        mock_get_llm.side_effect = lambda plugin_type, **kwargs: (
-            mock_chat if plugin_type == "chat" else mock_embedder
-        )
+
+        # Chat factory returns the mock chat client for any tier
+        def mock_factory(tier="fast"):
+            return mock_chat
+
+        mock_get_chat_factory.return_value = mock_factory
+        mock_get_llm.return_value = mock_embedder
 
         mock_retrieval = Mock()
         mock_retrieval.collection = "test_collection"
@@ -241,6 +252,7 @@ class TestFullCacheFlow:
         assert result.answer == "Cached answer from cloud"
 
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_vector_db_plugin")
+    @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_chat_factory")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_llm_plugin")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_retrieval_plugin")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.create_matcher_from_store")
@@ -253,6 +265,7 @@ class TestFullCacheFlow:
         mock_create_matcher,
         mock_get_retrieval,
         mock_get_llm,
+        mock_get_chat_factory,
         mock_get_vector_db,
         mock_config,
         mock_chunks,
@@ -270,9 +283,12 @@ class TestFullCacheFlow:
         mock_embedder = Mock()
         mock_embedder.embed.return_value = [0.1, 0.2, 0.3]
 
-        mock_get_llm.side_effect = lambda plugin_type, **kwargs: (
-            mock_chat if plugin_type == "chat" else mock_embedder
-        )
+        # Chat factory returns the mock chat client for any tier
+        def mock_factory(tier="fast"):
+            return mock_chat
+
+        mock_get_chat_factory.return_value = mock_factory
+        mock_get_llm.return_value = mock_embedder
 
         mock_retrieval = Mock()
         mock_retrieval.collection = "test_collection"

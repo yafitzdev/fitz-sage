@@ -35,6 +35,13 @@ class MockChatClient:
         return self.response
 
 
+def create_mock_chat_factory(mock_chat):
+    """Create a mock chat factory that returns the mock chat client."""
+    def factory(tier: str = "fast"):
+        return mock_chat
+    return factory
+
+
 # ---------------------------------------------------------------------------
 # Tests for HydeGenerator
 # ---------------------------------------------------------------------------
@@ -46,7 +53,7 @@ class TestHydeGenerator:
     def test_basic_generation(self):
         """Test basic hypothesis generation."""
         mock_chat = MockChatClient()
-        generator = HydeGenerator(chat=mock_chat)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat))
 
         hypotheses = generator.generate("What is the refund policy?")
 
@@ -58,7 +65,7 @@ class TestHydeGenerator:
     def test_chat_called_with_prompt(self):
         """Test that chat is called with correct message structure."""
         mock_chat = MockChatClient()
-        generator = HydeGenerator(chat=mock_chat)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat))
 
         generator.generate("What is the refund policy?")
 
@@ -71,7 +78,7 @@ class TestHydeGenerator:
     def test_prompt_contains_query(self):
         """Test that prompt includes the query."""
         mock_chat = MockChatClient()
-        generator = HydeGenerator(chat=mock_chat)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat))
 
         generator.generate("My specific question here")
 
@@ -81,7 +88,7 @@ class TestHydeGenerator:
     def test_prompt_contains_num_hypotheses(self):
         """Test that prompt includes hypothesis count."""
         mock_chat = MockChatClient()
-        generator = HydeGenerator(chat=mock_chat, num_hypotheses=5)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat), num_hypotheses=5)
 
         generator.generate("Test query")
 
@@ -91,7 +98,7 @@ class TestHydeGenerator:
     def test_custom_num_hypotheses(self):
         """Test custom number of hypotheses."""
         mock_chat = MockChatClient(response='["One", "Two"]')
-        generator = HydeGenerator(chat=mock_chat, num_hypotheses=2)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat), num_hypotheses=2)
 
         hypotheses = generator.generate("Test")
 
@@ -100,7 +107,7 @@ class TestHydeGenerator:
     def test_limits_to_num_hypotheses(self):
         """Test that results are limited to num_hypotheses."""
         mock_chat = MockChatClient(response='["P1", "P2", "P3", "P4", "P5", "P6"]')
-        generator = HydeGenerator(chat=mock_chat, num_hypotheses=3)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat), num_hypotheses=3)
 
         hypotheses = generator.generate("Test")
 
@@ -111,7 +118,7 @@ class TestHydeGenerator:
         mock_chat = MockChatClient()
         custom_template = "Custom template: {query} with {num_hypotheses} results"
         generator = HydeGenerator(
-            chat=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
             prompt_template=custom_template,
         )
 
@@ -123,7 +130,7 @@ class TestHydeGenerator:
     def test_empty_response_returns_empty_list(self):
         """Test that empty response returns empty list."""
         mock_chat = MockChatClient(response="[]")
-        generator = HydeGenerator(chat=mock_chat)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat))
 
         hypotheses = generator.generate("Test")
 
@@ -136,7 +143,7 @@ class TestHydeGenerator:
             def chat(self, messages):
                 raise RuntimeError("API error")
 
-        generator = HydeGenerator(chat=ErrorChat())
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(ErrorChat()))
 
         hypotheses = generator.generate("Test")
 
@@ -151,7 +158,7 @@ class TestResponseParsing:
         mock_chat = MockChatClient(
             response='["First passage about topic", "Second passage about topic"]'
         )
-        generator = HydeGenerator(chat=mock_chat, num_hypotheses=2)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat), num_hypotheses=2)
 
         hypotheses = generator.generate("Test")
 
@@ -164,7 +171,7 @@ class TestResponseParsing:
         mock_chat = MockChatClient(
             response='Here are the passages:\n["Passage 1", "Passage 2"]\n\nEnd of response.'
         )
-        generator = HydeGenerator(chat=mock_chat, num_hypotheses=2)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat), num_hypotheses=2)
 
         hypotheses = generator.generate("Test")
 
@@ -173,7 +180,7 @@ class TestResponseParsing:
     def test_parse_filters_empty_strings(self):
         """Test that empty strings are filtered from results."""
         mock_chat = MockChatClient(response='["Valid passage", "", "Another valid"]')
-        generator = HydeGenerator(chat=mock_chat, num_hypotheses=3)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat), num_hypotheses=3)
 
         hypotheses = generator.generate("Test")
 
@@ -185,7 +192,7 @@ class TestResponseParsing:
         mock_chat = MockChatClient(
             response='["  Passage with spaces  ", "\\nPassage with newlines\\n"]'
         )
-        generator = HydeGenerator(chat=mock_chat, num_hypotheses=2)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat), num_hypotheses=2)
 
         hypotheses = generator.generate("Test")
 
@@ -199,7 +206,7 @@ class TestResponseParsing:
 This is the first passage about the topic that provides useful context.
 This is the second passage with different perspective on the matter."""
         )
-        generator = HydeGenerator(chat=mock_chat, num_hypotheses=2)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat), num_hypotheses=2)
 
         hypotheses = generator.generate("Test")
 
@@ -209,7 +216,7 @@ This is the second passage with different perspective on the matter."""
     def test_parse_handles_non_string_items(self):
         """Test that non-string items in array are converted."""
         mock_chat = MockChatClient(response='["Valid string", 123, true, {"key": "value"}]')
-        generator = HydeGenerator(chat=mock_chat, num_hypotheses=4)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat), num_hypotheses=4)
 
         hypotheses = generator.generate("Test")
 
@@ -224,7 +231,7 @@ class TestPromptLoading:
     def test_default_prompt_loaded(self):
         """Test that default prompt template is loaded."""
         mock_chat = MockChatClient()
-        generator = HydeGenerator(chat=mock_chat)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat))
 
         # Should have loaded the default template
         assert generator.prompt_template is not None
@@ -233,7 +240,7 @@ class TestPromptLoading:
     def test_prompt_has_placeholders(self):
         """Test that default prompt has required placeholders."""
         mock_chat = MockChatClient()
-        generator = HydeGenerator(chat=mock_chat)
+        generator = HydeGenerator(chat_factory=create_mock_chat_factory(mock_chat))
 
         assert "{query}" in generator.prompt_template
         assert "{num_hypotheses}" in generator.prompt_template

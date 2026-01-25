@@ -1,14 +1,18 @@
 # tests/unit/test_config_loader.py
 """Test config loading."""
 
+from unittest.mock import patch
+
 import pytest
 
 from fitz_ai.config.loader import load_engine_config
 
 
 def test_load_config_from_defaults():
-    """Test loading config from default.yaml."""
-    config = load_engine_config("fitz_rag")
+    """Test loading config from default.yaml (isolated from user config)."""
+    # Mock _load_user_config to return None, ensuring we only test defaults
+    with patch("fitz_ai.config.loader._load_user_config", return_value=None):
+        config = load_engine_config("fitz_rag")
 
     # Verify it's a Pydantic model
     assert hasattr(config, "chat")

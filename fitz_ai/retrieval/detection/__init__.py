@@ -14,8 +14,10 @@ To add a new detection category:
 
 Usage:
     from fitz_ai.retrieval.detection import DetectionOrchestrator
+    from fitz_ai.llm import get_chat_factory
 
-    orchestrator = DetectionOrchestrator(chat_client=chat)
+    factory = get_chat_factory("cohere")
+    orchestrator = DetectionOrchestrator(chat_factory=factory)
     summary = orchestrator.detect_for_retrieval(query)
 
     if summary.has_temporal_intent:

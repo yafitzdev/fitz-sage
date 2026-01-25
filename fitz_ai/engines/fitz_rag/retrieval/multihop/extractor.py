@@ -10,8 +10,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from fitz_ai.engines.fitz_rag.protocols import ChatClient
 from fitz_ai.engines.fitz_rag.retrieval.multihop.utils import build_context_from_chunks
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
 
@@ -34,9 +34,12 @@ class BridgeExtractor:
         Bridge: "What products does TechCorp manufacture?"
     """
 
+    # Tier for bridge extraction (developer decision - fast for bulk)
+    TIER_EXTRACT: ModelTier = "fast"
+
     def __init__(
         self,
-        chat: ChatClient,
+        chat_factory: ChatFactory,
         max_questions: int = 2,
         max_context_chars: int = 5000,
     ):
@@ -44,11 +47,11 @@ class BridgeExtractor:
         Initialize the extractor.
 
         Args:
-            chat: Fast-tier chat client for extraction
+            chat_factory: Chat factory for per-task tier selection
             max_questions: Maximum bridge questions to generate
             max_context_chars: Maximum characters to include in prompt
         """
-        self.chat = chat
+        self.chat_factory = chat_factory
         self.max_questions = max_questions
         self.max_context_chars = max_context_chars
 
@@ -80,7 +83,8 @@ Return ONLY a JSON array: ["query1", "query2"]
 If no clear gaps, return: []
 """
 
-        response = self.chat.chat([{"role": "user", "content": prompt}])
+        chat = self.chat_factory(self.TIER_EXTRACT)
+        response = chat.chat([{"role": "user", "content": prompt}])
         questions = self._parse_response(response)
 
         if questions:

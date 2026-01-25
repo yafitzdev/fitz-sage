@@ -14,6 +14,13 @@ from fitz_ai.engines.fitz_rag.retrieval.multihop import (
     HopController,
 )
 
+
+def create_mock_chat_factory(mock_chat):
+    """Create a mock chat factory that returns the mock chat client."""
+    def factory(tier: str = "fast"):
+        return mock_chat
+    return factory
+
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -76,7 +83,7 @@ class TestEvidenceEvaluator:
     def test_sufficient_evidence(self, mock_chat, sample_chunks):
         """Test detection of sufficient evidence."""
         mock_chat.chat.return_value = "SUFFICIENT"
-        evaluator = EvidenceEvaluator(chat=mock_chat)
+        evaluator = EvidenceEvaluator(chat_factory=create_mock_chat_factory(mock_chat))
 
         result = evaluator.evaluate("What company does Sarah Chen lead?", sample_chunks)
 
@@ -86,7 +93,7 @@ class TestEvidenceEvaluator:
     def test_insufficient_evidence(self, mock_chat, sample_chunks):
         """Test detection of insufficient evidence."""
         mock_chat.chat.return_value = "INSUFFICIENT"
-        evaluator = EvidenceEvaluator(chat=mock_chat)
+        evaluator = EvidenceEvaluator(chat_factory=create_mock_chat_factory(mock_chat))
 
         result = evaluator.evaluate("What is Sarah's competitor's revenue?", sample_chunks)
 
@@ -95,7 +102,7 @@ class TestEvidenceEvaluator:
 
     def test_empty_chunks_returns_false(self, mock_chat):
         """Test that empty chunks returns insufficient."""
-        evaluator = EvidenceEvaluator(chat=mock_chat)
+        evaluator = EvidenceEvaluator(chat_factory=create_mock_chat_factory(mock_chat))
 
         result = evaluator.evaluate("Any query", [])
 
@@ -105,7 +112,7 @@ class TestEvidenceEvaluator:
     def test_parses_sufficient_case_insensitive(self, mock_chat, sample_chunks):
         """Test case-insensitive parsing of response."""
         mock_chat.chat.return_value = "sufficient - the evidence is complete"
-        evaluator = EvidenceEvaluator(chat=mock_chat)
+        evaluator = EvidenceEvaluator(chat_factory=create_mock_chat_factory(mock_chat))
 
         result = evaluator.evaluate("Query", sample_chunks)
 
@@ -123,7 +130,7 @@ class TestBridgeExtractor:
     def test_extracts_bridge_questions(self, mock_chat, sample_chunks):
         """Test extraction of bridge questions."""
         mock_chat.chat.return_value = '["What products does AutoMotors manufacture?"]'
-        extractor = BridgeExtractor(chat=mock_chat)
+        extractor = BridgeExtractor(chat_factory=create_mock_chat_factory(mock_chat))
 
         result = extractor.extract("What does Sarah's competitor make?", sample_chunks)
 
@@ -136,7 +143,7 @@ class TestBridgeExtractor:
         mock_chat.chat.return_value = """```json
 ["Question about competitor", "Question about products"]
 ```"""
-        extractor = BridgeExtractor(chat=mock_chat, max_questions=2)
+        extractor = BridgeExtractor(chat_factory=create_mock_chat_factory(mock_chat), max_questions=2)
 
         result = extractor.extract("Query", sample_chunks)
 
@@ -145,7 +152,7 @@ class TestBridgeExtractor:
     def test_returns_empty_list_on_parse_error(self, mock_chat, sample_chunks):
         """Test graceful handling of parse errors."""
         mock_chat.chat.return_value = "This is not valid JSON"
-        extractor = BridgeExtractor(chat=mock_chat)
+        extractor = BridgeExtractor(chat_factory=create_mock_chat_factory(mock_chat))
 
         result = extractor.extract("Query", sample_chunks)
 
@@ -154,7 +161,7 @@ class TestBridgeExtractor:
     def test_respects_max_questions(self, mock_chat, sample_chunks):
         """Test that max_questions limit is enforced."""
         mock_chat.chat.return_value = '["q1", "q2", "q3", "q4", "q5"]'
-        extractor = BridgeExtractor(chat=mock_chat, max_questions=2)
+        extractor = BridgeExtractor(chat_factory=create_mock_chat_factory(mock_chat), max_questions=2)
 
         result = extractor.extract("Query", sample_chunks)
 
@@ -163,7 +170,7 @@ class TestBridgeExtractor:
     def test_empty_array_response(self, mock_chat, sample_chunks):
         """Test handling of empty array (no gaps found)."""
         mock_chat.chat.return_value = "[]"
-        extractor = BridgeExtractor(chat=mock_chat)
+        extractor = BridgeExtractor(chat_factory=create_mock_chat_factory(mock_chat))
 
         result = extractor.extract("Query", sample_chunks)
 

@@ -94,6 +94,15 @@ class MockChatClient:
         return "Mock response"
 
 
+def create_mock_chat_factory(mock_chat):
+    """Create a mock chat factory that returns the mock chat client."""
+
+    def factory(tier: str = "fast"):
+        return mock_chat
+
+    return factory
+
+
 @dataclass
 class MockPoint:
     """Mock vector DB point/record."""
@@ -471,7 +480,7 @@ class TestQueryRouting:
         # Create router
         router = QueryRouter(
             schema_store=schema_store,
-            chat_client=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
             structured_confidence_threshold=0.6,
         )
 
@@ -502,7 +511,7 @@ class TestSQLGenerationAndExecution:
             row_count=5,
         )
 
-        generator = SQLGenerator(chat_client=mock_chat)
+        generator = SQLGenerator(chat_factory=create_mock_chat_factory(mock_chat))
         result = generator.generate("How many employees are there?", [schema])
 
         assert len(result.queries) > 0
@@ -686,7 +695,7 @@ class TestDerivedSentences:
         from fitz_ai.structured.formatter import ResultFormatter
         from fitz_ai.structured.sql_generator import SQLQuery
 
-        formatter = ResultFormatter(chat_client=mock_chat)
+        formatter = ResultFormatter(chat_factory=create_mock_chat_factory(mock_chat))
 
         query = SQLQuery(
             table="employees",
@@ -843,7 +852,7 @@ class TestFullPipelineFlow:
         # Step 2: Route query
         router = QueryRouter(
             schema_store=schema_store,
-            chat_client=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
             structured_confidence_threshold=0.6,
         )
 
@@ -873,7 +882,7 @@ class TestFullPipelineFlow:
         assert exec_result.data.get("COUNT(*)") == 3  # Alice, Bob, David
 
         # Step 5: Format result
-        formatter = ResultFormatter(chat_client=mock_chat)
+        formatter = ResultFormatter(chat_factory=create_mock_chat_factory(mock_chat))
         formatted = formatter.format(exec_result)
 
         assert formatted.sentence is not None

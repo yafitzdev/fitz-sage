@@ -25,7 +25,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, List, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, List
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.core.conflicts import find_conflicts
@@ -41,19 +41,13 @@ from fitz_ai.ingestion.enrichment.hierarchy.embedding_provider import (
 from fitz_ai.ingestion.enrichment.hierarchy.grouper import ChunkGrouper
 from fitz_ai.ingestion.enrichment.hierarchy.matcher import ChunkMatcher
 from fitz_ai.ingestion.enrichment.hierarchy.semantic_grouper import SemanticGrouper
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.prompts import hierarchy as hierarchy_prompts
 
 if TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
-
-
-@runtime_checkable
-class ChatClient(Protocol):
-    """Protocol for LLM chat clients."""
-
-    def chat(self, messages: list[dict[str, str]]) -> str: ...
 
 
 # =============================================================================
@@ -168,10 +162,13 @@ class HierarchyEnricher:
     - Level 2: Corpus summary (one separate chunk per rule)
     """
 
+    # Tier for hierarchy summarization (developer decision - background task)
+    TIER_SUMMARIZE: ModelTier = "fast"
+
     def __init__(
         self,
         config: HierarchyConfig,
-        chat_client: ChatClient,
+        chat_factory: ChatFactory,
         semantic_matcher: SemanticMatcher | None = None,
         embedder: Embedder | None = None,
     ):
@@ -180,14 +177,14 @@ class HierarchyEnricher:
 
         Args:
             config: Hierarchy configuration with rules
-            chat_client: LLM client for generating summaries
+            chat_factory: Chat factory for per-task tier selection
             semantic_matcher: Optional SemanticMatcher for conflict detection.
                              If not provided, conflicts won't be detected.
             embedder: Optional embedder for semantic grouping.
                      Required when config.grouping_strategy == "semantic".
         """
         self._config = config
-        self._chat = chat_client
+        self._chat_factory = chat_factory
         self._semantic_matcher = semantic_matcher
         self._embedder = embedder
 
@@ -399,7 +396,7 @@ Write a comprehensive summary (2-4 paragraphs) that captures the key information
 """
 
         messages = [{"role": "user", "content": llm_prompt}]
-        summary_content = self._chat.chat(messages)
+        summary_content = self._chat_factory(self.TIER_SUMMARIZE).chat(messages)
 
         return (summary_content, assessment)
 
@@ -444,7 +441,7 @@ Write a high-level overview (3-5 paragraphs) synthesizing the key insights.
 """
 
         messages = [{"role": "user", "content": llm_prompt}]
-        summary_content = self._chat.chat(messages)
+        summary_content = self._chat_factory(self.TIER_SUMMARIZE).chat(messages)
 
         chunk_id = hashlib.sha256("hierarchy:corpus:simple".encode()).hexdigest()[:16]
 
@@ -621,7 +618,7 @@ Write a comprehensive summary (2-4 paragraphs) that captures the key information
 """
 
         messages = [{"role": "user", "content": prompt}]
-        summary_content = self._chat.chat(messages)
+        summary_content = self._chat_factory(self.TIER_SUMMARIZE).chat(messages)
 
         return (summary_content, assessment)
 
@@ -672,7 +669,7 @@ Write a high-level overview (3-5 paragraphs) synthesizing the key insights.
 """
 
         messages = [{"role": "user", "content": prompt}]
-        summary_content = self._chat.chat(messages)
+        summary_content = self._chat_factory(self.TIER_SUMMARIZE).chat(messages)
 
         chunk_id = hashlib.sha256(f"hierarchy:corpus:{rule.name}".encode()).hexdigest()[:16]
 

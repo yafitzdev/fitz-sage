@@ -3,6 +3,8 @@
 Test that the default config can be loaded and validated.
 """
 
+from unittest.mock import patch
+
 from fitz_ai.config import load_engine_config
 from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 
@@ -15,8 +17,9 @@ def test_default_config_loads_and_validates_base_schema():
     - resolved runtime config validates against FitzRagConfig
     - all required fields are present
     """
-
-    cfg = load_engine_config("fitz_rag")
+    # Mock _load_user_config to avoid user config interference
+    with patch("fitz_ai.config.loader._load_user_config", return_value=None):
+        cfg = load_engine_config("fitz_rag")
 
     assert isinstance(cfg, FitzRagConfig)
 

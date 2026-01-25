@@ -10,6 +10,13 @@ from fitz_ai.core.chunk import Chunk
 from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
 
 
+def create_mock_chat_factory(mock_chat):
+    """Create a mock chat factory that returns the mock chat client."""
+    def factory(tier: str = "fast"):
+        return mock_chat
+    return factory
+
+
 class TestEntityLinkingPipelineIntegration:
     """Tests for entity extraction integration with EnrichmentPipeline.
 
@@ -38,7 +45,7 @@ class TestEntityLinkingPipelineIntegration:
         pipeline = EnrichmentPipeline(
             config=config,
             project_root=tmp_path,
-            chat_client=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
         )
 
         # Chunk content must be >= min_batch_content (500 chars) to trigger LLM call

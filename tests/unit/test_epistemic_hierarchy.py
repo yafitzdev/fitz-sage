@@ -25,6 +25,13 @@ from fitz_ai.prompts.hierarchy import (
 )
 
 
+def create_mock_chat_factory(mock_chat):
+    """Create a mock chat factory that returns the mock chat client."""
+    def factory(tier: str = "fast"):
+        return mock_chat
+    return factory
+
+
 class TestEpistemicAssessment:
     """Tests for the EpistemicAssessment dataclass and assess_chunk_group function."""
 
@@ -221,7 +228,7 @@ class TestHierarchyEnricherEpistemic:
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "This is a summary."
 
-        enricher = HierarchyEnricher(config=config, chat_client=mock_chat)
+        enricher = HierarchyEnricher(config=config, chat_factory=create_mock_chat_factory(mock_chat))
 
         chunks = [
             Chunk(
@@ -274,7 +281,7 @@ class TestHierarchyEnricherEpistemic:
 
         enricher = HierarchyEnricher(
             config=config,
-            chat_client=mock_chat,
+            chat_factory=create_mock_chat_factory(mock_chat),
             semantic_matcher=semantic_matcher,
         )
 
@@ -313,7 +320,7 @@ class TestHierarchyEnricherEpistemic:
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "Summary content."
 
-        enricher = HierarchyEnricher(config=config, chat_client=mock_chat)
+        enricher = HierarchyEnricher(config=config, chat_factory=create_mock_chat_factory(mock_chat))
 
         chunks = [
             Chunk(

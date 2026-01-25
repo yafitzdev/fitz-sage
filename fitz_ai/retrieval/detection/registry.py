@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from fitz_ai.llm.factory import ChatFactory
 from fitz_ai.logging.logger import get_logger
 
 from .llm_classifier import LLMClassifier
@@ -18,7 +19,7 @@ from .modules import AggregationType, TemporalIntent
 from .protocol import DetectionCategory, DetectionResult
 
 if TYPE_CHECKING:
-    from .llm_classifier import ChatProtocol
+    pass
 
 logger = get_logger(__name__)
 
@@ -125,7 +126,10 @@ class DetectionOrchestrator:
     parsing, but all are combined into a single LLM call.
 
     Usage:
-        orchestrator = DetectionOrchestrator(chat_client=chat)
+        from fitz_ai.llm import get_chat_factory
+
+        factory = get_chat_factory("cohere")
+        orchestrator = DetectionOrchestrator(chat_factory=factory)
         summary = orchestrator.detect_for_retrieval(query)
 
         if summary.has_temporal_intent:
@@ -133,7 +137,7 @@ class DetectionOrchestrator:
             ...
     """
 
-    chat_client: "ChatProtocol | None" = None
+    chat_factory: ChatFactory | None = None
 
     # Lazy-loaded classifier and expansion detector
     _classifier: LLMClassifier | None = field(default=None, init=False, repr=False)
@@ -141,8 +145,8 @@ class DetectionOrchestrator:
 
     def _ensure_classifier(self) -> LLMClassifier | None:
         """Lazy-load LLM classifier with all modules."""
-        if self._classifier is None and self.chat_client is not None:
-            self._classifier = LLMClassifier(chat_client=self.chat_client)
+        if self._classifier is None and self.chat_factory is not None:
+            self._classifier = LLMClassifier(chat_factory=self.chat_factory)
         return self._classifier
 
     def _get_expansion_detector(self) -> Any:
@@ -173,7 +177,7 @@ class DetectionOrchestrator:
             results = classifier.classify(query)
         else:
             results = {}
-            logger.debug("No chat client available, skipping LLM classification")
+            logger.debug("No chat factory available, skipping LLM classification")
 
         # Get expansion result from dict-based detector (not LLM)
         expansion_detector = self._get_expansion_detector()

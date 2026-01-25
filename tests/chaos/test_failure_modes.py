@@ -14,11 +14,22 @@ Run with: pytest tests/chaos/ -v -s -m chaos
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 pytestmark = pytest.mark.chaos
+
+
+def create_failing_chat_factory(side_effect):
+    """Create a chat factory that returns a client with failing chat method."""
+    mock_chat = Mock()
+    mock_chat.chat = Mock(side_effect=side_effect)
+
+    def factory(tier="fast"):
+        return mock_chat
+
+    return factory
 
 
 class TestLLMFailures:
@@ -34,26 +45,25 @@ class TestLLMFailures:
 
         from fitz_ai.engines.fitz_rag.exceptions import LLMError
 
-        async def slow_generate(*args, **kwargs):
-            await asyncio.sleep(60)  # Simulate timeout
-            return "response"
+        # Replace the chat factory with one that returns a timeout-failing client
+        original_factory = self.runner.pipeline.chat_factory
+        self.runner.pipeline.chat_factory = create_failing_chat_factory(
+            asyncio.TimeoutError("LLM timeout")
+        )
 
-        # Patch the chat service to timeout
-        with patch.object(
-            self.runner.pipeline.chat,
-            "chat",
-            side_effect=asyncio.TimeoutError("LLM timeout"),
-        ):
-            try:
-                result = self.runner.pipeline.run("What is TechCorp?")
-                # Should either return a graceful error or raise a handled exception
-                assert result is None or "error" in result.answer.lower()
-            except LLMError:
-                # LLMError is the expected exception - system handled it properly
-                pass
-            except Exception as e:
-                # Other exceptions are acceptable as long as they're handled
-                assert "timeout" in str(e).lower() or "unavailable" in str(e).lower()
+        try:
+            result = self.runner.pipeline.run("What is TechCorp?")
+            # Should either return a graceful error or raise a handled exception
+            assert result is None or "error" in result.answer.lower()
+        except LLMError:
+            # LLMError is the expected exception - system handled it properly
+            pass
+        except Exception as e:
+            # Other exceptions are acceptable as long as they're handled
+            assert "timeout" in str(e).lower() or "unavailable" in str(e).lower()
+        finally:
+            # Restore original factory
+            self.runner.pipeline.chat_factory = original_factory
 
     def test_llm_rate_limit_handling(self):
         """Rate limit errors should be handled."""
@@ -62,21 +72,23 @@ class TestLLMFailures:
         def rate_limited(*args, **kwargs):
             raise Exception("Rate limit exceeded. Retry after 60 seconds.")
 
-        with patch.object(
-            self.runner.pipeline.chat,
-            "chat",
-            side_effect=rate_limited,
-        ):
-            try:
-                result = self.runner.pipeline.run("What is TechCorp?")
-                # Should handle gracefully
-                assert result is None or "error" in str(result).lower()
-            except LLMError:
-                # LLMError is the expected exception - system handled it properly
-                pass
-            except Exception as e:
-                # Other handled exceptions are acceptable
-                assert "rate" in str(e).lower() or "limit" in str(e).lower()
+        # Replace the chat factory with one that returns a rate-limited client
+        original_factory = self.runner.pipeline.chat_factory
+        self.runner.pipeline.chat_factory = create_failing_chat_factory(rate_limited)
+
+        try:
+            result = self.runner.pipeline.run("What is TechCorp?")
+            # Should handle gracefully
+            assert result is None or "error" in str(result).lower()
+        except LLMError:
+            # LLMError is the expected exception - system handled it properly
+            pass
+        except Exception as e:
+            # Other handled exceptions are acceptable
+            assert "rate" in str(e).lower() or "limit" in str(e).lower()
+        finally:
+            # Restore original factory
+            self.runner.pipeline.chat_factory = original_factory
 
 
 class TestRetrievalFailures:
@@ -164,17 +176,19 @@ class TestPartialFailures:
         def malformed_response(*args, **kwargs):
             return None  # No response
 
-        with patch.object(
-            self.runner.pipeline.chat,
-            "chat",
-            side_effect=malformed_response,
-        ):
-            try:
-                _result = self.runner.pipeline.run("What is TechCorp?")
-                # Should handle None response gracefully
-            except Exception:
-                # Handled exception is acceptable
-                pass
+        # Replace the chat factory with one that returns malformed responses
+        original_factory = self.runner.pipeline.chat_factory
+        self.runner.pipeline.chat_factory = create_failing_chat_factory(malformed_response)
+
+        try:
+            _result = self.runner.pipeline.run("What is TechCorp?")
+            # Should handle None response gracefully
+        except Exception:
+            # Handled exception is acceptable
+            pass
+        finally:
+            # Restore original factory
+            self.runner.pipeline.chat_factory = original_factory
 
 
 class TestResourceExhaustion:

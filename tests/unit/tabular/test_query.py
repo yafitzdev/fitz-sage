@@ -10,6 +10,16 @@ from fitz_ai.tabular.models import ParsedTable, create_schema_chunk
 from fitz_ai.tabular.query import TableQueryStep
 
 
+def create_mock_chat_factory():
+    """Create a mock chat factory that returns the same mock client."""
+    mock_chat = MagicMock()
+
+    def factory(tier: str = "fast"):
+        return mock_chat
+
+    return factory, mock_chat
+
+
 class MockTableStore:
     """Mock PostgresTableStore for testing."""
 
@@ -70,9 +80,9 @@ class TestTableQueryStep:
     """Tests for TableQueryStep."""
 
     @pytest.fixture
-    def mock_chat(self):
-        """Create a mock chat client."""
-        return MagicMock()
+    def mock_chat_factory(self):
+        """Create a mock chat factory."""
+        return create_mock_chat_factory()
 
     @pytest.fixture
     def mock_store(self):
@@ -93,9 +103,10 @@ class TestTableQueryStep:
         return store
 
     @pytest.fixture
-    def step(self, mock_chat, mock_store):
-        """Create step with mock chat and store."""
-        return TableQueryStep(chat=mock_chat, table_store=mock_store)
+    def step(self, mock_chat_factory, mock_store):
+        """Create step with mock chat factory and store."""
+        factory, _ = mock_chat_factory
+        return TableQueryStep(chat_factory=factory, table_store=mock_store)
 
     @pytest.fixture
     def sample_table_chunk(self):
@@ -129,8 +140,9 @@ class TestTableQueryStep:
         assert result[0].id == "regular1"
         assert result[0].content == "This is regular content"
 
-    def test_processes_table_chunk(self, step, mock_chat, sample_table_chunk):
+    def test_processes_table_chunk(self, step, mock_chat_factory, sample_table_chunk):
         """Test processing a table schema chunk."""
+        _, mock_chat = mock_chat_factory
         # Mock LLM responses
         mock_chat.chat.side_effect = [
             '["Country", "Population"]',  # Column selection
@@ -144,8 +156,9 @@ class TestTableQueryStep:
         assert "SQL Query Results" in result[0].content
         assert "sql_executed" in result[0].metadata
 
-    def test_handles_mixed_chunks(self, step, mock_chat, sample_table_chunk):
+    def test_handles_mixed_chunks(self, step, mock_chat_factory, sample_table_chunk):
         """Test handling mix of table and regular chunks."""
+        _, mock_chat = mock_chat_factory
         regular_chunk = Chunk(
             id="reg1",
             doc_id="doc1",
@@ -167,8 +180,9 @@ class TestTableQueryStep:
         assert result[0].content == "Regular content"
         assert "SQL Query Results" in result[1].content
 
-    def test_column_selection_fallback(self, step, mock_chat, sample_table_chunk):
+    def test_column_selection_fallback(self, step, mock_chat_factory, sample_table_chunk):
         """Test fallback when column selection returns invalid JSON."""
+        _, mock_chat = mock_chat_factory
         mock_chat.chat.side_effect = [
             "invalid json response",  # Bad column selection
             'SELECT * FROM "tbl_test123"',  # SQL with all columns
@@ -181,9 +195,10 @@ class TestTableQueryStep:
         # Chat was called twice
         assert mock_chat.chat.call_count == 2
 
-    def test_missing_table_in_store(self, mock_chat):
+    def test_missing_table_in_store(self):
         """Test handling of chunk with table_id not in store."""
-        step = TableQueryStep(chat=mock_chat, table_store=MockTableStore())  # Empty store
+        factory, _ = create_mock_chat_factory()
+        step = TableQueryStep(chat_factory=factory, table_store=MockTableStore())  # Empty store
 
         broken_chunk = Chunk(
             id="broken1",
@@ -199,9 +214,10 @@ class TestTableQueryStep:
         assert len(result) == 1
         assert result[0].id == "broken1"
 
-    def test_no_store_provided(self, mock_chat, sample_table_chunk):
+    def test_no_store_provided(self, sample_table_chunk):
         """Test handling when no table_store is provided."""
-        step = TableQueryStep(chat=mock_chat, table_store=None)
+        factory, _ = create_mock_chat_factory()
+        step = TableQueryStep(chat_factory=factory, table_store=None)
 
         result = step.execute("query", [sample_table_chunk])
 
@@ -215,8 +231,8 @@ class TestColumnSelection:
 
     @pytest.fixture
     def step(self):
-        mock_chat = MagicMock()
-        return TableQueryStep(chat=mock_chat), mock_chat
+        factory, mock_chat = create_mock_chat_factory()
+        return TableQueryStep(chat_factory=factory), mock_chat
 
     def test_parses_json_array(self, step):
         """Test parsing valid JSON array response."""
@@ -255,8 +271,8 @@ class TestSQLExtraction:
 
     @pytest.fixture
     def step(self):
-        mock_chat = MagicMock()
-        return TableQueryStep(chat=mock_chat), mock_chat
+        factory, mock_chat = create_mock_chat_factory()
+        return TableQueryStep(chat_factory=factory), mock_chat
 
     def test_extracts_sql_from_plain_response(self, step):
         """Test extracting SQL from plain response."""
@@ -300,8 +316,8 @@ class TestResultFormatting:
 
     @pytest.fixture
     def step(self):
-        mock_chat = MagicMock()
-        return TableQueryStep(chat=mock_chat)
+        factory, _ = create_mock_chat_factory()
+        return TableQueryStep(chat_factory=factory)
 
     def test_formats_results_as_markdown_table(self, step):
         """Test markdown table formatting."""
@@ -388,8 +404,8 @@ class TestMultiTableDetection:
 
     def test_returns_false_for_single_chunk(self, mock_store, employees_chunk):
         """Test detection returns false for single table."""
-        mock_chat = MagicMock()
-        step = TableQueryStep(chat=mock_chat, table_store=mock_store)
+        factory, mock_chat = create_mock_chat_factory()
+        step = TableQueryStep(chat_factory=factory, table_store=mock_store)
 
         result = step._needs_multi_table("query", [employees_chunk])
 
@@ -398,9 +414,9 @@ class TestMultiTableDetection:
 
     def test_calls_llm_for_multiple_chunks(self, mock_store, employees_chunk, departments_chunk):
         """Test detection calls LLM for multiple tables."""
-        mock_chat = MagicMock()
+        factory, mock_chat = create_mock_chat_factory()
         mock_chat.chat.return_value = "no"
-        step = TableQueryStep(chat=mock_chat, table_store=mock_store)
+        step = TableQueryStep(chat_factory=factory, table_store=mock_store)
 
         result = step._needs_multi_table(
             "What is Alice's name?",
@@ -412,9 +428,9 @@ class TestMultiTableDetection:
 
     def test_returns_true_for_join_query(self, mock_store, employees_chunk, departments_chunk):
         """Test detection returns true for join query."""
-        mock_chat = MagicMock()
+        factory, mock_chat = create_mock_chat_factory()
         mock_chat.chat.return_value = "yes"
-        step = TableQueryStep(chat=mock_chat, table_store=mock_store)
+        step = TableQueryStep(chat_factory=factory, table_store=mock_store)
 
         result = step._needs_multi_table(
             "Show employee names with their department names",
@@ -456,14 +472,14 @@ class TestEndToEnd:
             ],
         )
 
-        # Setup mock chat
-        mock_chat = MagicMock()
+        # Setup mock chat factory
+        factory, mock_chat = create_mock_chat_factory()
         mock_chat.chat.side_effect = [
             '["Country", "Capital"]',  # Column selection
             'SELECT "country", "capital" FROM "tbl_e2e_test"',  # SQL
         ]
 
-        step = TableQueryStep(chat=mock_chat, table_store=mock_store)
+        step = TableQueryStep(chat_factory=factory, table_store=mock_store)
         result = step.execute("What are the capitals?", [chunk])
 
         assert len(result) == 1

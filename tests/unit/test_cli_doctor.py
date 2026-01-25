@@ -292,16 +292,18 @@ class TestDoctorTestMode:
 
     def test_doctor_test_runs_connections(self, tmp_path):
         """Test --test runs connection tests."""
-        import yaml
-
-        config_path = tmp_path / "fitz.yaml"
-        config = {
-            "chat": {"plugin_name": "cohere"},
-            "embedding": {"plugin_name": "cohere"},
-            "vector_db": {"plugin_name": "pgvector"},
-            "rerank": {"enabled": False},
-        }
-        config_path.write_text(yaml.dump(config))
+        # Mock CLIContext
+        mock_ctx = MagicMock()
+        mock_ctx.chat_plugin = "cohere"
+        mock_ctx.embedding_plugin = "cohere"
+        mock_ctx.vector_db_plugin = "pgvector"
+        mock_ctx.rerank_enabled = False
+        mock_ctx.vector_db_kwargs = {}
+        mock_ctx.chat_kwargs = {}
+        mock_ctx.embedding_kwargs = {}
+        mock_ctx.rerank_kwargs = {}
+        mock_ctx.chat_display = "cohere"
+        mock_ctx.embedding_display = "cohere"
 
         mock_system = MagicMock()
         mock_system.ollama.available = False
@@ -322,7 +324,7 @@ class TestDoctorTestMode:
                 return_value=mock_system,
             ),
             patch("fitz_ai.cli.context.FitzPaths.workspace", return_value=tmp_path),
-            patch("fitz_ai.cli.context.FitzPaths.config", return_value=config_path),
+            patch("fitz_ai.cli.commands.doctor.CLIContext.load", return_value=mock_ctx),
             patch("fitz_ai.llm.registry.get_llm_plugin", return_value=mock_plugin),
             patch(
                 "fitz_ai.vector_db.registry.get_vector_db_plugin",

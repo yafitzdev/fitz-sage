@@ -12,13 +12,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
-
-if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_rag.protocols import ChatClient
 
 logger = get_logger(__name__)
 
@@ -41,9 +38,12 @@ class HydeGenerator:
     and searched alongside the original query for improved recall.
     """
 
-    chat: "ChatClient"
+    chat_factory: ChatFactory
     num_hypotheses: int = 3
     prompt_template: str | None = field(default=None, repr=False)
+
+    # Tier for hypothesis generation (developer decision - creative task)
+    TIER_HYPOTHESIZE: ModelTier = "fast"
 
     def __post_init__(self):
         """Load default prompt template if not provided."""
@@ -64,7 +64,8 @@ class HydeGenerator:
         messages = [{"role": "user", "content": prompt}]
 
         try:
-            response = self.chat.chat(messages)
+            chat = self.chat_factory(self.TIER_HYPOTHESIZE)
+            response = chat.chat(messages)
             hypotheses = self._parse_response(response)
 
             logger.debug(f"{RETRIEVER} HyDE: generated {len(hypotheses)} hypotheses for query")

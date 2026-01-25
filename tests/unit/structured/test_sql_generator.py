@@ -45,6 +45,16 @@ class MockChatClient:
         )
 
 
+def create_mock_factory(response: dict[str, Any] | None = None) -> tuple:
+    """Create a mock chat factory that returns a mock client."""
+    client = MockChatClient(response)
+
+    def factory(tier: str = "fast") -> MockChatClient:
+        return client
+
+    return factory, client
+
+
 @pytest.fixture
 def employees_schema() -> TableSchema:
     """Create employees table schema."""
@@ -267,8 +277,8 @@ class TestSQLGenerator:
 
     def test_generate_basic_query(self, employees_schema: TableSchema):
         """Test basic query generation."""
-        client = MockChatClient()
-        generator = SQLGenerator(client)
+        factory, client = create_mock_factory()
+        generator = SQLGenerator(factory)
 
         result = generator.generate(
             "How many employees are in engineering?",
@@ -281,8 +291,8 @@ class TestSQLGenerator:
 
     def test_generate_calls_chat(self, employees_schema: TableSchema):
         """Test that generator calls chat client."""
-        client = MockChatClient()
-        generator = SQLGenerator(client)
+        factory, client = create_mock_factory()
+        generator = SQLGenerator(factory)
 
         generator.generate("Count employees", [employees_schema])
 
@@ -293,8 +303,8 @@ class TestSQLGenerator:
 
     def test_generate_no_schemas(self):
         """Test generation with no schemas."""
-        client = MockChatClient()
-        generator = SQLGenerator(client)
+        factory, client = create_mock_factory()
+        generator = SQLGenerator(factory)
 
         result = generator.generate("Count stuff", [])
 
@@ -303,7 +313,7 @@ class TestSQLGenerator:
 
     def test_generate_multiple_queries(self, employees_schema: TableSchema):
         """Test generating multiple queries."""
-        client = MockChatClient(
+        factory, client = create_mock_factory(
             response={
                 "queries": [
                     {"sql": "SELECT COUNT(*) FROM employees", "table": "employees"},
@@ -311,7 +321,7 @@ class TestSQLGenerator:
                 ]
             }
         )
-        generator = SQLGenerator(client)
+        generator = SQLGenerator(factory)
 
         result = generator.generate("Stats about employees", [employees_schema])
 
@@ -319,8 +329,8 @@ class TestSQLGenerator:
 
     def test_generate_handles_invalid_response(self, employees_schema: TableSchema):
         """Test handling of invalid LLM response."""
-        client = MockChatClient(response={"invalid": "response"})
-        generator = SQLGenerator(client)
+        factory, client = create_mock_factory(response={"invalid": "response"})
+        generator = SQLGenerator(factory)
 
         result = generator.generate("Count employees", [employees_schema])
 

@@ -19,6 +19,13 @@ from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 # =============================================================================
 
 
+def create_mock_chat_factory(mock_chat):
+    """Create a mock chat factory that returns the mock chat client."""
+    def factory(tier: str = "fast"):
+        return mock_chat
+    return factory
+
+
 @dataclass
 class MockRetrievalPipeline:
     """Mock retrieval pipeline that returns fixed chunks."""
@@ -71,7 +78,7 @@ def test_pipeline_end_to_end():
 
     components = PipelineComponents(
         retrieval=MockRetrievalPipeline(),
-        chat=DummyLLM(),
+        chat_factory=create_mock_chat_factory(DummyLLM()),
         rgs=rgs,
     )
 

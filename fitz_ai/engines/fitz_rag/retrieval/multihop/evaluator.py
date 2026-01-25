@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fitz_ai.engines.fitz_rag.protocols import ChatClient
 from fitz_ai.engines.fitz_rag.retrieval.multihop.utils import build_context_from_chunks
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import RETRIEVER
 
@@ -31,15 +31,18 @@ class EvidenceEvaluator:
     when uncertain, as getting more context is cheap compared to hallucination.
     """
 
-    def __init__(self, chat: ChatClient, max_context_chars: int = 5000):
+    # Tier for evidence evaluation (developer decision - fast for bulk)
+    TIER_EVALUATE: ModelTier = "fast"
+
+    def __init__(self, chat_factory: ChatFactory, max_context_chars: int = 5000):
         """
         Initialize the evaluator.
 
         Args:
-            chat: Fast-tier chat client for evaluation
+            chat_factory: Chat factory for per-task tier selection
             max_context_chars: Maximum characters to include in evaluation prompt
         """
-        self.chat = chat
+        self.chat_factory = chat_factory
         self.max_context_chars = max_context_chars
 
     def evaluate(self, query: str, chunks: list["Chunk"]) -> bool:
@@ -73,7 +76,8 @@ SUFFICIENT means: The evidence contains the key facts needed to answer the quest
 INSUFFICIENT means: The evidence is missing critical information, or only contains partial/indirect information.
 """
 
-        response = self.chat.chat([{"role": "user", "content": prompt}])
+        chat = self.chat_factory(self.TIER_EVALUATE)
+        response = chat.chat([{"role": "user", "content": prompt}])
         # Check for exact word match to avoid "INSUFFICIENT" matching "SUFFICIENT"
         response_upper = response.upper()
         is_sufficient = "SUFFICIENT" in response_upper and "INSUFFICIENT" not in response_upper

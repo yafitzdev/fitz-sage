@@ -25,12 +25,14 @@ Architecture:
 
 Usage:
     from fitz_ai.ingestion.enrichment import EnrichmentPipeline, EnrichmentConfig
+    from fitz_ai.llm import get_chat_factory
 
     # Create pipeline
+    factory = get_chat_factory("cohere")
     pipeline = EnrichmentPipeline.from_config(
         config=config.get("enrichment"),
         project_root=Path("./src"),
-        chat_client=my_llm,
+        chat_factory=factory,
     )
 
     # Unified enrichment (preferred - the "box" interface)

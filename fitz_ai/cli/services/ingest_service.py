@@ -160,6 +160,7 @@ class IngestService:
         from fitz_ai.ingestion.enrichment.pipeline import EnrichmentPipeline
         from fitz_ai.ingestion.parser import ParserRouter
         from fitz_ai.ingestion.state import IngestStateManager
+        from fitz_ai.llm.factory import get_chat_factory
         from fitz_ai.llm.registry import get_llm_plugin
         from fitz_ai.runtime import get_engine_registry
         from fitz_ai.vector_db.registry import get_vector_db_plugin
@@ -205,12 +206,10 @@ class IngestService:
 
             # Determine if we have an LLM for enrichment
             has_llm = False
-            chat_client = None
+            chat_factory = None
             try:
-                chat_client = get_llm_plugin(
-                    plugin_type="chat",
+                chat_factory = get_chat_factory(
                     plugin_name=cfg.chat.plugin_name,
-                    tier="fast",
                     **cfg.chat.kwargs,
                 )
                 has_llm = True
@@ -244,11 +243,11 @@ class IngestService:
 
             # Create enrichment pipeline if we have chat
             enrichment_pipeline = None
-            if has_llm and chat_client:
+            if has_llm and chat_factory:
                 enrichment_pipeline = EnrichmentPipeline(
-                    chat=chat_client,
-                    embedder=embedder,
                     config=enrichment_cfg,
+                    project_root=Path(source).resolve(),
+                    chat_factory=chat_factory,
                 )
 
             # State manager

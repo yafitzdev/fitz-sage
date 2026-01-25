@@ -412,7 +412,7 @@ def _build_enrichment_pipeline(
     source: str,
 ):
     """Build the enrichment pipeline from config and CLI args."""
-    from fitz_ai.llm.registry import get_llm_plugin
+    from fitz_ai.llm.factory import get_chat_factory
 
     enrichment_cfg = config.get("enrichment", {})
 
@@ -441,7 +441,7 @@ def _build_enrichment_pipeline(
 
     # Check if any selected artifact requires LLM
     # Hierarchy always requires LLM for summarization
-    chat_client = None
+    chat_factory = None
     needs_llm = True  # Hierarchy is always on, always needs LLM
 
     # Also check artifacts that require LLM
@@ -453,24 +453,22 @@ def _build_enrichment_pipeline(
         )
 
     if needs_llm:
-        # Get chat client from config - use "fast" tier for enrichment tasks
+        # Get chat factory from config
         chat_plugin = config.get("chat", {}).get("plugin_name", "cohere")
         chat_kwargs = config.get("chat", {}).get("kwargs", {})
         # Include user's model overrides if present
         chat_models = config.get("chat", {}).get("models")
         if chat_models:
             chat_kwargs["models"] = chat_models
-        chat_client = get_llm_plugin(
-            plugin_type="chat",
+        chat_factory = get_chat_factory(
             plugin_name=chat_plugin,
-            tier="fast",
             **chat_kwargs,
         )
 
     return EnrichmentPipeline(
         config=enrichment_config,
         project_root=Path(source).resolve(),
-        chat_client=chat_client,
+        chat_factory=chat_factory,
     )
 
 

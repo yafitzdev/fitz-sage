@@ -147,11 +147,15 @@ class TestDirectTableQuery:
     """Tests for DirectTableQuery class."""
 
     @pytest.fixture
-    def mock_chat(self):
-        """Create a mock chat client."""
+    def mock_chat_factory(self):
+        """Create a mock chat factory that returns a mock client."""
         chat = MagicMock()
         chat.chat = MagicMock(return_value='["name", "age"]')
-        return chat
+
+        def factory(tier: str = "fast"):
+            return chat
+
+        return factory, chat
 
     @pytest.fixture
     def sample_csv(self, tmp_path):
@@ -160,8 +164,9 @@ class TestDirectTableQuery:
         csv_file.write_text("name,age,city\nAlice,30,NYC\nBob,25,LA\nCharlie,35,SF")
         return csv_file
 
-    def test_selects_columns_via_llm(self, mock_chat, sample_csv):
+    def test_selects_columns_via_llm(self, mock_chat_factory, sample_csv):
         """Test that LLM is called to select columns."""
+        factory, mock_chat = mock_chat_factory
         # Make chat return columns, then SQL, then answer
         mock_chat.chat = MagicMock(
             side_effect=[
@@ -171,7 +176,7 @@ class TestDirectTableQuery:
             ]
         )
 
-        query = DirectTableQuery(chat=mock_chat)
+        query = DirectTableQuery(chat_factory=factory)
 
         # Should call chat for column selection (now requires samples)
         samples = {"name": ["Alice", "Bob"], "age": ["30", "25"], "city": ["NYC", "LA"]}
@@ -179,63 +184,70 @@ class TestDirectTableQuery:
 
         assert result == ["name", "age"]
 
-    def test_parses_json_list_from_code_block(self, mock_chat):
+    def test_parses_json_list_from_code_block(self, mock_chat_factory):
         """Test JSON parsing from markdown code block."""
-        query = DirectTableQuery(chat=mock_chat)
+        factory, _ = mock_chat_factory
+        query = DirectTableQuery(chat_factory=factory)
 
         # fallback contains valid column names that match the parsed result
         result = query._parse_json_list('```json\n["a", "b"]\n```', fallback=["a", "b", "c"])
 
         assert result == ["a", "b"]
 
-    def test_parses_plain_json_list(self, mock_chat):
+    def test_parses_plain_json_list(self, mock_chat_factory):
         """Test JSON parsing from plain response."""
-        query = DirectTableQuery(chat=mock_chat)
+        factory, _ = mock_chat_factory
+        query = DirectTableQuery(chat_factory=factory)
 
         # fallback contains valid column names that match the parsed result
         result = query._parse_json_list('["col1", "col2"]', fallback=["col1", "col2", "col3"])
 
         assert result == ["col1", "col2"]
 
-    def test_fallback_on_invalid_json(self, mock_chat):
+    def test_fallback_on_invalid_json(self, mock_chat_factory):
         """Test fallback when JSON is invalid."""
-        query = DirectTableQuery(chat=mock_chat)
+        factory, _ = mock_chat_factory
+        query = DirectTableQuery(chat_factory=factory)
 
         result = query._parse_json_list("not valid json", fallback=["fallback"])
 
         assert result == ["fallback"]
 
-    def test_extracts_sql_from_response(self, mock_chat):
+    def test_extracts_sql_from_response(self, mock_chat_factory):
         """Test SQL extraction."""
-        query = DirectTableQuery(chat=mock_chat)
+        factory, _ = mock_chat_factory
+        query = DirectTableQuery(chat_factory=factory)
 
         sql = query._extract_sql('```sql\nSELECT * FROM tbl\n```')
 
         assert sql == "SELECT * FROM tbl"
 
-    def test_extracts_sql_without_code_block(self, mock_chat):
+    def test_extracts_sql_without_code_block(self, mock_chat_factory):
         """Test SQL extraction from plain response."""
-        query = DirectTableQuery(chat=mock_chat)
+        factory, _ = mock_chat_factory
+        query = DirectTableQuery(chat_factory=factory)
 
         sql = query._extract_sql('SELECT "name" FROM "people" LIMIT 10')
 
         assert sql == 'SELECT "name" FROM "people" LIMIT 10'
 
-    def test_is_table_file_check(self, mock_chat, tmp_path):
+    def test_is_table_file_check(self, mock_chat_factory, tmp_path):
         """Test that non-table files are rejected."""
+        factory, _ = mock_chat_factory
         txt_file = tmp_path / "data.txt"
         txt_file.write_text("not a table")
 
-        query = DirectTableQuery(chat=mock_chat)
+        query = DirectTableQuery(chat_factory=factory)
 
         with pytest.raises(ValueError, match="Not a supported table file"):
             query.query(txt_file, "question")
 
-    def test_file_not_found(self, mock_chat, tmp_path):
+    def test_file_not_found(self, mock_chat_factory, tmp_path):
         """Test that missing files raise error."""
+        factory, _ = mock_chat_factory
         missing = tmp_path / "missing.csv"
 
-        query = DirectTableQuery(chat=mock_chat)
+        query = DirectTableQuery(chat_factory=factory)
 
         with pytest.raises(FileNotFoundError):
             query.query(missing, "question")

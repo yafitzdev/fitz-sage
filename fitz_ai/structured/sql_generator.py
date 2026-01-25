@@ -11,22 +11,14 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from typing import Any
 
+from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.structured.constants import MAX_QUERIES_PER_REQUEST, MAX_RESULT_NAMES
 from fitz_ai.structured.schema import TableSchema
 
 logger = get_logger(__name__)
-
-
-@runtime_checkable
-class ChatClient(Protocol):
-    """Protocol for chat completion."""
-
-    def chat(self, messages: list[dict[str, Any]]) -> str:
-        """Send messages and get response."""
-        ...
 
 
 @dataclass
@@ -352,14 +344,17 @@ class SQLGenerator:
     Produces simplified SQL that can be executed via metadata filtering.
     """
 
-    def __init__(self, chat_client: ChatClient):
+    # Tier for SQL generation (developer decision - balanced for complex SQL)
+    TIER_SQL_GENERATE: ModelTier = "balanced"
+
+    def __init__(self, chat_factory: ChatFactory):
         """
         Initialize generator.
 
         Args:
-            chat_client: Chat client for SQL generation (use fast tier)
+            chat_factory: Chat factory for per-task tier selection
         """
-        self._chat = chat_client
+        self._chat_factory = chat_factory
 
     def generate(
         self,
@@ -388,7 +383,8 @@ class SQLGenerator:
         )
 
         try:
-            response = self._chat.chat([{"role": "user", "content": prompt}])
+            chat = self._chat_factory(self.TIER_SQL_GENERATE)
+            response = chat.chat([{"role": "user", "content": prompt}])
             sql_dicts = _parse_sql_response(response)
 
             if not sql_dicts:
