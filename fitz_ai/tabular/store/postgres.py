@@ -74,6 +74,7 @@ class PostgresTableStore:
             column_names_original TEXT[] NOT NULL,
             row_count INTEGER NOT NULL,
             source_file TEXT,
+            file_hash TEXT,
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
     """
@@ -108,17 +109,20 @@ class PostgresTableStore:
         columns: list[str],
         rows: list[list[str]],
         source_file: str,
+        file_hash: str | None = None,
     ) -> str:
         """
         Store table as native PostgreSQL table.
 
         Creates actual table with columns and inserts all rows.
+        Includes _row_num column for incremental column addition.
 
         Args:
             table_id: Unique identifier for the table.
             columns: Column headers (original names).
             rows: Data rows.
             source_file: Original source file path.
+            file_hash: Hash of source file for change detection.
 
         Returns:
             Content hash for cache invalidation.
@@ -145,46 +149,53 @@ class PostgresTableStore:
             # Drop existing table if exists
             conn.execute(f'DROP TABLE IF EXISTS "{table_name}"')
 
-            # Create table with TEXT columns
-            cols_def = ", ".join(f'"{c}" TEXT' for c in sanitized_cols)
+            # Create table with _row_num + TEXT columns
+            cols_def = "_row_num INTEGER PRIMARY KEY, " + ", ".join(
+                f'"{c}" TEXT' for c in sanitized_cols
+            )
             conn.execute(f'CREATE TABLE "{table_name}" ({cols_def})')
 
-            # Insert rows in batches
+            # Insert rows in batches with row numbers
             if rows:
-                placeholders = ", ".join(["%s"] * len(sanitized_cols))
+                placeholders = ", ".join(["%s"] * (len(sanitized_cols) + 1))  # +1 for _row_num
                 # Batch insert for performance
                 batch_size = 1000
-                for i in range(0, len(rows), batch_size):
-                    batch = rows[i : i + batch_size]
-                    # Pad rows to match column count
-                    padded_batch = []
-                    for row in batch:
-                        if len(row) < len(sanitized_cols):
-                            row = row + [""] * (len(sanitized_cols) - len(row))
-                        elif len(row) > len(sanitized_cols):
-                            row = row[: len(sanitized_cols)]
-                        padded_batch.append(tuple(row))
+                with conn.cursor() as cur:
+                    for batch_start in range(0, len(rows), batch_size):
+                        batch = rows[batch_start : batch_start + batch_size]
+                        # Pad rows to match column count and prepend row number
+                        padded_batch = []
+                        for i, row in enumerate(batch):
+                            row_num = batch_start + i
+                            if len(row) < len(sanitized_cols):
+                                row = row + [""] * (len(sanitized_cols) - len(row))
+                            elif len(row) > len(sanitized_cols):
+                                row = row[: len(sanitized_cols)]
+                            padded_batch.append((row_num, *row))
 
-                    conn.executemany(
-                        f'INSERT INTO "{table_name}" VALUES ({placeholders})',
-                        padded_batch,
-                    )
+                        cur.executemany(
+                            f'INSERT INTO "{table_name}" VALUES ({placeholders})',
+                            padded_batch,
+                        )
 
             # Update metadata
             conn.execute(
                 """
                 INSERT INTO _table_metadata
-                    (table_id, table_name, hash, columns, column_names_original, row_count, source_file)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    (table_id, table_name, hash, columns, column_names_original,
+                     row_count, source_file, file_hash)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (table_id) DO UPDATE SET
                     table_name = EXCLUDED.table_name,
                     hash = EXCLUDED.hash,
                     columns = EXCLUDED.columns,
                     column_names_original = EXCLUDED.column_names_original,
                     row_count = EXCLUDED.row_count,
-                    source_file = EXCLUDED.source_file
+                    source_file = EXCLUDED.source_file,
+                    file_hash = EXCLUDED.file_hash
                 """,
-                (table_id, table_name, content_hash, sanitized_cols, columns, len(rows), source_file),
+                (table_id, table_name, content_hash, sanitized_cols, columns,
+                 len(rows), source_file, file_hash),
             )
             conn.commit()
 
@@ -219,9 +230,12 @@ class PostgresTableStore:
 
             table_name, hash_, columns, original_columns, row_count, source_file = result
 
-            # Fetch actual data from table
+            # Fetch actual data from table (excluding _row_num)
             try:
-                cursor = conn.execute(f'SELECT * FROM "{table_name}"')
+                cols_str = ", ".join(f'"{c}"' for c in columns)
+                cursor = conn.execute(
+                    f'SELECT {cols_str} FROM "{table_name}" ORDER BY _row_num'
+                )
                 rows = [list(row) for row in cursor.fetchall()]
             except Exception as e:
                 logger.warning(f"{STORAGE} Failed to fetch data from '{table_name}': {e}")
@@ -300,6 +314,9 @@ class PostgresTableStore:
 
         with self._manager.connection(self.collection) as conn:
             try:
+                # If no params, escape % chars to avoid placeholder interpretation
+                if not params:
+                    sql = sql.replace("%", "%%")
                 cursor = conn.execute(sql, params)
                 col_names = [desc[0] for desc in cursor.description] if cursor.description else []
                 rows = [list(row) for row in cursor.fetchall()]
@@ -327,6 +344,9 @@ class PostgresTableStore:
 
         with self._manager.connection(self.collection) as conn:
             try:
+                # If no params, escape % chars to avoid placeholder interpretation
+                if not params:
+                    sql = sql.replace("%", "%%")
                 cursor = conn.execute(sql, params)
                 col_names = [desc[0] for desc in cursor.description] if cursor.description else []
                 rows = [list(row) for row in cursor.fetchall()]
@@ -372,6 +392,144 @@ class PostgresTableStore:
                 (table_id,),
             ).fetchone()
             return result[0] if result else None
+
+    def get_file_hash(self, table_id: str) -> str | None:
+        """
+        Get file hash for change detection.
+
+        Args:
+            table_id: Table identifier.
+
+        Returns:
+            File hash if exists, None otherwise.
+        """
+        self._ensure_schema()
+
+        with self._manager.connection(self.collection) as conn:
+            result = conn.execute(
+                "SELECT file_hash FROM _table_metadata WHERE table_id = %s",
+                (table_id,),
+            ).fetchone()
+            return result[0] if result else None
+
+    def add_columns(
+        self,
+        table_id: str,
+        new_columns: list[str],
+        column_values: list[list[str]],
+    ) -> bool:
+        """
+        Add new columns to an existing table.
+
+        Uses _row_num for row alignment.
+
+        Args:
+            table_id: Table identifier.
+            new_columns: Original column names to add.
+            column_values: Values for each row, aligned by index.
+                          column_values[row_idx][col_idx]
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        self._ensure_schema()
+
+        with self._manager.connection(self.collection) as conn:
+            # Get table metadata
+            result = conn.execute(
+                """
+                SELECT table_name, columns, column_names_original
+                FROM _table_metadata WHERE table_id = %s
+                """,
+                (table_id,),
+            ).fetchone()
+
+            if not result:
+                logger.warning(f"{STORAGE} Table '{table_id}' not found for column addition")
+                return False
+
+            table_name, existing_cols, existing_original = result
+            existing_cols = list(existing_cols)
+            existing_original = list(existing_original)
+
+            # Sanitize new column names
+            sanitized_new = [_sanitize_column_name(c) for c in new_columns]
+
+            # Handle duplicates with existing columns
+            for i, col in enumerate(sanitized_new):
+                if col in existing_cols:
+                    # Append suffix to make unique
+                    suffix = 1
+                    while f"{col}_{suffix}" in existing_cols:
+                        suffix += 1
+                    sanitized_new[i] = f"{col}_{suffix}"
+
+            try:
+                # Add columns to table
+                for col in sanitized_new:
+                    conn.execute(f'ALTER TABLE "{table_name}" ADD COLUMN "{col}" TEXT')
+
+                # Update values row by row using _row_num
+                for row_num, row_values in enumerate(column_values):
+                    if not row_values:
+                        continue
+                    set_clause = ", ".join(
+                        f'"{col}" = %s' for col in sanitized_new[: len(row_values)]
+                    )
+                    conn.execute(
+                        f'UPDATE "{table_name}" SET {set_clause} WHERE _row_num = %s',
+                        (*row_values[: len(sanitized_new)], row_num),
+                    )
+
+                # Update metadata
+                updated_cols = existing_cols + sanitized_new
+                updated_original = existing_original + new_columns
+                conn.execute(
+                    """
+                    UPDATE _table_metadata
+                    SET columns = %s, column_names_original = %s
+                    WHERE table_id = %s
+                    """,
+                    (updated_cols, updated_original, table_id),
+                )
+                conn.commit()
+
+                logger.debug(
+                    f"{STORAGE} Added {len(new_columns)} columns to '{table_id}': {new_columns}"
+                )
+                return True
+
+            except Exception as e:
+                logger.warning(f"{STORAGE} Failed to add columns to '{table_id}': {e}")
+                conn.rollback()
+                return False
+
+    def has_columns(self, table_id: str, columns: list[str]) -> tuple[list[str], list[str]]:
+        """
+        Check which columns exist in a table.
+
+        Args:
+            table_id: Table identifier.
+            columns: Original column names to check.
+
+        Returns:
+            Tuple of (existing_columns, missing_columns).
+        """
+        self._ensure_schema()
+
+        with self._manager.connection(self.collection) as conn:
+            result = conn.execute(
+                "SELECT column_names_original FROM _table_metadata WHERE table_id = %s",
+                (table_id,),
+            ).fetchone()
+
+            if not result:
+                return [], columns
+
+            existing_original = set(result[0])
+            existing = [c for c in columns if c in existing_original]
+            missing = [c for c in columns if c not in existing_original]
+            return existing, missing
 
     def list_tables(self) -> list[str]:
         """List all table IDs."""

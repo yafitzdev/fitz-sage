@@ -2,16 +2,20 @@
 """
 Tabular Data Routing - Store tables as structured data, query with SQL.
 
-Two modes of table storage:
+Three modes of operation:
 
 1. **Embedded tables** (from documents):
    Tables extracted from markdown, PDF, etc. are stored as JSON in chunk payloads.
    Small and quick - data lives in vector DB.
 
 2. **Standalone table files** (CSV, TSV):
-   Tables from files are stored in TableStore (SQLite local, Qdrant team mode).
-   Compressed with gzip for efficient storage. Schema chunk in vector DB points
-   to table_id, actual data fetched at query time.
+   Tables from files are stored in PostgreSQL via TableStore.
+   Schema chunk in vector DB points to table_id, actual data fetched at query time.
+
+3. **Direct table query** (quickstart mode):
+   Fast path for querying tables without RAG pipeline.
+   Reads headers → LLM selects columns → parses only needed columns → SQL query.
+   Sub-second responses for table queries.
 
 Usage (Ingestion - embedded tables):
     from fitz_ai.tabular import TableExtractor
@@ -37,13 +41,26 @@ Usage (Ingestion - CSV files):
             sample_rows=parsed.rows[:3],
         )
 
-Usage (Query):
+Usage (Query via RAG):
     from fitz_ai.tabular import TableQueryStep
 
     step = TableQueryStep(chat=chat_client, table_store=store)
     augmented_chunks = step.execute(query, chunks)
+
+Usage (Direct query - fast path):
+    from fitz_ai.tabular import DirectTableQuery, is_table_file
+
+    if is_table_file(file_path):
+        query = DirectTableQuery(chat=chat_client)
+        result = query.query(file_path, "how many cars sold in 2005?")
+        print(result.answer)
 """
 
+from fitz_ai.tabular.direct_query import (
+    DirectQueryResult,
+    DirectTableQuery,
+    is_table_file,
+)
 from fitz_ai.tabular.extractor import TableExtractor
 from fitz_ai.tabular.models import (
     ParsedTable,
@@ -58,4 +75,8 @@ __all__ = [
     "create_schema_chunk_for_stored_table",
     "TableExtractor",
     "TableQueryStep",
+    # Direct query (fast path)
+    "DirectTableQuery",
+    "DirectQueryResult",
+    "is_table_file",
 ]

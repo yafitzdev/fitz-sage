@@ -104,6 +104,20 @@ def command(
 
 def _run_quickstart(source: Path, question: str, collection: str, verbose: bool) -> None:
     """Run quickstart with fitz_rag engine and pgvector."""
+    from fitz_ai.tabular import is_table_file
+
+    # =========================================================================
+    # Check if source is a table file - use fast path
+    # =========================================================================
+
+    if source.is_file() and is_table_file(source):
+        _run_table_quickstart(source, question, verbose)
+        return
+
+    # =========================================================================
+    # Standard document path
+    # =========================================================================
+
     engine_config_path = FitzPaths.engine_config("fitz_rag")
 
     # =========================================================================
@@ -776,3 +790,115 @@ def _run_query(
     answer = pipeline.run(question)
 
     return answer
+
+
+# =============================================================================
+# Table Quickstart (Fast Path)
+# =============================================================================
+
+
+def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
+    """
+    Fast path for table files - no embedding, direct SQL query.
+
+    Flow:
+    1. Read headers only (fast)
+    2. LLM selects relevant columns
+    3. Parse only needed columns
+    4. Create ephemeral PostgreSQL table
+    5. LLM generates SQL
+    6. Execute and display answer
+    7. Cleanup
+    """
+    import yaml
+
+    from fitz_ai.llm.registry import get_llm_plugin
+    from fitz_ai.tabular import DirectTableQuery
+
+    engine_config_path = FitzPaths.engine_config("fitz_rag")
+
+    # =========================================================================
+    # Step 1: Auto-detect Provider (same as document path)
+    # =========================================================================
+
+    provider, reason, extra = _resolve_provider(engine_config_path)
+
+    if provider is None and reason == "No provider available":
+        ui.error("Could not configure an LLM provider. Exiting.")
+        raise typer.Exit(1)
+
+    print()
+    if provider is None:
+        ui.success(reason)
+    else:
+        ui.success(f"Provider: {provider.capitalize()} ({reason})")
+        _create_provider_config(engine_config_path, provider, extra)
+
+    # =========================================================================
+    # Step 2: Load config and get chat client
+    # =========================================================================
+
+    with engine_config_path.open("r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f) or {}
+
+    if "fitz_rag" in raw:
+        config = raw["fitz_rag"]
+    else:
+        config = raw
+
+    chat_config = config.get("chat", {})
+
+    # Get chat client (use fast tier for quick responses)
+    chat_client = get_llm_plugin(
+        plugin_type="chat",
+        plugin_name=chat_config.get("plugin_name", "cohere"),
+        tier="fast",
+        **chat_config.get("kwargs", {}),
+    )
+
+    # =========================================================================
+    # Step 3: Run Direct Table Query
+    # =========================================================================
+
+    ui.step(1, 2, f"Analyzing {source.name}...")
+
+    try:
+        query_engine = DirectTableQuery(chat=chat_client)
+        result = query_engine.query(source, question)
+
+        if verbose:
+            ui.info(f"Columns used: {result.columns_used}")
+            ui.info(f"SQL: {result.sql}")
+            ui.info(f"Rows returned: {result.row_count}")
+
+    except Exception as e:
+        ui.error(f"Query failed: {e}")
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        raise typer.Exit(1)
+
+    # =========================================================================
+    # Step 4: Display Answer
+    # =========================================================================
+
+    ui.step(2, 2, "Done!")
+    print()
+
+    # Display answer
+    ui.header("Answer", "")
+    print(result.answer)
+    print()
+
+    # Show SQL if verbose
+    if verbose:
+        print("─" * 60)
+        print(f"SQL: {result.sql}")
+        print(f"Columns: {', '.join(result.columns)}")
+        print(f"Rows: {result.row_count}")
+
+    # Next steps
+    print()
+    ui.info("Table was queried directly (fast path, no persistent indexing).")
+    ui.info("To index for future RAG queries, use:")
+    ui.info(f'  fitz ingest {source} --collection my_tables')
