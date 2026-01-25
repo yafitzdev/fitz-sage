@@ -3,12 +3,10 @@
 
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
+import uuid
 
 import pytest
 
-from fitz_ai.core.paths import FitzPaths
 from fitz_ai.retrieval.entity_graph import EntityGraphStore
 
 
@@ -16,19 +14,15 @@ class TestEntityGraphStore:
     """Test EntityGraphStore functionality."""
 
     @pytest.fixture
-    def temp_workspace(self):
-        """Create a temporary workspace for testing."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            FitzPaths.set_workspace(Path(tmpdir))
-            yield tmpdir
-            FitzPaths.reset()
-
-    @pytest.fixture
-    def store(self, temp_workspace):
-        """Create a test entity graph store."""
-        store = EntityGraphStore(collection="test_collection")
+    def store(self):
+        """Create a test entity graph store with unique collection."""
+        # Use unique collection name to avoid test interference
+        collection = f"test_entity_graph_{uuid.uuid4().hex[:8]}"
+        store = EntityGraphStore(collection=collection)
+        store.clear()  # Ensure clean state
         yield store
-        store.close()  # Close SQLite connection for Windows cleanup
+        store.clear()  # Clean up after test
+        store.close()
 
     def test_add_and_retrieve_entities(self, store):
         """Test adding entities and retrieving them."""
@@ -211,23 +205,18 @@ class TestEntityGraphStore:
 class TestEntityGraphIntegration:
     """Integration tests for entity graph with retrieval."""
 
-    @pytest.fixture
-    def temp_workspace(self):
-        """Create a temporary workspace for testing."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            FitzPaths.set_workspace(Path(tmpdir))
-            yield tmpdir
-            FitzPaths.reset()
-
-    def test_multi_hop_scenario(self, temp_workspace):
+    def test_multi_hop_scenario(self):
         """
         Test the classic multi-hop scenario:
         - Chunk A: "Sarah Chen leads Acme Corp"
         - Chunk B: "Acme Corp manufactures widgets"
         - Query about Sarah's company's products should find both chunks
         """
-        store = EntityGraphStore(collection="test")
+        collection = f"test_multihop_{uuid.uuid4().hex[:8]}"
+        store = EntityGraphStore(collection=collection)
         try:
+            store.clear()
+
             # Simulate enriched chunks with entities
             store.add_chunk_entities(
                 "chunk_sarah",
@@ -249,12 +238,16 @@ class TestEntityGraphIntegration:
             assert "chunk_acme" in related
             assert "chunk_unrelated" not in related
         finally:
+            store.clear()
             store.close()
 
-    def test_person_connections(self, temp_workspace):
+    def test_person_connections(self):
         """Test finding all mentions of a person across documents."""
-        store = EntityGraphStore(collection="test")
+        collection = f"test_person_{uuid.uuid4().hex[:8]}"
+        store = EntityGraphStore(collection=collection)
         try:
+            store.clear()
+
             store.add_chunk_entities("bio", [("John Doe", "person")])
             store.add_chunk_entities(
                 "meeting_notes", [("John Doe", "person"), ("Q4 Review", "event")]
@@ -274,4 +267,5 @@ class TestEntityGraphIntegration:
             assert "email" in related
             assert "other_doc" not in related
         finally:
+            store.clear()
             store.close()

@@ -3,8 +3,7 @@
 Tests for fitz_ai.ingestion.state module.
 """
 
-import json
-from pathlib import Path
+import pytest
 
 from fitz_ai.ingestion.state import (
     EmbeddingConfig,
@@ -16,7 +15,7 @@ from fitz_ai.ingestion.state import (
 
 
 class TestIngestState:
-    """Tests for IngestState model."""
+    """Tests for IngestState model (Pydantic schema)."""
 
     def test_create_default_state(self):
         """Test creating a default state."""
@@ -94,44 +93,23 @@ class TestEmbeddingConfig:
 
 
 class TestIngestStateManager:
-    """Tests for IngestStateManager."""
+    """Tests for IngestStateManager (PostgreSQL-backed)."""
 
-    def test_creates_new_state_if_missing(self, tmp_path: Path):
-        """Test that new state is created if file doesn't exist."""
-        state_path = tmp_path / "ingest.json"
-        manager = IngestStateManager(state_path)
+    def test_creates_new_state(self):
+        """Test that new state is created if not exists."""
+        manager = IngestStateManager()
+        manager.load()
 
-        state = manager.load()
+        assert manager.schema_version == 1
+        assert len(manager.project_id) > 0
 
-        assert state.schema_version == 1
-        assert len(state.project_id) > 0
-
-    def test_loads_existing_state(self, tmp_path: Path):
-        """Test loading an existing state file."""
-        state_path = tmp_path / "ingest.json"
-
-        # Create a state file
-        state_data = {
-            "schema_version": 1,
-            "project_id": "existing-project",
-            "updated_at": "2024-01-01T00:00:00",
-            "roots": {},
-        }
-        state_path.write_text(json.dumps(state_data))
-
-        manager = IngestStateManager(state_path)
-        state = manager.load()
-
-        assert state.project_id == "existing-project"
-
-    def test_mark_active(self, tmp_path: Path):
+    def test_mark_active(self):
         """Test marking a file as active."""
-        state_path = tmp_path / "ingest.json"
-        manager = IngestStateManager(state_path)
+        manager = IngestStateManager()
         manager.load()
 
         manager.mark_active(
-            file_path="/root/test.md",
+            file_path="/root/test_state_active.md",
             root="/root",
             content_hash="sha256:abc123",
             ext=".md",
@@ -142,7 +120,7 @@ class TestIngestStateManager:
             embedding_id="cohere:embed-english-v3.0",
         )
 
-        entry = manager.get_file_entry("/root", "/root/test.md")
+        entry = manager.get_file_entry("/root", "/root/test_state_active.md")
         assert entry is not None
         assert entry.content_hash == "sha256:abc123"
         assert entry.status == FileStatus.ACTIVE
@@ -150,15 +128,14 @@ class TestIngestStateManager:
         assert entry.parser_id == "md.v1"
         assert entry.embedding_id == "cohere:embed-english-v3.0"
 
-    def test_mark_deleted(self, tmp_path: Path):
+    def test_mark_deleted(self):
         """Test marking a file as deleted."""
-        state_path = tmp_path / "ingest.json"
-        manager = IngestStateManager(state_path)
+        manager = IngestStateManager()
         manager.load()
 
         # First mark as active
         manager.mark_active(
-            file_path="/root/test.md",
+            file_path="/root/test_state_deleted.md",
             root="/root",
             content_hash="sha256:abc123",
             ext=".md",
@@ -170,20 +147,19 @@ class TestIngestStateManager:
         )
 
         # Then mark as deleted
-        manager.mark_deleted("/root", "/root/test.md")
+        manager.mark_deleted("/root", "/root/test_state_deleted.md")
 
-        entry = manager.get_file_entry("/root", "/root/test.md")
+        entry = manager.get_file_entry("/root", "/root/test_state_deleted.md")
         assert entry is not None
         assert entry.status == FileStatus.DELETED
 
-    def test_save_and_reload(self, tmp_path: Path):
-        """Test saving and reloading state."""
-        state_path = tmp_path / "ingest.json"
-        manager = IngestStateManager(state_path)
+    def test_persistence_across_managers(self):
+        """Test that state persists across manager instances."""
+        manager = IngestStateManager()
         manager.load()
 
         manager.mark_active(
-            file_path="/root/test.md",
+            file_path="/root/test_state_persist.md",
             root="/root",
             content_hash="sha256:abc123",
             ext=".md",
@@ -195,25 +171,24 @@ class TestIngestStateManager:
         )
         manager.save()
 
-        # Create new manager and load
-        manager2 = IngestStateManager(state_path)
+        # Create new manager and verify data persists
+        manager2 = IngestStateManager()
         manager2.load()
 
-        entry = manager2.get_file_entry("/root", "/root/test.md")
+        entry = manager2.get_file_entry("/root", "/root/test_state_persist.md")
         assert entry is not None
         assert entry.content_hash == "sha256:abc123"
         assert entry.chunker_id == "simple:1000:0"
 
-    def test_get_active_paths(self, tmp_path: Path):
+    def test_get_active_paths(self):
         """Test getting active paths."""
-        state_path = tmp_path / "ingest.json"
-        manager = IngestStateManager(state_path)
+        manager = IngestStateManager()
         manager.load()
 
-        # Add some files
+        # Add some files with unique paths
         manager.mark_active(
-            "/root/a.md",
-            "/root",
+            "/test_active_root/a.md",
+            "/test_active_root",
             "sha256:a",
             ".md",
             100,
@@ -223,8 +198,8 @@ class TestIngestStateManager:
             "cohere:embed-english-v3.0",
         )
         manager.mark_active(
-            "/root/b.md",
-            "/root",
+            "/test_active_root/b.md",
+            "/test_active_root",
             "sha256:b",
             ".md",
             100,
@@ -234,8 +209,8 @@ class TestIngestStateManager:
             "cohere:embed-english-v3.0",
         )
         manager.mark_active(
-            "/root/c.md",
-            "/root",
+            "/test_active_root/c.md",
+            "/test_active_root",
             "sha256:c",
             ".md",
             100,
@@ -246,15 +221,16 @@ class TestIngestStateManager:
         )
 
         # Delete one
-        manager.mark_deleted("/root", "/root/b.md")
+        manager.mark_deleted("/test_active_root", "/test_active_root/b.md")
 
-        active = manager.get_active_paths("/root")
-        assert active == {"/root/a.md", "/root/c.md"}
+        active = manager.get_active_paths("/test_active_root")
+        assert "/test_active_root/a.md" in active
+        assert "/test_active_root/c.md" in active
+        assert "/test_active_root/b.md" not in active
 
-    def test_set_embedding_config(self, tmp_path: Path):
+    def test_set_embedding_config(self):
         """Test setting embedding config."""
-        state_path = tmp_path / "ingest.json"
-        manager = IngestStateManager(state_path)
+        manager = IngestStateManager()
         manager.load()
 
         manager.set_embedding_config("openai", "text-embedding-3-small")
@@ -262,14 +238,13 @@ class TestIngestStateManager:
         assert manager.state.embedding is not None
         assert manager.state.embedding.id == "openai:text-embedding-3-small"
 
-    def test_config_ids_persisted(self, tmp_path: Path):
+    def test_config_ids_persisted(self):
         """Test that config IDs are persisted and loaded correctly."""
-        state_path = tmp_path / "ingest.json"
-        manager = IngestStateManager(state_path)
+        manager = IngestStateManager()
         manager.load()
 
         manager.mark_active(
-            file_path="/root/test.md",
+            file_path="/root/test_config_persist.md",
             root="/root",
             content_hash="sha256:abc123",
             ext=".md",
@@ -282,10 +257,10 @@ class TestIngestStateManager:
         manager.save()
 
         # Reload and verify
-        manager2 = IngestStateManager(state_path)
+        manager2 = IngestStateManager()
         manager2.load()
 
-        entry = manager2.get_file_entry("/root", "/root/test.md")
+        entry = manager2.get_file_entry("/root", "/root/test_config_persist.md")
         assert entry.chunker_id == "markdown:800:100"
         assert entry.parser_id == "md.v2"
         assert entry.embedding_id == "openai:text-embedding-3-large"

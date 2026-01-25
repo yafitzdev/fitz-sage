@@ -1,11 +1,11 @@
 # fitz_ai/ingestion/state/manager.py
 """
-State manager for incremental ingestion.
+State manager for incremental ingestion using PostgreSQL.
 
-Handles loading, saving, and updating the .fitz/ingest.json state file.
+Handles loading, saving, and updating ingestion state in PostgreSQL.
 
 Key responsibilities:
-- Load/create state file
+- Track which files have been ingested
 - Mark files as active (after successful ingestion)
 - Mark files as deleted (when no longer on disk)
 - Track config IDs (chunker_id, parser_id, embedding_id) per file
@@ -13,30 +13,29 @@ Key responsibilities:
 
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
-from fitz_ai.core.paths import FitzPaths
 from fitz_ai.ingestion.state.schema import (
     EmbeddingConfig,
     FileEntry,
     FileStatus,
-    IngestState,
-    RootEntry,
 )
+from fitz_ai.storage import get_connection_manager
 
 logger = logging.getLogger(__name__)
+
+# Use a dedicated database for global ingest state (not per-collection)
+INGEST_STATE_COLLECTION = "_ingest_state"
 
 
 class IngestStateManager:
     """
-    Manages the ingestion state file.
+    Manages the ingestion state in PostgreSQL.
 
-    The state file tracks:
+    The state tracks:
     - Which files have been ingested
     - Content hashes for change detection
     - Config IDs for re-chunking detection
@@ -59,101 +58,163 @@ class IngestStateManager:
             embedding_id="cohere:embed-english-v3.0",
         )
 
-        manager.save()
+        manager.save()  # Auto-commits, but kept for API compatibility
     """
 
-    def __init__(self, path: Optional[Path] = None) -> None:
+    SCHEMA_SQL = """
+        -- Project metadata
+        CREATE TABLE IF NOT EXISTS ingest_project (
+            id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+            project_id TEXT NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL,
+            embedding_provider TEXT,
+            embedding_model TEXT,
+            embedding_dimension INTEGER,
+            embedding_id TEXT
+        );
+
+        -- Root directories
+        CREATE TABLE IF NOT EXISTS ingest_roots (
+            root_path TEXT PRIMARY KEY,
+            last_scan_at TIMESTAMPTZ NOT NULL
+        );
+
+        -- File entries
+        CREATE TABLE IF NOT EXISTS ingest_files (
+            file_path TEXT PRIMARY KEY,
+            root_path TEXT NOT NULL REFERENCES ingest_roots(root_path) ON DELETE CASCADE,
+            content_hash TEXT NOT NULL,
+            ext TEXT NOT NULL,
+            size_bytes BIGINT NOT NULL,
+            mtime_epoch DOUBLE PRECISION NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            ingested_at TIMESTAMPTZ NOT NULL,
+            chunker_id TEXT NOT NULL,
+            parser_id TEXT NOT NULL,
+            embedding_id TEXT NOT NULL,
+            vector_db_id TEXT,
+            enricher_id TEXT,
+            collection TEXT NOT NULL DEFAULT 'default'
+        );
+
+        -- Index for root lookups
+        CREATE INDEX IF NOT EXISTS idx_ingest_files_root
+        ON ingest_files(root_path);
+
+        -- Index for status queries
+        CREATE INDEX IF NOT EXISTS idx_ingest_files_status
+        ON ingest_files(status);
+    """
+
+    def __init__(self, path=None) -> None:
         """
         Initialize the state manager.
 
         Args:
-            path: Path to state file. Defaults to .fitz/ingest.json
+            path: Ignored (kept for backwards compatibility). State is stored in PostgreSQL.
         """
-        self._path = path or FitzPaths.ingest_state()
-        self._state: Optional[IngestState] = None
+        self._manager = get_connection_manager()
+        self._manager.start()
+        self._schema_initialized = False
+        self._project_id: Optional[str] = None
+        self._embedding: Optional[EmbeddingConfig] = None
         self._dirty: bool = False
 
-    @property
-    def state(self) -> IngestState:
-        """Get the current state. Raises if not loaded."""
-        if self._state is None:
-            raise RuntimeError("State not loaded. Call load() first.")
-        return self._state
+    def _ensure_schema(self) -> None:
+        """Create tables schema if not exists."""
+        if self._schema_initialized:
+            return
 
-    def load(self) -> IngestState:
+        with self._manager.connection(INGEST_STATE_COLLECTION) as conn:
+            conn.execute(self.SCHEMA_SQL)
+            conn.commit()
+
+        self._schema_initialized = True
+        logger.debug("Ingest state schema initialized in PostgreSQL")
+
+    def load(self) -> "IngestStateManager":
         """
-        Load state from disk, or create new if not exists.
+        Load state from PostgreSQL, or create new if not exists.
 
         Returns:
-            The loaded or created state.
+            Self for chaining.
         """
-        if self._path.exists():
-            try:
-                with self._path.open("r", encoding="utf-8") as f:
-                    data = json.load(f)
-                self._state = IngestState.model_validate(data)
-                logger.debug(f"Loaded ingest state from {self._path}")
-            except Exception as e:
-                logger.warning(f"Failed to load state, creating new: {e}")
-                self._state = self._create_new_state()
-                self._dirty = True
-        else:
-            self._state = self._create_new_state()
-            self._dirty = True
-            logger.debug("Created new ingest state")
+        self._ensure_schema()
 
-        return self._state
+        with self._manager.connection(INGEST_STATE_COLLECTION) as conn:
+            # Load project metadata
+            result = conn.execute(
+                """
+                SELECT project_id, embedding_provider, embedding_model,
+                       embedding_dimension, embedding_id
+                FROM ingest_project
+                WHERE id = 1
+                """
+            ).fetchone()
+
+            if result:
+                self._project_id = result[0]
+                if result[1] and result[2]:
+                    self._embedding = EmbeddingConfig(
+                        provider=result[1],
+                        model=result[2],
+                        dimension=result[3],
+                        id=result[4] or f"{result[1]}:{result[2]}",
+                    )
+                logger.debug(f"Loaded ingest state for project {self._project_id}")
+            else:
+                # Create new project
+                self._project_id = str(uuid.uuid4())
+                conn.execute(
+                    """
+                    INSERT INTO ingest_project (id, project_id, updated_at)
+                    VALUES (1, %s, %s)
+                    """,
+                    (self._project_id, datetime.now(timezone.utc)),
+                )
+                conn.commit()
+                logger.debug(f"Created new ingest state: {self._project_id}")
+
+        return self
 
     def save(self) -> None:
         """
-        Save state to disk.
+        Save state to PostgreSQL.
 
-        Only writes if there are unsaved changes.
+        In PostgreSQL mode, changes are committed immediately,
+        but this method updates the project timestamp.
         """
-        if self._state is None:
-            return
-
         if not self._dirty:
-            logger.debug("State unchanged, skipping save")
             return
 
-        # Update timestamp
-        self._state.updated_at = datetime.now(timezone.utc)
+        self._ensure_schema()
 
-        # Ensure parent directory exists
-        self._path.parent.mkdir(parents=True, exist_ok=True)
+        with self._manager.connection(INGEST_STATE_COLLECTION) as conn:
+            conn.execute(
+                """
+                UPDATE ingest_project SET updated_at = %s WHERE id = 1
+                """,
+                (datetime.now(timezone.utc),),
+            )
+            conn.commit()
 
-        # Write atomically using temp file
-        temp_path = self._path.with_suffix(".tmp")
-        try:
-            with temp_path.open("w", encoding="utf-8") as f:
-                json.dump(
-                    self._state.model_dump(mode="json"),
-                    f,
-                    indent=2,
-                    default=str,
-                )
-            temp_path.replace(self._path)
-            self._dirty = False
-            logger.debug(f"Saved ingest state to {self._path}")
-        except Exception:
-            if temp_path.exists():
-                temp_path.unlink()
-            raise
+        self._dirty = False
+        logger.debug("Saved ingest state to PostgreSQL")
 
-    def _create_new_state(self) -> IngestState:
-        """Create a new empty state."""
-        return IngestState(
-            project_id=str(uuid.uuid4()),
-            updated_at=datetime.now(timezone.utc),
-        )
-
-    def _ensure_root(self, root: str) -> RootEntry:
+    def _ensure_root(self, root: str) -> None:
         """Ensure root entry exists, creating if necessary."""
-        if root not in self.state.roots:
-            self.state.roots[root] = RootEntry()
-            self._dirty = True
-        return self.state.roots[root]
+        self._ensure_schema()
+
+        with self._manager.connection(INGEST_STATE_COLLECTION) as conn:
+            conn.execute(
+                """
+                INSERT INTO ingest_roots (root_path, last_scan_at)
+                VALUES (%s, %s)
+                ON CONFLICT (root_path) DO NOTHING
+                """,
+                (root, datetime.now(timezone.utc)),
+            )
+            conn.commit()
 
     def mark_active(
         self,
@@ -189,23 +250,63 @@ class IngestStateManager:
             vector_db_id: Vector DB plugin used (e.g., "qdrant", "pgvector").
             collection: Collection the file was ingested into.
         """
-        root_entry = self._ensure_root(root)
+        self._ensure_root(root)
 
-        root_entry.files[file_path] = FileEntry(
-            ext=ext,
-            size_bytes=size_bytes,
-            mtime_epoch=mtime_epoch,
-            content_hash=content_hash,
-            status=FileStatus.ACTIVE,
-            ingested_at=datetime.now(timezone.utc),
-            chunker_id=chunker_id,
-            parser_id=parser_id,
-            embedding_id=embedding_id,
-            vector_db_id=vector_db_id,
-            enricher_id=enricher_id,
-            collection=collection,
-        )
-        root_entry.last_scan_at = datetime.now(timezone.utc)
+        with self._manager.connection(INGEST_STATE_COLLECTION) as conn:
+            now = datetime.now(timezone.utc)
+
+            # Upsert file entry
+            conn.execute(
+                """
+                INSERT INTO ingest_files (
+                    file_path, root_path, content_hash, ext, size_bytes, mtime_epoch,
+                    status, ingested_at, chunker_id, parser_id, embedding_id,
+                    vector_db_id, enricher_id, collection
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (file_path) DO UPDATE SET
+                    root_path = EXCLUDED.root_path,
+                    content_hash = EXCLUDED.content_hash,
+                    ext = EXCLUDED.ext,
+                    size_bytes = EXCLUDED.size_bytes,
+                    mtime_epoch = EXCLUDED.mtime_epoch,
+                    status = EXCLUDED.status,
+                    ingested_at = EXCLUDED.ingested_at,
+                    chunker_id = EXCLUDED.chunker_id,
+                    parser_id = EXCLUDED.parser_id,
+                    embedding_id = EXCLUDED.embedding_id,
+                    vector_db_id = EXCLUDED.vector_db_id,
+                    enricher_id = EXCLUDED.enricher_id,
+                    collection = EXCLUDED.collection
+                """,
+                (
+                    file_path,
+                    root,
+                    content_hash,
+                    ext,
+                    size_bytes,
+                    mtime_epoch,
+                    FileStatus.ACTIVE.value,
+                    now,
+                    chunker_id,
+                    parser_id,
+                    embedding_id,
+                    vector_db_id,
+                    enricher_id,
+                    collection,
+                ),
+            )
+
+            # Update root scan time
+            conn.execute(
+                """
+                UPDATE ingest_roots SET last_scan_at = %s WHERE root_path = %s
+                """,
+                (now, root),
+            )
+
+            conn.commit()
+
         self._dirty = True
 
     def mark_deleted(self, root: str, file_path: str) -> None:
@@ -218,25 +319,70 @@ class IngestStateManager:
             root: Absolute path to root directory.
             file_path: Absolute path to file.
         """
-        root_entry = self.state.roots.get(root)
-        if root_entry is None:
-            return
+        self._ensure_schema()
 
-        file_entry = root_entry.files.get(file_path)
-        if file_entry is None:
-            return
+        with self._manager.connection(INGEST_STATE_COLLECTION) as conn:
+            result = conn.execute(
+                """
+                UPDATE ingest_files
+                SET status = %s
+                WHERE file_path = %s AND root_path = %s AND status != %s
+                RETURNING file_path
+                """,
+                (FileStatus.DELETED.value, file_path, root, FileStatus.DELETED.value),
+            ).fetchone()
 
-        if file_entry.status != FileStatus.DELETED:
-            file_entry.status = FileStatus.DELETED
-            self._dirty = True
+            if result:
+                conn.commit()
+                self._dirty = True
 
     def get_active_paths(self, root: str) -> set[str]:
         """Get all active (non-deleted) file paths for a root."""
-        return self.state.get_active_paths(root)
+        self._ensure_schema()
+
+        with self._manager.connection(INGEST_STATE_COLLECTION) as conn:
+            cursor = conn.execute(
+                """
+                SELECT file_path FROM ingest_files
+                WHERE root_path = %s AND status = %s
+                """,
+                (root, FileStatus.ACTIVE.value),
+            )
+            return {row[0] for row in cursor.fetchall()}
 
     def get_file_entry(self, root: str, file_path: str) -> Optional[FileEntry]:
         """Get file entry if it exists."""
-        return self.state.get_file_entry(root, file_path)
+        self._ensure_schema()
+
+        with self._manager.connection(INGEST_STATE_COLLECTION) as conn:
+            result = conn.execute(
+                """
+                SELECT content_hash, ext, size_bytes, mtime_epoch, status,
+                       ingested_at, chunker_id, parser_id, embedding_id,
+                       vector_db_id, enricher_id, collection
+                FROM ingest_files
+                WHERE file_path = %s AND root_path = %s
+                """,
+                (file_path, root),
+            ).fetchone()
+
+            if not result:
+                return None
+
+            return FileEntry(
+                content_hash=result[0],
+                ext=result[1],
+                size_bytes=result[2],
+                mtime_epoch=result[3],
+                status=FileStatus(result[4]),
+                ingested_at=result[5],
+                chunker_id=result[6],
+                parser_id=result[7],
+                embedding_id=result[8],
+                vector_db_id=result[9],
+                enricher_id=result[10],
+                collection=result[11],
+            )
 
     def set_embedding_config(
         self,
@@ -252,8 +398,55 @@ class IngestStateManager:
             model: Model name.
             **kwargs: Additional config (dimension, etc.).
         """
-        self.state.embedding = EmbeddingConfig.create(provider, model, **kwargs)
+        self._ensure_schema()
+        self._embedding = EmbeddingConfig.create(provider, model, **kwargs)
+
+        with self._manager.connection(INGEST_STATE_COLLECTION) as conn:
+            conn.execute(
+                """
+                UPDATE ingest_project SET
+                    embedding_provider = %s,
+                    embedding_model = %s,
+                    embedding_dimension = %s,
+                    embedding_id = %s,
+                    updated_at = %s
+                WHERE id = 1
+                """,
+                (
+                    provider,
+                    model,
+                    kwargs.get("dimension"),
+                    self._embedding.id,
+                    datetime.now(timezone.utc),
+                ),
+            )
+            conn.commit()
+
         self._dirty = True
+
+    # Properties for backwards compatibility
+    @property
+    def state(self):
+        """Get state-like object for backwards compatibility."""
+        return self
+
+    @property
+    def embedding(self) -> Optional[EmbeddingConfig]:
+        """Get current embedding config (backwards compatibility)."""
+        return self._embedding
+
+    @property
+    def schema_version(self) -> int:
+        """Schema version (backwards compatibility)."""
+        return 1
+
+    @property
+    def project_id(self) -> str:
+        """Project ID (backwards compatibility)."""
+        if self._project_id is None:
+            self._ensure_schema()
+            self.load()
+        return self._project_id or ""
 
 
 __all__ = ["IngestStateManager"]
