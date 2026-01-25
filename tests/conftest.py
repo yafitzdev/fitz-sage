@@ -8,11 +8,25 @@ Config structure matches .fitz/config/ format.
 
 from __future__ import annotations
 
+import shutil
 from functools import lru_cache
 from pathlib import Path
 
 import pytest
 import yaml
+
+# =============================================================================
+# pgdata Reset (prevents corruption from interrupted test runs)
+# =============================================================================
+
+PROJECT_ROOT = Path(__file__).parent.parent
+
+
+def pytest_configure(config):
+    """Reset pgdata before any tests run to avoid corruption issues."""
+    pgdata_path = PROJECT_ROOT / ".fitz" / "pgdata"
+    if pgdata_path.exists():
+        shutil.rmtree(pgdata_path, ignore_errors=True)
 
 # =============================================================================
 # Test Configuration
@@ -29,14 +43,16 @@ def load_test_config() -> dict:
 
 
 def get_test_embedder():
-    """Get embedder configured for tests (local Ollama)."""
+    """Get embedder configured for tests (from first tier)."""
     from fitz_ai.llm.registry import get_llm_plugin
 
     config = load_test_config()
+    # Get embedding config from first tier
+    first_tier = config["tiers"][0]
     return get_llm_plugin(
         plugin_type="embedding",
-        plugin_name=config["embedding"],
-        **config.get("embedding_kwargs", {}),
+        plugin_name=first_tier["embedding"],
+        **first_tier.get("embedding_kwargs", {}),
     )
 
 

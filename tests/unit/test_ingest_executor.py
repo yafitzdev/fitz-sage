@@ -122,10 +122,12 @@ class TestDiffIngestExecutor:
         state_manager = IngestStateManager(state_path)
         state_manager.load()
 
-        # Create a simple router with default chunker
+        # Create a router with recursive chunker (better than simple)
+        from fitz_ai.ingestion.chunking.plugins.default.recursive import RecursiveChunker
+
         router = ChunkingRouter(
             chunker_map={},
-            default_chunker=SimpleChunker(chunk_size=1000, chunk_overlap=0),
+            default_chunker=RecursiveChunker(chunk_size=1000, chunk_overlap=200),
             warn_on_fallback=False,
         )
 
@@ -137,6 +139,7 @@ class TestDiffIngestExecutor:
             "chunking_router": router,
             "collection": "test_collection",
             "embedding_id": "test:embedding",
+            "vector_db_id": "test:vectordb",
         }
 
     def test_scans_and_ingests_new_files(self, tmp_path: Path, executor_deps):
@@ -153,8 +156,8 @@ class TestDiffIngestExecutor:
 
     def test_skips_existing_files(self, tmp_path: Path, executor_deps):
         """Test skipping files that exist in state with same hash."""
-        test_file = tmp_path / "existing.md"
-        test_file.write_text("# Already indexed")
+        test_file = tmp_path / "existing.txt"
+        test_file.write_text("Already indexed content")
 
         from fitz_ai.ingestion.hashing import compute_content_hash
 
@@ -165,12 +168,13 @@ class TestDiffIngestExecutor:
             file_path=str(test_file.resolve()),
             root=str(tmp_path.resolve()),
             content_hash=content_hash,
-            ext=".md",
+            ext=".txt",
             size_bytes=test_file.stat().st_size,
             mtime_epoch=test_file.stat().st_mtime,
-            chunker_id="simple:1000:0",
-            parser_id="mock:md:v1",
+            chunker_id="recursive:1000:200",
+            parser_id="mock:txt:v1",
             embedding_id="test:embedding",
+            vector_db_id="test:vectordb",
             collection="test_collection",
         )
 
@@ -229,8 +233,8 @@ class TestDiffIngestExecutor:
 
     def test_force_mode_ingests_everything(self, tmp_path: Path, executor_deps):
         """Test force mode ingests even files in state."""
-        test_file = tmp_path / "existing.md"
-        test_file.write_text("# Already indexed")
+        test_file = tmp_path / "existing.txt"
+        test_file.write_text("Already indexed content")
 
         from fitz_ai.ingestion.hashing import compute_content_hash
 
@@ -241,12 +245,13 @@ class TestDiffIngestExecutor:
             file_path=str(test_file.resolve()),
             root=str(tmp_path.resolve()),
             content_hash=content_hash,
-            ext=".md",
+            ext=".txt",
             size_bytes=test_file.stat().st_size,
             mtime_epoch=test_file.stat().st_mtime,
-            chunker_id="simple:1000:0",
-            parser_id="mock:md:v1",
+            chunker_id="recursive:1000:200",
+            parser_id="mock:txt:v1",
             embedding_id="test:embedding",
+            vector_db_id="test:vectordb",
             collection="test_collection",
         )
 

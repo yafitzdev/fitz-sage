@@ -273,25 +273,26 @@ class TestDocumentChunking:
     def test_default_chunker_for_unknown_extension(self):
         """Default chunker is used for unknown extensions."""
         from fitz_ai.core.document import DocumentElement, ElementType
+        from fitz_ai.ingestion.chunking.plugins.default.recursive import RecursiveChunker
 
         router = ChunkingRouter(
             chunker_map={},
-            default_chunker=SimpleChunker(chunk_size=100),
+            default_chunker=RecursiveChunker(chunk_size=100, chunk_overlap=20),
             warn_on_fallback=False,
         )
 
         doc = ParsedDocument(
-            source="file:///docs/data.csv",
+            source="file:///docs/data.xyz",
             elements=[
                 DocumentElement(
                     type=ElementType.TEXT,
-                    content="a,b,c\n1,2,3",
+                    content="This is some text content for an unknown file extension that should use the default chunker instead of any specialized one.",
                 )
             ],
             metadata={"doc_id": "data"},
         )
 
-        chunker = router.get_chunker(".csv")
+        chunker = router.get_chunker(".xyz")
         chunks = chunker.chunk(doc)
 
         assert len(chunks) >= 1

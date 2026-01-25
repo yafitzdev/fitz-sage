@@ -97,7 +97,7 @@ def test_with_real_embedder(tmp_path: Path, test_files):
 
     Run: pytest tests/unit/test_ingest_real_embedder.py::test_with_real_embedder -v -s --log-cli-level=INFO
     """
-    from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
+    from fitz_ai.ingestion.chunking.plugins.default.recursive import RecursiveChunker
     from fitz_ai.ingestion.chunking.router import ChunkingRouter
     from fitz_ai.ingestion.diff.executor import DiffIngestExecutor
     from fitz_ai.ingestion.state import IngestStateManager
@@ -115,7 +115,7 @@ def test_with_real_embedder(tmp_path: Path, test_files):
 
     router = ChunkingRouter(
         chunker_map={},
-        default_chunker=SimpleChunker(chunk_size=500, chunk_overlap=50),
+        default_chunker=RecursiveChunker(chunk_size=500, chunk_overlap=50),
         warn_on_fallback=False,
     )
 
