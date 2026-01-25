@@ -199,6 +199,61 @@ def parse_columns(
     raise ValueError(f"Unsupported file type: {suffix}")
 
 
+def read_sample_values(file_path: Path, num_rows: int = 20) -> dict[str, list[str]]:
+    """
+    Read sample values for each column (fast - just first few rows).
+
+    Args:
+        file_path: Path to table file.
+        num_rows: Number of sample rows to read.
+
+    Returns:
+        Dict mapping column name to list of unique sample values.
+    """
+    suffix = file_path.suffix.lower()
+
+    if suffix in {".csv", ".tsv"}:
+        delimiter = "\t" if suffix == ".tsv" else ","
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            reader = csv.reader(f, delimiter=delimiter)
+            headers = next(reader, [])
+
+            # Collect values per column
+            col_values: dict[str, set[str]] = {h: set() for h in headers}
+            for i, row in enumerate(reader):
+                if i >= num_rows:
+                    break
+                for j, val in enumerate(row):
+                    if j < len(headers) and val:
+                        col_values[headers[j]].add(val)
+
+        return {h: list(v)[:3] for h, v in col_values.items()}  # Max 3 unique values
+
+    elif suffix in {".xlsx", ".xls"}:
+        try:
+            import openpyxl
+
+            wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+            ws = wb.active
+
+            header_row = next(ws.iter_rows(max_row=1))
+            headers = [str(cell.value) if cell.value else f"col_{i}" for i, cell in enumerate(header_row)]
+
+            col_values: dict[str, set[str]] = {h: set() for h in headers}
+            for i, row in enumerate(ws.iter_rows(min_row=2, max_row=num_rows + 1)):
+                for j, cell in enumerate(row):
+                    if j < len(headers) and cell.value:
+                        col_values[headers[j]].add(str(cell.value))
+
+            wb.close()
+            return {h: list(v)[:3] for h, v in col_values.items()}
+
+        except ImportError:
+            return {}
+
+    return {}
+
+
 @dataclass
 class DirectTableQuery:
     """
@@ -215,13 +270,15 @@ class DirectTableQuery:
     max_results: int = 100
     _table_store: PostgresTableStore | None = field(default=None, repr=False)
 
-    COLUMN_SELECT_PROMPT = """Which columns from this table are needed to answer the question?
+    COLUMN_SELECT_PROMPT = """Select columns needed to answer this question.
 
-Columns available: {columns}
+Columns with sample values:
+{columns_with_samples}
+
 Question: {question}
 
-Reply with ONLY a JSON array of column names. Nothing else.
-Example response: ["column1", "column2"]"""
+Include columns for filtering (WHERE), grouping (GROUP BY), and results.
+Return ONLY a JSON array: ["col1", "col2"]"""
 
     SQL_PROMPT = """Write a PostgreSQL SQL query to answer this question.
 
@@ -291,19 +348,21 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
         current_file_hash = compute_file_hash(file_path)
 
         try:
-            # Step 1: Read headers (fast)
+            # Step 1: Read headers and sample values (fast - just first few rows)
             all_headers = read_headers(file_path)
+            samples = read_sample_values(file_path)
             logger.debug(f"Read {len(all_headers)} headers from {file_path.name}")
 
-            # Step 2: LLM selects relevant columns
-            needed_columns = self._select_columns(question, all_headers)
+            # Step 2: LLM selects relevant columns (with sample context)
+            needed_columns = self._select_columns(question, all_headers, samples)
             logger.debug(f"LLM selected columns: {needed_columns}")
 
             # Step 3: Check if table exists and has needed columns
             stored_file_hash = self.table_store.get_file_hash(table_id)
+            table_exists = self.table_store.get_table_name(table_id) is not None
 
-            if stored_file_hash and stored_file_hash == current_file_hash:
-                # File unchanged - check which columns we already have
+            if table_exists and stored_file_hash and stored_file_hash == current_file_hash:
+                # Table exists and file unchanged - check which columns we already have
                 existing, missing = self.table_store.has_columns(table_id, needed_columns)
                 logger.debug(f"Existing columns: {existing}, Missing: {missing}")
 
@@ -316,8 +375,8 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
                         self.table_store.add_columns(table_id, headers, column_values)
                         logger.debug(f"Added {len(missing)} columns incrementally")
             else:
-                # File changed or new - parse needed columns and store fresh
-                logger.debug("File changed or new, parsing needed columns")
+                # Table doesn't exist, file changed, or new - parse needed columns and store fresh
+                logger.debug("Creating fresh table (new or changed)")
                 headers, rows = parse_columns(file_path, needed_columns, all_headers)
 
                 if not headers:
@@ -349,14 +408,31 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
             )
             logger.debug(f"Generated SQL: {sql}")
 
-            # Step 6: Execute
+            # Step 6: Execute (with retry logic for missing columns)
             result = self.table_store.execute_query(table_id, sql)
 
             if result is None:
-                # Retry with error context
+                # Check if SQL references columns not in the table
+                missing_cols = self._find_missing_columns(sql, original_cols, all_headers)
+
+                if missing_cols:
+                    # Add missing columns and retry
+                    logger.debug(f"Adding missing columns for retry: {missing_cols}")
+                    headers, rows = parse_columns(file_path, missing_cols, all_headers)
+                    if headers:
+                        self.table_store.add_columns(table_id, headers, rows)
+                        needed_columns.extend(missing_cols)
+
+                        # Refresh column info
+                        columns_info = self.table_store.get_columns(table_id)
+                        if columns_info:
+                            sanitized_cols, original_cols = columns_info
+                            sample_rows = self._get_sample_data(pg_table_name, sanitized_cols)
+
+                # Regenerate SQL with updated columns
                 sql = self._generate_sql(
                     question, pg_table_name, sanitized_cols, sample_rows,
-                    previous_error="Query execution failed. Check column names and syntax."
+                    previous_error="Query failed. Use only these columns: " + ", ".join(sanitized_cols)
                 )
                 result = self.table_store.execute_query(table_id, sql)
 
@@ -391,10 +467,21 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
                     pass
             raise
 
-    def _select_columns(self, question: str, columns: list[str]) -> list[str]:
+    def _select_columns(
+        self, question: str, columns: list[str], samples: dict[str, list[str]]
+    ) -> list[str]:
         """Use LLM to select relevant columns."""
+        # Format columns with sample values
+        lines = []
+        for col in columns:
+            vals = samples.get(col, [])
+            if vals:
+                lines.append(f"- {col}: {', '.join(vals)}")
+            else:
+                lines.append(f"- {col}")
+
         prompt = self.COLUMN_SELECT_PROMPT.format(
-            columns=columns,
+            columns_with_samples="\n".join(lines),
             question=question,
         )
         response = self.chat.chat([{"role": "user", "content": prompt}])
@@ -473,20 +560,61 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
 
     def _parse_json_list(self, response: str, fallback: list[str]) -> list[str]:
         """Parse JSON list from LLM response."""
-        try:
-            text = response.strip()
-            if text.startswith("```"):
-                parts = text.split("```")
-                if len(parts) >= 2:
-                    text = parts[1].strip()
-                    if text.startswith("json"):
-                        text = text[4:].strip()
+        import re
 
+        text = response.strip()
+
+        # Remove markdown code blocks
+        if text.startswith("```"):
+            parts = text.split("```")
+            if len(parts) >= 2:
+                text = parts[1].strip()
+                if text.startswith("json"):
+                    text = text[4:].strip()
+
+        # Try direct JSON parse
+        try:
             result = json.loads(text)
             if isinstance(result, list):
-                return [str(item) for item in result]
+                # Flatten: if items look like string-repr lists, parse them
+                flat = []
+                for item in result:
+                    if isinstance(item, str) and item.startswith("["):
+                        try:
+                            inner = json.loads(item.replace("'", '"'))
+                            if isinstance(inner, list):
+                                flat.extend(str(i) for i in inner)
+                                continue
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+                    flat.append(str(item))
+                # Filter to only valid column names
+                valid = [c for c in flat if c in fallback]
+                if valid:
+                    return valid
         except (json.JSONDecodeError, ValueError):
             pass
+
+        # Try to find JSON array in text
+        match = re.search(r'\[([^\]]+)\]', text)
+        if match:
+            try:
+                arr_text = "[" + match.group(1) + "]"
+                # Normalize quotes
+                arr_text = arr_text.replace("'", '"')
+                result = json.loads(arr_text)
+                if isinstance(result, list):
+                    valid = [str(c) for c in result if str(c) in fallback]
+                    if valid:
+                        return valid
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        # Extract quoted strings that are valid column names
+        matches = re.findall(r'["\']([^"\']+)["\']', response)
+        valid = [m for m in matches if m in fallback]
+        if valid:
+            return valid
 
         logger.warning("Failed to parse column selection, using fallback")
         return fallback
@@ -509,12 +637,56 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
 
         return text
 
+    def _find_missing_columns(
+        self,
+        sql: str,
+        current_columns: list[str],
+        all_headers: list[str],
+    ) -> list[str]:
+        """
+        Find columns referenced in SQL that aren't in the table.
+
+        Args:
+            sql: The SQL query.
+            current_columns: Original column names currently in the table.
+            all_headers: All available column names from the file.
+
+        Returns:
+            List of missing column names that can be added.
+        """
+        # Extract potential column references from SQL
+        # Look for quoted identifiers and unquoted words
+        sql_lower = sql.lower()
+
+        # Create lowercase lookup sets
+        current_set = {c.lower() for c in current_columns}
+        headers_map = {h.lower(): h for h in all_headers}
+
+        missing = []
+        for header in all_headers:
+            header_lower = header.lower()
+            sanitized = _sanitize_column_name(header)
+
+            # Check if this header is referenced in SQL but not in current columns
+            if header_lower not in current_set:
+                # Check various forms of the column in SQL
+                if (
+                    header_lower in sql_lower
+                    or sanitized in sql_lower
+                    or f'"{header_lower}"' in sql_lower
+                    or f'"{sanitized}"' in sql_lower
+                ):
+                    missing.append(header)
+
+        return missing
+
 
 __all__ = [
     "DirectTableQuery",
     "DirectQueryResult",
     "is_table_file",
     "read_headers",
+    "read_sample_values",
     "parse_columns",
     "compute_file_hash",
 ]

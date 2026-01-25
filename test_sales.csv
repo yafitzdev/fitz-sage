@@ -1,0 +1,16 @@
+car_brand,model,year_sold,price,units_sold,region
+Toyota,Camry,2005,25000,1500,North America
+Honda,Accord,2005,24000,1200,North America
+Ford,Mustang,2005,35000,800,North America
+Toyota,Corolla,2005,18000,2000,Europe
+BMW,3 Series,2005,42000,600,Europe
+Toyota,Camry,2006,26000,1600,North America
+Honda,Civic,2006,20000,1800,North America
+Ford,F-150,2006,32000,2500,North America
+Toyota,Prius,2006,28000,900,Europe
+Mercedes,C-Class,2006,45000,550,Europe
+Toyota,Camry,2007,27000,1700,North America
+Honda,Accord,2007,25000,1300,North America
+Ford,Mustang,2007,36000,750,North America
+Toyota,Corolla,2007,19000,2100,Europe
+BMW,5 Series,2007,55000,400,Europe

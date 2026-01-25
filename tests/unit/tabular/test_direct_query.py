@@ -173,8 +173,9 @@ class TestDirectTableQuery:
 
         query = DirectTableQuery(chat=mock_chat)
 
-        # Should call chat for column selection
-        result = query._select_columns("Who is the oldest?", ["name", "age", "city"])
+        # Should call chat for column selection (now requires samples)
+        samples = {"name": ["Alice", "Bob"], "age": ["30", "25"], "city": ["NYC", "LA"]}
+        result = query._select_columns("Who is the oldest?", ["name", "age", "city"], samples)
 
         assert result == ["name", "age"]
 
@@ -182,7 +183,8 @@ class TestDirectTableQuery:
         """Test JSON parsing from markdown code block."""
         query = DirectTableQuery(chat=mock_chat)
 
-        result = query._parse_json_list('```json\n["a", "b"]\n```', fallback=["x"])
+        # fallback contains valid column names that match the parsed result
+        result = query._parse_json_list('```json\n["a", "b"]\n```', fallback=["a", "b", "c"])
 
         assert result == ["a", "b"]
 
@@ -190,7 +192,8 @@ class TestDirectTableQuery:
         """Test JSON parsing from plain response."""
         query = DirectTableQuery(chat=mock_chat)
 
-        result = query._parse_json_list('["col1", "col2"]', fallback=["x"])
+        # fallback contains valid column names that match the parsed result
+        result = query._parse_json_list('["col1", "col2"]', fallback=["col1", "col2", "col3"])
 
         assert result == ["col1", "col2"]
 

@@ -892,7 +892,7 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
 
     # Show SQL if verbose
     if verbose:
-        print("─" * 60)
+        print("-" * 60)
         print(f"SQL: {result.sql}")
         print(f"Columns: {', '.join(result.columns)}")
         print(f"Rows: {result.row_count}")
