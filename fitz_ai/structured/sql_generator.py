@@ -344,8 +344,8 @@ class SQLGenerator:
     Produces simplified SQL that can be executed via metadata filtering.
     """
 
-    # Tier for SQL generation (developer decision - balanced for complex SQL)
-    TIER_SQL_GENERATE: ModelTier = "balanced"
+    # Tier for SQL generation (developer decision - smart for accuracy-critical SQL)
+    TIER_SQL_GENERATE: ModelTier = "smart"
 
     def __init__(self, chat_factory: ChatFactory):
         """
