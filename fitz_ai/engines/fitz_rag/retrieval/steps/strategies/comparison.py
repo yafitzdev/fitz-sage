@@ -123,6 +123,9 @@ class ComparisonSearch(BaseVectorSearch):
         # Expand with entity graph
         all_results = self._expand_by_entity_graph(all_results)
 
+        # Apply keyword filtering for original query (Bug fix: was missing)
+        all_results = self._apply_keyword_filter(all_results, query)
+
         # Preserve pre-existing chunks
         if chunks:
             logger.debug(

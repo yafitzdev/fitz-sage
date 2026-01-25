@@ -106,14 +106,15 @@ class HydeGenerator:
 
         # Fallback: split by newlines if JSON parsing fails
         lines = [line.strip() for line in response.split("\n") if line.strip()]
-        # Filter out lines that look like JSON syntax or instructions
-        hypotheses = [
-            line
-            for line in lines
-            if not line.startswith("[")
-            and not line.startswith("]")
-            and not line.startswith('"')
-            and len(line) > 20
-        ]
+        # Filter out lines that look like JSON syntax brackets only
+        # Strip quotes from lines that may be JSON string elements
+        hypotheses = []
+        for line in lines:
+            if line.startswith("[") or line.startswith("]"):
+                continue
+            # Strip leading/trailing quotes and commas (from malformed JSON arrays)
+            cleaned = line.strip('",')
+            if len(cleaned) > 20:
+                hypotheses.append(cleaned)
 
         return hypotheses[: self.num_hypotheses]
