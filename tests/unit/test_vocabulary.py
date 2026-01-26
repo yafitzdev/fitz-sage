@@ -1,4 +1,4 @@
-# tests/test_vocabulary.py
+# tests/unit/test_vocabulary.py
 """
 Tests for fitz_ai.retrieval.vocabulary module.
 
@@ -15,6 +15,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+import pytest
+
+from tests.conftest import POSTGRES_DEPS_AVAILABLE, SKIP_POSTGRES_REASON
+
+# Skip entire module if postgres dependencies not available
+# (VocabularyStore uses PostgreSQL storage)
+if not POSTGRES_DEPS_AVAILABLE:
+    pytest.skip(SKIP_POSTGRES_REASON, allow_module_level=True)
 
 from fitz_ai.retrieval.vocabulary.detector import (
     DetectorPattern,

@@ -1,4 +1,4 @@
-# tests/test_ingest_executor.py
+# tests/unit/test_ingest_executor.py
 """
 Tests for fitz_ai.ingestion.diff.executor module.
 
@@ -14,6 +14,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Set
 
 import pytest
+
+from tests.conftest import POSTGRES_DEPS_AVAILABLE, SKIP_POSTGRES_REASON
+
+# Skip entire module if postgres dependencies not available
+# (IngestStateManager and DiffIngestExecutor use PostgreSQL storage)
+if not POSTGRES_DEPS_AVAILABLE:
+    pytest.skip(SKIP_POSTGRES_REASON, allow_module_level=True)
 
 from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker

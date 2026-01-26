@@ -48,10 +48,10 @@ import yaml
 def postgres_deps_available() -> bool:
     """Check if PostgreSQL dependencies (psycopg, pgvector, pgserver) are available."""
     try:
+        import pgserver  # noqa: F401
+        import pgvector  # noqa: F401
         import psycopg  # noqa: F401
         import psycopg_pool  # noqa: F401
-        import pgvector  # noqa: F401
-        import pgserver  # noqa: F401
 
         return True
     except ImportError:

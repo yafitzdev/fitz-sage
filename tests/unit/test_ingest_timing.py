@@ -1,4 +1,4 @@
-# tests/test_ingest_timing.py
+# tests/unit/test_ingest_timing.py
 """
 Diagnostic test to pinpoint ingestion slowness.
 
@@ -10,6 +10,13 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
+
+from tests.conftest import POSTGRES_DEPS_AVAILABLE, SKIP_POSTGRES_REASON
+
+# Skip entire module if postgres dependencies not available
+# (Tests use IngestStateManager which requires PostgreSQL)
+if not POSTGRES_DEPS_AVAILABLE:
+    pytest.skip(SKIP_POSTGRES_REASON, allow_module_level=True)
 
 from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.source.base import SourceFile

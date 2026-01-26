@@ -8,6 +8,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from tests.conftest import POSTGRES_DEPS_AVAILABLE, SKIP_POSTGRES_REASON
+
+# Skip entire module if postgres dependencies not available
+# (DirectTableQuery uses PostgresTableStore)
+if not POSTGRES_DEPS_AVAILABLE:
+    pytest.skip(SKIP_POSTGRES_REASON, allow_module_level=True)
+
 from fitz_ai.tabular.direct_query import (
     DirectTableQuery,
     compute_file_hash,

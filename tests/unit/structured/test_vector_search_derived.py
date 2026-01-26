@@ -6,6 +6,15 @@ Tests for VectorSearchStep integration with derived collection.
 from dataclasses import dataclass
 from typing import Any
 
+import pytest
+
+from tests.conftest import POSTGRES_DEPS_AVAILABLE, SKIP_POSTGRES_REASON
+
+# Skip entire module if postgres dependencies not available
+# (VectorSearchStep uses VectorDB which requires PostgreSQL)
+if not POSTGRES_DEPS_AVAILABLE:
+    pytest.skip(SKIP_POSTGRES_REASON, allow_module_level=True)
+
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.fitz_rag.retrieval.steps.vector_search import (
     DERIVED_AVAILABLE,

@@ -1,8 +1,16 @@
-# tests/test_ingest_state.py
+# tests/unit/test_ingest_state.py
 """
 Tests for fitz_ai.ingestion.state module.
 """
 
+import pytest
+
+from tests.conftest import POSTGRES_DEPS_AVAILABLE, SKIP_POSTGRES_REASON
+
+# Skip entire module if postgres dependencies not available
+# (IngestStateManager uses PostgreSQL storage)
+if not POSTGRES_DEPS_AVAILABLE:
+    pytest.skip(SKIP_POSTGRES_REASON, allow_module_level=True)
 
 from fitz_ai.ingestion.state import (
     EmbeddingConfig,

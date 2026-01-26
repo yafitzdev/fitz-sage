@@ -1,4 +1,4 @@
-# tests/test_entity_graph.py
+# tests/unit/test_entity_graph.py
 """Tests for entity graph store and related chunk discovery."""
 
 from __future__ import annotations
@@ -6,6 +6,13 @@ from __future__ import annotations
 import uuid
 
 import pytest
+
+from tests.conftest import POSTGRES_DEPS_AVAILABLE, SKIP_POSTGRES_REASON
+
+# Skip entire module if postgres dependencies not available
+# (EntityGraphStore uses PostgreSQL storage)
+if not POSTGRES_DEPS_AVAILABLE:
+    pytest.skip(SKIP_POSTGRES_REASON, allow_module_level=True)
 
 from fitz_ai.retrieval.entity_graph import EntityGraphStore
 
