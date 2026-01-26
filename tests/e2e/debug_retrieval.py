@@ -16,7 +16,7 @@ from fitz_ai.ingestion.state import IngestStateManager
 from fitz_ai.llm.registry import get_llm_plugin
 from fitz_ai.vector_db.registry import get_vector_db_plugin
 
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
+FIXTURES_DIR = Path(__file__).parent / "fixtures_rag"
 
 
 def setup_collection():

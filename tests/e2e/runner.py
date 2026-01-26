@@ -28,7 +28,7 @@ from .validators import ValidationResult, validate_answer
 logger = get_logger(__name__)
 
 # Path to test fixtures
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
+FIXTURES_DIR = Path(__file__).parent / "fixtures_rag"
 
 
 @dataclass
