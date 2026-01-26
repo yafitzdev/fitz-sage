@@ -341,48 +341,102 @@ class PostgresConnectionManager:
             raise RuntimeError("Connection manager not started. Call start() first.")
         return _replace_database_in_uri(self._base_uri, database)
 
-    def _ensure_database(self, collection: str) -> str:
+    def _ensure_database(self, collection: str, _retry: bool = True) -> str:
         """
         Ensure database exists for collection.
 
+        Auto-recovers from connection failures by restarting pgserver.
+
         Returns the database name.
         """
+        import psycopg
+
         db_name = f"fitz_{_sanitize_collection_name(collection)}"
 
         if db_name in self._initialized_dbs:
-            return db_name
-
-        # Connect to postgres database to create new database
-        import psycopg
+            # Verify connection is still alive
+            try:
+                postgres_uri = self._get_uri("postgres")
+                with psycopg.connect(postgres_uri, autocommit=True, connect_timeout=5) as conn:
+                    conn.execute("SELECT 1")
+                return db_name
+            except Exception:
+                # Connection dead, clear cache and retry
+                logger.warning(f"{STORAGE} Stale connection detected, will restart pgserver")
+                self._initialized_dbs.discard(db_name)
 
         postgres_uri = self._get_uri("postgres")
 
-        with psycopg.connect(postgres_uri, autocommit=True) as conn:
-            # Check if database exists
-            result = conn.execute(
-                "SELECT 1 FROM pg_database WHERE datname = %s", (db_name,)
-            ).fetchone()
+        try:
+            with psycopg.connect(postgres_uri, autocommit=True, connect_timeout=30) as conn:
+                # Check if database exists
+                result = conn.execute(
+                    "SELECT 1 FROM pg_database WHERE datname = %s", (db_name,)
+                ).fetchone()
 
-            if not result:
-                # Create database
-                conn.execute(f'CREATE DATABASE "{db_name}"')
-                logger.info(f"{STORAGE} Created database: {db_name}")
+                if not result:
+                    # Create database
+                    conn.execute(f'CREATE DATABASE "{db_name}"')
+                    logger.info(f"{STORAGE} Created database: {db_name}")
 
-        # Initialize pgvector extension in new database
-        db_uri = self._get_uri(db_name)
-        with psycopg.connect(db_uri) as conn:
-            conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-            conn.commit()
-            logger.debug(f"{STORAGE} pgvector extension enabled in {db_name}")
+            # Initialize pgvector extension in new database
+            db_uri = self._get_uri(db_name)
+            with psycopg.connect(db_uri, connect_timeout=30) as conn:
+                conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+                conn.commit()
+                logger.debug(f"{STORAGE} pgvector extension enabled in {db_name}")
 
-        self._initialized_dbs.add(db_name)
-        return db_name
+            self._initialized_dbs.add(db_name)
+            return db_name
+
+        except (psycopg.OperationalError, psycopg.errors.ConnectionTimeout) as e:
+            if not _retry:
+                raise
+
+            # Auto-recovery: restart pgserver and retry
+            logger.warning(f"{STORAGE} Connection failed ({e}), attempting auto-recovery...")
+            self._restart_pgserver()
+            return self._ensure_database(collection, _retry=False)
+
+    def _restart_pgserver(self) -> None:
+        """Restart pgserver after connection failure."""
+        with self._lock:
+            # Close all pools
+            for name, pool in list(self._pools.items()):
+                try:
+                    pool.close()
+                except Exception:
+                    pass
+            self._pools.clear()
+            self._initialized_dbs.clear()
+
+            # Stop pgserver
+            if self._pgserver is not None:
+                try:
+                    self._pgserver.cleanup()
+                except Exception:
+                    pass
+                self._pgserver = None
+
+            self._base_uri = None
+            self._started = False
+
+            # Kill any zombie processes
+            _kill_zombie_postgres_processes()
+            time.sleep(0.5)
+
+            # Restart
+            logger.info(f"{STORAGE} Restarting pgserver...")
+            self._start_pgserver()
+            self._started = True
+            logger.info(f"{STORAGE} pgserver restarted successfully")
 
     def get_pool(self, collection: str) -> "ConnectionPool":
         """
         Get connection pool for a collection.
 
-        Creates the database if it doesn't exist.
+        Creates the database if it doesn't exist. Auto-recovers from
+        stale connections by restarting pgserver.
 
         Args:
             collection: Collection name.
@@ -406,6 +460,22 @@ class PostgresConnectionManager:
                 open=True,
             )
             logger.debug(f"{STORAGE} Created connection pool for collection '{collection}'")
+        else:
+            # Verify existing pool is still healthy
+            pool = self._pools[collection]
+            try:
+                # Quick health check
+                with pool.connection(timeout=5) as conn:
+                    conn.execute("SELECT 1")
+            except Exception as e:
+                logger.warning(f"{STORAGE} Pool for '{collection}' is stale ({e}), recreating...")
+                try:
+                    pool.close()
+                except Exception:
+                    pass
+                del self._pools[collection]
+                # Recursive call will recreate the pool
+                return self.get_pool(collection)
 
         return self._pools[collection]
 

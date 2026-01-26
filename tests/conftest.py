@@ -51,9 +51,13 @@ PROJECT_ROOT = Path(__file__).parent.parent
 def pytest_configure(config):
     """Reset pgdata before any tests run to ensure clean state.
 
-    Uses production code's _force_remove_pgdata which handles zombie processes.
+    The PostgresConnectionManager now has auto-recovery built in,
+    but we still clean pgdata at test start for a deterministic state.
     """
-    from fitz_ai.storage.postgres import _force_remove_pgdata
+    from fitz_ai.storage.postgres import PostgresConnectionManager, _force_remove_pgdata
+
+    # Reset singleton first (stops any running pgserver)
+    PostgresConnectionManager.reset_instance()
 
     pgdata_path = PROJECT_ROOT / ".fitz" / "pgdata"
 
@@ -61,6 +65,14 @@ def pytest_configure(config):
         if not _force_remove_pgdata(pgdata_path):
             import warnings
             warnings.warn(f"Could not clean pgdata directory at {pgdata_path}")
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Clean up PostgresConnectionManager after all tests complete."""
+    from fitz_ai.storage.postgres import PostgresConnectionManager
+
+    # Stop pgserver gracefully
+    PostgresConnectionManager.reset_instance()
 
 # =============================================================================
 # Test Configuration
