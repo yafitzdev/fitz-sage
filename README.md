@@ -339,6 +339,21 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 >
 >Re-running ingestion on a large codebase takes seconds, not minutes. Changed your chunking config? Fitz detects that too and re-processes affected files.
 
+<br>
+
+#### Unified Storage (PostgreSQL) 🐘 → [Why PostgreSQL?](docs/features/unified-storage.md)
+
+>Fitz uses PostgreSQL + pgvector instead of dedicated vector databases (Pinecone, Qdrant, FAISS, etc.):
+>
+>| Concern | Dedicated Vector DB | Fitz (PostgreSQL) |
+>|---------|--------------------|--------------------|
+>| **Deployment** | Separate service to run | Embedded (just `pip install`) |
+>| **Structured data** | Another DB, or hack it | Native SQL |
+>| **Sync issues** | Vectors ↔ metadata drift | One transaction |
+>| **Local dev** | Docker or cloud account | Zero config |
+>
+>Vector search is <1% of query time (LLM dominates). Trading 10ms of search latency for unified storage, full SQL, and zero infrastructure is the right call.
+
 </details>
 
 ---
