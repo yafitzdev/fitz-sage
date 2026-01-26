@@ -4,11 +4,13 @@ PostgreSQL connection management for unified storage.
 
 Handles:
 - pgserver lifecycle for local mode (embedded PostgreSQL)
-- Connection pooling via psycopg_pool
+- Connection pooling via psycopg_pool with health checks
 - Per-collection database creation
 - pgvector extension initialization
 - Graceful shutdown on signals (SIGTERM, SIGINT)
-- Auto-recovery from corrupted pgdata
+- Auto-recovery from corrupted pgdata and stale connections
+- Automatic restart with exponential backoff on failures
+- Lock file cleanup for crashed instances
 """
 
 from __future__ import annotations
@@ -84,6 +86,11 @@ def _register_signal_handlers() -> None:
 # Valid collection name pattern (alphanumeric + underscore)
 COLLECTION_NAME_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
 
+# Retry configuration
+MAX_RESTART_ATTEMPTS = 3
+RETRY_BACKOFF_BASE = 0.5  # seconds
+RETRY_BACKOFF_MAX = 10.0  # seconds
+
 
 def _kill_zombie_postgres_processes() -> None:
     """
@@ -113,6 +120,37 @@ def _kill_zombie_postgres_processes() -> None:
                 logger.debug(f"{STORAGE} Killed zombie postgres processes")
     except Exception as e:
         logger.debug(f"{STORAGE} Could not kill postgres processes (may not exist): {e}")
+
+
+def _calculate_backoff(attempt: int) -> float:
+    """Calculate exponential backoff delay."""
+    delay = RETRY_BACKOFF_BASE * (2 ** attempt)
+    return min(delay, RETRY_BACKOFF_MAX)
+
+
+def _cleanup_stale_lock_files(data_dir: Path) -> None:
+    """
+    Remove stale PostgreSQL lock files that prevent startup.
+
+    PostgreSQL creates postmaster.pid and socket lock files that can
+    persist after crashes, preventing new instances from starting.
+    """
+    lock_files = [
+        data_dir / "postmaster.pid",
+        data_dir / ".s.PGSQL.5432.lock",
+    ]
+
+    # Also clean up any socket files
+    for item in data_dir.glob(".s.PGSQL.*"):
+        lock_files.append(item)
+
+    for lock_file in lock_files:
+        if lock_file.exists():
+            try:
+                lock_file.unlink()
+                logger.debug(f"{STORAGE} Removed stale lock file: {lock_file.name}")
+            except Exception as e:
+                logger.warning(f"{STORAGE} Could not remove lock file {lock_file}: {e}")
 
 
 def _force_remove_pgdata(data_dir: Path, max_retries: int = 3) -> bool:
@@ -190,6 +228,7 @@ class PostgresConnectionManager:
         self._base_uri: Optional[str] = None
         self._started = False
         self._initialized_dbs: set[str] = set()
+        self._restart_attempts = 0  # Track restart attempts to prevent infinite loops
 
     @classmethod
     def get_instance(cls, config: Optional[StorageConfig] = None) -> "PostgresConnectionManager":
@@ -263,6 +302,9 @@ class PostgresConnectionManager:
         data_dir = self.config.data_dir or FitzPaths.ensure_pgdata()
         data_dir = Path(data_dir)
         data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Clean up any stale lock files from previous crashes
+        _cleanup_stale_lock_files(data_dir)
 
         logger.info(f"{STORAGE} Starting pgserver at {data_dir} (timeout={timeout}s)")
 
@@ -399,7 +441,21 @@ class PostgresConnectionManager:
             return self._ensure_database(collection, _retry=False)
 
     def _restart_pgserver(self) -> None:
-        """Restart pgserver after connection failure."""
+        """Restart pgserver after connection failure with backoff."""
+        self._restart_attempts += 1
+
+        if self._restart_attempts > MAX_RESTART_ATTEMPTS:
+            raise RuntimeError(
+                f"pgserver restart failed after {MAX_RESTART_ATTEMPTS} attempts. "
+                "Try manually running 'fitz reset' or deleting ~/.fitz/pgdata"
+            )
+
+        backoff = _calculate_backoff(self._restart_attempts - 1)
+        logger.warning(
+            f"{STORAGE} Restart attempt {self._restart_attempts}/{MAX_RESTART_ATTEMPTS} "
+            f"(backoff: {backoff:.1f}s)"
+        )
+
         with self._lock:
             # Close all pools
             for name, pool in list(self._pools.items()):
@@ -423,12 +479,21 @@ class PostgresConnectionManager:
 
             # Kill any zombie processes
             _kill_zombie_postgres_processes()
-            time.sleep(0.5)
+
+            # Exponential backoff before restart
+            time.sleep(backoff)
+
+            # Clean up lock files
+            data_dir = self.config.data_dir or FitzPaths.ensure_pgdata()
+            _cleanup_stale_lock_files(Path(data_dir))
 
             # Restart
             logger.info(f"{STORAGE} Restarting pgserver...")
             self._start_pgserver()
             self._started = True
+
+            # Reset counter on successful restart
+            self._restart_attempts = 0
             logger.info(f"{STORAGE} pgserver restarted successfully")
 
     def get_pool(self, collection: str) -> "ConnectionPool":
@@ -453,11 +518,18 @@ class PostgresConnectionManager:
             db_name = self._ensure_database(collection)
             db_uri = self._get_uri(db_name)
 
+            # Configure pool with health checks and reconnection
             self._pools[collection] = ConnectionPool(
                 db_uri,
                 min_size=self.config.pool_min_size,
                 max_size=self.config.pool_max_size,
                 open=True,
+                # Check connection health before returning to caller
+                check=ConnectionPool.check_connection,
+                # Reconnect on failure (psycopg3 feature)
+                reconnect_timeout=30.0,
+                # Don't wait forever for connections
+                timeout=30.0,
             )
             logger.debug(f"{STORAGE} Created connection pool for collection '{collection}'")
         else:
@@ -480,19 +552,47 @@ class PostgresConnectionManager:
         return self._pools[collection]
 
     @contextmanager
-    def connection(self, collection: str) -> Generator["Connection", None, None]:
+    def connection(self, collection: str, max_retries: int = 2) -> Generator["Connection", None, None]:
         """
-        Get connection for a collection.
+        Get connection for a collection with automatic retry.
+
+        Handles transient connection failures by retrying with backoff.
 
         Args:
             collection: Collection name.
+            max_retries: Maximum retry attempts for transient failures.
 
         Yields:
             Database connection from pool.
         """
-        pool = self.get_pool(collection)
-        with pool.connection() as conn:
-            yield conn
+        import psycopg
+
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                pool = self.get_pool(collection)
+                with pool.connection() as conn:
+                    yield conn
+                    return  # Success
+            except (psycopg.OperationalError, psycopg.errors.ConnectionTimeout) as e:
+                last_error = e
+                if attempt < max_retries:
+                    backoff = _calculate_backoff(attempt)
+                    logger.warning(
+                        f"{STORAGE} Connection failed (attempt {attempt + 1}/{max_retries + 1}), "
+                        f"retrying in {backoff:.1f}s: {e}"
+                    )
+                    time.sleep(backoff)
+                    # Force pool recreation on next attempt
+                    if collection in self._pools:
+                        try:
+                            self._pools[collection].close()
+                        except Exception:
+                            pass
+                        del self._pools[collection]
+
+        # All retries exhausted
+        raise RuntimeError(f"Connection failed after {max_retries + 1} attempts: {last_error}")
 
     def execute(self, collection: str, sql: str, params: tuple = ()) -> Any:
         """
@@ -510,6 +610,56 @@ class PostgresConnectionManager:
             result = conn.execute(sql, params)
             conn.commit()
             return result
+
+    def is_healthy(self) -> tuple[bool, str]:
+        """
+        Check if PostgreSQL connection is healthy.
+
+        Returns:
+            Tuple of (is_healthy, message)
+        """
+        if not self._started:
+            return False, "Not started"
+
+        try:
+            import psycopg
+
+            postgres_uri = self._get_uri("postgres")
+            with psycopg.connect(postgres_uri, autocommit=True, connect_timeout=5) as conn:
+                result = conn.execute("SELECT version()").fetchone()
+                version = result[0] if result else "unknown"
+                return True, f"Connected to {version[:50]}..."
+        except Exception as e:
+            return False, f"Connection failed: {e}"
+
+    def get_stats(self) -> dict[str, Any]:
+        """
+        Get connection manager statistics.
+
+        Returns:
+            Dict with stats about pools, connections, and restarts.
+        """
+        stats = {
+            "started": self._started,
+            "mode": self.config.mode.value if self.config else "unknown",
+            "pools": len(self._pools),
+            "databases": len(self._initialized_dbs),
+            "restart_attempts": self._restart_attempts,
+        }
+
+        # Add pool-level stats
+        pool_stats = {}
+        for name, pool in self._pools.items():
+            try:
+                pool_stats[name] = {
+                    "size": pool.get_stats().get("pool_size", 0),
+                    "available": pool.get_stats().get("pool_available", 0),
+                }
+            except Exception:
+                pool_stats[name] = {"error": "Could not get stats"}
+
+        stats["pool_details"] = pool_stats
+        return stats
 
     def stop(self) -> None:
         """Stop PostgreSQL and close all pools.
