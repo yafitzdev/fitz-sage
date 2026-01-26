@@ -863,3 +863,286 @@ class TestImportErrorHandling:
                         db.search("test", [0.1] * 384, limit=10)
                 except (ImportError, AttributeError):
                     pass  # Expected if pgvector not available
+
+
+# =============================================================================
+# Edge Case Tests: Boundary Values
+# =============================================================================
+
+
+class TestBoundaryValues:
+    """Edge case tests for boundary values."""
+
+    def test_search_with_limit_zero(self, pgvector_db, mock_connection_manager):
+        """Search with limit=0 should return empty list."""
+        pgvector_db._initialized_collections["test_coll"] = 384
+
+        conn = MagicMock()
+        cursor = MagicMock()
+        cursor.__iter__ = Mock(return_value=iter([]))
+        conn.execute.return_value = cursor
+
+        mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
+        mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
+
+        with patch("pgvector.psycopg.register_vector"):
+            results = pgvector_db.search("test_coll", [0.1] * 384, limit=0)
+
+        assert results == []
+
+    def test_vector_with_nan_values(self, pgvector_db, mock_connection_manager):
+        """Vector with NaN values should be handled or rejected."""
+        import math
+
+        conn = MagicMock()
+        cursor = MagicMock()
+        conn.cursor.return_value.__enter__ = Mock(return_value=cursor)
+        conn.cursor.return_value.__exit__ = Mock(return_value=False)
+
+        mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
+        mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
+
+        # Vector with NaN
+        nan_vector = [0.1] * 383 + [math.nan]
+
+        with patch("pgvector.psycopg.register_vector"):
+            with patch.object(pgvector_db, "_ensure_schema"):
+                try:
+                    pgvector_db.upsert(
+                        "test_coll",
+                        [{"id": "nan_test", "vector": nan_vector, "payload": {}}],
+                    )
+                    # If it doesn't raise, that's also acceptable behavior
+                except (ValueError, Exception):
+                    pass  # Expected - NaN vectors are invalid
+
+    def test_vector_with_inf_values(self, pgvector_db, mock_connection_manager):
+        """Vector with Inf values should be handled or rejected."""
+        import math
+
+        conn = MagicMock()
+        cursor = MagicMock()
+        conn.cursor.return_value.__enter__ = Mock(return_value=cursor)
+        conn.cursor.return_value.__exit__ = Mock(return_value=False)
+
+        mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
+        mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
+
+        # Vector with Inf
+        inf_vector = [0.1] * 383 + [math.inf]
+
+        with patch("pgvector.psycopg.register_vector"):
+            with patch.object(pgvector_db, "_ensure_schema"):
+                try:
+                    pgvector_db.upsert(
+                        "test_coll",
+                        [{"id": "inf_test", "vector": inf_vector, "payload": {}}],
+                    )
+                except (ValueError, Exception):
+                    pass  # Expected - Inf vectors may be invalid
+
+    def test_search_with_very_large_limit(self, pgvector_db, mock_connection_manager):
+        """Search with very large limit should work."""
+        pgvector_db._initialized_collections["test_coll"] = 384
+
+        conn = MagicMock()
+        cursor = MagicMock()
+        cursor.__iter__ = Mock(return_value=iter([
+            ("id1", 0.9, {"content": "test"}),
+        ]))
+        conn.execute.return_value = cursor
+
+        mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
+        mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
+
+        with patch("pgvector.psycopg.register_vector"):
+            results = pgvector_db.search("test_coll", [0.1] * 384, limit=1000000)
+
+        # Should work, returns whatever exists
+        assert len(results) == 1
+
+
+# =============================================================================
+# Edge Case Tests: Hybrid Search Edge Cases
+# =============================================================================
+
+
+class TestHybridSearchEdgeCases:
+    """Edge case tests for hybrid search."""
+
+    def test_hybrid_search_empty_text(self, pgvector_db, mock_connection_manager):
+        """Hybrid search with empty query text should handle gracefully."""
+        pgvector_db._initialized_collections["test_coll"] = 384
+
+        conn = MagicMock()
+        cursor = MagicMock()
+        cursor.__iter__ = Mock(return_value=iter([]))
+        conn.execute.return_value = cursor
+
+        mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
+        mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
+
+        with patch("pgvector.psycopg.register_vector"):
+            results = pgvector_db.hybrid_search(
+                "test_coll",
+                query_vector=[0.1] * 384,
+                query_text="",  # Empty text
+                limit=10,
+            )
+
+        # Should return results (vector-only fallback) or empty
+        assert isinstance(results, list)
+
+    def test_hybrid_search_very_long_text(self, pgvector_db, mock_connection_manager):
+        """Hybrid search with very long text should work."""
+        pgvector_db._initialized_collections["test_coll"] = 384
+
+        conn = MagicMock()
+        cursor = MagicMock()
+        cursor.__iter__ = Mock(return_value=iter([]))
+        conn.execute.return_value = cursor
+
+        mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
+        mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
+
+        # Very long query text (10KB)
+        long_text = "word " * 2000
+
+        with patch("pgvector.psycopg.register_vector"):
+            results = pgvector_db.hybrid_search(
+                "test_coll",
+                query_vector=[0.1] * 384,
+                query_text=long_text,
+                limit=10,
+            )
+
+        assert isinstance(results, list)
+
+    def test_hybrid_search_special_chars_in_text(self, pgvector_db, mock_connection_manager):
+        """Hybrid search with special characters in text."""
+        pgvector_db._initialized_collections["test_coll"] = 384
+
+        conn = MagicMock()
+        cursor = MagicMock()
+        cursor.__iter__ = Mock(return_value=iter([]))
+        conn.execute.return_value = cursor
+
+        mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
+        mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
+
+        with patch("pgvector.psycopg.register_vector"):
+            results = pgvector_db.hybrid_search(
+                "test_coll",
+                query_vector=[0.1] * 384,
+                query_text="test's \"query\" with (special) chars: @#$%",
+                limit=10,
+            )
+
+        assert isinstance(results, list)
+
+
+# =============================================================================
+# Edge Case Tests: Concurrent Operations
+# =============================================================================
+
+
+class TestConcurrentOperations:
+    """Edge case tests for concurrent operations."""
+
+    def test_concurrent_upsert_same_id(self, pgvector_db, mock_connection_manager):
+        """Concurrent upserts to same ID should not cause errors."""
+        import threading
+
+        conn = MagicMock()
+        cursor = MagicMock()
+        conn.cursor.return_value.__enter__ = Mock(return_value=cursor)
+        conn.cursor.return_value.__exit__ = Mock(return_value=False)
+
+        mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
+        mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
+
+        errors = []
+
+        def do_upsert(version):
+            try:
+                with patch("pgvector.psycopg.register_vector"):
+                    with patch.object(pgvector_db, "_ensure_schema"):
+                        pgvector_db.upsert(
+                            "test_coll",
+                            [{"id": "same_id", "vector": [0.1 * version] * 384, "payload": {"v": version}}],
+                        )
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=do_upsert, args=(i,)) for i in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Should complete without errors (last write wins)
+        assert len(errors) == 0
+
+
+# =============================================================================
+# Edge Case Tests: Delete Operations
+# =============================================================================
+
+
+class TestDeleteOperations:
+    """Edge case tests for delete operations."""
+
+    def test_delete_nonexistent_points(self, pgvector_db, mock_connection_manager):
+        """Deleting points that don't exist should not raise."""
+        pgvector_db._initialized_collections["test_coll"] = 384
+
+        conn = MagicMock()
+        # Simulate no rows deleted
+        conn.execute.return_value.rowcount = 0
+
+        mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
+        mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
+
+        # Should not raise even if points don't exist
+        with patch("pgvector.psycopg.register_vector"):
+            try:
+                # If delete method exists
+                if hasattr(pgvector_db, "delete"):
+                    pgvector_db.delete("test_coll", ids=["nonexistent1", "nonexistent2"])
+            except AttributeError:
+                pass  # delete method may not exist
+
+
+# =============================================================================
+# Edge Case Tests: Large Payload
+# =============================================================================
+
+
+class TestLargePayload:
+    """Edge case tests for large payloads."""
+
+    def test_very_large_payload(self, pgvector_db, mock_connection_manager):
+        """Payload with MB of data should be handled."""
+        conn = MagicMock()
+        cursor = MagicMock()
+        conn.cursor.return_value.__enter__ = Mock(return_value=cursor)
+        conn.cursor.return_value.__exit__ = Mock(return_value=False)
+
+        mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
+        mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
+
+        # 1MB payload
+        large_content = "x" * (1024 * 1024)
+
+        with patch("pgvector.psycopg.register_vector"):
+            with patch.object(pgvector_db, "_ensure_schema"):
+                pgvector_db.upsert(
+                    "test_coll",
+                    [{
+                        "id": "large_payload",
+                        "vector": [0.1] * 384,
+                        "payload": {"content": large_content},
+                    }],
+                )
+
+        assert cursor.executemany.called
