@@ -37,6 +37,29 @@ if TYPE_CHECKING:
     from psycopg import Connection
     from psycopg_pool import ConnectionPool
 
+# Lazy imports for psycopg (done once at module level when first needed)
+_psycopg = None
+_psycopg_pool = None
+
+
+def _get_psycopg():
+    """Lazy import psycopg once."""
+    global _psycopg
+    if _psycopg is None:
+        import psycopg
+        _psycopg = psycopg
+    return _psycopg
+
+
+def _get_psycopg_pool():
+    """Lazy import psycopg_pool once."""
+    global _psycopg_pool
+    if _psycopg_pool is None:
+        from psycopg_pool import ConnectionPool
+        _psycopg_pool = ConnectionPool
+    return _psycopg_pool
+
+
 logger = get_logger(__name__)
 
 # Track if signal handlers have been registered
@@ -183,14 +206,24 @@ def _force_remove_pgdata(data_dir: Path, max_retries: int = 3) -> bool:
     return False
 
 
+# Cache for sanitized collection names (avoid regex on hot path)
+_sanitized_name_cache: dict[str, str] = {}
+
+
 def _sanitize_collection_name(name: str) -> str:
-    """Sanitize collection name for use as database name."""
+    """Sanitize collection name for use as database name (cached)."""
+    if name in _sanitized_name_cache:
+        return _sanitized_name_cache[name]
+
     # Replace invalid chars with underscore
     sanitized = re.sub(r"[^a-zA-Z0-9_]", "_", name)
     # Ensure starts with letter
     if sanitized and not sanitized[0].isalpha():
         sanitized = "c_" + sanitized
-    return sanitized.lower()
+    result = sanitized.lower()
+
+    _sanitized_name_cache[name] = result
+    return result
 
 
 def _replace_database_in_uri(uri: str, database: str) -> str:
@@ -226,9 +259,12 @@ class PostgresConnectionManager:
         self._pgserver: Any = None  # pgserver.Server instance
         self._pools: dict[str, "ConnectionPool"] = {}  # collection -> pool
         self._base_uri: Optional[str] = None
+        self._uri_cache: dict[str, str] = {}  # database -> URI cache
         self._started = False
         self._initialized_dbs: set[str] = set()
         self._restart_attempts = 0  # Track restart attempts to prevent infinite loops
+        self._last_health_check: float = 0.0  # Timestamp of last health check
+        self._health_check_interval = 30.0  # Seconds between proactive health checks
 
     @classmethod
     def get_instance(cls, config: Optional[StorageConfig] = None) -> "PostgresConnectionManager":
@@ -378,34 +414,34 @@ class PostgresConnectionManager:
         )
 
     def _get_uri(self, database: str = "postgres") -> str:
-        """Get connection URI for a database."""
+        """Get connection URI for a database (cached)."""
         if not self._base_uri:
             raise RuntimeError("Connection manager not started. Call start() first.")
-        return _replace_database_in_uri(self._base_uri, database)
+
+        # Check cache first
+        if database in self._uri_cache:
+            return self._uri_cache[database]
+
+        uri = _replace_database_in_uri(self._base_uri, database)
+        self._uri_cache[database] = uri
+        return uri
 
     def _ensure_database(self, collection: str, _retry: bool = True) -> str:
         """
         Ensure database exists for collection.
 
         Auto-recovers from connection failures by restarting pgserver.
+        Uses caching - only checks database existence once per session.
 
         Returns the database name.
         """
-        import psycopg
+        psycopg = _get_psycopg()
 
         db_name = f"fitz_{_sanitize_collection_name(collection)}"
 
+        # Fast path: already initialized this session
         if db_name in self._initialized_dbs:
-            # Verify connection is still alive
-            try:
-                postgres_uri = self._get_uri("postgres")
-                with psycopg.connect(postgres_uri, autocommit=True, connect_timeout=5) as conn:
-                    conn.execute("SELECT 1")
-                return db_name
-            except Exception:
-                # Connection dead, clear cache and retry
-                logger.warning(f"{STORAGE} Stale connection detected, will restart pgserver")
-                self._initialized_dbs.discard(db_name)
+            return db_name
 
         postgres_uri = self._get_uri("postgres")
 
@@ -465,6 +501,7 @@ class PostgresConnectionManager:
                     pass
             self._pools.clear()
             self._initialized_dbs.clear()
+            self._uri_cache.clear()  # Clear URI cache
 
             # Stop pgserver
             if self._pgserver is not None:
@@ -500,8 +537,8 @@ class PostgresConnectionManager:
         """
         Get connection pool for a collection.
 
-        Creates the database if it doesn't exist. Auto-recovers from
-        stale connections by restarting pgserver.
+        Creates the database if it doesn't exist. Pool has built-in health
+        checking via check= parameter - no manual verification needed.
 
         Args:
             collection: Collection name.
@@ -513,86 +550,70 @@ class PostgresConnectionManager:
             self.start()
 
         if collection not in self._pools:
-            from psycopg_pool import ConnectionPool
+            ConnectionPool = _get_psycopg_pool()
 
             db_name = self._ensure_database(collection)
             db_uri = self._get_uri(db_name)
 
-            # Configure pool with health checks and reconnection
+            # Configure pool with built-in health checks
+            # check= verifies connections before returning them
+            # reconnect_timeout= handles stale connections automatically
             self._pools[collection] = ConnectionPool(
                 db_uri,
                 min_size=self.config.pool_min_size,
                 max_size=self.config.pool_max_size,
                 open=True,
-                # Check connection health before returning to caller
                 check=ConnectionPool.check_connection,
-                # Reconnect on failure (psycopg3 feature)
                 reconnect_timeout=30.0,
-                # Don't wait forever for connections
                 timeout=30.0,
             )
             logger.debug(f"{STORAGE} Created connection pool for collection '{collection}'")
-        else:
-            # Verify existing pool is still healthy
-            pool = self._pools[collection]
-            try:
-                # Quick health check
-                with pool.connection(timeout=5) as conn:
-                    conn.execute("SELECT 1")
-            except Exception as e:
-                logger.warning(f"{STORAGE} Pool for '{collection}' is stale ({e}), recreating...")
-                try:
-                    pool.close()
-                except Exception:
-                    pass
-                del self._pools[collection]
-                # Recursive call will recreate the pool
-                return self.get_pool(collection)
 
         return self._pools[collection]
 
     @contextmanager
-    def connection(self, collection: str, max_retries: int = 2) -> Generator["Connection", None, None]:
+    def connection(self, collection: str) -> Generator["Connection", None, None]:
         """
-        Get connection for a collection with automatic retry.
+        Get connection for a collection.
 
-        Handles transient connection failures by retrying with backoff.
+        The pool handles health checking and reconnection automatically.
+        Only falls back to pgserver restart for catastrophic failures.
 
         Args:
             collection: Collection name.
-            max_retries: Maximum retry attempts for transient failures.
 
         Yields:
             Database connection from pool.
         """
-        import psycopg
+        psycopg = _get_psycopg()
 
-        last_error = None
-        for attempt in range(max_retries + 1):
+        try:
+            pool = self.get_pool(collection)
+            with pool.connection() as conn:
+                yield conn
+        except (psycopg.OperationalError, psycopg.errors.ConnectionTimeout) as e:
+            # Pool's reconnect failed - try pgserver restart as last resort
+            logger.warning(f"{STORAGE} Pool connection failed ({e}), attempting recovery...")
+
+            # Clear this pool
+            if collection in self._pools:
+                try:
+                    self._pools[collection].close()
+                except Exception:
+                    pass
+                del self._pools[collection]
+
+            # Try restarting pgserver
             try:
+                self._restart_pgserver()
+                # Retry once with fresh pool
                 pool = self.get_pool(collection)
                 with pool.connection() as conn:
                     yield conn
-                    return  # Success
-            except (psycopg.OperationalError, psycopg.errors.ConnectionTimeout) as e:
-                last_error = e
-                if attempt < max_retries:
-                    backoff = _calculate_backoff(attempt)
-                    logger.warning(
-                        f"{STORAGE} Connection failed (attempt {attempt + 1}/{max_retries + 1}), "
-                        f"retrying in {backoff:.1f}s: {e}"
-                    )
-                    time.sleep(backoff)
-                    # Force pool recreation on next attempt
-                    if collection in self._pools:
-                        try:
-                            self._pools[collection].close()
-                        except Exception:
-                            pass
-                        del self._pools[collection]
-
-        # All retries exhausted
-        raise RuntimeError(f"Connection failed after {max_retries + 1} attempts: {last_error}")
+            except Exception as retry_error:
+                raise RuntimeError(
+                    f"Connection failed even after pgserver restart: {retry_error}"
+                ) from e
 
     def execute(self, collection: str, sql: str, params: tuple = ()) -> Any:
         """
@@ -622,8 +643,7 @@ class PostgresConnectionManager:
             return False, "Not started"
 
         try:
-            import psycopg
-
+            psycopg = _get_psycopg()
             postgres_uri = self._get_uri("postgres")
             with psycopg.connect(postgres_uri, autocommit=True, connect_timeout=5) as conn:
                 result = conn.execute("SELECT version()").fetchone()
@@ -680,6 +700,9 @@ class PostgresConnectionManager:
 
             if hasattr(self, "_initialized_dbs"):
                 self._initialized_dbs.clear()
+
+            if hasattr(self, "_uri_cache"):
+                self._uri_cache.clear()
 
             # Stop pgserver
             if hasattr(self, "_pgserver") and self._pgserver is not None:
