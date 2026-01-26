@@ -1,4 +1,3 @@
-# tests/README.md
 # Fitz-AI Test Suite
 
 Comprehensive testing strategy for production-ready RAG.
