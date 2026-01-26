@@ -14,6 +14,9 @@ from __future__ import annotations
 
 import pytest
 
+# Pure logic tests - run on every commit
+pytestmark = pytest.mark.tier1
+
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.core.guardrails import CausalAttributionConstraint, SemanticMatcher
 

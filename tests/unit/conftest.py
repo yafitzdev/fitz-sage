@@ -17,6 +17,61 @@ from fitz_ai.core.guardrails import SemanticMatcher
 from .mock_embedder import create_deterministic_embedder
 
 
+def pytest_collection_modifyitems(items):
+    """Add tier markers to unit tests based on type.
+
+    Tier 1 (every commit): Pure logic tests with no I/O or mocks
+    Tier 2 (PR merge): Tests with mocks but no real services
+    Tier 3+: Already marked in specific files (integration, e2e)
+    """
+    # Files that should be tier1 (pure logic, fast, no external deps)
+    TIER1_PATTERNS = [
+        "test_answer_mode",
+        "test_chunker_id",
+        "test_constraints",
+        "test_causal_attribution",
+        "test_model_tier_resolution",
+        "test_query_router",
+        "test_vocabulary",
+        "test_semantic_grouping",
+        "test_entity_graph",
+        "test_context_pipeline",
+        "test_rgs",
+        "test_writer_basic",
+        # Tabular pure logic
+        "tabular/test_models",
+        "tabular/test_parser",
+        # Structured pure logic
+        "structured/test_types",
+        "structured/test_formatter",
+        "structured/test_router",
+        "structured/test_schema",
+    ]
+
+    for item in items:
+        fspath = str(item.fspath)
+
+        # Only process tests in unit directory
+        if "/unit/" not in fspath and "\\unit\\" not in fspath:
+            continue
+
+        # Skip if already has a tier marker
+        has_tier = any(
+            marker.name.startswith("tier")
+            for marker in item.iter_markers()
+        )
+        if has_tier:
+            continue
+
+        # Check if matches tier1 pattern
+        is_tier1 = any(pattern in fspath for pattern in TIER1_PATTERNS)
+
+        if is_tier1:
+            item.add_marker(pytest.mark.tier1)
+        else:
+            item.add_marker(pytest.mark.tier2)
+
+
 @pytest.fixture
 def mock_embedder() -> Callable[[str], list[float]]:
     """Fixture providing a deterministic mock embedder."""

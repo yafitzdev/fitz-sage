@@ -4,6 +4,32 @@ Root conftest - imports fixtures from all test modules.
 
 All tests use the centralized tests/test_config.yaml.
 Config structure matches .fitz/config/ format.
+
+Test Tiers (for CI/CD optimization):
+=====================================
+- tier1: Critical path tests - pure logic, no I/O (<30s)
+         Run: pytest -m tier1
+- tier2: Unit tests with mocks - no real services (<2min)
+         Run: pytest -m "tier1 or tier2"
+- tier3: Integration tests - real postgres, embeddings (<10min)
+         Run: pytest -m "tier1 or tier2 or tier3"
+- tier4: Heavy tests - security, chaos, load, performance (30min+)
+         Run: pytest (all tests)
+
+Recommended CI Configuration:
+- Every commit:    pytest -m tier1
+- PR merge:        pytest -m "tier1 or tier2"
+- Merge to main:   pytest -m "tier1 or tier2 or tier3"
+- Nightly:         pytest
+
+Feature Markers:
+- postgres: Postgres-specific tests (pgvector, table store)
+- llm: Tests requiring real LLM API calls
+- embeddings: Tests requiring real embedding API calls
+- integration: Tests requiring real services
+- e2e: End-to-end tests
+- slow: Slow tests (>10s)
+- security/chaos/performance/scalability: Category markers
 """
 
 from __future__ import annotations

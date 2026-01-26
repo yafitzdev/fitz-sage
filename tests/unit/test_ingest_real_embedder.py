@@ -16,6 +16,9 @@ from typing import Any, Dict, List
 
 import pytest
 
+# Mark as tier3 (requires real embeddings service) and integration
+pytestmark = [pytest.mark.tier3, pytest.mark.integration, pytest.mark.embeddings]
+
 from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.source.base import SourceFile
 

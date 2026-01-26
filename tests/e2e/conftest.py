@@ -23,6 +23,14 @@ from typing import Callable
 
 import pytest
 
+
+def pytest_collection_modifyitems(items):
+    """Add tier3 and e2e markers to all tests in this directory."""
+    for item in items:
+        if "/e2e/" in str(item.fspath) or "\\e2e\\" in str(item.fspath):
+            item.add_marker(pytest.mark.tier3)
+            item.add_marker(pytest.mark.e2e)
+
 from .runner import FIXTURES_DIR, E2ERunner
 from .scenarios import SCENARIOS, TestScenario
 

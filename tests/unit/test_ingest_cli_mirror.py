@@ -14,6 +14,9 @@ from pathlib import Path
 
 import pytest
 
+# Mark as tier3 (requires real services)
+pytestmark = [pytest.mark.tier3, pytest.mark.integration]
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 

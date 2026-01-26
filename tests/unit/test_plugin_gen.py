@@ -337,6 +337,8 @@ class TestTestInputs:
 
 
 @pytest.mark.slow
+@pytest.mark.tier4
+@pytest.mark.llm
 class TestPluginGeneratorIntegration:
     """Integration tests for the plugin generator."""
 

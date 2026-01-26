@@ -209,10 +209,20 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --strict-markers"
 markers = [
+    # Tier markers (for CI pipeline control)
+    "tier1: critical path tests - run on every commit (<30s)",
+    "tier2: unit tests with mocks - run on PR (<2min)",
+    "tier3: integration tests - run on merge to main (<10min)",
+    "tier4: heavy tests - run nightly (30min+)",
+    # Feature markers
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
+    "integration: marks tests as integration tests (real services)",
     "e2e: marks tests as end-to-end tests requiring real LLM and ingestion",
     "e2e_parser: marks tests as parser e2e tests (PDF/DOCX parsing)",
+    "postgres: marks tests as postgres-specific (pgvector, table store)",
+    "llm: marks tests requiring real LLM API calls",
+    "embeddings: marks tests requiring real embedding API calls",
+    # Category markers
     "performance: marks tests as performance benchmarks",
     "scalability: marks tests as scalability tests (large corpus, concurrent)",
     "security: marks tests as security tests (injection, leakage, validation)",
