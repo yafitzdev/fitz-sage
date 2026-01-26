@@ -384,7 +384,7 @@ def render_live_output(minimal: bool = False) -> str:
         lines.append("")
         lines.append("Test Plan:")
         lines.append("  1) fitz engine - select fitz_rag")
-        lines.append("  2) fitz init - set cohere, faiss as defaults")
+        lines.append("  2) fitz init - set cohere, pgvector as defaults")
         lines.append("  3) fitz doctor, fitz config")
         lines.append("  4) fitz quickstart - test one query")
         lines.append("  5) fitz query - query quickstart collection")
@@ -408,7 +408,7 @@ def render_live_output(minimal: bool = False) -> str:
         )
 
         # =====================================================================
-        # STEP 2: fitz init - set cohere, faiss as defaults
+        # STEP 2: fitz init - set cohere, pgvector as defaults
         # =====================================================================
         # Interactive init wizard flow for fitz_rag:
         # 1. Engine selection: Enter (confirm fitz_rag)
@@ -419,7 +419,7 @@ def render_live_output(minimal: bool = False) -> str:
         # 6. Embedding model: Enter (accept default)
         # 7. Rerank plugin: Enter (cohere default)
         # 8. Rerank model: Enter (accept default)
-        # 9. Vector DB: Enter (local_faiss is default)
+        # 9. Vector DB: Enter (local_pgvector is default)
         # 10. Retrieval: (may be skipped if only one option)
         # 11. Chunker: Enter (default)
         # 12. Chunk size: Enter (default)
@@ -429,7 +429,7 @@ def render_live_output(minimal: bool = False) -> str:
         init_stdin = "\n\n\n\n\n\n\n\n\n\n\n\ny\n"
         section(
             "2",
-            "fitz init - set cohere, faiss defaults",
+            "fitz init - set cohere, pgvector defaults",
             run_cmd("init", stdin_input=init_stdin, timeout=60),
         )
 

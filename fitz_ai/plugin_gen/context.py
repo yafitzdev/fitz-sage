@@ -142,7 +142,7 @@ Required fields:
 - description: string (describe the vector database)
 - features:
     - requires_uuid_ids: bool (true if DB requires UUID point IDs)
-    - auto_detect: string|null (service name for auto-detection, e.g., "qdrant")
+    - auto_detect: string|null (service name for auto-detection, e.g., "ollama")
     - supports_namespaces: bool (true if uses namespaces instead of collections)
 - connection:
     - type: "http"

@@ -63,7 +63,7 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
 
     if not avail_vector_db:
         ui.error("No vector database available!")
-        ui.info("Start Qdrant or ensure pgvector packages are installed.")
+        ui.info("Ensure pgvector packages are installed: pip install psycopg pgvector pgserver")
         raise typer.Exit(1)
 
     # Load defaults from default.yaml
@@ -191,9 +191,6 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
             parser_choice = "docling"
 
     # Generate config
-    qdrant_host = system.qdrant.host if system.qdrant.available else "localhost"
-    qdrant_port = system.qdrant.port if system.qdrant.available else 6333
-
     return generate_fitz_rag_config(
         chat=chat_choice,
         chat_model_smart=chat_model_smart,
@@ -205,8 +202,6 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
         rerank_model=rerank_model,
         vector_db=vector_db_choice,
         retrieval=retrieval_choice,
-        qdrant_host=qdrant_host,
-        qdrant_port=qdrant_port,
         chunker=chunker_choice,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -290,7 +285,7 @@ def command(
     """
     Initialize Fitz with an interactive setup wizard.
 
-    Detects available providers (API keys, Ollama, Qdrant) and
+    Detects available providers (API keys, Ollama, pgvector) and
     creates a working configuration file.
 
     Examples:
@@ -356,16 +351,7 @@ def command(
             else system.ollama.details
         ),
     )
-    ui.status(
-        "Qdrant",
-        system.qdrant.available,
-        (
-            f"{system.qdrant.host}:{system.qdrant.port}"
-            if system.qdrant.available
-            else system.qdrant.details
-        ),
-    )
-    ui.status("pgvector", system.pgvector.available)
+    ui.status("pgvector", system.pgvector.available, system.pgvector.details)
 
     for name, key_status in system.api_keys.items():
         ui.status(name.capitalize(), key_status.available)

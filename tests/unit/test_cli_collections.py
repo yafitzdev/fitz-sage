@@ -77,7 +77,7 @@ class TestCollectionsHelpers:
 
         with patch(
             "fitz_ai.vector_db.registry.available_vector_db_plugins",
-            return_value=["qdrant", "pgvector"],
+            return_value=["pgvector"],
         ):
             from fitz_ai.cli.commands.collections import _get_available_vector_dbs
 

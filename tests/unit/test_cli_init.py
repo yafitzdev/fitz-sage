@@ -29,7 +29,6 @@ class TestInitCommand:
         """Test that --show flag previews config without saving."""
         mock_system = MagicMock()
         mock_system.ollama.available = False
-        mock_system.qdrant.available = False
         mock_system.pgvector.available = True
         mock_system.api_keys = {
             "cohere": MagicMock(available=True),
@@ -103,13 +102,13 @@ class TestInitHelpers:
         assert "local_ollama" not in result
 
     def test_filter_available_plugins_pgvector(self):
-        """Test filter_available_plugins includes FAISS when available."""
+        """Test filter_available_plugins includes pgvector when available."""
         from fitz_ai.cli.commands.init_detector import filter_available_plugins
 
         mock_system = MagicMock()
         mock_system.pgvector.available = True
 
-        plugins = ["pgvector", "qdrant"]
+        plugins = ["pgvector"]
         result = filter_available_plugins(plugins, "vector_db", mock_system)
 
         assert "pgvector" in result
@@ -120,7 +119,6 @@ class TestInitHelpers:
 
         mock_system = MagicMock()
         mock_system.ollama.available = False
-        mock_system.qdrant.available = False
         mock_system.pgvector.available = False
         mock_system.api_keys = {
             "cohere": MagicMock(available=True),
@@ -191,8 +189,6 @@ class TestGenerateConfig:
             rerank_model="",
             vector_db="pgvector",
             retrieval="dense",
-            qdrant_host="localhost",
-            qdrant_port=6333,
             chunker="simple",
             chunk_size=1000,
             chunk_overlap=200,
@@ -224,8 +220,6 @@ class TestGenerateConfig:
             rerank_model="rerank-v3.5",
             vector_db="pgvector",
             retrieval="dense",
-            qdrant_host="localhost",
-            qdrant_port=6333,
             chunker="simple",
             chunk_size=1000,
             chunk_overlap=200,
@@ -253,8 +247,6 @@ class TestGenerateConfig:
             rerank_model="",
             vector_db="pgvector",
             retrieval="dense",
-            qdrant_host="localhost",
-            qdrant_port=6333,
             chunker="simple",
             chunk_size=1000,
             chunk_overlap=0,
@@ -264,35 +256,6 @@ class TestGenerateConfig:
 
         # Rerank section is commented out (not present in config)
         assert "rerank" not in config
-
-    def test_generate_fitz_rag_config_qdrant(self):
-        """Test generate_fitz_rag_config includes Qdrant settings."""
-        import yaml
-
-        from fitz_ai.cli.commands.init_config import generate_fitz_rag_config
-
-        config_str = generate_fitz_rag_config(
-            chat="cohere",
-            chat_model_smart="",
-            chat_model_fast="",
-            embedding="cohere",
-            embedding_model="",
-            rerank=None,
-            rerank_model="",
-            vector_db="qdrant",
-            retrieval="dense",
-            qdrant_host="192.168.1.100",
-            qdrant_port=6334,
-            chunker="simple",
-            chunk_size=1000,
-            chunk_overlap=0,
-        )
-
-        config = yaml.safe_load(config_str)
-
-        assert config["vector_db"]["plugin_name"] == "qdrant"
-        assert config["vector_db"]["kwargs"]["host"] == "192.168.1.100"
-        assert config["vector_db"]["kwargs"]["port"] == 6334
 
     def test_generate_fitz_rag_config_chunking(self):
         """Test generate_fitz_rag_config includes chunking settings."""
@@ -310,8 +273,6 @@ class TestGenerateConfig:
             rerank_model="",
             vector_db="pgvector",
             retrieval="dense",
-            qdrant_host="localhost",
-            qdrant_port=6333,
             chunker="recursive",
             chunk_size=500,
             chunk_overlap=100,
@@ -343,7 +304,6 @@ class TestInitValidation:
         """Test init fails when no chat plugins available (fitz_rag)."""
         mock_system = MagicMock()
         mock_system.ollama.available = False
-        mock_system.qdrant.available = False
         mock_system.pgvector.available = True
         mock_system.api_keys = {}
 
@@ -378,7 +338,6 @@ class TestInitValidation:
         """Test init fails when no vector DB available (fitz_rag)."""
         mock_system = MagicMock()
         mock_system.ollama.available = False
-        mock_system.qdrant.available = False
         mock_system.pgvector.available = False
         mock_system.api_keys = {"cohere": MagicMock(available=True)}
 

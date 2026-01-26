@@ -83,7 +83,6 @@ def _check_optional_dependencies() -> list[tuple[str, bool, str]]:
     """Check optional Python packages."""
     packages = [
         ("psycopg", "pgvector DB", "psycopg[binary]"),
-        ("qdrant_client", "Qdrant client", "qdrant-client"),
         ("cohere", "Cohere API", "cohere"),
         ("openai", "OpenAI API", "openai"),
     ]
@@ -272,12 +271,6 @@ def command(
         ui.status("Ollama", True, system.ollama.details)
     else:
         ui.warning("Ollama", system.ollama.details)
-
-    # Qdrant
-    if system.qdrant.available:
-        ui.status("Qdrant", True, f"{system.qdrant.host}:{system.qdrant.port}")
-    else:
-        ui.warning("Qdrant", system.qdrant.details)
 
     # pgvector
     if system.pgvector.available:

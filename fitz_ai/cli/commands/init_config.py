@@ -30,8 +30,6 @@ def generate_fitz_rag_config(
     rerank_model: str,
     vector_db: str,
     retrieval: str,
-    qdrant_host: str,
-    qdrant_port: int,
     chunker: str,
     chunk_size: int,
     chunk_overlap: int,
@@ -77,10 +75,10 @@ rerank:
 #     model: rerank-v3.5
 """
 
-    # Build vector DB kwargs
+    # Build vector DB kwargs (pgvector uses mode: local by default)
     vdb_kwargs = ""
-    if vector_db == "qdrant":
-        vdb_kwargs = f'\n    host: "{qdrant_host}"\n    port: {qdrant_port}'
+    if vector_db == "pgvector":
+        vdb_kwargs = "\n    mode: local"
 
     # Build chunking section
     chunking_section = f"""

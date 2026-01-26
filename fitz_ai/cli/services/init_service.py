@@ -16,7 +16,6 @@ class SystemStatus:
 
     api_keys: dict[str, Any]
     ollama: Any
-    qdrant: Any
     pgvector: Any
 
 
@@ -45,7 +44,6 @@ class InitService:
         return SystemStatus(
             api_keys=system.api_keys,
             ollama=system.ollama,
-            qdrant=system.qdrant,
             pgvector=system.pgvector,
         )
 
@@ -69,12 +67,6 @@ class InitService:
             # Ollama plugins require Ollama
             if "ollama" in plugin_lower:
                 if system.ollama.available:
-                    available.append(plugin)
-                continue
-
-            # Qdrant requires Qdrant
-            if "qdrant" in plugin_lower:
-                if system.qdrant.available:
                     available.append(plugin)
                 continue
 

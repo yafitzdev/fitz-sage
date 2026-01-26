@@ -2,21 +2,11 @@
 """
 Vector DB plugin system for Fitz.
 
-All HTTP-based vector DB plugins are YAML-driven. Drop a YAML file
-into plugins/ and it works automatically. Local vector DBs (like FAISS)
-use a thin YAML wrapper that points to a Python class.
-
 Usage:
     from fitz_ai.vector_db import get_vector_db_plugin
 
-    # HTTP-based plugins (from YAML)
-    db = get_vector_db_plugin("qdrant")
-    db = get_vector_db_plugin("pinecone", index_name="...", project_id="...")
-    db = get_vector_db_plugin("weaviate")
-    db = get_vector_db_plugin("milvus")
-
-    # Local plugins (Python implementation)
-    db = get_vector_db_plugin("local-faiss")
+    # pgvector (default, uses embedded PostgreSQL via pgserver)
+    db = get_vector_db_plugin("pgvector")
 
     # All plugins support the same interface
     db.upsert("collection", points)

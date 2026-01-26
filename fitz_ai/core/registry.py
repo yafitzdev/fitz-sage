@@ -424,8 +424,8 @@ def get_vector_db_plugin(plugin_name: str, **kwargs: Any) -> Any:
     Get a vector DB plugin instance.
 
     Args:
-        plugin_name: Name of the plugin (e.g., 'qdrant', 'pinecone', 'local-faiss')
-        **kwargs: Plugin configuration (host, port, etc.)
+        plugin_name: Name of the plugin (e.g., 'pgvector')
+        **kwargs: Plugin configuration (mode, connection_string, etc.)
 
     Returns:
         Vector DB plugin instance

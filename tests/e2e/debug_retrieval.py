@@ -26,7 +26,7 @@ def setup_collection():
 
     embedding_plugin = config.get("embedding", {}).get("plugin_name", "openai")
     embedding_kwargs = config.get("embedding", {}).get("kwargs", {})
-    vector_db_plugin_name = config.get("vector_db", {}).get("plugin_name", "qdrant")
+    vector_db_plugin_name = config.get("vector_db", {}).get("plugin_name", "pgvector")
     vector_db_kwargs = config.get("vector_db", {}).get("kwargs", {})
 
     collection = f"e2e_debug_{uuid.uuid4().hex[:8]}"

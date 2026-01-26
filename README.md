@@ -60,7 +60,7 @@ fitz serve  # http://localhost:8000/docs for interactive API
 
   Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)).
 
-  - ~75k lines of Python
+  - ~40k lines of Python
   - 1200+ tests, 100% coverage
   - Zero LangChain/LlamaIndex dependencies — built from scratch
 

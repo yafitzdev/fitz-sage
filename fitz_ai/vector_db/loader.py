@@ -717,10 +717,7 @@ def _get_auto_detected_kwargs(spec: VectorDBSpec, kwargs: Dict[str, Any]) -> Dic
 
         # Map service name to detection function
         detection_functions = {
-            "qdrant": detect.get_qdrant_connection,
             "ollama": detect.get_ollama_connection,
-            "weaviate": getattr(detect, "get_weaviate_connection", None),
-            "milvus": getattr(detect, "get_milvus_connection", None),
         }
 
         detect_func = detection_functions.get(auto_detect_service)

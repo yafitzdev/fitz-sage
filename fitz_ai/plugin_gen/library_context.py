@@ -39,11 +39,9 @@ KNOWN_LIBRARIES = {
     "spacy": "spacy",
     "nltk": "nltk",
     # Vector DBs
-    "qdrant": "qdrant-client",
-    "pinecone": "pinecone-client",
-    "weaviate": "weaviate-client",
+    "pgvector": "pgvector",
+    "psycopg": "psycopg[binary]",
     "chromadb": "chromadb",
-    "milvus": "pymilvus",
     # LLM clients
     "openai": "openai",
     "anthropic": "anthropic",

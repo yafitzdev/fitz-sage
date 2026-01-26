@@ -69,7 +69,7 @@ def test_ingest_cli_mirror():
     embedding_model = embedding_kwargs.get("model", "embed-english-v3.0")
     embedding_id = f"{embedding_plugin}:{embedding_model}"
 
-    vector_db_plugin = config.get("vector_db", {}).get("plugin_name", "qdrant")
+    vector_db_plugin = config.get("vector_db", {}).get("plugin_name", "pgvector")
     vector_db_kwargs = config.get("vector_db", {}).get("kwargs", {})
 
     print(f"  Embedding: {embedding_id}")

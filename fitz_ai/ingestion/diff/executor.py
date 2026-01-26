@@ -117,7 +117,7 @@ class DiffIngestExecutor:
             chunking_router=chunking_router,
             collection="my_collection",
             embedding_id="cohere:embed-english-v3.0",
-            vector_db_id="qdrant",
+            vector_db_id="pgvector",
         )
 
         summary = executor.run("/path/to/documents")
@@ -148,7 +148,7 @@ class DiffIngestExecutor:
             chunking_router: Router for file-type specific chunking.
             collection: Vector DB collection name.
             embedding_id: Current embedding configuration ID.
-            vector_db_id: Vector DB plugin name (e.g., "qdrant", "pgvector").
+            vector_db_id: Vector DB plugin name (e.g., "pgvector").
             enrichment_pipeline: Optional unified enrichment pipeline.
                                 Handles both chunk summaries and project artifacts.
             table_store: Optional table storage backend for CSV/table files.
@@ -819,7 +819,7 @@ def run_diff_ingest(
         chunking_router: Router for file-type specific chunking.
         collection: Vector DB collection name.
         embedding_id: Current embedding configuration ID.
-        vector_db_id: Vector DB plugin name (e.g., "qdrant", "pgvector").
+        vector_db_id: Vector DB plugin name (e.g., "pgvector").
         enrichment_pipeline: Optional unified enrichment pipeline.
         force: If True, ingest everything regardless of state.
         on_progress: Optional callback(current, total, file_path) for progress updates.

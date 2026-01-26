@@ -59,7 +59,7 @@ class FileEntry(BaseModel):
     )
     vector_db_id: Optional[str] = Field(
         default=None,
-        description="Vector DB plugin used (e.g., 'qdrant', 'pgvector')",
+        description="Vector DB plugin used (e.g., 'pgvector')",
     )
     enricher_id: Optional[str] = Field(
         default=None,

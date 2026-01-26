@@ -26,7 +26,7 @@ def mock_config():
     # Core plugins (string format in new flat schema)
     config.chat = "openai"
     config.embedding = "openai"
-    config.vector_db = "qdrant"
+    config.vector_db = "pgvector"
 
     # Plugin kwargs (real PluginKwargs, not dicts)
     config.chat_kwargs = PluginKwargs(model="gpt-4")

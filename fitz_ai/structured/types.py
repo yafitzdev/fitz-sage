@@ -327,14 +327,14 @@ class SQLFilter:
     """
     Complete SQL filter specification.
 
-    Represents a WHERE clause converted to Qdrant filter format.
+    Represents a WHERE clause converted to vector DB filter format.
     """
 
     conditions: list[SQLFilterCondition] = field(default_factory=list)
     operator: str = "AND"  # AND, OR
 
-    def to_qdrant_filter(self) -> dict[str, Any]:
-        """Convert to Qdrant filter format."""
+    def to_filter(self) -> dict[str, Any]:
+        """Convert to vector DB filter format."""
         if not self.conditions:
             return {}
 

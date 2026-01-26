@@ -308,8 +308,6 @@ class TestDoctorTestMode:
         mock_system = MagicMock()
         mock_system.ollama.available = False
         mock_system.ollama.details = "not running"
-        mock_system.qdrant.available = False
-        mock_system.qdrant.details = "not running"
         mock_system.pgvector.available = True
         mock_system.pgvector.details = "installed"
         mock_system.api_keys = {}
