@@ -19,7 +19,6 @@ Example with all features:
 ```yaml
 chat: cohere/command-r-plus
 embedding: cohere/embed-english-v3.0
-vector_db: qdrant
 rerank: cohere/rerank-english-v3.0
 vision: openai/gpt-4o
 collection: my_docs
@@ -98,14 +97,14 @@ class PluginKwargs(BaseModel):
 
     host: str | None = Field(
         default=None,
-        description="Host for self-hosted services (e.g., Qdrant, Ollama)",
+        description="Host for self-hosted services (e.g., Ollama)",
     )
 
     port: int | None = Field(
         default=None,
         ge=1,
         le=65535,
-        description="Port for self-hosted services",
+        description="Port for self-hosted services (e.g., Ollama)",
     )
 
     api_key: str | None = Field(
@@ -185,7 +184,7 @@ class FitzRagConfig(BasePluginConfig):
 
     vector_db: str = Field(
         default="pgvector",
-        description="Vector DB plugin: 'pgvector' (default), 'qdrant', 'pinecone', etc.",
+        description="Vector DB: 'pgvector' (PostgreSQL + pgvector, the only supported option)",
     )
 
     # ==========================================================================
@@ -312,7 +311,7 @@ class FitzRagConfig(BasePluginConfig):
 
     vector_db_kwargs: PluginKwargs = Field(
         default_factory=PluginKwargs,
-        description="Additional kwargs for vector DB plugin (host, port, etc.)",
+        description="pgvector config: mode ('local'/'external'), connection_string, hnsw_m, hnsw_ef_construction",
     )
 
     rerank_kwargs: PluginKwargs = Field(

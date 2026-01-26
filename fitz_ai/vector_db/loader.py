@@ -1,28 +1,22 @@
 # fitz_ai/vector_db/loader.py
 """
-Vector DB plugin loader with YAML specifications.
+Vector DB plugin loader.
 
-This module provides a generic, YAML-driven plugin system for HTTP-based
-vector databases. Drop a conforming YAML file into plugins/ and it works
-automatically - no Python code needed.
-
-For local vector DBs (like FAISS), the YAML spec points to a Python class
-that implements the VectorDBPlugin protocol.
-
-Auto-detects connection details from fitz_ai.core.detect (single source of truth).
+Fitz uses PostgreSQL + pgvector for unified storage. This module loads
+the pgvector plugin which handles both local (pgserver) and external
+PostgreSQL deployments.
 
 Usage:
     from fitz_ai.vector_db import get_vector_db_plugin
 
-    # HTTP-based (loads from YAML)
-    db = get_vector_db_plugin("qdrant")
-    db = get_vector_db_plugin("pinecone", index_name="my-index", project_id="abc123")
-    db = get_vector_db_plugin("weaviate", host="localhost", port=8080)
+    # Default: local mode (embedded PostgreSQL via pgserver)
+    db = get_vector_db_plugin("pgvector")
 
-    # Local (delegates to Python class)
-    db = get_vector_db_plugin("local-faiss")
+    # External PostgreSQL
+    db = get_vector_db_plugin("pgvector", mode="external",
+                              connection_string="postgresql://...")
 
-    # All plugins support the same interface
+    # Standard interface
     db.upsert("collection", points)
     results = db.search("collection", vector, limit=10)
     count = db.count("collection")
@@ -747,38 +741,27 @@ def _get_auto_detected_kwargs(spec: VectorDBSpec, kwargs: Dict[str, Any]) -> Dic
 
 def create_vector_db_plugin(plugin_name: str, **kwargs):
     """
-    Create a vector DB plugin from YAML specification.
+    Create the pgvector plugin instance.
 
-    Connection details are AUTO-DETECTED based on the YAML spec's
-    'features.auto_detect' field. This is provider-agnostic.
-
-    For HTTP-based plugins: Returns GenericVectorDBPlugin
-    For local plugins: Returns the specific Python implementation
+    Fitz uses PostgreSQL + pgvector exclusively for unified storage.
 
     Args:
-        plugin_name: Name of the plugin (e.g., 'qdrant', 'pinecone', 'local-faiss')
-        **kwargs: Plugin configuration (host, port, index_name, etc.)
+        plugin_name: Must be 'pgvector'
+        **kwargs: Plugin configuration (mode, connection_string, hnsw_m, etc.)
 
     Returns:
-        Vector DB plugin instance
+        PgVectorDB plugin instance
 
     Examples:
-        # Auto-detect Qdrant connection
-        db = create_vector_db_plugin("qdrant")
+        # Local mode (default) - embedded PostgreSQL via pgserver
+        db = create_vector_db_plugin("pgvector")
 
-        # Explicit connection
-        db = create_vector_db_plugin("qdrant", host="localhost", port=6333)
-
-        # Pinecone (cloud service)
+        # External PostgreSQL
         db = create_vector_db_plugin(
-            "pinecone",
-            index_name="my-index",
-            project_id="abc123",
-            environment="us-east-1-aws"
+            "pgvector",
+            mode="external",
+            connection_string="postgresql://user:pass@host:5432/db"
         )
-
-        # Local FAISS
-        db = create_vector_db_plugin("local-faiss")
     """
     spec = load_vector_db_spec(plugin_name)
 

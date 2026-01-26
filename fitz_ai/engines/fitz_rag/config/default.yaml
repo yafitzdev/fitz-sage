@@ -26,8 +26,8 @@ fitz_rag:
   # Examples: "cohere", "openai/text-embedding-3-small", "voyage/voyage-2"
   embedding: cohere
 
-  # Vector DB: "provider"
-  # Examples: "pgvector" (default), "qdrant", "pinecone", "weaviate"
+  # Vector DB: PostgreSQL + pgvector (unified storage for vectors, metadata, tables)
+  # Mode is set in vector_db_kwargs below
   vector_db: pgvector
 
   # ===========================================================================

@@ -280,11 +280,9 @@ embedding:
   kwargs:
     model: embed-english-v3.0
 
-vector_db:
-  plugin_name: qdrant
-  kwargs:
-    host: "localhost"
-    port: 6333
+vector_db: pgvector
+vector_db_kwargs:
+  mode: local  # or "external" with connection_string
 
 # Retrieval strategy - plugin choice controls reranking
 retrieval:
@@ -328,14 +326,11 @@ export AZURE_OPENAI_ENDPOINT="your-endpoint"
 ### Local-First Setup
 
 ```bash
-# Start Ollama
+# Start Ollama (for local LLM)
 ollama serve
 ollama pull llama3.2
 
-# Start Qdrant
-docker run -p 6333:6333 qdrant/qdrant
-
-# Initialize and use
+# Initialize and use (PostgreSQL starts automatically via pgserver)
 fitz init
 fitz ingest ./docs -y
 fitz query "What's in my docs?"

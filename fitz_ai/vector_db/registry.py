@@ -1,13 +1,13 @@
 # fitz_ai/vector_db/registry.py
 """
-Vector DB plugin registry - YAML-based system.
+Vector DB plugin registry.
 
-Handles discovery and instantiation of vector DB plugins from YAML specs.
+Fitz uses PostgreSQL + pgvector for all storage. This registry provides
+the pgvector plugin instance.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, List
 
 from fitz_ai.core.instrumentation import maybe_wrap
@@ -17,17 +17,27 @@ from fitz_ai.vector_db.loader import create_vector_db_plugin
 _VECTOR_DB_METHODS_TO_TRACK = {"search", "upsert", "delete", "count", "list_collections"}
 
 
-def get_vector_db_plugin(plugin_name: str, **kwargs: Any) -> Any:
+def get_vector_db_plugin(plugin_name: str = "pgvector", **kwargs: Any) -> Any:
     """
-    Get a vector DB plugin instance.
+    Get the pgvector plugin instance.
+
+    Fitz uses PostgreSQL + pgvector exclusively for unified storage.
+    The plugin_name parameter exists for backwards compatibility but
+    only 'pgvector' is supported.
 
     Args:
-        plugin_name: Name of the plugin (e.g., 'qdrant', 'pinecone', 'local-faiss')
-        **kwargs: Plugin configuration (host, port, etc.)
+        plugin_name: Must be 'pgvector' (default)
+        **kwargs: Plugin configuration (mode, connection_string, etc.)
 
     Returns:
-        Vector DB plugin instance
+        PgVectorDB plugin instance
     """
+    if plugin_name != "pgvector":
+        raise ValueError(
+            f"Unsupported vector_db plugin: '{plugin_name}'. "
+            f"Fitz uses PostgreSQL + pgvector exclusively. Use 'pgvector' or omit the parameter."
+        )
+
     plugin = create_vector_db_plugin(plugin_name, **kwargs)
     # Wrap for instrumentation (only if hooks registered)
     return maybe_wrap(
@@ -43,14 +53,9 @@ def available_vector_db_plugins() -> List[str]:
     List available vector DB plugins.
 
     Returns:
-        Sorted list of plugin names
+        ['pgvector'] - Fitz uses PostgreSQL + pgvector exclusively
     """
-    plugins_dir = Path(__file__).parent / "plugins"
-
-    if not plugins_dir.exists():
-        return []
-
-    return sorted(f.stem for f in plugins_dir.glob("*.yaml"))
+    return ["pgvector"]
 
 
 __all__ = [

@@ -414,15 +414,13 @@ chat = get_llm_plugin(plugin_name="cohere", plugin_type="chat", tier="fast")
 | `azure_openai` | Azure | Deployed embedding models |
 | `local_ollama` | Ollama | nomic-embed-text, etc. |
 
-### Vector DB Plugins
+### Vector DB
 
-| Plugin | Provider |
-|--------|----------|
-| `qdrant` | Qdrant (local or cloud) |
-| `pinecone` | Pinecone |
-| `weaviate` | Weaviate |
-| `milvus` | Milvus |
-| `local_faiss` | FAISS (local, no server) |
+Fitz uses PostgreSQL + pgvector exclusively for unified storage. See [Unified Storage](features/unified-storage.md).
+
+| Plugin | Description |
+|--------|-------------|
+| `pgvector` | PostgreSQL + pgvector (local via pgserver or external) |
 
 ---
 

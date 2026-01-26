@@ -101,11 +101,9 @@ embedding:
   kwargs:
     model: embed-english-v3.0
 
-vector_db:
-  plugin_name: qdrant
-  kwargs:
-    host: "localhost"
-    port: 6333
+vector_db: pgvector
+vector_db_kwargs:
+  mode: local  # or "external" with connection_string
 
 # Retrieval strategy - plugin choice controls reranking
 retrieval:

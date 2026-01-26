@@ -16,7 +16,7 @@ collection: my_docs
 ```
 
 Everything else uses sensible defaults:
-- Vector DB: `local_faiss` (no external service needed)
+- Vector DB: pgvector (embedded PostgreSQL via pgserver)
 - Reranking: disabled
 - Citations: enabled
 - Strict grounding: enabled
@@ -29,7 +29,6 @@ Everything else uses sensible defaults:
 ```yaml
 chat: anthropic/claude-sonnet-4
 embedding: openai/text-embedding-3-small
-vector_db: local_faiss
 collection: my_docs
 ```
 
@@ -39,21 +38,19 @@ collection: my_docs
 chat: cohere/command-r-plus
 embedding: cohere/embed-english-v3.0
 rerank: cohere/rerank-english-v3.0
-vector_db: local_faiss
 collection: my_docs
 ```
 
-### With Remote Vector DB
+### With External PostgreSQL
 
 ```yaml
 chat: anthropic/claude-sonnet-4
 embedding: openai/text-embedding-3-small
-vector_db: qdrant
 collection: my_docs
 
 vector_db_kwargs:
-  url: http://localhost:6333
-  api_key: ${QDRANT_API_KEY}
+  mode: external
+  connection_string: postgresql://user:pass@localhost:5432/mydb
 ```
 
 ### With Vision/VLM for Images
@@ -72,7 +69,6 @@ collection: my_docs
 # Core plugins
 chat: anthropic/claude-sonnet-4
 embedding: openai/text-embedding-3-small
-vector_db: qdrant
 
 # Optional features
 rerank: cohere/rerank-english-v3.0
@@ -98,10 +94,10 @@ cloud:
   api_key: ${FITZ_CLOUD_API_KEY}
   org_key: ${FITZ_ORG_KEY}
 
-# Vector DB connection
+# External PostgreSQL (for production)
 vector_db_kwargs:
-  url: https://qdrant.example.com
-  api_key: ${QDRANT_API_KEY}
+  mode: external
+  connection_string: ${DATABASE_URL}
 ```
 
 ## Feature Toggle: Enabled vs Disabled
