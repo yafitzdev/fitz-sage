@@ -138,26 +138,25 @@ You can—but you'll hit walls fast.
 ### Why Fitz?
 
 **Super fast setup 🐆**
-> Point at a folder. Ask a question. Get an answer with sources. Everything else is handled by Fitz.
+> Point at a folder. Ask a question. Get an answer with sources. Even for tables! Everything else is handled by Fitz.
 
 **Honest answers ✅**
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."*
 
-**Swap engines, keep everything else ⚙️**
-> RAG is evolving fast—HyDE, ColBERT, agentic RAG, whatever's next. Fitz lets you switch engines in one line. Your ingested data stays. Your queries stay. No migration, no re-ingestion, no new API to learn. Frameworks lock you in; Fitz lets you move.
-
 **Queries that actually work 📊**
-> Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1001", multi-query decomposition for complex questions, AST-aware chunking for code, and SQL execution for tabular data. No configuration—it just works.
+> Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, AST-aware chunking for code, and SQL execution for tabular data. No configuration—it just works.
+
+**Tabular data that is actually searchable 📈**
+> CSV and table data is a nightmare in most RAG systems—chunked arbitrarily, structure lost, queries fail. Fitz stores tables natively in [PostgreSQL alongside your vectors—same database](docs/features/unified-storage.md), no sync issues. Auto-detects schema and runs real SQL. Ask "What's the average price by region?" and get an actual computed answer, not fragmented rows.
 
 **Other Features at a Glance 🃏**
 >
->1. [x] **Local execution possible.** Embedded PostgreSQL + Ollama, no API keys required to start.
->2. [x] **Unified storage.** PostgreSQL + pgvector for vectors, metadata, and tables—[one database, full SQL](docs/features/unified-storage.md).
->3. [x] **Plugin-based architecture.** Swap LLMs, rerankers, and retrieval pipelines via YAML config.
->4. [x] **Extensible engine system.** FitzRAG built-in, with a clean registry for adding custom engines.
->5. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
->6. [x] **Full provenance.** Every answer traces back to the exact chunk and document.
->7. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
+>1. [x] **Fully local execution possible.** Embedded PostgreSQL + Ollama, no API keys required to start.
+>2. [x] **Plugin-based architecture.** Swap LLMs, rerankers, and retrieval pipelines via YAML config.
+>3. [x] **Extensible engine system.** FitzRAG built-in, with a clean registry for adding custom engines.
+>4. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
+>5. [x] **Full provenance.** Every answer traces back to the exact chunk and document.
+>6. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
 
 ####
 
