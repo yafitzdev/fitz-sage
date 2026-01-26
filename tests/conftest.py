@@ -49,10 +49,18 @@ PROJECT_ROOT = Path(__file__).parent.parent
 
 
 def pytest_configure(config):
-    """Reset pgdata before any tests run to avoid corruption issues."""
+    """Reset pgdata before any tests run to ensure clean state.
+
+    Uses production code's _force_remove_pgdata which handles zombie processes.
+    """
+    from fitz_ai.storage.postgres import _force_remove_pgdata
+
     pgdata_path = PROJECT_ROOT / ".fitz" / "pgdata"
+
     if pgdata_path.exists():
-        shutil.rmtree(pgdata_path, ignore_errors=True)
+        if not _force_remove_pgdata(pgdata_path):
+            import warnings
+            warnings.warn(f"Could not clean pgdata directory at {pgdata_path}")
 
 # =============================================================================
 # Test Configuration

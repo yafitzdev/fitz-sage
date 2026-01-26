@@ -17,7 +17,10 @@ import atexit
 import re
 import shutil
 import signal
+import subprocess
+import sys
 import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generator, Optional
@@ -80,6 +83,66 @@ def _register_signal_handlers() -> None:
 
 # Valid collection name pattern (alphanumeric + underscore)
 COLLECTION_NAME_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
+
+
+def _kill_zombie_postgres_processes() -> None:
+    """
+    Kill any zombie postgres processes that might hold locks on pgdata.
+
+    This is a best-effort cleanup for cases where postgres crashed or was
+    killed without proper shutdown, leaving lock files behind.
+    """
+    try:
+        if sys.platform == "win32":
+            # Windows: kill postgres.exe processes
+            result = subprocess.run(
+                ["taskkill", "/F", "/IM", "postgres.exe"],
+                capture_output=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                logger.debug(f"{STORAGE} Killed zombie postgres processes")
+        else:
+            # Unix: kill postgres processes owned by current user
+            result = subprocess.run(
+                ["pkill", "-9", "-u", str(subprocess.os.getuid()), "postgres"],
+                capture_output=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                logger.debug(f"{STORAGE} Killed zombie postgres processes")
+    except Exception as e:
+        logger.debug(f"{STORAGE} Could not kill postgres processes (may not exist): {e}")
+
+
+def _force_remove_pgdata(data_dir: Path, max_retries: int = 3) -> bool:
+    """
+    Forcefully remove pgdata directory, killing processes if needed.
+
+    Args:
+        data_dir: Path to pgdata directory
+        max_retries: Maximum number of retry attempts
+
+    Returns:
+        True if successfully removed, False otherwise
+    """
+    for attempt in range(max_retries):
+        try:
+            if data_dir.exists():
+                shutil.rmtree(data_dir)
+            return True
+        except PermissionError as e:
+            logger.warning(
+                f"{STORAGE} Cannot remove pgdata (attempt {attempt + 1}/{max_retries}): {e}"
+            )
+            # Try killing postgres processes that might hold locks
+            _kill_zombie_postgres_processes()
+            time.sleep(1)  # Give OS time to release file handles
+        except Exception as e:
+            logger.error(f"{STORAGE} Unexpected error removing pgdata: {e}")
+            return False
+
+    return False
 
 
 def _sanitize_collection_name(name: str) -> str:
@@ -241,10 +304,20 @@ class PostgresConnectionManager:
                         pass
                     self._pgserver = None
 
-                # Delete corrupted pgdata
+                # Kill any zombie postgres processes that might hold locks
+                _kill_zombie_postgres_processes()
+                time.sleep(0.5)  # Give OS time to release handles
+
+                # Delete corrupted pgdata with retries
                 if data_dir.exists():
-                    shutil.rmtree(data_dir, ignore_errors=True)
-                    logger.info(f"{STORAGE} Deleted corrupted pgdata at {data_dir}")
+                    if _force_remove_pgdata(data_dir):
+                        logger.info(f"{STORAGE} Deleted corrupted pgdata at {data_dir}")
+                    else:
+                        logger.error(
+                            f"{STORAGE} Could not delete pgdata at {data_dir}. "
+                            "Try manually deleting it or running 'fitz reset'."
+                        )
+                        raise RuntimeError(f"Cannot remove corrupted pgdata at {data_dir}")
 
                 # Recreate directory
                 data_dir.mkdir(parents=True, exist_ok=True)
@@ -369,21 +442,27 @@ class PostgresConnectionManager:
             return result
 
     def stop(self) -> None:
-        """Stop PostgreSQL and close all pools."""
-        with self._lock:
-            # Close all pools
-            for name, pool in self._pools.items():
-                try:
-                    pool.close()
-                    logger.debug(f"{STORAGE} Closed pool for '{name}'")
-                except Exception as e:
-                    logger.warning(f"{STORAGE} Error closing pool '{name}': {e}")
+        """Stop PostgreSQL and close all pools.
 
-            self._pools.clear()
-            self._initialized_dbs.clear()
+        This method is defensive and handles partially-initialized instances
+        (e.g., from crashes during __init__ or interrupted startup).
+        """
+        with self._lock:
+            # Close all pools (defensive - check attribute exists)
+            if hasattr(self, "_pools") and self._pools:
+                for name, pool in list(self._pools.items()):
+                    try:
+                        pool.close()
+                        logger.debug(f"{STORAGE} Closed pool for '{name}'")
+                    except Exception as e:
+                        logger.warning(f"{STORAGE} Error closing pool '{name}': {e}")
+                self._pools.clear()
+
+            if hasattr(self, "_initialized_dbs"):
+                self._initialized_dbs.clear()
 
             # Stop pgserver
-            if self._pgserver is not None:
+            if hasattr(self, "_pgserver") and self._pgserver is not None:
                 try:
                     self._pgserver.cleanup()
                     logger.info(f"{STORAGE} pgserver stopped")
@@ -391,8 +470,10 @@ class PostgresConnectionManager:
                     logger.warning(f"{STORAGE} Error stopping pgserver: {e}")
                 self._pgserver = None
 
-            self._base_uri = None
-            self._started = False
+            if hasattr(self, "_base_uri"):
+                self._base_uri = None
+            if hasattr(self, "_started"):
+                self._started = False
 
 
 # Module-level convenience functions

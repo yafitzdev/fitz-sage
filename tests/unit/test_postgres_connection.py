@@ -124,23 +124,27 @@ class TestSingletonPattern:
         """Multiple get_instance calls return same instance."""
         config = StorageConfig(mode=StorageMode.EXTERNAL, connection_string="postgresql://localhost/test")
 
+        # Patch both __init__ and atexit to prevent broken handlers being registered
         with patch.object(PostgresConnectionManager, "__init__", return_value=None):
-            instance1 = PostgresConnectionManager.get_instance(config)
-            instance2 = PostgresConnectionManager.get_instance()
+            with patch("fitz_ai.storage.postgres.atexit.register"):
+                instance1 = PostgresConnectionManager.get_instance(config)
+                instance2 = PostgresConnectionManager.get_instance()
 
-            assert instance1 is instance2
+                assert instance1 is instance2
 
     def test_reset_instance_creates_new(self):
         """Reset allows creating new instance."""
         config = StorageConfig(mode=StorageMode.EXTERNAL, connection_string="postgresql://localhost/test")
 
+        # Patch both __init__ and atexit to prevent broken handlers being registered
         with patch.object(PostgresConnectionManager, "__init__", return_value=None):
-            with patch.object(PostgresConnectionManager, "stop"):
-                instance1 = PostgresConnectionManager.get_instance(config)
-                PostgresConnectionManager.reset_instance()
-                instance2 = PostgresConnectionManager.get_instance(config)
+            with patch("fitz_ai.storage.postgres.atexit.register"):
+                with patch.object(PostgresConnectionManager, "stop"):
+                    instance1 = PostgresConnectionManager.get_instance(config)
+                    PostgresConnectionManager.reset_instance()
+                    instance2 = PostgresConnectionManager.get_instance(config)
 
-                assert instance1 is not instance2
+                    assert instance1 is not instance2
 
 
 # =============================================================================
@@ -349,17 +353,19 @@ class TestGracefulShutdown:
             connection_string="postgresql://localhost/test",
         )
 
+        # Patch both __init__ and atexit to prevent broken handlers being registered
         with patch.object(PostgresConnectionManager, "__init__", return_value=None):
-            instance = PostgresConnectionManager.get_instance(config)
-            instance._started = True
-            instance._pools = {}
-            instance.stop = MagicMock()
+            with patch("fitz_ai.storage.postgres.atexit.register"):
+                instance = PostgresConnectionManager.get_instance(config)
+                instance._started = True
+                instance._pools = {}
+                instance.stop = MagicMock()
 
-            PostgresConnectionManager.reset_instance()
+                PostgresConnectionManager.reset_instance()
 
-            instance.stop.assert_called_once()
-            # Getting new instance should work
-            assert PostgresConnectionManager._instance is None
+                instance.stop.assert_called_once()
+                # Getting new instance should work
+                assert PostgresConnectionManager._instance is None
 
 
 # =============================================================================
