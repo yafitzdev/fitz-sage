@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -248,6 +249,25 @@ class TestPipelineBuilding:
 # =============================================================================
 
 
+class MockSparseIndex:
+    """Mock sparse index for tests."""
+
+    def __init__(self, collection: str = "test"):
+        self.collection = collection
+
+    def hybrid_search(self, query: str, query_vector: list, limit: int = 10, alpha: float = 0.5):
+        """Return empty results for hybrid search."""
+        return []
+
+    def is_ready(self) -> bool:
+        """Mock sparse index is never ready (forces dense-only path)."""
+        return False
+
+    @classmethod
+    def load(cls, collection: str):
+        return cls(collection)
+
+
 class TestPipelineExecution:
     def test_create_and_retrieve(self):
         """Should create pipeline and execute retrieval."""
@@ -260,7 +280,12 @@ class TestPipelineExecution:
             top_k=5,
         )
 
-        chunks = pipeline.retrieve("test query")
+        # Mock sparse index to avoid postgres dependency
+        with patch(
+            "fitz_ai.retrieval.sparse.SparseIndex",
+            MockSparseIndex,
+        ):
+            chunks = pipeline.retrieve("test query")
 
         assert len(chunks) == 5
         assert all(isinstance(c, Chunk) for c in chunks)
@@ -277,7 +302,12 @@ class TestPipelineExecution:
             top_k=5,
         )
 
-        chunks = pipeline.retrieve("test query")
+        # Mock sparse index to avoid postgres dependency
+        with patch(
+            "fitz_ai.retrieval.sparse.SparseIndex",
+            MockSparseIndex,
+        ):
+            chunks = pipeline.retrieve("test query")
 
         # Reranker should have been called
         assert len(reranker.rerank_calls) == 1

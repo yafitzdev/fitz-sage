@@ -418,8 +418,6 @@ class TestConnectionPool:
 
     def test_pool_reused_for_same_collection(self):
         """Same collection returns same pool."""
-        import sys
-
         config = StorageConfig(
             mode=StorageMode.EXTERNAL,
             connection_string="postgresql://localhost/test",
@@ -430,11 +428,9 @@ class TestConnectionPool:
 
         mock_pool = MagicMock()
         mock_pool_class = MagicMock(return_value=mock_pool)
-        mock_psycopg_pool = MagicMock()
-        mock_psycopg_pool.ConnectionPool = mock_pool_class
 
         with patch.object(manager, "_ensure_database", return_value="fitz_coll"):
-            with patch.dict(sys.modules, {"psycopg_pool": mock_psycopg_pool}):
+            with patch("fitz_ai.storage.postgres._get_psycopg_pool", return_value=mock_pool_class):
                 pool1 = manager.get_pool("my_collection")
                 pool2 = manager.get_pool("my_collection")
 
@@ -458,8 +454,6 @@ class TestDatabaseCreation:
 
     def test_ensure_database_creates_if_not_exists(self):
         """_ensure_database creates database if it doesn't exist."""
-        import sys
-
         config = StorageConfig(
             mode=StorageMode.EXTERNAL,
             connection_string="postgresql://localhost/postgres",
@@ -481,7 +475,7 @@ class TestDatabaseCreation:
         mock_psycopg.connect.return_value.__enter__ = Mock(return_value=mock_conn)
         mock_psycopg.connect.return_value.__exit__ = Mock(return_value=False)
 
-        with patch.dict(sys.modules, {"psycopg": mock_psycopg}):
+        with patch("fitz_ai.storage.postgres._get_psycopg", return_value=mock_psycopg):
             db_name = manager._ensure_database("my_collection")
 
         assert db_name == "fitz_my_collection"
@@ -566,7 +560,7 @@ class TestPoolExhaustion:
         PostgresConnectionManager._instance = None
 
     def test_connection_pool_exhaustion_blocks(self):
-        """When pool exhausted, new requests should block or raise."""
+        """When pool exhausted, new requests should raise after recovery fails."""
         from psycopg_pool import PoolTimeout
 
         config = StorageConfig(
@@ -579,14 +573,20 @@ class TestPoolExhaustion:
         manager._started = True
         manager._base_uri = "postgresql://localhost/test"
 
-        # Mock pool that times out
+        # Mock pool that times out on connection
         mock_pool = MagicMock()
         mock_pool.connection.side_effect = PoolTimeout("Pool exhausted")
         manager._pools["test_coll"] = mock_pool
 
-        with pytest.raises(PoolTimeout):
-            with manager.connection("test_coll"):
-                pass
+        # Mock get_pool to always return our mock pool (prevents recovery from creating new pool)
+        # Mock _restart_pgserver to be a no-op
+        with patch.object(manager, "get_pool", return_value=mock_pool):
+            with patch.object(manager, "_restart_pgserver"):
+                # PoolTimeout inherits from psycopg.OperationalError, so code enters recovery
+                # Recovery also fails, so it wraps in RuntimeError
+                with pytest.raises(RuntimeError, match="Connection failed even after"):
+                    with manager.connection("test_coll"):
+                        pass
 
 
 # =============================================================================
@@ -735,7 +735,6 @@ class TestConcurrentPoolCreation:
 
     def test_concurrent_pool_creation_same_collection(self):
         """Concurrent pool requests for same collection should return same pool."""
-        import sys
         import threading
 
         config = StorageConfig(
@@ -746,18 +745,9 @@ class TestConcurrentPoolCreation:
         manager._started = True
         manager._base_uri = "postgresql://localhost/test"
 
-        # Create a mock pool class that tracks creation
-        creation_count = 0
+        # Create a mock pool
         mock_pool = MagicMock()
-
-        def mock_pool_constructor(*args, **kwargs):
-            nonlocal creation_count
-            creation_count += 1
-            return mock_pool
-
-        mock_pool_class = MagicMock(side_effect=mock_pool_constructor)
-        mock_psycopg_pool = MagicMock()
-        mock_psycopg_pool.ConnectionPool = mock_pool_class
+        mock_pool_class = MagicMock(return_value=mock_pool)
 
         results = []
         errors = []
@@ -765,7 +755,10 @@ class TestConcurrentPoolCreation:
         def get_pool():
             try:
                 with patch.object(manager, "_ensure_database", return_value="fitz_shared"):
-                    with patch.dict(sys.modules, {"psycopg_pool": mock_psycopg_pool}):
+                    with patch(
+                        "fitz_ai.storage.postgres._get_psycopg_pool",
+                        return_value=mock_pool_class,
+                    ):
                         pool = manager.get_pool("shared_collection")
                         results.append(id(pool))
             except Exception as e:
