@@ -266,142 +266,59 @@ response:
 
 ---
 
-## Vector DB Plugins
+## Vector DB Plugin
 
-Creates a vector database provider.
+Fitz uses PostgreSQL + pgvector for unified storage of vectors, metadata, and structured tables.
 
-**File:** `fitz_ai/vector_db/plugins/my_vectordb.yaml`
+**Plugin:** `pgvector` (default, no configuration needed)
+
+### Configuration
 
 ```yaml
-name: my_vectordb
-type: vector_db
-description: My custom vector database
+# Local mode (default) - embedded PostgreSQL via pgserver
+vector_db: pgvector
+vector_db_kwargs:
+  mode: local
 
-# =============================================================================
-# Features
-# =============================================================================
-features:
-  # If true, string IDs are converted to UUIDs
-  requires_uuid_ids: false
-
-  # Auto-detection function (optional)
-  auto_detect: null
-
-  # Whether DB uses namespaces vs collections
-  supports_namespaces: false
-
-# =============================================================================
-# Connection
-# =============================================================================
-connection:
-  type: http
-  base_url: "http://{{host}}:{{port}}"
-  default_host: localhost
-  default_port: 8000
-
-  auth:
-    type: bearer
-    env_var: MY_VECTORDB_API_KEY
-    header: Authorization
-    scheme: "Bearer"
-    optional: true
-
-# =============================================================================
-# Operations
-# =============================================================================
-operations:
-  # Search for similar vectors
-  search:
-    endpoint: /collections/{{collection}}/search
-    method: POST
-    body:
-      vector: "{{query_vector}}"
-      limit: "{{limit}}"
-    response:
-      results_path: results
-      mapping:
-        id: id
-        score: score
-        payload: metadata
-
-  # Insert/update vectors
-  upsert:
-    endpoint: /collections/{{collection}}/points
-    method: PUT
-
-    # Auto-create collection on 404
-    auto_create_collection: true
-    create_collection_endpoint: /collections/{{collection}}
-    create_collection_method: PUT
-    create_collection_body:
-      dimension: "{{vector_dim}}"
-
-    body:
-      points: "{{points}}"
-
-  # Retrieve points by ID (REQUIRED for table/CSV support)
-  retrieve:
-    endpoint: /collections/{{collection}}/points
-    method: POST
-    body:
-      ids: "{{ids}}"
-      with_payload: "{{with_payload}}"
-    response:
-      results_path: result
-      mapping:
-        id: id
-        payload: payload
-
-  # Count points
-  count:
-    endpoint: /collections/{{collection}}/count
-    method: GET
-    response:
-      count_path: count
-
-  # Delete collection
-  delete_collection:
-    endpoint: /collections/{{collection}}
-    method: DELETE
-    response:
-      success_codes: [200, 404]
-
-  # Create collection
-  create_collection:
-    endpoint: /collections/{{collection}}
-    method: PUT
-    body:
-      dimension: "{{vector_size}}"
-
-  # List collections
-  list_collections:
-    endpoint: /collections
-    method: GET
-    response:
-      collections_path: collections
-      name_field: name
-
-  # Get collection statistics
-  get_stats:
-    endpoint: /collections/{{collection}}
-    method: GET
-    response:
-      stats_path: result
+# External mode - your PostgreSQL instance
+vector_db: pgvector
+vector_db_kwargs:
+  mode: external
+  connection_string: postgresql://user:pass@host:5432/dbname
 ```
+
+### Why PostgreSQL?
+
+Fitz uses PostgreSQL + pgvector instead of dedicated vector databases for:
+
+- **Unified storage** - Vectors, metadata, and tables in one database
+- **Full SQL** - Real queries, joins, aggregations on structured data
+- **Zero friction** - `pip install` includes embedded PostgreSQL (pgserver)
+- **One code path** - Same behavior locally and in production
+
+See [Unified Storage](features/unified-storage.md) for the full rationale.
+
+### HNSW Index Settings
+
+```yaml
+vector_db_kwargs:
+  hnsw_m: 16                # Graph connectivity (default: 16)
+  hnsw_ef_construction: 64  # Build quality (default: 64)
+```
+
+Higher values = better recall but slower indexing.
 
 ---
 
 ## Using Your Plugin
 
-Once created, plugins are auto-discovered:
+Once created, LLM plugins are auto-discovered:
 
 ```python
 from fitz_ai.llm.registry import get_llm_plugin, available_llm_plugins
-from fitz_ai.vector_db.registry import get_vector_db_plugin, available_vector_db_plugins
 
 # List available plugins
 print(available_llm_plugins("chat"))      # ['cohere', 'openai', 'my_provider', ...]
-print(available_vector_db_plugins())       # ['qdrant', 'my_vectordb', ...]
 
 # Use your plugin
 chat = get_llm_plugin(plugin_name="my_provider", plugin_type="chat")
@@ -409,15 +326,12 @@ response = chat.chat([{"role": "user", "content": "Hello"}])
 
 embedder = get_llm_plugin(plugin_name="my_provider", plugin_type="embedding")
 vector = embedder.embed("Some text")
-
-vectordb = get_vector_db_plugin("my_vectordb", host="localhost", port=8000)
-results = vectordb.search(collection="test", vector=[0.1, 0.2, ...], limit=5)
 ```
 
 In configuration:
 
 ```yaml
-# fitz.yaml
+# .fitz/config/fitz_rag.yaml
 chat:
   plugin_name: my_provider
   kwargs:
@@ -426,11 +340,10 @@ chat:
 embedding:
   plugin_name: my_provider
 
-vector_db:
-  plugin_name: my_vectordb
-  kwargs:
-    host: localhost
-    port: 8000
+# Vector storage (pgvector is the default)
+vector_db: pgvector
+vector_db_kwargs:
+  mode: local
 ```
 
 ---

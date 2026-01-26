@@ -94,22 +94,88 @@ LLMError: Cannot connect to Ollama at http://localhost:11434
 
 ---
 
-### FAISS Import Error
+### PostgreSQL/pgserver Issues
 
 **Error:**
 ```
-ImportError: cannot import name 'faiss' from ...
+Could not start pgserver: pgdata directory locked
 ```
+
+**Cause:** A previous PostgreSQL process didn't shut down cleanly, leaving lock files.
 
 **Solution:**
 
-Install FAISS:
-```bash
-# CPU version (recommended)
-pip install faiss-cpu
+Fitz automatically attempts to clean up zombie processes, but if it persists:
 
-# GPU version (if you have CUDA)
-pip install faiss-gpu
+1. Kill any zombie postgres processes:
+   ```bash
+   # Linux/macOS
+   pkill -9 postgres
+
+   # Windows
+   taskkill /F /IM postgres.exe
+   ```
+
+2. Remove the pgdata directory:
+   ```bash
+   rm -rf ~/.fitz/pgdata
+   ```
+
+3. Fitz will recreate it on next run.
+
+---
+
+**Error:**
+```
+PostgreSQL connection failed: connection refused
+```
+
+**Solution for local mode:**
+1. Check if another process is using port 5432
+2. Remove pgdata and let Fitz reinitialize:
+   ```bash
+   rm -rf ~/.fitz/pgdata
+   ```
+
+**Solution for external mode:**
+1. Verify connection string in config:
+   ```yaml
+   vector_db_kwargs:
+     mode: external
+     connection_string: postgresql://user:pass@host:5432/dbname
+   ```
+2. Ensure pgvector extension is installed:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS vector;
+   ```
+
+---
+
+**Error:**
+```
+pgvector extension not found
+```
+
+**Cause:** External PostgreSQL doesn't have pgvector installed.
+
+**Solution:**
+
+Install pgvector on your PostgreSQL instance:
+```bash
+# Ubuntu/Debian
+sudo apt install postgresql-16-pgvector
+
+# macOS with Homebrew
+brew install pgvector
+
+# Or compile from source
+git clone https://github.com/pgvector/pgvector.git
+cd pgvector && make && sudo make install
+```
+
+Then enable in your database:
+```sql
+CREATE EXTENSION vector;
 ```
 
 ---
@@ -290,7 +356,7 @@ print(f"Embedding dim: {len(vector)}")
 
 # Test vector DB
 from fitz_ai.vector_db.registry import get_vector_db_plugin
-vdb = get_vector_db_plugin("local_faiss")
+vdb = get_vector_db_plugin("pgvector")
 collections = vdb.list_collections()
 print(f"Collections: {collections}")
 

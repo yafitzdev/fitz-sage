@@ -44,12 +44,12 @@ High-level system design of Fitz.
           ┌─────────────────────────┼─────────────────────────┐
           ▼                         ▼                         ▼
 ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────────┐
-│  LLM Services       │  │  Vector DB          │  │  Ingestion Pipeline     │
+│  LLM Services       │  │  Storage Layer      │  │  Ingestion Pipeline     │
 ├─────────────────────┤  ├─────────────────────┤  ├─────────────────────────┤
-│  - Chat             │  │  - FAISS (local)    │  │  - Parsing              │
-│  - Embedding        │  │  - Pinecone         │  │  - Chunking             │
-│  - Rerank           │  │  - Qdrant           │  │  - Enrichment           │
-│  - Vision           │  │  - Milvus           │  │  - Embedding            │
+│  - Chat             │  │  PostgreSQL +       │  │  - Parsing              │
+│  - Embedding        │  │  pgvector           │  │  - Chunking             │
+│  - Rerank           │  │  (vectors, metadata │  │  - Enrichment           │
+│  - Vision           │  │   tables, SQL)      │  │  - Embedding            │
 └─────────────────────┘  └─────────────────────┘  └─────────────────────────┘
           │                         │                         │
           ▼                         ▼                         ▼
@@ -78,9 +78,9 @@ Strict import rules enforce separation of concerns:
           ▲                    ▲                    ▲
           │                    │                    │
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐
-│  llm/           │  │  vector_db/     │  │  ingest/            │
-│  Chat, Embed,   │  │  FAISS, Pinecone│  │  Parse, Chunk,      │
-│  Rerank, Vision │  │  Qdrant, Milvus │  │  Enrich             │
+│  llm/           │  │  storage/       │  │  ingest/            │
+│  Chat, Embed,   │  │  PostgreSQL +   │  │  Parse, Chunk,      │
+│  Rerank, Vision │  │  pgvector       │  │  Enrich             │
 └─────────────────┘  └─────────────────┘  └─────────────────────┘
           ▲                    ▲                    ▲
           └────────────────────┼────────────────────┘
@@ -159,9 +159,9 @@ Verify with: `python -m tools.contract_map --fail-on-errors`
                                        │                  │
                                        ▼                  ▼
                                 ┌─────────────┐    ┌─────────────┐
-                                │ChunkEnricher│    │ FAISS/      │
-                                │ + Hierarchy │    │ Pinecone/   │
-                                │             │    │ Qdrant      │
+                                │ChunkEnricher│    │ PostgreSQL  │
+                                │ + Hierarchy │    │ + pgvector  │
+                                │             │    │             │
                                 └─────────────┘    └─────────────┘
 ```
 
@@ -211,7 +211,7 @@ Verify with: `python -m tools.contract_map --fail-on-errors`
 | Embedding | YAML | Vector embeddings | Cohere, OpenAI, Ollama |
 | Rerank | YAML | Result reranking | Cohere |
 | Vision | YAML | Image understanding | Cohere, OpenAI |
-| Vector DB | YAML | Vector storage | FAISS, Pinecone, Qdrant |
+| Vector DB | YAML | Vector storage | pgvector (PostgreSQL) |
 | Retrieval | YAML | Search strategy | Dense, Dense+Rerank |
 | Chunking | Python | Text splitting | Semantic, Fixed |
 | Parser | Python | Document parsing | Docling, Docling+VLM |
@@ -295,7 +295,7 @@ class Chunk:
 .fitz/
 ├── config/
 │   └── fitz_rag.yaml     # Main engine config
-├── vector_db/            # FAISS indices (if local)
+├── pgdata/               # PostgreSQL data (local mode)
 └── ingest_state.json     # Incremental ingestion state
 ```
 
@@ -318,10 +318,10 @@ rerank:
   plugin_name: cohere
   kwargs: { model: rerank-v3.5 }
 
-# Vector storage (YAML plugins)
-vector_db:
-  plugin_name: local_faiss
-  kwargs: { index_type: flat }
+# Vector storage (PostgreSQL + pgvector)
+vector_db: pgvector
+vector_db_kwargs:
+  mode: local  # or "external" with connection_string
 
 # Ingestion (mixed plugin types)
 parser:
@@ -392,7 +392,7 @@ fitz_ai/
 
 5. **Config-driven**: Provider selection lives only in config files.
 
-6. **Local-first**: Works offline with Ollama + FAISS.
+6. **Local-first**: Works offline with Ollama + embedded PostgreSQL.
 
 7. **Provenance always**: Every answer traces back to sources.
 
@@ -400,6 +400,7 @@ fitz_ai/
 
 ## See Also
 
+- [Unified Storage](features/unified-storage.md) - Why PostgreSQL + pgvector
 - [PLUGINS.md](PLUGINS.md) - Plugin development guide
 - [CONFIG.md](CONFIG.md) - Configuration reference
 - [FEATURE_CONTROL.md](FEATURE_CONTROL.md) - Feature control architecture

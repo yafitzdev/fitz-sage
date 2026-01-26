@@ -140,12 +140,13 @@ You can—but you'll hit walls fast.
 
 **Other Features at a Glance 🃏**
 >
->1. [x] **Local execution possible.** FAISS and Ollama support, no API keys required to start.
->2. [x] **Plugin-based architecture.** Swap LLMs, vector databases, rerankers, and retrieval pipelines via YAML config.
->3. [x] **Extensible engine system.** FitzRAG built-in, with a clean registry for adding custom engines.
->4. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
->5. [x] **Full provenance.** Every answer traces back to the exact chunk and document.
->6. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
+>1. [x] **Local execution possible.** Embedded PostgreSQL + Ollama, no API keys required to start.
+>2. [x] **Unified storage.** PostgreSQL + pgvector for vectors, metadata, and tables—[one database, full SQL](docs/features/unified-storage.md).
+>3. [x] **Plugin-based architecture.** Swap LLMs, rerankers, and retrieval pipelines via YAML config.
+>4. [x] **Extensible engine system.** FitzRAG built-in, with a clean registry for adding custom engines.
+>5. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
+>6. [x] **Full provenance.** Every answer traces back to the exact chunk and document.
+>7. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
 
 ####
 
@@ -735,6 +736,7 @@ MIT
 - [REST API](docs/API.md)
 - [Configuration Guide](docs/CONFIG.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Unified Storage (PostgreSQL + pgvector)](docs/features/unified-storage.md)
 - [Ingestion Pipeline](docs/INGESTION.md)
 - [Enrichment (Hierarchies, Entities)](docs/ENRICHMENT.md)
 - [Epistemic Constraints](docs/CONSTRAINTS.md)

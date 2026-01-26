@@ -71,17 +71,16 @@ vision:
   kwargs: {}
 
 # =============================================================================
-# Storage
+# Storage (PostgreSQL + pgvector)
 # =============================================================================
 
-# Vector Database
-vector_db:
-  plugin_name: local_faiss     # local_faiss, qdrant, pinecone, milvus, weaviate
-  kwargs: {}
-  # For Qdrant:
-  # kwargs:
-  #   host: localhost
-  #   port: 6333
+# Vector Database (unified storage for vectors, metadata, and tables)
+vector_db: pgvector
+vector_db_kwargs:
+  mode: local                  # local (embedded pgserver) or external
+  # For external PostgreSQL:
+  # mode: external
+  # connection_string: postgresql://user:pass@host:5432/dbname
 
 # =============================================================================
 # Retrieval
@@ -200,22 +199,39 @@ Vision Language Model for describing figures in PDFs.
 
 ### vector_db
 
-Vector database for storing and searching embeddings.
+Unified storage using PostgreSQL + pgvector. Handles vectors, metadata, and structured tables in one database.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `plugin_name` | string | `local_faiss` | Database plugin |
-| `kwargs` | object | `{}` | Connection options |
+| `vector_db` | string | `pgvector` | Storage plugin |
+| `vector_db_kwargs.mode` | string | `local` | `local` (embedded) or `external` |
+| `vector_db_kwargs.connection_string` | string | - | PostgreSQL URI (external mode) |
+| `vector_db_kwargs.hnsw_m` | int | `16` | HNSW index parameter |
+| `vector_db_kwargs.hnsw_ef_construction` | int | `64` | HNSW build quality |
 
-**Available plugins:**
+**Modes:**
 
-| Plugin | Type | kwargs |
-|--------|------|--------|
-| `local_faiss` | Local | None required |
-| `qdrant` | Server | `host`, `port`, `api_key` |
-| `pinecone` | Cloud | `api_key`, `environment` |
-| `milvus` | Server | `host`, `port` |
-| `weaviate` | Server | `host`, `port` |
+| Mode | Description | Configuration |
+|------|-------------|---------------|
+| `local` | Embedded PostgreSQL via pgserver | No config needed (auto-starts) |
+| `external` | Your PostgreSQL instance | Provide `connection_string` |
+
+**Local mode example:**
+```yaml
+vector_db: pgvector
+vector_db_kwargs:
+  mode: local
+```
+
+**External mode example:**
+```yaml
+vector_db: pgvector
+vector_db_kwargs:
+  mode: external
+  connection_string: postgresql://user:pass@localhost:5432/mydb
+```
+
+See [Unified Storage](features/unified-storage.md) for architecture details.
 
 ---
 
@@ -328,7 +344,8 @@ API keys are read from environment variables:
 | OpenAI | `OPENAI_API_KEY` |
 | Anthropic | `ANTHROPIC_API_KEY` |
 | Azure OpenAI | `AZURE_OPENAI_API_KEY` |
-| Pinecone | `PINECONE_API_KEY` |
+
+**Note:** PostgreSQL credentials are provided via the `connection_string` in config (external mode only). Local mode requires no credentials.
 
 ---
 
