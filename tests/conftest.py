@@ -41,6 +41,29 @@ import pytest
 import yaml
 
 # =============================================================================
+# Dependency Availability Checks
+# =============================================================================
+
+
+def postgres_deps_available() -> bool:
+    """Check if PostgreSQL dependencies (psycopg, pgvector, pgserver) are available."""
+    try:
+        import psycopg  # noqa: F401
+        import psycopg_pool  # noqa: F401
+        import pgvector  # noqa: F401
+        import pgserver  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+# Export for use in test files
+POSTGRES_DEPS_AVAILABLE = postgres_deps_available()
+SKIP_POSTGRES_REASON = "PostgreSQL dependencies (psycopg, pgvector, pgserver) not installed"
+
+
+# =============================================================================
 # pgdata Reset (prevents corruption from interrupted test runs)
 # =============================================================================
 
@@ -51,8 +74,13 @@ def pytest_configure(config):
     """Reset pgdata before any tests run to ensure clean state.
 
     Uses production code's _force_remove_pgdata which handles zombie processes.
+    Gracefully skips if postgres dependencies aren't installed.
     """
-    from fitz_ai.storage.postgres import _force_remove_pgdata
+    try:
+        from fitz_ai.storage.postgres import _force_remove_pgdata
+    except ImportError:
+        # Postgres dependencies not installed - skip pgdata cleanup
+        return
 
     pgdata_path = PROJECT_ROOT / ".fitz" / "pgdata"
 

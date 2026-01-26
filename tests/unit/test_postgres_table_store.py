@@ -16,6 +16,12 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from tests.conftest import POSTGRES_DEPS_AVAILABLE, SKIP_POSTGRES_REASON
+
+# Skip entire module if postgres dependencies not available
+if not POSTGRES_DEPS_AVAILABLE:
+    pytest.skip(SKIP_POSTGRES_REASON, allow_module_level=True)
+
 # Mark all tests in this module as postgres and tier2
 pytestmark = [pytest.mark.postgres, pytest.mark.tier2]
 
