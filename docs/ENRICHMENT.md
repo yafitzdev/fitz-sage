@@ -142,7 +142,7 @@ Extracts exact-match identifiers for vocabulary-based retrieval.
 - Constants: `MAX_RETRIES`, `API_KEY`
 - API endpoints: `/api/v2/users`
 
-**Stored in:** `VocabularyStore` for exact-match retrieval at query time.
+**Stored in:** PostgreSQL `keywords` table (via `VocabularyStore`) for exact-match retrieval at query time.
 
 ---
 
@@ -314,7 +314,7 @@ enrichment:
 | `fitz_ai/ingestion/enrichment/pipeline.py` | Main orchestrator |
 | `fitz_ai/ingestion/enrichment/config.py` | Configuration schema |
 | `fitz_ai/ingestion/enrichment/hierarchy/enricher.py` | Hierarchy generation |
-| `fitz_ai/ingestion/vocabulary/store.py` | Keyword vocabulary storage |
+| `fitz_ai/retrieval/vocabulary/store.py` | Keyword vocabulary storage (PostgreSQL) |
 
 ---
 

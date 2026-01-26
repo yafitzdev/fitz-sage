@@ -47,7 +47,7 @@ Fitz uses a YAML-based plugin system for LLM providers and vector databases. Thi
 
 Fitz uses two types of plugins:
 
-- **YAML plugins** - For external service integrations (LLM providers, vector DBs). Declarative, no code required.
+- **YAML plugins** - For external service integrations (LLM providers). Declarative, no code required.
 - **Python plugins** - For logic-based components (chunking, parsing, constraints). Require Python code.
 
 **Plugin Types:**
@@ -58,11 +58,12 @@ Fitz uses two types of plugins:
 | Embedding | YAML | `fitz_ai/llm/embedding/` | Text embeddings |
 | Rerank | YAML | `fitz_ai/llm/rerank/` | Document reranking |
 | Vision | YAML | `fitz_ai/llm/vision/` | VLM for image description |
-| Vector DB | YAML | `fitz_ai/vector_db/plugins/` | Vector storage |
 | Retrieval | YAML | `fitz_ai/engines/fitz_rag/retrieval/plugins/` | Retrieval strategies |
 | Chunking | Python | `fitz_ai/ingestion/chunking/plugins/` | Document chunking |
 | Parser | Python | `fitz_ai/ingestion/parser/plugins/` | Document parsing |
 | Guardrail | Python | `fitz_ai/core/guardrails/plugins/` | Epistemic safety |
+
+**Note:** Vector storage uses PostgreSQL + pgvector (built-in, not pluggable). See [Unified Storage](features/unified-storage.md).
 
 ---
 

@@ -11,6 +11,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.0] - 2026-01-26
+
+### 🎉 Highlights
+
+**Unified PostgreSQL Storage** - Replaced FAISS + SQLite with PostgreSQL + pgvector for all storage needs. Uses `pgserver` (pip-installable embedded PostgreSQL) for local mode with zero external dependencies. One database per collection, automatic schema management, and HNSW indexing for fast vector search.
+
+**Native PostgreSQL Tables** - Tabular data (CSV/tables) now stored directly in PostgreSQL with automatic schema inference. Enables SQL queries over structured data alongside vector search.
+
+**LLM Factory Pattern** - New `chat_factory()` function provides clean LLM client instantiation with proper dependency injection. Replaces scattered client creation logic.
+
+### 🚀 Added
+
+#### PostgreSQL Storage System (`fitz_ai/storage/`)
+- `PostgresConnectionManager` - Singleton connection manager with pgserver lifecycle
+- `StorageConfig` - Pydantic config for local/external PostgreSQL modes
+- Per-collection database isolation (one DB per collection)
+- Automatic pgvector extension initialization
+- Connection pooling via `psycopg_pool`
+- pgserver graceful shutdown with file handle cleanup on Windows
+- Auto-recovery on corrupted data directories
+
+#### pgvector Backend (`fitz_ai/backends/local_vector_db/pgvector.py`)
+- `PgVectorDB` - Full VectorDBPlugin implementation
+- HNSW indexing with configurable `m` and `ef_construction`
+- Hybrid search combining vector similarity + full-text search (tsvector)
+- Native PostgreSQL `tsvector` for sparse/BM25-style retrieval
+- `scroll()` and `scroll_with_vectors()` for batch iteration
+- Automatic schema creation on first use
+
+#### PostgreSQL Table Store (`fitz_ai/tabular/store/postgres.py`)
+- `PostgresTableStore` - Native PostgreSQL storage for tabular data
+- Gzip-compressed CSV storage in BYTEA column
+- Hash-based deduplication
+- Automatic schema inference and column tracking
+
+#### LLM Factory (`fitz_ai/llm/chat/factory.py`)
+- `chat_factory()` - Clean factory function for chat client instantiation
+- Proper dependency injection pattern
+- Tier-based model selection (smart/fast)
+
+#### Test Infrastructure
+- Test tier markers: `tier1` (unit), `tier2` (integration), `tier3` (e2e), `tier4` (performance)
+- `pytest.ini` configuration for tier-based test execution
+- pgserver test fixtures with auto-cleanup
+- Windows-specific file handle cleanup in tests
+
+### 🔄 Changed
+
+- **Default vector DB**: `faiss` → `pgvector` in default config
+- **Vocabulary storage**: YAML files → PostgreSQL `keywords` table
+- **Sparse index**: BM25 files → PostgreSQL `tsvector` column (auto-maintained)
+- **Entity graph**: SQLite files → PostgreSQL `entities` + `entity_chunks` tables
+- **Table store**: SQLite/generic → PostgreSQL native tables
+- **Collection delete**: Now drops entire PostgreSQL database (auto-cleans all related data)
+
+### 🗑️ Removed
+
+#### Legacy Storage Backends
+- `fitz_ai/backends/local_vector_db/faiss.py` - Replaced by pgvector
+- `fitz_ai/vector_db/plugins/local_faiss.yaml` - Replaced by pgvector.yaml
+- `fitz_ai/tabular/store/sqlite.py` - Replaced by postgres.py
+- `fitz_ai/tabular/store/generic.py` - Replaced by postgres.py
+- `fitz_ai/tabular/store/qdrant.py` - Replaced by postgres.py
+- `fitz_ai/tabular/store/cache.py` - No longer needed
+
+#### Knowledge Map Module
+- `fitz_ai/map/` - Experimental module removed (not production-ready)
+- `fitz map` CLI command removed
+
+#### Deprecated Path Helpers
+- `vocabulary()` path function - Now emits deprecation warning
+- `sparse_index()` path function - Now emits deprecation warning
+- `entity_graph()` path function - Now emits deprecation warning
+
+### 📦 Dependencies
+
+New:
+```toml
+"psycopg[binary]>=3.1"
+"psycopg-pool>=3.1"
+"pgvector>=0.2.0"
+"pgserver>=0.1.0"
+```
+
+Removed:
+```toml
+"faiss-cpu>=1.7.0"  # Now optional via [faiss] extra
+```
+
+### 🧪 Testing
+
+- 198 tier1 tests passing
+- 62 postgres-specific tests
+- 67 vocabulary tests (migrated to PostgreSQL)
+- Windows-compatible pgserver tests with file handle cleanup
+
+---
+
 ## [0.6.2] - 2026-01-24
 
 ### 🎉 Highlights
@@ -1217,7 +1315,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.2...v0.6.0

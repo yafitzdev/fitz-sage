@@ -165,7 +165,7 @@ fitz keywords clear                     # Clear all keywords
 
 **How it works:**
 1. During ingestion, Fitz scans chunks for identifier patterns
-2. Detected keywords are stored in `.fitz/keywords/{collection}.yaml`
+2. Detected keywords are stored in PostgreSQL (`keywords` table per collection)
 3. At query time, keywords in your question pre-filter chunks
 4. Semantic search runs only on chunks containing the keyword
 
@@ -234,7 +234,8 @@ fitz doctor --test       # Test actual connections
 - Python version
 - Configuration files
 - Required dependencies
-- Available services (Ollama, Qdrant, FAISS)
+- PostgreSQL/pgserver status
+- Available services (Ollama, pgvector)
 - API key configuration
 
 ---

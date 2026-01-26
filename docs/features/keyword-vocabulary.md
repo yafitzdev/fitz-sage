@@ -34,16 +34,19 @@ Result: Only TC-1001 content, never TC-1002
    - Versions: `v?\d+\.\d+\.\d+`, `\d+\.\d+-beta`
    - Code identifiers: `[A-Z][a-zA-Z]+Service`, `\w+Controller`
 
-2. **Vocabulary building** - Detected keywords are stored in a per-collection vocabulary:
-   ```json
-   {
-     "TC-1001": ["chunk_id_42", "chunk_id_67"],
-     "JIRA-4521": ["chunk_id_103"],
-     "AuthService": ["chunk_id_8", "chunk_id_15"]
-   }
+2. **Vocabulary building** - Detected keywords are stored in PostgreSQL:
+   ```sql
+   -- keywords table (per collection database)
+   CREATE TABLE keywords (
+       id TEXT PRIMARY KEY,
+       category TEXT NOT NULL,
+       match TEXT[] NOT NULL,     -- keyword variations
+       occurrences INTEGER DEFAULT 1,
+       first_seen TIMESTAMPTZ DEFAULT NOW()
+   );
    ```
 
-3. **Inverted index** - Fast lookup: keyword → chunk IDs
+3. **Inverted index** - Fast lookup via PostgreSQL queries
 
 ### At Query Time
 
@@ -80,7 +83,7 @@ Internal settings in `KeywordExtractor`:
 ## Files
 
 - **Keyword vocabulary:** `fitz_ai/retrieval/vocabulary/`
-- **Vocabulary storage:** `.fitz/vocabulary/{collection}.json`
+- **Vocabulary storage:** PostgreSQL `keywords` table (per-collection database)
 - **Query filtering:** `fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py` (`_filter_by_keywords`)
 - **Ingestion hook:** `fitz_ai/ingestion/diff/executor.py` (`_build_keyword_vocabulary`)
 
@@ -122,9 +125,9 @@ Only chunks containing the exact identifier `TC-1001` are considered.
 
 ## Dependencies
 
-- No external dependencies
-- Pure Python implementation
-- JSON for vocabulary storage
+- PostgreSQL + pgvector (unified storage)
+- Vocabulary stored in `keywords` table per collection
+- Automatically deleted when collection is dropped
 
 ## Related Features
 

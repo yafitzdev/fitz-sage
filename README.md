@@ -1,14 +1,25 @@
+
+
+<div align="center">
+
 # fitz-ai
+
+### Intelligent, honest RAG in 5 minutes. No infrastructure. No boilerplate.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.6.2-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.7.0-green.svg)](CHANGELOG.md)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
 
----
 
-**Intelligent, honest RAG in 5 minutes. No infrastructure. No boilerplate.**
+[Quick Start](#quick-start) • [Installation](#installation) • [Documentation](docs/) • [GitHub](https://github.com/yafitzdev/fitz-ai)
+
+</div>
+
+<br />
+
+---
 
 ```bash
 pip install fitz-ai
@@ -184,7 +195,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 | [**code-aware-chunking**](docs/features/code-aware-chunking.md) | "How does the auth module work?" *(code)* | ❌ Broken code fragments — Naive chunking splits functions mid-body | ✅ Complete functions |
 | [**contextual-embeddings**](docs/features/contextual-embeddings.md) | "When does it expire?" | ❌ Ambiguous chunk — "It expires in 24h" embedded without context; "it" = ? | ✅ Summary-prefixed embeddings |
 
-> [!TIP]
+> [!IMPORTANT]
 > These features are **always on**—no configuration needed. Fitz automatically detects when to use each capability.
 
 ---
@@ -393,7 +404,6 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 >| `llm-chat` | YAML | Connect to a chat LLM provider |
 >| `llm-embedding` | YAML | Connect to an embedding provider |
 >| `llm-rerank` | YAML | Connect to a reranking provider |
->| `vector-db` | YAML | Connect to a vector database |
 >| `retrieval` | YAML | Define a retrieval strategy |
 >| `chunker` | Python | Custom document chunking logic |
 >| `reader` | Python | Custom file format reader |
@@ -574,11 +584,14 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 │  │  FitzRAG  │  │  Custom... │  (extensible registry)         │
 │  └───────────┘  └────────────┘                                │
 ├───────────────────────────────────────────────────────────────┤
-│  Plugin System (all YAML-defined)                             │
-│  ┌────────┐ ┌───────────┐ ┌────────┐ ┌──────────┐             │
-│  │  Chat  │ │ Embedding │ │ Rerank │ │ VectorDB │             │
-│  └────────┘ └───────────┘ └────────┘ └──────────┘             │
+│  LLM Plugins (YAML-defined)                                   │
+│  ┌────────┐ ┌───────────┐ ┌────────┐                          │
+│  │  Chat  │ │ Embedding │ │ Rerank │                          │
+│  └────────┘ └───────────┘ └────────┘                          │
 │  openai, cohere, anthropic, ollama, azure...                  │
+├───────────────────────────────────────────────────────────────┤
+│  Storage (PostgreSQL + pgvector)                              │
+│  vectors | metadata | tables | keywords | full-text search    │
 ├───────────────────────────────────────────────────────────────┤
 │  Retrieval Pipelines (plugin choice controls features)        │
 │  dense (no rerank) | dense_rerank (with rerank)               │
