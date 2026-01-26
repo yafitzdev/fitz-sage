@@ -3,14 +3,12 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from fitz_ai.tabular.direct_query import (
-    DirectQueryResult,
     DirectTableQuery,
     compute_file_hash,
     is_table_file,
@@ -218,7 +216,7 @@ class TestDirectTableQuery:
         factory, _ = mock_chat_factory
         query = DirectTableQuery(chat_factory=factory)
 
-        sql = query._extract_sql('```sql\nSELECT * FROM tbl\n```')
+        sql = query._extract_sql("```sql\nSELECT * FROM tbl\n```")
 
         assert sql == "SELECT * FROM tbl"
 

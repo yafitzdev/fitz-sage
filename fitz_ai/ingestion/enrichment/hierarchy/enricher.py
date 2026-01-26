@@ -711,4 +711,4 @@ Write a high-level overview (3-5 paragraphs) synthesizing the key insights.
         )
 
 
-__all__ = ["HierarchyEnricher", "ChatClient", "EpistemicAssessment", "assess_chunk_group"]
+__all__ = ["HierarchyEnricher", "EpistemicAssessment", "assess_chunk_group"]

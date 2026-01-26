@@ -12,6 +12,7 @@ from typing import Callable
 
 import pytest
 
+
 # Mark all tests in this directory as tier4 and security
 def pytest_configure(config):
     """Apply markers to all tests in this directory."""
@@ -24,6 +25,7 @@ def pytest_collection_modifyitems(items):
         if "/security/" in str(item.fspath) or "\\security\\" in str(item.fspath):
             item.add_marker(pytest.mark.tier4)
             item.add_marker(pytest.mark.security)
+
 
 from tests.e2e.config import get_tier_names, load_test_config
 

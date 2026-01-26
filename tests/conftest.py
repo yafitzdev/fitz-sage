@@ -34,7 +34,6 @@ Feature Markers:
 
 from __future__ import annotations
 
-import shutil
 from functools import lru_cache
 from pathlib import Path
 
@@ -60,7 +59,9 @@ def pytest_configure(config):
     if pgdata_path.exists():
         if not _force_remove_pgdata(pgdata_path):
             import warnings
+
             warnings.warn(f"Could not clean pgdata directory at {pgdata_path}")
+
 
 # =============================================================================
 # Test Configuration

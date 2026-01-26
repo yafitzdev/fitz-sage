@@ -17,9 +17,12 @@ from fitz_ai.engines.fitz_rag.retrieval.multihop import (
 
 def create_mock_chat_factory(mock_chat):
     """Create a mock chat factory that returns the mock chat client."""
+
     def factory(tier: str = "fast"):
         return mock_chat
+
     return factory
+
 
 # =============================================================================
 # Test Fixtures
@@ -143,7 +146,9 @@ class TestBridgeExtractor:
         mock_chat.chat.return_value = """```json
 ["Question about competitor", "Question about products"]
 ```"""
-        extractor = BridgeExtractor(chat_factory=create_mock_chat_factory(mock_chat), max_questions=2)
+        extractor = BridgeExtractor(
+            chat_factory=create_mock_chat_factory(mock_chat), max_questions=2
+        )
 
         result = extractor.extract("Query", sample_chunks)
 
@@ -161,7 +166,9 @@ class TestBridgeExtractor:
     def test_respects_max_questions(self, mock_chat, sample_chunks):
         """Test that max_questions limit is enforced."""
         mock_chat.chat.return_value = '["q1", "q2", "q3", "q4", "q5"]'
-        extractor = BridgeExtractor(chat_factory=create_mock_chat_factory(mock_chat), max_questions=2)
+        extractor = BridgeExtractor(
+            chat_factory=create_mock_chat_factory(mock_chat), max_questions=2
+        )
 
         result = extractor.extract("Query", sample_chunks)
 

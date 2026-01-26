@@ -48,7 +48,7 @@ from fitz_ai.engines.fitz_rag.retrieval.multihop import (
 )
 from fitz_ai.engines.fitz_rag.retrieval.registry import get_retrieval_plugin
 from fitz_ai.engines.fitz_rag.routing import QueryIntent, QueryRouter
-from fitz_ai.llm.factory import ChatFactory, ModelTier, get_chat_factory
+from fitz_ai.llm.factory import ModelTier, get_chat_factory
 from fitz_ai.llm.registry import get_llm_plugin
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE, VECTOR_DB
@@ -445,7 +445,9 @@ class RAGPipeline:
                 tier = "fast"
                 chat = self.chat_factory(tier)
                 model_name = getattr(chat, "params", {}).get("model", "unknown")
-                logger.info(f"{PIPELINE} Using fast tier model '{model_name}' per cloud routing advice")
+                logger.info(
+                    f"{PIPELINE} Using fast tier model '{model_name}' per cloud routing advice"
+                )
                 return chat
 
         return self.chat_factory(self.TIER_ANSWER)

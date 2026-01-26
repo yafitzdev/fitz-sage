@@ -25,7 +25,6 @@ from fitz_ai.tabular.store.postgres import (
     _sanitize_table_name,
 )
 
-
 # =============================================================================
 # Table Name Sanitization Tests
 # =============================================================================
@@ -175,7 +174,9 @@ class TestStore:
         create_calls = [c for c in calls if "CREATE TABLE" in c]
         assert len(create_calls) >= 1
 
-    def test_store_handles_duplicate_columns(self, table_store, mock_connection_manager, mock_connection):
+    def test_store_handles_duplicate_columns(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """Store deduplicates column names."""
         columns = ["name", "name", "name"]  # All duplicates
         rows = [["a", "b", "c"]]
@@ -238,16 +239,18 @@ class TestStore:
 class TestRetrieve:
     """Tests for retrieve operation."""
 
-    def test_retrieve_returns_stored_table(self, table_store, mock_connection_manager, mock_connection):
+    def test_retrieve_returns_stored_table(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """Retrieve returns StoredTable with correct data."""
         # Mock metadata query result
         mock_connection.execute.return_value.fetchone.return_value = (
             "tbl_my_table",  # table_name
-            "abc123",        # hash
+            "abc123",  # hash
             ["col_a", "col_b"],  # columns (sanitized)
             ["Col A", "Col B"],  # original columns
-            2,               # row_count
-            "test.csv",      # source_file
+            2,  # row_count
+            "test.csv",  # source_file
         )
 
         # Mock data fetch
@@ -263,7 +266,9 @@ class TestRetrieve:
         assert result.columns == ["Col A", "Col B"]  # Original names
         assert result.row_count == 2
 
-    def test_retrieve_nonexistent_returns_none(self, table_store, mock_connection_manager, mock_connection):
+    def test_retrieve_nonexistent_returns_none(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """Retrieve returns None for nonexistent table."""
         mock_connection.execute.return_value.fetchone.return_value = None
 
@@ -280,7 +285,9 @@ class TestRetrieve:
 class TestQueryExecution:
     """Tests for SQL query execution."""
 
-    def test_execute_query_returns_results(self, table_store, mock_connection_manager, mock_connection):
+    def test_execute_query_returns_results(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """execute_query returns column names and rows."""
         cursor = MagicMock()
         cursor.description = [("count",), ("sum",)]
@@ -297,7 +304,9 @@ class TestQueryExecution:
         assert col_names == ["count", "sum"]
         assert rows == [[10, 100]]
 
-    def test_execute_query_escapes_percent(self, table_store, mock_connection_manager, mock_connection):
+    def test_execute_query_escapes_percent(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """execute_query escapes % when no params provided."""
         cursor = MagicMock()
         cursor.description = [("pct",)]
@@ -315,7 +324,9 @@ class TestQueryExecution:
         sql = call_args[0][0]
         assert "%%" in sql
 
-    def test_execute_query_handles_error(self, table_store, mock_connection_manager, mock_connection):
+    def test_execute_query_handles_error(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """execute_query returns None on error."""
         # Make _ensure_schema succeed but actual query fail
         call_count = 0
@@ -366,7 +377,9 @@ class TestAddColumns:
         alter_calls = [c for c in calls if "ALTER TABLE" in c]
         assert len(alter_calls) >= 1
 
-    def test_add_columns_handles_duplicates(self, table_store, mock_connection_manager, mock_connection):
+    def test_add_columns_handles_duplicates(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """add_columns handles duplicate column names."""
         # Existing columns include 'status'
         mock_connection.execute.return_value.fetchone.return_value = (
@@ -389,7 +402,9 @@ class TestAddColumns:
         alter_calls = [c for c in calls if "ALTER TABLE" in c and "status_1" in c.lower()]
         assert len(alter_calls) >= 1
 
-    def test_add_columns_nonexistent_table_fails(self, table_store, mock_connection_manager, mock_connection):
+    def test_add_columns_nonexistent_table_fails(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """add_columns returns False for nonexistent table."""
         mock_connection.execute.return_value.fetchone.return_value = None
 
@@ -444,7 +459,9 @@ class TestListAndDelete:
 class TestHash:
     """Tests for hash operations."""
 
-    def test_get_hash_returns_stored_hash(self, table_store, mock_connection_manager, mock_connection):
+    def test_get_hash_returns_stored_hash(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """get_hash returns the stored content hash."""
         mock_connection.execute.return_value.fetchone.return_value = ("abc123hash",)
 
@@ -452,7 +469,9 @@ class TestHash:
 
         assert result == "abc123hash"
 
-    def test_get_hash_nonexistent_returns_none(self, table_store, mock_connection_manager, mock_connection):
+    def test_get_hash_nonexistent_returns_none(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """get_hash returns None for nonexistent table."""
         mock_connection.execute.return_value.fetchone.return_value = None
 
@@ -460,7 +479,9 @@ class TestHash:
 
         assert result is None
 
-    def test_get_file_hash_returns_stored_hash(self, table_store, mock_connection_manager, mock_connection):
+    def test_get_file_hash_returns_stored_hash(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """get_file_hash returns the stored file hash."""
         mock_connection.execute.return_value.fetchone.return_value = ("filehash456",)
 
@@ -477,7 +498,9 @@ class TestHash:
 class TestLargeBatch:
     """Tests for large batch operations."""
 
-    def test_store_large_batch_10k_rows(self, table_store, mock_connection_manager, mock_connection):
+    def test_store_large_batch_10k_rows(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """Store handles 10k+ rows in one call."""
         columns = ["id", "name", "value"]
         # Create 10,000 rows
@@ -688,11 +711,11 @@ class TestSpecialCharacters:
         """Store handles special characters in cell values."""
         columns = ["id", "content"]
         rows = [
-            ["1", "Line1\nLine2"],          # Newlines
-            ["2", "Tab\there"],              # Tabs
-            ["3", "Quote's and \"doubles\""],# Quotes
-            ["4", "Semi;colon"],             # Semicolons
-            ["5", "Back\\slash"],            # Backslashes
+            ["1", "Line1\nLine2"],  # Newlines
+            ["2", "Tab\there"],  # Tabs
+            ["3", 'Quote\'s and "doubles"'],  # Quotes
+            ["4", "Semi;colon"],  # Semicolons
+            ["5", "Back\\slash"],  # Backslashes
         ]
 
         cursor = MagicMock()
@@ -757,7 +780,9 @@ class TestSpecialCharacters:
 class TestSQLInjectionPrevention:
     """Edge case tests for SQL injection prevention."""
 
-    def test_sql_injection_in_table_name(self, table_store, mock_connection_manager, mock_connection):
+    def test_sql_injection_in_table_name(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """Malicious table names should be sanitized."""
         malicious_name = "users; DROP TABLE tbl_users;--"
 
@@ -776,7 +801,9 @@ class TestSQLInjectionPrevention:
         for call in calls:
             assert "DROP TABLE" not in call or "tbl_users__drop_table" in call.lower()
 
-    def test_sql_injection_in_column_values(self, table_store, mock_connection_manager, mock_connection):
+    def test_sql_injection_in_column_values(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """Malicious values in cells should be parameterized."""
         columns = ["id", "name"]
         malicious_value = "'; DROP TABLE tbl_users;--"
@@ -821,7 +848,9 @@ class TestSQLInjectionPrevention:
 class TestTableMetadata:
     """Edge case tests for table metadata operations."""
 
-    def test_has_columns_nonexistent_table(self, table_store, mock_connection_manager, mock_connection):
+    def test_has_columns_nonexistent_table(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """has_columns on nonexistent table should return empty existing, all missing."""
         mock_connection.execute.return_value.fetchone.return_value = None
 
@@ -858,7 +887,9 @@ class TestTableMetadata:
 class TestTransactionRollback:
     """Edge case tests for transaction handling."""
 
-    def test_add_columns_rollback_on_failure(self, table_store, mock_connection_manager, mock_connection):
+    def test_add_columns_rollback_on_failure(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """add_columns should rollback on partial failure."""
         # Mock metadata fetch to succeed
         mock_connection.execute.return_value.fetchone.return_value = (
@@ -874,7 +905,9 @@ class TestTransactionRollback:
             nonlocal call_count
             call_count += 1
             if call_count <= 3:  # Metadata queries + ALTER
-                return MagicMock(fetchone=Mock(return_value=("tbl_my_table", ["existing"], ["Existing"])))
+                return MagicMock(
+                    fetchone=Mock(return_value=("tbl_my_table", ["existing"], ["Existing"]))
+                )
             raise Exception("Update failed")  # Fail on value update
 
         mock_connection.execute.side_effect = side_effect
@@ -897,7 +930,9 @@ class TestTransactionRollback:
 class TestRowOrdering:
     """Edge case tests for row ordering preservation."""
 
-    def test_retrieve_preserves_row_order(self, table_store, mock_connection_manager, mock_connection):
+    def test_retrieve_preserves_row_order(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """Retrieve should preserve the original row order."""
         # Mock metadata
         mock_connection.execute.return_value.fetchone.return_value = (
@@ -963,7 +998,9 @@ class TestRowOrdering:
 class TestTableNameCollision:
     """Tests for table name collision scenarios."""
 
-    def test_table_name_collision_after_sanitization(self, table_store, mock_connection_manager, mock_connection):
+    def test_table_name_collision_after_sanitization(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """Tables that become same name after sanitization should be handled."""
         # These two names sanitize to the same result
         name1 = "my-table"
@@ -995,7 +1032,9 @@ class TestTableNameCollision:
         # Should have completed without error
         assert cursor.executemany.called
 
-    def test_names_differing_only_by_case(self, table_store, mock_connection_manager, mock_connection):
+    def test_names_differing_only_by_case(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """Names differing only by case should map to same table."""
         name1 = "MyTable"
         name2 = "mytable"
@@ -1014,7 +1053,9 @@ class TestTableNameCollision:
 class TestConcurrentWrites:
     """Tests for concurrent write operations."""
 
-    def test_concurrent_writes_same_table(self, table_store, mock_connection_manager, mock_connection):
+    def test_concurrent_writes_same_table(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """Concurrent writes to same table should be serialized or handled."""
         import threading
 
@@ -1075,7 +1116,6 @@ class TestQueryBoundaries:
 
     def test_query_with_negative_limit(self, table_store, mock_connection_manager, mock_connection):
         """Query with negative LIMIT should be handled by PostgreSQL."""
-        cursor = MagicMock()
         # PostgreSQL will error on negative LIMIT
         mock_connection.execute.side_effect = [
             MagicMock(),  # _ensure_schema
@@ -1090,7 +1130,9 @@ class TestQueryBoundaries:
         # Should return None on error
         assert result is None
 
-    def test_query_with_very_large_offset(self, table_store, mock_connection_manager, mock_connection):
+    def test_query_with_very_large_offset(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """Query with large OFFSET should return empty if beyond data."""
         cursor = MagicMock()
         cursor.description = [("id",)]
@@ -1119,10 +1161,10 @@ class TestBinaryLikeData:
         """Store handles binary-like data (null bytes, control chars)."""
         columns = ["id", "data"]
         rows = [
-            ["1", "null\x00byte"],           # Null byte
-            ["2", "control\x01\x02chars"],   # Control characters
-            ["3", "bell\x07char"],           # Bell character
-            ["4", "escape\x1bseq"],          # Escape sequence
+            ["1", "null\x00byte"],  # Null byte
+            ["2", "control\x01\x02chars"],  # Control characters
+            ["3", "bell\x07char"],  # Bell character
+            ["4", "escape\x1bseq"],  # Escape sequence
         ]
 
         cursor = MagicMock()
@@ -1194,7 +1236,9 @@ class TestBinaryLikeData:
 class TestColumnEdgeCases:
     """Tests for column name edge cases."""
 
-    def test_reserved_word_column_names(self, table_store, mock_connection_manager, mock_connection):
+    def test_reserved_word_column_names(
+        self, table_store, mock_connection_manager, mock_connection
+    ):
         """Store handles SQL reserved word column names."""
         # SQL reserved words as column names
         columns = ["select", "from", "where", "order", "table", "index"]
@@ -1256,9 +1300,5 @@ class TestColumnEdgeCases:
         create_calls = [c for c in calls if "CREATE TABLE" in c and "tbl_" in c.lower()]
         # Should have at least one call for the actual table (with tbl_ prefix)
         assert len(create_calls) >= 1
-        # Check any of the create calls contains sanitized column
-        table_create = [c for c in create_calls if "numeric_cols" in c.lower() or "tbl_t_" in c.lower()]
-        # If we found the table creation, check it has sanitized columns
-        # Numeric columns should be prefixed (c_123) or quoted
         # Just verify the store completed successfully with mocks
         assert cursor.executemany.called

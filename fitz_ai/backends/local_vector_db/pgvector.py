@@ -135,7 +135,6 @@ class PgVectorDB:
             return
 
         try:
-            import psycopg
             from pgvector.psycopg import register_vector
         except ImportError as e:
             raise ImportError(
@@ -174,7 +173,9 @@ class PgVectorDB:
                             f"but got vectors with dim={dim}. Drop the collection to change dimensions."
                         )
                     self._initialized_collections[collection] = existing_dim
-                    logger.debug(f"{VECTOR_DB} Using existing collection '{collection}' (dim={existing_dim})")
+                    logger.debug(
+                        f"{VECTOR_DB} Using existing collection '{collection}' (dim={existing_dim})"
+                    )
                     return
 
         # Table doesn't exist, create it
@@ -202,9 +203,7 @@ class PgVectorDB:
         self._initialized_collections[collection] = dim
         logger.info(f"{VECTOR_DB} Created collection '{collection}' (dim={dim})")
 
-    def _build_filter_clause(
-        self, filter_cond: Optional[Dict[str, Any]]
-    ) -> Tuple[str, List[Any]]:
+    def _build_filter_clause(self, filter_cond: Optional[Dict[str, Any]]) -> Tuple[str, List[Any]]:
         """Build SQL WHERE clause from Qdrant-style filter."""
         if not filter_cond:
             return "", []
@@ -242,9 +241,7 @@ class PgVectorDB:
             return "WHERE " + " AND ".join(conditions), params
         return "", []
 
-    def _build_single_condition(
-        self, cond: Dict[str, Any]
-    ) -> Tuple[str, List[Any]]:
+    def _build_single_condition(self, cond: Dict[str, Any]) -> Tuple[str, List[Any]]:
         """Build single filter condition."""
         key = cond.get("key")
         if not key:
@@ -306,7 +303,7 @@ class PgVectorDB:
             return
 
         try:
-            import psycopg
+            import psycopg.types.json
             from pgvector.psycopg import register_vector
         except ImportError as e:
             raise ImportError(
@@ -527,9 +524,7 @@ class PgVectorDB:
             return []
 
         with self._manager.connection(collection_name) as conn:
-            cursor = conn.execute(
-                "SELECT id, payload FROM chunks WHERE id = ANY(%s)", (ids,)
-            )
+            cursor = conn.execute("SELECT id, payload FROM chunks WHERE id = ANY(%s)", (ids,))
             return [
                 {"id": row[0], "payload": dict(row[1]) if with_payload and row[1] else {}}
                 for row in cursor

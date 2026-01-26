@@ -223,5 +223,4 @@ __all__ = [
     "RouteDecision",
     "SemanticRoute",
     "StructuredRoute",
-    "ChatClient",
 ]

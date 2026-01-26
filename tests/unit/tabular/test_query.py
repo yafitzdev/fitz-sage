@@ -1,7 +1,7 @@
 # tests/tabular/test_query.py
 """Tests for TableQueryStep - table queries at retrieval time."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -59,7 +59,9 @@ class MockTableStore:
             return self._tables[table_id]["row_count"]
         return None
 
-    def execute_query(self, table_id: str, sql: str, params: tuple = ()) -> tuple[list[str], list[list]] | None:
+    def execute_query(
+        self, table_id: str, sql: str, params: tuple = ()
+    ) -> tuple[list[str], list[list]] | None:
         """Mock SQL execution - just return all rows for simplicity."""
         # Find the table from SQL (crude but works for tests)
         for tid, t in self._tables.items():
@@ -67,7 +69,9 @@ class MockTableStore:
                 return t["sanitized_cols"], t["rows"]
         return None
 
-    def execute_multi_table_query(self, sql: str, params: tuple = ()) -> tuple[list[str], list[list]] | None:
+    def execute_multi_table_query(
+        self, sql: str, params: tuple = ()
+    ) -> tuple[list[str], list[list]] | None:
         """Mock multi-table query execution."""
         # For testing, just return first table's data
         if self._tables:

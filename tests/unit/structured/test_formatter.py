@@ -84,7 +84,9 @@ class TestResultFormatter:
 
     def test_format_count_result(self, count_query: SQLQuery):
         """Test formatting COUNT result."""
-        factory, client = create_mock_factory("There are 42 employees in the engineering department.")
+        factory, client = create_mock_factory(
+            "There are 42 employees in the engineering department."
+        )
         formatter = ResultFormatter(factory)
 
         execution_result = ExecutionResult(

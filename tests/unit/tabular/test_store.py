@@ -1,7 +1,6 @@
 # tests/unit/tabular/test_store.py
 """Tests for table storage backends."""
 
-import pytest
 
 from fitz_ai.tabular.store.base import compress_csv, compute_hash, decompress_csv
 

@@ -201,7 +201,7 @@ class TestDimensionMismatch:
         # Second call: dimension check returns 384
         conn.execute.side_effect = [
             MagicMock(fetchone=Mock(return_value=(True,))),  # table exists
-            MagicMock(fetchone=Mock(return_value=(384,))),   # existing dim
+            MagicMock(fetchone=Mock(return_value=(384,))),  # existing dim
         ]
 
         mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
@@ -243,16 +243,20 @@ class TestSearch:
 
         conn = MagicMock()
         cursor = MagicMock()
-        cursor.__iter__ = Mock(return_value=iter([
-            ("id1", 0.95, {"content": "test"}),
-        ]))
+        cursor.__iter__ = Mock(
+            return_value=iter(
+                [
+                    ("id1", 0.95, {"content": "test"}),
+                ]
+            )
+        )
         conn.execute.return_value = cursor
 
         mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
         mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
 
         with patch("pgvector.psycopg.register_vector"):
-            results = pgvector_db.search(
+            pgvector_db.search(
                 "test_coll",
                 [0.1] * 384,
                 limit=10,
@@ -290,16 +294,20 @@ class TestHybridSearch:
 
         conn = MagicMock()
         cursor = MagicMock()
-        cursor.__iter__ = Mock(return_value=iter([
-            ("id1", 0.025, {"content": "test result"}),
-        ]))
+        cursor.__iter__ = Mock(
+            return_value=iter(
+                [
+                    ("id1", 0.025, {"content": "test result"}),
+                ]
+            )
+        )
         conn.execute.return_value = cursor
 
         mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
         mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
 
         with patch("pgvector.psycopg.register_vector"):
-            results = pgvector_db.hybrid_search(
+            pgvector_db.hybrid_search(
                 "test_coll",
                 query_vector=[0.1] * 384,
                 query_text="test query",
@@ -311,10 +319,10 @@ class TestHybridSearch:
         call_args = conn.execute.call_args
         sql = call_args[0][0]
         assert "vector_results" in sql  # CTE for vector search
-        assert "text_results" in sql    # CTE for text search
-        assert "rrf" in sql             # RRF fusion CTE
-        assert "ts_rank_cd" in sql      # BM25-style ranking
-        assert "plainto_tsquery" in sql # Full-text query
+        assert "text_results" in sql  # CTE for text search
+        assert "rrf" in sql  # RRF fusion CTE
+        assert "ts_rank_cd" in sql  # BM25-style ranking
+        assert "plainto_tsquery" in sql  # Full-text query
 
     def test_hybrid_search_alpha_weights(self, pgvector_db, mock_connection_manager):
         """Hybrid search applies correct alpha weights."""
@@ -436,10 +444,7 @@ class TestUpsert:
         mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
 
         # Create 1000 points
-        points = [
-            {"id": str(i), "vector": [0.1] * 384, "payload": {"idx": i}}
-            for i in range(1000)
-        ]
+        points = [{"id": str(i), "vector": [0.1] * 384, "payload": {"idx": i}} for i in range(1000)]
 
         with patch("pgvector.psycopg.register_vector"):
             with patch.object(pgvector_db, "_ensure_schema"):
@@ -501,9 +506,9 @@ class TestScrollPagination:
         conn = MagicMock()
         # Return 10 records
         cursor = MagicMock()
-        cursor.__iter__ = Mock(return_value=iter([
-            (f"id_{i}", {"content": f"content_{i}"}) for i in range(10)
-        ]))
+        cursor.__iter__ = Mock(
+            return_value=iter([(f"id_{i}", {"content": f"content_{i}"}) for i in range(10)])
+        )
         conn.execute.return_value = cursor
 
         mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
@@ -522,9 +527,13 @@ class TestScrollPagination:
         conn = MagicMock()
         # Return less than limit (last page)
         cursor = MagicMock()
-        cursor.__iter__ = Mock(return_value=iter([
-            ("id_0", {"content": "last"}),
-        ]))
+        cursor.__iter__ = Mock(
+            return_value=iter(
+                [
+                    ("id_0", {"content": "last"}),
+                ]
+            )
+        )
         conn.execute.return_value = cursor
 
         mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
@@ -548,9 +557,13 @@ class TestScrollPagination:
 
         conn = MagicMock()
         cursor = MagicMock()
-        cursor.__iter__ = Mock(return_value=iter([
-            ("id_0", {"content": "test"}, [0.1] * 384),
-        ]))
+        cursor.__iter__ = Mock(
+            return_value=iter(
+                [
+                    ("id_0", {"content": "test"}, [0.1] * 384),
+                ]
+            )
+        )
         conn.execute.return_value = cursor
 
         mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
@@ -638,11 +651,15 @@ class TestVectorValidation:
         conn = MagicMock()
         cursor = MagicMock()
         # Return results in order of decreasing similarity
-        cursor.__iter__ = Mock(return_value=iter([
-            ("id_high", 0.95, {"content": "very similar"}),
-            ("id_med", 0.75, {"content": "somewhat similar"}),
-            ("id_low", 0.50, {"content": "less similar"}),
-        ]))
+        cursor.__iter__ = Mock(
+            return_value=iter(
+                [
+                    ("id_high", 0.95, {"content": "very similar"}),
+                    ("id_med", 0.75, {"content": "somewhat similar"}),
+                    ("id_low", 0.50, {"content": "less similar"}),
+                ]
+            )
+        )
         conn.execute.return_value = cursor
 
         mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
@@ -682,11 +699,13 @@ class TestPayloadEdgeCases:
                 # Payload with None values
                 pgvector_db.upsert(
                     "test_coll",
-                    [{
-                        "id": "1",
-                        "vector": [0.1] * 384,
-                        "payload": {"content": None, "score": None, "valid": True},
-                    }],
+                    [
+                        {
+                            "id": "1",
+                            "vector": [0.1] * 384,
+                            "payload": {"content": None, "score": None, "valid": True},
+                        }
+                    ],
                 )
 
         # Should complete without error
@@ -706,15 +725,17 @@ class TestPayloadEdgeCases:
             with patch.object(pgvector_db, "_ensure_schema"):
                 pgvector_db.upsert(
                     "test_coll",
-                    [{
-                        "id": "unicode_test",
-                        "vector": [0.1] * 384,
-                        "payload": {
-                            "content": "日本語テスト",
-                            "emoji": "🎉🚀",
-                            "special": "café naïve",
-                        },
-                    }],
+                    [
+                        {
+                            "id": "unicode_test",
+                            "vector": [0.1] * 384,
+                            "payload": {
+                                "content": "日本語テスト",
+                                "emoji": "🎉🚀",
+                                "special": "café naïve",
+                            },
+                        }
+                    ],
                 )
 
         assert cursor.executemany.called
@@ -803,11 +824,15 @@ class TestCountAndRetrieveEdgeCases:
         conn = MagicMock()
         cursor = MagicMock()
         # Only return data for existing IDs
-        cursor.__iter__ = Mock(return_value=iter([
-            ("id1", {"content": "content1"}),
-            ("id3", {"content": "content3"}),
-            # id2 not found
-        ]))
+        cursor.__iter__ = Mock(
+            return_value=iter(
+                [
+                    ("id1", {"content": "content1"}),
+                    ("id3", {"content": "content3"}),
+                    # id2 not found
+                ]
+            )
+        )
         conn.execute.return_value = cursor
 
         mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
@@ -947,9 +972,13 @@ class TestBoundaryValues:
 
         conn = MagicMock()
         cursor = MagicMock()
-        cursor.__iter__ = Mock(return_value=iter([
-            ("id1", 0.9, {"content": "test"}),
-        ]))
+        cursor.__iter__ = Mock(
+            return_value=iter(
+                [
+                    ("id1", 0.9, {"content": "test"}),
+                ]
+            )
+        )
         conn.execute.return_value = cursor
 
         mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
@@ -1034,7 +1063,7 @@ class TestHybridSearchEdgeCases:
             results = pgvector_db.hybrid_search(
                 "test_coll",
                 query_vector=[0.1] * 384,
-                query_text="test's \"query\" with (special) chars: @#$%",
+                query_text='test\'s "query" with (special) chars: @#$%',
                 limit=10,
             )
 
@@ -1069,7 +1098,13 @@ class TestConcurrentOperations:
                     with patch.object(pgvector_db, "_ensure_schema"):
                         pgvector_db.upsert(
                             "test_coll",
-                            [{"id": "same_id", "vector": [0.1 * version] * 384, "payload": {"v": version}}],
+                            [
+                                {
+                                    "id": "same_id",
+                                    "vector": [0.1 * version] * 384,
+                                    "payload": {"v": version},
+                                }
+                            ],
                         )
             except Exception as e:
                 errors.append(e)
@@ -1138,11 +1173,13 @@ class TestLargePayload:
             with patch.object(pgvector_db, "_ensure_schema"):
                 pgvector_db.upsert(
                     "test_coll",
-                    [{
-                        "id": "large_payload",
-                        "vector": [0.1] * 384,
-                        "payload": {"content": large_content},
-                    }],
+                    [
+                        {
+                            "id": "large_payload",
+                            "vector": [0.1] * 384,
+                            "payload": {"content": large_content},
+                        }
+                    ],
                 )
 
         assert cursor.executemany.called

@@ -194,8 +194,16 @@ class PostgresTableStore:
                     source_file = EXCLUDED.source_file,
                     file_hash = EXCLUDED.file_hash
                 """,
-                (table_id, table_name, content_hash, sanitized_cols, columns,
-                 len(rows), source_file, file_hash),
+                (
+                    table_id,
+                    table_name,
+                    content_hash,
+                    sanitized_cols,
+                    columns,
+                    len(rows),
+                    source_file,
+                    file_hash,
+                ),
             )
             conn.commit()
 
@@ -233,9 +241,7 @@ class PostgresTableStore:
             # Fetch actual data from table (excluding _row_num)
             try:
                 cols_str = ", ".join(f'"{c}"' for c in columns)
-                cursor = conn.execute(
-                    f'SELECT {cols_str} FROM "{table_name}" ORDER BY _row_num'
-                )
+                cursor = conn.execute(f'SELECT {cols_str} FROM "{table_name}" ORDER BY _row_num')
                 rows = [list(row) for row in cursor.fetchall()]
             except Exception as e:
                 logger.warning(f"{STORAGE} Failed to fetch data from '{table_name}': {e}")

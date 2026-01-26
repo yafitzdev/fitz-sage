@@ -380,7 +380,6 @@ class E2ERunner:
         Args:
             tier_name: Name of the tier to switch to
         """
-        from fitz_ai.llm.registry import get_llm_plugin
 
         if tier_name == self._current_tier:
             logger.debug(f"Already on tier '{tier_name}', skipping rebuild")
@@ -392,12 +391,18 @@ class E2ERunner:
         tier_config = get_tier_config(tier_name, e2e_config)
 
         # Check if embedding changed - if so, need to re-ingest
-        current_tier_config = get_tier_config(self._current_tier, e2e_config) if self._current_tier else None
-        current_embedding = current_tier_config["embedding"]["plugin_name"] if current_tier_config else None
+        current_tier_config = (
+            get_tier_config(self._current_tier, e2e_config) if self._current_tier else None
+        )
+        current_embedding = (
+            current_tier_config["embedding"]["plugin_name"] if current_tier_config else None
+        )
         new_embedding = tier_config["embedding"]["plugin_name"]
 
         if current_embedding != new_embedding:
-            logger.info(f"E2E: Embedding changed ({current_embedding} -> {new_embedding}), re-ingesting...")
+            logger.info(
+                f"E2E: Embedding changed ({current_embedding} -> {new_embedding}), re-ingesting..."
+            )
             # Delete old collection and re-ingest with new embedding
             self._reingest_with_tier(tier_name, tier_config)
         else:

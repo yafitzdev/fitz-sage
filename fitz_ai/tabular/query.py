@@ -25,18 +25,16 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.engines.fitz_rag.retrieval.steps.base import RetrievalStep
 from fitz_ai.llm.factory import ChatFactory, ModelTier
 
-from .models import ParsedTable
-from .store.postgres import PostgresTableStore, _sanitize_table_name
+from .store.postgres import PostgresTableStore
 
 if TYPE_CHECKING:
-    from fitz_ai.tabular.store.base import TableStore
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +195,9 @@ Return ONLY the SQL query, no explanation."""
         sanitized_cols, original_cols = columns_info
         return pg_table_name, sanitized_cols, original_cols
 
-    def _get_sample_data(self, pg_table_name: str, columns: list[str], limit: int = 3) -> list[list[str]]:
+    def _get_sample_data(
+        self, pg_table_name: str, columns: list[str], limit: int = 3
+    ) -> list[list[str]]:
         """Fetch sample data from PostgreSQL table."""
         if self.table_store is None:
             return []
@@ -258,15 +258,11 @@ Return ONLY the SQL query, no explanation."""
 
             # 4. Generate SQL with sanitized column names
             sample_for_sql = self._get_sample_data(pg_table_name, needed_sanitized)
-            sql = self._generate_sql(
-                query, pg_table_name, needed_sanitized, sample_for_sql
-            )
+            sql = self._generate_sql(query, pg_table_name, needed_sanitized, sample_for_sql)
             logger.debug(f"Generated SQL: {sql}")
 
             # 5. Execute against PostgreSQL
-            result = self.table_store.execute_query(
-                chunk.metadata.get("table_id", ""), sql
-            )
+            result = self.table_store.execute_query(chunk.metadata.get("table_id", ""), sql)
 
             if result is None:
                 logger.warning(f"SQL execution failed for {pg_table_name}")
@@ -486,7 +482,9 @@ Results ({len(results)} rows):
         previous_error = None
 
         for attempt in range(max_retries + 1):
-            sql = self._generate_sql_attempt(query, table_name, columns, sample_rows, previous_error)
+            sql = self._generate_sql_attempt(
+                query, table_name, columns, sample_rows, previous_error
+            )
 
             # Validate by test execution
             result = self.table_store.execute_query("", sql)
@@ -498,9 +496,7 @@ Results ({len(results)} rows):
                 return sql
 
             previous_error = "Query execution failed"
-            logger.warning(
-                f"SQL validation failed (attempt {attempt + 1}/{max_retries + 1})"
-            )
+            logger.warning(f"SQL validation failed (attempt {attempt + 1}/{max_retries + 1})")
 
             if attempt == max_retries:
                 logger.error(f"SQL generation failed after {max_retries + 1} attempts")

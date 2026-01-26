@@ -201,8 +201,8 @@ def detect_pgvector() -> ServiceStatus:
         ServiceStatus with available=True if psycopg can be imported
     """
     try:
-        import psycopg  # noqa: F401
         import pgvector  # noqa: F401
+        import psycopg  # noqa: F401
 
         return ServiceStatus(
             name="pgvector",

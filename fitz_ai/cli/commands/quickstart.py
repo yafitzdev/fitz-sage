@@ -872,6 +872,7 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
         ui.error(f"Query failed: {e}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         raise typer.Exit(1)
 
@@ -898,4 +899,4 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
     print()
     ui.info("Table was queried directly (fast path, no persistent indexing).")
     ui.info("To index for future RAG queries, use:")
-    ui.info(f'  fitz ingest {source} --collection my_tables')
+    ui.info(f"  fitz ingest {source} --collection my_tables")

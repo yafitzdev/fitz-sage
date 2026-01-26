@@ -3,7 +3,6 @@
 Tests for fitz_ai.ingestion.state module.
 """
 
-import pytest
 
 from fitz_ai.ingestion.state import (
     EmbeddingConfig,

@@ -309,7 +309,10 @@ class TestInitValidation:
 
         with (
             patch("fitz_ai.cli.commands.init_wizard.detect_system", return_value=mock_system),
-            patch("fitz_ai.cli.commands.init_wizard.CLIContext.load", return_value=self._create_mock_ctx()),
+            patch(
+                "fitz_ai.cli.commands.init_wizard.CLIContext.load",
+                return_value=self._create_mock_ctx(),
+            ),
             patch(
                 "fitz_ai.cli.commands.init_wizard.get_default_engine",
                 return_value="fitz_rag",
@@ -343,7 +346,10 @@ class TestInitValidation:
 
         with (
             patch("fitz_ai.cli.commands.init_wizard.detect_system", return_value=mock_system),
-            patch("fitz_ai.cli.commands.init_wizard.CLIContext.load", return_value=self._create_mock_ctx()),
+            patch(
+                "fitz_ai.cli.commands.init_wizard.CLIContext.load",
+                return_value=self._create_mock_ctx(),
+            ),
             patch(
                 "fitz_ai.cli.commands.init_wizard.get_default_engine",
                 return_value="fitz_rag",
@@ -365,7 +371,10 @@ class TestInitValidation:
                 return_value=["simple"],
             ),
             patch("fitz_ai.cli.commands.init_wizard.load_default_config", return_value={}),
-            patch("fitz_ai.cli.commands.init_wizard.CLIContext.load", return_value=self._create_mock_ctx()),
+            patch(
+                "fitz_ai.cli.commands.init_wizard.CLIContext.load",
+                return_value=self._create_mock_ctx(),
+            ),
         ):
             result = runner.invoke(app, ["init", "-y"])
 

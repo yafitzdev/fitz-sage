@@ -47,8 +47,10 @@ class MockChatClient:
 
 def create_mock_chat_factory(mock_chat):
     """Create a mock chat factory that returns the mock chat client."""
+
     def factory(tier: str = "fast"):
         return mock_chat
+
     return factory
 
 
@@ -230,7 +232,9 @@ class TestQueryRewriter:
     def test_short_query_skipped(self):
         """Test that very short queries skip rewriting."""
         mock_chat = MockChatClient()
-        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat), min_query_length=5)
+        rewriter = QueryRewriter(
+            chat_factory=create_mock_chat_factory(mock_chat), min_query_length=5
+        )
 
         result = rewriter.rewrite("ab")
 
@@ -484,7 +488,9 @@ class TestPromptLoading:
         """Test custom prompt template."""
         mock_chat = MockChatClient()
         custom_template = "Rewrite: {query}\n{history_section}"
-        rewriter = QueryRewriter(chat_factory=create_mock_chat_factory(mock_chat), prompt_template=custom_template)
+        rewriter = QueryRewriter(
+            chat_factory=create_mock_chat_factory(mock_chat), prompt_template=custom_template
+        )
 
         # Use query with pronoun to trigger heuristic
         rewriter.rewrite("Explain their test functionality")

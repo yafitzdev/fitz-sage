@@ -47,6 +47,7 @@ def _get_psycopg():
     global _psycopg
     if _psycopg is None:
         import psycopg
+
         _psycopg = psycopg
     return _psycopg
 
@@ -56,6 +57,7 @@ def _get_psycopg_pool():
     global _psycopg_pool
     if _psycopg_pool is None:
         from psycopg_pool import ConnectionPool
+
         _psycopg_pool = ConnectionPool
     return _psycopg_pool
 
@@ -106,6 +108,7 @@ def _register_signal_handlers() -> None:
         # Signal handling not available (e.g., not main thread, or Windows limitations)
         logger.debug(f"{STORAGE} Could not register signal handlers: {e}")
 
+
 # Valid collection name pattern (alphanumeric + underscore)
 COLLECTION_NAME_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
 
@@ -117,7 +120,7 @@ RETRY_BACKOFF_MAX = 10.0  # seconds
 
 def _calculate_backoff(attempt: int) -> float:
     """Calculate exponential backoff delay."""
-    delay = RETRY_BACKOFF_BASE * (2 ** attempt)
+    delay = RETRY_BACKOFF_BASE * (2**attempt)
     return min(delay, RETRY_BACKOFF_MAX)
 
 
@@ -301,7 +304,9 @@ class PostgresConnectionManager:
                     raise ValueError("connection_string required for external mode")
 
             self._started = True
-            logger.info(f"{STORAGE} PostgreSQL connection manager started (mode={self.config.mode.value})")
+            logger.info(
+                f"{STORAGE} PostgreSQL connection manager started (mode={self.config.mode.value})"
+            )
 
     def _start_pgserver(self, timeout: int = 60, allow_recovery: bool = True) -> None:
         """
@@ -319,9 +324,7 @@ class PostgresConnectionManager:
         try:
             import pgserver
         except ImportError as e:
-            raise ImportError(
-                "pgserver not installed. Install with: pip install pgserver"
-            ) from e
+            raise ImportError("pgserver not installed. Install with: pip install pgserver") from e
 
         data_dir = self.config.data_dir or FitzPaths.ensure_pgdata()
         data_dir = Path(data_dir)

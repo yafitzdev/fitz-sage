@@ -13,7 +13,6 @@ User modifications are preserved across re-ingests.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
 
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import STORAGE
@@ -137,7 +136,9 @@ class VocabularyStore:
                         )
                     )
 
-                logger.debug(f"[VOCABULARY] Loaded {len(keywords)} keywords for '{self.collection}'")
+                logger.debug(
+                    f"[VOCABULARY] Loaded {len(keywords)} keywords for '{self.collection}'"
+                )
                 return keywords
 
         except Exception as e:
@@ -465,9 +466,7 @@ class VocabularyStore:
         self._ensure_schema()
 
         with self._manager.connection(self.collection) as conn:
-            cursor = conn.execute(
-                "SELECT DISTINCT category FROM keywords ORDER BY category"
-            )
+            cursor = conn.execute("SELECT DISTINCT category FROM keywords ORDER BY category")
             return [row[0] for row in cursor.fetchall()]
 
     def clear(self) -> None:

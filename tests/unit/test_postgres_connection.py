@@ -26,7 +26,6 @@ from fitz_ai.storage.postgres import (
     _sanitize_collection_name,
 )
 
-
 # =============================================================================
 # Collection Name Sanitization Tests
 # =============================================================================
@@ -122,7 +121,9 @@ class TestSingletonPattern:
 
     def test_get_instance_returns_same_instance(self):
         """Multiple get_instance calls return same instance."""
-        config = StorageConfig(mode=StorageMode.EXTERNAL, connection_string="postgresql://localhost/test")
+        config = StorageConfig(
+            mode=StorageMode.EXTERNAL, connection_string="postgresql://localhost/test"
+        )
 
         # Patch both __init__ and atexit to prevent broken handlers being registered
         with patch.object(PostgresConnectionManager, "__init__", return_value=None):
@@ -134,7 +135,9 @@ class TestSingletonPattern:
 
     def test_reset_instance_creates_new(self):
         """Reset allows creating new instance."""
-        config = StorageConfig(mode=StorageMode.EXTERNAL, connection_string="postgresql://localhost/test")
+        config = StorageConfig(
+            mode=StorageMode.EXTERNAL, connection_string="postgresql://localhost/test"
+        )
 
         # Patch both __init__ and atexit to prevent broken handlers being registered
         with patch.object(PostgresConnectionManager, "__init__", return_value=None):
@@ -204,8 +207,8 @@ class TestAutoRecovery:
     @patch("fitz_ai.storage.postgres.FitzPaths.ensure_pgdata")
     def test_recovery_deletes_pgdata_on_failure(self, mock_ensure_pgdata, mock_rmtree):
         """Recovery deletes corrupted pgdata directory."""
-        from pathlib import Path
         import sys
+        from pathlib import Path
 
         mock_ensure_pgdata.return_value = Path("/tmp/test_pgdata")
 
@@ -237,8 +240,8 @@ class TestAutoRecovery:
 
     def test_recovery_disabled_raises_immediately(self):
         """With recovery disabled, failure raises immediately."""
-        from pathlib import Path
         import sys
+        from pathlib import Path
 
         config = StorageConfig(mode=StorageMode.LOCAL, data_dir=Path("/tmp/test"))
         manager = PostgresConnectionManager(config)
@@ -269,9 +272,9 @@ class TestPgserverTimeout:
 
     def test_pgserver_timeout_raises_error(self):
         """Pgserver startup exceeding timeout raises RuntimeError."""
-        from pathlib import Path
         import sys
         import time
+        from pathlib import Path
 
         config = StorageConfig(mode=StorageMode.LOCAL, data_dir=Path("/tmp/test"))
         manager = PostgresConnectionManager(config)
@@ -595,8 +598,8 @@ class TestImportErrors:
 
     def test_import_error_pgserver_not_installed(self):
         """Should raise clear error if pgserver not installed in local mode."""
-        from pathlib import Path
         import sys
+        from pathlib import Path
 
         config = StorageConfig(mode=StorageMode.LOCAL, data_dir=Path("/tmp/test"))
         manager = PostgresConnectionManager(config)
@@ -628,7 +631,6 @@ class TestRaceConditions:
     def test_database_creation_race_condition(self):
         """Concurrent database creation should not fail due to lock."""
         import threading
-        import sys
 
         config = StorageConfig(
             mode=StorageMode.EXTERNAL,
@@ -655,10 +657,7 @@ class TestRaceConditions:
                 errors.append(e)
 
         # Multiple threads trying to get same database
-        threads = [
-            threading.Thread(target=get_db, args=(f"coll_{i}",))
-            for i in range(5)
-        ]
+        threads = [threading.Thread(target=get_db, args=(f"coll_{i}",)) for i in range(5)]
         for t in threads:
             t.start()
         for t in threads:

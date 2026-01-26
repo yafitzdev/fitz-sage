@@ -19,20 +19,16 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
-import logging
 import re
-import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.logging.logger import get_logger
-from fitz_ai.storage import get_connection_manager
 from fitz_ai.tabular.store.postgres import (
     PostgresTableStore,
     _sanitize_column_name,
-    _sanitize_table_name,
 )
 
 if TYPE_CHECKING:
@@ -97,7 +93,10 @@ def read_headers(file_path: Path) -> list[str]:
 
             wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
             ws = wb.active
-            headers = [str(cell.value) if cell.value else f"col_{i}" for i, cell in enumerate(next(ws.iter_rows(max_row=1)))]
+            headers = [
+                str(cell.value) if cell.value else f"col_{i}"
+                for i, cell in enumerate(next(ws.iter_rows(max_row=1)))
+            ]
             wb.close()
             return headers
         except ImportError:
@@ -164,7 +163,9 @@ def parse_columns(
 
             # Get headers
             header_row = next(ws.iter_rows(max_row=1))
-            headers = [str(cell.value) if cell.value else f"col_{i}" for i, cell in enumerate(header_row)]
+            headers = [
+                str(cell.value) if cell.value else f"col_{i}" for i, cell in enumerate(header_row)
+            ]
 
             # Find column indices
             col_indices = []
@@ -238,7 +239,9 @@ def read_sample_values(file_path: Path, num_rows: int = 20) -> dict[str, list[st
             ws = wb.active
 
             header_row = next(ws.iter_rows(max_row=1))
-            headers = [str(cell.value) if cell.value else f"col_{i}" for i, cell in enumerate(header_row)]
+            headers = [
+                str(cell.value) if cell.value else f"col_{i}" for i, cell in enumerate(header_row)
+            ]
 
             col_values: dict[str, set[str]] = {h: set() for h in headers}
             for i, row in enumerate(ws.iter_rows(min_row=2, max_row=num_rows + 1)):
@@ -412,9 +415,7 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
             sample_rows = self._get_sample_data(pg_table_name, sanitized_cols)
 
             # Step 5: Generate SQL
-            sql = self._generate_sql(
-                question, pg_table_name, sanitized_cols, sample_rows
-            )
+            sql = self._generate_sql(question, pg_table_name, sanitized_cols, sample_rows)
             logger.debug(f"Generated SQL: {sql}")
 
             # Step 6: Execute (with retry logic for missing columns)
@@ -440,8 +441,12 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
 
                 # Regenerate SQL with updated columns
                 sql = self._generate_sql(
-                    question, pg_table_name, sanitized_cols, sample_rows,
-                    previous_error="Query failed. Use only these columns: " + ", ".join(sanitized_cols)
+                    question,
+                    pg_table_name,
+                    sanitized_cols,
+                    sample_rows,
+                    previous_error="Query failed. Use only these columns: "
+                    + ", ".join(sanitized_cols),
                 )
                 result = self.table_store.execute_query(table_id, sql)
 
@@ -467,7 +472,7 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
                 columns_used=needed_columns,
             )
 
-        except Exception as e:
+        except Exception:
             # Cleanup on error
             if not persist:
                 try:
@@ -514,13 +519,16 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
         if previous_error:
             error_context = f"\n\nPrevious error: {previous_error}\nPlease fix the query."
 
-        prompt = self.SQL_PROMPT.format(
-            table_name=table_name,
-            columns=columns,
-            samples=samples,
-            question=question,
-            max_results=self.max_results,
-        ) + error_context
+        prompt = (
+            self.SQL_PROMPT.format(
+                table_name=table_name,
+                columns=columns,
+                samples=samples,
+                question=question,
+                max_results=self.max_results,
+            )
+            + error_context
+        )
 
         chat = self.chat_factory(self.TIER_SQL_GENERATE)
         response = chat.chat([{"role": "user", "content": prompt}])
@@ -608,7 +616,7 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
             pass
 
         # Try to find JSON array in text
-        match = re.search(r'\[([^\]]+)\]', text)
+        match = re.search(r"\[([^\]]+)\]", text)
         if match:
             try:
                 arr_text = "[" + match.group(1) + "]"
@@ -672,7 +680,6 @@ Provide a clear, direct answer based on the data. If the results are empty, say 
 
         # Create lowercase lookup sets
         current_set = {c.lower() for c in current_columns}
-        headers_map = {h.lower(): h for h in all_headers}
 
         missing = []
         for header in all_headers:

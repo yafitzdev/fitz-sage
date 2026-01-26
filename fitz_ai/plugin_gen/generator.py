@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 from typing import Callable, Optional
 
+from fitz_ai.llm.factory import ChatFactory, ModelTier, get_chat_factory
 from fitz_ai.plugin_gen.context import (
     build_generation_prompt,
     build_retry_prompt,
@@ -29,8 +30,6 @@ from fitz_ai.plugin_gen.types import (
     ReviewResult,
 )
 from fitz_ai.plugin_gen.validators import PluginValidator, format_validation_error
-
-from fitz_ai.llm.factory import ChatFactory, ModelTier, get_chat_factory
 
 logger = logging.getLogger(__name__)
 

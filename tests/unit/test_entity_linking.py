@@ -12,8 +12,10 @@ from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
 
 def create_mock_chat_factory(mock_chat):
     """Create a mock chat factory that returns the mock chat client."""
+
     def factory(tier: str = "fast"):
         return mock_chat
+
     return factory
 
 

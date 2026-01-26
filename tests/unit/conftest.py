@@ -56,10 +56,7 @@ def pytest_collection_modifyitems(items):
             continue
 
         # Skip if already has a tier marker
-        has_tier = any(
-            marker.name.startswith("tier")
-            for marker in item.iter_markers()
-        )
+        has_tier = any(marker.name.startswith("tier") for marker in item.iter_markers())
         if has_tier:
             continue
 

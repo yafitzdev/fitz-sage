@@ -12,10 +12,11 @@ from __future__ import annotations
 import platform
 import shutil
 import subprocess
+from pathlib import Path
 
 import typer
 
-from fitz_ai.cli.ui import console, ui
+from fitz_ai.cli.ui import ui
 from fitz_ai.core.paths import FitzPaths
 from fitz_ai.logging.logger import get_logger
 
@@ -83,9 +84,6 @@ def _clear_pgserver_temp() -> None:
             pgserver_dir = Path(app_data) / "pgserver"
             if pgserver_dir.exists():
                 shutil.rmtree(pgserver_dir, ignore_errors=True)
-
-
-from pathlib import Path
 
 
 @app.callback(invoke_without_command=True)

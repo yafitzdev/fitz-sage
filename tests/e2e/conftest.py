@@ -31,6 +31,7 @@ def pytest_collection_modifyitems(items):
             item.add_marker(pytest.mark.tier3)
             item.add_marker(pytest.mark.e2e)
 
+
 from .runner import FIXTURES_DIR, E2ERunner
 from .scenarios import SCENARIOS, TestScenario
 
