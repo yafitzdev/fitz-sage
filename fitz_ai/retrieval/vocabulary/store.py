@@ -1,8 +1,8 @@
 # fitz_ai/retrieval/vocabulary/store.py
 """
-Vocabulary store for persisting keywords to YAML.
+Vocabulary store for persisting keywords to PostgreSQL.
 
-The vocabulary is stored in .fitz/keywords.yaml and contains:
+The vocabulary is stored per-collection in the PostgreSQL database:
 - Auto-detected keywords with variations
 - User-defined keywords
 - Metadata about detection
@@ -13,13 +13,11 @@ User modifications are preserved across re-ingests.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
+from typing import Optional
 
-import yaml
-
-from fitz_ai.core.paths import FitzPaths
 from fitz_ai.logging.logger import get_logger
+from fitz_ai.logging.tags import STORAGE
+from fitz_ai.storage import get_connection_manager
 
 from .models import Keyword, VocabularyMetadata
 
@@ -28,9 +26,9 @@ logger = get_logger(__name__)
 
 class VocabularyStore:
     """
-    Manages keyword vocabulary persistence.
+    Manages keyword vocabulary persistence in PostgreSQL.
 
-    Vocabulary is stored per-collection in .fitz/keywords/{collection}.yaml.
+    Vocabulary is stored per-collection in the database.
     This ensures keywords from different collections don't mix.
 
     Usage:
@@ -46,44 +44,101 @@ class VocabularyStore:
         store.merge_and_save(new_keywords, source_docs=50)
     """
 
-    def __init__(self, collection: str | None = None, path: Path | None = None):
+    SCHEMA_SQL = """
+        -- Keywords table
+        CREATE TABLE IF NOT EXISTS keywords (
+            id TEXT PRIMARY KEY,
+            category TEXT NOT NULL,
+            match TEXT[] NOT NULL DEFAULT '{}',
+            occurrences INTEGER NOT NULL DEFAULT 1,
+            first_seen TEXT,
+            user_defined BOOLEAN NOT NULL DEFAULT FALSE,
+            auto_generated TEXT[] NOT NULL DEFAULT '{}'
+        );
+
+        -- Vocabulary metadata (singleton)
+        CREATE TABLE IF NOT EXISTS vocabulary_meta (
+            id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+            generated TIMESTAMPTZ NOT NULL,
+            source_docs INTEGER NOT NULL DEFAULT 0,
+            auto_detected INTEGER NOT NULL DEFAULT 0,
+            user_modified INTEGER NOT NULL DEFAULT 0
+        );
+
+        -- Index for category lookups
+        CREATE INDEX IF NOT EXISTS idx_keywords_category
+        ON keywords(category);
+    """
+
+    def __init__(self, collection: str | None = None, path=None):
         """
         Initialize the store.
 
         Args:
             collection: Collection name for per-collection vocabulary
-            path: Override path (defaults to .fitz/keywords/{collection}.yaml)
+            path: Ignored (kept for backwards compatibility)
         """
-        self.collection = collection
-        if path:
-            self.path = path
-        else:
-            self.path = FitzPaths.vocabulary(collection)
+        self.collection = collection or "default"
+        self._manager = get_connection_manager()
+        self._manager.start()
+        self._schema_initialized = False
+
+    def _ensure_schema(self) -> None:
+        """Create tables schema if not exists."""
+        if self._schema_initialized:
+            return
+
+        with self._manager.connection(self.collection) as conn:
+            conn.execute(self.SCHEMA_SQL)
+            conn.commit()
+
+        self._schema_initialized = True
+        logger.debug(f"{STORAGE} Vocabulary schema initialized for '{self.collection}'")
 
     def exists(self) -> bool:
-        """Check if vocabulary file exists."""
-        return self.path.exists()
+        """Check if vocabulary has any keywords."""
+        self._ensure_schema()
+
+        with self._manager.connection(self.collection) as conn:
+            result = conn.execute("SELECT COUNT(*) FROM keywords").fetchone()
+            return result[0] > 0 if result else False
 
     def load(self) -> list[Keyword]:
         """
-        Load keywords from YAML file.
+        Load keywords from PostgreSQL.
 
         Returns:
-            List of keywords (empty if file doesn't exist)
+            List of keywords (empty if none exist)
         """
-        if not self.path.exists():
-            return []
+        self._ensure_schema()
 
         try:
-            with open(self.path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
+            with self._manager.connection(self.collection) as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT id, category, match, occurrences, first_seen,
+                           user_defined, auto_generated
+                    FROM keywords
+                    ORDER BY category, id
+                    """
+                )
 
-            if not data or "keywords" not in data:
-                return []
+                keywords = []
+                for row in cursor.fetchall():
+                    keywords.append(
+                        Keyword(
+                            id=row[0],
+                            category=row[1],
+                            match=list(row[2]) if row[2] else [],
+                            occurrences=row[3],
+                            first_seen=row[4],
+                            user_defined=row[5],
+                            auto_generated=list(row[6]) if row[6] else [],
+                        )
+                    )
 
-            keywords = [Keyword.from_dict(kw) for kw in data["keywords"]]
-            logger.debug(f"[VOCABULARY] Loaded {len(keywords)} keywords from {self.path}")
-            return keywords
+                logger.debug(f"[VOCABULARY] Loaded {len(keywords)} keywords for '{self.collection}'")
+                return keywords
 
         except Exception as e:
             logger.warning(f"[VOCABULARY] Failed to load keywords: {e}")
@@ -91,25 +146,34 @@ class VocabularyStore:
 
     def load_with_metadata(self) -> tuple[list[Keyword], VocabularyMetadata | None]:
         """
-        Load keywords and metadata from YAML file.
+        Load keywords and metadata from PostgreSQL.
 
         Returns:
             Tuple of (keywords, metadata)
         """
-        if not self.path.exists():
-            return [], None
+        self._ensure_schema()
 
         try:
-            with open(self.path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
+            keywords = self.load()
 
-            if not data:
-                return [], None
+            with self._manager.connection(self.collection) as conn:
+                result = conn.execute(
+                    """
+                    SELECT generated, source_docs, auto_detected, user_modified
+                    FROM vocabulary_meta
+                    WHERE id = 1
+                    """
+                ).fetchone()
 
-            keywords = [Keyword.from_dict(kw) for kw in data.get("keywords", [])]
-            metadata = None
-            if "_meta" in data:
-                metadata = VocabularyMetadata.from_dict(data["_meta"])
+                if result:
+                    metadata = VocabularyMetadata(
+                        generated=result[0] if result[0] else datetime.now(timezone.utc),
+                        source_docs=result[1],
+                        auto_detected=result[2],
+                        user_modified=result[3],
+                    )
+                else:
+                    metadata = None
 
             return keywords, metadata
 
@@ -123,47 +187,65 @@ class VocabularyStore:
         metadata: VocabularyMetadata | None = None,
     ) -> None:
         """
-        Save keywords to YAML file.
+        Save keywords to PostgreSQL.
 
         Args:
             keywords: Keywords to save
             metadata: Optional metadata
         """
-        # Ensure parent directory exists
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._ensure_schema()
 
-        data: dict[str, Any] = {}
+        with self._manager.connection(self.collection) as conn:
+            # Clear existing keywords and insert new ones
+            conn.execute("DELETE FROM keywords")
 
-        # Add metadata
-        if metadata:
-            data["_meta"] = metadata.to_dict()
-        else:
-            data["_meta"] = VocabularyMetadata(
-                auto_detected=len([k for k in keywords if not k.user_defined]),
-                user_modified=len([k for k in keywords if k.user_defined]),
-            ).to_dict()
+            for kw in keywords:
+                conn.execute(
+                    """
+                    INSERT INTO keywords (id, category, match, occurrences, first_seen,
+                                         user_defined, auto_generated)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        kw.id,
+                        kw.category,
+                        kw.match,
+                        kw.occurrences,
+                        kw.first_seen,
+                        kw.user_defined,
+                        kw.auto_generated,
+                    ),
+                )
 
-        # Add keywords grouped by category
-        data["keywords"] = [kw.to_dict() for kw in keywords]
+            # Calculate metadata if not provided
+            if not metadata:
+                metadata = VocabularyMetadata(
+                    auto_detected=len([k for k in keywords if not k.user_defined]),
+                    user_modified=len([k for k in keywords if k.user_defined]),
+                )
 
-        # Write with nice formatting
-        with open(self.path, "w", encoding="utf-8") as f:
-            # Add header comment
-            f.write("# Auto-generated vocabulary file\n")
-            f.write("# Edit freely - your changes are preserved on re-ingest\n")
-            f.write("#\n")
-            f.write(f"# Generated: {datetime.now(timezone.utc).isoformat()}\n")
-            f.write("#\n\n")
-
-            yaml.dump(
-                data,
-                f,
-                default_flow_style=False,
-                allow_unicode=True,
-                sort_keys=False,
+            # Upsert metadata
+            conn.execute(
+                """
+                INSERT INTO vocabulary_meta (id, generated, source_docs, auto_detected, user_modified)
+                VALUES (1, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    generated = EXCLUDED.generated,
+                    source_docs = EXCLUDED.source_docs,
+                    auto_detected = EXCLUDED.auto_detected,
+                    user_modified = EXCLUDED.user_modified
+                """,
+                (
+                    metadata.generated,
+                    metadata.source_docs,
+                    metadata.auto_detected,
+                    metadata.user_modified,
+                ),
             )
 
-        logger.info(f"[VOCABULARY] Saved {len(keywords)} keywords to {self.path}")
+            conn.commit()
+
+        logger.info(f"[VOCABULARY] Saved {len(keywords)} keywords for '{self.collection}'")
 
     def merge_and_save(
         self,
@@ -182,7 +264,7 @@ class VocabularyStore:
         Returns:
             Merged list of keywords
         """
-        existing, existing_meta = self.load_with_metadata()
+        existing, _ = self.load_with_metadata()
 
         # Build lookup of existing keywords by ID (case-insensitive)
         existing_by_id: dict[str, Keyword] = {kw.id.lower(): kw for kw in existing}
@@ -244,17 +326,39 @@ class VocabularyStore:
         Args:
             keyword: Keyword to add
         """
-        keywords = self.load()
+        self._ensure_schema()
 
         # Check if already exists
-        existing_ids = {kw.id.lower() for kw in keywords}
-        if keyword.id.lower() in existing_ids:
-            logger.warning(f"[VOCABULARY] Keyword {keyword.id!r} already exists")
-            return
+        with self._manager.connection(self.collection) as conn:
+            result = conn.execute(
+                "SELECT id FROM keywords WHERE LOWER(id) = LOWER(%s)",
+                (keyword.id,),
+            ).fetchone()
 
-        keyword.user_defined = True
-        keywords.append(keyword)
-        self.save(keywords)
+            if result:
+                logger.warning(f"[VOCABULARY] Keyword {keyword.id!r} already exists")
+                return
+
+            keyword.user_defined = True
+            conn.execute(
+                """
+                INSERT INTO keywords (id, category, match, occurrences, first_seen,
+                                     user_defined, auto_generated)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    keyword.id,
+                    keyword.category,
+                    keyword.match,
+                    keyword.occurrences,
+                    keyword.first_seen,
+                    keyword.user_defined,
+                    keyword.auto_generated,
+                ),
+            )
+            conn.commit()
+
+        logger.info(f"[VOCABULARY] Added keyword {keyword.id!r}")
 
     def add_variation(self, keyword_id: str, variation: str) -> bool:
         """
@@ -267,18 +371,31 @@ class VocabularyStore:
         Returns:
             True if successful, False if keyword not found
         """
-        keywords = self.load()
+        self._ensure_schema()
 
-        for kw in keywords:
-            if kw.id.lower() == keyword_id.lower():
-                if variation not in kw.match:
-                    kw.match.append(variation)
-                    self.save(keywords)
-                    logger.info(f"[VOCABULARY] Added variation {variation!r} to {keyword_id}")
-                return True
+        with self._manager.connection(self.collection) as conn:
+            # Get current match array
+            result = conn.execute(
+                "SELECT match FROM keywords WHERE LOWER(id) = LOWER(%s)",
+                (keyword_id,),
+            ).fetchone()
 
-        logger.warning(f"[VOCABULARY] Keyword {keyword_id!r} not found")
-        return False
+            if not result:
+                logger.warning(f"[VOCABULARY] Keyword {keyword_id!r} not found")
+                return False
+
+            current_match = list(result[0]) if result[0] else []
+
+            if variation not in current_match:
+                current_match.append(variation)
+                conn.execute(
+                    "UPDATE keywords SET match = %s WHERE LOWER(id) = LOWER(%s)",
+                    (current_match, keyword_id),
+                )
+                conn.commit()
+                logger.info(f"[VOCABULARY] Added variation {variation!r} to {keyword_id}")
+
+            return True
 
     def remove_keyword(self, keyword_id: str) -> bool:
         """
@@ -290,15 +407,18 @@ class VocabularyStore:
         Returns:
             True if removed, False if not found
         """
-        keywords = self.load()
-        original_count = len(keywords)
+        self._ensure_schema()
 
-        keywords = [kw for kw in keywords if kw.id.lower() != keyword_id.lower()]
+        with self._manager.connection(self.collection) as conn:
+            result = conn.execute(
+                "DELETE FROM keywords WHERE LOWER(id) = LOWER(%s) RETURNING id",
+                (keyword_id,),
+            ).fetchone()
 
-        if len(keywords) < original_count:
-            self.save(keywords)
-            logger.info(f"[VOCABULARY] Removed keyword {keyword_id!r}")
-            return True
+            if result:
+                conn.commit()
+                logger.info(f"[VOCABULARY] Removed keyword {keyword_id!r}")
+                return True
 
         logger.warning(f"[VOCABULARY] Keyword {keyword_id!r} not found")
         return False
@@ -313,10 +433,50 @@ class VocabularyStore:
         Returns:
             Keywords in that category
         """
-        keywords = self.load()
-        return [kw for kw in keywords if kw.category == category]
+        self._ensure_schema()
+
+        with self._manager.connection(self.collection) as conn:
+            cursor = conn.execute(
+                """
+                SELECT id, category, match, occurrences, first_seen,
+                       user_defined, auto_generated
+                FROM keywords
+                WHERE category = %s
+                ORDER BY id
+                """,
+                (category,),
+            )
+
+            return [
+                Keyword(
+                    id=row[0],
+                    category=row[1],
+                    match=list(row[2]) if row[2] else [],
+                    occurrences=row[3],
+                    first_seen=row[4],
+                    user_defined=row[5],
+                    auto_generated=list(row[6]) if row[6] else [],
+                )
+                for row in cursor.fetchall()
+            ]
 
     def get_categories(self) -> list[str]:
         """Get all unique categories in the vocabulary."""
-        keywords = self.load()
-        return sorted(set(kw.category for kw in keywords))
+        self._ensure_schema()
+
+        with self._manager.connection(self.collection) as conn:
+            cursor = conn.execute(
+                "SELECT DISTINCT category FROM keywords ORDER BY category"
+            )
+            return [row[0] for row in cursor.fetchall()]
+
+    def clear(self) -> None:
+        """Clear all keywords from the vocabulary."""
+        self._ensure_schema()
+
+        with self._manager.connection(self.collection) as conn:
+            conn.execute("DELETE FROM keywords")
+            conn.execute("DELETE FROM vocabulary_meta")
+            conn.commit()
+
+        logger.info(f"[VOCABULARY] Cleared vocabulary for '{self.collection}'")

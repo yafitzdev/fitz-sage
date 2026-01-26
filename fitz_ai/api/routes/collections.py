@@ -101,12 +101,11 @@ async def delete_collection(name: str) -> dict:
 
 
 def _delete_vocabulary(collection: str) -> None:
-    """Delete vocabulary file associated with a collection."""
-    from fitz_ai.core.paths import FitzPaths
+    """Delete vocabulary associated with a collection.
 
-    vocab_path = FitzPaths.vocabulary(collection)
-    if vocab_path.exists():
-        try:
-            vocab_path.unlink()
-        except Exception as e:
-            logger.debug(f"Failed to delete vocabulary for {collection}: {e}")
+    Note: Vocabulary is now stored in PostgreSQL (same database as collection),
+    so it's automatically deleted when the collection database is dropped.
+    This function is kept for backwards compatibility but is now a no-op.
+    """
+    # No-op: vocabulary is in PostgreSQL and deleted with the collection database
+    pass

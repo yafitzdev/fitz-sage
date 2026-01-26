@@ -117,16 +117,14 @@ def _load_collections_with_stats(client: Any) -> List[Dict[str, Any]]:
 
 
 def _delete_vocabulary(collection: str) -> None:
-    """Delete vocabulary file associated with a collection."""
-    from fitz_ai.core.paths import FitzPaths
+    """Delete vocabulary associated with a collection.
 
-    vocab_path = FitzPaths.vocabulary(collection)
-    if vocab_path.exists():
-        try:
-            vocab_path.unlink()
-            ui.info(f"Deleted vocabulary file: {vocab_path.name}")
-        except Exception as e:
-            logger.warning(f"Failed to delete vocabulary file: {e}")
+    Note: Vocabulary is now stored in PostgreSQL (same database as collection),
+    so it's automatically deleted when the collection database is dropped.
+    This function is kept for backwards compatibility but is now a no-op.
+    """
+    # No-op: vocabulary is in PostgreSQL and deleted with the collection database
+    pass
 
 
 def _delete_table_registry(collection: str) -> None:
@@ -143,16 +141,14 @@ def _delete_table_registry(collection: str) -> None:
 
 
 def _delete_entity_graph(collection: str) -> None:
-    """Delete entity graph database associated with a collection."""
-    from fitz_ai.core.paths import FitzPaths
+    """Delete entity graph associated with a collection.
 
-    graph_path = FitzPaths.entity_graph(collection)
-    if graph_path.exists():
-        try:
-            graph_path.unlink()
-            ui.info(f"Deleted entity graph: {graph_path.name}")
-        except Exception as e:
-            logger.warning(f"Failed to delete entity graph: {e}")
+    Note: Entity graph is now stored in PostgreSQL (same database as collection),
+    so it's automatically deleted when the collection database is dropped.
+    This function is kept for backwards compatibility but is now a no-op.
+    """
+    # No-op: entity graph is in PostgreSQL and deleted with the collection database
+    pass
 
 
 def _display_example_chunks(client: Any, collection: str, limit: int = 3) -> None:

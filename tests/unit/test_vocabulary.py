@@ -572,11 +572,12 @@ class TestSuggestKeywords:
 
 
 class TestVocabularyStore:
-    """Tests for VocabularyStore class."""
+    """Tests for VocabularyStore class (PostgreSQL-based)."""
 
-    def test_save_and_load(self, tmp_path: Path):
+    def test_save_and_load(self):
         """Test basic save and load."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
+        store = VocabularyStore(collection="test_save_and_load")
+        store.clear()  # Ensure clean state
 
         keywords = [
             make_keyword("TC-1001", match=["TC-1001", "tc-1001"]),
@@ -587,12 +588,15 @@ class TestVocabularyStore:
         loaded = store.load()
 
         assert len(loaded) == 2
-        assert loaded[0].id == "TC-1001"
-        assert loaded[1].id == "JIRA-123"
+        # PostgreSQL sorts by category, id so order may differ
+        ids = {k.id for k in loaded}
+        assert "TC-1001" in ids
+        assert "JIRA-123" in ids
 
-    def test_exists(self, tmp_path: Path):
+    def test_exists(self):
         """Test exists check."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
+        store = VocabularyStore(collection="test_exists")
+        store.clear()  # Ensure clean state
 
         assert not store.exists()
 
@@ -600,17 +604,19 @@ class TestVocabularyStore:
 
         assert store.exists()
 
-    def test_load_nonexistent(self, tmp_path: Path):
-        """Test loading from nonexistent file."""
-        store = VocabularyStore(path=tmp_path / "nonexistent.yaml")
+    def test_load_nonexistent(self):
+        """Test loading from empty collection."""
+        store = VocabularyStore(collection="test_load_nonexistent")
+        store.clear()  # Ensure clean state
 
         keywords = store.load()
 
         assert keywords == []
 
-    def test_load_with_metadata(self, tmp_path: Path):
+    def test_load_with_metadata(self):
         """Test loading with metadata."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
+        store = VocabularyStore(collection="test_load_with_metadata")
+        store.clear()  # Ensure clean state
 
         keywords = [make_keyword("TC-1001")]
         metadata = VocabularyMetadata(source_docs=10, auto_detected=5)
@@ -623,9 +629,10 @@ class TestVocabularyStore:
         assert loaded_meta.source_docs == 10
         assert loaded_meta.auto_detected == 5
 
-    def test_merge_and_save_new_keywords(self, tmp_path: Path):
+    def test_merge_and_save_new_keywords(self):
         """Test merging new keywords."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
+        store = VocabularyStore(collection="test_merge_and_save_new")
+        store.clear()  # Ensure clean state
 
         # Initial save
         store.save([make_keyword("TC-1001", match=["TC-1001"])])
@@ -642,9 +649,10 @@ class TestVocabularyStore:
         # TC-1001 was not re-detected, so it's removed unless user_defined
         assert any(k.id == "TC-1002" for k in loaded)
 
-    def test_merge_preserves_user_defined(self, tmp_path: Path):
+    def test_merge_preserves_user_defined(self):
         """Test that user-defined keywords are preserved."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
+        store = VocabularyStore(collection="test_merge_preserves_user")
+        store.clear()  # Ensure clean state
 
         # Save user-defined keyword
         user_kw = make_keyword("CUSTOM-001", user_defined=True)
@@ -660,9 +668,10 @@ class TestVocabularyStore:
         assert any(k.id == "CUSTOM-001" for k in loaded)
         assert any(k.id == "TC-1001" for k in loaded)
 
-    def test_merge_preserves_user_variations(self, tmp_path: Path):
+    def test_merge_preserves_user_variations(self):
         """Test that user-added variations are preserved."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
+        store = VocabularyStore(collection="test_merge_preserves_vars")
+        store.clear()  # Ensure clean state
 
         # Save with auto-generated variations
         kw = Keyword(
@@ -688,10 +697,10 @@ class TestVocabularyStore:
         # User variation should be preserved
         assert "user-added-variation" in tc1001.match
 
-    def test_add_keyword(self, tmp_path: Path):
+    def test_add_keyword(self):
         """Test adding a single keyword."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
-        store.save([])
+        store = VocabularyStore(collection="test_add_keyword")
+        store.clear()  # Ensure clean state
 
         store.add_keyword(make_keyword("TC-1001"))
 
@@ -700,9 +709,10 @@ class TestVocabularyStore:
         assert loaded[0].id == "TC-1001"
         assert loaded[0].user_defined is True
 
-    def test_add_keyword_duplicate(self, tmp_path: Path):
+    def test_add_keyword_duplicate(self):
         """Test adding duplicate keyword (should not add)."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
+        store = VocabularyStore(collection="test_add_keyword_dup")
+        store.clear()  # Ensure clean state
         store.save([make_keyword("TC-1001")])
 
         store.add_keyword(make_keyword("TC-1001"))
@@ -710,9 +720,10 @@ class TestVocabularyStore:
         loaded = store.load()
         assert len(loaded) == 1
 
-    def test_add_variation(self, tmp_path: Path):
+    def test_add_variation(self):
         """Test adding variation to existing keyword."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
+        store = VocabularyStore(collection="test_add_variation")
+        store.clear()  # Ensure clean state
         store.save([make_keyword("TC-1001", match=["TC-1001"])])
 
         result = store.add_variation("TC-1001", "testcase-1001")
@@ -721,18 +732,19 @@ class TestVocabularyStore:
         loaded = store.load()
         assert "testcase-1001" in loaded[0].match
 
-    def test_add_variation_not_found(self, tmp_path: Path):
+    def test_add_variation_not_found(self):
         """Test adding variation to nonexistent keyword."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
-        store.save([])
+        store = VocabularyStore(collection="test_add_var_notfound")
+        store.clear()  # Ensure clean state
 
         result = store.add_variation("TC-9999", "variation")
 
         assert result is False
 
-    def test_remove_keyword(self, tmp_path: Path):
+    def test_remove_keyword(self):
         """Test removing a keyword."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
+        store = VocabularyStore(collection="test_remove_keyword")
+        store.clear()  # Ensure clean state
         store.save(
             [
                 make_keyword("TC-1001"),
@@ -747,18 +759,20 @@ class TestVocabularyStore:
         assert len(loaded) == 1
         assert loaded[0].id == "TC-1002"
 
-    def test_remove_keyword_not_found(self, tmp_path: Path):
+    def test_remove_keyword_not_found(self):
         """Test removing nonexistent keyword."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
+        store = VocabularyStore(collection="test_remove_kw_notfound")
+        store.clear()  # Ensure clean state
         store.save([make_keyword("TC-1001")])
 
         result = store.remove_keyword("TC-9999")
 
         assert result is False
 
-    def test_get_by_category(self, tmp_path: Path):
+    def test_get_by_category(self):
         """Test filtering by category."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
+        store = VocabularyStore(collection="test_get_by_category")
+        store.clear()  # Ensure clean state
         store.save(
             [
                 make_keyword("TC-1001", category="testcase"),
@@ -772,9 +786,10 @@ class TestVocabularyStore:
         assert len(testcases) == 2
         assert all(k.category == "testcase" for k in testcases)
 
-    def test_get_categories(self, tmp_path: Path):
+    def test_get_categories(self):
         """Test getting all categories."""
-        store = VocabularyStore(path=tmp_path / "vocab.yaml")
+        store = VocabularyStore(collection="test_get_categories")
+        store.clear()  # Ensure clean state
         store.save(
             [
                 make_keyword("TC-1001", category="testcase"),
@@ -789,17 +804,23 @@ class TestVocabularyStore:
         assert "ticket" in categories
         assert "version" in categories
 
-    def test_collection_based_path(self, tmp_path: Path, monkeypatch):
-        """Test that collection creates collection-specific path."""
-        # Monkeypatch FitzPaths to use tmp_path
-        from fitz_ai.core import paths
+    def test_collection_isolation(self):
+        """Test that collections are isolated from each other."""
+        store1 = VocabularyStore(collection="test_isolation_1")
+        store2 = VocabularyStore(collection="test_isolation_2")
+        store1.clear()
+        store2.clear()
 
-        monkeypatch.setattr(paths.FitzPaths, "workspace", classmethod(lambda cls: tmp_path))
+        store1.save([make_keyword("TC-1001")])
+        store2.save([make_keyword("JIRA-123", category="ticket")])
 
-        store = VocabularyStore(collection="my_collection")
+        loaded1 = store1.load()
+        loaded2 = store2.load()
 
-        assert "my_collection" in str(store.path)
-        assert store.path.suffix == ".yaml"
+        assert len(loaded1) == 1
+        assert loaded1[0].id == "TC-1001"
+        assert len(loaded2) == 1
+        assert loaded2[0].id == "JIRA-123"
 
 
 # ---------------------------------------------------------------------------
