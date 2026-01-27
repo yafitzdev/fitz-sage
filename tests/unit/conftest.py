@@ -8,6 +8,7 @@ requiring actual embedding API calls.
 
 from __future__ import annotations
 
+import os
 from typing import Callable
 
 import pytest
@@ -15,6 +16,12 @@ import pytest
 from fitz_ai.core.guardrails import SemanticMatcher
 
 from .mock_embedder import create_deterministic_embedder
+
+
+def _is_parallel_run() -> bool:
+    """Check if running under pytest-xdist with multiple workers."""
+    # PYTEST_XDIST_WORKER is set when running under xdist
+    return "PYTEST_XDIST_WORKER" in os.environ
 
 
 def pytest_collection_modifyitems(items):
@@ -74,6 +81,9 @@ def pytest_collection_modifyitems(items):
         is_postgres = any(pattern in fspath for pattern in POSTGRES_PATTERNS)
         if is_postgres:
             item.add_marker(pytest.mark.postgres)
+            # Auto-skip postgres tests when running in parallel (pgserver can't handle it)
+            if _is_parallel_run():
+                item.add_marker(pytest.mark.skip(reason="Postgres tests skipped in parallel mode (use -m postgres separately)"))
 
         # Skip tier marking if already has a tier marker
         has_tier = any(marker.name.startswith("tier") for marker in item.iter_markers())
