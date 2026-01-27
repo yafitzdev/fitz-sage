@@ -161,8 +161,9 @@ def test_config():
 # Import fixtures from submodules
 # =============================================================================
 
-# Import e2e fixtures so they're available to performance/security/chaos tests
-from tests.e2e.conftest import *  # noqa: E402, F401, F403
+# Note: E2E fixtures NOT imported here - they have autouse=True session fixtures
+# that conflict with pytest-xdist parallel execution. E2E tests get their fixtures
+# from tests/e2e/conftest.py directly via pytest's conftest discovery.
 
 # Import unit test fixtures
 from tests.unit.conftest import *  # noqa: E402, F401, F403

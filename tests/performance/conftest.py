@@ -5,12 +5,15 @@ Performance test fixtures.
 These tests measure latency, memory usage, and throughput
 under normal (single-user) conditions.
 
-Note: e2e fixtures (e2e_runner) are imported via tests/conftest.py
+Imports e2e fixtures directly (not via root conftest to avoid parallel execution issues).
 """
 
 from __future__ import annotations
 
 import gc
+
+# Import e2e fixtures for performance tests (these run serially, not in parallel)
+from tests.e2e.conftest import *  # noqa: F401, F403
 import time
 from dataclasses import dataclass, field
 from typing import Callable

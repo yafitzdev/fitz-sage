@@ -90,9 +90,10 @@ jobs:
         env:
           PYTHONUTF8: 1
         run: |
-          # Only run unit tests - skip e2e, chaos, security, performance, load tests
-          # These require real API keys and external services
-          pytest tests/unit/ -v --tb=short
+          # Run non-postgres tests in parallel (fast)
+          pytest tests/unit/ -v --tb=short -n auto -m "not postgres"
+          # Run postgres tests serially (pgserver can't handle parallel workers)
+          pytest tests/unit/ -v --tb=short -m "postgres"
 
   # ===========================================================================
   # Core Module Import Check (Lightweight)
@@ -154,8 +155,10 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          # Only unit tests for coverage - skip tests requiring API keys
-          pytest tests/unit/ --cov=fitz_ai --cov-report=xml --cov-report=term-missing
+          # Run non-postgres tests in parallel, postgres tests serially
+          # Use --cov-append to combine coverage from both runs
+          pytest tests/unit/ --cov=fitz_ai --cov-report=xml --cov-report=term-missing -n auto -m "not postgres"
+          pytest tests/unit/ --cov=fitz_ai --cov-report=xml --cov-report=term-missing --cov-append -m "postgres"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

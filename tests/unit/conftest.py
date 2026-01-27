@@ -18,11 +18,13 @@ from .mock_embedder import create_deterministic_embedder
 
 
 def pytest_collection_modifyitems(items):
-    """Add tier markers to unit tests based on type.
+    """Add tier and postgres markers to unit tests based on type.
 
     Tier 1 (every commit): Pure logic tests with no I/O or mocks
     Tier 2 (PR merge): Tests with mocks but no real services
     Tier 3+: Already marked in specific files (integration, e2e)
+
+    Postgres marker: Tests that use PostgreSQL (can't run in parallel due to pgserver)
     """
     # Files that should be tier1 (pure logic, fast, no external deps)
     TIER1_PATTERNS = [
@@ -48,6 +50,20 @@ def pytest_collection_modifyitems(items):
         "structured/test_schema",
     ]
 
+    # Files that use PostgreSQL (pgserver) - must run serially
+    POSTGRES_PATTERNS = [
+        "test_pgvector",
+        "test_postgres",
+        "test_ingest_executor",
+        "test_ingest_state",
+        "test_ingest_timing",
+        "test_vocabulary",
+        "test_entity_graph",
+        "test_retrieval_yaml_plugins",
+        "test_direct_query",
+        "test_vector_search_derived",
+    ]
+
     for item in items:
         fspath = str(item.fspath)
 
@@ -55,7 +71,12 @@ def pytest_collection_modifyitems(items):
         if "/unit/" not in fspath and "\\unit\\" not in fspath:
             continue
 
-        # Skip if already has a tier marker
+        # Add postgres marker if file uses postgres
+        is_postgres = any(pattern in fspath for pattern in POSTGRES_PATTERNS)
+        if is_postgres:
+            item.add_marker(pytest.mark.postgres)
+
+        # Skip tier marking if already has a tier marker
         has_tier = any(marker.name.startswith("tier") for marker in item.iter_markers())
         if has_tier:
             continue

@@ -1,0 +1,108 @@
+# .github/workflows/mutation.yml
+#
+# Nightly Mutation Testing for Fitz
+# Validates test quality by checking if tests catch code mutations
+# Only runs on main branch, nightly schedule
+
+name: Mutation Testing
+
+on:
+  schedule:
+    # Run at 3 AM UTC daily
+    - cron: "0 3 * * *"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  mutation:
+    name: Mutation Testing
+    runs-on: ubuntu-latest
+    # Only run on main branch
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-mutation-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-mutation-
+            ${{ runner.os }}-pip-
+
+      - name: Cache mutmut results
+        uses: actions/cache@v4
+        with:
+          path: .mutmut-cache
+          key: mutmut-${{ github.sha }}
+          restore-keys: |
+            mutmut-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install minimal deps for mutation testing (same as CI test job)
+          pip install pydantic pyyaml httpx typing-extensions typer jinja2
+          pip install pytest pytest-cov pytest-xdist psutil
+          pip install numpy faiss-cpu cryptography
+          pip install mutmut
+          pip install -e . --no-deps
+
+      - name: Run mutation tests
+        id: mutation
+        continue-on-error: true
+        run: |
+          # Run mutation tests with timeout (60 minutes max)
+          timeout 3600 python -m mutmut run --CI || true
+
+          # Generate results summary
+          python -m mutmut results > mutation_summary.txt || true
+
+          # Extract mutation score
+          KILLED=$(grep -oP 'Killed mutants:\s+\K\d+' mutation_summary.txt || echo "0")
+          SURVIVED=$(grep -oP 'Survived mutants:\s+\K\d+' mutation_summary.txt || echo "0")
+          TOTAL=$((KILLED + SURVIVED))
+
+          if [ $TOTAL -gt 0 ]; then
+            SCORE=$(echo "scale=1; $KILLED * 100 / $TOTAL" | bc)
+          else
+            SCORE="N/A"
+          fi
+
+          echo "mutation_score=$SCORE" >> $GITHUB_OUTPUT
+          echo "killed=$KILLED" >> $GITHUB_OUTPUT
+          echo "survived=$SURVIVED" >> $GITHUB_OUTPUT
+
+          cat mutation_summary.txt
+
+      - name: Generate HTML report
+        run: |
+          python -m mutmut html || true
+
+      - name: Upload mutation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: |
+            html/
+            mutation_summary.txt
+            .mutmut-cache
+          retention-days: 30
+
+      - name: Post summary
+        run: |
+          echo "## Mutation Testing Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Mutation Score | ${{ steps.mutation.outputs.mutation_score }}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Killed | ${{ steps.mutation.outputs.killed }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Survived | ${{ steps.mutation.outputs.survived }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See artifacts for detailed HTML report." >> $GITHUB_STEP_SUMMARY

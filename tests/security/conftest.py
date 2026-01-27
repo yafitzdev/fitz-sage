@@ -3,6 +3,8 @@
 Security test fixtures with tiered fallback support.
 
 Security tests run with local LLM first, then retry with cloud on failure.
+
+Imports e2e fixtures directly (not via root conftest to avoid parallel execution issues).
 """
 
 from __future__ import annotations
@@ -11,6 +13,9 @@ import functools
 from typing import Callable
 
 import pytest
+
+# Import e2e fixtures for security tests (these run serially, not in parallel)
+from tests.e2e.conftest import *  # noqa: F401, F403
 
 
 # Mark all tests in this directory as tier4 and security

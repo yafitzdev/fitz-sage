@@ -2,12 +2,15 @@
 """
 Chaos test fixtures.
 
-Note: e2e fixtures (e2e_runner) are imported via tests/conftest.py
+Imports e2e fixtures directly (not via root conftest to avoid parallel execution issues).
 """
 
 from __future__ import annotations
 
 import pytest
+
+# Import e2e fixtures for chaos tests (these run serially, not in parallel)
+from tests.e2e.conftest import *  # noqa: F401, F403
 
 
 def pytest_collection_modifyitems(items):

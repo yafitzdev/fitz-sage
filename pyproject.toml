@@ -133,6 +133,7 @@ dev = [
     "mypy>=1.0",
     "ruff>=0.1.0",
     "psutil>=5.9",
+    "mutmut>=2.4",  # Mutation testing
 ]
 
 # Load and performance testing
@@ -232,3 +233,20 @@ markers = [
     "security: marks tests as security tests (injection, leakage, validation)",
     "chaos: marks tests as chaos/reliability tests (failure modes, recovery)",
 ]
+
+[tool.mutmut]
+# Target core business logic modules
+paths_to_mutate = [
+    "fitz_ai/core/",
+    "fitz_ai/engines/fitz_rag/",
+    "fitz_ai/retrieval/detection/",
+]
+# Exclude init files, pure config, and path utilities
+paths_to_exclude = [
+    "__init__.py",
+    "fitz_ai/core/paths.py",
+    "fitz_ai/core/constants.py",
+    "fitz_ai/engines/fitz_rag/config/",
+]
+# Run unit tests quickly, stop on first failure
+runner = "python -m pytest tests/unit/ -x -q --tb=no"

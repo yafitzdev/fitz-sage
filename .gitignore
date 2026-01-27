@@ -103,6 +103,11 @@ test_docs/
 .e2e_cache.db
 .e2e_cache/
 
+# Mutation testing
+.mutmut-cache
+html/
+mutation_summary.txt
+
 # Vector DB data (local development)
 qdrant_data/
 chroma_data/

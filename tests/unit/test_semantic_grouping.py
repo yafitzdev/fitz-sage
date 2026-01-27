@@ -210,7 +210,7 @@ class TestHierarchyEnricherSemantic:
 
         enricher = HierarchyEnricher(
             config=config,
-            chat_client=mock_chat,
+            chat_factory=lambda tier: mock_chat,
             embedder=mock_embedder,
         )
 
@@ -229,7 +229,7 @@ class TestHierarchyEnricherSemantic:
         with pytest.raises(ValueError, match="Semantic grouping requires an embedder"):
             HierarchyEnricher(
                 config=config,
-                chat_client=mock_chat,
+                chat_factory=lambda tier: mock_chat,
                 embedder=None,
             )
 
@@ -255,7 +255,7 @@ class TestHierarchyEnricherSemantic:
 
         enricher = HierarchyEnricher(
             config=config,
-            chat_client=mock_chat,
+            chat_factory=lambda tier: mock_chat,
             embedder=mock_embedder,
         )
 
@@ -297,7 +297,7 @@ class TestEnrichmentPipelineSemantic:
         pipeline = EnrichmentPipeline(
             config=config,
             project_root=tmp_path,
-            chat_client=mock_chat,
+            chat_factory=lambda tier: mock_chat,
             embedder=mock_embedder,
         )
 
@@ -318,7 +318,7 @@ class TestEnrichmentPipelineSemantic:
                 },
             },
             project_root=tmp_path,
-            chat_client=mock_chat,
+            chat_factory=lambda tier: mock_chat,
             embedder=mock_embedder,
         )
 
