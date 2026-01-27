@@ -27,6 +27,7 @@ def pytest_collection_modifyitems(items):
     Postgres marker: Tests that use PostgreSQL (can't run in parallel due to pgserver)
     """
     # Files that should be tier1 (pure logic, fast, no external deps)
+    # NOTE: Do NOT include postgres tests here - they can't run in parallel
     TIER1_PATTERNS = [
         "test_answer_mode",
         "test_chunker_id",
@@ -34,9 +35,7 @@ def pytest_collection_modifyitems(items):
         "test_causal_attribution",
         "test_model_tier_resolution",
         "test_query_router",
-        "test_vocabulary",
         "test_semantic_grouping",
-        "test_entity_graph",
         "test_context_pipeline",
         "test_rgs",
         "test_writer_basic",
