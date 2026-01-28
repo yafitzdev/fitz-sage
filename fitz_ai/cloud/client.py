@@ -18,8 +18,9 @@ from fitz_ai.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Fitz Cloud requires 1536-dimensional embeddings (OpenAI text-embedding-3-small standard)
-REQUIRED_EMBEDDING_DIM = 1536
+# Supported embedding dimensions (partial indexes exist on server for fast lookup)
+# Any dimension works, but these have optimized indexes
+INDEXED_EMBEDDING_DIMS = {768, 1024, 1536, 3072}
 
 
 @dataclass
@@ -106,17 +107,14 @@ class CloudClient:
         if not self.config.enabled or not self.encryption:
             return CacheLookupResult(hit=False)
 
-        # Validate embedding dimension
+        # Log if using non-indexed dimension (will still work, just slower)
         embedding_dim = len(query_embedding)
-        if embedding_dim != REQUIRED_EMBEDDING_DIM:
-            if not self._dimension_warning_logged:
-                logger.warning(
-                    f"Cloud cache requires {REQUIRED_EMBEDDING_DIM}-dimensional embeddings "
-                    f"(OpenAI text-embedding-3-small). Your embedding has {embedding_dim} dimensions. "
-                    "Cloud cache disabled. Local RAG continues normally."
-                )
-                self._dimension_warning_logged = True
-            return CacheLookupResult(hit=False)
+        if embedding_dim not in INDEXED_EMBEDDING_DIMS and not self._dimension_warning_logged:
+            logger.info(
+                f"Using {embedding_dim}-dimensional embeddings. "
+                f"Indexed dimensions {INDEXED_EMBEDDING_DIMS} have faster lookup."
+            )
+            self._dimension_warning_logged = True
 
         cache_key = compute_cache_key(query_text, retrieval_fingerprint, versions)
 
@@ -201,18 +199,6 @@ class CloudClient:
             True if stored successfully
         """
         if not self.config.enabled or not self.encryption:
-            return False
-
-        # Validate embedding dimension
-        embedding_dim = len(query_embedding)
-        if embedding_dim != REQUIRED_EMBEDDING_DIM:
-            if not self._dimension_warning_logged:
-                logger.warning(
-                    f"Cloud cache requires {REQUIRED_EMBEDDING_DIM}-dimensional embeddings "
-                    f"(OpenAI text-embedding-3-small). Your embedding has {embedding_dim} dimensions. "
-                    "Cache storage skipped. Local RAG continues normally."
-                )
-                self._dimension_warning_logged = True
             return False
 
         cache_key = compute_cache_key(query_text, retrieval_fingerprint, versions)
