@@ -95,7 +95,7 @@ class FitzQueryEngine(BaseQueryEngine):
             llm: Language model for synthesis
             api_key: Fitz Cloud API key (fitz_xxx format)
             org_key: Encryption key (64-char hex, NEVER sent to server)
-            embedding_fn: Function to embed query → 1536-dim vector
+            embedding_fn: Function to embed query → embedding vector
             llm_model: LLM model name for cache versioning
             prompt_template: Optional custom prompt template (must have {context} and {question})
             org_id: Optional organization ID

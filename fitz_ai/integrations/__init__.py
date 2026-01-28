@@ -8,7 +8,7 @@ This package provides integration layers for popular RAG frameworks:
 All integrations share a common base optimizer that handles:
 - Cloud cache lookup/store
 - Client-side encryption (org_key never leaves local)
-- Dimension validation (1536-dim embeddings required)
+- Any embedding dimension supported
 - Routing advice (Pro+ tiers)
 """
 

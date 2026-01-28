@@ -86,7 +86,7 @@ class FitzOptimizer:
             org_key: Encryption key (64-char hex, NEVER sent to server)
             org_id: Organization ID (auto-generated if not provided)
             base_url: Cloud API URL
-            embedding_fn: Optional function to embed query text → 1536-dim vector
+            embedding_fn: Optional function to embed query text → embedding vector
             engine_version: Version string for cache invalidation
             collection_version: Collection version for cache invalidation
             timeout: HTTP request timeout in seconds
@@ -125,7 +125,7 @@ class FitzOptimizer:
 
         Args:
             query: Query text
-            query_embedding: Query embedding (must be 1536-dim)
+            query_embedding: Query embedding vector
             chunk_ids: List of retrieved chunk IDs (for fingerprinting)
             llm_model: LLM model name (for version tracking)
             chunk_embeddings: Optional chunk embeddings for routing advice (Pro+ tiers)
@@ -206,7 +206,7 @@ class FitzOptimizer:
 
         Args:
             query: Query text
-            query_embedding: Query embedding (must be 1536-dim)
+            query_embedding: Query embedding vector
             chunk_ids: List of retrieved chunk IDs
             llm_model: LLM model name
             answer_text: Generated answer text

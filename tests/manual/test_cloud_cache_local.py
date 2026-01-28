@@ -22,7 +22,7 @@ from fitz_ai.core import Answer, Provenance
 
 
 def get_embedding(text: str) -> list[float]:
-    """Get 1536-dim embedding - tries OpenAI, falls back to deterministic mock."""
+    """Get embedding - tries OpenAI (1536-dim), falls back to deterministic mock (768-dim)."""
     import hashlib
 
     # Try OpenAI first
@@ -235,7 +235,7 @@ def main():
     print("=" * 60)
     print("""
 What happened:
-1. Query embedding generated (1536-dim, OpenAI)
+1. Query embedding generated (any dimension supported)
 2. Cache lookup #1 -> MISS (no cached answer)
 3. Answer encrypted locally with org_key
 4. Encrypted blob stored in Fitz Cloud
