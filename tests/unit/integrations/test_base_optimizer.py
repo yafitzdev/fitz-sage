@@ -52,14 +52,25 @@ class TestFitzOptimizer:
         assert len(org_id1) == 36  # UUID format
 
     @patch("fitz_ai.integrations.base.CloudClient")
-    def test_lookup_dimension_validation(self, mock_client_class):
-        """Wrong embedding dimension returns miss."""
+    def test_lookup_accepts_any_dimension(self, mock_client_class):
+        """Any embedding dimension is accepted (non-indexed just logs warning)."""
+        # Setup mock
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        # Mock cache miss (dimension doesn't affect lookup behavior)
+        mock_result = MagicMock()
+        mock_result.hit = False
+        mock_result.answer = None
+        mock_result.routing = None
+        mock_client.lookup_cache.return_value = mock_result
+
         optimizer = FitzOptimizer(
             api_key="fitz_test_key_12345",
             org_key="a" * 64,
         )
 
-        # Wrong dimension (768 instead of 1536)
+        # Non-indexed dimension (768) should still call lookup
         result = optimizer.lookup(
             query="test query",
             query_embedding=[1.0] * 768,
@@ -67,10 +78,8 @@ class TestFitzOptimizer:
             llm_model="gpt-4o",
         )
 
-        assert result.hit is False
-        assert result.answer is None
-        # Client lookup should not be called with wrong dimension
-        mock_client_class.return_value.lookup_cache.assert_not_called()
+        # Lookup should proceed regardless of dimension
+        mock_client.lookup_cache.assert_called_once()
 
     @patch("fitz_ai.integrations.base.CloudClient")
     def test_lookup_cache_hit(self, mock_client_class):
@@ -139,14 +148,19 @@ class TestFitzOptimizer:
         assert result.routing_advice["dedup_chunks"] == [1, 3]
 
     @patch("fitz_ai.integrations.base.CloudClient")
-    def test_store_dimension_validation(self, mock_client_class):
-        """Wrong embedding dimension fails silently."""
+    def test_store_accepts_any_dimension(self, mock_client_class):
+        """Any embedding dimension is accepted for store."""
+        # Setup mock
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        mock_client.store_cache.return_value = True
+
         optimizer = FitzOptimizer(
             api_key="fitz_test_key_12345",
             org_key="a" * 64,
         )
 
-        # Wrong dimension
+        # Non-indexed dimension (768) should still call store
         stored = optimizer.store(
             query="test query",
             query_embedding=[1.0] * 768,
@@ -155,8 +169,8 @@ class TestFitzOptimizer:
             answer_text="Test answer",
         )
 
-        assert stored is False
-        mock_client_class.return_value.store_cache.assert_not_called()
+        assert stored is True
+        mock_client.store_cache.assert_called_once()
 
     @patch("fitz_ai.integrations.base.CloudClient")
     def test_store_success(self, mock_client_class):

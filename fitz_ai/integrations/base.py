@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from fitz_ai.cloud.cache_key import CacheVersions, compute_retrieval_fingerprint
-from fitz_ai.cloud.client import REQUIRED_EMBEDDING_DIM, CloudClient
+from fitz_ai.cloud.client import INDEXED_EMBEDDING_DIMS, CloudClient
 from fitz_ai.cloud.config import CloudConfig
 from fitz_ai.core import Answer, Provenance
 from fitz_ai.logging.logger import get_logger
@@ -134,12 +134,13 @@ class FitzOptimizer:
         Returns:
             OptimizationResult with hit status, answer (if hit), or routing advice (if miss)
         """
-        # Validate embedding dimension
-        if len(query_embedding) != REQUIRED_EMBEDDING_DIM:
+        # Log if using non-indexed embedding dimension (still works, just slower)
+        embedding_dim = len(query_embedding)
+        if embedding_dim not in INDEXED_EMBEDDING_DIMS:
             logger.debug(
-                f"Embedding dimension mismatch: {len(query_embedding)} != {REQUIRED_EMBEDDING_DIM}"
+                f"Using {embedding_dim}-dim embeddings. "
+                f"Indexed dimensions {INDEXED_EMBEDDING_DIMS} have faster lookup."
             )
-            return OptimizationResult(hit=False)
 
         retrieval_fingerprint = compute_retrieval_fingerprint(chunk_ids)
         versions = CacheVersions(
@@ -217,12 +218,13 @@ class FitzOptimizer:
         Returns:
             True if stored successfully
         """
-        # Validate embedding dimension
-        if len(query_embedding) != REQUIRED_EMBEDDING_DIM:
+        # Log if using non-indexed embedding dimension (still works, just slower)
+        embedding_dim = len(query_embedding)
+        if embedding_dim not in INDEXED_EMBEDDING_DIMS:
             logger.debug(
-                f"Embedding dimension mismatch: {len(query_embedding)} != {REQUIRED_EMBEDDING_DIM}"
+                f"Using {embedding_dim}-dim embeddings. "
+                f"Indexed dimensions {INDEXED_EMBEDDING_DIMS} have faster lookup."
             )
-            return False
 
         retrieval_fingerprint = compute_retrieval_fingerprint(chunk_ids)
         versions = CacheVersions(
@@ -286,11 +288,12 @@ class FitzOptimizer:
 
         try:
             embedding = self.embedding_fn(query)
-            if len(embedding) != REQUIRED_EMBEDDING_DIM:
-                logger.warning(
-                    f"Embedding dimension mismatch: {len(embedding)} != {REQUIRED_EMBEDDING_DIM}"
+            embedding_dim = len(embedding)
+            if embedding_dim not in INDEXED_EMBEDDING_DIMS:
+                logger.debug(
+                    f"Using {embedding_dim}-dim embeddings. "
+                    f"Indexed dimensions {INDEXED_EMBEDDING_DIMS} have faster lookup."
                 )
-                return None
             return embedding
         except Exception as e:
             logger.warning("Embedding failed", extra={"error": str(e)})
