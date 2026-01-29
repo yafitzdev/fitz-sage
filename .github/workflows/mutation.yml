@@ -101,23 +101,34 @@ jobs:
           echo "=== Raw summary file ==="
           cat mutation_summary.txt || true
 
-          # Extract mutation score (mutmut output format varies)
-          # Try multiple patterns
-          KILLED=$(grep -E "^Killed|killed" mutation_summary.txt | grep -oE '[0-9]+' | head -1 || echo "0")
-          SURVIVED=$(grep -E "^Survived|survived" mutation_summary.txt | grep -oE '[0-9]+' | head -1 || echo "0")
+          # Extract mutation score from mutmut 2.x output
+          # Format: "⠴ 990/990  🎉 99  ⏰ 0  🤔 0  🙁 891  🔇 0"
+          # 🎉 = killed, 🙁 = survived
 
-          # Fallback: count from status lines
-          if [ "$KILLED" = "0" ] && [ "$SURVIVED" = "0" ]; then
-            KILLED=$(grep -c "^KILLED" mutation_summary.txt 2>/dev/null || echo "0")
-            SURVIVED=$(grep -c "^SURVIVED" mutation_summary.txt 2>/dev/null || echo "0")
+          # Try to extract from the progress line first
+          KILLED=$(grep -oE '🎉 [0-9]+' mutation_summary.txt | grep -oE '[0-9]+' | tail -1 || echo "0")
+          SURVIVED=$(grep -oE '🙁 [0-9]+' mutation_summary.txt | grep -oE '[0-9]+' | tail -1 || echo "0")
+
+          # Fallback: try "Survived" text format
+          if [ -z "$KILLED" ] || [ "$KILLED" = "0" ]; then
+            # Count "Survived" section entries
+            SURVIVED_COUNT=$(grep -c "^---- " mutation_summary.txt 2>/dev/null || echo "0")
+            if [ "$SURVIVED_COUNT" != "0" ]; then
+              # Extract number in parentheses after "Survived"
+              SURVIVED=$(grep -oE 'Survived.*\([0-9]+\)' mutation_summary.txt | grep -oE '[0-9]+' | head -1 || echo "$SURVIVED")
+            fi
           fi
+
+          # Ensure we have numbers
+          KILLED=${KILLED:-0}
+          SURVIVED=${SURVIVED:-0}
 
           TOTAL=$((KILLED + SURVIVED))
 
           echo "Killed: $KILLED, Survived: $SURVIVED, Total: $TOTAL"
 
           if [ $TOTAL -gt 0 ]; then
-            SCORE=$(echo "scale=1; $KILLED * 100 / $TOTAL" | bc)
+            SCORE=$(awk "BEGIN {printf \"%.1f\", $KILLED * 100 / $TOTAL}")
           else
             SCORE="N/A"
           fi
