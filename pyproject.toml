@@ -133,7 +133,7 @@ dev = [
     "mypy>=1.0",
     "ruff>=0.1.0",
     "psutil>=5.9",
-    "mutmut>=2.4",  # Mutation testing
+    "mutmut>=2.4,<3",  # Mutation testing (3.x removed CI-friendly commands)
     "hypothesis>=6.100.0",  # Property-based testing
 ]
 

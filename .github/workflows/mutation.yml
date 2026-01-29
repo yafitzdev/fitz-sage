@@ -51,7 +51,8 @@ jobs:
           pip install pydantic pyyaml httpx typing-extensions typer jinja2
           pip install pytest pytest-cov pytest-xdist psutil
           pip install numpy faiss-cpu cryptography
-          pip install mutmut
+          # Pin mutmut to 2.x - version 3.x removed CI-friendly commands (html, results)
+          pip install "mutmut>=2.4,<3"
           pip install -e . --no-deps
 
       - name: Verify setup
@@ -84,10 +85,11 @@ jobs:
         run: |
           # Run mutation tests - mutmut reads config from pyproject.toml
           echo "=== mutmut version ==="
-          python -m mutmut version || pip show mutmut | grep Version
+          pip show mutmut | grep Version
 
           echo "=== Starting mutation testing ==="
-          # mutmut uses pyproject.toml config for paths_to_mutate and runner
+          # mutmut 2.x uses pyproject.toml config for paths_to_mutate and runner
+          # --CI flag enables non-interactive mode suitable for CI
           timeout 3600 python -m mutmut run --CI || true
 
           echo ""
