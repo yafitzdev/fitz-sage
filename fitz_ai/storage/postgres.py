@@ -133,14 +133,24 @@ def _kill_zombie_postgres_processes() -> None:
     """
     try:
         if sys.platform == "win32":
-            # Windows: kill postgres.exe processes
-            result = subprocess.run(
-                ["taskkill", "/F", "/IM", "postgres.exe"],
-                capture_output=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
+            # Windows: kill postgres.exe and related processes
+            killed_any = False
+            for proc_name in ["postgres.exe", "pg_ctl.exe", "initdb.exe"]:
+                try:
+                    result = subprocess.run(
+                        ["taskkill", "/F", "/IM", proc_name],
+                        capture_output=True,
+                        timeout=10,
+                    )
+                    if result.returncode == 0:
+                        killed_any = True
+                except Exception:
+                    pass
+
+            if killed_any:
                 logger.debug(f"{STORAGE} Killed zombie postgres processes")
+                # Windows needs extra time after killing processes
+                time.sleep(1.0)
         else:
             # Unix: kill postgres processes owned by current user
             result = subprocess.run(
@@ -179,7 +189,7 @@ def _cleanup_stale_lock_files(data_dir: Path) -> None:
                 logger.warning(f"{STORAGE} Could not remove lock file {lock_file}: {e}")
 
 
-def _force_remove_pgdata(data_dir: Path, max_retries: int = 3) -> bool:
+def _force_remove_pgdata(data_dir: Path, max_retries: int = 5) -> bool:
     """
     Forcefully remove pgdata directory, killing processes if needed.
 
@@ -201,7 +211,23 @@ def _force_remove_pgdata(data_dir: Path, max_retries: int = 3) -> bool:
             )
             # Try killing postgres processes that might hold locks
             _kill_zombie_postgres_processes()
-            time.sleep(1)  # Give OS time to release file handles
+
+            # Windows needs more time to release file handles
+            wait_time = 2.0 if sys.platform == "win32" else 1.0
+            time.sleep(wait_time)
+
+            # On Windows, try using rd /s /q as nuclear option
+            if sys.platform == "win32" and attempt >= 2:
+                try:
+                    subprocess.run(
+                        ["cmd", "/c", "rd", "/s", "/q", str(data_dir)],
+                        capture_output=True,
+                        timeout=10,
+                    )
+                    if not data_dir.exists():
+                        return True
+                except Exception:
+                    pass
         except Exception as e:
             logger.error(f"{STORAGE} Unexpected error removing pgdata: {e}")
             return False
@@ -330,7 +356,8 @@ class PostgresConnectionManager:
         data_dir = Path(data_dir)
         data_dir.mkdir(parents=True, exist_ok=True)
 
-        # Clean up any stale lock files from previous crashes
+        # Clean up any stale state from previous crashes BEFORE first attempt
+        _kill_zombie_postgres_processes()
         _cleanup_stale_lock_files(data_dir)
 
         logger.info(f"{STORAGE} Starting pgserver at {data_dir} (timeout={timeout}s)")
@@ -361,48 +388,77 @@ class PostgresConnectionManager:
             logger.info(f"{STORAGE} pgserver started successfully")
             return
 
-        # Recovery attempt - reset pgdata and try again
+        # Recovery attempts - reset pgdata and try again (up to 3 times)
         if allow_recovery:
-            logger.warning(f"{STORAGE} pgserver failed to start, attempting auto-recovery...")
-            try:
-                # Clean up any partial state
-                if self._pgserver is not None:
-                    try:
-                        self._pgserver.cleanup()
-                    except Exception:
-                        pass
-                    self._pgserver = None
+            max_recovery_attempts = 3
+            for recovery_attempt in range(max_recovery_attempts):
+                logger.warning(
+                    f"{STORAGE} pgserver failed to start, attempting auto-recovery "
+                    f"({recovery_attempt + 1}/{max_recovery_attempts})..."
+                )
+                try:
+                    # Clean up any partial state
+                    if self._pgserver is not None:
+                        try:
+                            self._pgserver.cleanup()
+                        except Exception:
+                            pass
+                        self._pgserver = None
 
-                # Kill any zombie postgres processes that might hold locks
-                _kill_zombie_postgres_processes()
-                time.sleep(0.5)  # Give OS time to release handles
+                    # Kill any zombie postgres processes that might hold locks
+                    _kill_zombie_postgres_processes()
 
-                # Delete corrupted pgdata with retries
-                if data_dir.exists():
-                    if _force_remove_pgdata(data_dir):
-                        logger.info(f"{STORAGE} Deleted corrupted pgdata at {data_dir}")
-                    else:
-                        logger.error(
-                            f"{STORAGE} Could not delete pgdata at {data_dir}. "
-                            "Try manually deleting it or running 'fitz reset'."
-                        )
-                        raise RuntimeError(f"Cannot remove corrupted pgdata at {data_dir}")
+                    # Windows needs more time to release file handles
+                    wait_time = 3.0 if sys.platform == "win32" else 1.0
+                    time.sleep(wait_time)
 
-                # Recreate directory
-                data_dir.mkdir(parents=True, exist_ok=True)
+                    # Delete corrupted pgdata with retries
+                    if data_dir.exists():
+                        if _force_remove_pgdata(data_dir):
+                            logger.info(f"{STORAGE} Deleted corrupted pgdata at {data_dir}")
+                        else:
+                            logger.warning(
+                                f"{STORAGE} Could not delete pgdata at {data_dir}, "
+                                f"will retry..."
+                            )
+                            continue  # Try again
 
-                # Retry without recovery (to prevent infinite loop)
-                if _try_start():
-                    logger.info(f"{STORAGE} pgserver started successfully after recovery")
-                    return
-            except Exception as e:
-                logger.error(f"{STORAGE} Auto-recovery failed: {e}")
+                    # Recreate directory
+                    data_dir.mkdir(parents=True, exist_ok=True)
 
-        # All attempts failed
-        raise RuntimeError(
-            f"pgserver failed to start within {timeout}s even after recovery attempt. "
-            "Try manually running 'fitz reset' or deleting ~/.fitz/pgdata"
-        )
+                    # Clean lock files again just in case
+                    _cleanup_stale_lock_files(data_dir)
+
+                    # Retry startup
+                    if _try_start():
+                        logger.info(f"{STORAGE} pgserver started successfully after recovery")
+                        return
+
+                except Exception as e:
+                    logger.error(f"{STORAGE} Auto-recovery attempt {recovery_attempt + 1} failed: {e}")
+
+                # Exponential backoff between recovery attempts
+                if recovery_attempt < max_recovery_attempts - 1:
+                    backoff = 2.0 * (recovery_attempt + 1)
+                    logger.info(f"{STORAGE} Waiting {backoff}s before next recovery attempt...")
+                    time.sleep(backoff)
+
+        # All attempts failed - provide helpful error message
+        if sys.platform == "win32":
+            help_msg = (
+                f"pgserver failed to start after {max_recovery_attempts if allow_recovery else 1} attempts. "
+                "Try these steps:\n"
+                "1. Close any database tools (pgAdmin, DBeaver, etc.)\n"
+                "2. Run: taskkill /F /IM postgres.exe\n"
+                f"3. Delete: {data_dir}\n"
+                "4. Retry your command"
+            )
+        else:
+            help_msg = (
+                f"pgserver failed to start after {max_recovery_attempts if allow_recovery else 1} attempts. "
+                f"Try: rm -rf {data_dir} && fitz <your-command>"
+            )
+        raise RuntimeError(help_msg)
 
     def _get_uri(self, database: str = "postgres") -> str:
         """Get connection URI for a database (cached)."""
