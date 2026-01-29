@@ -1,15 +1,15 @@
 # .github/workflows/mutation.yml
 #
-# Nightly Mutation Testing for Fitz
+# Weekly Mutation Testing for Fitz
 # Validates test quality by checking if tests catch code mutations
-# Only runs on main branch, nightly schedule
+# Runs weekly (Sunday 3 AM UTC) - takes 3-5 hours for full suite
 
 name: Mutation Testing
 
 on:
   schedule:
-    # Run at 3 AM UTC daily
-    - cron: "0 3 * * *"
+    # Run at 3 AM UTC on Sundays only (full suite takes hours)
+    - cron: "0 3 * * 0"
   workflow_dispatch: # Allow manual trigger
 
 jobs:
@@ -90,7 +90,8 @@ jobs:
           echo "=== Starting mutation testing ==="
           # mutmut 2.x uses pyproject.toml config for paths_to_mutate and runner
           # --CI flag enables non-interactive mode suitable for CI
-          timeout 3600 python -m mutmut run --CI || true
+          # 6 hour timeout for full core/ mutation with all unit tests
+          timeout 21600 python -m mutmut run --CI || true
 
           echo ""
           echo "=== Mutation Results ==="

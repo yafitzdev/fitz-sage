@@ -237,11 +237,10 @@ markers = [
 ]
 
 [tool.mutmut]
-# Target only files with dedicated tests (keeps runtime under 1 hour)
-# answer_mode.py, answer_mode_resolver.py, guardrails/ have good test coverage
-paths_to_mutate = "fitz_ai/core/guardrails/"
-# Run ALL tests that import guardrails
-runner = "python -m pytest tests/unit/test_constraints.py tests/unit/test_causal_attribution.py tests/unit/test_answer_mode.py tests/unit/test_epistemic_hierarchy.py -x -q --tb=no"
-# Test execution timeout
-test_time_multiplier = 2.0
-test_time_base = 5.0
+# Full mutation testing - run overnight locally or in weekly CI
+paths_to_mutate = "fitz_ai/core/"
+# Run all unit tests (except slow postgres recovery tests)
+runner = "python -m pytest tests/unit/ -x -q --tb=no --ignore=tests/unit/test_postgres_recovery.py"
+# Test execution timeout (generous for full suite)
+test_time_multiplier = 3.0
+test_time_base = 10.0
