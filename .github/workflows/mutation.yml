@@ -82,16 +82,13 @@ jobs:
         id: mutation
         continue-on-error: true
         run: |
-          # Run mutation tests on core module first (smaller, faster feedback)
-          # Target specific high-value modules to keep runtime reasonable
-          echo "=== Starting mutation testing ==="
+          # Run mutation tests - mutmut reads config from pyproject.toml
+          echo "=== mutmut version ==="
+          python -m mutmut version || pip show mutmut | grep Version
 
-          # Run mutmut with explicit paths
-          # Start with a small module to verify it works
-          timeout 3600 python -m mutmut run \
-            --paths-to-mutate=fitz_ai/core/constraints.py \
-            --runner="python -m pytest tests/unit/test_constraints.py -x -q --tb=no" \
-            --CI || true
+          echo "=== Starting mutation testing ==="
+          # mutmut uses pyproject.toml config for paths_to_mutate and runner
+          timeout 3600 python -m mutmut run --CI || true
 
           echo ""
           echo "=== Mutation Results ==="

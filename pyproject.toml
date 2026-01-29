@@ -237,10 +237,10 @@ markers = [
 ]
 
 [tool.mutmut]
-# Target core business logic modules (mutmut uses single path, we'll use CI args for multiple)
-paths_to_mutate = "fitz_ai/"
-# Run unit tests quickly, stop on first failure
-runner = "python -m pytest tests/unit/ -x -q --tb=no"
+# Target core module only (smaller, faster feedback)
+paths_to_mutate = "fitz_ai/core/"
+# Run core-related unit tests only, stop on first failure
+runner = "python -m pytest tests/unit/test_constraints.py tests/unit/test_answer_mode.py tests/unit/test_chunker_id.py -x -q --tb=no"
 # Test execution timeout
 test_time_multiplier = 2.0
 test_time_base = 5.0
