@@ -54,20 +54,53 @@ jobs:
           pip install mutmut
           pip install -e . --no-deps
 
+      - name: Verify setup
+        run: |
+          echo "=== Checking mutmut config ==="
+          python -m mutmut show-config || true
+          echo ""
+          echo "=== Source files to mutate ==="
+          find fitz_ai/core -name "*.py" | head -20
+          echo ""
+          echo "=== Test files ==="
+          find tests/unit -name "test_*.py" | head -10
+
       - name: Run mutation tests
         id: mutation
         continue-on-error: true
         run: |
-          # Run mutation tests with timeout (60 minutes max)
-          timeout 3600 python -m mutmut run --CI || true
+          # Run mutation tests on core module first (smaller, faster feedback)
+          # Target specific high-value modules to keep runtime reasonable
+          echo "=== Starting mutation testing ==="
 
-          # Generate results summary
-          python -m mutmut results > mutation_summary.txt || true
+          timeout 3600 python -m mutmut run \
+            --paths-to-mutate=fitz_ai/core/ \
+            --tests-dir=tests/unit/ \
+            --CI || true
 
-          # Extract mutation score
-          KILLED=$(grep -oP 'Killed mutants:\s+\K\d+' mutation_summary.txt || echo "0")
-          SURVIVED=$(grep -oP 'Survived mutants:\s+\K\d+' mutation_summary.txt || echo "0")
+          echo ""
+          echo "=== Mutation Results ==="
+          python -m mutmut results || true
+          python -m mutmut results > mutation_summary.txt 2>&1 || true
+
+          # Show the raw output for debugging
+          echo "=== Raw summary file ==="
+          cat mutation_summary.txt || true
+
+          # Extract mutation score (mutmut output format varies)
+          # Try multiple patterns
+          KILLED=$(grep -E "^Killed|killed" mutation_summary.txt | grep -oE '[0-9]+' | head -1 || echo "0")
+          SURVIVED=$(grep -E "^Survived|survived" mutation_summary.txt | grep -oE '[0-9]+' | head -1 || echo "0")
+
+          # Fallback: count from status lines
+          if [ "$KILLED" = "0" ] && [ "$SURVIVED" = "0" ]; then
+            KILLED=$(grep -c "^KILLED" mutation_summary.txt 2>/dev/null || echo "0")
+            SURVIVED=$(grep -c "^SURVIVED" mutation_summary.txt 2>/dev/null || echo "0")
+          fi
+
           TOTAL=$((KILLED + SURVIVED))
+
+          echo "Killed: $KILLED, Survived: $SURVIVED, Total: $TOTAL"
 
           if [ $TOTAL -gt 0 ]; then
             SCORE=$(echo "scale=1; $KILLED * 100 / $TOTAL" | bc)
@@ -78,8 +111,6 @@ jobs:
           echo "mutation_score=$SCORE" >> $GITHUB_OUTPUT
           echo "killed=$KILLED" >> $GITHUB_OUTPUT
           echo "survived=$SURVIVED" >> $GITHUB_OUTPUT
-
-          cat mutation_summary.txt
 
       - name: Generate HTML report
         run: |

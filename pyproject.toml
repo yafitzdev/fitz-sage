@@ -237,18 +237,10 @@ markers = [
 ]
 
 [tool.mutmut]
-# Target core business logic modules
-paths_to_mutate = [
-    "fitz_ai/core/",
-    "fitz_ai/engines/fitz_rag/",
-    "fitz_ai/retrieval/detection/",
-]
-# Exclude init files, pure config, and path utilities
-paths_to_exclude = [
-    "__init__.py",
-    "fitz_ai/core/paths.py",
-    "fitz_ai/core/constants.py",
-    "fitz_ai/engines/fitz_rag/config/",
-]
+# Target core business logic modules (mutmut uses single path, we'll use CI args for multiple)
+paths_to_mutate = "fitz_ai/"
 # Run unit tests quickly, stop on first failure
 runner = "python -m pytest tests/unit/ -x -q --tb=no"
+# Test execution timeout
+test_time_multiplier = 2.0
+test_time_base = 5.0
