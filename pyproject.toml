@@ -237,10 +237,11 @@ markers = [
 ]
 
 [tool.mutmut]
-# Target core module
-paths_to_mutate = "fitz_ai/core/"
-# Run ALL unit tests for full coverage picture, stop on first failure
-runner = "python -m pytest tests/unit/ -x -q --tb=no --ignore=tests/unit/test_postgres_recovery.py"
-# Test execution timeout (increased for full test suite)
-test_time_multiplier = 3.0
-test_time_base = 10.0
+# Target only files with dedicated tests (keeps runtime under 1 hour)
+# answer_mode.py, answer_mode_resolver.py, guardrails/ have good test coverage
+paths_to_mutate = "fitz_ai/core/guardrails/"
+# Run relevant tests - guardrails + constraints + answer_mode
+runner = "python -m pytest tests/unit/test_constraints.py tests/unit/test_causal_attribution.py tests/unit/test_answer_mode.py -x -q --tb=no"
+# Test execution timeout
+test_time_multiplier = 2.0
+test_time_base = 5.0
