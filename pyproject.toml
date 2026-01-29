@@ -239,8 +239,8 @@ markers = [
 [tool.mutmut]
 # Full mutation testing - run overnight locally or in weekly CI
 paths_to_mutate = "fitz_ai/core/"
-# Run all unit tests (except slow postgres recovery tests)
-runner = "python -m pytest tests/unit/ -x -q --tb=no --ignore=tests/unit/test_postgres_recovery.py"
+# Run unit + integration tests for thorough coverage
+runner = "python -m pytest tests/unit/ tests/integration/ -x -q --tb=no --ignore=tests/unit/test_postgres_recovery.py"
 # Test execution timeout (generous for full suite)
 test_time_multiplier = 3.0
 test_time_base = 10.0
