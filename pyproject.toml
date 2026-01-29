@@ -134,6 +134,7 @@ dev = [
     "ruff>=0.1.0",
     "psutil>=5.9",
     "mutmut>=2.4",  # Mutation testing
+    "hypothesis>=6.100.0",  # Property-based testing
 ]
 
 # Load and performance testing
@@ -232,6 +233,7 @@ markers = [
     "scalability: marks tests as scalability tests (large corpus, concurrent)",
     "security: marks tests as security tests (injection, leakage, validation)",
     "chaos: marks tests as chaos/reliability tests (failure modes, recovery)",
+    "property: marks tests as property-based tests (hypothesis)",
 ]
 
 [tool.mutmut]

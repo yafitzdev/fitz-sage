@@ -8,7 +8,6 @@ requiring actual embedding API calls.
 
 from __future__ import annotations
 
-import os
 from typing import Callable
 
 import pytest
@@ -18,13 +17,7 @@ from fitz_ai.core.guardrails import SemanticMatcher
 from .mock_embedder import create_deterministic_embedder
 
 
-def _is_parallel_run() -> bool:
-    """Check if running under pytest-xdist with multiple workers."""
-    # PYTEST_XDIST_WORKER is set when running under xdist
-    return "PYTEST_XDIST_WORKER" in os.environ
-
-
-def pytest_collection_modifyitems(items):
+def pytest_collection_modifyitems(config, items):
     """Add tier and postgres markers to unit tests based on type.
 
     Tier 1 (every commit): Pure logic tests with no I/O or mocks
@@ -54,6 +47,8 @@ def pytest_collection_modifyitems(items):
         "structured/test_formatter",
         "structured/test_router",
         "structured/test_schema",
+        # Property-based tests (pure logic, deterministic)
+        "property/",
     ]
 
     # Files that use PostgreSQL (pgserver) - must run serially
@@ -82,8 +77,10 @@ def pytest_collection_modifyitems(items):
         if is_postgres:
             item.add_marker(pytest.mark.postgres)
             # Auto-skip postgres tests when running in parallel (pgserver can't handle it)
-            if _is_parallel_run():
-                item.add_marker(pytest.mark.skip(reason="Postgres tests skipped in parallel mode (use -m postgres separately)"))
+            # Check if xdist is active with multiple workers
+            num_workers = getattr(config.option, "numprocesses", None)
+            if num_workers is not None and num_workers != 0:
+                item.add_marker(pytest.mark.skip(reason="Postgres tests skipped in parallel mode (run with: pytest -m postgres)"))
 
         # Skip tier marking if already has a tier marker
         has_tier = any(marker.name.startswith("tier") for marker in item.iter_markers())
