@@ -56,14 +56,27 @@ jobs:
 
       - name: Verify setup
         run: |
-          echo "=== Checking mutmut config ==="
-          python -m mutmut show-config || true
+          echo "=== Python and package check ==="
+          python --version
+          python -c "import fitz_ai; print('fitz_ai imported OK')"
+
           echo ""
           echo "=== Source files to mutate ==="
-          find fitz_ai/core -name "*.py" | head -20
+          find fitz_ai/core -name "*.py" -type f | wc -l
+          find fitz_ai/core -name "*.py" -type f | head -10
+
           echo ""
           echo "=== Test files ==="
-          find tests/unit -name "test_*.py" | head -10
+          find tests/unit -name "test_*.py" -type f | wc -l
+
+      - name: Verify tests pass (baseline)
+        run: |
+          echo "=== Running baseline tests (mutmut needs passing tests) ==="
+          python -m pytest tests/unit/test_constraints.py tests/unit/test_answer_mode.py -v --tb=short || {
+            echo "ERROR: Baseline tests failed! Mutmut requires passing tests."
+            exit 1
+          }
+          echo "Baseline tests passed!"
 
       - name: Run mutation tests
         id: mutation
@@ -73,9 +86,11 @@ jobs:
           # Target specific high-value modules to keep runtime reasonable
           echo "=== Starting mutation testing ==="
 
+          # Run mutmut with explicit paths
+          # Start with a small module to verify it works
           timeout 3600 python -m mutmut run \
-            --paths-to-mutate=fitz_ai/core/ \
-            --tests-dir=tests/unit/ \
+            --paths-to-mutate=fitz_ai/core/constraints.py \
+            --runner="python -m pytest tests/unit/test_constraints.py -x -q --tb=no" \
             --CI || true
 
           echo ""
