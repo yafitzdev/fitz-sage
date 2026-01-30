@@ -488,6 +488,24 @@ class TestAnthropicChat:
                     call_kwargs = mock_httpx_client.call_args[1]
                     assert call_kwargs["verify"] == "/path/to/ca.crt"
 
+    def test_backwards_compatible_with_api_key_auth(self) -> None:
+        """Verify API-key-only users see no behavior change."""
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
+            mock_client = MagicMock()
+            mock_content = MagicMock()
+            mock_content.text = "Hello from Anthropic!"
+            mock_response = MagicMock()
+            mock_response.content = [mock_content]
+            mock_client.messages.create.return_value = mock_response
+
+            with patch("httpx.Client"):
+                with patch("anthropic.Anthropic", return_value=mock_client):
+                    auth = ApiKeyAuth("ANTHROPIC_API_KEY")
+                    provider = AnthropicChat(auth)
+                    result = provider.chat([{"role": "user", "content": "Hi"}])
+
+                    assert result == "Hello from Anthropic!"
+
 
 class TestOllamaChat:
     """Test Ollama chat provider."""
