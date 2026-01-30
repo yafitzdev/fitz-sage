@@ -259,8 +259,8 @@ class InstrumentedProxy:
                          If None, all public methods are instrumented.
 
     Example:
-        plugin = get_llm_plugin("openai", "chat")
-        proxy = InstrumentedProxy(plugin, "llm.chat", "openai", {"chat"})
+        chat = get_chat("openai")
+        proxy = InstrumentedProxy(chat, "llm.chat", "openai", {"chat"})
         proxy.chat(messages)  # Hook is notified
     """
 

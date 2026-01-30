@@ -31,7 +31,7 @@ def ingest_direct_text(
     from fitz_ai.core.chunk import Chunk
     from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
     from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
-    from fitz_ai.llm.registry import get_llm_plugin
+    from fitz_ai.llm import get_embedder
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     ui.header("Fitz Ingest", "Direct text ingestion")
@@ -47,12 +47,8 @@ def ingest_direct_text(
     print()
 
     # Get components
-    embedding_kwargs = config.get("embedding", {}).get("kwargs", {})
-    embedder = get_llm_plugin(
-        plugin_type="embedding",
-        plugin_name=ctx.embedding_plugin,
-        **embedding_kwargs,
-    )
+    embedding_config = config.get("embedding", {}).get("kwargs", {})
+    embedder = get_embedder(ctx.embedding_plugin, config=embedding_config)
 
     vector_client = get_vector_db_plugin(ctx.vector_db_plugin)
 

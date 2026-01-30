@@ -103,17 +103,17 @@ def _check_optional_dependencies() -> list[tuple[str, bool, str]]:
 
 
 def _test_embedding(ctx: CLIContext) -> tuple[bool, str]:
-    """Test embedding plugin."""
+    """Test embedding provider."""
     try:
-        from fitz_ai.llm.registry import get_llm_plugin
+        from fitz_ai.llm import get_embedder
 
         if not ctx.embedding_plugin:
             return False, "Not configured"
 
-        plugin = get_llm_plugin(plugin_type="embedding", plugin_name=ctx.embedding_plugin)
+        embedder = get_embedder(ctx.embedding_plugin)
 
         # Try a test embedding
-        vector = plugin.embed("test")
+        vector = embedder.embed("test")
         if vector and len(vector) > 0:
             return True, f"{ctx.embedding_plugin} (dim={len(vector)})"
         return False, "Empty response"
@@ -123,15 +123,15 @@ def _test_embedding(ctx: CLIContext) -> tuple[bool, str]:
 
 
 def _test_chat(ctx: CLIContext) -> tuple[bool, str]:
-    """Test chat plugin (without making actual call)."""
+    """Test chat provider (without making actual call)."""
     try:
-        from fitz_ai.llm.registry import get_llm_plugin
+        from fitz_ai.llm import get_chat
 
         if not ctx.chat_plugin:
             return False, "Not configured"
 
         # Just try to instantiate
-        get_llm_plugin(plugin_type="chat", plugin_name=ctx.chat_plugin)
+        get_chat(ctx.chat_plugin)
         return True, f"{ctx.chat_plugin} ready"
 
     except Exception as e:
@@ -155,19 +155,21 @@ def _test_vector_db(ctx: CLIContext) -> tuple[bool, str]:
 
 
 def _test_rerank(ctx: CLIContext) -> tuple[bool, str]:
-    """Test rerank plugin."""
+    """Test rerank provider."""
     if not ctx.rerank_enabled:
         return True, "Disabled (optional)"
 
     try:
-        from fitz_ai.llm.registry import get_llm_plugin
+        from fitz_ai.llm import get_reranker
 
         if not ctx.rerank_plugin:
             return False, "Enabled but no plugin"
 
         # Just try to instantiate
-        get_llm_plugin(plugin_type="rerank", plugin_name=ctx.rerank_plugin)
-        return True, f"{ctx.rerank_plugin} ready"
+        reranker = get_reranker(ctx.rerank_plugin)
+        if reranker:
+            return True, f"{ctx.rerank_plugin} ready"
+        return False, "Failed to create"
 
     except Exception as e:
         return False, str(e)[:50]

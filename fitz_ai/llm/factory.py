@@ -24,44 +24,37 @@ Tier Guidelines:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from typing import Any, Callable, Literal
 
-if TYPE_CHECKING:
-    pass
+from fitz_ai.llm.config import create_chat_provider
+from fitz_ai.llm.providers.base import ChatProvider
 
 ModelTier = Literal["fast", "balanced", "smart"]
-ChatFactory = Callable[[ModelTier], Any]
+ChatFactory = Callable[[ModelTier], ChatProvider]
 
 
-def get_chat_factory(plugin_name: str, **kwargs: Any) -> ChatFactory:
+def get_chat_factory(spec: str, config: dict[str, Any] | None = None) -> ChatFactory:
     """
     Create a factory that returns cached chat clients per tier.
 
     Args:
-        plugin_name: Name of the chat plugin (e.g., "cohere", "openai").
-        **kwargs: Additional kwargs passed to plugin initialization.
+        spec: Provider spec (e.g., "cohere", "openai/gpt-4o").
+        config: Optional config with auth/base_url settings.
 
     Returns:
-        Factory function: (tier) -> chat_client
+        Factory function: (tier) -> ChatProvider
 
     Example:
         factory = get_chat_factory("cohere")
         chat = factory("fast")  # Returns cached fast-tier client
         chat.chat([{"role": "user", "content": "Hello"}])
     """
-    from fitz_ai.llm.registry import get_llm_plugin
-
     # Cache clients per tier (lazy initialization)
-    cache: dict[ModelTier, Any] = {}
+    cache: dict[ModelTier, ChatProvider] = {}
 
-    def factory(tier: ModelTier = "fast") -> Any:
+    def factory(tier: ModelTier = "fast") -> ChatProvider:
         if tier not in cache:
-            cache[tier] = get_llm_plugin(
-                plugin_type="chat",
-                plugin_name=plugin_name,
-                tier=tier,
-                **kwargs,
-            )
+            cache[tier] = create_chat_provider(spec, config, tier)
         return cache[tier]
 
     return factory

@@ -382,41 +382,9 @@ def available_constraint_plugins() -> List[str]:
 
 
 # =============================================================================
-# Re-exports from YAML-based Registries (LLM and Vector DB)
+# Re-exports from Vector DB Registry
 # =============================================================================
 # These are lazy imports to avoid circular dependencies at module load time.
-
-
-def get_llm_plugin(plugin_name: str, plugin_type: str, **kwargs: Any) -> Any:
-    """
-    Get an LLM plugin instance.
-
-    Args:
-        plugin_name: Name of the plugin (e.g., 'openai', 'anthropic', 'local')
-        plugin_type: Type of plugin ('chat', 'embedding', 'rerank')
-        **kwargs: Plugin configuration
-
-    Returns:
-        LLM plugin instance
-    """
-    from fitz_ai.llm.registry import get_llm_plugin as _get_llm_plugin
-
-    return _get_llm_plugin(plugin_name=plugin_name, plugin_type=plugin_type, **kwargs)
-
-
-def available_llm_plugins(plugin_type: str) -> List[str]:
-    """
-    List available LLM plugins for a given type.
-
-    Args:
-        plugin_type: Type of plugin ('chat', 'embedding', 'rerank')
-
-    Returns:
-        Sorted list of plugin names
-    """
-    from fitz_ai.llm.registry import available_llm_plugins as _available_llm_plugins
-
-    return _available_llm_plugins(plugin_type)
 
 
 def get_vector_db_plugin(plugin_name: str, **kwargs: Any) -> Any:
@@ -459,7 +427,6 @@ __all__ = [
     "PluginRegistryError",
     "PluginNotFoundError",
     "DuplicatePluginError",
-    "LLMRegistryError",
     "VectorDBRegistryError",
     # Registry class
     "PluginRegistry",
@@ -480,9 +447,7 @@ __all__ = [
     "available_pipeline_plugins",
     "get_constraint_plugin",
     "available_constraint_plugins",
-    # YAML-based plugin accessors (re-exported)
-    "get_llm_plugin",
-    "available_llm_plugins",
+    # Vector DB plugin accessors (re-exported)
     "get_vector_db_plugin",
     "available_vector_db_plugins",
 ]

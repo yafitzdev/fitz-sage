@@ -100,12 +100,21 @@ class InitService:
         return available
 
     def get_default_model(self, plugin_type: str, plugin_name: str, tier: str = "smart") -> str:
-        """Get default model for a plugin."""
-        from fitz_ai.llm.registry import get_llm_plugin
+        """Get default model for a provider."""
+        from fitz_ai.llm import get_chat, get_embedder, get_reranker
 
         try:
-            instance = get_llm_plugin(plugin_type=plugin_type, plugin_name=plugin_name, tier=tier)
-            return getattr(instance, "params", {}).get("model", "")
+            if plugin_type == "chat":
+                instance = get_chat(plugin_name, tier=tier)  # type: ignore[arg-type]
+            elif plugin_type == "embedding":
+                instance = get_embedder(plugin_name)
+            elif plugin_type == "rerank":
+                instance = get_reranker(plugin_name)
+                if instance is None:
+                    return ""
+            else:
+                return ""
+            return getattr(instance, "_model", "")
         except Exception:
             return ""
 

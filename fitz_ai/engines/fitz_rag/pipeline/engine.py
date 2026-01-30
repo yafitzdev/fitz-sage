@@ -48,8 +48,7 @@ from fitz_ai.engines.fitz_rag.retrieval.multihop import (
 )
 from fitz_ai.engines.fitz_rag.retrieval.registry import get_retrieval_plugin
 from fitz_ai.engines.fitz_rag.routing import QueryIntent, QueryRouter
-from fitz_ai.llm.factory import ModelTier, get_chat_factory
-from fitz_ai.llm.registry import get_llm_plugin
+from fitz_ai.llm import ModelTier, get_chat_factory, get_embedder, get_reranker
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE, VECTOR_DB
 from fitz_ai.retrieval.entity_graph import EntityGraphStore
@@ -686,41 +685,32 @@ class RAGPipeline:
         logger.info(f"{VECTOR_DB} Using vector DB plugin='{cfg.vector_db}'")
 
         # Chat factory for per-task tier selection
-        chat_kwargs = {k: v for k, v in cfg.chat_kwargs.model_dump().items() if v is not None}
-        chat_factory = get_chat_factory(cfg.chat, **chat_kwargs)
+        chat_config = {k: v for k, v in cfg.chat_kwargs.model_dump().items() if v is not None}
+        chat_factory = get_chat_factory(cfg.chat, config=chat_config)
         smart_chat = chat_factory("smart")
-        model_name = getattr(smart_chat, "params", {}).get("model", "unknown")
-        logger.info(f"{PIPELINE} Using chat plugin='{cfg.chat}' model='{model_name}' (smart tier)")
+        model_name = getattr(smart_chat, "_model", "unknown")
+        logger.info(f"{PIPELINE} Using chat provider='{cfg.chat}' model='{model_name}' (smart tier)")
 
         # Embedding
-        embedding_kwargs = {
+        embedding_config = {
             k: v for k, v in cfg.embedding_kwargs.model_dump().items() if v is not None
         }
-        embedder = get_llm_plugin(
-            plugin_type="embedding",
-            plugin_name=cfg.embedding,
-            **embedding_kwargs,
-        )
-        logger.info(f"{PIPELINE} Using embedding plugin='{cfg.embedding}'")
+        embedder = get_embedder(cfg.embedding, config=embedding_config)
+        logger.info(f"{PIPELINE} Using embedding provider='{cfg.embedding}'")
 
         # Rerank (optional - None means disabled in flat schema)
-        reranker = None
-        if cfg.rerank:
-            rerank_kwargs = {
-                k: v for k, v in cfg.rerank_kwargs.model_dump().items() if v is not None
-            }
-            reranker = get_llm_plugin(
-                plugin_type="rerank",
-                plugin_name=cfg.rerank,
-                **rerank_kwargs,
-            )
-            logger.info(f"{PIPELINE} Using rerank plugin='{cfg.rerank}'")
+        rerank_config = {
+            k: v for k, v in cfg.rerank_kwargs.model_dump().items() if v is not None
+        }
+        reranker = get_reranker(cfg.rerank, config=rerank_config)
+        if reranker:
+            logger.info(f"{PIPELINE} Using rerank provider='{cfg.rerank}'")
 
         # Log fast tier info (for multi-query expansion, detection, etc.)
         fast_chat = chat_factory("fast")
-        fast_model = getattr(fast_chat, "params", {}).get("model", "unknown")
+        fast_model = getattr(fast_chat, "_model", "unknown")
         logger.info(
-            f"{PIPELINE} Using chat plugin='{cfg.chat}' model='{fast_model}' "
+            f"{PIPELINE} Using chat provider='{cfg.chat}' model='{fast_model}' "
             "(fast tier for multi-query expansion)"
         )
 

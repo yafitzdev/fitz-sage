@@ -66,14 +66,12 @@ class DoclingVisionParser(DoclingParser):
             vision_cfg = config.get("vision", {})
 
             if vision_cfg.get("plugin_name"):
-                from fitz_ai.llm.registry import get_llm_plugin
+                from fitz_ai.llm import get_vision
 
-                vision_kwargs = vision_cfg.get("kwargs", {})
-                self.vision_client = get_llm_plugin(
-                    plugin_type="vision",
-                    plugin_name=vision_cfg["plugin_name"],
-                    tier="fast",
-                    **vision_kwargs,
+                vision_config = vision_cfg.get("kwargs", {})
+                self.vision_client = get_vision(
+                    vision_cfg["plugin_name"],
+                    config=vision_config,
                 )
         except Exception as e:
             import logging

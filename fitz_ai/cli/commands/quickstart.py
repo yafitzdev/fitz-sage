@@ -582,8 +582,7 @@ def _run_ingestion(
     from fitz_ai.ingestion.enrichment.hierarchy.enricher import HierarchyEnricher
     from fitz_ai.ingestion.parser import ParserRouter
     from fitz_ai.ingestion.source.base import SourceFile
-    from fitz_ai.llm.factory import get_chat_factory
-    from fitz_ai.llm.registry import get_llm_plugin
+    from fitz_ai.llm import get_chat_factory, get_embedder
     from fitz_ai.vector_db.registry import get_vector_db_plugin
     from fitz_ai.vector_db.writer import VectorDBWriter
 
@@ -695,8 +694,8 @@ def _run_ingestion(
 
     # Get chat factory for summarization
     chat_factory = get_chat_factory(
-        plugin_name=chat_config.get("plugin_name", "cohere"),
-        **chat_config.get("kwargs", {}),
+        chat_config.get("plugin_name", "cohere"),
+        config=chat_config.get("kwargs", {}),
     )
 
     # Create hierarchy enricher with simple mode defaults
@@ -715,11 +714,9 @@ def _run_ingestion(
     if verbose:
         ui.info("Generating embeddings...")
 
-    # get_llm_plugin returns an instance, not a class
-    embedder = get_llm_plugin(
-        plugin_type="embedding",
-        plugin_name=embedding_config.get("plugin_name", "cohere"),
-        **embedding_config.get("kwargs", {}),
+    embedder = get_embedder(
+        embedding_config.get("plugin_name", "cohere"),
+        config=embedding_config.get("kwargs", {}),
     )
 
     vectors = []
@@ -811,7 +808,7 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
     """
     import yaml
 
-    from fitz_ai.llm.factory import get_chat_factory
+    from fitz_ai.llm import get_chat_factory
     from fitz_ai.tabular import DirectTableQuery
 
     engine_config_path = FitzPaths.engine_config("fitz_rag")
@@ -849,8 +846,8 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
 
     # Get chat factory
     chat_factory = get_chat_factory(
-        plugin_name=chat_config.get("plugin_name", "cohere"),
-        **chat_config.get("kwargs", {}),
+        chat_config.get("plugin_name", "cohere"),
+        config=chat_config.get("kwargs", {}),
     )
 
     # =========================================================================

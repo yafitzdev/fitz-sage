@@ -1,51 +1,46 @@
 # fitz_ai/llm/__init__.py
 """
-LLM plugin system for Fitz.
+LLM provider system for Fitz.
 
-All LLM plugins are YAML-based. Use get_llm_plugin() to get instances.
+Direct provider wrappers with pluggable authentication.
 """
 
 from __future__ import annotations
 
+# Public API
+from fitz_ai.llm.client import get_chat, get_embedder, get_reranker, get_vision
 from fitz_ai.llm.factory import ChatFactory, ModelTier, get_chat_factory
-from fitz_ai.llm.loader import (
-    YAMLPluginError,
-    YAMLPluginNotFoundError,
-    YAMLPluginValidationError,
-    clear_cache,
-    list_plugins,
-    load_plugin,
-)
-from fitz_ai.llm.registry import LLMRegistryError, available_llm_plugins, get_llm_plugin
-from fitz_ai.llm.runtime import (
-    YAMLChatClient,
-    YAMLEmbeddingClient,
-    YAMLPluginBase,
-    YAMLRerankClient,
-    create_yaml_client,
+
+# Provider protocols
+from fitz_ai.llm.providers.base import (
+    ChatProvider,
+    EmbeddingProvider,
+    RerankProvider,
+    RerankResult,
+    VisionProvider,
 )
 
+# Auth providers
+from fitz_ai.llm.auth import ApiKeyAuth, AuthProvider, M2MAuth
+
 __all__ = [
-    # Registry (main API)
-    "get_llm_plugin",
-    "available_llm_plugins",
-    "LLMRegistryError",
+    # Public API
+    "get_chat",
+    "get_embedder",
+    "get_reranker",
+    "get_vision",
     # Factory (per-task tier selection)
     "get_chat_factory",
     "ChatFactory",
     "ModelTier",
-    # Loader
-    "load_plugin",
-    "list_plugins",
-    "clear_cache",
-    # Errors
-    "YAMLPluginError",
-    "YAMLPluginNotFoundError",
-    "YAMLPluginValidationError",
-    # Runtime (for advanced use)
-    "YAMLPluginBase",
-    "YAMLChatClient",
-    "YAMLEmbeddingClient",
-    "YAMLRerankClient",
-    "create_yaml_client",
+    # Provider protocols
+    "ChatProvider",
+    "EmbeddingProvider",
+    "RerankProvider",
+    "VisionProvider",
+    "RerankResult",
+    # Auth providers
+    "AuthProvider",
+    "ApiKeyAuth",
+    "M2MAuth",
 ]

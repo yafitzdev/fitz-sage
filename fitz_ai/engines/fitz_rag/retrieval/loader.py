@@ -15,11 +15,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from fitz_ai.llm.factory import ChatFactory
-    from fitz_ai.llm.types import Embedder, Reranker
     from fitz_ai.retrieval.entity_graph.types import EntityGraphClient
     from fitz_ai.retrieval.vocabulary.types import KeywordMatcherClient
     from fitz_ai.vector_db.types import VectorClient
+
+    # Duck-typed protocols for LLM providers
+    Embedder = Any  # Has embed() and embed_batch() methods
+    Reranker = Any  # Has rerank() method
 
 import yaml
 
