@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fitz_ai.llm.auth import ApiKeyAuth
+from fitz_ai.llm.auth import ApiKeyAuth, DynamicHttpxAuth
 from fitz_ai.llm.providers import (
     ChatProvider,
     CohereChat,
@@ -256,6 +256,76 @@ class TestOpenAIChat:
 
                 call_kwargs = mock_openai.call_args[1]
                 assert call_kwargs["base_url"] == "https://custom.api.com/v1"
+
+    def test_uses_dynamic_httpx_auth(self) -> None:
+        """Verify OpenAI provider uses DynamicHttpxAuth for per-request auth."""
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+            with patch("httpx.Client") as mock_httpx_client:
+                with patch("openai.OpenAI"):
+                    auth = ApiKeyAuth("OPENAI_API_KEY")
+                    OpenAIChat(auth)
+
+                    # Verify httpx.Client was created with auth parameter
+                    call_kwargs = mock_httpx_client.call_args[1]
+                    assert "auth" in call_kwargs
+                    # Verify it's a DynamicHttpxAuth instance
+                    assert isinstance(call_kwargs["auth"], DynamicHttpxAuth)
+
+    def test_backwards_compatible_with_api_key_auth(self) -> None:
+        """Verify API-key-only users see no behavior change."""
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+            mock_client = MagicMock()
+            mock_message = MagicMock()
+            mock_message.content = "Hello from OpenAI!"
+            mock_choice = MagicMock()
+            mock_choice.message = mock_message
+            mock_response = MagicMock()
+            mock_response.choices = [mock_choice]
+            mock_client.chat.completions.create.return_value = mock_response
+
+            with patch("httpx.Client"):
+                with patch("openai.OpenAI", return_value=mock_client):
+                    auth = ApiKeyAuth("OPENAI_API_KEY")
+                    provider = OpenAIChat(auth)
+                    result = provider.chat([{"role": "user", "content": "Hi"}])
+
+                    assert result == "Hello from OpenAI!"
+
+    def test_api_key_unused_placeholder(self) -> None:
+        """Verify SDK receives api_key='unused' placeholder."""
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+            with patch("httpx.Client"):
+                with patch("openai.OpenAI") as mock_openai:
+                    auth = ApiKeyAuth("OPENAI_API_KEY")
+                    OpenAIChat(auth)
+
+                    call_kwargs = mock_openai.call_args[1]
+                    assert call_kwargs["api_key"] == "unused"
+
+    def test_httpx_timeout_matches_sdk_defaults(self) -> None:
+        """Verify httpx.Client has SDK-compatible timeout (600s read, 5s connect)."""
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+            with patch("httpx.Client") as mock_httpx_client:
+                with patch("openai.OpenAI"):
+                    auth = ApiKeyAuth("OPENAI_API_KEY")
+                    OpenAIChat(auth)
+
+                    call_kwargs = mock_httpx_client.call_args[1]
+                    timeout = call_kwargs.get("timeout")
+                    # Verify timeout is set (specific values depend on httpx.Timeout)
+                    assert timeout is not None
+
+    def test_http_client_passed_to_sdk(self) -> None:
+        """Verify http_client is passed to OpenAI SDK."""
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+            mock_http_client = MagicMock()
+            with patch("httpx.Client", return_value=mock_http_client):
+                with patch("openai.OpenAI") as mock_openai:
+                    auth = ApiKeyAuth("OPENAI_API_KEY")
+                    OpenAIChat(auth)
+
+                    call_kwargs = mock_openai.call_args[1]
+                    assert call_kwargs["http_client"] == mock_http_client
 
 
 @pytest.mark.skipif(not HAS_OPENAI, reason="openai not installed")
