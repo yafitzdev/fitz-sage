@@ -13,6 +13,7 @@ import httpx
 import pytest
 
 from fitz_ai.llm.auth import ApiKeyAuth, AuthProvider, CompositeAuth, M2MAuth
+from fitz_ai.llm.config import resolve_auth
 
 
 class TestAuthProvider:
@@ -456,3 +457,163 @@ class TestCompositeAuth:
             headers = composite.get_headers()
             assert headers["Authorization"] == "Bearer m2m_token_123"
             assert headers["X-Api-Key"] == "bmw_secret"
+
+
+class TestEnterpriseAuth:
+    """Test enterprise authentication (M2M + API key)."""
+
+    def test_enterprise_auth_creates_composite(self) -> None:
+        """Enterprise auth creates CompositeAuth with M2M + ApiKey."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"access_token": "m2m-token", "expires_in": 3600}
+
+        with patch("httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.post.return_value = mock_response
+
+            with patch.dict("os.environ", {
+                "TEST_LLM_KEY": "llm-api-key-123",
+                "CLIENT_ID": "my-client",
+                "CLIENT_SECRET": "my-secret",
+            }):
+                config = {
+                    "auth": {
+                        "type": "enterprise",
+                        "token_url": "https://auth.example.com/token",
+                        "client_id": "${CLIENT_ID}",
+                        "client_secret": "${CLIENT_SECRET}",
+                        "llm_api_key_env": "TEST_LLM_KEY",
+                    }
+                }
+
+                auth = resolve_auth("openai", config)
+
+                assert isinstance(auth, CompositeAuth)
+
+                # Verify headers include both M2M token and API key
+                headers = auth.get_headers()
+                assert headers["Authorization"] == "Bearer m2m-token"
+                assert headers["X-Api-Key"] == "llm-api-key-123"
+
+    def test_enterprise_auth_missing_fields_lists_all(self) -> None:
+        """Missing enterprise auth fields error lists ALL missing fields."""
+        config = {
+            "auth": {
+                "type": "enterprise",
+                "token_url": "https://auth.example.com/token",
+                # Missing: client_id, client_secret, llm_api_key_env
+            }
+        }
+
+        with pytest.raises(ValueError) as exc_info:
+            resolve_auth("openai", config)
+
+        error_msg = str(exc_info.value)
+        # All three missing fields should be mentioned
+        assert "client_id" in error_msg
+        assert "client_secret" in error_msg
+        assert "llm_api_key_env" in error_msg
+
+    def test_enterprise_auth_validates_api_key_env_exists(self) -> None:
+        """Enterprise auth validates API key env var exists at startup."""
+        config = {
+            "auth": {
+                "type": "enterprise",
+                "token_url": "https://auth.example.com/token",
+                "client_id": "my-client",
+                "client_secret": "my-secret",
+                "llm_api_key_env": "NONEXISTENT_API_KEY",
+            }
+        }
+
+        # Ensure the env var doesn't exist
+        with patch.dict("os.environ", {}, clear=True):
+            with pytest.raises(ValueError) as exc_info:
+                resolve_auth("openai", config)
+
+            error_msg = str(exc_info.value)
+            assert "NONEXISTENT_API_KEY" in error_msg
+
+    def test_enterprise_auth_custom_header(self) -> None:
+        """Enterprise auth supports custom LLM API key header."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"access_token": "m2m-token", "expires_in": 3600}
+
+        with patch("httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.post.return_value = mock_response
+
+            with patch.dict("os.environ", {"CUSTOM_KEY": "custom-api-key"}):
+                config = {
+                    "auth": {
+                        "type": "enterprise",
+                        "token_url": "https://auth.example.com/token",
+                        "client_id": "my-client",
+                        "client_secret": "my-secret",
+                        "llm_api_key_env": "CUSTOM_KEY",
+                        "llm_api_key_header": "Authorization",  # Use bearer instead
+                    }
+                }
+
+                auth = resolve_auth("openai", config)
+                headers = auth.get_headers()
+
+                # With Authorization header, API key should override M2M token
+                # (later provider overrides earlier in CompositeAuth)
+                assert "Authorization" in headers
+
+    def test_enterprise_auth_with_mtls(self, temp_certificate) -> None:
+        """Enterprise auth passes through mTLS options to M2MAuth."""
+        cert_path, key_path = temp_certificate
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"access_token": "m2m-token", "expires_in": 3600}
+
+        with patch("httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.post.return_value = mock_response
+
+            with patch.dict("os.environ", {"TEST_KEY": "api-key"}):
+                config = {
+                    "auth": {
+                        "type": "enterprise",
+                        "token_url": "https://auth.example.com/token",
+                        "client_id": "my-client",
+                        "client_secret": "my-secret",
+                        "llm_api_key_env": "TEST_KEY",
+                        "client_cert_path": cert_path,
+                        "client_key_path": key_path,
+                    },
+                    "cert_path": cert_path,  # CA cert for verification
+                }
+
+                auth = resolve_auth("openai", config)
+
+                # Verify request kwargs include cert options
+                kwargs = auth.get_request_kwargs()
+                assert kwargs.get("verify") == cert_path
+                assert kwargs.get("cert") == (cert_path, key_path)
+
+    def test_enterprise_auth_with_scope(self) -> None:
+        """Enterprise auth passes scope to M2MAuth."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"access_token": "m2m-token", "expires_in": 3600}
+
+        with patch("httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.post.return_value = mock_response
+
+            with patch.dict("os.environ", {"TEST_KEY": "api-key"}):
+                config = {
+                    "auth": {
+                        "type": "enterprise",
+                        "token_url": "https://auth.example.com/token",
+                        "client_id": "my-client",
+                        "client_secret": "my-secret",
+                        "llm_api_key_env": "TEST_KEY",
+                        "scope": "llm-access read",
+                    }
+                }
+
+                auth = resolve_auth("openai", config)
+                # Trigger token fetch
+                auth.get_headers()
+
+                # Verify scope was passed in token request
+                call_kwargs = mock_client.return_value.__enter__.return_value.post.call_args
+                assert call_kwargs[1]["data"]["scope"] == "llm-access read"
