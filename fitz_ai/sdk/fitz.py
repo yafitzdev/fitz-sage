@@ -118,7 +118,7 @@ class fitz:
         from fitz_ai.ingestion.diff.scanner import FileScanner
         from fitz_ai.ingestion.parser import ParserRouter
         from fitz_ai.ingestion.source.base import SourceFile
-        from fitz_ai.llm.registry import get_llm_plugin
+        from fitz_ai.llm import get_embedder
         from fitz_ai.vector_db.registry import get_vector_db_plugin
         from fitz_ai.vector_db.writer import VectorDBWriter
 
@@ -188,11 +188,8 @@ class fitz:
 
         # Step 3: Embed chunks
         logger.info("Generating embeddings...")
-        embedder = get_llm_plugin(
-            plugin_type="embedding",
-            plugin_name=embedding_config.get("plugin_name", "cohere"),
-            **embedding_config.get("kwargs", {}),
-        )
+        embedding_spec = embedding_config.get("plugin_name", "cohere")
+        embedder = get_embedder(embedding_spec, config=embedding_config.get("kwargs", {}))
 
         vectors = []
         for chunk in chunks:

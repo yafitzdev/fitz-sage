@@ -107,15 +107,14 @@ def load_test_config() -> dict:
 
 def get_test_embedder():
     """Get embedder configured for tests (from first tier)."""
-    from fitz_ai.llm.registry import get_llm_plugin
+    from fitz_ai.llm import get_embedder
 
     config = load_test_config()
     # Get embedding config from first tier
     first_tier = config["tiers"][0]
-    return get_llm_plugin(
-        plugin_type="embedding",
-        plugin_name=first_tier["embedding"],
-        **first_tier.get("embedding_kwargs", {}),
+    return get_embedder(
+        first_tier["embedding"],
+        config=first_tier.get("embedding_kwargs", {}),
     )
 
 
@@ -126,16 +125,15 @@ def get_test_chat(tier: str = "smart"):
     Args:
         tier: Model tier - "smart", "fast", or "balanced"
     """
-    from fitz_ai.llm.registry import get_llm_plugin
+    from fitz_ai.llm import get_chat
 
     config = load_test_config()
     # Get chat config from first tier (local)
     first_tier = config["tiers"][0]
-    return get_llm_plugin(
-        plugin_type="chat",
-        plugin_name=first_tier["chat"],
-        tier=tier,
-        **first_tier.get("chat_kwargs", {}),
+    return get_chat(
+        first_tier["chat"],
+        tier=tier,  # type: ignore[arg-type]
+        config=first_tier.get("chat_kwargs", {}),
     )
 
 

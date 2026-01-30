@@ -160,8 +160,7 @@ class IngestService:
         from fitz_ai.ingestion.enrichment.pipeline import EnrichmentPipeline
         from fitz_ai.ingestion.parser import ParserRouter
         from fitz_ai.ingestion.state import IngestStateManager
-        from fitz_ai.llm.factory import get_chat_factory
-        from fitz_ai.llm.registry import get_llm_plugin
+        from fitz_ai.llm import get_chat_factory, get_embedder
         from fitz_ai.runtime import get_engine_registry
         from fitz_ai.vector_db.registry import get_vector_db_plugin
 
@@ -198,20 +197,13 @@ class IngestService:
 
             # Initialize components
             vector_client = get_vector_db_plugin(cfg.vector_db.plugin_name, **cfg.vector_db.kwargs)
-            embedder = get_llm_plugin(
-                plugin_type="embedding",
-                plugin_name=cfg.embedding.plugin_name,
-                **cfg.embedding.kwargs,
-            )
+            embedder = get_embedder(cfg.embedding.plugin_name, config=cfg.embedding.kwargs)
 
             # Determine if we have an LLM for enrichment
             has_llm = False
             chat_factory = None
             try:
-                chat_factory = get_chat_factory(
-                    plugin_name=cfg.chat.plugin_name,
-                    **cfg.chat.kwargs,
-                )
+                chat_factory = get_chat_factory(cfg.chat.plugin_name, config=cfg.chat.kwargs)
                 has_llm = True
             except Exception:
                 pass

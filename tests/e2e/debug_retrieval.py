@@ -13,7 +13,7 @@ from fitz_ai.ingestion.chunking.router import ChunkingRouter
 from fitz_ai.ingestion.diff import run_diff_ingest
 from fitz_ai.ingestion.parser import ParserRouter
 from fitz_ai.ingestion.state import IngestStateManager
-from fitz_ai.llm.registry import get_llm_plugin
+from fitz_ai.llm import get_embedder
 from fitz_ai.vector_db.registry import get_vector_db_plugin
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures_rag"
@@ -33,11 +33,7 @@ def setup_collection():
     print(f"Creating debug collection: {collection}")
 
     vector_client = get_vector_db_plugin(vector_db_plugin_name, **vector_db_kwargs)
-    embedder = get_llm_plugin(
-        plugin_type="embedding",
-        plugin_name=embedding_plugin,
-        **embedding_kwargs,
-    )
+    embedder = get_embedder(embedding_plugin, config=embedding_kwargs)
 
     # Parser and chunking
     parser_router = ParserRouter(docling_parser="docling")

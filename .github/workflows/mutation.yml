@@ -1,18 +1,15 @@
 # .github/workflows/mutation.yml
 #
-# Mutation Testing for Fitz - Split across days
-# Each day tests a different part of core/ to fit within 6h limit
+# Mutation Testing for Fitz - Split across 3 days
+# Sun: guardrails/, Mon: paths/, Tue: core/*.py
 
 name: Mutation Testing
 
 on:
   schedule:
-    # Sunday: guardrails
-    - cron: "0 3 * * 0"
-    # Monday: paths
-    - cron: "0 3 * * 1"
-    # Tuesday: top-level core files
-    - cron: "0 3 * * 2"
+    - cron: "0 3 * * 0"  # Sunday: guardrails
+    - cron: "0 3 * * 1"  # Monday: paths
+    - cron: "0 3 * * 2"  # Tuesday: core-files
   workflow_dispatch:
     inputs:
       target:
@@ -40,7 +37,6 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TARGET="${{ inputs.target }}"
           else
-            # Determine by day of week (0=Sunday, 1=Monday, 2=Tuesday)
             DAY=$(date +%w)
             case $DAY in
               0) TARGET="guardrails" ;;
@@ -50,21 +46,17 @@ jobs:
             esac
           fi
           echo "target=$TARGET" >> $GITHUB_OUTPUT
-          echo "Testing: $TARGET"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Cache pip packages
+      - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-mutation-${{ hashFiles('**/pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-mutation-
-            ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
@@ -81,46 +73,34 @@ jobs:
           TARGET="${{ steps.target.outputs.target }}"
 
           case $TARGET in
-            guardrails)
-              PATHS="fitz_ai/core/guardrails/"
-              ;;
-            paths)
-              PATHS="fitz_ai/core/paths/"
-              ;;
-            core-files)
-              # Create temp file with only top-level .py files
-              PATHS="fitz_ai/core/answer.py,fitz_ai/core/answer_mode.py,fitz_ai/core/answer_mode_resolver.py,fitz_ai/core/chunk.py,fitz_ai/core/config.py,fitz_ai/core/conflicts.py,fitz_ai/core/constants.py,fitz_ai/core/constraints.py,fitz_ai/core/detect.py,fitz_ai/core/document.py,fitz_ai/core/engine.py,fitz_ai/core/exceptions.py,fitz_ai/core/http.py,fitz_ai/core/instrumentation.py,fitz_ai/core/knowledge.py,fitz_ai/core/platform.py,fitz_ai/core/provenance.py,fitz_ai/core/query.py,fitz_ai/core/registry.py,fitz_ai/core/utils.py"
-              ;;
+            guardrails) PATHS="fitz_ai/core/guardrails/" ;;
+            paths) PATHS="fitz_ai/core/paths/" ;;
+            core-files) PATHS="fitz_ai/core/answer.py,fitz_ai/core/answer_mode.py,fitz_ai/core/chunk.py,fitz_ai/core/config.py,fitz_ai/core/constants.py,fitz_ai/core/constraints.py,fitz_ai/core/detect.py,fitz_ai/core/document.py,fitz_ai/core/engine.py,fitz_ai/core/http.py,fitz_ai/core/registry.py,fitz_ai/core/utils.py" ;;
           esac
 
           echo "Target: $TARGET"
+          echo "Paths: $PATHS"
 
-          # Run mutmut, capture full output, show only progress to reduce log spam
+          # Run mutmut, capture output, only show last 30 lines to reduce spam
           timeout 21600 python -m mutmut run \
             --paths-to-mutate "$PATHS" \
             --tests-dir tests/ \
             --runner "python -m pytest tests/unit/ tests/integration/ -x -q --tb=no --ignore=tests/unit/test_postgres_recovery.py" \
-            --CI 2>&1 | tee mutmut_run.log | grep -E '(🎉|🙁|Error|FAILED|===)' | tail -30 || true
+            --CI 2>&1 | tee mutmut_output.log | grep -E '(^[0-9]|🎉|🙁|===|Error|FAILED)' | tail -50 || true
 
           echo ""
           echo "=== Final Status ==="
-          FINAL_LINE=$(grep -E '🎉.*🙁' mutmut_run.log | tail -1)
+          # Get the last progress line with counts
+          FINAL_LINE=$(grep -E '🎉.*🙁' mutmut_output.log | tail -1)
           echo "$FINAL_LINE"
 
-          # Parse from the progress line (has emoji counts)
+          # Parse killed and survived from the progress line
           KILLED=$(echo "$FINAL_LINE" | grep -oE '🎉 [0-9]+' | grep -oE '[0-9]+' || echo "0")
           SURVIVED=$(echo "$FINAL_LINE" | grep -oE '🙁 [0-9]+' | grep -oE '[0-9]+' || echo "0")
+
           KILLED=${KILLED:-0}
           SURVIVED=${SURVIVED:-0}
           TOTAL=$((KILLED + SURVIVED))
-
-          # Save summary
-          echo "Target: $TARGET" > mutation_summary.txt
-          echo "Killed: $KILLED" >> mutation_summary.txt
-          echo "Survived: $SURVIVED" >> mutation_summary.txt
-          python -m mutmut results 2>&1 | head -80 >> mutation_summary.txt || true
-
-          echo "Killed: $KILLED, Survived: $SURVIVED, Total: $TOTAL"
 
           if [ $TOTAL -gt 0 ]; then
             SCORE=$(awk "BEGIN {printf \"%.1f\", $KILLED * 100 / $TOTAL}")
@@ -128,33 +108,39 @@ jobs:
             SCORE="N/A"
           fi
 
+          echo "Killed: $KILLED, Survived: $SURVIVED, Score: $SCORE%"
+
           echo "mutation_score=$SCORE" >> $GITHUB_OUTPUT
           echo "killed=$KILLED" >> $GITHUB_OUTPUT
           echo "survived=$SURVIVED" >> $GITHUB_OUTPUT
           echo "target=$TARGET" >> $GITHUB_OUTPUT
 
-      - name: Generate HTML report
-        run: |
-          python -m mutmut html || true
+          # Save summary for artifact
+          echo "Target: $TARGET" > mutation_summary.txt
+          echo "Killed: $KILLED" >> mutation_summary.txt
+          echo "Survived: $SURVIVED" >> mutation_summary.txt
+          echo "Score: $SCORE%" >> mutation_summary.txt
+          echo "" >> mutation_summary.txt
+          python -m mutmut results 2>&1 | head -100 >> mutation_summary.txt || true
 
-      - name: Upload mutation report
+      - name: Generate HTML report
+        run: python -m mutmut html 2>/dev/null || true
+
+      - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: mutation-report-${{ steps.target.outputs.target }}
+          name: mutation-${{ steps.target.outputs.target }}
           path: |
             html/
             mutation_summary.txt
           retention-days: 30
 
-      - name: Post summary
+      - name: Summary
         run: |
-          echo "## Mutation Testing Results: ${{ steps.mutation.outputs.target }}" >> $GITHUB_STEP_SUMMARY
+          echo "## Mutation Testing: ${{ steps.mutation.outputs.target }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Target | ${{ steps.mutation.outputs.target }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Mutation Score | ${{ steps.mutation.outputs.mutation_score }}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Score** | **${{ steps.mutation.outputs.mutation_score }}%** |" >> $GITHUB_STEP_SUMMARY
           echo "| Killed | ${{ steps.mutation.outputs.killed }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Survived | ${{ steps.mutation.outputs.survived }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "See artifacts for detailed HTML report." >> $GITHUB_STEP_SUMMARY

@@ -127,11 +127,9 @@ def test_ingest_cli_mirror():
 
     # Embedder
     t = time.perf_counter()
-    from fitz_ai.llm.registry import get_llm_plugin
+    from fitz_ai.llm import get_embedder
 
-    embedder = get_llm_plugin(
-        plugin_type="embedding", plugin_name=embedding_plugin, **embedding_kwargs
-    )
+    embedder = get_embedder(embedding_plugin, config=embedding_kwargs)
     t = log_timing("Embedder", t, f"{embedding_plugin}")
 
     # Vector DB

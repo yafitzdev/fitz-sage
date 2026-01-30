@@ -224,7 +224,7 @@ class E2ERunner:
         from fitz_ai.ingestion.diff import run_diff_ingest
         from fitz_ai.ingestion.parser import ParserRouter
         from fitz_ai.ingestion.state import IngestStateManager
-        from fitz_ai.llm.registry import get_llm_plugin
+        from fitz_ai.llm import get_embedder
         from fitz_ai.vector_db.registry import get_vector_db_plugin
 
         logger.info(f"E2E Setup: Creating collection '{self.collection}'")
@@ -262,11 +262,7 @@ class E2ERunner:
         self.vector_client = get_vector_db_plugin(vector_db_plugin, **vector_db_kwargs)
 
         # Embedder
-        embedder = get_llm_plugin(
-            plugin_type="embedding",
-            plugin_name=embedding_plugin,
-            **embedding_kwargs,
-        )
+        embedder = get_embedder(embedding_plugin, config=embedding_kwargs)
 
         # Parser and chunking - use appropriate chunkers per file type
         parser_router = ParserRouter(docling_parser="docling")
@@ -411,24 +407,15 @@ class E2ERunner:
 
     def _swap_chat_model(self, tier_name: str, tier_config: dict) -> None:
         """Swap only the chat model, keeping existing embeddings."""
-        from fitz_ai.llm.registry import get_llm_plugin
+        from fitz_ai.llm import get_chat
 
         chat_plugin_name = tier_config["chat"]["plugin_name"]
         chat_kwargs = tier_config["chat"].get("kwargs", {})
 
-        new_chat = get_llm_plugin(
-            plugin_type="chat",
-            plugin_name=chat_plugin_name,
-            **chat_kwargs,
-        )
+        new_chat = get_chat(chat_plugin_name, config=chat_kwargs)
 
         # Also get fast chat for multi-hop (uses same tier)
-        new_fast_chat = get_llm_plugin(
-            plugin_type="chat",
-            plugin_name=chat_plugin_name,
-            tier="fast",
-            **chat_kwargs,
-        )
+        new_fast_chat = get_chat(chat_plugin_name, tier="fast", config=chat_kwargs)  # type: ignore[arg-type]
 
         # Swap chat models in existing pipeline
         self.pipeline.chat = new_chat
@@ -453,7 +440,7 @@ class E2ERunner:
         from fitz_ai.ingestion.diff import run_diff_ingest
         from fitz_ai.ingestion.parser import ParserRouter
         from fitz_ai.ingestion.state import IngestStateManager
-        from fitz_ai.llm.registry import get_llm_plugin
+        from fitz_ai.llm import get_embedder
 
         # Delete existing collection
         try:
@@ -471,11 +458,7 @@ class E2ERunner:
         vector_db_kwargs = tier_config["vector_db"].get("kwargs", {})
 
         # New embedder
-        embedder = get_llm_plugin(
-            plugin_type="embedding",
-            plugin_name=embedding_plugin,
-            **embedding_kwargs,
-        )
+        embedder = get_embedder(embedding_plugin, config=embedding_kwargs)
 
         # Parser and chunking - use appropriate chunkers per file type
         parser_router = ParserRouter(docling_parser="docling")

@@ -147,7 +147,7 @@ def _run_fitz_rag_ingest(
     from fitz_ai.ingestion.chunking.router import ChunkingRouter
     from fitz_ai.ingestion.parser import ParserRouter
     from fitz_ai.ingestion.state import IngestStateManager
-    from fitz_ai.llm.registry import get_llm_plugin
+    from fitz_ai.llm import get_embedder
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     # =========================================================================
@@ -253,10 +253,8 @@ def _run_fitz_rag_ingest(
         chunking_router = ChunkingRouter.from_config(router_config)
 
         # Embedder
-        embedding_kwargs = config.get("embedding", {}).get("kwargs", {})
-        embedder = get_llm_plugin(
-            plugin_type="embedding", plugin_name=ctx.embedding_plugin, **embedding_kwargs
-        )
+        embedding_config = config.get("embedding", {}).get("kwargs", {})
+        embedder = get_embedder(ctx.embedding_plugin, config=embedding_config)
 
         # Vector DB writer
         vector_client = get_vector_db_plugin(vector_db_plugin)
@@ -412,7 +410,7 @@ def _build_enrichment_pipeline(
     source: str,
 ):
     """Build the enrichment pipeline from config and CLI args."""
-    from fitz_ai.llm.factory import get_chat_factory
+    from fitz_ai.llm import get_chat_factory
 
     enrichment_cfg = config.get("enrichment", {})
 
@@ -455,15 +453,8 @@ def _build_enrichment_pipeline(
     if needs_llm:
         # Get chat factory from config
         chat_plugin = config.get("chat", {}).get("plugin_name", "cohere")
-        chat_kwargs = config.get("chat", {}).get("kwargs", {})
-        # Include user's model overrides if present
-        chat_models = config.get("chat", {}).get("models")
-        if chat_models:
-            chat_kwargs["models"] = chat_models
-        chat_factory = get_chat_factory(
-            plugin_name=chat_plugin,
-            **chat_kwargs,
-        )
+        chat_config = config.get("chat", {}).get("kwargs", {})
+        chat_factory = get_chat_factory(chat_plugin, config=chat_config)
 
     return EnrichmentPipeline(
         config=enrichment_config,

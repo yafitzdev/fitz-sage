@@ -40,6 +40,58 @@ logger = get_logger(__name__)
 DEFAULT_ENGINE = "fitz_rag"
 
 
+# =============================================================================
+# Provider Model Defaults
+# =============================================================================
+
+
+def _get_chat_model_defaults(provider: str) -> dict:
+    """Get chat model defaults for a provider."""
+    if provider == "cohere":
+        from fitz_ai.llm.providers.cohere import CHAT_MODELS
+
+        return dict(CHAT_MODELS)  # {tier: model_name}
+    elif provider == "openai":
+        from fitz_ai.llm.providers.openai import CHAT_MODELS
+
+        return dict(CHAT_MODELS)
+    elif provider == "anthropic":
+        from fitz_ai.llm.providers.anthropic import CHAT_MODELS
+
+        return dict(CHAT_MODELS)
+    elif provider == "ollama":
+        from fitz_ai.llm.providers.ollama import CHAT_MODELS
+
+        return dict(CHAT_MODELS)
+    return {}
+
+
+def _get_embedding_model_default(provider: str) -> str:
+    """Get embedding model default for a provider."""
+    if provider == "cohere":
+        from fitz_ai.llm.providers.cohere import EMBEDDING_MODEL
+
+        return EMBEDDING_MODEL
+    elif provider == "openai":
+        from fitz_ai.llm.providers.openai import EMBEDDING_MODEL
+
+        return EMBEDDING_MODEL
+    elif provider == "ollama":
+        from fitz_ai.llm.providers.ollama import EMBEDDING_MODEL
+
+        return EMBEDDING_MODEL
+    return ""
+
+
+def _get_rerank_model_default(provider: str) -> str:
+    """Get rerank model default for a provider."""
+    if provider == "cohere":
+        from fitz_ai.llm.providers.cohere import RERANK_MODEL
+
+        return RERANK_MODEL
+    return ""
+
+
 @dataclass
 class CLIContext:
     """
@@ -272,8 +324,6 @@ class CLIContext:
     @staticmethod
     def _get_chat_models_v2(plugin_string: str, chat_kwargs: dict) -> dict:
         """Get chat model names from V2 config or plugin defaults."""
-        from fitz_ai.llm.loader import load_plugin
-
         if not plugin_string:
             return {}
 
@@ -284,18 +334,15 @@ class CLIContext:
         # Extract provider name
         provider = plugin_string.split("/")[0]
 
-        # Fall back to plugin defaults
+        # Get defaults from provider modules
         try:
-            spec = load_plugin("chat", provider)
-            return spec.defaults.get("models", {})
+            return _get_chat_model_defaults(provider)
         except Exception:
             return {}
 
     @staticmethod
     def _get_embedding_model_v2(plugin_string: str, emb_kwargs: dict) -> str:
         """Get embedding model from V2 config or plugin defaults."""
-        from fitz_ai.llm.loader import load_plugin
-
         if not plugin_string:
             return ""
 
@@ -307,19 +354,16 @@ class CLIContext:
         if "/" in plugin_string:
             return plugin_string.split("/", 1)[1]
 
-        # Fall back to plugin defaults
+        # Get defaults from provider modules
         provider = plugin_string
         try:
-            spec = load_plugin("embedding", provider)
-            return spec.defaults.get("model", "")
+            return _get_embedding_model_default(provider)
         except Exception:
             return ""
 
     @staticmethod
     def _get_rerank_model_v2(plugin_string: str | None, rerank_kwargs: dict) -> str:
         """Get rerank model from V2 config or plugin defaults."""
-        from fitz_ai.llm.loader import load_plugin
-
         if not plugin_string:
             return ""
 
@@ -331,19 +375,16 @@ class CLIContext:
         if "/" in plugin_string:
             return plugin_string.split("/", 1)[1]
 
-        # Fall back to plugin defaults
+        # Get defaults from provider modules
         provider = plugin_string
         try:
-            spec = load_plugin("rerank", provider)
-            return spec.defaults.get("model", "")
+            return _get_rerank_model_default(provider)
         except Exception:
             return ""
 
     @staticmethod
     def _get_chat_models(chat: dict, plugin_name: str) -> dict:
         """Get chat model names from config or plugin defaults."""
-        from fitz_ai.llm.loader import load_plugin
-
         if not plugin_name:
             return {}
 
@@ -353,18 +394,15 @@ class CLIContext:
         if "models" in chat_kwargs:
             return chat_kwargs["models"]
 
-        # Fall back to plugin defaults
+        # Get defaults from provider modules
         try:
-            spec = load_plugin("chat", plugin_name)
-            return spec.defaults.get("models", {})
+            return _get_chat_model_defaults(plugin_name)
         except Exception:
             return {}
 
     @staticmethod
     def _get_embedding_model(emb: dict, plugin_name: str) -> str:
         """Get embedding model name from config or plugin defaults."""
-        from fitz_ai.llm.loader import load_plugin
-
         if not plugin_name:
             return ""
 
@@ -374,18 +412,15 @@ class CLIContext:
         if "model" in emb_kwargs:
             return emb_kwargs["model"]
 
-        # Fall back to plugin defaults
+        # Get defaults from provider modules
         try:
-            spec = load_plugin("embedding", plugin_name)
-            return spec.defaults.get("model", "")
+            return _get_embedding_model_default(plugin_name)
         except Exception:
             return ""
 
     @staticmethod
     def _get_rerank_model(rerank: dict, plugin_name: str) -> str:
         """Get rerank model name from config or plugin defaults."""
-        from fitz_ai.llm.loader import load_plugin
-
         if not rerank.get("enabled") or not plugin_name:
             return ""
 
@@ -395,10 +430,9 @@ class CLIContext:
         if "model" in rerank_kwargs:
             return rerank_kwargs["model"]
 
-        # Fall back to plugin defaults
+        # Get defaults from provider modules
         try:
-            spec = load_plugin("rerank", plugin_name)
-            return spec.defaults.get("model", "")
+            return _get_rerank_model_default(plugin_name)
         except Exception:
             return ""
 

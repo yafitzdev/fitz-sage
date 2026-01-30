@@ -78,7 +78,8 @@ class TestFullCacheFlow:
 
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_vector_db_plugin")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_chat_factory")
-    @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_llm_plugin")
+    @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_embedder")
+    @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_reranker")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_retrieval_plugin")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.create_matcher_from_store")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_table_store")
@@ -89,7 +90,8 @@ class TestFullCacheFlow:
         mock_table_store,
         mock_create_matcher,
         mock_get_retrieval,
-        mock_get_llm,
+        mock_get_reranker,
+        mock_get_embedder,
         mock_get_chat_factory,
         mock_get_vector_db,
         mock_config,
@@ -113,7 +115,8 @@ class TestFullCacheFlow:
             return mock_chat
 
         mock_get_chat_factory.return_value = mock_factory
-        mock_get_llm.return_value = mock_embedder
+        mock_get_embedder.return_value = mock_embedder
+        mock_get_reranker.return_value = None
 
         mock_retrieval = Mock()
         mock_retrieval.collection = "test_collection"
@@ -170,7 +173,8 @@ class TestFullCacheFlow:
 
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_vector_db_plugin")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_chat_factory")
-    @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_llm_plugin")
+    @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_embedder")
+    @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_reranker")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_retrieval_plugin")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.create_matcher_from_store")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_table_store")
@@ -181,7 +185,8 @@ class TestFullCacheFlow:
         mock_table_store,
         mock_create_matcher,
         mock_get_retrieval,
-        mock_get_llm,
+        mock_get_reranker,
+        mock_get_embedder,
         mock_get_chat_factory,
         mock_get_vector_db,
         mock_config,
@@ -201,7 +206,8 @@ class TestFullCacheFlow:
             return mock_chat
 
         mock_get_chat_factory.return_value = mock_factory
-        mock_get_llm.return_value = mock_embedder
+        mock_get_embedder.return_value = mock_embedder
+        mock_get_reranker.return_value = None
 
         mock_retrieval = Mock()
         mock_retrieval.collection = "test_collection"
@@ -253,7 +259,8 @@ class TestFullCacheFlow:
 
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_vector_db_plugin")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_chat_factory")
-    @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_llm_plugin")
+    @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_embedder")
+    @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_reranker")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_retrieval_plugin")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.create_matcher_from_store")
     @patch("fitz_ai.engines.fitz_rag.pipeline.engine.get_table_store")
@@ -264,7 +271,8 @@ class TestFullCacheFlow:
         mock_table_store,
         mock_create_matcher,
         mock_get_retrieval,
-        mock_get_llm,
+        mock_get_reranker,
+        mock_get_embedder,
         mock_get_chat_factory,
         mock_get_vector_db,
         mock_config,
@@ -288,7 +296,8 @@ class TestFullCacheFlow:
             return mock_chat
 
         mock_get_chat_factory.return_value = mock_factory
-        mock_get_llm.return_value = mock_embedder
+        mock_get_embedder.return_value = mock_embedder
+        mock_get_reranker.return_value = None
 
         mock_retrieval = Mock()
         mock_retrieval.collection = "test_collection"

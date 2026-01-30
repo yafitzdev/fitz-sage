@@ -1,0 +1,262 @@
+# fitz_ai/llm/providers/openai.py
+"""
+OpenAI provider wrappers using the official SDK.
+
+Also supports Azure OpenAI via base_url configuration.
+"""
+
+from __future__ import annotations
+
+import base64
+import logging
+from typing import Any, Iterator
+
+from fitz_ai.llm.auth import AuthProvider
+from fitz_ai.llm.providers.base import ModelTier
+
+logger = logging.getLogger(__name__)
+
+# Default models by tier
+CHAT_MODELS: dict[ModelTier, str] = {
+    "smart": "gpt-4o",
+    "balanced": "gpt-4o-mini",
+    "fast": "gpt-4o-mini",
+}
+
+EMBEDDING_MODEL = "text-embedding-3-small"
+VISION_MODEL = "gpt-4o"
+
+
+class OpenAIChat:
+    """
+    OpenAI chat provider using the official SDK.
+
+    Args:
+        auth: Authentication provider.
+        model: Model name override.
+        tier: Model tier (smart, balanced, fast).
+        base_url: Custom base URL (for Azure or proxies).
+        **kwargs: Additional default kwargs for chat calls.
+    """
+
+    def __init__(
+        self,
+        auth: AuthProvider,
+        model: str | None = None,
+        tier: ModelTier = "smart",
+        base_url: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        import openai
+
+        headers = auth.get_headers()
+        api_key = headers.get("Authorization", "").replace("Bearer ", "")
+        if not api_key:
+            api_key = headers.get("X-Api-Key", "")
+
+        request_kwargs = auth.get_request_kwargs()
+
+        client_kwargs: dict[str, Any] = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        if "verify" in request_kwargs:
+            # OpenAI SDK uses http_client for custom SSL
+            import httpx
+
+            client_kwargs["http_client"] = httpx.Client(verify=request_kwargs["verify"])
+
+        self._client = openai.OpenAI(**client_kwargs)
+        self._model = model or CHAT_MODELS[tier]
+        self._defaults = kwargs
+
+    def chat(self, messages: list[dict[str, Any]], **kwargs: Any) -> str:
+        """Generate a chat completion."""
+        params = {**self._defaults, **kwargs}
+
+        response = self._client.chat.completions.create(
+            model=params.pop("model", self._model),
+            messages=messages,
+            **params,
+        )
+
+        if response.choices and response.choices[0].message:
+            return response.choices[0].message.content or ""
+        return ""
+
+    def chat_stream(self, messages: list[dict[str, Any]], **kwargs: Any) -> Iterator[str]:
+        """Generate a streaming chat completion."""
+        params = {**self._defaults, **kwargs}
+
+        stream = self._client.chat.completions.create(
+            model=params.pop("model", self._model),
+            messages=messages,
+            stream=True,
+            **params,
+        )
+
+        for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta:
+                content = chunk.choices[0].delta.content
+                if content:
+                    yield content
+
+
+class OpenAIEmbedding:
+    """
+    OpenAI embedding provider using the official SDK.
+
+    Args:
+        auth: Authentication provider.
+        model: Model name override.
+        dimensions: Output dimensions (for models that support it).
+        base_url: Custom base URL.
+    """
+
+    def __init__(
+        self,
+        auth: AuthProvider,
+        model: str | None = None,
+        dimensions: int | None = None,
+        base_url: str | None = None,
+    ) -> None:
+        import openai
+
+        headers = auth.get_headers()
+        api_key = headers.get("Authorization", "").replace("Bearer ", "")
+        if not api_key:
+            api_key = headers.get("X-Api-Key", "")
+
+        request_kwargs = auth.get_request_kwargs()
+
+        client_kwargs: dict[str, Any] = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        if "verify" in request_kwargs:
+            import httpx
+
+            client_kwargs["http_client"] = httpx.Client(verify=request_kwargs["verify"])
+
+        self._client = openai.OpenAI(**client_kwargs)
+        self._model = model or EMBEDDING_MODEL
+        self._dimensions = dimensions
+
+    def embed(self, text: str) -> list[float]:
+        """Embed a single text."""
+        result = self.embed_batch([text])
+        return result[0]
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Embed multiple texts."""
+        if not texts:
+            return []
+
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "input": texts,
+        }
+        if self._dimensions:
+            kwargs["dimensions"] = self._dimensions
+
+        response = self._client.embeddings.create(**kwargs)
+
+        # Sort by index to ensure order matches input
+        sorted_data = sorted(response.data, key=lambda x: x.index)
+        return [list(item.embedding) for item in sorted_data]
+
+    @property
+    def dimensions(self) -> int:
+        """Return embedding dimensions."""
+        if self._dimensions:
+            return self._dimensions
+        # Default for text-embedding-3-small
+        return 1536
+
+
+class OpenAIVision:
+    """
+    OpenAI vision provider using the official SDK.
+
+    Args:
+        auth: Authentication provider.
+        model: Model name override.
+        base_url: Custom base URL.
+        **kwargs: Additional default kwargs.
+    """
+
+    def __init__(
+        self,
+        auth: AuthProvider,
+        model: str | None = None,
+        base_url: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        import openai
+
+        headers = auth.get_headers()
+        api_key = headers.get("Authorization", "").replace("Bearer ", "")
+        if not api_key:
+            api_key = headers.get("X-Api-Key", "")
+
+        request_kwargs = auth.get_request_kwargs()
+
+        client_kwargs: dict[str, Any] = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        if "verify" in request_kwargs:
+            import httpx
+
+            client_kwargs["http_client"] = httpx.Client(verify=request_kwargs["verify"])
+
+        self._client = openai.OpenAI(**client_kwargs)
+        self._model = model or VISION_MODEL
+        self._defaults = kwargs
+
+    def describe_image(self, image_base64: str, prompt: str | None = None) -> str:
+        """Describe an image using the vision model."""
+        actual_prompt = prompt or (
+            "Describe this figure/chart/diagram in detail. Include any data values, "
+            "labels, axes, trends, and key insights visible in the image."
+        )
+
+        # Detect image type from base64 header or default to png
+        media_type = "image/png"
+        if image_base64.startswith("/9j/"):
+            media_type = "image/jpeg"
+        elif image_base64.startswith("iVBOR"):
+            media_type = "image/png"
+        elif image_base64.startswith("R0lGOD"):
+            media_type = "image/gif"
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": actual_prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{media_type};base64,{image_base64}"},
+                    },
+                ],
+            }
+        ]
+
+        params = {**self._defaults}
+        response = self._client.chat.completions.create(
+            model=params.pop("model", self._model),
+            messages=messages,
+            **params,
+        )
+
+        if response.choices and response.choices[0].message:
+            return response.choices[0].message.content or ""
+        return ""
+
+
+__all__ = [
+    "OpenAIChat",
+    "OpenAIEmbedding",
+    "OpenAIVision",
+    "CHAT_MODELS",
+    "EMBEDDING_MODEL",
+    "VISION_MODEL",
+]
