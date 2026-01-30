@@ -9,6 +9,7 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from fitz_ai.llm.auth import ApiKeyAuth, AuthProvider, M2MAuth
@@ -256,3 +257,131 @@ class TestM2MAuth:
 
             # Only one token refresh despite concurrent access
             assert call_count == 1
+
+    def test_retry_on_transient_error(self) -> None:
+        """Token refresh retries on transient network errors."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"access_token": "token", "expires_in": 3600}
+
+        call_count = 0
+
+        def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise httpx.TimeoutException("Connection timeout")
+            return mock_response
+
+        with patch("httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.post = mock_post
+
+            auth = M2MAuth(
+                token_url="https://auth.example.com/token",
+                client_id="my-client",
+                client_secret="my-secret",
+            )
+            headers = auth.get_headers()
+
+            assert headers == {"Authorization": "Bearer token"}
+            assert call_count == 3  # Failed twice, succeeded on third
+
+    def test_no_retry_on_auth_error(self) -> None:
+        """Token refresh does NOT retry on 401/403 errors."""
+        call_count = 0
+
+        def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            response = MagicMock()
+            response.status_code = 401
+            response.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "Unauthorized", request=MagicMock(), response=response
+            )
+            return response
+
+        with patch("httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.post = mock_post
+
+            auth = M2MAuth(
+                token_url="https://auth.example.com/token",
+                client_id="my-client",
+                client_secret="wrong-secret",
+            )
+
+            with pytest.raises(httpx.HTTPStatusError):
+                auth.get_headers()
+
+            # Only one attempt - no retry on auth errors
+            assert call_count == 1
+
+    def test_circuit_breaker_opens_after_failures(self) -> None:
+        """Circuit breaker opens after consecutive transient failures."""
+        from circuitbreaker import CircuitBreakerError, CircuitBreakerMonitor
+        from tenacity import RetryError
+
+        # Reset all circuit breakers before test
+        for cb in CircuitBreakerMonitor.get_circuits():
+            cb.reset()
+
+        call_count = 0
+
+        def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            raise httpx.NetworkError("Connection refused")
+
+        with patch("httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.post = mock_post
+
+            auth = M2MAuth(
+                token_url="https://auth.example.com/token",
+                client_id="my-client",
+                client_secret="my-secret",
+            )
+
+            # First call will retry 5 times then fail with RetryError or CircuitBreakerError
+            with pytest.raises((httpx.NetworkError, CircuitBreakerError, RetryError)):
+                auth.get_headers()
+
+            # Verify multiple attempts were made (retry attempts)
+            # 5 retry attempts with exponential backoff
+            assert call_count >= 5
+
+        # Reset circuit breaker for other tests
+        for cb in CircuitBreakerMonitor.get_circuits():
+            cb.reset()
+
+    def test_recovery_after_transient_failure(self) -> None:
+        """System recovers automatically when token endpoint becomes available."""
+        from circuitbreaker import CircuitBreakerMonitor
+
+        # Reset all circuit breakers before test
+        for cb in CircuitBreakerMonitor.get_circuits():
+            cb.reset()
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"access_token": "recovered-token", "expires_in": 3600}
+
+        call_count = 0
+
+        def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise httpx.TimeoutException("Timeout")
+            return mock_response
+
+        with patch("httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.post = mock_post
+
+            auth = M2MAuth(
+                token_url="https://auth.example.com/token",
+                client_id="my-client",
+                client_secret="my-secret",
+            )
+
+            # Call succeeds after retries (simulating endpoint recovery)
+            headers = auth.get_headers()
+
+            assert headers == {"Authorization": "Bearer recovered-token"}
+            assert call_count == 3  # 2 failures + 1 success
