@@ -333,19 +333,21 @@ class PostgresConnectionManager:
         # fitz-pgserver handles crash recovery internally via unique log files
         logger.info(f"{STORAGE} Starting pgserver at {data_dir}")
 
+        startup_error = None
         try:
             self._pgserver = pgserver.get_server(str(data_dir))
             self._base_uri = self._pgserver.get_uri()
             logger.info(f"{STORAGE} pgserver started successfully")
             return
         except Exception as e:
+            startup_error = e
             logger.warning(f"{STORAGE} pgserver startup failed: {e}")
 
         # =================================================================
         # STEP 2: Nuclear recovery - delete everything and retry once
         # =================================================================
         if not allow_recovery:
-            raise RuntimeError(f"pgserver failed to start: {e}")
+            raise RuntimeError(f"pgserver failed to start: {startup_error}")
 
         logger.warning(f"{STORAGE} Attempting nuclear recovery (deleting pgdata)...")
 

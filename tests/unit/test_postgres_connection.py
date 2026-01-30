@@ -235,11 +235,13 @@ class TestAutoRecovery:
             return mock_server
 
         mock_pgserver_module.get_server = mock_get_server
+        mock_pgserver_module.PostgresServer = MagicMock()
+        mock_pgserver_module.PostgresServer._instances = {}
 
-        with patch.dict(sys.modules, {"pgserver": mock_pgserver_module}):
+        with patch.dict(sys.modules, {"fitz_pgserver": mock_pgserver_module}):
             with patch("pathlib.Path.mkdir"):
                 with patch("pathlib.Path.exists", return_value=True):
-                    manager._start_pgserver(timeout=1, allow_recovery=True)
+                    manager._start_pgserver(allow_recovery=True)
 
         # Verify rmtree was called for recovery
         assert mock_rmtree.called
@@ -254,52 +256,15 @@ class TestAutoRecovery:
 
         mock_pgserver_module = MagicMock()
         mock_pgserver_module.get_server.side_effect = Exception("Startup failed")
+        mock_pgserver_module.PostgresServer = MagicMock()
+        mock_pgserver_module.PostgresServer._instances = {}
 
-        with patch.dict(sys.modules, {"pgserver": mock_pgserver_module}):
+        with patch.dict(sys.modules, {"fitz_pgserver": mock_pgserver_module}):
             with patch("pathlib.Path.mkdir"):
                 with pytest.raises(RuntimeError) as exc_info:
-                    manager._start_pgserver(timeout=1, allow_recovery=False)
+                    manager._start_pgserver(allow_recovery=False)
 
         assert "failed to start" in str(exc_info.value)
-
-
-# =============================================================================
-# Timeout Tests
-# =============================================================================
-
-
-class TestPgserverTimeout:
-    """Tests for pgserver startup timeout."""
-
-    def teardown_method(self):
-        """Reset singleton after each test."""
-        # Directly clear singleton without calling stop() to avoid hanging
-        PostgresConnectionManager._instance = None
-
-    def test_pgserver_timeout_raises_error(self):
-        """Pgserver startup exceeding timeout raises RuntimeError."""
-        import sys
-        import time
-        from pathlib import Path
-
-        config = StorageConfig(mode=StorageMode.LOCAL, data_dir=Path("/tmp/test"))
-        manager = PostgresConnectionManager(config)
-
-        mock_pgserver_module = MagicMock()
-
-        def slow_get_server(path):
-            time.sleep(0.5)  # Simulate slow startup
-            raise Exception("Still starting...")
-
-        mock_pgserver_module.get_server = slow_get_server
-
-        with patch.dict(sys.modules, {"pgserver": mock_pgserver_module}):
-            with patch("pathlib.Path.mkdir"):
-                with pytest.raises(RuntimeError) as exc_info:
-                    # Very short timeout to trigger error quickly
-                    manager._start_pgserver(timeout=0.1, allow_recovery=False)
-
-        assert "failed to start" in str(exc_info.value).lower()
 
 
 # =============================================================================
@@ -386,9 +351,14 @@ class TestConnectionPool:
     """Tests for connection pooling."""
 
     def teardown_method(self):
-        """Reset singleton after each test."""
-        # Directly clear singleton without calling stop() to avoid hanging
+        """Reset singleton and module-level globals after each test."""
+        import fitz_ai.storage.postgres as pg_module
+
+        # Reset singleton
         PostgresConnectionManager._instance = None
+        # Reset module-level globals that may have been set to mocks
+        pg_module._psycopg = None
+        pg_module._psycopg_pool = None
 
     def test_get_pool_auto_starts(self):
         """get_pool auto-starts if not started."""
@@ -603,22 +573,24 @@ class TestImportErrors:
         PostgresConnectionManager._instance = None
 
     def test_import_error_pgserver_not_installed(self):
-        """Should raise clear error if pgserver not installed in local mode."""
+        """Should raise clear error if fitz-pgserver not installed in local mode."""
         import sys
         from pathlib import Path
 
         config = StorageConfig(mode=StorageMode.LOCAL, data_dir=Path("/tmp/test"))
         manager = PostgresConnectionManager(config)
 
-        # Simulate pgserver not installed by making import raise
-        def raise_import_error(*args):
-            raise ImportError("No module named 'pgserver'")
+        # Simulate fitz-pgserver not installed by making import raise
+        def raise_import_error(*args, **kwargs):
+            if args and "fitz_pgserver" in str(args[0]):
+                raise ImportError("No module named 'fitz_pgserver'")
+            return MagicMock()
 
-        with patch.dict(sys.modules, {"pgserver": None}):
+        with patch.dict(sys.modules, {"fitz_pgserver": None}):
             with patch("builtins.__import__", side_effect=raise_import_error):
                 with patch("pathlib.Path.mkdir"):
                     with pytest.raises((ImportError, RuntimeError)):
-                        manager._start_pgserver(timeout=1, allow_recovery=False)
+                        manager._start_pgserver(allow_recovery=False)
 
 
 # =============================================================================
