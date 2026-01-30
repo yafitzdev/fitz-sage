@@ -205,6 +205,24 @@ class TestCohereChat:
                     call_kwargs = mock_httpx_client.call_args[1]
                     assert call_kwargs["verify"] == "/path/to/ca.crt"
 
+    def test_backwards_compatible_with_api_key_auth(self) -> None:
+        """Verify API-key-only users see no behavior change."""
+        with patch.dict("os.environ", {"COHERE_API_KEY": "test-key"}):
+            mock_client = MagicMock()
+            mock_response = MagicMock()
+            mock_content = MagicMock()
+            mock_content.text = "Hello from Cohere!"
+            mock_response.message.content = [mock_content]
+            mock_client.chat.return_value = mock_response
+
+            with patch("httpx.Client"):
+                with patch("cohere.ClientV2", return_value=mock_client):
+                    auth = ApiKeyAuth("COHERE_API_KEY")
+                    provider = CohereChat(auth)
+                    result = provider.chat([{"role": "user", "content": "Hi"}])
+
+                    assert result == "Hello from Cohere!"
+
 
 class TestCohereEmbedding:
     """Test Cohere embedding provider."""
@@ -244,6 +262,18 @@ class TestCohereEmbedding:
                 provider = CohereEmbedding(auth, dimensions=512)
                 assert provider.dimensions == 512
 
+    def test_uses_dynamic_httpx_auth(self) -> None:
+        """Verify CohereEmbedding uses DynamicHttpxAuth for per-request auth."""
+        with patch.dict("os.environ", {"COHERE_API_KEY": "test-key"}):
+            with patch("httpx.Client") as mock_httpx_client:
+                with patch("cohere.ClientV2"):
+                    auth = ApiKeyAuth("COHERE_API_KEY")
+                    CohereEmbedding(auth)
+
+                    call_kwargs = mock_httpx_client.call_args[1]
+                    assert "auth" in call_kwargs
+                    assert isinstance(call_kwargs["auth"], DynamicHttpxAuth)
+
 
 class TestCohereRerank:
     """Test Cohere rerank provider."""
@@ -278,6 +308,18 @@ class TestCohereRerank:
                 result = provider.rerank("query", [])
 
             assert result == []
+
+    def test_uses_dynamic_httpx_auth(self) -> None:
+        """Verify CohereRerank uses DynamicHttpxAuth for per-request auth."""
+        with patch.dict("os.environ", {"COHERE_API_KEY": "test-key"}):
+            with patch("httpx.Client") as mock_httpx_client:
+                with patch("cohere.ClientV2"):
+                    auth = ApiKeyAuth("COHERE_API_KEY")
+                    CohereRerank(auth)
+
+                    call_kwargs = mock_httpx_client.call_args[1]
+                    assert "auth" in call_kwargs
+                    assert isinstance(call_kwargs["auth"], DynamicHttpxAuth)
 
 
 @pytest.mark.skipif(not HAS_OPENAI, reason="openai not installed")
