@@ -1,6 +1,9 @@
 # fitz_ai/llm/providers/anthropic.py
 """
 Anthropic provider wrappers using the official SDK.
+
+Uses DynamicHttpxAuth for per-request token refresh, solving the frozen
+token bug where M2M tokens captured at __init__ never refresh.
 """
 
 from __future__ import annotations
@@ -9,6 +12,7 @@ import logging
 from typing import Any, Iterator
 
 from fitz_ai.llm.auth import AuthProvider
+from fitz_ai.llm.auth.httpx_auth import DynamicHttpxAuth
 from fitz_ai.llm.providers.base import ModelTier
 
 logger = logging.getLogger(__name__)
@@ -65,22 +69,23 @@ class AnthropicChat:
         models: dict[ModelTier, str] | None = None,
         **kwargs: Any,
     ) -> None:
+        import httpx
         import anthropic
-
-        headers = auth.get_headers()
-        api_key = headers.get("Authorization", "").replace("Bearer ", "")
-        if not api_key:
-            api_key = headers.get("X-Api-Key", "")
 
         request_kwargs = auth.get_request_kwargs()
 
-        client_kwargs: dict[str, Any] = {"api_key": api_key}
-        if "verify" in request_kwargs:
-            import httpx
+        http_client = httpx.Client(
+            auth=DynamicHttpxAuth(auth),
+            verify=request_kwargs.get("verify", True),
+            timeout=httpx.Timeout(600.0, connect=5.0),
+        )
 
-            client_kwargs["http_client"] = httpx.Client(verify=request_kwargs["verify"])
-
-        self._client = anthropic.Anthropic(**client_kwargs)
+        # SDK requires auth_token or api_key; auth_token triggers Bearer path
+        # http_client auth overrides any SDK-set Authorization header
+        self._client = anthropic.Anthropic(
+            auth_token="unused",  # SDK validation, overridden by http_client
+            http_client=http_client,
+        )
         # Use provided models dict, falling back to defaults
         tier_models = models or CHAT_MODELS
         self._model = model or tier_models.get(tier) or CHAT_MODELS[tier]
@@ -147,22 +152,23 @@ class AnthropicVision:
         model: str | None = None,
         **kwargs: Any,
     ) -> None:
+        import httpx
         import anthropic
-
-        headers = auth.get_headers()
-        api_key = headers.get("Authorization", "").replace("Bearer ", "")
-        if not api_key:
-            api_key = headers.get("X-Api-Key", "")
 
         request_kwargs = auth.get_request_kwargs()
 
-        client_kwargs: dict[str, Any] = {"api_key": api_key}
-        if "verify" in request_kwargs:
-            import httpx
+        http_client = httpx.Client(
+            auth=DynamicHttpxAuth(auth),
+            verify=request_kwargs.get("verify", True),
+            timeout=httpx.Timeout(600.0, connect=5.0),
+        )
 
-            client_kwargs["http_client"] = httpx.Client(verify=request_kwargs["verify"])
-
-        self._client = anthropic.Anthropic(**client_kwargs)
+        # SDK requires auth_token or api_key; auth_token triggers Bearer path
+        # http_client auth overrides any SDK-set Authorization header
+        self._client = anthropic.Anthropic(
+            auth_token="unused",  # SDK validation, overridden by http_client
+            http_client=http_client,
+        )
         self._model = model or VISION_MODEL
         self._defaults = kwargs
 
