@@ -173,7 +173,7 @@ def cloud_pipeline(
     from fitz_ai.ingestion.diff import run_diff_ingest
     from fitz_ai.ingestion.parser import ParserRouter
     from fitz_ai.ingestion.state import IngestStateManager
-    from fitz_ai.llm.registry import get_llm_plugin
+    from fitz_ai.llm import get_embedder
     from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     # Check if cloud is reachable
@@ -189,13 +189,8 @@ def cloud_pipeline(
         pytest.skip(f"pgvector not available: {e}")
 
     # Initialize embedder (using Ollama nomic-embed-text, 768-dim)
-    # Plugin name is "local_ollama" in fitz-ai
     try:
-        embedder = get_llm_plugin(
-            plugin_type="embedding",
-            plugin_name="local_ollama",
-            model="nomic-embed-text",
-        )
+        embedder = get_embedder("ollama", config={"model": "nomic-embed-text"})
         # Test that embedder works
         test_embedding = embedder.embed("test")
         if not test_embedding or len(test_embedding) < 100:

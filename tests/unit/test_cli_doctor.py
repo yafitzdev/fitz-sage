@@ -192,7 +192,7 @@ class TestDoctorConnectionTests:
         mock_plugin.embed.return_value = [0.1, 0.2, 0.3]
 
         with patch(
-            "fitz_ai.llm.registry.get_llm_plugin",
+            "fitz_ai.llm.get_embedder",
             return_value=mock_plugin,
         ):
             from fitz_ai.cli.commands.doctor import _test_embedding
@@ -218,7 +218,7 @@ class TestDoctorConnectionTests:
         mock_plugin = MagicMock()
 
         with patch(
-            "fitz_ai.llm.registry.get_llm_plugin",
+            "fitz_ai.llm.get_chat",
             return_value=mock_plugin,
         ):
             from fitz_ai.cli.commands.doctor import _test_chat
@@ -271,7 +271,7 @@ class TestDoctorConnectionTests:
         mock_plugin = MagicMock()
 
         with patch(
-            "fitz_ai.llm.registry.get_llm_plugin",
+            "fitz_ai.llm.get_reranker",
             return_value=mock_plugin,
         ):
             from fitz_ai.cli.commands.doctor import _test_rerank
@@ -323,7 +323,9 @@ class TestDoctorTestMode:
             ),
             patch("fitz_ai.cli.context.FitzPaths.workspace", return_value=tmp_path),
             patch("fitz_ai.cli.commands.doctor.CLIContext.load", return_value=mock_ctx),
-            patch("fitz_ai.llm.registry.get_llm_plugin", return_value=mock_plugin),
+            patch("fitz_ai.llm.get_embedder", return_value=mock_plugin),
+            patch("fitz_ai.llm.get_chat", return_value=mock_plugin),
+            patch("fitz_ai.llm.get_reranker", return_value=mock_plugin),
             patch(
                 "fitz_ai.vector_db.registry.get_vector_db_plugin",
                 return_value=mock_plugin,
