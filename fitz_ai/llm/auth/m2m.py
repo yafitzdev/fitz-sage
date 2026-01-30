@@ -4,18 +4,38 @@ M2M OAuth2 client credentials authentication provider.
 
 Supports enterprise deployments with:
 - OAuth2 client credentials flow (RFC 6749 Section 4.4)
-- Automatic token refresh
+- Automatic token refresh with exponential backoff
+- Circuit breaker protection against token endpoint failures
 - Custom CA certificates
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
 from typing import Any
 
 import httpx
+from circuitbreaker import circuit
+from tenacity import (
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
+
+logger = logging.getLogger(__name__)
+
+# Transient network errors that should be retried
+# Do NOT include HTTPStatusError - 401/403 are permanent failures
+TRANSIENT_ERRORS = (
+    httpx.TimeoutException,
+    httpx.NetworkError,
+    httpx.RemoteProtocolError,
+)
 
 
 class M2MAuth:
@@ -62,8 +82,25 @@ class M2MAuth:
             return resolved
         return value
 
+    @retry(
+        wait=wait_exponential_jitter(initial=1, max=60, jitter=1),  # 1s, 2s, 4s... up to 60s
+        stop=stop_after_attempt(5),  # Give up after 5 attempts
+        retry=retry_if_exception_type(TRANSIENT_ERRORS),  # Only retry transient errors
+        before_sleep=before_sleep_log(logger, logging.WARNING),  # Log retries at WARNING
+    )
+    @circuit(
+        failure_threshold=5,  # Open circuit after 5 consecutive failures
+        recovery_timeout=30,  # Allow test request after 30s (half-open state)
+        expected_exception=TRANSIENT_ERRORS,  # Only count transient errors as failures
+    )
     def _refresh_token(self) -> None:
-        """Fetch a new access token from the token endpoint."""
+        """Fetch a new access token from the token endpoint.
+
+        Resilience:
+        - Retries transient errors (timeout, network) with exponential backoff
+        - Circuit breaker prevents retry storms on sustained outages
+        - Non-transient errors (401, 403) fail immediately without retry
+        """
         verify: bool | str = self.cert_path if self.cert_path else True
 
         data = {
@@ -74,7 +111,7 @@ class M2MAuth:
         if self.scope:
             data["scope"] = self.scope
 
-        with httpx.Client(verify=verify) as client:
+        with httpx.Client(verify=verify, timeout=10.0) as client:
             response = client.post(
                 self.token_url,
                 data=data,
@@ -86,6 +123,7 @@ class M2MAuth:
         self._token = token_data["access_token"]
         expires_in = token_data.get("expires_in", 3600)
         self._expires_at = time.time() + expires_in - self.refresh_margin_seconds
+        logger.debug("Token refreshed successfully, expires in %d seconds", expires_in)
 
     def _ensure_valid_token(self) -> str:
         """Ensure we have a valid token, refreshing if necessary."""
