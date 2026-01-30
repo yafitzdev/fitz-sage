@@ -3,14 +3,12 @@
 PostgreSQL connection management for unified storage.
 
 Handles:
-- pgserver lifecycle for local mode (embedded PostgreSQL)
+- pgserver lifecycle for local mode (embedded PostgreSQL via fitz-pgserver)
 - Connection pooling via psycopg_pool with health checks
 - Per-collection database creation
 - pgvector extension initialization
 - Graceful shutdown on signals (SIGTERM, SIGINT)
-- Auto-recovery from corrupted pgdata and stale connections
-- Automatic restart with exponential backoff on failures
-- Lock file cleanup for crashed instances
+- Auto-recovery from corrupted pgdata (nuclear recovery as last resort)
 """
 
 from __future__ import annotations
@@ -112,117 +110,6 @@ def _register_signal_handlers() -> None:
 # Valid collection name pattern (alphanumeric + underscore)
 COLLECTION_NAME_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
 
-# Retry configuration
-MAX_RESTART_ATTEMPTS = 3
-RETRY_BACKOFF_BASE = 0.5  # seconds
-RETRY_BACKOFF_MAX = 10.0  # seconds
-
-
-def _calculate_backoff(attempt: int) -> float:
-    """Calculate exponential backoff delay."""
-    delay = RETRY_BACKOFF_BASE * (2**attempt)
-    return min(delay, RETRY_BACKOFF_MAX)
-
-
-def _kill_postgres_for_pgdata(data_dir: Path) -> bool:
-    """
-    Kill all postgres processes that are using a specific pgdata directory.
-
-    Uses psutil to find the main postgres process by checking command line,
-    then kills it along with all its children. This catches orphan child
-    processes even when the parent is already dead.
-
-    Args:
-        data_dir: The pgdata directory
-
-    Returns:
-        True if any processes were killed
-    """
-    try:
-        import psutil
-    except ImportError:
-        return False
-
-    killed_any = False
-    # Use forward slashes for matching (postgres on Windows uses forward slashes)
-    data_dir_posix = data_dir.resolve().as_posix()
-    data_dir_str = str(data_dir.resolve())
-
-    # Find main postgres process and all child processes
-    main_postgres_pids = []
-    all_postgres_procs = []
-
-    for proc in psutil.process_iter(["pid", "name", "cmdline"]):
-        try:
-            name = proc.info.get("name", "").lower()
-            if "postgres" not in name:
-                continue
-
-            all_postgres_procs.append(proc)
-            cmdline = proc.info.get("cmdline") or []
-            cmdline_str = " ".join(cmdline)
-
-            # Check if this postgres is using our data directory
-            # Match both forward and backslash versions
-            if data_dir_posix in cmdline_str or data_dir_str in cmdline_str:
-                main_postgres_pids.append(proc.pid)
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            continue
-
-    # Stop main postgres processes gracefully (allows clean shutdown, avoids recovery)
-    for main_pid in main_postgres_pids:
-        try:
-            main_proc = psutil.Process(main_pid)
-            children = main_proc.children(recursive=True)
-
-            logger.debug(
-                f"{STORAGE} Stopping postgres PID {main_pid} and {len(children)} children"
-            )
-
-            # Try graceful termination first (fast shutdown)
-            main_proc.terminate()
-            try:
-                main_proc.wait(timeout=10)  # Give postgres time to checkpoint
-                killed_any = True
-            except psutil.TimeoutExpired:
-                # Force kill if graceful shutdown didn't work
-                logger.debug(f"{STORAGE} Graceful shutdown timed out, force killing")
-                for child in children:
-                    try:
-                        child.kill()
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        pass
-                main_proc.kill()
-                psutil.wait_procs([main_proc] + children, timeout=5)
-                killed_any = True
-
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            pass
-
-    # If we didn't find a main process but there ARE postgres processes,
-    # they might be orphans. Kill ALL postgres processes as fallback.
-    if not main_postgres_pids and all_postgres_procs:
-        logger.debug(f"{STORAGE} No main postgres found, killing all {len(all_postgres_procs)} orphans")
-        for proc in all_postgres_procs:
-            try:
-                proc.terminate()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
-        # Wait with longer timeout for graceful shutdown
-        gone, alive = psutil.wait_procs(all_postgres_procs, timeout=5)
-        # Force kill any that didn't terminate
-        for proc in alive:
-            try:
-                proc.kill()
-                killed_any = True
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
-        if gone:
-            killed_any = True
-
-    return killed_any
-
-
 def _kill_zombie_postgres_processes() -> None:
     """
     Kill any zombie postgres processes that might hold locks on pgdata.
@@ -261,61 +148,6 @@ def _kill_zombie_postgres_processes() -> None:
                 logger.debug(f"{STORAGE} Killed zombie postgres processes")
     except Exception as e:
         logger.debug(f"{STORAGE} Could not kill postgres processes (may not exist): {e}")
-
-
-def _cleanup_stale_lock_files(data_dir: Path) -> None:
-    """
-    Remove stale PostgreSQL lock files that prevent startup.
-
-    PostgreSQL creates postmaster.pid and socket lock files that can
-    persist after crashes, preventing new instances from starting.
-    """
-    lock_files = [
-        data_dir / "postmaster.pid",
-        data_dir / ".s.PGSQL.5432.lock",
-    ]
-
-    # Also clean up any socket files
-    for item in data_dir.glob(".s.PGSQL.*"):
-        lock_files.append(item)
-
-    for lock_file in lock_files:
-        if lock_file.exists():
-            try:
-                lock_file.unlink()
-                logger.debug(f"{STORAGE} Removed stale file: {lock_file.name}")
-            except Exception as e:
-                logger.warning(f"{STORAGE} Could not remove {lock_file}: {e}")
-
-    # Handle log file specially on Windows - rename instead of delete
-    # to avoid sharing violations when file handles haven't been released
-    log_file = data_dir / "log"
-    if log_file.exists():
-        try:
-            log_file.unlink()
-            logger.debug(f"{STORAGE} Removed log file")
-        except PermissionError:
-            if sys.platform == "win32":
-                # Try renaming instead - this sometimes works when delete doesn't
-                try:
-                    import uuid
-
-                    old_log = data_dir / f"log.old.{uuid.uuid4().hex[:8]}"
-                    log_file.rename(old_log)
-                    logger.debug(f"{STORAGE} Renamed log to {old_log.name}")
-                except Exception:
-                    # Wait and retry delete
-                    for i in range(5):
-                        time.sleep(0.5)
-                        try:
-                            log_file.unlink()
-                            logger.debug(f"{STORAGE} Removed log file after retry {i+1}")
-                            break
-                        except Exception:
-                            if i == 4:
-                                logger.warning(f"{STORAGE} Could not remove log file after retries")
-        except Exception as e:
-            logger.warning(f"{STORAGE} Could not remove log file: {e}")
 
 
 def _force_remove_pgdata(data_dir: Path, max_retries: int = 5) -> bool:
@@ -463,66 +295,42 @@ class PostgresConnectionManager:
                 f"{STORAGE} PostgreSQL connection manager started (mode={self.config.mode.value})"
             )
 
-    def _start_pgserver(self, timeout: int = 60, allow_recovery: bool = True) -> None:
+    def _start_pgserver(self, allow_recovery: bool = True) -> None:
         """
-        Start embedded pgserver with guaranteed clean state.
+        Start embedded pgserver (fitz-pgserver fork).
 
-        Philosophy: ALWAYS ensure clean state before starting. This is slower but
-        guarantees success. We kill any existing postgres using our pgdata, clear
-        all caches, and start fresh. This handles all edge cases:
-        - Killed Python processes leaving orphan postgres
-        - Corrupted pgdata from interrupted operations
-        - Stale pgserver cache entries
-        - File locks from crashed processes
+        fitz-pgserver handles most robustness issues internally:
+        - Unique log file names per session (avoids Windows sharing violations)
+        - Proper crash recovery via WAL replay
+
+        We only do nuclear recovery (delete pgdata) as a last resort when
+        pgserver itself fails to start.
 
         Args:
-            timeout: Maximum seconds to wait for pgserver to start (default: 60)
             allow_recovery: If True, attempt nuclear recovery on failure
 
         Raises:
-            ImportError: If pgserver package not installed
+            ImportError: If fitz-pgserver package not installed
             RuntimeError: If pgserver fails to start even after recovery
         """
         try:
             import fitz_pgserver as pgserver
         except ImportError as e:
-            raise ImportError("fitz-pgserver not installed. Install with: pip install fitz-pgserver") from e
+            raise ImportError(
+                "fitz-pgserver not installed. Install with: pip install fitz-pgserver"
+            ) from e
 
         data_dir = self.config.data_dir or FitzPaths.ensure_pgdata()
         data_dir = Path(data_dir)
         resolved_path = data_dir.expanduser().resolve()
 
-        # =================================================================
-        # STEP 1: Guarantee clean state - kill ALL postgres using our pgdata
-        # =================================================================
-        # This catches:
-        # - Running postgres from previous clean start
-        # - Orphan child processes from killed parent
-        # - Zombie processes from crashes
-        logger.debug(f"{STORAGE} Ensuring no postgres processes are using {data_dir}")
-
-        killed = _kill_postgres_for_pgdata(data_dir)
-        if killed:
-            logger.info(f"{STORAGE} Killed postgres processes using our pgdata")
-
-        # Windows needs time for file handles to be released, even if we didn't
-        # kill anything (postgres might have been killed externally)
-        if sys.platform == "win32":
-            time.sleep(1.0)  # Windows needs more time for file handle cleanup
-
-        # Clear pgserver's internal cache
-        if resolved_path in pgserver.PostgresServer._instances:
-            del pgserver.PostgresServer._instances[resolved_path]
-
-        # Clean up lock files
-        _cleanup_stale_lock_files(data_dir)
-
         # Ensure directory exists
         data_dir.mkdir(parents=True, exist_ok=True)
 
         # =================================================================
-        # STEP 2: Start pgserver
+        # STEP 1: Try to start pgserver directly
         # =================================================================
+        # fitz-pgserver handles crash recovery internally via unique log files
         logger.info(f"{STORAGE} Starting pgserver at {data_dir}")
 
         try:
@@ -534,14 +342,14 @@ class PostgresConnectionManager:
             logger.warning(f"{STORAGE} pgserver startup failed: {e}")
 
         # =================================================================
-        # STEP 3: Nuclear recovery - delete everything and retry once
+        # STEP 2: Nuclear recovery - delete everything and retry once
         # =================================================================
         if not allow_recovery:
             raise RuntimeError(f"pgserver failed to start: {e}")
 
-        logger.warning(f"{STORAGE} Attempting nuclear recovery...")
+        logger.warning(f"{STORAGE} Attempting nuclear recovery (deleting pgdata)...")
 
-        # Kill ALL postgres processes (not just ours)
+        # Kill ALL postgres processes
         _kill_zombie_postgres_processes()
         time.sleep(0.5 if sys.platform == "win32" else 0.2)
 
@@ -553,7 +361,7 @@ class PostgresConnectionManager:
                     "Close any programs using it and try again."
                 )
 
-        # Clear cache again
+        # Clear pgserver cache
         if resolved_path in pgserver.PostgresServer._instances:
             del pgserver.PostgresServer._instances[resolved_path]
 
@@ -563,7 +371,7 @@ class PostgresConnectionManager:
         try:
             self._pgserver = pgserver.get_server(str(data_dir))
             self._base_uri = self._pgserver.get_uri()
-            logger.info(f"{STORAGE} pgserver started after recovery")
+            logger.info(f"{STORAGE} pgserver started after nuclear recovery")
             return
         except Exception as retry_error:
             raise RuntimeError(
@@ -842,17 +650,10 @@ class PostgresConnectionManager:
             if hasattr(self, "_pgserver") and self._pgserver is not None:
                 try:
                     self._pgserver.cleanup()
+                    logger.info(f"{STORAGE} pgserver stopped")
                 except Exception as e:
                     logger.warning(f"{STORAGE} Error stopping pgserver: {e}")
                 self._pgserver = None
-
-                # Windows: wait for postgres to fully terminate and release file handles
-                if sys.platform == "win32":
-                    time.sleep(1.0)
-                    _kill_zombie_postgres_processes()
-                    time.sleep(0.5)
-
-                logger.info(f"{STORAGE} pgserver stopped")
 
             if hasattr(self, "_base_uri"):
                 self._base_uri = None

@@ -4,6 +4,9 @@ Tests for PostgreSQL connection manager recovery logic.
 
 Tests both unit-level helper functions and integration-level
 recovery scenarios to ensure pgserver handles failures gracefully.
+
+Note: Most robustness is now handled by fitz-pgserver (unique log files,
+crash recovery). These tests focus on nuclear recovery as last resort.
 """
 
 import os
@@ -16,12 +19,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from fitz_ai.storage.postgres import (
-    MAX_RESTART_ATTEMPTS,
-    RETRY_BACKOFF_BASE,
-    RETRY_BACKOFF_MAX,
     PostgresConnectionManager,
-    _calculate_backoff,
-    _cleanup_stale_lock_files,
     _force_remove_pgdata,
     _kill_zombie_postgres_processes,
     _sanitize_collection_name,
@@ -32,36 +30,6 @@ from fitz_ai.storage.config import StorageConfig, StorageMode
 # =============================================================================
 # Unit Tests - Helper Functions
 # =============================================================================
-
-
-class TestCalculateBackoff:
-    """Tests for exponential backoff calculation."""
-
-    def test_first_attempt_backoff(self):
-        """First attempt uses base backoff."""
-        backoff = _calculate_backoff(0)
-        assert backoff == RETRY_BACKOFF_BASE
-
-    def test_exponential_growth(self):
-        """Backoff grows exponentially."""
-        backoff_0 = _calculate_backoff(0)
-        backoff_1 = _calculate_backoff(1)
-        backoff_2 = _calculate_backoff(2)
-
-        assert backoff_1 == backoff_0 * 2
-        assert backoff_2 == backoff_0 * 4
-
-    def test_max_backoff_cap(self):
-        """Backoff is capped at maximum."""
-        # Large attempt number should hit cap
-        backoff = _calculate_backoff(100)
-        assert backoff == RETRY_BACKOFF_MAX
-
-    def test_backoff_never_exceeds_max(self):
-        """No backoff value exceeds maximum."""
-        for attempt in range(20):
-            backoff = _calculate_backoff(attempt)
-            assert backoff <= RETRY_BACKOFF_MAX
 
 
 class TestSanitizeCollectionName:
@@ -87,56 +55,6 @@ class TestSanitizeCollectionName:
     def test_result_is_lowercase(self):
         """Result is always lowercase."""
         assert _sanitize_collection_name("MyCollection") == "mycollection"
-
-
-class TestCleanupStaleLockFiles:
-    """Tests for stale lock file cleanup."""
-
-    def test_removes_postmaster_pid(self):
-        """Removes postmaster.pid file."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            data_dir = Path(tmpdir)
-            lock_file = data_dir / "postmaster.pid"
-            lock_file.write_text("12345")
-
-            _cleanup_stale_lock_files(data_dir)
-
-            assert not lock_file.exists()
-
-    def test_removes_socket_lock(self):
-        """Removes socket lock files."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            data_dir = Path(tmpdir)
-            lock_file = data_dir / ".s.PGSQL.5432.lock"
-            lock_file.write_text("lock")
-
-            _cleanup_stale_lock_files(data_dir)
-
-            assert not lock_file.exists()
-
-    def test_removes_socket_files(self):
-        """Removes socket files matching pattern."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            data_dir = Path(tmpdir)
-            socket_file = data_dir / ".s.PGSQL.5432"
-            socket_file.write_text("socket")
-
-            _cleanup_stale_lock_files(data_dir)
-
-            assert not socket_file.exists()
-
-    def test_handles_missing_files(self):
-        """Doesn't fail if files don't exist."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            data_dir = Path(tmpdir)
-            # No lock files - should not raise
-            _cleanup_stale_lock_files(data_dir)
-
-    def test_handles_missing_directory(self):
-        """Doesn't fail if directory doesn't exist."""
-        nonexistent = Path("/nonexistent/path/that/does/not/exist")
-        # Should not raise (glob on nonexistent dir returns empty)
-        _cleanup_stale_lock_files(nonexistent)
 
 
 class TestForceRemovePgdata:
@@ -281,7 +199,7 @@ class TestPgserverRecoveryIntegration:
 
         This tests the fix: cache is cleared BEFORE first startup attempt.
         """
-        import pgserver
+        import fitz_pgserver as pgserver
 
         config = StorageConfig(
             mode=StorageMode.LOCAL,
@@ -369,7 +287,10 @@ class TestPgserverRecoveryIntegration:
             time.sleep(1.0)
 
     def test_recovery_from_stale_lock_file(self, temp_pgdata):
-        """Pgserver recovers when stale lock file exists."""
+        """Pgserver recovers when stale lock file exists.
+
+        fitz-pgserver handles this via nuclear recovery (delete pgdata).
+        """
         # Create stale lock file with fake PID
         lock_file = temp_pgdata / "postmaster.pid"
         lock_file.write_text("99999\n/fake/path\n12345\n")  # Fake content
@@ -382,7 +303,7 @@ class TestPgserverRecoveryIntegration:
         manager = PostgresConnectionManager(config)
 
         try:
-            # Should start successfully (recovery cleans up stale lock file)
+            # Should start successfully (nuclear recovery deletes pgdata)
             manager.start()
 
             assert manager._started is True
@@ -395,25 +316,6 @@ class TestPgserverRecoveryIntegration:
             manager.stop()
             # Give Windows time to release file handles
             import time
-            time.sleep(1.0)
-
-    def test_recovery_cleans_socket_files(self, temp_pgdata):
-        """Pgserver cleans up stale socket files."""
-        # Create stale socket files
-        (temp_pgdata / ".s.PGSQL.5432").write_text("socket")
-        (temp_pgdata / ".s.PGSQL.5432.lock").write_text("lock")
-
-        config = StorageConfig(
-            mode=StorageMode.LOCAL,
-            data_dir=str(temp_pgdata),
-        )
-        manager = PostgresConnectionManager(config)
-
-        try:
-            manager.start()
-            assert manager._started is True
-        finally:
-            manager.stop()
             time.sleep(1.0)
 
     def test_connection_creates_database(self, temp_pgdata):
