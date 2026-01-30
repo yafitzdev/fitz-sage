@@ -8,9 +8,9 @@ Parses provider/model strings and instantiates correct provider + auth combinati
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, Literal
 
-from fitz_ai.llm.auth import ApiKeyAuth, AuthProvider, M2MAuth
+from fitz_ai.llm.auth import ApiKeyAuth, AuthProvider, CompositeAuth, M2MAuth
 from fitz_ai.llm.providers.base import (
     ChatProvider,
     EmbeddingProvider,
@@ -61,6 +61,38 @@ def parse_provider_string(spec: str) -> tuple[str, str | None]:
     return spec.strip(), None
 
 
+def _validate_enterprise_config(auth_config: dict[str, Any]) -> None:
+    """Validate enterprise auth config with actionable error messages."""
+    required = ["token_url", "client_id", "client_secret", "llm_api_key_env"]
+    missing = [f for f in required if not auth_config.get(f)]
+
+    if missing:
+        raise ValueError(
+            f"Enterprise auth config missing required fields: {', '.join(missing)}\n\n"
+            f"Required configuration:\n"
+            f"  auth:\n"
+            f"    type: enterprise\n"
+            f"    token_url: <OAuth2 token endpoint>\n"
+            f"    client_id: ${{CLIENT_ID}}  # or literal value\n"
+            f"    client_secret: ${{CLIENT_SECRET}}\n"
+            f"    llm_api_key_env: <env var name for LLM API key>\n\n"
+            f"Optional fields:\n"
+            f"    scope: <OAuth2 scope>\n"
+            f"    llm_api_key_header: X-Api-Key  # default\n"
+            f"    client_cert_path: <mTLS cert path>\n"
+            f"    client_key_path: <mTLS key path>\n"
+            f"    client_key_password: ${{KEY_PASSWORD}}"
+        )
+
+    # Validate API key env var exists at startup (fail fast)
+    api_key_env = auth_config["llm_api_key_env"]
+    if not os.environ.get(api_key_env):
+        raise ValueError(
+            f"Enterprise auth requires environment variable {api_key_env} to be set.\n"
+            f"This variable should contain the LLM API key for the underlying provider."
+        )
+
+
 def resolve_auth(provider: str, config: dict[str, Any] | None = None) -> AuthProvider | None:
     """
     Resolve authentication for a provider.
@@ -86,9 +118,52 @@ def resolve_auth(provider: str, config: dict[str, Any] | None = None) -> AuthPro
             },
             "cert_path": "/etc/ssl/corp-ca.crt"  # optional
         }
+
+    Config format for enterprise auth (M2M + API key):
+        {
+            "auth": {
+                "type": "enterprise",
+                "token_url": "https://auth.corp.com/oauth/token",
+                "client_id": "${CLIENT_ID}",
+                "client_secret": "${CLIENT_SECRET}",
+                "scope": "optional-scope",  # optional
+                "llm_api_key_env": "BMW_LLM_API_KEY",
+                "llm_api_key_header": "X-Api-Key",  # optional, default X-Api-Key
+                "client_cert_path": "/path/to/client.crt",  # optional, for mTLS
+                "client_key_path": "/path/to/client.key",  # optional, for mTLS
+                "client_key_password": "${KEY_PASSWORD}"  # optional, for encrypted key
+            },
+            "cert_path": "/etc/ssl/corp-ca.crt"  # optional, for CA verification
+        }
     """
     config = config or {}
     auth_config = config.get("auth", {})
+
+    # Check for enterprise auth (M2M + API key)
+    if auth_config.get("type") == "enterprise":
+        _validate_enterprise_config(auth_config)
+
+        # Create M2MAuth for bearer token (Authorization header)
+        m2m = M2MAuth(
+            token_url=auth_config["token_url"],
+            client_id=auth_config["client_id"],
+            client_secret=auth_config["client_secret"],
+            cert_path=config.get("cert_path"),
+            scope=auth_config.get("scope"),
+            client_cert_path=auth_config.get("client_cert_path"),
+            client_key_path=auth_config.get("client_key_path"),
+            client_key_password=auth_config.get("client_key_password"),
+        )
+
+        # Create ApiKeyAuth for LLM API key (X-Api-Key header by default)
+        api_key_env = auth_config["llm_api_key_env"]
+        header_name = auth_config.get("llm_api_key_header", "X-Api-Key")
+        header_format: Literal["bearer", "x-api-key", "basic"] = (
+            "x-api-key" if header_name.lower() == "x-api-key" else "bearer"
+        )
+        api_key = ApiKeyAuth(api_key_env, header_format=header_format)
+
+        return CompositeAuth(m2m, api_key)
 
     # Check for M2M auth
     if auth_config.get("type") == "m2m":
