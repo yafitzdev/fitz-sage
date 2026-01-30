@@ -3,15 +3,18 @@
 OpenAI provider wrappers using the official SDK.
 
 Also supports Azure OpenAI via base_url configuration.
+
+Uses DynamicHttpxAuth for per-request token refresh, solving the frozen
+token bug where M2M tokens captured at __init__ never refresh.
 """
 
 from __future__ import annotations
 
-import base64
 import logging
 from typing import Any, Iterator
 
 from fitz_ai.llm.auth import AuthProvider
+from fitz_ai.llm.auth.httpx_auth import DynamicHttpxAuth
 from fitz_ai.llm.providers.base import ModelTier
 
 logger = logging.getLogger(__name__)
@@ -48,23 +51,23 @@ class OpenAIChat:
         models: dict[ModelTier, str] | None = None,
         **kwargs: Any,
     ) -> None:
+        import httpx
         import openai
-
-        headers = auth.get_headers()
-        api_key = headers.get("Authorization", "").replace("Bearer ", "")
-        if not api_key:
-            api_key = headers.get("X-Api-Key", "")
 
         request_kwargs = auth.get_request_kwargs()
 
-        client_kwargs: dict[str, Any] = {"api_key": api_key}
+        http_client = httpx.Client(
+            auth=DynamicHttpxAuth(auth),
+            verify=request_kwargs.get("verify", True),
+            timeout=httpx.Timeout(600.0, connect=5.0),
+        )
+
+        client_kwargs: dict[str, Any] = {
+            "api_key": "unused",  # SDK requires non-empty, http_client auth overrides
+            "http_client": http_client,
+        }
         if base_url:
             client_kwargs["base_url"] = base_url
-        if "verify" in request_kwargs:
-            # OpenAI SDK uses http_client for custom SSL
-            import httpx
-
-            client_kwargs["http_client"] = httpx.Client(verify=request_kwargs["verify"])
 
         self._client = openai.OpenAI(**client_kwargs)
         # Use provided models dict, falling back to defaults
@@ -122,22 +125,23 @@ class OpenAIEmbedding:
         dimensions: int | None = None,
         base_url: str | None = None,
     ) -> None:
+        import httpx
         import openai
-
-        headers = auth.get_headers()
-        api_key = headers.get("Authorization", "").replace("Bearer ", "")
-        if not api_key:
-            api_key = headers.get("X-Api-Key", "")
 
         request_kwargs = auth.get_request_kwargs()
 
-        client_kwargs: dict[str, Any] = {"api_key": api_key}
+        http_client = httpx.Client(
+            auth=DynamicHttpxAuth(auth),
+            verify=request_kwargs.get("verify", True),
+            timeout=httpx.Timeout(600.0, connect=5.0),
+        )
+
+        client_kwargs: dict[str, Any] = {
+            "api_key": "unused",  # SDK requires non-empty, http_client auth overrides
+            "http_client": http_client,
+        }
         if base_url:
             client_kwargs["base_url"] = base_url
-        if "verify" in request_kwargs:
-            import httpx
-
-            client_kwargs["http_client"] = httpx.Client(verify=request_kwargs["verify"])
 
         self._client = openai.OpenAI(**client_kwargs)
         self._model = model or EMBEDDING_MODEL
@@ -193,22 +197,23 @@ class OpenAIVision:
         base_url: str | None = None,
         **kwargs: Any,
     ) -> None:
+        import httpx
         import openai
-
-        headers = auth.get_headers()
-        api_key = headers.get("Authorization", "").replace("Bearer ", "")
-        if not api_key:
-            api_key = headers.get("X-Api-Key", "")
 
         request_kwargs = auth.get_request_kwargs()
 
-        client_kwargs: dict[str, Any] = {"api_key": api_key}
+        http_client = httpx.Client(
+            auth=DynamicHttpxAuth(auth),
+            verify=request_kwargs.get("verify", True),
+            timeout=httpx.Timeout(600.0, connect=5.0),
+        )
+
+        client_kwargs: dict[str, Any] = {
+            "api_key": "unused",  # SDK requires non-empty, http_client auth overrides
+            "http_client": http_client,
+        }
         if base_url:
             client_kwargs["base_url"] = base_url
-        if "verify" in request_kwargs:
-            import httpx
-
-            client_kwargs["http_client"] = httpx.Client(verify=request_kwargs["verify"])
 
         self._client = openai.OpenAI(**client_kwargs)
         self._model = model or VISION_MODEL
