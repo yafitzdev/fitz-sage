@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from fitz_ai.llm.auth import ApiKeyAuth, AuthProvider, M2MAuth
+from fitz_ai.llm.auth import ApiKeyAuth, AuthProvider, CompositeAuth, M2MAuth
 
 
 class TestAuthProvider:
@@ -385,3 +385,73 @@ class TestM2MAuth:
 
             assert headers == {"Authorization": "Bearer recovered-token"}
             assert call_count == 3  # 2 failures + 1 success
+
+
+class TestCompositeAuth:
+    """Test CompositeAuth for multi-header scenarios."""
+
+    def test_requires_at_least_one_provider(self) -> None:
+        """CompositeAuth raises ValueError with no providers."""
+        with pytest.raises(ValueError, match="at least one provider"):
+            CompositeAuth()
+
+    def test_single_provider_passthrough(self) -> None:
+        """Single provider headers are passed through unchanged."""
+        with patch.dict("os.environ", {"TEST_KEY": "secret123"}):
+            api_key = ApiKeyAuth("TEST_KEY")
+            composite = CompositeAuth(api_key)
+            headers = composite.get_headers()
+            assert headers == {"Authorization": "Bearer secret123"}
+
+    def test_merges_multiple_provider_headers(self) -> None:
+        """Multiple providers have their headers merged."""
+        with patch.dict("os.environ", {"KEY1": "token1", "KEY2": "token2"}):
+            # First provider: standard Bearer
+            auth1 = ApiKeyAuth("KEY1")
+            # Second provider: custom header
+            auth2 = ApiKeyAuth("KEY2", header_format="x-api-key")
+            composite = CompositeAuth(auth1, auth2)
+
+            headers = composite.get_headers()
+            assert headers["Authorization"] == "Bearer token1"
+            assert headers["X-Api-Key"] == "token2"
+
+    def test_later_provider_overrides_earlier(self) -> None:
+        """When providers have conflicting headers, later wins."""
+        with patch.dict("os.environ", {"KEY1": "first", "KEY2": "second"}):
+            auth1 = ApiKeyAuth("KEY1")
+            auth2 = ApiKeyAuth("KEY2")  # Same header as auth1
+            composite = CompositeAuth(auth1, auth2)
+
+            headers = composite.get_headers()
+            # auth2 should override auth1
+            assert headers["Authorization"] == "Bearer second"
+
+    def test_merges_request_kwargs(self) -> None:
+        """Request kwargs are merged from all providers."""
+        with patch.dict("os.environ", {"KEY": "value"}):
+            # Mock provider with custom request kwargs
+            mock_provider = MagicMock()
+            mock_provider.get_headers.return_value = {}
+            mock_provider.get_request_kwargs.return_value = {"verify": "/path/to/ca.crt"}
+
+            api_key = ApiKeyAuth("KEY")
+            composite = CompositeAuth(api_key, mock_provider)
+
+            kwargs = composite.get_request_kwargs()
+            assert kwargs["verify"] == "/path/to/ca.crt"
+
+    def test_m2m_plus_api_key_pattern(self) -> None:
+        """Verify BMW pattern: M2M bearer + API key headers."""
+        # This test uses mocks since M2MAuth needs actual token endpoint
+        mock_m2m = MagicMock()
+        mock_m2m.get_headers.return_value = {"Authorization": "Bearer m2m_token_123"}
+        mock_m2m.get_request_kwargs.return_value = {}
+
+        with patch.dict("os.environ", {"BMW_API_KEY": "bmw_secret"}):
+            api_key = ApiKeyAuth("BMW_API_KEY", header_format="x-api-key")
+            composite = CompositeAuth(mock_m2m, api_key)
+
+            headers = composite.get_headers()
+            assert headers["Authorization"] == "Bearer m2m_token_123"
+            assert headers["X-Api-Key"] == "bmw_secret"
