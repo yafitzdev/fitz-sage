@@ -271,6 +271,103 @@ class TestPgserverRecoveryIntegration:
                 time.sleep(1.0)
         # Ignore if cleanup fails - temp dir will be cleaned by OS eventually
 
+    def test_recovery_from_stale_pgserver_cache(self, temp_pgdata):
+        """Pgserver handles stale cache from killed process.
+
+        When a process is killed mid-test, pgserver's internal cache might
+        contain a reference to a dead/broken server instance. The next process
+        must clear this cache before attempting to start, otherwise it will
+        get the cached broken instance.
+
+        This tests the fix: cache is cleared BEFORE first startup attempt.
+        """
+        import pgserver
+
+        config = StorageConfig(
+            mode=StorageMode.LOCAL,
+            data_dir=str(temp_pgdata),
+        )
+
+        # Simulate a killed process leaving stale cache entry
+        # Create a mock "broken" server instance in pgserver's cache
+        resolved_path = temp_pgdata.expanduser().resolve()
+
+        class BrokenServer:
+            """Simulates a server from a killed process."""
+
+            def get_uri(self):
+                raise RuntimeError("Server from killed process")
+
+            def cleanup(self):
+                pass
+
+        # Inject the broken server into pgserver's cache
+        pgserver.PostgresServer._instances[resolved_path] = BrokenServer()
+
+        # Now try to start - this should clear the cache and start fresh
+        manager = PostgresConnectionManager(config)
+
+        try:
+            manager.start()
+
+            # Should have succeeded despite the stale cache
+            assert manager._started is True
+            assert manager._pgserver is not None
+
+            # The broken server should have been removed from cache
+            # (replaced with the real server)
+            assert resolved_path in pgserver.PostgresServer._instances
+            assert not isinstance(
+                pgserver.PostgresServer._instances[resolved_path], BrokenServer
+            )
+
+            # Verify we can actually connect
+            is_healthy, _ = manager.is_healthy()
+            assert is_healthy is True
+        finally:
+            manager.stop()
+            time.sleep(1.0)
+
+    def test_recovery_from_partially_initialized_pgdata(self, temp_pgdata):
+        """Pgserver recovers when pgdata is partially initialized (no PG_VERSION).
+
+        This tests a critical bug fix: pgserver caches PostgresServer instances
+        by path. When the first startup attempt fails on a partially initialized
+        pgdata, the broken instance gets cached. Recovery must clear this cache
+        before retrying, otherwise pgserver returns the cached broken instance.
+
+        Scenario:
+        1. pgdata exists with some files (postmaster.pid, pg_hba.conf) but NOT PG_VERSION
+        2. initdb fails because "directory exists but is not empty"
+        3. Recovery deletes pgdata and recreates it
+        4. Without the cache fix, pgserver returns cached broken instance -> fails again
+        5. With the cache fix, pgserver creates fresh instance -> succeeds
+        """
+        # Create partially initialized pgdata (has files but NOT PG_VERSION)
+        (temp_pgdata / "postmaster.pid").write_text("99999\n/fake\n")
+        (temp_pgdata / "pg_hba.conf").write_text("# partial")
+        (temp_pgdata / "log").write_text("partial init log")
+
+        config = StorageConfig(
+            mode=StorageMode.LOCAL,
+            data_dir=str(temp_pgdata),
+        )
+        manager = PostgresConnectionManager(config)
+
+        try:
+            # Should recover and start successfully
+            manager.start()
+
+            assert manager._started is True
+            assert manager._pgserver is not None
+
+            # Verify we can actually connect
+            is_healthy, _ = manager.is_healthy()
+            assert is_healthy is True
+        finally:
+            manager.stop()
+            time.sleep(1.0)
+
     def test_recovery_from_stale_lock_file(self, temp_pgdata):
         """Pgserver recovers when stale lock file exists."""
         # Create stale lock file with fake PID
@@ -412,8 +509,8 @@ class TestPgserverRecoveryIntegration:
 
 
 @pytest.mark.postgres
-class TestPgserverMaxRetries:
-    """Test that max retry limit is enforced."""
+class TestPgserverNuclearRecovery:
+    """Test nuclear recovery behavior (delete pgdata and retry)."""
 
     @pytest.fixture(autouse=True)
     def setup_and_teardown(self):
@@ -422,24 +519,8 @@ class TestPgserverMaxRetries:
         yield
         PostgresConnectionManager.reset_instance()
 
-    def test_restart_fails_after_max_attempts(self):
-        """Restart raises error after max attempts exceeded."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config = StorageConfig(
-                mode=StorageMode.LOCAL,
-                data_dir=str(Path(tmpdir) / "pgdata"),
-            )
-            manager = PostgresConnectionManager(config)
-
-            # Set restart attempts to max
-            manager._restart_attempts = MAX_RESTART_ATTEMPTS
-
-            # Next restart should fail
-            with pytest.raises(RuntimeError, match="restart failed"):
-                manager._restart_pgserver()
-
-    def test_restart_counter_resets_on_success(self):
-        """Restart counter resets after successful restart."""
+    def test_restart_recovers_from_crash(self):
+        """Restart recovers after simulated crash via nuclear recovery."""
         tmpdir = tempfile.mkdtemp()
         try:
             pgdata = Path(tmpdir) / "pgdata"
@@ -452,13 +533,14 @@ class TestPgserverMaxRetries:
             manager = PostgresConnectionManager(config)
             manager.start()
 
-            # Simulate some restart attempts
-            manager._restart_attempts = 2
+            # Verify started
+            is_healthy, _ = manager.is_healthy()
+            assert is_healthy
 
-            # Successful restart should reset counter
+            # Restart should work
             manager._restart_pgserver()
-
-            assert manager._restart_attempts == 0
+            is_healthy, _ = manager.is_healthy()
+            assert is_healthy
 
             manager.stop()
             time.sleep(1.0)

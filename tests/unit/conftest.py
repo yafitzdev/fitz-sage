@@ -36,6 +36,7 @@ def pytest_collection_modifyitems(config, items):
         "test_model_tier_resolution",
         "test_query_router",
         "test_semantic_grouping",
+        "test_semantic_math",
         "test_context_pipeline",
         "test_rgs",
         "test_writer_basic",

@@ -65,7 +65,7 @@ dependencies = [
     "psycopg[binary]>=3.1",
     "psycopg-pool>=3.1",
     "pgvector>=0.2.0",
-    "pgserver>=0.1.0",
+    "fitz-pgserver>=0.1.5",  # Fork of pgserver with Windows crash recovery fix
     # Docling for advanced document parsing (PDF, DOCX, PPTX, images)
     "docling>=2.0",
 ]
