@@ -121,6 +121,14 @@ def _get_provider_kwargs(config: dict[str, Any] | None) -> dict[str, Any]:
     if "base_url" in config:
         kwargs["base_url"] = config["base_url"]
 
+    # Pass through models dict for tier-based model selection (Ollama, etc.)
+    if "models" in config:
+        kwargs["models"] = config["models"]
+
+    # Pass through model for single model override (embeddings, etc.)
+    if "model" in config:
+        kwargs["model"] = config["model"]
+
     return kwargs
 
 

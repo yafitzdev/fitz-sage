@@ -418,6 +418,36 @@ def available_vector_db_plugins() -> List[str]:
 
 
 # =============================================================================
+# LLM Plugin Discovery
+# =============================================================================
+
+# Provider capabilities mapping
+_LLM_PROVIDER_CAPABILITIES: Dict[str, List[str]] = {
+    "cohere": ["chat", "embedding", "rerank"],
+    "openai": ["chat", "embedding"],
+    "anthropic": ["chat"],
+    "ollama": ["chat", "embedding"],
+}
+
+
+def available_llm_plugins(plugin_type: str) -> List[str]:
+    """
+    List available LLM plugins for a given type.
+
+    Args:
+        plugin_type: Type of LLM plugin ("chat", "embedding", "rerank", "vision")
+
+    Returns:
+        List of provider names that support the given type
+    """
+    return [
+        provider
+        for provider, capabilities in _LLM_PROVIDER_CAPABILITIES.items()
+        if plugin_type in capabilities
+    ]
+
+
+# =============================================================================
 # Public API
 # =============================================================================
 
@@ -450,4 +480,6 @@ __all__ = [
     # Vector DB plugin accessors (re-exported)
     "get_vector_db_plugin",
     "available_vector_db_plugins",
+    # LLM plugin accessors
+    "available_llm_plugins",
 ]

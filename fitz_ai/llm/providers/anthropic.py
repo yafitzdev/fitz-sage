@@ -62,6 +62,7 @@ class AnthropicChat:
         auth: AuthProvider,
         model: str | None = None,
         tier: ModelTier = "smart",
+        models: dict[ModelTier, str] | None = None,
         **kwargs: Any,
     ) -> None:
         import anthropic
@@ -80,7 +81,9 @@ class AnthropicChat:
             client_kwargs["http_client"] = httpx.Client(verify=request_kwargs["verify"])
 
         self._client = anthropic.Anthropic(**client_kwargs)
-        self._model = model or CHAT_MODELS[tier]
+        # Use provided models dict, falling back to defaults
+        tier_models = models or CHAT_MODELS
+        self._model = model or tier_models.get(tier) or CHAT_MODELS[tier]
         self._defaults = kwargs
 
     def chat(self, messages: list[dict[str, Any]], **kwargs: Any) -> str:

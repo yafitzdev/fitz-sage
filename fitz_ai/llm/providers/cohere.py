@@ -40,6 +40,7 @@ class CohereChat:
         auth: AuthProvider,
         model: str | None = None,
         tier: ModelTier = "smart",
+        models: dict[ModelTier, str] | None = None,
         **kwargs: Any,
     ) -> None:
         import cohere
@@ -51,7 +52,9 @@ class CohereChat:
             api_key = headers.get("X-Api-Key", "")
 
         self._client = cohere.ClientV2(api_key=api_key)
-        self._model = model or CHAT_MODELS[tier]
+        # Use provided models dict, falling back to defaults
+        tier_models = models or CHAT_MODELS
+        self._model = model or tier_models.get(tier) or CHAT_MODELS[tier]
         self._defaults = kwargs
 
     def chat(self, messages: list[dict[str, Any]], **kwargs: Any) -> str:

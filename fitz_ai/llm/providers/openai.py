@@ -45,6 +45,7 @@ class OpenAIChat:
         model: str | None = None,
         tier: ModelTier = "smart",
         base_url: str | None = None,
+        models: dict[ModelTier, str] | None = None,
         **kwargs: Any,
     ) -> None:
         import openai
@@ -66,7 +67,9 @@ class OpenAIChat:
             client_kwargs["http_client"] = httpx.Client(verify=request_kwargs["verify"])
 
         self._client = openai.OpenAI(**client_kwargs)
-        self._model = model or CHAT_MODELS[tier]
+        # Use provided models dict, falling back to defaults
+        tier_models = models or CHAT_MODELS
+        self._model = model or tier_models.get(tier) or CHAT_MODELS[tier]
         self._defaults = kwargs
 
     def chat(self, messages: list[dict[str, Any]], **kwargs: Any) -> str:

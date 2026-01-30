@@ -44,10 +44,13 @@ class OllamaChat:
         model: str | None = None,
         tier: ModelTier = "smart",
         base_url: str | None = None,
+        models: dict[ModelTier, str] | None = None,
         **kwargs: Any,
     ) -> None:
         self._base_url = base_url or DEFAULT_BASE_URL
-        self._model = model or CHAT_MODELS[tier]
+        # Use provided models dict, falling back to defaults
+        tier_models = models or CHAT_MODELS
+        self._model = model or tier_models.get(tier) or CHAT_MODELS[tier]
         self._defaults = kwargs
         self._client = httpx.Client(base_url=self._base_url, timeout=120.0)
 

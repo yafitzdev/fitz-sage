@@ -54,6 +54,12 @@ class AggregationModule(DetectionModule):
             except ValueError:
                 pass
 
+        # Default fetch_multiplier based on aggregation type (4 for COUNT, 3 otherwise)
+        default_multiplier = 4 if agg_type == AggregationType.COUNT else 3
+        fetch_multiplier = data.get("fetch_multiplier")
+        if not isinstance(fetch_multiplier, int) or fetch_multiplier < 1:
+            fetch_multiplier = default_multiplier
+
         return DetectionResult(
             detected=True,
             category=self.category,
@@ -62,7 +68,7 @@ class AggregationModule(DetectionModule):
             matches=[],
             metadata={
                 "target": data.get("target"),
-                "fetch_multiplier": data.get("fetch_multiplier", 3),
+                "fetch_multiplier": fetch_multiplier,
             },
             transformations=[],
         )
