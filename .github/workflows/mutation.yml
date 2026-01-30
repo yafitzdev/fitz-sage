@@ -1,131 +1,106 @@
 # .github/workflows/mutation.yml
 #
-# Nightly Mutation Testing for Fitz
-# Validates test quality by checking if tests catch code mutations
-# Only runs on main branch, nightly schedule
+# Mutation Testing for Fitz - Split across 3 days
+# Sun: guardrails/, Mon: paths/, Tue: core/*.py
 
 name: Mutation Testing
 
 on:
   schedule:
-    # Run at 3 AM UTC daily
-    - cron: "0 3 * * *"
-  workflow_dispatch: # Allow manual trigger
+    - cron: "0 3 * * 0"  # Sunday: guardrails
+    - cron: "0 3 * * 1"  # Monday: paths
+    - cron: "0 3 * * 2"  # Tuesday: core-files
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which part to test'
+        required: true
+        default: 'guardrails'
+        type: choice
+        options:
+          - guardrails
+          - paths
+          - core-files
 
 jobs:
   mutation:
     name: Mutation Testing
     runs-on: ubuntu-latest
-    # Only run on main branch
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Determine target
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET="${{ inputs.target }}"
+          else
+            DAY=$(date +%w)
+            case $DAY in
+              0) TARGET="guardrails" ;;
+              1) TARGET="paths" ;;
+              2) TARGET="core-files" ;;
+              *) TARGET="guardrails" ;;
+            esac
+          fi
+          echo "target=$TARGET" >> $GITHUB_OUTPUT
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Cache pip packages
+      - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-mutation-${{ hashFiles('**/pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-mutation-
-            ${{ runner.os }}-pip-
-
-      - name: Cache mutmut results
-        uses: actions/cache@v4
-        with:
-          path: .mutmut-cache
-          key: mutmut-${{ github.sha }}
-          restore-keys: |
-            mutmut-
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          # Install minimal deps for mutation testing (same as CI test job)
-          pip install pydantic pyyaml httpx typing-extensions typer jinja2
-          pip install pytest pytest-cov pytest-xdist psutil
-          pip install numpy faiss-cpu cryptography
-          # Pin mutmut to 2.x - version 3.x removed CI-friendly commands (html, results)
-          pip install "mutmut>=2.4,<3"
-          pip install -e . --no-deps
-
-      - name: Verify setup
-        run: |
-          echo "=== Python and package check ==="
-          python --version
-          python -c "import fitz_ai; print('fitz_ai imported OK')"
-
-          echo ""
-          echo "=== Source files to mutate ==="
-          find fitz_ai/core -name "*.py" -type f | wc -l
-          find fitz_ai/core -name "*.py" -type f | head -10
-
-          echo ""
-          echo "=== Test files ==="
-          find tests/unit -name "test_*.py" -type f | wc -l
-
-      - name: Verify tests pass (baseline)
-        run: |
-          echo "=== Running baseline tests (mutmut needs passing tests) ==="
-          python -m pytest tests/unit/test_constraints.py tests/unit/test_answer_mode.py -v --tb=short || {
-            echo "ERROR: Baseline tests failed! Mutmut requires passing tests."
-            exit 1
-          }
-          echo "Baseline tests passed!"
+          pip install -q pydantic pyyaml httpx typing-extensions typer jinja2
+          pip install -q pytest pytest-cov pytest-xdist psutil hypothesis
+          pip install -q numpy faiss-cpu cryptography
+          pip install -q "mutmut>=2.4,<3"
+          pip install -q -e . --no-deps
 
       - name: Run mutation tests
         id: mutation
         continue-on-error: true
         run: |
-          # Run mutation tests - mutmut reads config from pyproject.toml
-          echo "=== mutmut version ==="
-          pip show mutmut | grep Version
+          TARGET="${{ steps.target.outputs.target }}"
 
-          echo "=== Starting mutation testing ==="
-          # mutmut 2.x uses pyproject.toml config for paths_to_mutate and runner
-          # --CI flag enables non-interactive mode suitable for CI
-          timeout 3600 python -m mutmut run --CI || true
+          case $TARGET in
+            guardrails) PATHS="fitz_ai/core/guardrails/" ;;
+            paths) PATHS="fitz_ai/core/paths/" ;;
+            core-files) PATHS="fitz_ai/core/answer.py,fitz_ai/core/answer_mode.py,fitz_ai/core/chunk.py,fitz_ai/core/config.py,fitz_ai/core/constants.py,fitz_ai/core/constraints.py,fitz_ai/core/detect.py,fitz_ai/core/document.py,fitz_ai/core/engine.py,fitz_ai/core/http.py,fitz_ai/core/registry.py,fitz_ai/core/utils.py" ;;
+          esac
+
+          echo "Target: $TARGET"
+          echo "Paths: $PATHS"
+
+          # Run mutmut, capture output, only show last 30 lines to reduce spam
+          timeout 21600 python -m mutmut run \
+            --paths-to-mutate "$PATHS" \
+            --tests-dir tests/ \
+            --runner "python -m pytest tests/unit/ tests/integration/ -x -q --tb=no --ignore=tests/unit/test_postgres_recovery.py" \
+            --CI 2>&1 | tee mutmut_output.log | grep -E '(^[0-9]|🎉|🙁|===|Error|FAILED)' | tail -50 || true
 
           echo ""
-          echo "=== Mutation Results ==="
-          python -m mutmut results || true
-          python -m mutmut results > mutation_summary.txt 2>&1 || true
+          echo "=== Final Status ==="
+          # Get the last progress line with counts
+          FINAL_LINE=$(grep -E '🎉.*🙁' mutmut_output.log | tail -1)
+          echo "$FINAL_LINE"
 
-          # Show the raw output for debugging
-          echo "=== Raw summary file ==="
-          cat mutation_summary.txt || true
+          # Parse killed and survived from the progress line
+          KILLED=$(echo "$FINAL_LINE" | grep -oE '🎉 [0-9]+' | grep -oE '[0-9]+' || echo "0")
+          SURVIVED=$(echo "$FINAL_LINE" | grep -oE '🙁 [0-9]+' | grep -oE '[0-9]+' || echo "0")
 
-          # Extract mutation score from mutmut 2.x output
-          # Format: "⠴ 990/990  🎉 99  ⏰ 0  🤔 0  🙁 891  🔇 0"
-          # 🎉 = killed, 🙁 = survived
-
-          # Try to extract from the progress line first
-          KILLED=$(grep -oE '🎉 [0-9]+' mutation_summary.txt | grep -oE '[0-9]+' | tail -1 || echo "0")
-          SURVIVED=$(grep -oE '🙁 [0-9]+' mutation_summary.txt | grep -oE '[0-9]+' | tail -1 || echo "0")
-
-          # Fallback: try "Survived" text format
-          if [ -z "$KILLED" ] || [ "$KILLED" = "0" ]; then
-            # Count "Survived" section entries
-            SURVIVED_COUNT=$(grep -c "^---- " mutation_summary.txt 2>/dev/null || echo "0")
-            if [ "$SURVIVED_COUNT" != "0" ]; then
-              # Extract number in parentheses after "Survived"
-              SURVIVED=$(grep -oE 'Survived.*\([0-9]+\)' mutation_summary.txt | grep -oE '[0-9]+' | head -1 || echo "$SURVIVED")
-            fi
-          fi
-
-          # Ensure we have numbers
           KILLED=${KILLED:-0}
           SURVIVED=${SURVIVED:-0}
-
           TOTAL=$((KILLED + SURVIVED))
-
-          echo "Killed: $KILLED, Survived: $SURVIVED, Total: $TOTAL"
 
           if [ $TOTAL -gt 0 ]; then
             SCORE=$(awk "BEGIN {printf \"%.1f\", $KILLED * 100 / $TOTAL}")
@@ -133,32 +108,39 @@ jobs:
             SCORE="N/A"
           fi
 
+          echo "Killed: $KILLED, Survived: $SURVIVED, Score: $SCORE%"
+
           echo "mutation_score=$SCORE" >> $GITHUB_OUTPUT
           echo "killed=$KILLED" >> $GITHUB_OUTPUT
           echo "survived=$SURVIVED" >> $GITHUB_OUTPUT
+          echo "target=$TARGET" >> $GITHUB_OUTPUT
+
+          # Save summary for artifact
+          echo "Target: $TARGET" > mutation_summary.txt
+          echo "Killed: $KILLED" >> mutation_summary.txt
+          echo "Survived: $SURVIVED" >> mutation_summary.txt
+          echo "Score: $SCORE%" >> mutation_summary.txt
+          echo "" >> mutation_summary.txt
+          python -m mutmut results 2>&1 | head -100 >> mutation_summary.txt || true
 
       - name: Generate HTML report
-        run: |
-          python -m mutmut html || true
+        run: python -m mutmut html 2>/dev/null || true
 
-      - name: Upload mutation report
+      - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: mutation-report
+          name: mutation-${{ steps.target.outputs.target }}
           path: |
             html/
             mutation_summary.txt
-            .mutmut-cache
           retention-days: 30
 
-      - name: Post summary
+      - name: Summary
         run: |
-          echo "## Mutation Testing Results" >> $GITHUB_STEP_SUMMARY
+          echo "## Mutation Testing: ${{ steps.mutation.outputs.target }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Mutation Score | ${{ steps.mutation.outputs.mutation_score }}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Score** | **${{ steps.mutation.outputs.mutation_score }}%** |" >> $GITHUB_STEP_SUMMARY
           echo "| Killed | ${{ steps.mutation.outputs.killed }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Survived | ${{ steps.mutation.outputs.survived }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "See artifacts for detailed HTML report." >> $GITHUB_STEP_SUMMARY
