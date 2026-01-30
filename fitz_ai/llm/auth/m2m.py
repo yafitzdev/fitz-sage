@@ -7,6 +7,7 @@ Supports enterprise deployments with:
 - Automatic token refresh with exponential backoff
 - Circuit breaker protection against token endpoint failures
 - Custom CA certificates
+- mTLS (mutual TLS) client certificate authentication
 """
 
 from __future__ import annotations
@@ -26,6 +27,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential_jitter,
 )
+
+from fitz_ai.llm.auth.certificates import validate_certificate_file, validate_key_file
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +52,9 @@ class M2MAuth:
         cert_path: Path to CA certificate bundle for enterprise CAs.
         scope: Optional OAuth2 scope.
         refresh_margin_seconds: Refresh token this many seconds before expiry.
+        client_cert_path: Path to client certificate for mTLS authentication.
+        client_key_path: Path to client private key for mTLS authentication.
+        client_key_password: Password for encrypted client key (or env var with ${VAR} syntax).
     """
 
     def __init__(
@@ -59,6 +65,9 @@ class M2MAuth:
         cert_path: str | None = None,
         scope: str | None = None,
         refresh_margin_seconds: int = 60,
+        client_cert_path: str | None = None,
+        client_key_path: str | None = None,
+        client_key_password: str | None = None,
     ) -> None:
         self.token_url = token_url
         self.client_id = self._resolve_env_var(client_id)
@@ -66,6 +75,23 @@ class M2MAuth:
         self.cert_path = cert_path
         self.scope = scope
         self.refresh_margin_seconds = refresh_margin_seconds
+
+        # Resolve client key password (may use ${VAR} syntax)
+        resolved_key_password = (
+            self._resolve_env_var(client_key_password) if client_key_password else None
+        )
+
+        # Validate certificates at init time (fail fast with actionable errors)
+        if cert_path:
+            validate_certificate_file(cert_path, "CA certificate")
+        if client_cert_path:
+            validate_certificate_file(client_cert_path, "Client certificate")
+        if client_key_path:
+            validate_key_file(client_key_path, "Client key", resolved_key_password)
+
+        self.client_cert_path = client_cert_path
+        self.client_key_path = client_key_path
+        self.client_key_password = resolved_key_password
 
         self._token: str | None = None
         self._expires_at: float = 0
@@ -138,7 +164,23 @@ class M2MAuth:
         return {"Authorization": f"Bearer {token}"}
 
     def get_request_kwargs(self) -> dict[str, Any]:
-        """Return additional request kwargs for certificate verification."""
+        """Return additional request kwargs for certificate verification and mTLS."""
+        kwargs: dict[str, Any] = {}
+
         if self.cert_path:
-            return {"verify": self.cert_path}
-        return {}
+            kwargs["verify"] = self.cert_path
+
+        if self.client_cert_path:
+            if self.client_key_path:
+                if self.client_key_password:
+                    kwargs["cert"] = (
+                        self.client_cert_path,
+                        self.client_key_path,
+                        self.client_key_password,
+                    )
+                else:
+                    kwargs["cert"] = (self.client_cert_path, self.client_key_path)
+            else:
+                kwargs["cert"] = self.client_cert_path
+
+        return kwargs
