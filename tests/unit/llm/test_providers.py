@@ -436,6 +436,58 @@ class TestAnthropicChat:
             assert len(call_kwargs["messages"]) == 1
             assert call_kwargs["messages"][0]["role"] == "user"
 
+    def test_uses_dynamic_httpx_auth(self) -> None:
+        """Verify Anthropic provider uses DynamicHttpxAuth for per-request auth."""
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch("httpx.Client") as mock_httpx_client:
+                with patch("anthropic.Anthropic"):
+                    auth = ApiKeyAuth("ANTHROPIC_API_KEY")
+                    AnthropicChat(auth)
+
+                    # Verify httpx.Client was created with auth parameter
+                    call_kwargs = mock_httpx_client.call_args[1]
+                    assert "auth" in call_kwargs
+                    # Verify it's a DynamicHttpxAuth instance
+                    assert isinstance(call_kwargs["auth"], DynamicHttpxAuth)
+
+    def test_auth_token_unused_placeholder(self) -> None:
+        """Verify SDK receives auth_token='unused' placeholder."""
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch("httpx.Client"):
+                with patch("anthropic.Anthropic") as mock_anthropic:
+                    auth = ApiKeyAuth("ANTHROPIC_API_KEY")
+                    AnthropicChat(auth)
+
+                    call_kwargs = mock_anthropic.call_args[1]
+                    assert call_kwargs["auth_token"] == "unused"
+
+    def test_http_client_passed_to_sdk(self) -> None:
+        """Verify http_client is passed to Anthropic SDK."""
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
+            mock_http_client = MagicMock()
+            with patch("httpx.Client", return_value=mock_http_client):
+                with patch("anthropic.Anthropic") as mock_anthropic:
+                    auth = ApiKeyAuth("ANTHROPIC_API_KEY")
+                    AnthropicChat(auth)
+
+                    call_kwargs = mock_anthropic.call_args[1]
+                    assert call_kwargs["http_client"] == mock_http_client
+
+    def test_certificate_path_propagates(self) -> None:
+        """Verify certificate path from auth flows to httpx.Client."""
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch("httpx.Client") as mock_httpx_client:
+                with patch("anthropic.Anthropic"):
+                    # Create auth that returns certificate path
+                    auth = MagicMock()
+                    auth.get_headers.return_value = {"Authorization": "Bearer test"}
+                    auth.get_request_kwargs.return_value = {"verify": "/path/to/ca.crt"}
+
+                    AnthropicChat(auth)
+
+                    call_kwargs = mock_httpx_client.call_args[1]
+                    assert call_kwargs["verify"] == "/path/to/ca.crt"
+
 
 class TestOllamaChat:
     """Test Ollama chat provider."""
