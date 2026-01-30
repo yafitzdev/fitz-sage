@@ -68,6 +68,9 @@ dependencies = [
     "fitz-pgserver>=0.1.5",  # Fork of pgserver with Windows crash recovery fix
     # Docling for advanced document parsing (PDF, DOCX, PPTX, images)
     "docling>=2.0",
+    # Resilience for M2M auth (retry, circuit breaker)
+    "tenacity>=8.0.0",
+    "circuitbreaker>=2.1.3",
 ]
 
 [project.optional-dependencies]
