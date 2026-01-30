@@ -151,6 +151,60 @@ class TestCohereChat:
                 fast = CohereChat(auth, tier="fast")
                 assert fast._model == "command-r7b-12-2024"
 
+    def test_uses_dynamic_httpx_auth(self) -> None:
+        """Verify Cohere provider uses DynamicHttpxAuth for per-request auth."""
+        with patch.dict("os.environ", {"COHERE_API_KEY": "test-key"}):
+            with patch("httpx.Client") as mock_httpx_client:
+                with patch("cohere.ClientV2"):
+                    auth = ApiKeyAuth("COHERE_API_KEY")
+                    CohereChat(auth)
+
+                    # Verify httpx.Client was created with auth parameter
+                    call_kwargs = mock_httpx_client.call_args[1]
+                    assert "auth" in call_kwargs
+                    # Verify it's a DynamicHttpxAuth instance
+                    assert isinstance(call_kwargs["auth"], DynamicHttpxAuth)
+
+    def test_httpx_client_passed_to_sdk(self) -> None:
+        """Verify httpx_client (not http_client) is passed to Cohere SDK."""
+        with patch.dict("os.environ", {"COHERE_API_KEY": "test-key"}):
+            mock_httpx_client = MagicMock()
+            with patch("httpx.Client", return_value=mock_httpx_client):
+                with patch("cohere.ClientV2") as mock_cohere:
+                    auth = ApiKeyAuth("COHERE_API_KEY")
+                    CohereChat(auth)
+
+                    call_kwargs = mock_cohere.call_args[1]
+                    # Cohere uses httpx_client, not http_client
+                    assert call_kwargs["httpx_client"] == mock_httpx_client
+                    assert "http_client" not in call_kwargs
+
+    def test_api_key_unused_placeholder(self) -> None:
+        """Verify SDK receives api_key='unused' placeholder."""
+        with patch.dict("os.environ", {"COHERE_API_KEY": "test-key"}):
+            with patch("httpx.Client"):
+                with patch("cohere.ClientV2") as mock_cohere:
+                    auth = ApiKeyAuth("COHERE_API_KEY")
+                    CohereChat(auth)
+
+                    call_kwargs = mock_cohere.call_args[1]
+                    assert call_kwargs["api_key"] == "unused"
+
+    def test_certificate_path_propagates(self) -> None:
+        """Verify certificate path from auth flows to httpx.Client verify parameter."""
+        with patch.dict("os.environ", {"COHERE_API_KEY": "test-key"}):
+            with patch("httpx.Client") as mock_httpx_client:
+                with patch("cohere.ClientV2"):
+                    # Create mock auth that returns custom certificate path
+                    mock_auth = MagicMock()
+                    mock_auth.get_headers.return_value = {"Authorization": "Bearer test"}
+                    mock_auth.get_request_kwargs.return_value = {"verify": "/path/to/ca.crt"}
+
+                    CohereChat(mock_auth)
+
+                    call_kwargs = mock_httpx_client.call_args[1]
+                    assert call_kwargs["verify"] == "/path/to/ca.crt"
+
 
 class TestCohereEmbedding:
     """Test Cohere embedding provider."""
