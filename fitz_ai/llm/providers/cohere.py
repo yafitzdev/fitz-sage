@@ -1,6 +1,9 @@
 # fitz_ai/llm/providers/cohere.py
 """
 Cohere provider wrappers using the official SDK.
+
+Uses DynamicHttpxAuth for per-request token refresh, solving the frozen
+token bug where M2M tokens captured at __init__ never refresh.
 """
 
 from __future__ import annotations
@@ -9,6 +12,7 @@ import logging
 from typing import Any, Iterator
 
 from fitz_ai.llm.auth import AuthProvider
+from fitz_ai.llm.auth.httpx_auth import DynamicHttpxAuth
 from fitz_ai.llm.providers.base import ModelTier, RerankResult
 
 logger = logging.getLogger(__name__)
@@ -43,15 +47,21 @@ class CohereChat:
         models: dict[ModelTier, str] | None = None,
         **kwargs: Any,
     ) -> None:
+        import httpx
         import cohere
 
-        # Extract API key from auth provider headers
-        headers = auth.get_headers()
-        api_key = headers.get("Authorization", "").replace("Bearer ", "")
-        if not api_key:
-            api_key = headers.get("X-Api-Key", "")
+        request_kwargs = auth.get_request_kwargs()
 
-        self._client = cohere.ClientV2(api_key=api_key)
+        httpx_client = httpx.Client(
+            auth=DynamicHttpxAuth(auth),
+            verify=request_kwargs.get("verify", True),
+            timeout=httpx.Timeout(300.0, connect=5.0),
+        )
+
+        self._client = cohere.ClientV2(
+            api_key="unused",  # SDK requires non-empty, httpx_client auth overrides
+            httpx_client=httpx_client,
+        )
         # Use provided models dict, falling back to defaults
         tier_models = models or CHAT_MODELS
         self._model = model or tier_models.get(tier) or CHAT_MODELS[tier]
@@ -109,14 +119,21 @@ class CohereEmbedding:
         input_type: str = "search_document",
         dimensions: int | None = None,
     ) -> None:
+        import httpx
         import cohere
 
-        headers = auth.get_headers()
-        api_key = headers.get("Authorization", "").replace("Bearer ", "")
-        if not api_key:
-            api_key = headers.get("X-Api-Key", "")
+        request_kwargs = auth.get_request_kwargs()
 
-        self._client = cohere.ClientV2(api_key=api_key)
+        httpx_client = httpx.Client(
+            auth=DynamicHttpxAuth(auth),
+            verify=request_kwargs.get("verify", True),
+            timeout=httpx.Timeout(300.0, connect=5.0),
+        )
+
+        self._client = cohere.ClientV2(
+            api_key="unused",  # SDK requires non-empty, httpx_client auth overrides
+            httpx_client=httpx_client,
+        )
         self._model = model or EMBEDDING_MODEL
         self._input_type = input_type
         self._dimensions = dimensions
@@ -185,14 +202,21 @@ class CohereRerank:
         auth: AuthProvider,
         model: str | None = None,
     ) -> None:
+        import httpx
         import cohere
 
-        headers = auth.get_headers()
-        api_key = headers.get("Authorization", "").replace("Bearer ", "")
-        if not api_key:
-            api_key = headers.get("X-Api-Key", "")
+        request_kwargs = auth.get_request_kwargs()
 
-        self._client = cohere.ClientV2(api_key=api_key)
+        httpx_client = httpx.Client(
+            auth=DynamicHttpxAuth(auth),
+            verify=request_kwargs.get("verify", True),
+            timeout=httpx.Timeout(300.0, connect=5.0),
+        )
+
+        self._client = cohere.ClientV2(
+            api_key="unused",  # SDK requires non-empty, httpx_client auth overrides
+            httpx_client=httpx_client,
+        )
         self._model = model or RERANK_MODEL
 
     def rerank(
