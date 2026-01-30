@@ -55,6 +55,7 @@ class CohereChat:
         httpx_client = httpx.Client(
             auth=DynamicHttpxAuth(auth),
             verify=request_kwargs.get("verify", True),
+            cert=request_kwargs.get("cert"),
             timeout=httpx.Timeout(300.0, connect=5.0),
         )
 
@@ -127,6 +128,7 @@ class CohereEmbedding:
         httpx_client = httpx.Client(
             auth=DynamicHttpxAuth(auth),
             verify=request_kwargs.get("verify", True),
+            cert=request_kwargs.get("cert"),
             timeout=httpx.Timeout(300.0, connect=5.0),
         )
 
@@ -210,6 +212,7 @@ class CohereRerank:
         httpx_client = httpx.Client(
             auth=DynamicHttpxAuth(auth),
             verify=request_kwargs.get("verify", True),
+            cert=request_kwargs.get("cert"),
             timeout=httpx.Timeout(300.0, connect=5.0),
         )
 

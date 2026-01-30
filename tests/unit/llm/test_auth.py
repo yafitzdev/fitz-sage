@@ -205,16 +205,17 @@ class TestM2MAuth:
             call_kwargs = mock_client.return_value.__enter__.return_value.post.call_args
             assert call_kwargs[1]["data"]["scope"] == "read write"
 
-    def test_cert_path_in_request_kwargs(self) -> None:
+    def test_cert_path_in_request_kwargs(self, temp_certificate) -> None:
         """Certificate path is returned in request kwargs."""
+        cert_path, _ = temp_certificate
         auth = M2MAuth(
             token_url="https://auth.example.com/token",
             client_id="my-client",
             client_secret="my-secret",
-            cert_path="/etc/ssl/corp-ca.crt",
+            cert_path=cert_path,
         )
         kwargs = auth.get_request_kwargs()
-        assert kwargs == {"verify": "/etc/ssl/corp-ca.crt"}
+        assert kwargs == {"verify": cert_path}
 
     def test_no_cert_path_empty_kwargs(self) -> None:
         """No cert path means empty request kwargs."""

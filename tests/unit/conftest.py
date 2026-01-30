@@ -8,9 +8,16 @@ requiring actual embedding API calls.
 
 from __future__ import annotations
 
+import tempfile
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Callable
 
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
 
 from fitz_ai.core.guardrails import SemanticMatcher
 
@@ -114,3 +121,67 @@ def semantic_matcher(mock_embedder) -> SemanticMatcher:
         query_threshold=0.70,
         conflict_threshold=0.70,
     )
+
+
+def _generate_test_certificate(days_valid: int = 365) -> tuple[bytes, bytes]:
+    """Generate a self-signed test certificate and private key.
+
+    Args:
+        days_valid: Number of days the certificate should be valid.
+
+    Returns:
+        Tuple of (certificate_pem, private_key_pem)
+    """
+    # Generate private key
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    # Generate certificate
+    subject = issuer = x509.Name([
+        x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Test"),
+        x509.NameAttribute(NameOID.COMMON_NAME, "test.example.com"),
+    ])
+
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(timezone.utc))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=days_valid))
+        .sign(private_key, hashes.SHA256())
+    )
+
+    cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+    key_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+
+    return cert_pem, key_pem
+
+
+@pytest.fixture
+def temp_certificate() -> tuple[str, str]:
+    """Fixture providing temporary certificate and key files.
+
+    Returns:
+        Tuple of (certificate_path, key_path) as strings.
+    """
+    cert_pem, key_pem = _generate_test_certificate()
+
+    with tempfile.NamedTemporaryFile(suffix=".crt", delete=False) as cert_file:
+        cert_file.write(cert_pem)
+        cert_path = cert_file.name
+
+    with tempfile.NamedTemporaryFile(suffix=".key", delete=False) as key_file:
+        key_file.write(key_pem)
+        key_path = key_file.name
+
+    yield cert_path, key_path
+
+    # Cleanup
+    Path(cert_path).unlink(missing_ok=True)
+    Path(key_path).unlink(missing_ok=True)

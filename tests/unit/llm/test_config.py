@@ -83,8 +83,9 @@ class TestResolveAuth:
         auth = resolve_auth("ollama")
         assert auth is None
 
-    def test_m2m_auth(self) -> None:
+    def test_m2m_auth(self, temp_certificate) -> None:
         """M2M auth is created from config."""
+        cert_path, _ = temp_certificate
         config = {
             "auth": {
                 "type": "m2m",
@@ -93,14 +94,14 @@ class TestResolveAuth:
                 "client_secret": "my-secret",
                 "scope": "read write",
             },
-            "cert_path": "/etc/ssl/ca.crt",
+            "cert_path": cert_path,
         }
         auth = resolve_auth("openai", config)
         assert isinstance(auth, M2MAuth)
         assert auth.token_url == "https://auth.example.com/token"
         assert auth.client_id == "my-client"
         assert auth.client_secret == "my-secret"
-        assert auth.cert_path == "/etc/ssl/ca.crt"
+        assert auth.cert_path == cert_path
         assert auth.scope == "read write"
 
     def test_m2m_auth_minimal(self) -> None:
