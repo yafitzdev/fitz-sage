@@ -138,3 +138,7 @@ tmpclaude-*-cwd
 openapi.json
 .claudeignore
 tags
+
+# GSD planning docs (local-only)
+.planning/
+.planning/
