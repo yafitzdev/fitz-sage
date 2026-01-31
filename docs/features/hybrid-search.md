@@ -115,3 +115,9 @@ PostgreSQL tsvector configuration:
 - PostgreSQL + pgvector (unified storage)
 - Full-text search via PostgreSQL's built-in tsvector
 - No additional Python dependencies for sparse search
+
+## Related Features
+
+- [**Sparse Search**](sparse-search.md) - Detailed documentation on the full-text search component
+- [**Keyword Vocabulary**](keyword-vocabulary.md) - Pre-indexed identifiers for guaranteed exact matching
+- [**Query Expansion**](query-expansion.md) - Synonym/acronym expansion also uses RRF fusion

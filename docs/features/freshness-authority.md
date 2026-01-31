@@ -16,20 +16,22 @@ Detect query intent from keywords and boost documents accordingly:
 
 ## How It Works
 
+Detection is **LLM-based** via the unified `DetectionOrchestrator`. The `FreshnessModule` analyzes query intent and determines whether to apply recency or authority boosting:
+
 ```
 Query comes in
     │
-    ├─ Contains recency keywords? ("latest", "recent", "current", "new", "updated")
+    ├─ LLM detects recency intent? (asks about "latest", "recent", "current")
     │       │
     │       ▼
     │   Boost by modified_at (exponential decay, half-life 90 days)
     │
-    ├─ Contains authority keywords? ("official", "spec", "authoritative", "canonical")
+    ├─ LLM detects authority intent? (asks about "official", "spec", "authoritative")
     │       │
     │       ▼
     │   Boost by source_type (spec > design > document > notes)
     │
-    └─ No intent keywords? → Pass through unchanged
+    └─ No freshness/authority intent? → Pass through unchanged
 ```
 
 ## Key Design Decisions

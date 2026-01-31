@@ -157,6 +157,7 @@ You can—but you'll hit walls fast.
 >4. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
 >5. [x] **Full provenance.** Every answer traces back to the exact chunk and document.
 >6. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
+>7. [x] **[Enterprise gateway support](docs/features/enterprise-gateway.md).** OAuth2 M2M, custom CA certs, mTLS, and corporate proxy/gateway integration.
 
 ####
 
@@ -180,11 +181,13 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 | [**epistemic-honesty**](docs/features/epistemic-honesty.md) | "What was our Q4 revenue?" | ❌ Hallucinated number — Info doesn't exist, but LLM won't admit it | ✅ "I don't know" |
 | [**keyword-vocabulary**](docs/features/keyword-vocabulary.md) | "Find TC_1000" | ❌ Wrong test case — Embeddings see TC_1000 ≈ TC_2000 (semantically similar) | ✅ Exact keyword matching |
 | [**hybrid-search**](docs/features/hybrid-search.md) | "X100 battery specs" | ❌ Returns Y200 docs — Semantic search misses exact model numbers | ✅ Hybrid search (dense + sparse) |
+| [**sparse-search**](docs/features/sparse-search.md) | "error code E_AUTH_401" | ❌ No exact match — Embeddings miss precise error codes | ✅ PostgreSQL full-text search |
 | [**multi-hop**](docs/features/multi-hop-reasoning.md) | "Who wrote the paper cited by the 2023 review?" | ❌ Returns the review only — Single-step search can't traverse references | ✅ Iterative retrieval |
 | [**hierarchical-rag**](docs/features/hierarchical-rag.md) | "What are the design principles?" | ❌ Random fragments — Answer is spread across docs; no single chunk contains it | ✅ Hierarchical summaries |
 | [**tabular-data-routing**](docs/features/tabular-data-routing.md) | "What's the timeout for CAN?" *(table)* | ❌ Fragmented rows — Tables chunked arbitrarily, structure lost | ✅ SQL on structured data |
 | [**multi-query**](docs/features/multi-query-rag.md) | *[User pastes 500-char test report]* "What failed and why?" | ❌ Vaguely related chunks — Long input → averaged embedding → matches nothing specifically | ✅ Multi-query decomposition |
 | [**comparison-queries**](docs/features/comparison-queries.md) | "Compare React vs Vue performance" | ❌ Incomplete comparison — Only retrieves one entity, missing the other | ✅ Multi-entity retrieval |
+| [**entity-graph**](docs/features/entity-graph.md) | "What else mentions AuthService?" | ❌ Isolated chunks — No awareness of shared entities across docs | ✅ Entity-based chunk linking |
 | [**temporal-queries**](docs/features/temporal-queries.md) | "What changed between Q1 and Q2?" | ❌ Random chunks — No awareness of time periods in query | ✅ Temporal query handling |
 | [**aggregation-queries**](docs/features/aggregation-queries.md) | "List all the test cases that failed" | ❌ Partial list — No mechanism for comprehensive retrieval | ✅ Aggregation query handling |
 | [**freshness-authority**](docs/features/freshness-authority.md) | "What does the official spec say?" | ❌ Returns notes — Can't distinguish authoritative vs informal sources | ✅ Freshness/authority boosting |

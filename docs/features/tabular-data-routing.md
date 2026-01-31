@@ -155,8 +155,6 @@ JOIN departments d ON e.department = d.dept_id
 WHERE d.dept_name = 'R&D'
 ```
 
-See [Multi-Table Joins](./multi-table-joins.md) for details.
-
 ## Dependencies
 
 - `sqlite3` (built-in to Python)

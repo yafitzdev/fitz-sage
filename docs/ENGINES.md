@@ -14,7 +14,7 @@ Query → Embed → Vector Search → Rerank → Context Build → LLM → Answe
 
 **Key Features**:
 - Separate embedding model for retrieval
-- Vector database for storage (Qdrant, FAISS)
+- Vector database for storage (pgvector)
 - Chunk-based retrieval with optional reranking
 - Hierarchical summaries for analytical queries
 - Epistemic guardrails (knows when to say "I don't know")

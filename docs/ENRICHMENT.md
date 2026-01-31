@@ -160,6 +160,8 @@ Extracts named entities and domain concepts.
 
 **Stored in:** `chunk.metadata["entities"]`
 
+**Used by:** [Entity Graph](features/entity-graph.md) for discovering related chunks via shared entities at query time.
+
 ---
 
 ## Hierarchy
@@ -310,7 +312,7 @@ enrichment:
 
 | File | Purpose |
 |------|---------|
-| `fitz_ai/ingestion/enrichment/chunk/enricher.py` | ChunkEnricher bus and modules |
+| `fitz_ai/ingestion/enrichment/bus.py` | ChunkEnricher bus and modules |
 | `fitz_ai/ingestion/enrichment/pipeline.py` | Main orchestrator |
 | `fitz_ai/ingestion/enrichment/config.py` | Configuration schema |
 | `fitz_ai/ingestion/enrichment/hierarchy/enricher.py` | Hierarchy generation |

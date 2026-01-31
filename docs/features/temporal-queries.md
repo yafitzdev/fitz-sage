@@ -41,11 +41,11 @@ The system detects five types of temporal intent:
 
 | Intent | Triggers | Example |
 |--------|----------|---------|
-| CHANGE | "what changed", "updates since", "differences" | "What changed in Q1?" |
 | COMPARISON | "between X and Y", "compare", "vs" | "Compare 2023 vs 2024" |
-| PERIOD | Single time reference | "Revenue in Q1 2024" |
-| BEFORE | "before", "prior to", "until" | "Before the merger" |
-| AFTER | "after", "since", "following" | "Since last month" |
+| TREND | "over time", "history", "evolution" | "How has revenue trended?" |
+| POINT_IN_TIME | "as of", "in Q1", specific date | "Revenue in Q1 2024" |
+| RANGE | "from X to Y", date ranges | "Between January and March" |
+| SEQUENCE | "first/then/after", "what changed" | "What changed after Q1?" |
 
 ### Temporal Reference Extraction
 
@@ -95,7 +95,7 @@ Results from all sub-queries are merged using RRF:
 - **Orchestrator:** `fitz_ai/retrieval/detection/registry.py`
 - **Integration:** `fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py`
 
-Detection is now LLM-based via the unified `DetectionOrchestrator`. The `TemporalModule` contributes its prompt fragment and parses `TemporalIntent` (CHANGE, COMPARISON, PERIOD, BEFORE, AFTER) from the combined LLM response.
+Detection is now LLM-based via the unified `DetectionOrchestrator`. The `TemporalModule` contributes its prompt fragment and parses `TemporalIntent` (COMPARISON, TREND, POINT_IN_TIME, RANGE, SEQUENCE) from the combined LLM response.
 
 ## Benefits
 

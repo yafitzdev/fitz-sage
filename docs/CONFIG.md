@@ -45,7 +45,7 @@ default_engine: fitz_rag  # Default engine (custom engines can be registered)
 
 # Chat (LLM for answering questions)
 chat:
-  plugin_name: cohere          # cohere, openai, anthropic, local_ollama
+  plugin_name: cohere          # cohere, openai, anthropic, local_ollama, enterprise
   kwargs:
     models:
       smart: command-a-03-2025     # Best quality (queries)
@@ -150,7 +150,9 @@ LLM provider for answering questions.
 | `kwargs.models.balanced` | string | varies | Model for bulk operations |
 | `kwargs.temperature` | float | `0.2` | Response randomness (0-1) |
 
-**Available plugins:** `cohere`, `openai`, `anthropic`, `azure_openai`, `local_ollama`
+**Available plugins:** `cohere`, `openai`, `anthropic`, `azure_openai`, `local_ollama`, `enterprise`
+
+> **Enterprise deployments:** Use `plugin_name: enterprise` with OAuth2 M2M authentication, custom CA certificates, and mTLS support. See [Enterprise Gateway](features/enterprise-gateway.md).
 
 ---
 
@@ -163,7 +165,7 @@ Embedding provider for text-to-vector conversion.
 | `plugin_name` | string | `cohere` | Provider plugin |
 | `kwargs.model` | string | varies | Embedding model name |
 
-**Available plugins:** `cohere`, `openai`, `azure_openai`, `local_ollama`
+**Available plugins:** `cohere`, `openai`, `azure_openai`, `local_ollama`, `enterprise`
 
 ---
 
