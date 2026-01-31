@@ -26,6 +26,7 @@ ENV_VAR_MAP: dict[str, str | None] = {
     "anthropic": "ANTHROPIC_API_KEY",
     "azure_openai": "AZURE_OPENAI_API_KEY",
     "ollama": None,  # No auth required
+    "enterprise": None,  # Auth configured explicitly via auth block
 }
 
 # Provider name → default header format
@@ -175,6 +176,21 @@ def resolve_auth(provider: str, config: dict[str, Any] | None = None) -> AuthPro
             scope=auth_config.get("scope"),
         )
 
+    # Enterprise provider requires explicit auth config
+    if provider == "enterprise":
+        raise ValueError(
+            "Enterprise provider requires an 'auth' block in config.\n"
+            "Example:\n"
+            "  chat_kwargs:\n"
+            "    auth:\n"
+            "      type: m2m\n"
+            "      token_url: https://auth.corp.internal/oauth/token\n"
+            "      client_id: ${CLIENT_ID}\n"
+            "      client_secret: ${CLIENT_SECRET}\n"
+            "    base_url: https://llm.corp.internal/v1\n"
+            "    model: openai/gpt-4o"
+        )
+
     # Default: API key auth
     env_var = ENV_VAR_MAP.get(provider)
     if env_var is None:
@@ -235,7 +251,31 @@ def create_chat_provider(
     if model:
         kwargs["model"] = model
 
-    if provider == "cohere":
+    if provider == "enterprise":
+        from fitz_ai.llm.providers.enterprise import EnterpriseChat
+
+        # Enterprise requires base_url and model
+        base_url = kwargs.pop("base_url", None)
+        model = kwargs.pop("model", None)
+        if not base_url:
+            raise ValueError(
+                "Enterprise provider requires 'base_url' in config.\n"
+                "Example:\n"
+                "  chat_kwargs:\n"
+                "    base_url: https://llm.corp.internal/v1\n"
+                "    model: openai/gpt-4o"
+            )
+        if not model:
+            raise ValueError(
+                "Enterprise provider requires 'model' in config.\n"
+                "Example:\n"
+                "  chat_kwargs:\n"
+                "    base_url: https://llm.corp.internal/v1\n"
+                "    model: openai/gpt-4o"
+            )
+        return EnterpriseChat(auth, base_url=base_url, model=model, **kwargs)  # type: ignore[arg-type]
+
+    elif provider == "cohere":
         from fitz_ai.llm.providers.cohere import CohereChat
 
         return CohereChat(auth, tier=tier, **kwargs)  # type: ignore[arg-type]
@@ -285,7 +325,31 @@ def create_embedding_provider(
     if "dimensions" in config:
         kwargs["dimensions"] = config["dimensions"]
 
-    if provider == "cohere":
+    if provider == "enterprise":
+        from fitz_ai.llm.providers.enterprise import EnterpriseEmbedding
+
+        # Enterprise requires base_url and model
+        base_url = kwargs.pop("base_url", None)
+        model = kwargs.pop("model", None)
+        if not base_url:
+            raise ValueError(
+                "Enterprise provider requires 'base_url' in config.\n"
+                "Example:\n"
+                "  embedding_kwargs:\n"
+                "    base_url: https://llm.corp.internal/v1\n"
+                "    model: openai/text-embedding-3-small"
+            )
+        if not model:
+            raise ValueError(
+                "Enterprise provider requires 'model' in config.\n"
+                "Example:\n"
+                "  embedding_kwargs:\n"
+                "    base_url: https://llm.corp.internal/v1\n"
+                "    model: openai/text-embedding-3-small"
+            )
+        return EnterpriseEmbedding(auth, base_url=base_url, model=model, **kwargs)  # type: ignore[arg-type]
+
+    elif provider == "cohere":
         from fitz_ai.llm.providers.cohere import CohereEmbedding
 
         # Cohere uses input_type parameter
