@@ -93,3 +93,9 @@ Each aggregation type triggers expanded retrieval:
 - **COUNT**: 4x fetch multiplier for accurate counting
 - **UNIQUE**: 3x fetch multiplier to find all distinct items
 - **LIST**: 3x fetch multiplier for comprehensive listing
+
+## Related Features
+
+- [**Comparison Queries**](comparison-queries.md) - Multi-entity retrieval (another detection module)
+- [**Temporal Queries**](temporal-queries.md) - Time-based retrieval (another detection module)
+- [**Hierarchical RAG**](hierarchical-rag.md) - L2 summaries help with "list all themes" queries

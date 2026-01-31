@@ -101,3 +101,9 @@ Detection is now LLM-based via the unified `DetectionOrchestrator`. The `Freshne
 | Old docs rank equally | Recent docs boosted when asked |
 | Notes = Specs | Specs prioritized when "official" |
 | User filters manually | Intent-based automatic boosting |
+
+## Related Features
+
+- [**Temporal Queries**](temporal-queries.md) - Time-based retrieval (freshness complements time filtering)
+- [**Aggregation Queries**](aggregation-queries.md) - List/count detection (another detection module)
+- [**Comparison Queries**](comparison-queries.md) - Entity comparison (another detection module)

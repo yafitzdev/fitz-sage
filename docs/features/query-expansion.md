@@ -109,3 +109,9 @@ Typical overhead: 2-4x search time for 3-5 variations. Worth it for improved rec
 - No LLM required (dictionary-based expansion)
 - Fast, deterministic synonym/acronym matching
 - To add new synonyms or acronyms, edit the dicts in `detection/detectors/expansion.py`
+
+## Related Features
+
+- [**Hybrid Search**](hybrid-search.md) - Dense + sparse search (expansion runs on both)
+- [**Keyword Vocabulary**](keyword-vocabulary.md) - Exact-match identifiers (complements synonym expansion)
+- [**HyDE**](hyde.md) - LLM-based query expansion (for abstract queries)

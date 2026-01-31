@@ -126,3 +126,9 @@ Detection is now LLM-based via the unified `DetectionOrchestrator`. The `Tempora
 
 - Requires chat LLM client for detection (unified `DetectionOrchestrator`)
 - Part of the combined LLM classification call (no additional latency)
+
+## Related Features
+
+- [**Comparison Queries**](comparison-queries.md) - Multi-entity retrieval (often combined with temporal)
+- [**Aggregation Queries**](aggregation-queries.md) - List/count queries (another detection module)
+- [**Freshness & Authority**](freshness-authority.md) - Recency boosting (complements temporal filtering)

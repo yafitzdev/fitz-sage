@@ -116,3 +116,9 @@ vectors = [self.embedder.embed(self._get_embedding_text(c)) for c in chunks]
 ## References
 
 - [Anthropic: Contextual Retrieval](https://www.anthropic.com/news/contextual-retrieval) - Original technique description
+
+## Related Features
+
+- [**Enrichment**](../ENRICHMENT.md) - SummaryModule generates the summaries used for contextual embeddings
+- [**Hybrid Search**](hybrid-search.md) - Dense embeddings (improved by context) combined with sparse search
+- [**Keyword Vocabulary**](keyword-vocabulary.md) - Exact-match keywords complement contextual semantic matching

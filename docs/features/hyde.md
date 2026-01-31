@@ -103,3 +103,9 @@ Typical overhead: ~500ms for hypothesis generation + 3x embedding/search. Worth 
 
 - Requires chat client configured (fast tier used)
 - No additional packages beyond core fitz-ai
+
+## Related Features
+
+- [**Multi-Query RAG**](multi-query-rag.md) - Handles long queries; HyDE handles abstract queries
+- [**Query Expansion**](query-expansion.md) - Rule-based synonym expansion (runs alongside HyDE)
+- [**Contextual Embeddings**](contextual-embeddings.md) - Improves chunk embeddings; HyDE improves query embeddings

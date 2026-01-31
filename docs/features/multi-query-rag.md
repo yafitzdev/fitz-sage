@@ -84,3 +84,9 @@ steps:
 - Log analysis with structured data
 - Support ticket routing with metadata
 - Any scenario with long, structured input + unstructured knowledge base
+
+## Related Features
+
+- [**HyDE**](hyde.md) - Generates hypothetical docs for abstract queries (complements multi-query for different scenarios)
+- [**Query Expansion**](query-expansion.md) - Synonym/acronym expansion (rule-based, runs alongside multi-query)
+- [**Hierarchical RAG**](hierarchical-rag.md) - Summaries help when multi-query extracts high-level themes

@@ -241,4 +241,11 @@ For fitz-ai's scale and use case, this is the right trade-off. If you're buildin
 
 ---
 
+## Related Features
+
+- [**Hybrid Search**](hybrid-search.md) - Dense + sparse search powered by pgvector + tsvector
+- [**Sparse Search**](sparse-search.md) - PostgreSQL full-text search (tsvector)
+- [**Tabular Data Routing**](tabular-data-routing.md) - SQL queries on ingested tables (same PostgreSQL)
+- [**Entity Graph**](entity-graph.md) - Entity-chunk relationships stored in PostgreSQL
+
 *See also: [Configuration Guide](../CONFIG.md) for pgvector settings*

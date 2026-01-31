@@ -125,3 +125,9 @@ Typical overhead: 100-300ms per query. Worth it for conversational UX.
 
 - Fast-tier chat model configured in `chat:` config section
 - No additional dependencies beyond existing LLM infrastructure
+
+## Related Features
+
+- [**Query Expansion**](query-expansion.md) - Synonym/acronym expansion (rule-based, complements LLM rewriting)
+- [**HyDE**](hyde.md) - Hypothetical doc generation (another query transformation technique)
+- [**Multi-Query RAG**](multi-query-rag.md) - Decomposes long queries into focused searches
