@@ -1,0 +1,72 @@
+{
+  "description": "Test cases verifying answers stay grounded in context without hallucination",
+  "expected_mode": "confident",
+  "cases": [
+    {
+      "id": "ground_halluc_001",
+      "query": "What is the company's revenue?",
+      "contexts": [
+        "The company reported $50 million in revenue for fiscal year 2023, representing a 15% increase from the previous year."
+      ],
+      "expected_mode": "confident",
+      "forbidden_claims": ["$100 million", "$75 million", "profit", "net income", "EBITDA"],
+      "description": "Revenue question - should not hallucinate different numbers or conflate with profit",
+      "rationale": "Only $50 million is mentioned; any other figure is hallucination"
+    },
+    {
+      "id": "ground_halluc_002",
+      "query": "Who founded the company?",
+      "contexts": [
+        "TechCorp was founded by Sarah Chen in 2015. She serves as CEO to this day."
+      ],
+      "expected_mode": "confident",
+      "forbidden_claims": ["John", "Michael", "Steve", "Elon", "Bill", "Mark", "co-founded", "co-founder"],
+      "description": "Founder question - should not add fictional co-founders",
+      "rationale": "Only Sarah Chen is mentioned as founder; adding others is hallucination"
+    },
+    {
+      "id": "ground_halluc_003",
+      "query": "What programming languages does the API support?",
+      "contexts": [
+        "Our API provides SDKs for Python and JavaScript. Full documentation is available for both languages."
+      ],
+      "expected_mode": "confident",
+      "forbidden_claims": ["Java", "Ruby", "Go", "Rust", "C#", "PHP", "TypeScript"],
+      "description": "SDK support question - should not add unsupported languages",
+      "rationale": "Only Python and JavaScript are mentioned; other languages are hallucination"
+    },
+    {
+      "id": "ground_halluc_004",
+      "query": "What are the side effects of this medication?",
+      "contexts": [
+        "Common side effects include drowsiness and dry mouth. Contact your doctor if symptoms persist."
+      ],
+      "expected_mode": "confident",
+      "forbidden_claims": ["headache", "nausea", "vomiting", "dizziness", "death", "heart attack", "seizure"],
+      "description": "Medical side effects - should not fabricate additional effects",
+      "rationale": "Only drowsiness and dry mouth are documented; others are potentially dangerous hallucinations"
+    },
+    {
+      "id": "ground_halluc_005",
+      "query": "What features are included in the Pro plan?",
+      "contexts": [
+        "Pro plan includes: unlimited projects, priority support, and advanced analytics. Pricing is $29/month."
+      ],
+      "expected_mode": "confident",
+      "forbidden_claims": ["API access", "custom domain", "white label", "SSO", "team management", "unlimited users"],
+      "description": "Plan features - should not add features not mentioned",
+      "rationale": "Only three features are listed; adding others misleads customers"
+    },
+    {
+      "id": "ground_halluc_006",
+      "query": "When was the product launched?",
+      "contexts": [
+        "Version 2.0 was launched in March 2023 with significant performance improvements."
+      ],
+      "expected_mode": "confident",
+      "forbidden_claims": ["2020", "2021", "2022", "2024", "January", "February", "version 1.0", "beta"],
+      "description": "Launch date - should not fabricate different dates or versions",
+      "rationale": "March 2023 and version 2.0 are the only facts; others are hallucination"
+    }
+  ]
+}

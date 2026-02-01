@@ -146,6 +146,11 @@ loadtest = [
     "psutil>=5.9",
 ]
 
+# Benchmarking (BEIR for cross-RAG comparison)
+benchmarks = [
+    "beir>=2.0.0",
+]
+
 # Install everything at once (core deps include pgvector now)
 all = [
     "ollama>=0.1.0",

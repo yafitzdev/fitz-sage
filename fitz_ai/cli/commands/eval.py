@@ -4,13 +4,19 @@ Evaluation and observability commands.
 
 Commands:
     fitz eval governance-stats    - Show governance decision statistics
+    fitz eval beir                - Run BEIR retrieval benchmark (cross-RAG comparison)
+    fitz eval rgb                 - Run RGB robustness tests
+    fitz eval fitz-gov            - Run FITZ-GOV governance benchmark (Fitz's moat)
+    fitz eval dashboard           - Display benchmark results dashboard
+    fitz eval all                 - Run all benchmarks
 """
 
 from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from pathlib import Path
+from typing import Annotated, Optional
 
 import typer
 
@@ -347,6 +353,486 @@ def _display_plain(distribution, constraints, flips, verbose: bool) -> None:
                 if flip.old_version or flip.new_version:
                     version_info = f" [v{flip.old_version or '?'} -> v{flip.new_version or '?'}]"
                 print(f"  {query_preview}: {flip.old_mode} -> {flip.new_mode}{version_info}")
+
+
+# =============================================================================
+# Benchmark Commands
+# =============================================================================
+
+
+def _get_engine(collection: str):
+    """Get a Fitz RAG engine for the given collection."""
+    from fitz_ai.config import load_engine_config
+    from fitz_ai.engines.fitz_rag.engine import FitzRagEngine
+
+    config = load_engine_config("fitz_rag")
+    config.vector_db_kwargs["collection"] = collection
+    return FitzRagEngine(config)
+
+
+@app.command("beir")
+def beir_benchmark(
+    dataset: Annotated[
+        list[str],
+        typer.Option(
+            "--dataset",
+            "-d",
+            help="BEIR dataset(s) to evaluate. Can specify multiple.",
+        ),
+    ] = ["scifact"],
+    data_dir: Annotated[
+        Optional[str],
+        typer.Option(
+            "--data-dir",
+            help="Directory to store downloaded datasets. Defaults to ~/.fitz/beir_data/",
+        ),
+    ] = None,
+    collection: Annotated[
+        Optional[str],
+        typer.Option(
+            "--collection",
+            "-c",
+            help="Collection to use for evaluation.",
+        ),
+    ] = None,
+    output: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output file path for results (JSON).",
+        ),
+    ] = None,
+) -> None:
+    """
+    Run BEIR retrieval benchmark.
+
+    Evaluates retrieval quality using industry-standard BEIR datasets.
+    Measures nDCG@10, Recall@100, and other metrics.
+
+    Requires: pip install fitz-ai[benchmarks]
+
+    Examples:
+
+        # Run on default dataset (scifact)
+        fitz eval beir
+
+        # Run on multiple datasets
+        fitz eval beir -d scifact -d nfcorpus
+
+        # Save results
+        fitz eval beir -d scifact -o results/beir_scifact.json
+    """
+    try:
+        from fitz_ai.evaluation.benchmarks.beir import BEIRBenchmark
+    except ImportError:
+        ui.error("BEIR benchmark requires: pip install fitz-ai[benchmarks]")
+        raise typer.Exit(1)
+
+    collection = _get_collection(collection)
+    engine = _get_engine(collection)
+
+    benchmark = BEIRBenchmark(data_dir=data_dir)
+
+    ui.header("BEIR Retrieval Benchmark")
+    ui.info(f"Datasets: {', '.join(dataset)}")
+    print()
+
+    if len(dataset) == 1:
+        result = benchmark.evaluate(engine, dataset[0])
+        ui.success(f"nDCG@10: {result.ndcg_at_10:.4f}")
+        ui.info(f"Recall@100: {result.recall_at_100:.4f}")
+        ui.info(f"Queries: {result.num_queries}")
+
+        if output:
+            benchmark.save_results(result, output)
+            ui.info(f"Results saved to {output}")
+    else:
+        result = benchmark.evaluate_suite(engine, dataset)
+        ui.success(f"Average nDCG@10: {result.average_ndcg_at_10:.4f}")
+        ui.info(f"Average Recall@100: {result.average_recall_at_100:.4f}")
+
+        for r in result.results:
+            print(f"  {r.dataset}: nDCG@10={r.ndcg_at_10:.4f}")
+
+        if output:
+            benchmark.save_results(result, output)
+            ui.info(f"Results saved to {output}")
+
+
+@app.command("rgb")
+def rgb_benchmark(
+    collection: Annotated[
+        Optional[str],
+        typer.Option(
+            "--collection",
+            "-c",
+            help="Collection to use for evaluation.",
+        ),
+    ] = None,
+    test_set: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--test-set",
+            "-t",
+            help="Path to custom test cases (JSON).",
+        ),
+    ] = None,
+    test_type: Annotated[
+        Optional[str],
+        typer.Option(
+            "--type",
+            help="Specific test type to run (noise_robustness, negative_rejection, etc.)",
+        ),
+    ] = None,
+    output: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output file path for results (JSON).",
+        ),
+    ] = None,
+) -> None:
+    """
+    Run RGB robustness benchmark.
+
+    Tests RAG robustness across four dimensions:
+    - noise_robustness: Handling irrelevant context
+    - negative_rejection: Abstaining when appropriate (maps to ABSTAIN mode)
+    - information_integration: Synthesizing multiple sources
+    - counterfactual_robustness: Detecting conflicts (maps to DISPUTED mode)
+
+    Examples:
+
+        # Run all RGB tests
+        fitz eval rgb
+
+        # Run specific test type
+        fitz eval rgb --type negative_rejection
+
+        # Use custom test set
+        fitz eval rgb -t my_rgb_tests.json
+    """
+    from fitz_ai.evaluation.benchmarks.rgb import RGBEvaluator, RGBTestType
+
+    collection = _get_collection(collection)
+    engine = _get_engine(collection)
+
+    evaluator = RGBEvaluator()
+
+    ui.header("RGB Robustness Benchmark")
+    print()
+
+    # Parse test type if specified
+    rgb_type = None
+    if test_type:
+        try:
+            rgb_type = RGBTestType(test_type)
+        except ValueError:
+            ui.error(f"Invalid test type: {test_type}")
+            ui.info(f"Valid types: {', '.join(t.value for t in RGBTestType)}")
+            raise typer.Exit(1)
+
+    if test_set:
+        result = evaluator.evaluate_from_file(engine, test_set, rgb_type)
+    else:
+        # Use built-in test cases
+        ui.warning("No test set provided. Using empty test set.")
+        ui.info("Create test cases with rgb.create_negative_rejection_case() etc.")
+        result = evaluator.evaluate(engine, [], rgb_type)
+
+    ui.success(f"Overall Score: {result.overall_score:.2%}")
+
+    if result.noise_robustness:
+        ui.info(f"Noise Robustness: {result.noise_robustness.score:.2%}")
+    if result.negative_rejection:
+        ui.info(f"Negative Rejection: {result.negative_rejection.score:.2%}")
+    if result.information_integration:
+        ui.info(f"Information Integration: {result.information_integration.score:.2%}")
+    if result.counterfactual_robustness:
+        ui.info(f"Counterfactual Robustness: {result.counterfactual_robustness.score:.2%}")
+
+    if output:
+        evaluator.save_results(result, output)
+        ui.info(f"Results saved to {output}")
+
+
+@app.command("fitz-gov")
+def fitz_gov_benchmark(
+    collection: Annotated[
+        Optional[str],
+        typer.Option(
+            "--collection",
+            "-c",
+            help="Collection to use for evaluation.",
+        ),
+    ] = None,
+    category: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            "--category",
+            help="Specific categories to test (abstention, dispute, qualification, confidence).",
+        ),
+    ] = None,
+    data_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--data-dir",
+            help="Directory containing test case JSON files.",
+        ),
+    ] = None,
+    output: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output file path for results (JSON).",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output as JSON to stdout.",
+        ),
+    ] = False,
+) -> None:
+    """
+    Run FITZ-GOV governance calibration benchmark.
+
+    Fitz's core differentiator - tests governance mode classification:
+    - abstention: Should refuse when evidence insufficient
+    - dispute: Should flag conflicting information
+    - qualification: Should hedge uncertain claims
+    - confidence: Should answer directly when evidence is clear
+
+    Outputs accuracy by category and a confusion matrix.
+
+    Examples:
+
+        # Run full benchmark
+        fitz eval fitz-gov
+
+        # Run specific categories
+        fitz eval fitz-gov --category abstention --category dispute
+
+        # JSON output
+        fitz eval fitz-gov --json
+
+        # Save results
+        fitz eval fitz-gov -o results/fitz_gov.json
+    """
+    from fitz_ai.evaluation.benchmarks.fitz_gov import FitzGovBenchmark, FitzGovCategory
+
+    collection = _get_collection(collection)
+    engine = _get_engine(collection)
+
+    benchmark = FitzGovBenchmark(data_dir=data_dir)
+
+    # Parse categories
+    categories = None
+    if category:
+        try:
+            categories = [FitzGovCategory(c) for c in category]
+        except ValueError as e:
+            ui.error(f"Invalid category: {e}")
+            ui.info(f"Valid categories: {', '.join(FitzGovBenchmark.get_available_categories())}")
+            raise typer.Exit(1)
+
+    if not json_output:
+        ui.header("FITZ-GOV Governance Benchmark")
+        if categories:
+            ui.info(f"Categories: {', '.join(c.value for c in categories)}")
+        print()
+
+    result = benchmark.evaluate(engine, categories=categories)
+
+    if json_output:
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        ui.success(f"Overall Accuracy: {result.overall_accuracy:.2%}")
+        print()
+
+        if RICH:
+            _display_fitz_gov_rich(result)
+        else:
+            _display_fitz_gov_plain(result)
+
+    if output:
+        benchmark.save_results(result, output)
+        if not json_output:
+            ui.info(f"Results saved to {output}")
+
+
+def _display_fitz_gov_rich(result) -> None:
+    """Display FITZ-GOV results with Rich."""
+    # Category breakdown
+    table = Table(title="Category Accuracy", show_header=True, header_style="bold")
+    table.add_column("Category", style="cyan")
+    table.add_column("Accuracy", justify="right")
+    table.add_column("Correct", justify="right")
+    table.add_column("Total", justify="right")
+
+    for cat_result in [result.abstention, result.dispute, result.qualification, result.confidence]:
+        if cat_result:
+            style = (
+                "green"
+                if cat_result.accuracy >= 0.8
+                else "yellow" if cat_result.accuracy >= 0.5 else "red"
+            )
+            table.add_row(
+                cat_result.category.value.title(),
+                f"[{style}]{cat_result.accuracy:.2%}[/{style}]",
+                str(cat_result.num_correct),
+                str(cat_result.num_total),
+            )
+
+    console.print(table)
+    print()
+
+    # Confusion matrix
+    console.print(str(result.confusion_matrix))
+
+
+def _display_fitz_gov_plain(result) -> None:
+    """Display FITZ-GOV results in plain text."""
+    print("Category Breakdown:")
+    print("-" * 40)
+    for cat_result in [result.abstention, result.dispute, result.qualification, result.confidence]:
+        if cat_result:
+            print(
+                f"  {cat_result.category.value.title()}: "
+                f"{cat_result.accuracy:.2%} ({cat_result.num_correct}/{cat_result.num_total})"
+            )
+    print()
+    print(str(result.confusion_matrix))
+
+
+@app.command("dashboard")
+def benchmark_dashboard(
+    results_dir: Annotated[
+        Path,
+        typer.Argument(
+            help="Directory containing benchmark result JSON files.",
+        ),
+    ],
+) -> None:
+    """
+    Display unified benchmark results dashboard.
+
+    Loads results from all benchmarks (BEIR, RAGAS, RGB, FITZ-GOV)
+    and displays a consolidated view.
+
+    Expected directory structure:
+        results_dir/
+            beir/*.json
+            ragas/*.json
+            rgb/*.json
+            fitz_gov/*.json
+
+    Examples:
+
+        # View dashboard
+        fitz eval dashboard ./benchmark_results
+    """
+    from fitz_ai.evaluation.dashboard import BenchmarkDashboard
+
+    if not results_dir.exists():
+        ui.error(f"Results directory not found: {results_dir}")
+        raise typer.Exit(1)
+
+    dashboard = BenchmarkDashboard.load_from_directory(results_dir)
+    dashboard.print_summary()
+
+
+@app.command("all")
+def run_all_benchmarks(
+    collection: Annotated[
+        Optional[str],
+        typer.Option(
+            "--collection",
+            "-c",
+            help="Collection to use for evaluation.",
+        ),
+    ] = None,
+    output_dir: Annotated[
+        Path,
+        typer.Option(
+            "--output-dir",
+            "-o",
+            help="Directory to save all results.",
+        ),
+    ] = Path("./benchmark_results"),
+    beir_datasets: Annotated[
+        list[str],
+        typer.Option(
+            "--beir-dataset",
+            help="BEIR datasets to run (can specify multiple).",
+        ),
+    ] = ["scifact"],
+    skip_beir: Annotated[
+        bool,
+        typer.Option(
+            "--skip-beir",
+            help="Skip BEIR benchmark (requires external package).",
+        ),
+    ] = False,
+) -> None:
+    """
+    Run all benchmarks and save results.
+
+    Runs BEIR (cross-RAG comparison) and FITZ-GOV (Fitz's governance benchmark).
+    Results are saved to subdirectories for dashboard viewing.
+
+    Examples:
+
+        # Run all benchmarks
+        fitz eval all -c my_collection -o ./results
+
+        # Skip BEIR (no external deps needed)
+        fitz eval all --skip-beir
+    """
+    collection = _get_collection(collection)
+
+    # Create output directories
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "beir").mkdir(exist_ok=True)
+    (output_dir / "rgb").mkdir(exist_ok=True)
+    (output_dir / "fitz_gov").mkdir(exist_ok=True)
+
+    ui.header("Running All Benchmarks")
+    print()
+
+    # BEIR
+    if not skip_beir:
+        try:
+            from fitz_ai.evaluation.benchmarks.beir import BEIRBenchmark
+
+            ui.info("Running BEIR benchmark...")
+            engine = _get_engine(collection)
+            benchmark = BEIRBenchmark()
+            result = benchmark.evaluate_suite(engine, beir_datasets)
+            benchmark.save_results(result, output_dir / "beir" / "results.json")
+            ui.success(f"BEIR: nDCG@10 = {result.average_ndcg_at_10:.4f}")
+        except ImportError:
+            ui.warning("Skipping BEIR (requires: pip install fitz-ai[benchmarks])")
+    else:
+        ui.info("Skipping BEIR benchmark")
+
+    # FITZ-GOV (no external deps)
+    ui.info("Running FITZ-GOV benchmark...")
+    from fitz_ai.evaluation.benchmarks.fitz_gov import FitzGovBenchmark
+
+    engine = _get_engine(collection)
+    benchmark = FitzGovBenchmark()
+    result = benchmark.evaluate(engine)
+    benchmark.save_results(result, output_dir / "fitz_gov" / "results.json")
+    ui.success(f"FITZ-GOV: Accuracy = {result.overall_accuracy:.2%}")
+
+    print()
+    ui.success(f"All results saved to {output_dir}")
+    ui.info(f"View dashboard with: fitz eval dashboard {output_dir}")
 
 
 # Export for main CLI

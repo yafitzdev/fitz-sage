@@ -1,0 +1,72 @@
+{
+  "description": "Test cases where sources provide contradictory information",
+  "expected_mode": "disputed",
+  "cases": [
+    {
+      "id": "dispute_facts_001",
+      "query": "When was the company founded?",
+      "contexts": [
+        "TechCorp was founded in 2005 by John Smith and Jane Doe in Silicon Valley, starting as a small consulting firm.",
+        "According to SEC filings, TechCorp was incorporated in 2008 and began operations the same year."
+      ],
+      "expected_mode": "disputed",
+      "description": "Conflicting founding dates from different sources",
+      "rationale": "One source says 2005, another says 2008 - this is a factual contradiction that cannot be reconciled"
+    },
+    {
+      "id": "dispute_facts_002",
+      "query": "What is the recommended daily water intake?",
+      "contexts": [
+        "Health experts recommend drinking at least 8 glasses (64 ounces) of water per day for optimal hydration.",
+        "Recent research published in the Journal of Medicine suggests that most people need only 4-6 glasses of water daily, as food provides significant hydration."
+      ],
+      "expected_mode": "disputed",
+      "description": "Conflicting health recommendations",
+      "rationale": "Sources disagree on recommended amount - 8 glasses vs 4-6 glasses"
+    },
+    {
+      "id": "dispute_facts_003",
+      "query": "Is coffee good for health?",
+      "contexts": [
+        "Studies show coffee consumption is linked to reduced risk of type 2 diabetes, Parkinson's disease, and liver cancer. Moderate consumption (3-4 cups) appears beneficial.",
+        "Research indicates coffee can increase anxiety, disrupt sleep patterns, and raise blood pressure. Health organizations recommend limiting intake to 1 cup per day or avoiding it entirely."
+      ],
+      "expected_mode": "disputed",
+      "description": "Conflicting health claims about coffee",
+      "rationale": "One source emphasizes benefits, another emphasizes risks - direct contradiction in recommendation"
+    },
+    {
+      "id": "dispute_facts_004",
+      "query": "What is the project deadline?",
+      "contexts": [
+        "Email from Project Manager (Jan 5): The final deliverable is due on March 15th. No extensions will be granted.",
+        "Meeting notes from Jan 10: After discussion with stakeholders, the deadline has been moved to April 1st to accommodate additional requirements."
+      ],
+      "expected_mode": "disputed",
+      "description": "Conflicting project deadlines from different communications",
+      "rationale": "Two different dates given (March 15 vs April 1) - context suggests timeline change but both appear authoritative"
+    },
+    {
+      "id": "dispute_facts_005",
+      "query": "What is the maximum file upload size?",
+      "contexts": [
+        "API Documentation v2.1: Maximum file upload size is 10MB per file. Larger files must be split into chunks.",
+        "API Documentation v2.3: We've increased the maximum upload size to 50MB per file to support larger media files."
+      ],
+      "expected_mode": "disputed",
+      "description": "Conflicting technical specifications from different doc versions",
+      "rationale": "Two documentation versions state different limits (10MB vs 50MB) - unclear which is current"
+    },
+    {
+      "id": "dispute_facts_006",
+      "query": "How many employees does the company have?",
+      "contexts": [
+        "Our 2023 Annual Report states we employ 5,200 people across 12 global offices.",
+        "According to our LinkedIn company page updated this month, we have over 8,000 employees worldwide."
+      ],
+      "expected_mode": "disputed",
+      "description": "Conflicting employee counts from official sources",
+      "rationale": "Significant discrepancy (5,200 vs 8,000) between two official company sources"
+    }
+  ]
+}
