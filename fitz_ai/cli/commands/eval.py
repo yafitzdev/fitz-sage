@@ -572,7 +572,7 @@ def fitz_gov_benchmark(
         Optional[list[str]],
         typer.Option(
             "--category",
-            help="Specific categories to test (abstention, dispute, qualification, confidence).",
+            help="Categories to test: abstention, dispute, qualification, confidence, grounding, relevance.",
         ),
     ] = None,
     data_dir: Annotated[
@@ -667,8 +667,8 @@ def fitz_gov_benchmark(
 
 def _display_fitz_gov_rich(result) -> None:
     """Display FITZ-GOV results with Rich."""
-    # Category breakdown
-    table = Table(title="Category Accuracy", show_header=True, header_style="bold")
+    # Governance Mode Categories
+    table = Table(title="Governance Mode Accuracy", show_header=True, header_style="bold")
     table.add_column("Category", style="cyan")
     table.add_column("Accuracy", justify="right")
     table.add_column("Correct", justify="right")
@@ -691,13 +691,38 @@ def _display_fitz_gov_rich(result) -> None:
     console.print(table)
     print()
 
+    # Answer Quality Categories (grounding + relevance)
+    if result.grounding or result.relevance:
+        quality_table = Table(title="Answer Quality", show_header=True, header_style="bold")
+        quality_table.add_column("Category", style="cyan")
+        quality_table.add_column("Accuracy", justify="right")
+        quality_table.add_column("Correct", justify="right")
+        quality_table.add_column("Total", justify="right")
+
+        for cat_result in [result.grounding, result.relevance]:
+            if cat_result:
+                style = (
+                    "green"
+                    if cat_result.accuracy >= 0.8
+                    else "yellow" if cat_result.accuracy >= 0.5 else "red"
+                )
+                quality_table.add_row(
+                    cat_result.category.value.title(),
+                    f"[{style}]{cat_result.accuracy:.2%}[/{style}]",
+                    str(cat_result.num_correct),
+                    str(cat_result.num_total),
+                )
+
+        console.print(quality_table)
+        print()
+
     # Confusion matrix
     console.print(str(result.confusion_matrix))
 
 
 def _display_fitz_gov_plain(result) -> None:
     """Display FITZ-GOV results in plain text."""
-    print("Category Breakdown:")
+    print("Governance Mode Categories:")
     print("-" * 40)
     for cat_result in [result.abstention, result.dispute, result.qualification, result.confidence]:
         if cat_result:
@@ -705,6 +730,18 @@ def _display_fitz_gov_plain(result) -> None:
                 f"  {cat_result.category.value.title()}: "
                 f"{cat_result.accuracy:.2%} ({cat_result.num_correct}/{cat_result.num_total})"
             )
+
+    if result.grounding or result.relevance:
+        print()
+        print("Answer Quality Categories:")
+        print("-" * 40)
+        for cat_result in [result.grounding, result.relevance]:
+            if cat_result:
+                print(
+                    f"  {cat_result.category.value.title()}: "
+                    f"{cat_result.accuracy:.2%} ({cat_result.num_correct}/{cat_result.num_total})"
+                )
+
     print()
     print(str(result.confusion_matrix))
 
