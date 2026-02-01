@@ -35,13 +35,18 @@ class RerankStep(RetrievalStep):
     Takes top-k chunks from previous step, reranks them, returns top rerank_k.
     VIP chunks (score=1.0) are excluded from reranking and always prepended.
 
+    Skips reranking if fewer than `min_chunks` regular chunks - the cross-encoder
+    adds latency and cost, with diminishing value on small candidate pools.
+
     Args:
         reranker: Reranking service
         k: Number of chunks to return after reranking (default: 10)
+        min_chunks: Skip reranking if fewer than this many chunks (default: 10)
     """
 
     reranker: Any  # Reranking service (duck-typed)
     k: int = 10  # Return top k after reranking
+    min_chunks: int = 20  # Skip reranking if fewer chunks than this
 
     def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
         if not chunks:
@@ -64,6 +69,13 @@ class RerankStep(RetrievalStep):
         if not regular_chunks:
             # Only VIP chunks, nothing to rerank
             return vip
+
+        # Skip reranking if too few chunks - not worth the latency/cost
+        if len(regular_chunks) < self.min_chunks:
+            logger.debug(
+                f"{RETRIEVER} RerankStep: skipping rerank ({len(regular_chunks)} < {self.min_chunks} chunks)"
+            )
+            return vip + regular_chunks[: self.k]
 
         # Extract text for reranker
         documents = [chunk.content for chunk in regular_chunks]

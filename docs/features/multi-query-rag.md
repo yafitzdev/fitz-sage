@@ -58,7 +58,7 @@ Expected: ACK within 100ms. Actual: Timeout.
 
 ## Configuration
 
-No configuration required. Feature is automatically enabled in `dense` and `dense_rerank` plugins.
+No configuration required. Feature is automatically enabled in the `dense` retrieval plugin.
 
 The threshold (300 chars) can be adjusted per-plugin in YAML:
 

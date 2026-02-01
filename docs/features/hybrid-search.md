@@ -121,3 +121,4 @@ PostgreSQL tsvector configuration:
 - [**Sparse Search**](sparse-search.md) - Detailed documentation on the full-text search component
 - [**Keyword Vocabulary**](keyword-vocabulary.md) - Pre-indexed identifiers for guaranteed exact matching
 - [**Query Expansion**](query-expansion.md) - Synonym/acronym expansion also uses RRF fusion
+- [**Reranking**](reranking.md) - Cross-encoder precision layer after hybrid search

@@ -25,21 +25,21 @@ Fitz uses a YAML-based plugin system for LLM providers and vector databases. Thi
 │    docling        → No VLM (figures become "[Figure]")          │
 │    docling_vision → Uses VLM from vision: config                │
 │                                                                 │
-│  Retrieval Plugin (Rerank control):                             │
-│    dense          → No reranking (pure vector search)           │
-│    dense_rerank   → Uses reranker from rerank: config           │
+│  Reranking (Provider-presence control):                         │
+│    rerank: null   → No reranking (pure vector search)           │
+│    rerank: cohere → Reranking auto-enabled (baked in)           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 **The pattern:**
 - `fitz init` prompts for providers and saves them to config
 - Config sections (`vision:`, `rerank:`) specify WHAT provider to use
-- Plugin choice specifies IF the feature is used
-- No `enabled: true/false` flags - plugin name IS the toggle
+- VLM: Parser plugin choice specifies IF the feature is used
+- Reranking: Provider presence enables the feature (baked into `dense` plugin)
 
 **Config locations:**
 - Parser: `chunking.default.parser` → `"docling"` or `"docling_vision"`
-- Retrieval: `retrieval.plugin_name` → `"dense"` or `"dense_rerank"`
+- Reranking: `rerank:` → `cohere` (enabled) or `null` (disabled)
 
 ---
 

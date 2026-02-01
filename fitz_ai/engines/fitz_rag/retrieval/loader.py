@@ -310,7 +310,7 @@ def create_retrieval_pipeline(
     Create a retrieval pipeline from a YAML plugin definition.
 
     Args:
-        plugin_name: Name of the plugin (e.g., "dense", "dense_rerank")
+        plugin_name: Name of the plugin (e.g., "dense")
         vector_client: Vector database client
         embedder: Embedding service
         collection: Collection name

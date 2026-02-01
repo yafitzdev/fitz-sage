@@ -247,5 +247,6 @@ For fitz-ai's scale and use case, this is the right trade-off. If you're buildin
 - [**Sparse Search**](sparse-search.md) - PostgreSQL full-text search (tsvector)
 - [**Tabular Data Routing**](tabular-data-routing.md) - SQL queries on ingested tables (same PostgreSQL)
 - [**Entity Graph**](entity-graph.md) - Entity-chunk relationships stored in PostgreSQL
+- [**Reranking**](reranking.md) - Query-time precision layer (not stored, but complements vector retrieval)
 
 *See also: [Configuration Guide](../CONFIG.md) for pgvector settings*

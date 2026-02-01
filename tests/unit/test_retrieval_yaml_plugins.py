@@ -227,19 +227,19 @@ class TestPipelineBuilding:
         assert "RerankStep" not in step_names
 
     def test_build_pipeline_includes_rerank_with_reranker(self):
-        """Should include rerank step if reranker provided and using dense_rerank plugin."""
-        spec = load_plugin_spec("dense_rerank")
+        """Should include rerank step if reranker provided (baked into dense plugin)."""
+        spec = load_plugin_spec("dense")  # Reranking is baked into dense
         deps = RetrievalDependencies(
             vector_client=MockVectorClient(make_hits(10)),
             embedder=MockEmbedder(),
             collection="test_collection",
-            reranker=MockReranker(),  # With reranker
+            reranker=MockReranker(),  # With reranker - enables rerank step
             top_k=5,
         )
 
         steps = build_pipeline_from_spec(spec, deps)
 
-        # Should include rerank step
+        # Should include rerank step when reranker is provided
         step_names = [s.name for s in steps]
         assert "RerankStep" in step_names
 
@@ -291,14 +291,14 @@ class TestPipelineExecution:
         assert all(isinstance(c, Chunk) for c in chunks)
 
     def test_retrieve_with_reranker(self):
-        """Should execute retrieval with reranking when using dense_rerank plugin."""
+        """Should execute retrieval with reranking when reranker is provided (baked in)."""
         reranker = MockReranker()
         pipeline = create_retrieval_pipeline(
-            plugin_name="dense_rerank",
+            plugin_name="dense",  # Reranking is baked into dense plugin
             vector_client=MockVectorClient(make_hits(20)),
             embedder=MockEmbedder(),
             collection="test_collection",
-            reranker=reranker,
+            reranker=reranker,  # Presence enables reranking
             top_k=5,
         )
 
@@ -311,7 +311,7 @@ class TestPipelineExecution:
 
         # Reranker should have been called
         assert len(reranker.rerank_calls) == 1
-        # dense_rerank has threshold=0.6, MockReranker gives 0.99, 0.89, 0.79, 0.69, 0.59...
+        # dense has threshold=0.6 when reranking, MockReranker gives 0.99, 0.89, 0.79, 0.69, 0.59...
         # So 4 chunks pass the threshold (0.99, 0.89, 0.79, 0.69 are >= 0.6)
         assert len(chunks) == 4
 

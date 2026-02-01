@@ -1,18 +1,24 @@
 # fitz_ai/engines/fitz_rag/retrieval/plugins/dense.yaml
 #
-# Dense Retrieval Plugin (No Reranking)
+# Dense Retrieval Plugin (with automatic reranking when available)
 #
-# Pure vector search without cross-encoder reranking.
-# Use this when you don't have a reranker configured or want faster queries.
-# For better precision, use dense_rerank instead.
+# Standard retrieval pipeline with intelligent vector search.
+# Reranking is automatically enabled when a reranker is configured.
 #
 # VectorSearchStep has built-in:
-# - Multi-query expansion for long queries (automatic, no config needed)
-# - Keyword filtering for exact term matching (automatic, no config needed)
-# - Deduplication of results (automatic, no config needed)
+# - Multi-query expansion for long queries (automatic)
+# - Keyword filtering for exact term matching (automatic)
+# - Hybrid search: dense + sparse with RRF fusion (automatic)
+# - Detection: temporal, aggregation, comparison, freshness (automatic)
+# - Query rewriting for conversational context (automatic)
+# - Deduplication of results (automatic)
+#
+# Reranking (when rerank: provider is configured):
+# - Cross-encoder reranking for precision
+# - Score threshold filtering (post-selection)
 
 plugin_name: dense
-description: "Dense retrieval with vector search only (no reranking)"
+description: "Dense retrieval with automatic reranking when configured"
 
 # Pipeline steps - executed in order
 # Each step references a Python class in fitz_ai.engines.fitz_rag.retrieval.steps
@@ -20,10 +26,21 @@ steps:
   - type: artifact_fetch       # Fetch artifacts first (always included)
     enabled_if: fetch_artifacts
 
-  - type: vector_search        # Intelligent vector search (multi-query + keyword baked in)
-    k: 25                      # Candidates to retrieve (larger pool to not miss relevant chunks)
-    use_config: top_k          # Use top_k from config if set (multiplied by 2)
+  - type: vector_search        # Intelligent vector search (all detection baked in)
+    k: 40                      # Large candidate pool (for reranking or direct use)
+
+  # Reranking steps - only enabled when reranker is configured
+  - type: rerank
+    k: 15                      # Keep top 15 after reranking
+    min_chunks: 20             # Skip rerank if fewer than 20 candidates (not worth the cost)
+    enabled_if: reranker
 
   - type: limit
-    k: 10                      # Final chunks returned (uses retrieval.top_k from config)
+    k: 5                       # Final chunks returned
     use_config: top_k          # Override k with value from retrieval config
+
+  - type: threshold            # Filter low-confidence results (post-selection)
+    threshold: 0.6
+    score_key: rerank_score
+    fallback_key: vector_score
+    enabled_if: reranker       # Only threshold when reranking

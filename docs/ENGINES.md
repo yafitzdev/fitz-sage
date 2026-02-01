@@ -105,13 +105,13 @@ vector_db: pgvector
 vector_db_kwargs:
   mode: local  # or "external" with connection_string
 
-# Retrieval strategy - plugin choice controls reranking
+# Retrieval strategy
 retrieval:
-  plugin_name: dense_rerank  # or "dense" for no reranking
+  plugin_name: dense
   collection: my_knowledge
   top_k: 5
 
-# Rerank provider (used only if retrieval.plugin_name includes reranking)
+# Rerank provider (presence enables reranking automatically)
 rerank:
   plugin_name: cohere
   kwargs:

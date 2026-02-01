@@ -6,11 +6,11 @@ This document explains how optional features (VLM for figure description, rerank
 
 ## Design Philosophy
 
-Fitz uses a **plugin-based feature control** pattern:
+Fitz uses a **provider-presence pattern** for optional features:
 
 - **Config declares WHICH** provider/model to use
-- **Plugin choice determines IF** the feature is used
-- **No `enabled: true/false` flags** - the plugin name IS the toggle
+- **Provider presence determines IF** the feature is used
+- **No `enabled: true/false` flags** - setting a provider enables the feature
 
 This keeps the config declarative and avoids boolean flags that can get out of sync.
 
@@ -36,7 +36,7 @@ This keeps the config declarative and avoids boolean flags that can get out of s
 │                                      model: rerank-v3.5         │
 │                                                                 │
 │  chunking:                       retrieval:                     │
-│    default:                        plugin_name: dense_rerank    │
+│    default:                        plugin_name: dense           │
 │      parser: docling_vision        collection: default          │
 │      plugin_name: recursive        top_k: 5                     │
 │                                                                 │
@@ -44,10 +44,10 @@ This keeps the config declarative and avoids boolean flags that can get out of s
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  PLUGIN determines IF the feature is used                       │
+│  PROVIDER PRESENCE determines IF the feature is used            │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  Parser Plugin (controls VLM usage):                            │
+│  VLM (controlled by parser plugin):                             │
 │    ┌──────────────────────┐    ┌──────────────────┐             │
 │    │     docling          │    │  docling_vision  │             │
 │    ├──────────────────────┤    ├──────────────────┤             │
@@ -55,12 +55,12 @@ This keeps the config declarative and avoids boolean flags that can get out of s
 │    │ Figures → "[Figure]" │    │ vision: config   │             │
 │    └──────────────────────┘    └──────────────────┘             │
 │                                                                 │
-│  Retrieval Plugin (controls reranking):                         │
+│  Reranking (controlled by provider presence):                   │
 │    ┌────────────────────┐    ┌──────────────────┐               │
-│    │      dense         │    │   dense_rerank   │               │
+│    │   rerank: null     │    │  rerank: cohere  │               │
 │    ├────────────────────┤    ├──────────────────┤               │
-│    │ No reranking       │    │ Uses reranker    │               │
-│    │ Pure vector search │    │ from rerank: cfg │               │
+│    │ No reranking       │    │ Reranking auto-  │               │
+│    │ Pure vector search │    │ enabled (baked)  │               │
 │    └────────────────────┘    └──────────────────┘               │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -118,34 +118,30 @@ Reranking improves retrieval quality by re-scoring chunks with a cross-encoder m
 
 1. **`fitz init`** prompts for a rerank provider (typically cohere)
 2. Config saves the provider in `rerank:` section
-3. **Retrieval plugin** determines if reranking is actually used:
-   - `retrieval.plugin_name: dense` → Pure vector search
-   - `retrieval.plugin_name: dense_rerank` → Vector search + reranking
+3. **Reranking is automatically enabled** when a rerank provider is configured
+4. No separate plugin choice needed - it's baked into the `dense` retrieval pipeline
 
 ### Config example:
 
 ```yaml
-# Retrieval plugin choice enables reranking
+# Rerank provider presence enables reranking
+rerank: cohere                  # ← Reranking enabled
+# rerank: null                  # ← No reranking (default)
+
+# Retrieval pipeline (reranking auto-injected when provider configured)
 retrieval:
-  plugin_name: dense_rerank  # ← Uses reranking
-  # plugin_name: dense       # ← No reranking
+  plugin_name: dense            # Single plugin - handles both cases
   collection: default
   top_k: 5
-
-# Rerank provider (used only if retrieval uses reranking)
-rerank:
-  plugin_name: cohere
-  kwargs:
-    model: rerank-v3.5
 ```
 
 ### Key files:
 
 | File | Purpose |
 |------|---------|
-| `fitz_ai/engines/fitz_rag/retrieval/plugins/dense.yaml` | Pure dense retrieval |
-| `fitz_ai/engines/fitz_rag/retrieval/plugins/dense_rerank.yaml` | Dense + reranking |
-| `fitz_ai/engines/fitz_rag/engine.py` | Loads retrieval plugin |
+| `fitz_ai/engines/fitz_rag/retrieval/plugins/dense.yaml` | Retrieval pipeline (rerank steps have `enabled_if: reranker`) |
+| `fitz_ai/engines/fitz_rag/retrieval/loader.py` | Skips rerank steps when no reranker provided |
+| `fitz_ai/llm/providers/cohere.py` | Cohere rerank implementation |
 
 ---
 
@@ -153,23 +149,22 @@ rerank:
 
 ### Advantages:
 
-1. **No boolean flags to sync** - The plugin name itself is the toggle
-2. **Clear separation** - Config says "what", plugin says "if"
-3. **Extensibility** - Add new parser/retrieval variants without config changes
+1. **No boolean flags to sync** - Provider presence itself is the toggle
+2. **Baked-in intelligence** - Reranking joins other automatic features like hybrid search
+3. **Simpler config** - One retrieval plugin, not two
 4. **Explicit** - Reading the config tells you exactly what will happen
 
 ### Comparison with alternatives:
 
 ```yaml
-# ❌ BAD: Boolean flags (can get out of sync)
-vision:
-  enabled: true          # ← Easy to forget to toggle
-  plugin_name: cohere
+# ❌ OLD: Plugin choice was the toggle
+retrieval:
+  plugin_name: dense_rerank     # Had to choose plugin
 
-# ✅ GOOD: Plugin choice is the toggle
-chunking:
-  default:
-    parser: docling_vision  # ← This IS the toggle
+# ✅ NEW: Provider presence is the toggle
+rerank: cohere                  # This alone enables reranking
+retrieval:
+  plugin_name: dense            # Single plugin
 ```
 
 ---
@@ -178,39 +173,34 @@ chunking:
 
 Follow this pattern for any new optional feature:
 
-1. **Create two plugins** - one with the feature, one without
-2. **Add provider config section** - for the underlying service
-3. **Let plugin choice control usage** - no enabled flags
+1. **For ingestion-time features** (like VLM): Create two parser plugins
+2. **For query-time features** (like reranking): Use `enabled_if` in pipeline steps
 
-Example for a hypothetical "summarizer" feature:
+Example for a hypothetical "summarizer" feature at query time:
 
 ```yaml
-# Summarization provider config
-summarization:
-  plugin_name: cohere
-  kwargs:
-    model: command-r
+# In retrieval plugin YAML:
+steps:
+  - type: summarize
+    enabled_if: summarizer      # Only runs if summarizer dependency provided
 
-# Chunker plugin controls usage
-chunking:
-  default:
-    plugin_name: recursive            # ← No summarization
-    # plugin_name: recursive_summary  # ← With summarization
+# In config:
+summarizer: cohere              # Presence enables the feature
 ```
 
 ---
 
 ## Quick Reference
 
-| Feature | Config Section | Plugin Location | Enable | Disable |
-|---------|---------------|-----------------|--------|---------|
-| VLM | `vision:` | `chunking.default.parser` | `docling_vision` | `docling` |
-| Rerank | `rerank:` | `retrieval.plugin_name` | `dense_rerank` | `dense` |
+| Feature | Config Section | Enable | Disable |
+|---------|---------------|--------|---------|
+| VLM | `vision:` + `chunking.default.parser` | `parser: docling_vision` | `parser: docling` |
+| Rerank | `rerank:` | `rerank: cohere` | `rerank: null` (or omit) |
 
 ---
 
 ## See Also
 
+- [Reranking Feature](features/reranking.md) - Detailed reranking documentation
 - [PLUGINS.md](PLUGINS.md) - Plugin development guide
 - [CLI.md](CLI.md) - CLI reference
-- `fitz_ai/cli/commands/init.py` - Init wizard implementation

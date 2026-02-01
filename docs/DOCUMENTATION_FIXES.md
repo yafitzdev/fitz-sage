@@ -91,7 +91,48 @@ The following are intentionally not linked from README:
 
 ---
 
+## Reranking Feature Documentation
+
+- [x] **docs/features/reranking.md** - Created documentation for cross-encoder reranking
+
+### Cross-Linking
+- [x] **README.md** - Added reranking to feature table
+- [x] **docs/CONFIG.md** - Added link to reranking feature doc
+- [x] **docs/features/hybrid-search.md** - Added reranking to Related Features
+- [x] **docs/features/sparse-search.md** - Added reranking to Related Features
+- [x] **docs/features/multi-hop-reasoning.md** - Added reranking to Related Features
+- [x] **docs/features/unified-storage.md** - Added reranking to Related Features
+
+---
+
+## Reranking Baked-In Refactor (2026-02-01)
+
+Removed `dense_rerank` plugin - reranking is now baked into `dense` plugin and auto-enabled when rerank provider is configured.
+
+### Code Changes
+- [x] **fitz_ai/engines/fitz_rag/retrieval/plugins/dense.yaml** - Added rerank/threshold steps with `enabled_if: reranker`
+- [x] **fitz_ai/engines/fitz_rag/retrieval/plugins/dense_rerank.yaml** - Deleted
+- [x] **fitz_ai/engines/fitz_rag/config/schema.py** - Updated retrieval_plugin description
+- [x] **fitz_ai/engines/fitz_rag/config/default.yaml** - Updated comment
+- [x] **fitz_ai/engines/fitz_rag/retrieval/loader.py** - Updated docstring
+- [x] **fitz_ai/engines/fitz_rag/retrieval/registry.py** - Updated docstring
+- [x] **tests/unit/test_retrieval_yaml_plugins.py** - Updated tests to use `dense` with reranker
+
+### Documentation Updates
+- [x] **CLAUDE.md** - Updated feature control section, added reranking to baked-in list
+- [x] **docs/FEATURE_CONTROL.md** - Rewrote reranking section for provider-presence pattern
+- [x] **docs/features/reranking.md** - Updated to reflect baked-in behavior
+- [x] **docs/CONFIG.md** - Removed dense_rerank from plugins table
+- [x] **docs/ARCHITECTURE.md** - Updated feature control examples
+- [x] **docs/config_examples.md** - Updated examples
+- [x] **docs/ENGINES.md** - Updated config example
+- [x] **docs/CLI.md** - Updated config example
+- [x] **docs/PLUGINS.md** - Updated reranking control section
+- [x] **docs/features/multi-query-rag.md** - Updated plugin reference
+
+---
+
 ## Summary
 
-**Completed**: 11 fixes + 3 new feature docs + cross-linking
+**Completed**: 11 fixes + 4 new feature docs + cross-linking + reranking baked-in refactor
 **Remaining**: None (archive broken links skipped intentionally)

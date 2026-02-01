@@ -74,8 +74,8 @@ embedding: openai/text-embedding-3-small
 rerank: cohere/rerank-english-v3.0
 vision: openai/gpt-4o
 
-# Retrieval
-retrieval_plugin: dense_rerank
+# Retrieval (reranking auto-enabled by rerank: above)
+retrieval_plugin: dense
 collection: production_docs
 top_k: 10
 

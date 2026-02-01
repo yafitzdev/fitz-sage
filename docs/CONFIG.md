@@ -87,7 +87,7 @@ vector_db_kwargs:
 # =============================================================================
 
 retrieval:
-  plugin_name: dense           # dense, dense_rerank
+  plugin_name: dense           # Reranking auto-enabled when rerank: configured
   collection: default          # Collection name
   top_k: 5                     # Number of chunks to retrieve
 
@@ -180,7 +180,7 @@ Reranking provider for improving retrieval quality.
 
 **Available plugins:** `cohere`
 
-**Note:** Reranking is only used when `retrieval.plugin_name: dense_rerank`. See [Feature Control](FEATURE_CONTROL.md).
+**Note:** Reranking is automatically enabled when a rerank provider is configured. See [Feature Control](FEATURE_CONTROL.md) and [Reranking Feature](features/reranking.md).
 
 ---
 
@@ -247,12 +247,7 @@ Retrieval strategy for finding relevant chunks.
 | `collection` | string | `default` | Collection to search |
 | `top_k` | int | `5` | Chunks to retrieve |
 
-**Available plugins:**
-
-| Plugin | Description |
-|--------|-------------|
-| `dense` | Pure vector similarity search |
-| `dense_rerank` | Vector search + reranking |
+**Note:** Reranking is automatically enabled when `rerank:` is configured. No plugin choice needed.
 
 ---
 

@@ -48,7 +48,7 @@ fitz_rag:
   # Retrieval Configuration
   # ===========================================================================
 
-  # Retrieval pipeline: "dense", "dense_rerank", etc.
+  # Retrieval pipeline (reranking auto-enabled when rerank provider configured)
   retrieval_plugin: dense
 
   # Vector DB collection name (required)

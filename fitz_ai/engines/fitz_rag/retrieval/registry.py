@@ -44,7 +44,7 @@ def get_retrieval_plugin(
     Get a retrieval plugin by name.
 
     Args:
-        plugin_name: Name of the plugin (e.g., "dense", "dense_rerank")
+        plugin_name: Name of the plugin (e.g., "dense")
         vector_client: Vector database client
         embedder: Embedding service
         collection: Collection name

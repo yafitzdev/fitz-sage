@@ -149,6 +149,7 @@ Internal parameters in `HopController`:
 
 ## Related Features
 
-- **Comparison Queries** - Multi-entity retrieval (related but single-hop)
-- **Temporal Queries** - Period filtering (related but single-hop)
-- **Epistemic Honesty** - ABSTAIN if even multi-hop can't find answer
+- [**Comparison Queries**](comparison-queries.md) - Multi-entity retrieval (related but single-hop)
+- [**Temporal Queries**](temporal-queries.md) - Period filtering (related but single-hop)
+- [**Epistemic Honesty**](epistemic-honesty.md) - ABSTAIN if even multi-hop can't find answer
+- [**Reranking**](reranking.md) - Runs inside each hop for precision

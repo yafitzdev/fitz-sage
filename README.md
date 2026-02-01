@@ -196,6 +196,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 | [**hyde**](docs/features/hyde.md) | "What's TechCorp's approach to sustainability?" | ❌ Poor recall — Abstract queries don't embed close to concrete documents | ✅ Hypothetical document generation |
 | [**code-aware-chunking**](docs/features/code-aware-chunking.md) | "How does the auth module work?" *(code)* | ❌ Broken code fragments — Naive chunking splits functions mid-body | ✅ Complete functions |
 | [**contextual-embeddings**](docs/features/contextual-embeddings.md) | "When does it expire?" | ❌ Ambiguous chunk — "It expires in 24h" embedded without context; "it" = ? | ✅ Summary-prefixed embeddings |
+| [**reranking**](docs/features/reranking.md) | "What's the battery warranty?" | ❌ Imprecise ranking — Vector similarity ≠ true relevance; best answer buried | ✅ Cross-encoder precision |
 
 > [!IMPORTANT]
 > These features are **always on**—no configuration needed. Fitz automatically detects when to use each capability.

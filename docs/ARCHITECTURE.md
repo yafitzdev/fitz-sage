@@ -233,12 +233,11 @@ Features are controlled by plugin selection, not boolean flags:
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  RIGHT: Plugin selection                                                    │
+│  RIGHT: Provider presence                                                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  retrieval:                                                                 │
-│    plugin_name: dense_rerank   ◀─── Uses reranking                          │
-│    # or                                                                     │
-│    plugin_name: dense          ◀─── No reranking                            │
+│  rerank: cohere              ◀─── Enables reranking (baked in)              │
+│  # or                                                                       │
+│  rerank: null                ◀─── No reranking                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -246,7 +245,7 @@ Features are controlled by plugin selection, not boolean flags:
 
 | Feature | Enabled By | Disabled By |
 |---------|------------|-------------|
-| Reranking | `retrieval.plugin_name: dense_rerank` | `retrieval.plugin_name: dense` |
+| Reranking | `rerank: cohere` | `rerank: null` (or omit) |
 | Vision/VLM | `parser.plugin_name: docling_vision` | `parser.plugin_name: docling` |
 | Enrichment | Chat client available (automatic) | `enrichment.enabled: false` |
 
@@ -332,8 +331,9 @@ chunking:
     plugin_name: semantic        # Python plugin
 
 # Features
+rerank: cohere                   # Provider presence enables reranking
 retrieval:
-  plugin_name: dense_rerank      # YAML plugin (controls rerank)
+  plugin_name: dense             # YAML plugin
 
 enrichment:
   hierarchy:

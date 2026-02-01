@@ -207,7 +207,7 @@ class FitzRagConfig(BasePluginConfig):
 
     retrieval_plugin: str = Field(
         default="dense",
-        description="Retrieval pipeline plugin: 'dense', 'dense_rerank', etc.",
+        description="Retrieval pipeline plugin. Reranking auto-enabled when rerank provider configured.",
     )
 
     collection: str = Field(

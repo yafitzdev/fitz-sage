@@ -158,6 +158,7 @@ Internal parameters:
 
 ## Related Features
 
-- **Hybrid Search** - Sparse search is the "sparse" half of hybrid
-- **Keyword Vocabulary** - Complements sparse with pre-indexed identifiers
-- **Query Expansion** - Expanded queries also run through sparse search
+- [**Hybrid Search**](hybrid-search.md) - Sparse search is the "sparse" half of hybrid
+- [**Keyword Vocabulary**](keyword-vocabulary.md) - Complements sparse with pre-indexed identifiers
+- [**Query Expansion**](query-expansion.md) - Expanded queries also run through sparse search
+- [**Reranking**](reranking.md) - Cross-encoder re-scores after hybrid search fusion
