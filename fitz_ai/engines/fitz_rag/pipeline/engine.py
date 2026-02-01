@@ -37,6 +37,7 @@ from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
 from fitz_ai.engines.fitz_rag.pipeline.components import (
     CloudComponents,
     GuardrailComponents,
+    ObservabilityComponents,
     PipelineComponents,
     RoutingComponents,
     StructuredComponents,
@@ -145,6 +146,10 @@ class RAGPipeline:
         self.result_formatter = structured.result_formatter
         self.derived_store = structured.derived_store
 
+        # Unpack observability components
+        observability = components.observability or ObservabilityComponents()
+        self._governance_logger = observability.governance_logger
+
         # Log initialization status
         routing_status = (
             "enabled" if self.query_router and self.query_router.enabled else "disabled"
@@ -155,11 +160,13 @@ class RAGPipeline:
         )
         cloud_routing_status = "enabled" if cloud.is_enabled() else "disabled"
         structured_status = "enabled" if structured.is_enabled() else "disabled"
+        governance_status = "enabled" if observability.is_enabled() else "disabled"
         logger.info(
             f"{PIPELINE} RAGPipeline initialized with {self.retrieval.plugin_name} retrieval, "
             f"{len(self.constraints)} constraint(s), routing={routing_status}, "
             f"keywords={keyword_status}, multihop={multihop_status}, "
-            f"cloud_routing={cloud_routing_status}, structured={structured_status}"
+            f"cloud_routing={cloud_routing_status}, structured={structured_status}, "
+            f"governance_logging={governance_status}"
         )
 
     def _wrap_step(self, name: str, fn, *args, error_class=None, **kwargs):
@@ -257,12 +264,31 @@ class RAGPipeline:
         constraint_results = run_constraints(query, raw_chunks, self.constraints)
 
         # Step 3: Governance decision (resolves mode from signals)
+        import time
+
+        governance_start = time.perf_counter()
         governor = AnswerGovernor()
         governance = governor.decide(constraint_results)
+        governance_ms = (time.perf_counter() - governance_start) * 1000
+
         logger.info(
             f"{PIPELINE} Governance decision: mode={governance.mode.value}, "
             f"triggered={governance.triggered_constraints}"
         )
+
+        # Log to PostgreSQL for observability (Phase 2: Governance Observability)
+        if self._governance_logger:
+            collection = getattr(self.retrieval, "collection", "default")
+            try:
+                self._governance_logger.log(
+                    decision=governance,
+                    query=query,
+                    chunks=raw_chunks,
+                    latency_ms=governance_ms,
+                )
+            except Exception as e:
+                # Fail-open: don't block pipeline on logging errors
+                logger.warning(f"{PIPELINE} Failed to log governance decision: {e}")
 
         # Use governance.mode for downstream processing
         answer_mode = governance.mode
@@ -294,9 +320,7 @@ class RAGPipeline:
             # Include governance explanation in metadata when not confident
             if governance.user_explanation:
                 answer.metadata["governance_explanation"] = governance.user_explanation
-                answer.metadata["triggered_constraints"] = list(
-                    governance.triggered_constraints
-                )
+                answer.metadata["triggered_constraints"] = list(governance.triggered_constraints)
 
             logger.info(f"{PIPELINE} Pipeline run completed (mode={answer_mode.value})")
 
@@ -857,6 +881,19 @@ class RAGPipeline:
                 logger.warning(f"{PIPELINE} Failed to initialize structured components: {e}")
                 structured_router = None
 
+        # Governance logger for observability (fail-open: disabled if storage unavailable)
+        governance_logger = None
+        try:
+            from fitz_ai.evaluation.logger import GovernanceLogger
+            from fitz_ai.storage.postgres import get_connection_manager
+
+            manager = get_connection_manager()
+            pool = manager.get_pool(cfg.collection)
+            governance_logger = GovernanceLogger(pool, collection=cfg.collection)
+            logger.info(f"{PIPELINE} Governance logging enabled for collection='{cfg.collection}'")
+        except Exception as e:
+            logger.debug(f"{PIPELINE} Governance logging disabled: {e}")
+
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
 
         # Build component groups
@@ -884,6 +921,9 @@ class RAGPipeline:
                 sql_generator=sql_generator,
                 result_formatter=result_formatter,
                 derived_store=derived_store,
+            ),
+            observability=ObservabilityComponents(
+                governance_logger=governance_logger,
             ),
         )
 

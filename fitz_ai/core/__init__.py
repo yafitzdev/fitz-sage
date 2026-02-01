@@ -70,7 +70,7 @@ from .exceptions import (
 )
 
 # Epistemic guardrails (constraint plugins)
-from .governance import AnswerGovernor, GovernanceDecision, decide_answer_mode
+from .governance import AnswerGovernor, GovernanceDecision, GovernanceLog, decide_answer_mode
 from .guardrails import ConstraintPlugin as ConstraintPluginProtocol
 from .guardrails import ConstraintResult, SemanticMatcher
 from .guardrails import create_default_constraints, create_semantic_matcher, run_constraints
@@ -112,6 +112,7 @@ __all__ = [
     # Governance
     "AnswerGovernor",
     "GovernanceDecision",
+    "GovernanceLog",
     "decide_answer_mode",
     # Path Management
     "FitzPaths",

@@ -72,6 +72,21 @@ class RoutingComponents:
 
 
 @dataclass
+class ObservabilityComponents:
+    """
+    Observability components for governance tracking.
+
+    Groups dependencies for logging and monitoring governance decisions.
+    """
+
+    governance_logger: Any | None = None  # GovernanceLogger for decision tracking
+
+    def is_enabled(self) -> bool:
+        """Check if governance logging is enabled."""
+        return self.governance_logger is not None
+
+
+@dataclass
 class PipelineComponents:
     """
     Complete set of RAGPipeline dependencies.
@@ -93,3 +108,4 @@ class PipelineComponents:
     routing: RoutingComponents | None = None
     cloud: CloudComponents | None = None
     structured: StructuredComponents | None = None
+    observability: ObservabilityComponents | None = None

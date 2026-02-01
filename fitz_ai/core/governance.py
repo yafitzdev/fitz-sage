@@ -16,13 +16,117 @@ GovernanceDecision that controls answer generation.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Sequence
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any, Sequence
 
 from fitz_ai.core.answer_mode import AnswerMode
 
 if TYPE_CHECKING:
     from fitz_ai.core.guardrails.base import ConstraintResult
+
+
+@dataclass(frozen=True)
+class GovernanceLog:
+    """
+    Structured log entry for a governance decision.
+
+    Captures everything needed to understand, debug, and analyze governance
+    decisions over time. Designed for PostgreSQL storage and observability.
+
+    Attributes:
+        timestamp: When the decision was made (UTC)
+        query_hash: SHA256 of normalized query for deduplication
+        mode: The resolved AnswerMode value
+        triggered_constraints: Names of constraints that denied decisive answers
+        signals: Raw signal strings from constraints (abstain, disputed, etc.)
+        reasons: Human-readable explanations from triggered constraints
+        chunk_count: Number of retrieved chunks available for the decision
+        collection: The collection being queried
+        latency_ms: Time to make governance decision (optional)
+        pipeline_version: Version of the pipeline for tracking regressions
+    """
+
+    timestamp: datetime
+    query_hash: str
+    mode: str
+    triggered_constraints: tuple[str, ...]
+    signals: tuple[str, ...]
+    reasons: tuple[str, ...]
+    chunk_count: int
+    collection: str
+    latency_ms: float | None = None
+    pipeline_version: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize for JSON/logging."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "query_hash": self.query_hash,
+            "mode": self.mode,
+            "triggered_constraints": list(self.triggered_constraints),
+            "signals": list(self.signals),
+            "reasons": list(self.reasons),
+            "chunk_count": self.chunk_count,
+            "collection": self.collection,
+            "latency_ms": self.latency_ms,
+            "pipeline_version": self.pipeline_version,
+        }
+
+    @classmethod
+    def from_decision(
+        cls,
+        decision: "GovernanceDecision",
+        query_hash: str,
+        chunk_count: int,
+        collection: str,
+        latency_ms: float | None = None,
+        pipeline_version: str | None = None,
+    ) -> "GovernanceLog":
+        """
+        Create a GovernanceLog from a GovernanceDecision.
+
+        Args:
+            decision: The governance decision to log
+            query_hash: Pre-computed hash of the query
+            chunk_count: Number of chunks available for the decision
+            collection: Collection being queried
+            latency_ms: Time to make governance decision
+            pipeline_version: Version of the pipeline
+
+        Returns:
+            GovernanceLog ready for storage
+        """
+        return cls(
+            timestamp=datetime.now(timezone.utc),
+            query_hash=query_hash,
+            mode=decision.mode.value,
+            triggered_constraints=decision.triggered_constraints,
+            signals=tuple(decision.signals),
+            reasons=decision.reasons,
+            chunk_count=chunk_count,
+            collection=collection,
+            latency_ms=latency_ms,
+            pipeline_version=pipeline_version,
+        )
+
+    @staticmethod
+    def hash_query(query: str) -> str:
+        """
+        Normalize and hash a query for deduplication.
+
+        Normalization: lowercase, strip whitespace.
+        Hash: SHA256 truncated to 64 chars (256 bits).
+
+        Args:
+            query: The query string to hash
+
+        Returns:
+            64-character hex hash
+        """
+        normalized = query.lower().strip()
+        return hashlib.sha256(normalized.encode()).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -189,6 +293,7 @@ def decide_answer_mode(results: Sequence["ConstraintResult"]) -> GovernanceDecis
 
 
 __all__ = [
+    "GovernanceLog",
     "GovernanceDecision",
     "AnswerGovernor",
     "decide_answer_mode",
