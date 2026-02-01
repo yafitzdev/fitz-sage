@@ -11,6 +11,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.1] - 2026-02-01
+
+### 🎉 Highlights
+
+**Enterprise Authentication System** - New enterprise-grade auth framework with dynamic token refresh, mTLS support, and circuit breaker patterns for production resilience. Supports OAuth2, API key rotation, and composite multi-header authentication.
+
+**Reranking Intelligence** - Reranking is now baked directly into the dense vector search plugin with smart skip logic when no rerank provider is configured. Seamless integration without separate configuration flags.
+
+**Multi-Dimension Cloud Cache** - Cloud cache API now supports multiple embedding dimensions, enabling projects with different embedding models to share the same cache infrastructure.
+
+### 🚀 Added
+
+#### Enterprise Authentication (`fitz_ai/llm/auth/`)
+- `DynamicHttpxAuth` - Dynamic token refresh with callback support for httpx clients
+- `TokenProviderAdapter` - Adapter pattern for OAuth2/API key providers
+- `CompositeAuth` - Multi-header authentication for complex scenarios
+- `M2MAuth` enhancements - Added retry logic with exponential backoff and circuit breaker
+- `EnterpriseAuth` - New auth type for enterprise gateway providers
+- Certificate validation utilities with expiry checking and chain validation
+- mTLS support across all LLM providers (Anthropic, OpenAI, Cohere)
+
+#### Reranking
+- Baked reranking into `DenseVectorSearchStep` with automatic skip when `rerank: null`
+- Smart provider detection - only runs rerank when provider is configured
+- No configuration flags needed - presence of rerank provider IS the toggle
+
+#### Cloud Cache
+- Multi-dimension embedding support in cache key generation
+- Dimension validation and compatibility checking
+- Graceful handling of single-dimension cache entries during migration
+
+#### Testing Infrastructure
+- Property-based tests with Hypothesis for vocabulary variations
+- Mutation testing with mutmut (weekly CI + local overnight)
+- E2E integration tests for cloud cache
+- pgserver recovery tests (unit + integration)
+- Test tier markers for granular test execution
+
+### 🔧 Fixed
+
+- pgserver auto-recovery on Windows with improved stale lock handling
+- Mutation testing CI workflow output parsing for mutmut 2.x
+- Integration support for multiple embedding dimensions
+- Cloud cache edge cases with dimension mismatches
+
+### 📚 Documentation
+
+- Updated embedding dimension references across docs
+- Added enterprise auth examples
+- Improved troubleshooting guides
+
+### 🧪 Testing
+
+- Added comprehensive test coverage for dynamic auth, circuit breakers, and retry logic
+- Certificate validation test suite
+- Auth provider integration tests
+- Property-based testing for vocabulary variations
+
+---
+
 ## [0.7.0] - 2026-01-26
 
 ### 🎉 Highlights

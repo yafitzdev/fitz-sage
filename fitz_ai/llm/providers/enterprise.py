@@ -91,6 +91,7 @@ class EnterpriseChat:
                         break
                     try:
                         import json
+
                         data = json.loads(chunk)
                         if "choices" in data and data["choices"]:
                             delta = data["choices"][0].get("delta", {})

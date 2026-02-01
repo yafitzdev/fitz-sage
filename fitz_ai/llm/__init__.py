@@ -7,6 +7,9 @@ Direct provider wrappers with pluggable authentication.
 
 from __future__ import annotations
 
+# Auth providers
+from fitz_ai.llm.auth import ApiKeyAuth, AuthProvider, M2MAuth
+
 # Public API
 from fitz_ai.llm.client import get_chat, get_embedder, get_reranker, get_vision
 from fitz_ai.llm.factory import ChatFactory, ModelTier, get_chat_factory
@@ -19,9 +22,6 @@ from fitz_ai.llm.providers.base import (
     RerankResult,
     VisionProvider,
 )
-
-# Auth providers
-from fitz_ai.llm.auth import ApiKeyAuth, AuthProvider, M2MAuth
 
 __all__ = [
     # Public API

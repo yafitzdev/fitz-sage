@@ -25,7 +25,6 @@ import pytest
 from fitz_ai.cloud import CloudClient, CloudConfig
 from fitz_ai.cloud.cache_key import CacheVersions
 
-
 # Path to test fixtures (reuse from e2e)
 FIXTURES_DIR = Path(__file__).parent.parent / "e2e" / "fixtures_rag"
 
@@ -105,7 +104,9 @@ def cloud_org_id() -> str:
 
 
 @pytest.fixture
-def cloud_client(cloud_config: CloudConfig, cloud_org_id: str) -> Generator[CloudClient, None, None]:
+def cloud_client(
+    cloud_config: CloudConfig, cloud_org_id: str
+) -> Generator[CloudClient, None, None]:
     """
     Create CloudClient instance with cleanup.
 

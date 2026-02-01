@@ -71,7 +71,7 @@ class TestFitzOptimizer:
         )
 
         # Non-indexed dimension (768) should still call lookup
-        result = optimizer.lookup(
+        optimizer.lookup(
             query="test query",
             query_embedding=[1.0] * 768,
             chunk_ids=["c1", "c2"],

@@ -15,9 +15,9 @@ import sys
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
+from fitz_ai.cloud.cache_key import CacheVersions
 from fitz_ai.cloud.client import CloudClient
 from fitz_ai.cloud.config import CloudConfig
-from fitz_ai.cloud.cache_key import CacheVersions
 from fitz_ai.core import Answer, Provenance
 
 
@@ -28,11 +28,9 @@ def get_embedding(text: str) -> list[float]:
     # Try OpenAI first
     try:
         import openai
+
         client = openai.OpenAI()
-        response = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=text
-        )
+        response = client.embeddings.create(model="text-embedding-3-small", input=text)
         return response.data[0].embedding
     except Exception as e:
         print(f"    (OpenAI unavailable: {str(e)[:50]}... using mock embedding)")
@@ -50,7 +48,7 @@ def get_embedding(text: str) -> list[float]:
     embedding = [random.uniform(-1, 1) for _ in range(768)]
 
     # Normalize the vector
-    norm = sum(x*x for x in embedding) ** 0.5
+    norm = sum(x * x for x in embedding) ** 0.5
     return [x / norm for x in embedding]
 
 
@@ -120,6 +118,7 @@ def main():
     except Exception as e:
         print(f"    [FAIL] Exception during lookup: {e}")
         import traceback
+
         traceback.print_exc()
         return
 
@@ -151,9 +150,11 @@ def main():
     print("\n[7] Storing answer in cache...")
 
     # Debug: manually test the store endpoint
-    import httpx
-    import json
     import base64
+    import json
+
+    import httpx
+
     from fitz_ai.cloud.cache_key import compute_cache_key
     from fitz_ai.cloud.crypto import CacheEncryption
 
@@ -164,7 +165,10 @@ def main():
     encryption = CacheEncryption(config.org_key)
     answer_data = {
         "text": answer.text,
-        "provenance": [{"source_id": p.source_id, "excerpt": p.excerpt, "metadata": p.metadata} for p in answer.provenance],
+        "provenance": [
+            {"source_id": p.source_id, "excerpt": p.excerpt, "metadata": p.metadata}
+            for p in answer.provenance
+        ],
         "mode": None,
         "metadata": answer.metadata,
     }
@@ -202,6 +206,7 @@ def main():
     except Exception as e:
         print(f"    HTTP error: {e}")
         import traceback
+
         traceback.print_exc()
         stored = False
 
@@ -233,7 +238,8 @@ def main():
     print("\n" + "=" * 60)
     print("TEST PASSED!")
     print("=" * 60)
-    print("""
+    print(
+        """
 What happened:
 1. Query embedding generated (any dimension supported)
 2. Cache lookup #1 -> MISS (no cached answer)
@@ -245,7 +251,8 @@ The cloud NEVER saw:
 - The query text (only embedding vector)
 - The answer text (only encrypted blob)
 - Your org_key (stays local)
-""")
+"""
+    )
 
     client.close()
 

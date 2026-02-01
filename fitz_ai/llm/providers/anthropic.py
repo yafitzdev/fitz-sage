@@ -69,8 +69,8 @@ class AnthropicChat:
         models: dict[ModelTier, str] | None = None,
         **kwargs: Any,
     ) -> None:
-        import httpx
         import anthropic
+        import httpx
 
         request_kwargs = auth.get_request_kwargs()
 
@@ -153,8 +153,8 @@ class AnthropicVision:
         model: str | None = None,
         **kwargs: Any,
     ) -> None:
-        import httpx
         import anthropic
+        import httpx
 
         request_kwargs = auth.get_request_kwargs()
 

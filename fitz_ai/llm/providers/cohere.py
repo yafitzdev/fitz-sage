@@ -47,8 +47,8 @@ class CohereChat:
         models: dict[ModelTier, str] | None = None,
         **kwargs: Any,
     ) -> None:
-        import httpx
         import cohere
+        import httpx
 
         request_kwargs = auth.get_request_kwargs()
 
@@ -120,8 +120,8 @@ class CohereEmbedding:
         input_type: str = "search_document",
         dimensions: int | None = None,
     ) -> None:
-        import httpx
         import cohere
+        import httpx
 
         request_kwargs = auth.get_request_kwargs()
 
@@ -204,8 +204,8 @@ class CohereRerank:
         auth: AuthProvider,
         model: str | None = None,
     ) -> None:
-        import httpx
         import cohere
+        import httpx
 
         request_kwargs = auth.get_request_kwargs()
 

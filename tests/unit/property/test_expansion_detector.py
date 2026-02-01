@@ -7,21 +7,21 @@ Target: fitz_ai/retrieval/detection/detectors/expansion.py
 """
 
 import pytest
-from hypothesis import given, settings, assume
+from hypothesis import given, settings
 
 from fitz_ai.retrieval.detection.detectors.expansion import (
-    ExpansionDetector,
+    ACRONYMS,
     MAX_VARIATIONS,
     SYNONYMS,
-    ACRONYMS,
+    ExpansionDetector,
 )
 from fitz_ai.retrieval.detection.protocol import DetectionCategory
 
 from .strategies import (
-    query_text,
-    query_with_synonym,
-    query_with_acronym,
     non_empty_text,
+    query_text,
+    query_with_acronym,
+    query_with_synonym,
 )
 
 pytestmark = pytest.mark.property
@@ -141,8 +141,7 @@ class TestExpansionDetectorCasePreservation:
         if result.detected:
             # At least one transformation should start with uppercase
             has_uppercase_replacement = any(
-                t.startswith("Remove") or t.startswith("Erase")
-                for t in result.transformations
+                t.startswith("Remove") or t.startswith("Erase") for t in result.transformations
             )
             assert has_uppercase_replacement
 
@@ -155,8 +154,7 @@ class TestExpansionDetectorCasePreservation:
         if result.detected:
             # Transformations should have lowercase replacements
             has_lowercase_replacement = any(
-                "remove" in t.lower() or "erase" in t.lower()
-                for t in result.transformations
+                "remove" in t.lower() or "erase" in t.lower() for t in result.transformations
             )
             assert has_lowercase_replacement
 
@@ -180,7 +178,7 @@ class TestExpansionDetectorMatchPositions:
             # If start is valid, the matched text should match substring
             if 0 <= match.start < len(query):
                 # Case-insensitive comparison since positions come from lowercased search
-                extracted = query[match.start:match.end]
+                extracted = query[match.start : match.end]
                 assert extracted.lower() == match.text.lower()
 
     @given(query=query_with_acronym())
@@ -299,9 +297,6 @@ class TestExpansionDetectorMatchPatterns:
         detector = ExpansionDetector()
         result = detector.detect(query)
 
-        # Should have at least one acronym match
-        acronym_matches = [m for m in result.matches if m.pattern_name == "acronym"]
-
         if result.detected:
             # May also have synonym matches, but should have at least one match
             assert len(result.matches) >= 1
@@ -338,10 +333,7 @@ class TestExpansionDetectorDictionaryConsistency:
         words = set(query.lower().split())
 
         # Check if any words are in dictionaries
-        has_known_word = any(
-            w in SYNONYMS or w in ACRONYMS
-            for w in words
-        )
+        has_known_word = any(w in SYNONYMS or w in ACRONYMS for w in words)
 
         result = detector.detect(query)
 

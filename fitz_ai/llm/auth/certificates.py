@@ -79,14 +79,10 @@ def validate_certificate_file(path: str, cert_type: str) -> None:
     # Warn if expiring soon (within 7 days)
     days_until_expiry = (cert.not_valid_after_utc - now).days
     if days_until_expiry < 7:
-        logger.warning(
-            f"{cert_type} will expire in {days_until_expiry} days: {path}"
-        )
+        logger.warning(f"{cert_type} will expire in {days_until_expiry} days: {path}")
 
 
-def validate_key_file(
-    path: str, key_type: str, password: str | None = None
-) -> None:
+def validate_key_file(path: str, key_type: str, password: str | None = None) -> None:
     """
     Validate a private key file with user-friendly error messages.
 

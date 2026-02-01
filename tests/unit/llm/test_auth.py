@@ -470,11 +470,14 @@ class TestEnterpriseAuth:
         with patch("httpx.Client") as mock_client:
             mock_client.return_value.__enter__.return_value.post.return_value = mock_response
 
-            with patch.dict("os.environ", {
-                "TEST_LLM_KEY": "llm-api-key-123",
-                "CLIENT_ID": "my-client",
-                "CLIENT_SECRET": "my-secret",
-            }):
+            with patch.dict(
+                "os.environ",
+                {
+                    "TEST_LLM_KEY": "llm-api-key-123",
+                    "CLIENT_ID": "my-client",
+                    "CLIENT_SECRET": "my-secret",
+                },
+            ):
                 config = {
                     "auth": {
                         "type": "enterprise",

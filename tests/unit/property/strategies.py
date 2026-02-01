@@ -17,14 +17,50 @@ from hypothesis import strategies as st
 
 # Common query words (realistic search patterns)
 QUERY_WORDS = [
-    "how", "what", "where", "when", "why", "who",
-    "find", "show", "get", "list", "explain",
-    "the", "a", "an", "is", "are", "was", "were",
-    "to", "from", "with", "for", "in", "on", "at",
-    "error", "bug", "issue", "problem", "fix",
-    "create", "delete", "update", "add", "remove",
-    "user", "file", "data", "system", "config",
-    "api", "database", "server", "client",
+    "how",
+    "what",
+    "where",
+    "when",
+    "why",
+    "who",
+    "find",
+    "show",
+    "get",
+    "list",
+    "explain",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "to",
+    "from",
+    "with",
+    "for",
+    "in",
+    "on",
+    "at",
+    "error",
+    "bug",
+    "issue",
+    "problem",
+    "fix",
+    "create",
+    "delete",
+    "update",
+    "add",
+    "remove",
+    "user",
+    "file",
+    "data",
+    "system",
+    "config",
+    "api",
+    "database",
+    "server",
+    "client",
 ]
 
 
@@ -57,10 +93,36 @@ def document_text(draw, min_chars: int = 100, max_chars: int = 5000) -> str:
     """
     # Use a fixed word pool to reduce entropy
     words = [
-        "the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog",
-        "lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing",
-        "data", "system", "process", "function", "method", "class", "object",
-        "user", "input", "output", "result", "value", "type", "code", "test",
+        "the",
+        "quick",
+        "brown",
+        "fox",
+        "jumps",
+        "over",
+        "lazy",
+        "dog",
+        "lorem",
+        "ipsum",
+        "dolor",
+        "sit",
+        "amet",
+        "consectetur",
+        "adipiscing",
+        "data",
+        "system",
+        "process",
+        "function",
+        "method",
+        "class",
+        "object",
+        "user",
+        "input",
+        "output",
+        "result",
+        "value",
+        "type",
+        "code",
+        "test",
     ]
 
     # Target length with some variance
@@ -97,21 +159,94 @@ def document_text(draw, min_chars: int = 100, max_chars: int = 5000) -> str:
 
 # Known synonyms from expansion.py
 KNOWN_SYNONYMS = [
-    "delete", "remove", "create", "add", "update", "modify",
-    "get", "retrieve", "fetch", "error", "failure", "issue", "bug",
-    "start", "stop", "run", "execute", "install", "setup", "configure",
-    "file", "document", "folder", "directory", "user", "function", "method",
-    "class", "list", "array", "api", "endpoint", "database", "db",
-    "server", "client", "request", "response", "enable", "disable", "active", "inactive",
+    "delete",
+    "remove",
+    "create",
+    "add",
+    "update",
+    "modify",
+    "get",
+    "retrieve",
+    "fetch",
+    "error",
+    "failure",
+    "issue",
+    "bug",
+    "start",
+    "stop",
+    "run",
+    "execute",
+    "install",
+    "setup",
+    "configure",
+    "file",
+    "document",
+    "folder",
+    "directory",
+    "user",
+    "function",
+    "method",
+    "class",
+    "list",
+    "array",
+    "api",
+    "endpoint",
+    "database",
+    "db",
+    "server",
+    "client",
+    "request",
+    "response",
+    "enable",
+    "disable",
+    "active",
+    "inactive",
 ]
 
 # Known acronyms from expansion.py
 KNOWN_ACRONYMS = [
-    "api", "ui", "ux", "db", "sql", "html", "css", "js", "ts",
-    "url", "http", "https", "json", "xml", "csv", "pdf", "id",
-    "auth", "config", "env", "dev", "prod", "repo", "pr", "ci", "cd",
-    "k8s", "aws", "gcp", "vm", "os", "cpu", "gpu", "ram", "ssd", "hdd",
-    "iot", "ml", "ai", "nlp", "llm", "rag",
+    "api",
+    "ui",
+    "ux",
+    "db",
+    "sql",
+    "html",
+    "css",
+    "js",
+    "ts",
+    "url",
+    "http",
+    "https",
+    "json",
+    "xml",
+    "csv",
+    "pdf",
+    "id",
+    "auth",
+    "config",
+    "env",
+    "dev",
+    "prod",
+    "repo",
+    "pr",
+    "ci",
+    "cd",
+    "k8s",
+    "aws",
+    "gcp",
+    "vm",
+    "os",
+    "cpu",
+    "gpu",
+    "ram",
+    "ssd",
+    "hdd",
+    "iot",
+    "ml",
+    "ai",
+    "nlp",
+    "llm",
+    "rag",
 ]
 
 
@@ -128,8 +263,12 @@ def query_with_synonym(draw) -> str:
     prefix_words = draw(st.integers(min_value=0, max_value=3))
     suffix_words = draw(st.integers(min_value=0, max_value=3))
 
-    prefix = draw(st.lists(st.sampled_from(QUERY_WORDS), min_size=prefix_words, max_size=prefix_words))
-    suffix = draw(st.lists(st.sampled_from(QUERY_WORDS), min_size=suffix_words, max_size=suffix_words))
+    prefix = draw(
+        st.lists(st.sampled_from(QUERY_WORDS), min_size=prefix_words, max_size=prefix_words)
+    )
+    suffix = draw(
+        st.lists(st.sampled_from(QUERY_WORDS), min_size=suffix_words, max_size=suffix_words)
+    )
 
     words = prefix + [synonym] + suffix
     return " ".join(words)
@@ -148,8 +287,12 @@ def query_with_acronym(draw) -> str:
     prefix_words = draw(st.integers(min_value=0, max_value=3))
     suffix_words = draw(st.integers(min_value=0, max_value=3))
 
-    prefix = draw(st.lists(st.sampled_from(QUERY_WORDS), min_size=prefix_words, max_size=prefix_words))
-    suffix = draw(st.lists(st.sampled_from(QUERY_WORDS), min_size=suffix_words, max_size=suffix_words))
+    prefix = draw(
+        st.lists(st.sampled_from(QUERY_WORDS), min_size=prefix_words, max_size=prefix_words)
+    )
+    suffix = draw(
+        st.lists(st.sampled_from(QUERY_WORDS), min_size=suffix_words, max_size=suffix_words)
+    )
 
     words = prefix + [acronym] + suffix
     return " ".join(words)
@@ -158,6 +301,7 @@ def query_with_acronym(draw) -> str:
 # =============================================================================
 # Chunker Parameter Strategies
 # =============================================================================
+
 
 @st.composite
 def chunk_params(draw, min_size: int = 10, max_size: int = 5000) -> tuple[int, int]:
@@ -183,6 +327,7 @@ def chunk_params(draw, min_size: int = 10, max_size: int = 5000) -> tuple[int, i
 # Keyword Strategies (for vocabulary tests)
 # =============================================================================
 
+
 @st.composite
 def testcase_id(draw) -> str:
     """
@@ -207,11 +352,15 @@ def ticket_id(draw) -> str:
     """
     # 2-5 uppercase letters
     prefix_len = draw(st.integers(min_value=2, max_value=5))
-    prefix = "".join(draw(st.lists(
-        st.sampled_from("ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
-        min_size=prefix_len,
-        max_size=prefix_len
-    )))
+    prefix = "".join(
+        draw(
+            st.lists(
+                st.sampled_from("ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+                min_size=prefix_len,
+                max_size=prefix_len,
+            )
+        )
+    )
     separator = draw(st.sampled_from(["-", "_"]))
     number = draw(st.integers(min_value=1, max_value=99999))
     return f"{prefix}{separator}{number}"
@@ -268,11 +417,13 @@ def keyword_with_category(draw) -> tuple[str, str]:
         last = draw(st.sampled_from(last_names))
         keyword = f"{first} {last}"
     else:  # generic
-        keyword = draw(st.text(
-            alphabet=st.characters(whitelist_categories=("Ll", "Lu", "Nd")),
-            min_size=3,
-            max_size=20
-        ))
+        keyword = draw(
+            st.text(
+                alphabet=st.characters(whitelist_categories=("Ll", "Lu", "Nd")),
+                min_size=3,
+                max_size=20,
+            )
+        )
 
     return (keyword, category)
 
@@ -281,16 +432,22 @@ def keyword_with_category(draw) -> tuple[str, str]:
 # General Text Strategies
 # =============================================================================
 
+
 @st.composite
 def non_empty_text(draw, min_size: int = 1, max_size: int = 100) -> str:
     """
     Generate non-empty printable text.
     """
-    return draw(st.text(
-        alphabet=st.characters(whitelist_categories=("L", "N", "P", "Z")),
-        min_size=min_size,
-        max_size=max_size
-    )).strip() or "fallback"
+    return (
+        draw(
+            st.text(
+                alphabet=st.characters(whitelist_categories=("L", "N", "P", "Z")),
+                min_size=min_size,
+                max_size=max_size,
+            )
+        ).strip()
+        or "fallback"
+    )
 
 
 # Strategy aliases for easy import

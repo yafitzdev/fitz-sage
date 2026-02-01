@@ -9,14 +9,14 @@ Targets:
 """
 
 import pytest
-from hypothesis import given, assume, settings
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from fitz_ai.core.document import ParsedDocument, DocumentElement, ElementType
-from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
+from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.chunking.plugins.default.recursive import RecursiveChunker
+from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
 
-from .strategies import document_text, chunk_params
+from .strategies import chunk_params, document_text
 
 pytestmark = pytest.mark.property
 
@@ -69,7 +69,7 @@ class TestSimpleChunkerSizeConstraint:
 
     @given(
         text=document_text(min_chars=100, max_chars=3000),
-        params=chunk_params(min_size=50, max_size=500)
+        params=chunk_params(min_size=50, max_size=500),
     )
     @settings(max_examples=50)
     def test_chunk_size_respected(self, text: str, params: tuple[int, int]):
@@ -83,9 +83,9 @@ class TestSimpleChunkerSizeConstraint:
         chunks = chunker.chunk(doc)
 
         for chunk in chunks:
-            assert len(chunk.content) <= chunk_size, (
-                f"Chunk content {len(chunk.content)} > {chunk_size}"
-            )
+            assert (
+                len(chunk.content) <= chunk_size
+            ), f"Chunk content {len(chunk.content)} > {chunk_size}"
 
 
 class TestSimpleChunkerSequentialIndices:
@@ -332,7 +332,7 @@ class TestRecursiveChunkerIdDeterminism:
 
     @given(
         chunk_size=st.integers(min_value=50, max_value=500),
-        chunk_overlap=st.integers(min_value=0, max_value=49)
+        chunk_overlap=st.integers(min_value=0, max_value=49),
     )
     def test_chunker_id_deterministic(self, chunk_size: int, chunk_overlap: int):
         """Same params produce same chunker_id."""
@@ -345,7 +345,7 @@ class TestRecursiveChunkerIdDeterminism:
 
     @given(
         chunk_size=st.integers(min_value=50, max_value=500),
-        chunk_overlap=st.integers(min_value=0, max_value=49)
+        chunk_overlap=st.integers(min_value=0, max_value=49),
     )
     def test_chunker_id_format(self, chunk_size: int, chunk_overlap: int):
         """chunker_id follows 'recursive:size:overlap' format."""

@@ -24,7 +24,6 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from unittest.mock import patch
 
 import pytest
 
@@ -32,23 +31,14 @@ from fitz_ai.cloud.cache_key import CacheVersions, compute_cache_key
 from fitz_ai.core import Answer
 
 from .cloud_fixtures import (
-    FIXTURES_DIR,
-    cache_versions,
-    check_cloud_reachable,
     cloud_available,
-    cloud_client,
-    cloud_config,
-    cloud_org_id,
-    cloud_pipeline,
-    get_cloud_env_vars,
-    test_queries,
-    unique_collection_name,
 )
 
 
 def generate_random_embedding(dim: int = 768, seed: int | None = None) -> list[float]:
     """Generate a random unit-normalized embedding that won't semantically match others."""
     import random
+
     if seed is not None:
         random.seed(seed)
     # Generate random values
@@ -194,7 +184,9 @@ class TestCloudCacheIntegration:
             versions=cache_versions,
         )
 
-        assert result.hit is False, "Different query text with different embedding should be cache miss"
+        assert (
+            result.hit is False
+        ), "Different query text with different embedding should be cache miss"
 
     def test_different_fingerprint_is_cache_miss(self, cloud_client, cache_versions):
         """Same query with different retrieval fingerprint should miss."""
@@ -222,7 +214,9 @@ class TestCloudCacheIntegration:
             versions=cache_versions,
         )
 
-        assert result.hit is False, "Different fingerprint with different embedding should be cache miss"
+        assert (
+            result.hit is False
+        ), "Different fingerprint with different embedding should be cache miss"
 
     def test_different_llm_model_is_cache_miss(self, cloud_client, unique_collection_name):
         """Same query with different LLM model version should miss."""
@@ -271,7 +265,9 @@ class TestCloudCacheIntegration:
             versions=versions_b,
         )
 
-        assert result.hit is False, "Different LLM model with different embedding should be cache miss"
+        assert (
+            result.hit is False
+        ), "Different LLM model with different embedding should be cache miss"
 
 
 @pytest.mark.integration
@@ -432,8 +428,9 @@ class TestCloudCacheWithPipeline:
 
         # First query should store to cache (if miss)
         if "cache miss" in log_text:
-            assert "cache stored" in log_text or "stored in cloud cache" in log_text, \
-                "Cache miss should result in storing the answer"
+            assert (
+                "cache stored" in log_text or "stored in cloud cache" in log_text
+            ), "Cache miss should result in storing the answer"
 
         # Wait briefly for cache to propagate
         time.sleep(0.5)
@@ -490,15 +487,13 @@ class TestCloudCacheWithPipeline:
 
         # Check if answer contains expected content (informational, not assertion)
         answer_text = result1.answer.lower()
-        found = any(
-            expected.lower() in answer_text for expected in query_info["expected_contains"]
-        )
+        found = any(expected.lower() in answer_text for expected in query_info["expected_contains"])
         if not found:
             # Log warning but don't fail - this is a retrieval/LLM quality issue, not cache
             import warnings
+
             warnings.warn(
-                f"LLM did not produce expected content. Got: {result1.answer[:200]}...",
-                UserWarning
+                f"LLM did not produce expected content. Got: {result1.answer[:200]}...", UserWarning
             )
 
         # Wait for cache

@@ -7,7 +7,7 @@ Target: fitz_ai/retrieval/vocabulary/variations.py
 """
 
 import pytest
-from hypothesis import given, assume
+from hypothesis import assume, given
 
 from fitz_ai.retrieval.vocabulary.variations import (
     generate_variations,
@@ -15,11 +15,11 @@ from fitz_ai.retrieval.vocabulary.variations import (
 )
 
 from .strategies import (
+    keyword_with_category,
+    non_empty_text,
     testcase_id,
     ticket_id,
     version_string,
-    keyword_with_category,
-    non_empty_text,
 )
 
 pytestmark = pytest.mark.property

@@ -88,7 +88,11 @@ def pytest_collection_modifyitems(config, items):
             # Check if xdist is active with multiple workers
             num_workers = getattr(config.option, "numprocesses", None)
             if num_workers is not None and num_workers != 0:
-                item.add_marker(pytest.mark.skip(reason="Postgres tests skipped in parallel mode (run with: pytest -m postgres)"))
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason="Postgres tests skipped in parallel mode (run with: pytest -m postgres)"
+                    )
+                )
 
         # Skip tier marking if already has a tier marker
         has_tier = any(marker.name.startswith("tier") for marker in item.iter_markers())
@@ -136,11 +140,13 @@ def _generate_test_certificate(days_valid: int = 365) -> tuple[bytes, bytes]:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
     # Generate certificate
-    subject = issuer = x509.Name([
-        x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Test"),
-        x509.NameAttribute(NameOID.COMMON_NAME, "test.example.com"),
-    ])
+    subject = issuer = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Test"),
+            x509.NameAttribute(NameOID.COMMON_NAME, "test.example.com"),
+        ]
+    )
 
     cert = (
         x509.CertificateBuilder()

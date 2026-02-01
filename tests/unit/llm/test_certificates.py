@@ -11,10 +11,8 @@ Tests cover:
 
 from __future__ import annotations
 
-import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from cryptography import x509
@@ -22,12 +20,12 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
+from fitz_ai.llm.auth import M2MAuth
 from fitz_ai.llm.auth.certificates import (
     CertificateError,
     validate_certificate_file,
     validate_key_file,
 )
-from fitz_ai.llm.auth import M2MAuth
 
 
 class TestCertificateError:
@@ -80,9 +78,7 @@ class TestValidateCertificateFile:
         """Expired certificate raises CertificateError with expiry date."""
         # Generate an expired certificate
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        subject = issuer = x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, "test")
-        ])
+        subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "test")])
         cert = (
             x509.CertificateBuilder()
             .subject_name(subject)
@@ -108,9 +104,7 @@ class TestValidateCertificateFile:
         """Valid certificate does NOT raise."""
         # Generate a valid certificate (expires in 365 days)
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        subject = issuer = x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, "test")
-        ])
+        subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "test")])
         cert = (
             x509.CertificateBuilder()
             .subject_name(subject)
@@ -204,9 +198,7 @@ class TestM2MAuthCertificates:
         assert "cert" in kwargs
         assert kwargs["cert"] == (cert_path, key_path)
 
-    def test_m2m_auth_get_request_kwargs_with_password(
-        self, tmp_path: Path
-    ) -> None:
+    def test_m2m_auth_get_request_kwargs_with_password(self, tmp_path: Path) -> None:
         """M2MAuth.get_request_kwargs includes password in cert tuple."""
         # Generate an encrypted key
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -218,9 +210,7 @@ class TestM2MAuthCertificates:
         )
 
         # Generate matching certificate
-        subject = issuer = x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, "test")
-        ])
+        subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "test")])
         cert = (
             x509.CertificateBuilder()
             .subject_name(subject)

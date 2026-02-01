@@ -18,14 +18,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from fitz_ai.storage.config import StorageConfig, StorageMode
 from fitz_ai.storage.postgres import (
     PostgresConnectionManager,
     _force_remove_pgdata,
     _kill_zombie_postgres_processes,
     _sanitize_collection_name,
 )
-from fitz_ai.storage.config import StorageConfig, StorageMode
-
 
 # =============================================================================
 # Unit Tests - Helper Functions
@@ -108,10 +107,8 @@ class TestForceRemovePgdata:
                 return original_rmtree(path, *args, **kwargs)
 
             with patch("shutil.rmtree", side_effect=mock_rmtree):
-                with patch(
-                    "fitz_ai.storage.postgres._kill_zombie_postgres_processes"
-                ):
-                    result = _force_remove_pgdata(data_dir, max_retries=5)
+                with patch("fitz_ai.storage.postgres._kill_zombie_postgres_processes"):
+                    _force_remove_pgdata(data_dir, max_retries=5)
 
             # Should have retried and eventually succeeded
             assert call_count >= 3
@@ -137,8 +134,7 @@ class TestKillZombiePostgresProcesses:
         assert mock_run.called
 
     @pytest.mark.skipif(
-        os.name == "nt",
-        reason="Unix-specific test (os.getuid not available on Windows)"
+        os.name == "nt", reason="Unix-specific test (os.getuid not available on Windows)"
     )
     @patch("subprocess.run")
     def test_calls_pkill_on_unix(self, mock_run):
@@ -175,6 +171,7 @@ class TestPgserverRecoveryIntegration:
     def temp_pgdata(self):
         """Create a temporary pgdata directory."""
         import time
+
         tmpdir = tempfile.mkdtemp()
         pgdata = Path(tmpdir) / "pgdata"
         pgdata.mkdir()
@@ -235,9 +232,7 @@ class TestPgserverRecoveryIntegration:
             # The broken server should have been removed from cache
             # (replaced with the real server)
             assert resolved_path in pgserver.PostgresServer._instances
-            assert not isinstance(
-                pgserver.PostgresServer._instances[resolved_path], BrokenServer
-            )
+            assert not isinstance(pgserver.PostgresServer._instances[resolved_path], BrokenServer)
 
             # Verify we can actually connect
             is_healthy, _ = manager.is_healthy()
@@ -316,6 +311,7 @@ class TestPgserverRecoveryIntegration:
             manager.stop()
             # Give Windows time to release file handles
             import time
+
             time.sleep(1.0)
 
     def test_connection_creates_database(self, temp_pgdata):

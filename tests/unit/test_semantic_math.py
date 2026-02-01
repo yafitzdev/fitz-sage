@@ -6,7 +6,7 @@ These tests kill mutation testing survivors by verifying edge cases
 that mutations would break.
 """
 
-import math
+
 import pytest
 
 from fitz_ai.core.guardrails.semantic import cosine_similarity, mean_vector

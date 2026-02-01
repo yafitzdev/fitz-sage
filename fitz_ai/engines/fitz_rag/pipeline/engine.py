@@ -689,7 +689,9 @@ class RAGPipeline:
         chat_factory = get_chat_factory(cfg.chat, config=chat_config)
         smart_chat = chat_factory("smart")
         model_name = getattr(smart_chat, "_model", "unknown")
-        logger.info(f"{PIPELINE} Using chat provider='{cfg.chat}' model='{model_name}' (smart tier)")
+        logger.info(
+            f"{PIPELINE} Using chat provider='{cfg.chat}' model='{model_name}' (smart tier)"
+        )
 
         # Embedding
         embedding_config = {
@@ -699,9 +701,7 @@ class RAGPipeline:
         logger.info(f"{PIPELINE} Using embedding provider='{cfg.embedding}'")
 
         # Rerank (optional - None means disabled in flat schema)
-        rerank_config = {
-            k: v for k, v in cfg.rerank_kwargs.model_dump().items() if v is not None
-        }
+        rerank_config = {k: v for k, v in cfg.rerank_kwargs.model_dump().items() if v is not None}
         reranker = get_reranker(cfg.rerank, config=rerank_config)
         if reranker:
             logger.info(f"{PIPELINE} Using rerank provider='{cfg.rerank}'")

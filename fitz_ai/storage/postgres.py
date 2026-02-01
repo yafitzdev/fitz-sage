@@ -110,6 +110,7 @@ def _register_signal_handlers() -> None:
 # Valid collection name pattern (alphanumeric + underscore)
 COLLECTION_NAME_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
 
+
 def _kill_zombie_postgres_processes() -> None:
     """
     Kill any zombie postgres processes that might hold locks on pgdata.
