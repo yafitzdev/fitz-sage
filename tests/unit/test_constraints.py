@@ -18,11 +18,12 @@ import pytest
 pytestmark = pytest.mark.tier1
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.core.governance import AnswerGovernor
 from fitz_ai.core.guardrails import (
     ConflictAwareConstraint,
     ConstraintResult,
     SemanticMatcher,
-    apply_constraints,
+    run_constraints,
 )
 
 from .mock_embedder import create_deterministic_embedder
@@ -208,16 +209,16 @@ class TestConflictAwareConstraint:
 # =============================================================================
 
 
-class TestApplyConstraints:
+class TestRunConstraints:
     """Test the constraint runner."""
 
-    def test_no_constraints_allows(self):
-        """Should allow when no constraints configured."""
-        result = apply_constraints("query", [], [])
-        assert result.allow_decisive_answer is True
+    def test_no_constraints_returns_empty(self):
+        """Should return empty list when no constraints configured."""
+        results = run_constraints("query", [], [])
+        assert results == []
 
     def test_single_constraint_deny(self, semantic_matcher):
-        """Should deny when single constraint denies."""
+        """Should preserve denial signal when single constraint denies."""
         constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher)
 
         chunks = [
@@ -225,12 +226,15 @@ class TestApplyConstraints:
             make_chunk("2", "This is an operational incident from misconfiguration."),
         ]
 
-        result = apply_constraints("What type?", chunks, [constraint])
+        results = run_constraints("What type?", chunks, [constraint])
+        governor = AnswerGovernor()
+        decision = governor.decide(results)
 
-        assert result.allow_decisive_answer is False
+        assert decision.mode.value in ("disputed", "qualified", "abstain")
+        assert not decision.is_confident
 
     def test_multiple_constraints_any_deny(self):
-        """Should deny if any constraint denies."""
+        """Should preserve all signals when multiple constraints deny."""
 
         class AlwaysAllowConstraint:
             name = "always_allow"
@@ -246,10 +250,12 @@ class TestApplyConstraints:
 
         constraints = [AlwaysAllowConstraint(), AlwaysDenyConstraint()]
 
-        result = apply_constraints("query", [], constraints)
+        results = run_constraints("query", [], constraints)
+        governor = AnswerGovernor()
+        decision = governor.decide(results)
 
-        assert result.allow_decisive_answer is False
-        assert "test denial" in result.reason
+        assert not decision.is_confident
+        assert "test denial" in decision.reasons
 
     def test_constraint_exception_continues(self):
         """Should continue if a constraint raises an exception."""
@@ -269,9 +275,11 @@ class TestApplyConstraints:
         constraints = [CrashingConstraint(), WorkingConstraint()]
 
         # Should not raise, should allow (fail-safe)
-        result = apply_constraints("query", [], constraints)
+        results = run_constraints("query", [], constraints)
+        governor = AnswerGovernor()
+        decision = governor.decide(results)
 
-        assert result.allow_decisive_answer is True
+        assert decision.is_confident
 
 
 # =============================================================================

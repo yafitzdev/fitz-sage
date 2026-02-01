@@ -21,8 +21,9 @@ Usage:
         ConstraintPlugin,
         SemanticMatcher,
         create_default_constraints,
-        apply_constraints,
+        run_constraints,
     )
+    from fitz_ai.core.governance import AnswerGovernor
 
     # Create semantic matcher with your embedder
     matcher = SemanticMatcher(embedder=my_embedder.embed)
@@ -30,8 +31,9 @@ Usage:
     # Get default constraints
     constraints = create_default_constraints(matcher)
 
-    # Apply to query + chunks
-    result = apply_constraints(query, chunks, constraints)
+    # Run constraints and get governance decision
+    results = run_constraints(query, chunks, constraints)
+    decision = AnswerGovernor().decide(results)
 """
 
 from __future__ import annotations
@@ -42,7 +44,7 @@ from .base import ConstraintPlugin, ConstraintResult
 from .plugins.causal_attribution import CausalAttributionConstraint
 from .plugins.conflict_aware import ConflictAwareConstraint
 from .plugins.insufficient_evidence import InsufficientEvidenceConstraint
-from .runner import apply_constraints
+from .runner import run_constraints
 from .semantic import SemanticMatcher
 
 if TYPE_CHECKING:
@@ -100,7 +102,7 @@ __all__ = [
     "InsufficientEvidenceConstraint",
     "CausalAttributionConstraint",
     # Functions
-    "apply_constraints",
+    "run_constraints",
     "create_default_constraints",
     "create_semantic_matcher",
 ]

@@ -10,12 +10,13 @@ from __future__ import annotations
 from typing import Sequence
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.core.answer_mode_resolver import resolve_answer_mode
+from fitz_ai.core.governance import AnswerGovernor, GovernanceDecision
 from fitz_ai.core.guardrails import (
     ConstraintPlugin,
     ConstraintResult,
     SemanticMatcher,
     create_default_constraints,
+    run_constraints,
 )
 from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 from fitz_ai.engines.fitz_rag.exceptions import (
@@ -252,12 +253,19 @@ class RAGPipeline:
                 )
             raw_chunks = filtered_chunks
 
-        # Step 2: Apply constraints
-        constraint_results = self._apply_all_constraints(query, raw_chunks)
+        # Step 2: Run constraints (preserves individual results)
+        constraint_results = run_constraints(query, raw_chunks, self.constraints)
 
-        # Step 3: Resolve answer mode from constraint signals
-        answer_mode = resolve_answer_mode(constraint_results)
-        logger.info(f"{PIPELINE} Answer mode resolved: {answer_mode.value}")
+        # Step 3: Governance decision (resolves mode from signals)
+        governor = AnswerGovernor()
+        governance = governor.decide(constraint_results)
+        logger.info(
+            f"{PIPELINE} Governance decision: mode={governance.mode.value}, "
+            f"triggered={governance.triggered_constraints}"
+        )
+
+        # Use governance.mode for downstream processing
+        answer_mode = governance.mode
 
         # Step 4: Process context (dedupe, group, merge, pack)
         chunks = self._wrap_step("Context processing", self.context.process, raw_chunks)
@@ -282,6 +290,14 @@ class RAGPipeline:
         # Step 7: Structure the answer with mode
         def _build_answer():
             answer = self.rgs.build_answer(raw, chunks, mode=answer_mode)
+
+            # Include governance explanation in metadata when not confident
+            if governance.user_explanation:
+                answer.metadata["governance_explanation"] = governance.user_explanation
+                answer.metadata["triggered_constraints"] = list(
+                    governance.triggered_constraints
+                )
+
             logger.info(f"{PIPELINE} Pipeline run completed (mode={answer_mode.value})")
 
             # Step 8: Store in cloud cache
@@ -291,25 +307,6 @@ class RAGPipeline:
             return answer
 
         return self._wrap_step("Build RGS answer", _build_answer, error_class=RGSGenerationError)
-
-    def _apply_all_constraints(
-        self,
-        query: str,
-        chunks,
-    ) -> list[ConstraintResult]:
-        """Apply all constraints and return individual results."""
-        results: list[ConstraintResult] = []
-
-        for constraint in self.constraints:
-            try:
-                result = constraint.apply(query, chunks)
-                results.append(result)
-            except Exception as e:
-                logger.warning(f"{PIPELINE} Constraint '{constraint.name}' raised exception: {e}")
-                # Fail-safe: continue without this constraint's result
-                continue
-
-        return results
 
     def _handle_structured_prefetch(self, query: str) -> None:
         """

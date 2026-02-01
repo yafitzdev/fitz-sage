@@ -1,17 +1,17 @@
-# tests/core/test_answer_mode.py
+# tests/unit/test_answer_mode.py
 """
 Tests for the AnswerMode system.
 
 These tests verify:
 1. AnswerMode enum values
-2. AnswerModeResolver logic
+2. AnswerGovernor decision logic
 3. Mode instruction mapping
 """
 
 from __future__ import annotations
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.core.answer_mode_resolver import resolve_answer_mode
+from fitz_ai.core.governance import AnswerGovernor
 from fitz_ai.core.guardrails import ConstraintResult
 from fitz_ai.engines.fitz_rag.generation.answer_mode.instructions import (
     MODE_INSTRUCTIONS,
@@ -40,61 +40,92 @@ class TestAnswerModeEnum:
 
 
 # =============================================================================
-# Tests: AnswerModeResolver
+# Tests: AnswerGovernor
 # =============================================================================
 
 
-class TestAnswerModeResolver:
-    """Test the answer mode resolution logic."""
+class TestAnswerGovernor:
+    """Test the answer mode resolution logic via AnswerGovernor."""
 
     def test_empty_results_returns_confident(self):
         """Should return CONFIDENT when no constraint results."""
-        mode = resolve_answer_mode([])
-        assert mode == AnswerMode.CONFIDENT
+        governor = AnswerGovernor()
+        decision = governor.decide([])
+        assert decision.mode == AnswerMode.CONFIDENT
 
     def test_all_allowed_returns_confident(self):
         """Should return CONFIDENT when all constraints allow."""
+        governor = AnswerGovernor()
         results = [
             ConstraintResult.allow(),
             ConstraintResult.allow(),
         ]
-        mode = resolve_answer_mode(results)
-        assert mode == AnswerMode.CONFIDENT
+        decision = governor.decide(results)
+        assert decision.mode == AnswerMode.CONFIDENT
 
     def test_abstain_signal_returns_abstain(self):
         """Should return ABSTAIN when abstain signal present."""
+        governor = AnswerGovernor()
         results = [
             ConstraintResult.allow(),
-            ConstraintResult.deny("No evidence", signal="abstain"),
+            ConstraintResult(
+                allow_decisive_answer=False,
+                reason="No evidence",
+                signal="abstain",
+                metadata={"constraint_name": "insufficient_evidence"},
+            ),
         ]
-        mode = resolve_answer_mode(results)
-        assert mode == AnswerMode.ABSTAIN
+        decision = governor.decide(results)
+        assert decision.mode == AnswerMode.ABSTAIN
 
     def test_disputed_signal_returns_disputed(self):
         """Should return DISPUTED when disputed signal present."""
+        governor = AnswerGovernor()
         results = [
             ConstraintResult.allow(),
-            ConstraintResult.deny("Conflicting sources", signal="disputed"),
+            ConstraintResult(
+                allow_decisive_answer=False,
+                reason="Conflicting sources",
+                signal="disputed",
+                metadata={"constraint_name": "conflict_aware"},
+            ),
         ]
-        mode = resolve_answer_mode(results)
-        assert mode == AnswerMode.DISPUTED
+        decision = governor.decide(results)
+        assert decision.mode == AnswerMode.DISPUTED
 
     def test_abstain_takes_priority_over_disputed(self):
         """ABSTAIN should take priority over DISPUTED."""
+        governor = AnswerGovernor()
         results = [
-            ConstraintResult.deny("Conflict", signal="disputed"),
-            ConstraintResult.deny("No evidence", signal="abstain"),
+            ConstraintResult(
+                allow_decisive_answer=False,
+                reason="Conflict",
+                signal="disputed",
+                metadata={"constraint_name": "conflict_aware"},
+            ),
+            ConstraintResult(
+                allow_decisive_answer=False,
+                reason="No evidence",
+                signal="abstain",
+                metadata={"constraint_name": "insufficient_evidence"},
+            ),
         ]
-        mode = resolve_answer_mode(results)
-        assert mode == AnswerMode.ABSTAIN
+        decision = governor.decide(results)
+        assert decision.mode == AnswerMode.ABSTAIN
 
     def test_denial_without_signal_returns_qualified(self):
         """Should return QUALIFIED when denied without signal."""
+        governor = AnswerGovernor()
         results = [
-            ConstraintResult.deny("Some issue"),  # No signal
+            ConstraintResult(
+                allow_decisive_answer=False,
+                reason="Some issue",
+                signal=None,
+                metadata={"constraint_name": "custom"},
+            ),
         ]
-        mode = resolve_answer_mode(results)
-        assert mode == AnswerMode.QUALIFIED
+        decision = governor.decide(results)
+        assert decision.mode == AnswerMode.QUALIFIED
 
 
 # =============================================================================
@@ -135,32 +166,49 @@ class TestConstraintToModeIntegration:
 
     def test_conflict_constraint_produces_disputed(self):
         """ConflictAwareConstraint denial should produce DISPUTED mode."""
+        governor = AnswerGovernor()
         # Simulate what ConflictAwareConstraint returns
-        result = ConstraintResult.deny(
+        result = ConstraintResult(
+            allow_decisive_answer=False,
             reason="Conflicting classifications detected",
             signal="disputed",
+            metadata={"constraint_name": "conflict_aware"},
         )
 
-        mode = resolve_answer_mode([result])
-        assert mode == AnswerMode.DISPUTED
+        decision = governor.decide([result])
+        assert decision.mode == AnswerMode.DISPUTED
 
     def test_insufficient_evidence_produces_abstain(self):
         """InsufficientEvidenceConstraint denial should produce ABSTAIN mode."""
+        governor = AnswerGovernor()
         # Simulate what InsufficientEvidenceConstraint returns
-        result = ConstraintResult.deny(
+        result = ConstraintResult(
+            allow_decisive_answer=False,
             reason="No explicit causal evidence found",
             signal="abstain",
+            metadata={"constraint_name": "insufficient_evidence"},
         )
 
-        mode = resolve_answer_mode([result])
-        assert mode == AnswerMode.ABSTAIN
+        decision = governor.decide([result])
+        assert decision.mode == AnswerMode.ABSTAIN
 
     def test_both_constraints_deny_abstain_wins(self):
         """When both constraints deny, ABSTAIN should take priority."""
+        governor = AnswerGovernor()
         results = [
-            ConstraintResult.deny("Conflict", signal="disputed"),
-            ConstraintResult.deny("No evidence", signal="abstain"),
+            ConstraintResult(
+                allow_decisive_answer=False,
+                reason="Conflict",
+                signal="disputed",
+                metadata={"constraint_name": "conflict_aware"},
+            ),
+            ConstraintResult(
+                allow_decisive_answer=False,
+                reason="No evidence",
+                signal="abstain",
+                metadata={"constraint_name": "insufficient_evidence"},
+            ),
         ]
 
-        mode = resolve_answer_mode(results)
-        assert mode == AnswerMode.ABSTAIN
+        decision = governor.decide(results)
+        assert decision.mode == AnswerMode.ABSTAIN
