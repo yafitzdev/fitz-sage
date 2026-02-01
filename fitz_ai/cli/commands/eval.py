@@ -366,7 +366,8 @@ def _get_engine(collection: str):
     from fitz_ai.engines.fitz_rag.engine import FitzRagEngine
 
     config = load_engine_config("fitz_rag")
-    config.vector_db_kwargs["collection"] = collection
+    # Override collection in config (collection is a top-level field now)
+    config.collection = collection
     return FitzRagEngine(config)
 
 
