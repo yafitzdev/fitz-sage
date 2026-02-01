@@ -87,6 +87,8 @@ jobs:
           pip install tenacity circuitbreaker
           # Property testing
           pip install hypothesis
+          # Embedded postgres for storage tests
+          pip install fitz-pgserver psycopg psycopg-pool
           # Install package in editable mode without dependencies (they're already installed above)
           pip install -e . --no-deps
 
@@ -161,6 +163,8 @@ jobs:
           pip install tenacity circuitbreaker
           # Property testing
           pip install hypothesis
+          # Embedded postgres for storage tests
+          pip install fitz-pgserver psycopg psycopg-pool
           pip install -e . --no-deps
 
       - name: Run tests with coverage
