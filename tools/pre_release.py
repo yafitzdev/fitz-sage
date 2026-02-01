@@ -132,38 +132,55 @@ def main() -> int:
         else:
             print(f"  OK: {desc}")
 
-    # Step 4: Run a quick subset of tests
-    step("4. Quick Test (non-postgres unit tests)")
+    # Step 4: Run a quick subset of tests (actually run them, not just collect)
+    step("4. Quick Test Subset")
     result = run(
         [
             "python",
             "-m",
             "pytest",
-            "tests/unit/",
+            "tests/unit/llm/",  # LLM tests (use patch() which catches missing deps)
+            "tests/unit/property/",  # Property tests (use hypothesis)
             "-v",
-            "--tb=short",
+            "--tb=line",
             "-x",  # Stop on first failure
-            "-q",  # Quiet
-            "--ignore=tests/unit/test_postgres_recovery.py",
+            "-q",
             "-m",
             "not postgres and not slow",
-            "--co",
-            "-q",  # Just collect, don't run (fast check)
+            "--ignore=tests/unit/llm/test_auth_adapters.py",  # Skip slow/complex tests
         ],
         check=False,
     )
+    output = result.stdout + result.stderr
     if result.returncode != 0:
-        if "ModuleNotFoundError" in result.stderr or "ImportError" in result.stderr:
-            errors.append("Test collection failed: missing dependency")
-            print("  FAIL: Test collection failed due to missing dependency")
-            # Find the missing module
-            for line in result.stderr.split("\n"):
-                if "ModuleNotFoundError" in line or "No module named" in line:
-                    print(f"        {line.strip()}")
+        if "ModuleNotFoundError" in output or "No module named" in output:
+            # Extract missing module names
+            missing_modules = set()
+            for line in output.split("\n"):
+                if "No module named" in line:
+                    # Extract module name from various formats
+                    parts = line.split("No module named")[-1]
+                    mod = parts.strip().strip("'\"").split("'")[0].split(".")[0]
+                    if mod:
+                        missing_modules.add(mod)
+
+            for mod in missing_modules:
+                mod_normalized = mod.lower().replace("-", "_")
+                if mod_normalized in ci_deps:
+                    print(f"  WARN: {mod} missing locally but IS in CI deps (OK for CI)")
+                else:
+                    errors.append(f"Missing dep: {mod}")
+                    print(f"  FAIL: '{mod}' not installed AND not in CI deps")
+                    print(f"        → Add 'pip install {mod}' to .github/workflows/ci.yml")
         else:
-            print("  OK: Tests can be collected")
+            errors.append("Tests failed")
+            print("  FAIL: Some tests failed")
+            # Show last few lines
+            lines = output.strip().split("\n")
+            for line in lines[-10:]:
+                print(f"        {line}")
     else:
-        print("  OK: Tests can be collected")
+        print("  OK: Quick tests passed")
 
     # Summary
     step("SUMMARY")

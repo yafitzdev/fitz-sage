@@ -3,6 +3,7 @@
 LLM provider implementations.
 
 Each provider wraps an official SDK or HTTP client for a specific LLM service.
+All providers are optional - install the SDK you need.
 """
 
 from fitz_ai.llm.providers.base import (
@@ -14,8 +15,6 @@ from fitz_ai.llm.providers.base import (
     StreamingChatProvider,
     VisionProvider,
 )
-from fitz_ai.llm.providers.cohere import CohereChat, CohereEmbedding, CohereRerank
-from fitz_ai.llm.providers.ollama import OllamaChat, OllamaEmbedding
 
 __all__ = [
     # Protocols
@@ -27,14 +26,27 @@ __all__ = [
     # Types
     "ModelTier",
     "RerankResult",
-    # Cohere
-    "CohereChat",
-    "CohereEmbedding",
-    "CohereRerank",
-    # Ollama
-    "OllamaChat",
-    "OllamaEmbedding",
 ]
+
+# Optional: Cohere (requires cohere package)
+try:
+    from fitz_ai.llm.providers.cohere import (  # noqa: F401
+        CohereChat,
+        CohereEmbedding,
+        CohereRerank,
+    )
+
+    __all__.extend(["CohereChat", "CohereEmbedding", "CohereRerank"])
+except ImportError:
+    pass
+
+# Optional: Ollama (requires ollama package)
+try:
+    from fitz_ai.llm.providers.ollama import OllamaChat, OllamaEmbedding  # noqa: F401
+
+    __all__.extend(["OllamaChat", "OllamaEmbedding"])
+except ImportError:
+    pass
 
 # Optional: OpenAI (requires openai package)
 try:

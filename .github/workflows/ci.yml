@@ -85,6 +85,8 @@ jobs:
           pip install cryptography
           # Auth resilience (lightweight, needed for M2M auth)
           pip install tenacity circuitbreaker
+          # Property testing
+          pip install hypothesis
           # Install package in editable mode without dependencies (they're already installed above)
           pip install -e . --no-deps
 
@@ -157,6 +159,8 @@ jobs:
           pip install cryptography
           # Auth resilience (lightweight, needed for M2M auth)
           pip install tenacity circuitbreaker
+          # Property testing
+          pip install hypothesis
           pip install -e . --no-deps
 
       - name: Run tests with coverage
