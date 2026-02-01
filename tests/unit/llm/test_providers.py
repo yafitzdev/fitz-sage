@@ -5,6 +5,8 @@ Unit tests for LLM provider implementations.
 
 from __future__ import annotations
 
+# Check for optional SDK dependencies
+import importlib.util
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -23,25 +25,18 @@ from fitz_ai.llm.providers import (
     VisionProvider,
 )
 
-# Check for optional SDK dependencies
-try:
-    import openai
-
-    HAS_OPENAI = True
+HAS_OPENAI = importlib.util.find_spec("openai") is not None
+if HAS_OPENAI:
     from fitz_ai.llm.providers import OpenAIChat, OpenAIEmbedding, OpenAIVision
-except ImportError:
-    HAS_OPENAI = False
+else:
     OpenAIChat = None  # type: ignore[misc, assignment]
     OpenAIEmbedding = None  # type: ignore[misc, assignment]
     OpenAIVision = None  # type: ignore[misc, assignment]
 
-try:
-    import anthropic
-
-    HAS_ANTHROPIC = True
+HAS_ANTHROPIC = importlib.util.find_spec("anthropic") is not None
+if HAS_ANTHROPIC:
     from fitz_ai.llm.providers import AnthropicChat, AnthropicVision
-except ImportError:
-    HAS_ANTHROPIC = False
+else:
     AnthropicChat = None  # type: ignore[misc, assignment]
     AnthropicVision = None  # type: ignore[misc, assignment]
 

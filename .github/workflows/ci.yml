@@ -83,6 +83,8 @@ jobs:
           pip install numpy faiss-cpu
           # Cloud module encryption
           pip install cryptography
+          # Auth resilience (lightweight, needed for M2M auth)
+          pip install tenacity circuitbreaker
           # Install package in editable mode without dependencies (they're already installed above)
           pip install -e . --no-deps
 
@@ -113,6 +115,8 @@ jobs:
         run: |
           # Install minimal core dependencies (skip heavy ML deps)
           pip install pydantic pyyaml httpx typing-extensions typer jinja2
+          # Auth resilience (lightweight, needed for M2M auth)
+          pip install tenacity circuitbreaker
           pip install -e . --no-deps
 
       - name: Check core imports work
@@ -151,6 +155,8 @@ jobs:
           pip install numpy faiss-cpu
           # Cloud module encryption
           pip install cryptography
+          # Auth resilience (lightweight, needed for M2M auth)
+          pip install tenacity circuitbreaker
           pip install -e . --no-deps
 
       - name: Run tests with coverage

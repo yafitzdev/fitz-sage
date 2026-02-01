@@ -135,19 +135,10 @@ class TestGetVision:
 
 
 # Skip OpenAI/Anthropic tests if SDKs not installed
-try:
-    import openai
+import importlib.util
 
-    HAS_OPENAI = True
-except ImportError:
-    HAS_OPENAI = False
-
-try:
-    import anthropic
-
-    HAS_ANTHROPIC = True
-except ImportError:
-    HAS_ANTHROPIC = False
+HAS_OPENAI = importlib.util.find_spec("openai") is not None
+HAS_ANTHROPIC = importlib.util.find_spec("anthropic") is not None
 
 
 @pytest.mark.skipif(not HAS_OPENAI, reason="openai not installed")

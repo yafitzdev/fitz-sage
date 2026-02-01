@@ -38,7 +38,11 @@ __all__ = [
 
 # Optional: OpenAI (requires openai package)
 try:
-    from fitz_ai.llm.providers.openai import OpenAIChat, OpenAIEmbedding, OpenAIVision
+    from fitz_ai.llm.providers.openai import (  # noqa: F401
+        OpenAIChat,
+        OpenAIEmbedding,
+        OpenAIVision,
+    )
 
     __all__.extend(["OpenAIChat", "OpenAIEmbedding", "OpenAIVision"])
 except ImportError:
@@ -46,7 +50,10 @@ except ImportError:
 
 # Optional: Anthropic (requires anthropic package)
 try:
-    from fitz_ai.llm.providers.anthropic import AnthropicChat, AnthropicVision
+    from fitz_ai.llm.providers.anthropic import (  # noqa: F401
+        AnthropicChat,
+        AnthropicVision,
+    )
 
     __all__.extend(["AnthropicChat", "AnthropicVision"])
 except ImportError:
