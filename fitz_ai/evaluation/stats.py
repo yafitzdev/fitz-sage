@@ -225,7 +225,8 @@ class GovernanceStats:
         Find queries that changed mode over time.
 
         Detects behavioral changes by comparing the most recent decision
-        for each query hash with its previous decision.
+        for each query hash with its previous decision. Includes pipeline
+        versions to help identify which changes caused regressions.
 
         Args:
             since: Only consider decisions after this time
@@ -244,6 +245,7 @@ class GovernanceStats:
             since = now - timedelta(days=30)  # Default 30 days
 
         # Find queries with multiple decisions that changed mode
+        # Include pipeline_version for regression tracking
         sql = """
             WITH ranked AS (
                 SELECT
@@ -251,6 +253,7 @@ class GovernanceStats:
                     query_text,
                     mode,
                     timestamp,
+                    pipeline_version,
                     ROW_NUMBER() OVER (PARTITION BY query_hash ORDER BY timestamp DESC) as rn
                 FROM governance_logs
                 WHERE timestamp >= %s
@@ -261,8 +264,10 @@ class GovernanceStats:
                     r1.query_text,
                     r1.mode as new_mode,
                     r1.timestamp as new_timestamp,
+                    r1.pipeline_version as new_version,
                     r2.mode as old_mode,
-                    r2.timestamp as old_timestamp
+                    r2.timestamp as old_timestamp,
+                    r2.pipeline_version as old_version
                 FROM ranked r1
                 JOIN ranked r2 ON r1.query_hash = r2.query_hash AND r2.rn = 2
                 WHERE r1.rn = 1 AND r1.mode != r2.mode
@@ -273,7 +278,9 @@ class GovernanceStats:
                 old_mode,
                 new_mode,
                 old_timestamp,
-                new_timestamp
+                new_timestamp,
+                old_version,
+                new_version
             FROM current_and_previous
             ORDER BY new_timestamp DESC
         """
@@ -290,6 +297,8 @@ class GovernanceStats:
                 new_mode=row[3],
                 old_timestamp=row[4],
                 new_timestamp=row[5],
+                old_version=row[6],
+                new_version=row[7],
             )
             for row in rows
         ]

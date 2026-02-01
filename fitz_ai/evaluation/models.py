@@ -110,6 +110,8 @@ class GovernanceFlip:
         new_mode: Current governance mode
         old_timestamp: When the previous decision was made
         new_timestamp: When the new decision was made
+        old_version: Pipeline version of the old decision (for tracking)
+        new_version: Pipeline version of the new decision (for tracking)
     """
 
     query_hash: str
@@ -118,6 +120,8 @@ class GovernanceFlip:
     new_mode: str
     old_timestamp: datetime
     new_timestamp: datetime
+    old_version: str | None = None
+    new_version: str | None = None
 
     @property
     def is_regression(self) -> bool:
@@ -160,6 +164,8 @@ class GovernanceFlip:
             "new_mode": self.new_mode,
             "old_timestamp": self.old_timestamp.isoformat(),
             "new_timestamp": self.new_timestamp.isoformat(),
+            "old_version": self.old_version,
+            "new_version": self.new_version,
             "is_regression": self.is_regression,
             "is_improvement": self.is_improvement,
         }

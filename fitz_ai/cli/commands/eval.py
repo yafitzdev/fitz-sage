@@ -245,15 +245,22 @@ def _display_flips_rich(flips) -> None:
         table = Table(title="⚠️  Regressions", show_header=True, header_style="bold red")
         table.add_column("Query", style="dim", max_width=40)
         table.add_column("Change", style="red")
+        table.add_column("Version", style="dim")
         table.add_column("When")
 
         for flip in regressions[:10]:  # Limit to 10
             query_preview = (
                 flip.query_text[:37] + "..." if flip.query_text else flip.query_hash[:10]
             )
+            version_change = ""
+            if flip.old_version or flip.new_version:
+                old_v = flip.old_version or "?"
+                new_v = flip.new_version or "?"
+                version_change = f"{old_v} → {new_v}"
             table.add_row(
                 query_preview,
                 f"{flip.old_mode} → {flip.new_mode}",
+                version_change,
                 flip.new_timestamp.strftime("%Y-%m-%d %H:%M"),
             )
 
@@ -264,15 +271,22 @@ def _display_flips_rich(flips) -> None:
         table = Table(title="✓ Improvements", show_header=True, header_style="bold green")
         table.add_column("Query", style="dim", max_width=40)
         table.add_column("Change", style="green")
+        table.add_column("Version", style="dim")
         table.add_column("When")
 
         for flip in improvements[:10]:
             query_preview = (
                 flip.query_text[:37] + "..." if flip.query_text else flip.query_hash[:10]
             )
+            version_change = ""
+            if flip.old_version or flip.new_version:
+                old_v = flip.old_version or "?"
+                new_v = flip.new_version or "?"
+                version_change = f"{old_v} → {new_v}"
             table.add_row(
                 query_preview,
                 f"{flip.old_mode} → {flip.new_mode}",
+                version_change,
                 flip.new_timestamp.strftime("%Y-%m-%d %H:%M"),
             )
 
@@ -316,7 +330,10 @@ def _display_plain(distribution, constraints, flips, verbose: bool) -> None:
                 query_preview = (
                     flip.query_text[:30] + "..." if flip.query_text else flip.query_hash[:10]
                 )
-                print(f"  {query_preview}: {flip.old_mode} -> {flip.new_mode}")
+                version_info = ""
+                if flip.old_version or flip.new_version:
+                    version_info = f" [v{flip.old_version or '?'} -> v{flip.new_version or '?'}]"
+                print(f"  {query_preview}: {flip.old_mode} -> {flip.new_mode}{version_info}")
 
         if improvements:
             print()
@@ -326,7 +343,10 @@ def _display_plain(distribution, constraints, flips, verbose: bool) -> None:
                 query_preview = (
                     flip.query_text[:30] + "..." if flip.query_text else flip.query_hash[:10]
                 )
-                print(f"  {query_preview}: {flip.old_mode} -> {flip.new_mode}")
+                version_info = ""
+                if flip.old_version or flip.new_version:
+                    version_info = f" [v{flip.old_version or '?'} -> v{flip.new_version or '?'}]"
+                print(f"  {query_preview}: {flip.old_mode} -> {flip.new_mode}{version_info}")
 
 
 # Export for main CLI

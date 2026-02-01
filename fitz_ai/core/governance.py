@@ -38,6 +38,7 @@ class GovernanceLog:
     Attributes:
         timestamp: When the decision was made (UTC)
         query_hash: SHA256 of normalized query for deduplication
+        query_text: Original query text (stored for debugging, not used in hash)
         mode: The resolved AnswerMode value
         triggered_constraints: Names of constraints that denied decisive answers
         signals: Raw signal strings from constraints (abstain, disputed, etc.)
@@ -50,6 +51,7 @@ class GovernanceLog:
 
     timestamp: datetime
     query_hash: str
+    query_text: str | None
     mode: str
     triggered_constraints: tuple[str, ...]
     signals: tuple[str, ...]
@@ -64,6 +66,7 @@ class GovernanceLog:
         return {
             "timestamp": self.timestamp.isoformat(),
             "query_hash": self.query_hash,
+            "query_text": self.query_text,
             "mode": self.mode,
             "triggered_constraints": list(self.triggered_constraints),
             "signals": list(self.signals),
@@ -79,6 +82,7 @@ class GovernanceLog:
         cls,
         decision: "GovernanceDecision",
         query_hash: str,
+        query_text: str | None,
         chunk_count: int,
         collection: str,
         latency_ms: float | None = None,
@@ -90,6 +94,7 @@ class GovernanceLog:
         Args:
             decision: The governance decision to log
             query_hash: Pre-computed hash of the query
+            query_text: Original query text (for debugging)
             chunk_count: Number of chunks available for the decision
             collection: Collection being queried
             latency_ms: Time to make governance decision
@@ -101,6 +106,7 @@ class GovernanceLog:
         return cls(
             timestamp=datetime.now(timezone.utc),
             query_hash=query_hash,
+            query_text=query_text,
             mode=decision.mode.value,
             triggered_constraints=decision.triggered_constraints,
             signals=tuple(decision.signals),
