@@ -98,7 +98,14 @@ jobs:
         run: |
           # Run non-postgres tests in parallel (fast)
           pytest tests/unit/ -v --tb=short -n auto -m "not postgres"
+
+      - name: Run postgres tests (Linux only)
+        if: runner.os == 'Linux'
+        env:
+          PYTHONUTF8: 1
+        run: |
           # Run postgres tests serially (pgserver can't handle parallel workers)
+          # Skip on Windows - initdb.exe fails on GitHub runners
           pytest tests/unit/ -v --tb=short -m "postgres"
 
   # ===========================================================================
