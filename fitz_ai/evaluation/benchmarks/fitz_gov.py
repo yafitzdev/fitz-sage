@@ -47,8 +47,12 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-# Path to bundled test data
-DATA_DIR = Path(__file__).parent.parent / "data" / "fitz_gov"
+# Default data directory (downloaded from GitHub)
+DATA_DIR = Path.home() / ".fitz" / "fitz_gov_data"
+
+# Default GitHub repo for FITZ-GOV benchmark data
+FITZ_GOV_REPO_URL = "https://github.com/yafitzdev/fitz-gov"
+FITZ_GOV_DATA_URL = f"{FITZ_GOV_REPO_URL}/releases/latest/download/fitz_gov_data.zip"
 
 
 class FitzGovCategory(str, Enum):
@@ -455,25 +459,79 @@ class FitzGovBenchmark:
     Example:
         benchmark = FitzGovBenchmark()
 
-        # Run full benchmark
+        # Run full benchmark (downloads data from GitHub if needed)
         results = benchmark.evaluate(engine)
 
         # Run specific category
         results = benchmark.evaluate(engine, categories=[FitzGovCategory.ABSTENTION])
-
-        # Generate new test cases from corpus
-        cases = benchmark.generate_test_cases(corpus_chunks)
     """
 
-    def __init__(self, data_dir: Path | str | None = None):
+    def __init__(
+        self,
+        data_dir: Path | str | None = None,
+        data_url: str | None = None,
+    ):
         """
         Initialize FITZ-GOV benchmark.
 
         Args:
             data_dir: Directory containing test case JSON files.
-                     Defaults to bundled test data.
+                     Defaults to ~/.fitz/fitz_gov_data/
+            data_url: URL to download benchmark data from.
+                     Defaults to FITZ-GOV GitHub releases.
         """
         self._data_dir = Path(data_dir) if data_dir else DATA_DIR
+        self._data_url = data_url or FITZ_GOV_DATA_URL
+
+    def download_data(self, force: bool = False) -> Path:
+        """
+        Download FITZ-GOV benchmark data from GitHub.
+
+        Args:
+            force: If True, re-download even if data exists.
+
+        Returns:
+            Path to data directory.
+        """
+        import shutil
+        import tempfile
+        import urllib.request
+        import zipfile
+
+        if self._data_dir.exists() and not force:
+            # Check if data looks valid (has at least one category dir)
+            category_dirs = ["abstention", "dispute", "qualification", "confidence"]
+            has_data = any((self._data_dir / cat).exists() for cat in category_dirs)
+            if has_data:
+                logger.info(f"FITZ-GOV data already exists at {self._data_dir}")
+                return self._data_dir
+
+        logger.info(f"Downloading FITZ-GOV benchmark data from {self._data_url}")
+        self._data_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            # Download zip to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+                urllib.request.urlretrieve(self._data_url, tmp.name)
+                tmp_path = Path(tmp.name)
+
+            # Extract to data directory
+            with zipfile.ZipFile(tmp_path, "r") as zf:
+                zf.extractall(self._data_dir)
+
+            # Clean up temp file
+            tmp_path.unlink()
+
+            logger.info(f"FITZ-GOV data downloaded to {self._data_dir}")
+            return self._data_dir
+
+        except Exception as e:
+            logger.error(f"Failed to download FITZ-GOV data: {e}")
+            raise RuntimeError(
+                f"Failed to download FITZ-GOV benchmark data from {self._data_url}. "
+                f"Please check your internet connection or manually download the data. "
+                f"Error: {e}"
+            ) from e
 
     def evaluate(
         self,
@@ -728,12 +786,16 @@ class FitzGovBenchmark:
         self,
         categories: list[FitzGovCategory] | None = None,
     ) -> list[FitzGovCase]:
-        """Load test cases from data directory."""
+        """Load test cases from data directory (downloads if needed)."""
         cases: list[FitzGovCase] = []
 
+        # Download data if not present
         if not self._data_dir.exists():
-            logger.warning(f"FITZ-GOV data directory not found: {self._data_dir}")
-            return cases
+            try:
+                self.download_data()
+            except RuntimeError as e:
+                logger.warning(f"Could not download FITZ-GOV data: {e}")
+                return cases
 
         # Map categories to directory names
         category_dirs = {
@@ -788,128 +850,3 @@ class FitzGovBenchmark:
     def get_available_categories() -> list[str]:
         """Get list of available categories."""
         return [c.value for c in FitzGovCategory]
-
-
-class FitzGovDatasetGenerator:
-    """
-    Generate FITZ-GOV test cases from an existing corpus.
-
-    Uses LLM to identify scenarios that should trigger different
-    governance modes, creating a custom test suite for your data.
-    """
-
-    def __init__(self, chat_client: Any):
-        """
-        Initialize generator.
-
-        Args:
-            chat_client: Chat client for LLM-based case generation
-        """
-        self._chat = chat_client
-
-    def generate_abstention_cases(
-        self,
-        chunks: list[Any],
-        num_cases: int = 10,
-    ) -> list[FitzGovCase]:
-        """
-        Generate abstention test cases.
-
-        Creates questions that the corpus cannot answer, paired with
-        chunks that are tangentially related but insufficient.
-        """
-        cases: list[FitzGovCase] = []
-
-        # Use LLM to generate out-of-scope questions based on corpus themes
-        prompt = f"""Given these document excerpts, generate {num_cases} questions that:
-1. Are related to the general topic
-2. Cannot be answered by the provided information
-3. Would require external knowledge
-
-Excerpts:
-{self._format_chunks(chunks[:5])}
-
-Return as JSON: {{"questions": ["q1", "q2", ...]}}"""
-
-        response = self._chat.complete(prompt)
-        questions = self._parse_json_response(response).get("questions", [])
-
-        for i, q in enumerate(questions[:num_cases]):
-            # Pair with random chunks that won't answer the question
-            contexts = [c.text for c in chunks[:3]]
-            cases.append(
-                FitzGovCase(
-                    id=f"gen_abstain_{i}",
-                    category=FitzGovCategory.ABSTENTION,
-                    subcategory="generated_out_of_scope",
-                    query=q,
-                    contexts=contexts,
-                    expected_mode=AnswerMode.ABSTAIN,
-                    description=f"Generated out-of-scope question: {q[:50]}...",
-                    rationale="Question cannot be answered from provided context",
-                )
-            )
-
-        return cases
-
-    def generate_dispute_cases(
-        self,
-        chunks: list[Any],
-        num_cases: int = 10,
-    ) -> list[FitzGovCase]:
-        """
-        Generate dispute test cases by finding or creating contradictions.
-        """
-        cases: list[FitzGovCase] = []
-
-        # Find pairs of chunks that might have conflicting info
-        prompt = f"""Analyze these document excerpts for potential contradictions or conflicting information.
-Generate {num_cases} questions where the excerpts provide conflicting answers.
-
-Excerpts:
-{self._format_chunks(chunks[:10])}
-
-Return as JSON: {{"cases": [{{"question": "...", "chunk_indices": [0, 3], "conflict": "..."}}]}}"""
-
-        response = self._chat.complete(prompt)
-        generated = self._parse_json_response(response).get("cases", [])
-
-        for i, case_data in enumerate(generated[:num_cases]):
-            indices = case_data.get("chunk_indices", [0, 1])
-            contexts = [chunks[idx].text for idx in indices if idx < len(chunks)]
-
-            cases.append(
-                FitzGovCase(
-                    id=f"gen_dispute_{i}",
-                    category=FitzGovCategory.DISPUTE,
-                    subcategory="generated_conflict",
-                    query=case_data["question"],
-                    contexts=contexts,
-                    expected_mode=AnswerMode.DISPUTED,
-                    description=f"Generated conflict case: {case_data.get('conflict', '')}",
-                    rationale="Sources provide conflicting information",
-                )
-            )
-
-        return cases
-
-    def _format_chunks(self, chunks: list[Any]) -> str:
-        """Format chunks for prompt."""
-        lines = []
-        for i, chunk in enumerate(chunks):
-            text = chunk.text if hasattr(chunk, "text") else str(chunk)
-            lines.append(f"[{i}] {text[:500]}...")
-        return "\n\n".join(lines)
-
-    def _parse_json_response(self, response: str) -> dict:
-        """Parse JSON from LLM response."""
-        try:
-            # Try to extract JSON from response
-            import re
-
-            match = re.search(r"\{.*\}", response, re.DOTALL)
-            if match:
-                return json.loads(match.group())
-        except Exception:
-            pass
-        return {}
