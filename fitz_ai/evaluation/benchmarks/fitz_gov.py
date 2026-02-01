@@ -500,9 +500,11 @@ class FitzGovBenchmark:
 
         if self._data_dir.exists() and not force:
             # Check if data looks valid (has at least one category dir)
+            # Check both flat structure and nested data/cases/ structure
             category_dirs = ["abstention", "dispute", "qualification", "confidence"]
-            has_data = any((self._data_dir / cat).exists() for cat in category_dirs)
-            if has_data:
+            has_flat = any((self._data_dir / cat).exists() for cat in category_dirs)
+            has_nested = any((self._data_dir / "data" / "cases" / cat).exists() for cat in category_dirs)
+            if has_flat or has_nested:
                 logger.info(f"FITZ-GOV data already exists at {self._data_dir}")
                 return self._data_dir
 
@@ -797,6 +799,12 @@ class FitzGovBenchmark:
                 logger.warning(f"Could not download FITZ-GOV data: {e}")
                 return cases
 
+        # Determine the cases root directory
+        # Support both flat structure (categories at root) and nested (data/cases/<category>)
+        cases_root = self._data_dir
+        if (self._data_dir / "data" / "cases").exists():
+            cases_root = self._data_dir / "data" / "cases"
+
         # Map categories to directory names
         category_dirs = {
             # Governance mode categories
@@ -812,13 +820,13 @@ class FitzGovBenchmark:
         target_categories = categories or list(FitzGovCategory)
 
         for cat in target_categories:
-            cat_dir = self._data_dir / category_dirs[cat]
+            cat_dir = cases_root / category_dirs[cat]
             if not cat_dir.exists():
                 continue
 
             for json_file in cat_dir.glob("*.json"):
                 try:
-                    with open(json_file) as f:
+                    with open(json_file, encoding="utf-8") as f:
                         data = json.load(f)
 
                     for case_data in data.get("cases", []):
