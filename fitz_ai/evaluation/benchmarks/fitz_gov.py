@@ -718,9 +718,12 @@ class FitzGovBenchmark:
         return True, None
 
     def _run_with_contexts(self, engine: FitzRagEngine, query, contexts: list[str]):
-        """Run engine with injected contexts."""
+        """Run engine with injected contexts (bypasses retrieval for controlled testing)."""
         from fitz_ai.core import Chunk
+        from fitz_ai.engines.fitz_rag.generation.constraints import run_constraints
+        from fitz_ai.engines.fitz_rag.generation.governance import AnswerGovernor
 
+        # Create chunks from injected contexts
         chunks = [
             Chunk(
                 id=f"fitz_gov_context_{i}",
@@ -732,9 +735,44 @@ class FitzGovBenchmark:
             for i, ctx in enumerate(contexts)
         ]
 
+        # Convert to dict format expected by pipeline internals
+        chunk_dicts = [
+            {"id": c.id, "content": c.content, "doc_id": c.doc_id, "metadata": c.metadata}
+            for c in chunks
+        ]
+
         pipeline = engine._pipeline
-        governance = pipeline._get_governance_decision(query.text, chunks)
-        answer = pipeline._generate_answer(query.text, chunks, governance)
+
+        # Step 1: Run constraints on injected chunks
+        constraint_results = run_constraints(query.text, chunk_dicts, pipeline.constraints)
+
+        # Step 2: Get governance decision
+        governor = AnswerGovernor()
+        governance = governor.decide(constraint_results)
+
+        # Step 3: Process context through context pipeline
+        processed_chunks = pipeline.context.process(chunk_dicts)
+
+        # Step 4: Build prompt with governance mode
+        prompt = pipeline.rgs.build_prompt(query.text, processed_chunks)
+        prompt = pipeline._apply_answer_mode_to_prompt(prompt, governance.mode)
+
+        # Step 5: Generate answer via LLM
+        messages = [
+            {"role": "system", "content": prompt.system},
+            {"role": "user", "content": prompt.user},
+        ]
+        chat_client = pipeline._select_chat_for_routing()
+        raw_response = chat_client.chat(messages)
+
+        # Step 6: Build structured answer
+        answer = pipeline.rgs.build_answer(raw_response, processed_chunks, mode=governance.mode)
+
+        # Include governance metadata
+        if governance.user_explanation:
+            answer.metadata["governance_explanation"] = governance.user_explanation
+            answer.metadata["triggered_constraints"] = list(governance.triggered_constraints)
+
         return answer
 
     def _get_answer_mode(self, answer) -> AnswerMode:
