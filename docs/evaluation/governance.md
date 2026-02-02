@@ -252,6 +252,22 @@ Adaptive mode mitigates by selecting method based on query type.
 
 Entity matching bypass threshold set at 0.85 similarity. Higher catches more wrong-entity cases but risks false abstentions on legitimate matches.
 
+### Hybrid Relevance Detection
+
+Approach 2 showed that enriched metadata (summaries) improved abstention to 57.5% but destroyed dispute detection. The current implementation uses a **hybrid approach**:
+
+- Embeddings check general semantic similarity
+- Summaries check specific topic match (only in ambiguous similarity range 0.45-0.75)
+- ConflictAware handles dispute detection separately
+
+This isolates the benefit of metadata for abstention without affecting dispute accuracy. To test with enriched chunks:
+
+```bash
+fitz eval fitz-gov --enrich --model ollama/qwen2.5:3b
+```
+
+Note: `--enrich` adds latency (LLM calls for enrichment) but better simulates production conditions where chunks are pre-enriched during ingestion.
+
 ---
 
 ## Known Failure Modes

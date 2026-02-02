@@ -629,10 +629,18 @@ def fitz_gov_benchmark(
     adaptive: Annotated[
         bool,
         typer.Option(
-            "--adaptive",
+            "--adaptive/--no-adaptive",
             help="Auto-select detection method: fusion for uncertainty queries, pairwise for factual.",
         ),
-    ] = False,
+    ] = True,
+    model: Annotated[
+        Optional[str],
+        typer.Option(
+            "--model",
+            "-m",
+            help="Override chat model for constraints. Format: provider or provider/model (e.g., ollama, ollama/qwen2.5:3b, cohere).",
+        ),
+    ] = None,
 ) -> None:
     """
     Run FITZ-GOV governance calibration benchmark.
@@ -649,6 +657,9 @@ def fitz_gov_benchmark(
 
         # Run full benchmark
         fitz eval fitz-gov
+
+        # Specify model for reproducible results
+        fitz eval fitz-gov --model ollama/qwen2.5:3b
 
         # Run specific categories
         fitz eval fitz-gov --category abstention --category dispute
@@ -671,6 +682,7 @@ def fitz_gov_benchmark(
         deterministic=deterministic,
         use_fusion=fusion,
         adaptive=adaptive,
+        model_override=model,
     )
 
     # Parse categories
@@ -685,6 +697,8 @@ def fitz_gov_benchmark(
 
     if not json_output:
         ui.header("FITZ-GOV Governance Benchmark")
+        if model:
+            ui.info(f"Model: {model}")
         if categories:
             ui.info(f"Categories: {', '.join(c.value for c in categories)}")
         print()

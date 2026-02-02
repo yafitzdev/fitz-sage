@@ -143,16 +143,15 @@ You can—but you'll hit walls fast.
 **Honest answers ✅** → [Governance Benchmark](docs/features/governance-benchmarking.md)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."*
 >
-> **Measured, not claimed:** Fitz scores **70.5%** on [FITZ-GOV](docs/features/governance-benchmarking.md), a benchmark for epistemic honesty—detecting when to abstain (55%), dispute (95%), or qualify (77.5%) answers.
+> **Measured, not claimed:** Fitz scores **70.5%** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty—detecting when to abstain (55%), dispute (95%), or qualify (77.5%) answers.
 
 **Queries that actually work 📊**
 > Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, AST-aware chunking for code, and SQL execution for tabular data. No configuration—it just works.
 
-**Tabular data that is actually searchable 📈**
-> CSV and table data is a nightmare in most RAG systems—chunked arbitrarily, structure lost, queries fail. Fitz stores tables natively in PostgreSQL alongside your vectors—[same database](docs/features/unified-storage.md), no sync issues. Auto-detects schema and runs real SQL. Ask "What's the average price by region?" and get an actual computed answer, not fragmented rows.
+**Tabular data that is actually searchable 📈** → [Unified Storage](docs/features/unified-storage.md)
+> CSV and table data is a nightmare in most RAG systems—chunked arbitrarily, structure lost, queries fail. Fitz stores tables natively in PostgreSQL alongside your vectors—same database, no sync issues. Auto-detects schema and runs real SQL. Ask "What's the average price by region?" and get an actual computed answer, not fragmented rows.
 
 **Other Features at a Glance 🃏**
->
 >1. [x] **Fully local execution possible.** Embedded PostgreSQL + Ollama, no API keys required to start.
 >2. [x] **Plugin-based architecture.** Swap LLMs, rerankers, and retrieval pipelines via YAML config.
 >3. [x] **Extensible engine system.** FitzRAG built-in, with a clean registry for adding custom engines.

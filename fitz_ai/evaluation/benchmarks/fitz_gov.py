@@ -96,7 +96,8 @@ class FitzGovBenchmark:
         enrich_chunks: bool = False,
         deterministic: bool = False,
         use_fusion: bool = False,
-        adaptive: bool = False,
+        adaptive: bool = True,
+        model_override: str | None = None,
     ):
         """
         Initialize FITZ-GOV benchmark.
@@ -120,6 +121,9 @@ class FitzGovBenchmark:
             adaptive: If True, auto-select detection method based on query type:
                      - Uncertainty/causal queries → Fusion (conservative)
                      - Factual queries → Standard pairwise (aggressive)
+            model_override: Override chat model for constraints. Format: provider or
+                          provider/model (e.g., "ollama", "ollama/qwen2.5:3b", "cohere").
+                          If None, uses the engine's configured model.
         """
         # Import fitz-gov (validates it's installed)
         fitz_gov = _import_fitz_gov()
@@ -133,8 +137,16 @@ class FitzGovBenchmark:
         self._deterministic = deterministic
         self._use_fusion = use_fusion
         self._adaptive = adaptive
+        self._model_override = model_override
         self._enricher = None
         self._embedder = None
+        self._chat_factory_override = None
+
+        # Create chat factory override if model specified
+        if model_override:
+            from fitz_ai.llm.factory import get_chat_factory
+
+            self._chat_factory_override = get_chat_factory(model_override)
 
         # Store fitz-gov module reference for lazy access
         self._fitz_gov = fitz_gov
@@ -245,6 +257,8 @@ class FitzGovBenchmark:
         result.metadata["deterministic"] = self._deterministic
         result.metadata["use_fusion"] = self._use_fusion
         result.metadata["adaptive"] = self._adaptive
+        if self._model_override:
+            result.metadata["model"] = self._model_override
 
         return result
 
@@ -313,7 +327,7 @@ class FitzGovBenchmark:
 
             constraints = create_deterministic_constraints(embedder=self._embedder)
             constraint_results = run_constraints(query.text, chunks, constraints)
-        elif self._use_fusion or self._adaptive:
+        elif self._use_fusion or self._adaptive or self._model_override:
             # Create constraints with fusion/adaptive mode for contradiction detection
             from fitz_ai.core.guardrails import (
                 CausalAttributionConstraint,
@@ -321,7 +335,11 @@ class FitzGovBenchmark:
                 InsufficientEvidenceConstraint,
             )
 
-            fast_chat = pipeline.chat_factory("fast")
+            # Use model override if specified, otherwise use engine's chat factory
+            if self._chat_factory_override:
+                fast_chat = self._chat_factory_override("fast")
+            else:
+                fast_chat = pipeline.chat_factory("fast")
             # Get embedder from pipeline for semantic relevance checking
             embedder = self._embedder if self._embedder else pipeline.embedder.embed
             constraints = [

@@ -201,36 +201,27 @@ def _is_uncertainty_query(query: str) -> tuple[bool, str]:
 def _has_causal_evidence(chunks: Sequence[Chunk]) -> bool:
     """Check if any chunk contains causal language using keywords.
 
-    Checks both raw content AND enriched summaries (summaries often
-    capture the 'why' more clearly than raw content).
+    Only checks raw content - NOT summaries. LLM-generated summaries often
+    use causal language in a meta way ("This describes X because...") which
+    creates false positives for evidence detection.
     """
     for chunk in chunks:
-        # Check raw content
         content = chunk.content.lower()
         if any(kw in content for kw in CAUSAL_EVIDENCE_KEYWORDS):
             return True
-
-        # Check enriched summary (often clearer signal)
-        summary = chunk.metadata.get("summary", "")
-        if summary:
-            summary_lower = summary.lower()
-            if any(kw in summary_lower for kw in CAUSAL_EVIDENCE_KEYWORDS):
-                return True
 
     return False
 
 
 def _has_predictive_evidence(chunks: Sequence[Chunk]) -> bool:
-    """Check if any chunk contains forward-looking/predictive language."""
+    """Check if any chunk contains forward-looking/predictive language.
+
+    Only checks raw content - NOT summaries (same rationale as causal evidence).
+    """
     for chunk in chunks:
         content = chunk.content.lower()
         if any(kw in content for kw in PREDICTIVE_EVIDENCE_KEYWORDS):
             return True
-
-        summary = chunk.metadata.get("summary", "")
-        if summary:
-            if any(kw in summary.lower() for kw in PREDICTIVE_EVIDENCE_KEYWORDS):
-                return True
 
     return False
 

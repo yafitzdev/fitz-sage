@@ -374,7 +374,17 @@ class InsufficientEvidenceConstraint:
         if specific_entities and not entity_match_found and max_sim < 0.85:
             return False, max_sim, f"missing_entity:{list(specific_entities)[:3]}"
 
-        # 4. If we have entity match OR no specific entities OR very high similarity, allow
+        # 4. ENRICHMENT BOOST: Use summaries for "same topic, wrong aspect" detection
+        # Only activates when chunks are enriched (have summaries)
+        # Only applies in ambiguous similarity range where embeddings aren't decisive
+        if 0.45 <= max_sim < 0.70:
+            has_summaries = any(chunk.metadata.get("summary") for chunk in chunks)
+            if has_summaries:
+                summary_match = _has_summary_overlap(query, chunks)
+                if not summary_match:
+                    return False, max_sim, "no_summary_overlap"
+
+        # 5. If we have entity match OR no specific entities OR very high similarity, allow
         return True, max_sim, "relevant"
 
     def apply(
