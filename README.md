@@ -205,7 +205,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 
 ---
 
-### Governance: Know What You Don't Know
+### Governance
 
 Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty.
 
