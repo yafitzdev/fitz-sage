@@ -735,23 +735,17 @@ class FitzGovBenchmark:
             for i, ctx in enumerate(contexts)
         ]
 
-        # Convert to dict format expected by pipeline internals
-        chunk_dicts = [
-            {"id": c.id, "content": c.content, "doc_id": c.doc_id, "metadata": c.metadata}
-            for c in chunks
-        ]
-
         pipeline = engine._pipeline
 
-        # Step 1: Run constraints on injected chunks
-        constraint_results = run_constraints(query.text, chunk_dicts, pipeline.constraints)
+        # Step 1: Run constraints on injected chunks (constraints expect Chunk objects)
+        constraint_results = run_constraints(query.text, chunks, pipeline.constraints)
 
         # Step 2: Get governance decision
         governor = AnswerGovernor()
         governance = governor.decide(constraint_results)
 
         # Step 3: Process context through context pipeline
-        processed_chunks = pipeline.context.process(chunk_dicts)
+        processed_chunks = pipeline.context.process(chunks)
 
         # Step 4: Build prompt with governance mode
         prompt = pipeline.rgs.build_prompt(query.text, processed_chunks)
