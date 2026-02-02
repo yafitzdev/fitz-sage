@@ -54,6 +54,40 @@ If unclear, answer UNCLEAR.
 
 Reply with ONLY one word: CONTRADICT, AGREE, or UNCLEAR"""
 
+# Fusion prompts - same question asked 3 different ways
+# Helps reduce variance through majority voting
+FUSION_PROMPTS = [
+    # Direct contradiction check
+    """Do these two texts CONTRADICT each other regarding the question?
+
+Question: {query}
+Text A: {text1}
+Text B: {text2}
+
+Answer CONTRADICT if they make opposite claims, AGREE if compatible, UNCLEAR if uncertain.
+Reply with ONE word: CONTRADICT, AGREE, or UNCLEAR""",
+
+    # Consistency framing (inverted)
+    """Are these two texts CONSISTENT with each other regarding the question?
+
+Question: {query}
+First text: {text1}
+Second text: {text2}
+
+Answer YES if they agree or are compatible, NO if they contradict, UNCLEAR if uncertain.
+Reply with ONE word: YES, NO, or UNCLEAR""",
+
+    # Logical compatibility framing
+    """If the first statement is true, could the second statement also be true?
+
+Question context: {query}
+Statement 1: {text1}
+Statement 2: {text2}
+
+Answer YES if both could be true, NO if they are mutually exclusive, UNCLEAR if uncertain.
+Reply with ONE word: YES, NO, or UNCLEAR""",
+]
+
 
 # Keywords that indicate user is asking for conflict resolution
 RESOLUTION_KEYWORDS = (
@@ -67,6 +101,22 @@ RESOLUTION_KEYWORDS = (
     "which is correct",
 )
 
+# Keywords that indicate uncertainty/causal queries (use conservative detection)
+UNCERTAINTY_QUERY_PATTERNS = (
+    "why ",
+    "why?",
+    "what caused",
+    "what led to",
+    "how come",
+    "what made",
+    "might",
+    "could",
+    "possibly",
+    "potentially",
+    "likely",
+    "unlikely",
+)
+
 
 def _is_resolution_query(query: str) -> bool:
     """Check if query is asking to resolve conflicts (keyword-based)."""
@@ -74,26 +124,39 @@ def _is_resolution_query(query: str) -> bool:
     return any(kw in q for kw in RESOLUTION_KEYWORDS)
 
 
+def _is_uncertainty_query(query: str) -> bool:
+    """Check if query involves uncertainty/causality (use conservative detection)."""
+    q = query.lower().strip()
+    return any(pattern in q for pattern in UNCERTAINTY_QUERY_PATTERNS)
+
+
 @dataclass
 class ConflictAwareConstraint:
     """
-    Constraint that detects conflicting claims using simple YES/NO classification.
+    Constraint that detects conflicting claims using pairwise LLM comparison.
 
     When retrieved chunks contain mutually exclusive claims (e.g., one says
     "revenue increased" and another says "revenue decreased"), this constraint
     prevents the system from confidently asserting either.
 
-    Uses simple per-chunk stance detection:
-    - Ask LLM: "Does this chunk say YES or NO to the query?"
-    - If some say YES and some say NO → contradiction
+    Three modes:
+    - Standard: Single pairwise comparison prompt (aggressive, high recall)
+    - Fusion: Ask 3 different ways, majority vote (conservative, high precision)
+    - Adaptive: Auto-select based on query type:
+        - Uncertainty/causal queries → Fusion (fewer false disputes)
+        - Factual queries → Standard (catch more contradictions)
 
     Attributes:
-        chat: ChatProvider for stance classification
+        chat: ChatProvider for contradiction detection
         enabled: Whether this constraint is active (default: True)
+        use_fusion: If True, always use 3-prompt fusion (default: False)
+        adaptive: If True, select method based on query type (default: False)
     """
 
     chat: "ChatProvider | None" = None
     enabled: bool = True
+    use_fusion: bool = False
+    adaptive: bool = False
     _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     @property
@@ -165,6 +228,61 @@ class ConflictAwareConstraint:
             logger.warning(f"{PIPELINE} ConflictAwareConstraint: contradiction check failed: {e}")
             return False
 
+    def _check_pairwise_fusion(self, query: str, chunk1: Chunk, chunk2: Chunk) -> bool:
+        """
+        Check for contradiction using 3-prompt fusion with majority voting.
+
+        Asks the same question 3 different ways:
+        1. Direct: "Do these CONTRADICT?"
+        2. Inverted: "Are these CONSISTENT?" (NO = contradict)
+        3. Logical: "If A is true, can B be true?" (NO = contradict)
+
+        Returns True if 2+ prompts indicate contradiction.
+        This reduces variance by requiring consensus.
+        """
+        if not self.chat:
+            return False
+
+        text1 = chunk1.content[:400] if len(chunk1.content) > 400 else chunk1.content
+        text2 = chunk2.content[:400] if len(chunk2.content) > 400 else chunk2.content
+
+        contradict_votes = 0
+        responses = []
+
+        for i, prompt_template in enumerate(FUSION_PROMPTS):
+            prompt = prompt_template.format(query=query, text1=text1, text2=text2)
+
+            try:
+                response = self.chat.chat(
+                    [{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                    max_tokens=10,
+                )
+                word = response.strip().upper()
+                responses.append(word)
+
+                # Interpret response based on prompt framing
+                if i == 0:  # Direct: CONTRADICT means contradiction
+                    if "CONTRADICT" in word:
+                        contradict_votes += 1
+                elif i == 1:  # Inverted: NO means contradiction (not consistent)
+                    if word.startswith("NO"):
+                        contradict_votes += 1
+                elif i == 2:  # Logical: NO means contradiction (mutually exclusive)
+                    if word.startswith("NO"):
+                        contradict_votes += 1
+
+            except Exception as e:
+                logger.warning(f"{PIPELINE} ConflictAwareConstraint: fusion prompt {i} failed: {e}")
+                responses.append("ERROR")
+
+        logger.debug(
+            f"{PIPELINE} ConflictAwareConstraint fusion: votes={contradict_votes}/3, responses={responses}"
+        )
+
+        # Majority vote: 2+ must indicate contradiction
+        return contradict_votes >= 2
+
     def apply(
         self,
         query: str,
@@ -210,15 +328,31 @@ class ConflictAwareConstraint:
         chunks_to_check = list(chunks[:5])
         first_chunk = chunks_to_check[0]
 
+        # Choose detection method based on settings
+        if self.adaptive:
+            # Adaptive mode: use fusion for uncertainty queries, standard for factual
+            use_fusion_for_query = _is_uncertainty_query(query)
+            check_method = self._check_pairwise_fusion if use_fusion_for_query else self._check_pairwise_contradiction
+            method_name = "adaptive-fusion" if use_fusion_for_query else "adaptive-pairwise"
+            logger.debug(
+                f"{PIPELINE} ConflictAwareConstraint: adaptive mode selected {method_name} "
+                f"(uncertainty_query={use_fusion_for_query})"
+            )
+        else:
+            # Fixed mode: use fusion if explicitly enabled
+            check_method = self._check_pairwise_fusion if self.use_fusion else self._check_pairwise_contradiction
+            method_name = "fusion" if self.use_fusion else "pairwise"
+
         for other_chunk in chunks_to_check[1:]:
-            if self._check_pairwise_contradiction(query, first_chunk, other_chunk):
+            if check_method(query, first_chunk, other_chunk):
                 logger.info(
-                    f"{PIPELINE} ConflictAwareConstraint: contradiction detected "
+                    f"{PIPELINE} ConflictAwareConstraint ({method_name}): contradiction detected "
                     f"between chunks"
                 )
                 return ConstraintResult.deny(
                     reason="Retrieved chunks contain contradictory information",
                     signal="disputed",
+                    method=method_name,
                 )
 
         logger.debug(f"{PIPELINE} ConflictAwareConstraint: no contradiction detected")

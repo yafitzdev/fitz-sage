@@ -5,18 +5,20 @@ Insufficient Evidence Constraint - Default guardrail for evidence coverage.
 This constraint prevents the system from giving confident answers when
 there is no relevant evidence in the retrieved chunks.
 
-Uses enriched metadata when available (preferred):
-1. Entity overlap: query entities vs chunk entities
-2. Summary relevance: query topics vs chunk summaries
+Priority order:
+1. Embedding similarity (if embedder provided) - most reliable
+2. Enriched metadata (entity/summary overlap)
+3. Lexical overlap fallback
 
-Falls back to raw content overlap when metadata unavailable.
+No LLM calls. Deterministic with tunable thresholds.
 """
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.logging.logger import get_logger
@@ -26,8 +28,26 @@ from ..base import ConstraintResult
 
 logger = get_logger(__name__)
 
+# Type alias for embedder function
+EmbedderFunc = Callable[[str], list[float]]
+
 # Below this score, vectors are nearly orthogonal (no semantic relationship)
 MIN_RELEVANCE_SCORE = 0.3
+# Embedding similarity threshold for relevance
+# Higher = stricter (rejects more as irrelevant)
+MIN_EMBEDDING_SIMILARITY = 0.5
+
+
+def _cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
+    """Compute cosine similarity between two vectors."""
+    dot_product = sum(a * b for a, b in zip(vec1, vec2))
+    norm1 = math.sqrt(sum(a * a for a in vec1))
+    norm2 = math.sqrt(sum(b * b for b in vec2))
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+
+    return dot_product / (norm1 * norm2)
 
 # Common stopwords to ignore in overlap check
 STOPWORDS = frozenset({
@@ -170,26 +190,67 @@ class InsufficientEvidenceConstraint:
     """
     Constraint that prevents confident answers without relevant evidence.
 
-    Priority order:
+    Priority order (deterministic, no LLM):
     1. No chunks = ABSTAIN
-    2. Vector score available and < 0.3 = ABSTAIN
-    3. Enriched metadata available:
-       - Entity overlap OR summary overlap = ALLOW
-       - No enriched match = ABSTAIN (reliable signal)
-    4. Fallback: lexical overlap on raw content
+    2. Embedding similarity (if embedder provided) - most reliable
+    3. Vector score from retrieval (if available)
+    4. Enriched metadata (entity/summary overlap)
+    5. Fallback: lexical overlap on raw content
 
     Attributes:
+        embedder: Optional function to embed text (enables semantic similarity)
         enabled: Whether this constraint is active (default: True)
         min_score: Minimum vector score to consider relevant (default: 0.3)
+        min_similarity: Minimum embedding similarity (default: 0.4)
     """
 
+    embedder: EmbedderFunc | None = None
     enabled: bool = True
     min_score: float = MIN_RELEVANCE_SCORE
+    min_similarity: float = MIN_EMBEDDING_SIMILARITY
     _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     @property
     def name(self) -> str:
         return "insufficient_evidence"
+
+    def _get_embedding(self, text: str) -> list[float] | None:
+        """Get embedding with caching."""
+        if not self.embedder:
+            return None
+
+        cache_key = hash(text[:200])
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        try:
+            embedding = self.embedder(text)
+            self._cache[cache_key] = embedding
+            return embedding
+        except Exception as e:
+            logger.warning(f"{PIPELINE} InsufficientEvidence: embedding failed: {e}")
+            return None
+
+    def _check_embedding_relevance(
+        self, query: str, chunks: Sequence[Chunk]
+    ) -> tuple[bool, float]:
+        """
+        Check relevance using embedding similarity.
+
+        Returns (is_relevant, max_similarity).
+        """
+        query_emb = self._get_embedding(query)
+        if not query_emb:
+            return True, 0.0  # Can't check, allow
+
+        max_sim = 0.0
+        for chunk in chunks:
+            chunk_emb = self._get_embedding(chunk.content)
+            if chunk_emb:
+                sim = _cosine_similarity(query_emb, chunk_emb)
+                max_sim = max(max_sim, sim)
+
+        return max_sim >= self.min_similarity, max_sim
 
     def apply(
         self,
@@ -218,7 +279,26 @@ class InsufficientEvidenceConstraint:
                 evidence_count=0,
             )
 
-        # Rule 2: Check vector_score if available
+        # Rule 2: Check embedding similarity (most reliable, if available)
+        if self.embedder:
+            is_relevant, max_sim = self._check_embedding_relevance(query, chunks)
+            if not is_relevant:
+                logger.info(
+                    f"{PIPELINE} InsufficientEvidenceConstraint: low embedding similarity "
+                    f"({max_sim:.3f} < {self.min_similarity}) -> ABSTAIN"
+                )
+                return ConstraintResult.deny(
+                    reason=f"Context not semantically relevant (similarity={max_sim:.3f})",
+                    signal="abstain",
+                    evidence_count=len(chunks),
+                    max_similarity=max_sim,
+                )
+            logger.debug(
+                f"{PIPELINE} InsufficientEvidenceConstraint: embedding similarity OK ({max_sim:.3f})"
+            )
+            return ConstraintResult.allow()
+
+        # Rule 3: Check vector_score if available (from retrieval)
         max_score = _get_max_score(chunks)
         if max_score is not None:
             if max_score < self.min_score:
@@ -232,13 +312,11 @@ class InsufficientEvidenceConstraint:
                     evidence_count=len(chunks),
                     max_score=max_score,
                 )
-            # Score is good enough
             return ConstraintResult.allow()
 
-        # Rule 3: Check enriched metadata (preferred when available)
+        # Rule 4: Check enriched metadata
         is_relevant, method = _check_enriched_relevance(query, chunks)
         if method != "no_enrichment":
-            # Enriched data available - trust it
             if is_relevant:
                 logger.debug(
                     f"{PIPELINE} InsufficientEvidenceConstraint: relevant via {method}"
@@ -255,7 +333,7 @@ class InsufficientEvidenceConstraint:
                     method=method,
                 )
 
-        # Rule 4: No enrichment, fallback to lexical overlap
+        # Rule 5: Fallback to lexical overlap
         if not _has_lexical_overlap(query, chunks):
             logger.info(
                 f"{PIPELINE} InsufficientEvidenceConstraint: no lexical overlap -> ABSTAIN"

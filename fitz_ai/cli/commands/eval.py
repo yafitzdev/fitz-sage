@@ -612,6 +612,27 @@ def fitz_gov_benchmark(
             help="Enrich chunks with metadata (summary, keywords, entities) before constraints.",
         ),
     ] = False,
+    deterministic: Annotated[
+        bool,
+        typer.Option(
+            "--deterministic",
+            help="Use deterministic constraints (embeddings + regex). No LLM variance.",
+        ),
+    ] = False,
+    fusion: Annotated[
+        bool,
+        typer.Option(
+            "--fusion",
+            help="Use 3-prompt fusion for contradiction detection. Reduces variance via majority voting.",
+        ),
+    ] = False,
+    adaptive: Annotated[
+        bool,
+        typer.Option(
+            "--adaptive",
+            help="Auto-select detection method: fusion for uncertainty queries, pairwise for factual.",
+        ),
+    ] = False,
 ) -> None:
     """
     Run FITZ-GOV governance calibration benchmark.
@@ -643,7 +664,14 @@ def fitz_gov_benchmark(
     collection = _get_collection(collection)
     engine = _get_engine(collection)
 
-    benchmark = FitzGovBenchmark(data_dir=data_dir, full_mode=full, enrich_chunks=enrich)
+    benchmark = FitzGovBenchmark(
+        data_dir=data_dir,
+        full_mode=full,
+        enrich_chunks=enrich,
+        deterministic=deterministic,
+        use_fusion=fusion,
+        adaptive=adaptive,
+    )
 
     # Parse categories
     categories = None
