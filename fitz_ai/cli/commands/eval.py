@@ -605,6 +605,13 @@ def fitz_gov_benchmark(
             help="Run full LLM generation for answer quality tests (slower).",
         ),
     ] = False,
+    enrich: Annotated[
+        bool,
+        typer.Option(
+            "--enrich",
+            help="Enrich chunks with metadata (summary, keywords, entities) before constraints.",
+        ),
+    ] = False,
 ) -> None:
     """
     Run FITZ-GOV governance calibration benchmark.
@@ -636,7 +643,7 @@ def fitz_gov_benchmark(
     collection = _get_collection(collection)
     engine = _get_engine(collection)
 
-    benchmark = FitzGovBenchmark(data_dir=data_dir, full_mode=full)
+    benchmark = FitzGovBenchmark(data_dir=data_dir, full_mode=full, enrich_chunks=enrich)
 
     # Parse categories
     categories = None

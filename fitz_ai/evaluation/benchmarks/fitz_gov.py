@@ -93,6 +93,7 @@ class FitzGovBenchmark:
         llm_validation: bool = False,
         llm_model: str = "qwen2.5:14b",
         llm_base_url: str = "http://localhost:11434",
+        enrich_chunks: bool = False,
     ):
         """
         Initialize FITZ-GOV benchmark.
@@ -106,6 +107,9 @@ class FitzGovBenchmark:
                            grounding and relevance categories. Requires Ollama.
             llm_model: Ollama model for LLM validation. Default: qwen2.5:14b
             llm_base_url: Ollama API URL. Default: http://localhost:11434
+            enrich_chunks: If True, enrich chunks with metadata (summary, keywords,
+                          entities) before running constraints. This simulates the
+                          full ingestion pipeline.
         """
         # Import fitz-gov (validates it's installed)
         fitz_gov = _import_fitz_gov()
@@ -115,6 +119,8 @@ class FitzGovBenchmark:
         self._llm_validation = llm_validation
         self._llm_model = llm_model
         self._llm_base_url = llm_base_url
+        self._enrich_chunks = enrich_chunks
+        self._enricher = None
 
         # Store fitz-gov module reference for lazy access
         self._fitz_gov = fitz_gov
@@ -133,6 +139,33 @@ class FitzGovBenchmark:
             AnswerMode.QUALIFIED: fitz_gov.AnswerMode.QUALIFIED,
             AnswerMode.CONFIDENT: fitz_gov.AnswerMode.CONFIDENT,
         }
+
+        # Initialize enricher if enabled
+        if enrich_chunks:
+            self._init_enricher()
+
+    def _init_enricher(self) -> None:
+        """Initialize the chunk enricher for metadata extraction."""
+        from fitz_ai.ingestion.enrichment.bus import ChunkEnricher
+        from fitz_ai.ingestion.enrichment.modules import (
+            EntityModule,
+            KeywordModule,
+            SummaryModule,
+        )
+        from fitz_ai.llm import get_chat_factory
+
+        try:
+            # Use ollama for enrichment (runs locally)
+            chat_factory = get_chat_factory("ollama")
+            self._enricher = ChunkEnricher(
+                chat_factory=chat_factory,
+                modules=[SummaryModule(), KeywordModule(), EntityModule()],
+                min_batch_content=50,  # Lower threshold for benchmark's short chunks
+            )
+            logger.info("Initialized chunk enricher for FITZ-GOV benchmark")
+        except Exception as e:
+            logger.warning(f"Failed to initialize enricher: {e}")
+            self._enricher = None
 
     def evaluate(
         self,
@@ -227,6 +260,15 @@ class FitzGovBenchmark:
             )
             for i, ctx in enumerate(contexts)
         ]
+
+        # Enrich chunks if enricher is available
+        if self._enricher is not None:
+            try:
+                result = self._enricher.enrich(chunks)
+                chunks = result.chunks
+                logger.debug(f"Enriched {len(chunks)} chunks")
+            except Exception as e:
+                logger.warning(f"Chunk enrichment failed: {e}")
 
         pipeline = engine._pipeline
 

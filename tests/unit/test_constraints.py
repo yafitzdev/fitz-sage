@@ -56,17 +56,16 @@ def create_mock_chat_yes_no(stances: list[str]):
 
 
 def create_mock_chat_no_conflict():
-    """Mock chat that returns consistent YES stances (no conflict)."""
+    """Mock chat that returns AGREE (no contradiction) for pairwise checks."""
     mock = MagicMock()
-    mock.chat.return_value = "YES"
+    mock.chat.return_value = "AGREE"
     return mock
 
 
 def create_mock_chat_with_conflict():
-    """Mock chat that returns conflicting YES/NO stances."""
+    """Mock chat that returns CONTRADICT for pairwise checks."""
     mock = MagicMock()
-    # First call returns YES, second returns NO (conflict)
-    mock.chat.side_effect = ["YES", "NO"]
+    mock.chat.return_value = "CONTRADICT"
     return mock
 
 

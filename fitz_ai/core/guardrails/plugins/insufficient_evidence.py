@@ -5,10 +5,11 @@ Insufficient Evidence Constraint - Default guardrail for evidence coverage.
 This constraint prevents the system from giving confident answers when
 there is no relevant evidence in the retrieved chunks.
 
-Three rules (checked in order):
-1. Empty context = ABSTAIN
-2. If vector_score available and all < 0.3 = ABSTAIN
-3. If no vector_score, check lexical overlap (zero shared words = ABSTAIN)
+Uses enriched metadata when available (preferred):
+1. Entity overlap: query entities vs chunk entities
+2. Summary relevance: query topics vs chunk summaries
+
+Falls back to raw content overlap when metadata unavailable.
 """
 
 from __future__ import annotations
@@ -53,6 +54,27 @@ def _extract_words(text: str) -> set[str]:
     return {w for w in words if w not in STOPWORDS}
 
 
+def _extract_query_entities(query: str) -> set[str]:
+    """Extract potential entities from query (proper nouns, capitalized words, quoted terms)."""
+    entities = set()
+
+    # Quoted terms
+    quoted = re.findall(r'"([^"]+)"', query)
+    entities.update(q.lower() for q in quoted)
+
+    # Capitalized words (potential proper nouns) - excluding sentence starters
+    words = query.split()
+    for i, word in enumerate(words):
+        # Skip first word and common question starters
+        if i > 0 and word[0].isupper() and word.lower() not in STOPWORDS:
+            entities.add(word.lower())
+
+    # Also extract meaningful words as potential topics
+    entities.update(_extract_words(query))
+
+    return entities
+
+
 def _get_max_score(chunks: Sequence[Chunk]) -> float | None:
     """Get the highest vector_score from chunks, or None if no scores."""
     scores = []
@@ -63,8 +85,53 @@ def _get_max_score(chunks: Sequence[Chunk]) -> float | None:
     return max(scores) if scores else None
 
 
+def _has_entity_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
+    """Check if query entities appear in chunk entities (enriched metadata)."""
+    query_entities = _extract_query_entities(query)
+    if not query_entities:
+        return True  # Can't determine, allow
+
+    for chunk in chunks:
+        chunk_entities = chunk.metadata.get("entities", [])
+        if chunk_entities:
+            # Extract entity names from enriched data
+            chunk_entity_names = {
+                e.get("name", "").lower()
+                for e in chunk_entities
+                if isinstance(e, dict) and e.get("name")
+            }
+            if query_entities & chunk_entity_names:
+                return True
+
+    return False
+
+
+def _has_summary_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
+    """Check if query topics appear in chunk summaries (less noise than raw content)."""
+    query_words = _extract_words(query)
+    if not query_words:
+        return True  # Can't determine, allow
+
+    # Calculate match ratio - what fraction of query words appear in any summary?
+    all_summary_words = set()
+    for chunk in chunks:
+        summary = chunk.metadata.get("summary", "")
+        if summary:
+            all_summary_words.update(_extract_words(summary))
+
+    if not all_summary_words:
+        return True  # No summaries, can't determine
+
+    overlap = query_words & all_summary_words
+    match_ratio = len(overlap) / len(query_words)
+
+    # Require at least 30% of query words to appear in summaries
+    # This catches cases where only 1 common word matches by coincidence
+    return match_ratio >= 0.3
+
+
 def _has_lexical_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
-    """Check if query shares any meaningful words with chunks."""
+    """Check if query shares any meaningful words with chunks (fallback)."""
     query_words = _extract_words(query)
     if not query_words:
         return True  # Can't determine overlap, allow
@@ -77,15 +144,45 @@ def _has_lexical_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
     return False
 
 
+def _check_enriched_relevance(query: str, chunks: Sequence[Chunk]) -> tuple[bool, str]:
+    """
+    Check relevance using enriched metadata.
+
+    Returns (is_relevant, method_used).
+    """
+    # Check if chunks have enrichment
+    has_entities = any(chunk.metadata.get("entities") for chunk in chunks)
+    has_summaries = any(chunk.metadata.get("summary") for chunk in chunks)
+
+    if has_entities or has_summaries:
+        # Use enriched data - stricter checks
+        entity_match = _has_entity_overlap(query, chunks) if has_entities else False
+        summary_match = _has_summary_overlap(query, chunks) if has_summaries else False
+
+        if entity_match:
+            return True, "entity_overlap"
+        if summary_match:
+            return True, "summary_overlap"
+
+        # Enriched but no match - this is a reliable ABSTAIN signal
+        return False, "no_enriched_match"
+
+    # No enrichment - can't use this method
+    return True, "no_enrichment"
+
+
 @dataclass
 class InsufficientEvidenceConstraint:
     """
     Constraint that prevents confident answers without relevant evidence.
 
-    Three rules (checked in order):
-    1. If no chunks retrieved, abstain
-    2. If best chunk score < 0.3, abstain (off-topic retrieval)
-    3. If no scores available, check lexical overlap (zero = abstain)
+    Priority order:
+    1. No chunks = ABSTAIN
+    2. Vector score available and < 0.3 = ABSTAIN
+    3. Enriched metadata available:
+       - Entity overlap OR summary overlap = ALLOW
+       - No enriched match = ABSTAIN (reliable signal)
+    4. Fallback: lexical overlap on raw content
 
     Attributes:
         enabled: Whether this constraint is active (default: True)
@@ -144,7 +241,27 @@ class InsufficientEvidenceConstraint:
             # Score is good enough
             return ConstraintResult.allow()
 
-        # Rule 3: No vector_score, use lexical overlap as fallback
+        # Rule 3: Check enriched metadata (preferred when available)
+        is_relevant, method = _check_enriched_relevance(query, chunks)
+        if method != "no_enrichment":
+            # Enriched data available - trust it
+            if is_relevant:
+                logger.debug(
+                    f"{PIPELINE} InsufficientEvidenceConstraint: relevant via {method}"
+                )
+                return ConstraintResult.allow()
+            else:
+                logger.info(
+                    f"{PIPELINE} InsufficientEvidenceConstraint: {method} -> ABSTAIN"
+                )
+                return ConstraintResult.deny(
+                    reason="Context not relevant (no entity or summary overlap)",
+                    signal="abstain",
+                    evidence_count=len(chunks),
+                    method=method,
+                )
+
+        # Rule 4: No enrichment, fallback to lexical overlap
         if not _has_lexical_overlap(query, chunks):
             logger.info(
                 f"{PIPELINE} InsufficientEvidenceConstraint: no lexical overlap -> ABSTAIN"

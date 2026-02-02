@@ -39,6 +39,21 @@ Text: {text}
 
 Reply with ONLY one word: YES, NO, or UNCLEAR"""
 
+# Single-call contradiction detection prompt
+CONTRADICTION_PROMPT = """Do these texts CONTRADICT each other about the question?
+
+Question: {query}
+
+Text 1: {text1}
+
+Text 2: {text2}
+
+If they say OPPOSITE things (one says yes, one says no), answer CONTRADICT.
+If they agree or are compatible, answer AGREE.
+If unclear, answer UNCLEAR.
+
+Reply with ONLY one word: CONTRADICT, AGREE, or UNCLEAR"""
+
 
 # Keywords that indicate user is asking for conflict resolution
 RESOLUTION_KEYWORDS = (
@@ -90,12 +105,15 @@ class ConflictAwareConstraint:
         Get chunk's stance on the query: YES, NO, or UNCLEAR.
 
         Uses a simple single-word response format that fast models handle well.
+        Uses raw content (not summary) because contradiction detection needs
+        the full detail - summaries often lose the nuance needed for YES/NO.
         """
         if not self.chat:
             return "UNCLEAR"
 
-        # Truncate chunk content to keep prompt short
+        # Use raw content - summaries lose nuance needed for stance detection
         text = chunk.content[:500] if len(chunk.content) > 500 else chunk.content
+
         prompt = STANCE_PROMPT.format(query=query, text=text)
 
         try:
@@ -118,6 +136,35 @@ class ConflictAwareConstraint:
             logger.warning(f"{PIPELINE} ConflictAwareConstraint: stance check failed: {e}")
             return "UNCLEAR"
 
+    def _check_pairwise_contradiction(self, query: str, chunk1: Chunk, chunk2: Chunk) -> bool:
+        """
+        Check if two chunks contradict each other about the query.
+
+        Uses a single LLM call to compare both chunks together,
+        which is more reliable than separate stance detection.
+        """
+        if not self.chat:
+            return False
+
+        text1 = chunk1.content[:400] if len(chunk1.content) > 400 else chunk1.content
+        text2 = chunk2.content[:400] if len(chunk2.content) > 400 else chunk2.content
+
+        prompt = CONTRADICTION_PROMPT.format(query=query, text1=text1, text2=text2)
+
+        try:
+            response = self.chat.chat(
+                [{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=10,
+            )
+
+            word = response.strip().upper()
+            return "CONTRADICT" in word
+
+        except Exception as e:
+            logger.warning(f"{PIPELINE} ConflictAwareConstraint: contradiction check failed: {e}")
+            return False
+
     def apply(
         self,
         query: str,
@@ -125,6 +172,9 @@ class ConflictAwareConstraint:
     ) -> ConstraintResult:
         """
         Check for conflicting claims in retrieved chunks.
+
+        Uses pairwise contradiction detection - comparing chunks together
+        rather than classifying each independently.
 
         Args:
             query: The user's question
@@ -155,27 +205,21 @@ class ConflictAwareConstraint:
             )
             return ConstraintResult.allow()
 
-        # Get stance for each chunk (limit to 5 for efficiency)
+        # Use pairwise contradiction detection (more reliable than per-chunk stance)
+        # Check first chunk against all others (limit to 4 comparisons)
         chunks_to_check = list(chunks[:5])
-        stances = [self._get_chunk_stance(query, c) for c in chunks_to_check]
+        first_chunk = chunks_to_check[0]
 
-        logger.debug(f"{PIPELINE} ConflictAwareConstraint: stances={stances}")
-
-        # Check for contradiction: some YES and some NO
-        has_yes = "YES" in stances
-        has_no = "NO" in stances
-
-        if has_yes and has_no:
-            yes_count = stances.count("YES")
-            no_count = stances.count("NO")
-            logger.info(
-                f"{PIPELINE} ConflictAwareConstraint: contradiction detected "
-                f"({yes_count} YES, {no_count} NO)"
-            )
-            return ConstraintResult.deny(
-                reason=f"Conflicting stances: {yes_count} say YES, {no_count} say NO",
-                signal="disputed",
-            )
+        for other_chunk in chunks_to_check[1:]:
+            if self._check_pairwise_contradiction(query, first_chunk, other_chunk):
+                logger.info(
+                    f"{PIPELINE} ConflictAwareConstraint: contradiction detected "
+                    f"between chunks"
+                )
+                return ConstraintResult.deny(
+                    reason="Retrieved chunks contain contradictory information",
+                    signal="disputed",
+                )
 
         logger.debug(f"{PIPELINE} ConflictAwareConstraint: no contradiction detected")
         return ConstraintResult.allow()

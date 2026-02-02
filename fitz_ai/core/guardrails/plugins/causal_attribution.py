@@ -67,11 +67,24 @@ def _is_causal_query(query: str) -> bool:
 
 
 def _has_causal_evidence(chunks: Sequence[Chunk]) -> bool:
-    """Check if any chunk contains causal language using keywords."""
+    """Check if any chunk contains causal language using keywords.
+
+    Checks both raw content AND enriched summaries (summaries often
+    capture the 'why' more clearly than raw content).
+    """
     for chunk in chunks:
+        # Check raw content
         content = chunk.content.lower()
         if any(kw in content for kw in CAUSAL_EVIDENCE_KEYWORDS):
             return True
+
+        # Check enriched summary (often clearer signal)
+        summary = chunk.metadata.get("summary", "")
+        if summary:
+            summary_lower = summary.lower()
+            if any(kw in summary_lower for kw in CAUSAL_EVIDENCE_KEYWORDS):
+                return True
+
     return False
 
 
