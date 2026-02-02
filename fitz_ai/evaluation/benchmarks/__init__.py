@@ -66,44 +66,32 @@ def __getattr__(name: str):
             return RGBResult
         return RGBEvaluator
 
-    # FITZ-GOV
+    # FITZ-GOV - FitzGovBenchmark is the main entry point
+    if name == "FitzGovBenchmark":
+        from .fitz_gov import FitzGovBenchmark
+
+        return FitzGovBenchmark
+
+    # FITZ-GOV types and LLM Validator - import from fitz-gov package
     if name in (
         "FitzGovCategory",
         "FitzGovCase",
         "FitzGovCaseResult",
         "FitzGovCategoryResult",
         "FitzGovResult",
-        "FitzGovBenchmark",
+        "OllamaValidator",
+        "ValidatorConfig",
+        "ValidationResult",
     ):
-        from .fitz_gov import (
-            FitzGovBenchmark,
-            FitzGovCase,
-            FitzGovCaseResult,
-            FitzGovCategory,
-            FitzGovCategoryResult,
-            FitzGovResult,
-        )
+        try:
+            import fitz_gov
 
-        if name == "FitzGovCategory":
-            return FitzGovCategory
-        elif name == "FitzGovCase":
-            return FitzGovCase
-        elif name == "FitzGovCaseResult":
-            return FitzGovCaseResult
-        elif name == "FitzGovCategoryResult":
-            return FitzGovCategoryResult
-        elif name == "FitzGovResult":
-            return FitzGovResult
-        return FitzGovBenchmark
-
-    # LLM Validator
-    if name in ("OllamaValidator", "ValidatorConfig", "ValidationResult"):
-        from .llm_validator import OllamaValidator, ValidationResult, ValidatorConfig
-
-        if name == "OllamaValidator":
-            return OllamaValidator
-        elif name == "ValidatorConfig":
-            return ValidatorConfig
-        return ValidationResult
+            return getattr(fitz_gov, name)
+        except ImportError:
+            raise ImportError(
+                f"fitz-gov package is required for {name}. "
+                "Install with: pip install fitz-gov "
+                "or: pip install -e path/to/fitz-gov"
+            )
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

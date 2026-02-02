@@ -1,42 +1,22 @@
 # fitz_ai/evaluation/benchmarks/fitz_gov.py
 """
-FITZ-GOV: Comprehensive RAG Governance Benchmark.
+FITZ-GOV benchmark integration for Fitz RAG engine.
 
-Fitz's core differentiator is epistemic honesty - knowing when to abstain,
-dispute, or qualify answers. FITZ-GOV measures governance calibration AND
-answer quality, making it a complete RAG evaluation framework.
+This module wraps the fitz-gov package to evaluate Fitz's governance calibration.
+The evaluation logic lives in fitz-gov so all RAG systems get identical evaluation.
 
-Governance Mode Categories (maps to AnswerMode):
-1. ABSTENTION - Should refuse to answer (insufficient/irrelevant context)
-2. DISPUTE - Should flag conflicting information
-3. QUALIFICATION - Should hedge (causal claims without evidence, etc.)
-4. CONFIDENCE - Should answer confidently (clear evidence supports answer)
-
-Answer Quality Categories (no external deps like RAGAS):
-5. GROUNDING - Answer must be grounded in context (no hallucination)
-6. RELEVANCE - Answer must address the actual question asked
-
-The benchmark produces accuracy by category and a confusion matrix for
-governance modes.
+Requires: pip install fitz-gov (or pip install -e path/to/fitz-gov)
 
 Usage:
     from fitz_ai.evaluation.benchmarks import FitzGovBenchmark
 
     benchmark = FitzGovBenchmark()
     results = benchmark.evaluate(engine)
-    print(results.confusion_matrix)
-    print(f"Abstention accuracy: {results.abstention.accuracy:.2%}")
-    print(f"Grounding accuracy: {results.grounding.accuracy:.2%}")
+    print(results)
 """
 
 from __future__ import annotations
 
-import json
-import re
-from collections import defaultdict
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -45,424 +25,49 @@ from fitz_ai.logging.logger import get_logger
 
 if TYPE_CHECKING:
     from fitz_ai.engines.fitz_rag.engine import FitzRagEngine
-    from fitz_ai.evaluation.benchmarks.llm_validator import OllamaValidator
 
 logger = get_logger(__name__)
 
 # Default data directory (downloaded from GitHub)
 DATA_DIR = Path.home() / ".fitz" / "fitz_gov_data"
 
-# Default GitHub repo for FITZ-GOV benchmark data
-FITZ_GOV_REPO_URL = "https://github.com/yafitzdev/fitz-gov"
-FITZ_GOV_DATA_URL = f"{FITZ_GOV_REPO_URL}/releases/latest/download/fitz_gov_data.zip"
 
-
-class FitzGovCategory(str, Enum):
-    """Categories of governance test cases."""
-
-    # Governance Mode Categories (maps to AnswerMode)
-    ABSTENTION = "abstention"
-    """Cases where the system should refuse to answer."""
-
-    DISPUTE = "dispute"
-    """Cases where the system should flag conflicting information."""
-
-    QUALIFICATION = "qualification"
-    """Cases where the system should hedge or qualify the answer."""
-
-    CONFIDENCE = "confidence"
-    """Cases where the system should answer confidently."""
-
-    # Answer Quality Categories
-    GROUNDING = "grounding"
-    """Cases testing if answers are grounded in context (no hallucination)."""
-
-    RELEVANCE = "relevance"
-    """Cases testing if answers address the actual question asked."""
-
-
-@dataclass
-class FitzGovCase:
-    """A single FITZ-GOV test case."""
-
-    id: str
-    """Unique identifier for the test case."""
-
-    category: FitzGovCategory
-    """Category of governance test."""
-
-    subcategory: str
-    """More specific subcategory (e.g., "no_context", "out_of_scope")."""
-
-    query: str
-    """The question to answer."""
-
-    contexts: list[str]
-    """Context passages to use."""
-
-    expected_mode: AnswerMode
-    """Expected Fitz answer mode (for governance categories)."""
-
-    description: str
-    """Human-readable description of what's being tested."""
-
-    rationale: str
-    """Why this mode is expected."""
-
-    # Answer quality fields (for grounding/relevance categories)
-    forbidden_claims: list[str] = field(default_factory=list)
-    """For GROUNDING: Regex patterns that indicate hallucination (should NOT appear in answer)."""
-
-    required_elements: list[str] = field(default_factory=list)
-    """For RELEVANCE: Elements that MUST appear in the answer."""
-
-    forbidden_elements: list[str] = field(default_factory=list)
-    """For RELEVANCE: Patterns that indicate false confidence (should NOT appear)."""
-
-    evaluation_config: dict[str, Any] = field(default_factory=dict)
-    """Evaluation configuration (use_regex, case_insensitive, allowed_phrases, etc.)."""
-
-    metadata: dict[str, Any] = field(default_factory=dict)
-    """Additional test case metadata."""
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
-        result = {
-            "id": self.id,
-            "category": self.category.value,
-            "subcategory": self.subcategory,
-            "query": self.query,
-            "contexts": self.contexts,
-            "expected_mode": self.expected_mode.value,
-            "description": self.description,
-            "rationale": self.rationale,
-            "metadata": self.metadata,
-        }
-        # Include answer quality fields only if set
-        if self.forbidden_claims:
-            result["forbidden_claims"] = self.forbidden_claims
-        if self.required_elements:
-            result["required_elements"] = self.required_elements
-        if self.forbidden_elements:
-            result["forbidden_elements"] = self.forbidden_elements
-        if self.evaluation_config:
-            result["evaluation_config"] = self.evaluation_config
-        return result
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> FitzGovCase:
-        """Create from dictionary."""
-        return cls(
-            id=data["id"],
-            category=FitzGovCategory(data["category"]),
-            subcategory=data["subcategory"],
-            query=data["query"],
-            contexts=data["contexts"],
-            expected_mode=AnswerMode(data["expected_mode"]),
-            description=data["description"],
-            rationale=data["rationale"],
-            forbidden_claims=data.get("forbidden_claims", []),
-            required_elements=data.get("required_elements", []),
-            forbidden_elements=data.get("forbidden_elements", []),
-            evaluation_config=data.get("evaluation_config", {}),
-            metadata=data.get("metadata", {}),
-        )
-
-
-@dataclass
-class FitzGovCaseResult:
-    """Result for a single FITZ-GOV test case."""
-
-    case: FitzGovCase
-    """The test case."""
-
-    passed: bool
-    """Whether the test passed (mode matched expected)."""
-
-    answer: str
-    """Generated answer text."""
-
-    actual_mode: AnswerMode
-    """Actual Fitz answer mode."""
-
-    triggered_constraints: list[str]
-    """Constraints that were triggered."""
-
-    failure_analysis: str | None = None
-    """Analysis of why the test failed (if applicable)."""
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            "case": self.case.to_dict(),
-            "passed": self.passed,
-            "answer": self.answer,
-            "actual_mode": self.actual_mode.value,
-            "triggered_constraints": self.triggered_constraints,
-            "failure_analysis": self.failure_analysis,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> FitzGovCaseResult:
-        """Create from dictionary."""
-        return cls(
-            case=FitzGovCase.from_dict(data["case"]),
-            passed=data["passed"],
-            answer=data["answer"],
-            actual_mode=AnswerMode(data["actual_mode"]),
-            triggered_constraints=data["triggered_constraints"],
-            failure_analysis=data.get("failure_analysis"),
-        )
-
-
-@dataclass
-class FitzGovCategoryResult:
-    """Results for a single governance category."""
-
-    category: FitzGovCategory
-    """The category."""
-
-    accuracy: float
-    """Accuracy for this category (0-1)."""
-
-    num_correct: int
-    """Number of correct predictions."""
-
-    num_total: int
-    """Total number of test cases."""
-
-    case_results: list[FitzGovCaseResult]
-    """Individual case results."""
-
-    subcategory_accuracy: dict[str, float]
-    """Accuracy by subcategory."""
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            "category": self.category.value,
-            "accuracy": self.accuracy,
-            "num_correct": self.num_correct,
-            "num_total": self.num_total,
-            "case_results": [r.to_dict() for r in self.case_results],
-            "subcategory_accuracy": self.subcategory_accuracy,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> FitzGovCategoryResult:
-        """Create from dictionary."""
-        return cls(
-            category=FitzGovCategory(data["category"]),
-            accuracy=data["accuracy"],
-            num_correct=data["num_correct"],
-            num_total=data["num_total"],
-            case_results=[FitzGovCaseResult.from_dict(r) for r in data["case_results"]],
-            subcategory_accuracy=data["subcategory_accuracy"],
-        )
-
-
-@dataclass
-class FitzGovConfusionMatrix:
-    """Confusion matrix for governance mode predictions."""
-
-    matrix: dict[str, dict[str, int]]
-    """Matrix[expected][actual] = count."""
-
-    def __post_init__(self):
-        """Initialize empty matrix if needed."""
-        if not self.matrix:
-            modes = [m.value for m in AnswerMode]
-            self.matrix = {exp: {act: 0 for act in modes} for exp in modes}
-
-    def add(self, expected: AnswerMode, actual: AnswerMode) -> None:
-        """Add a prediction to the matrix."""
-        self.matrix[expected.value][actual.value] += 1
-
-    def get_accuracy(self) -> float:
-        """Get overall accuracy."""
-        correct = sum(self.matrix[m][m] for m in self.matrix)
-        total = sum(sum(row.values()) for row in self.matrix.values())
-        return correct / total if total > 0 else 0.0
-
-    def get_mode_precision(self, mode: AnswerMode) -> float:
-        """Get precision for a specific mode."""
-        mode_val = mode.value
-        true_positive = self.matrix[mode_val][mode_val]
-        predicted_positive = sum(self.matrix[exp][mode_val] for exp in self.matrix)
-        return true_positive / predicted_positive if predicted_positive > 0 else 0.0
-
-    def get_mode_recall(self, mode: AnswerMode) -> float:
-        """Get recall for a specific mode."""
-        mode_val = mode.value
-        true_positive = self.matrix[mode_val][mode_val]
-        actual_positive = sum(self.matrix[mode_val].values())
-        return true_positive / actual_positive if actual_positive > 0 else 0.0
-
-    def to_dict(self) -> dict[str, dict[str, int]]:
-        """Convert to dictionary."""
-        return self.matrix
-
-    @classmethod
-    def from_dict(cls, data: dict[str, dict[str, int]]) -> FitzGovConfusionMatrix:
-        """Create from dictionary."""
-        return cls(matrix=data)
-
-    def __str__(self) -> str:
-        """Pretty print the confusion matrix."""
-        modes = [m.value for m in AnswerMode]
-        lines = ["Confusion Matrix (rows=expected, cols=actual):"]
-        header = "           " + " ".join(f"{m[:8]:>10}" for m in modes)
-        lines.append(header)
-        for exp in modes:
-            row = f"{exp[:10]:>10} " + " ".join(f"{self.matrix[exp][act]:>10}" for act in modes)
-            lines.append(row)
-        return "\n".join(lines)
-
-
-@dataclass
-class FitzGovResult:
-    """Full FITZ-GOV benchmark results."""
-
-    overall_accuracy: float
-    """Overall accuracy across all categories."""
-
-    # Governance Mode Categories
-    abstention: FitzGovCategoryResult | None
-    """Results for abstention category."""
-
-    dispute: FitzGovCategoryResult | None
-    """Results for dispute category."""
-
-    qualification: FitzGovCategoryResult | None
-    """Results for qualification category."""
-
-    confidence: FitzGovCategoryResult | None
-    """Results for confidence category."""
-
-    # Answer Quality Categories
-    grounding: FitzGovCategoryResult | None
-    """Results for grounding category (no hallucination)."""
-
-    relevance: FitzGovCategoryResult | None
-    """Results for relevance category (answers the question)."""
-
-    confusion_matrix: FitzGovConfusionMatrix
-    """Mode confusion matrix (governance categories only)."""
-
-    num_cases: int
-    """Total number of test cases."""
-
-    evaluation_time_seconds: float
-    """Time taken for evaluation."""
-
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    """When evaluation was run."""
-
-    metadata: dict[str, Any] = field(default_factory=dict)
-    """Additional metadata."""
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
-        return {
-            "overall_accuracy": self.overall_accuracy,
-            "abstention": self.abstention.to_dict() if self.abstention else None,
-            "dispute": self.dispute.to_dict() if self.dispute else None,
-            "qualification": self.qualification.to_dict() if self.qualification else None,
-            "confidence": self.confidence.to_dict() if self.confidence else None,
-            "grounding": self.grounding.to_dict() if self.grounding else None,
-            "relevance": self.relevance.to_dict() if self.relevance else None,
-            "confusion_matrix": self.confusion_matrix.to_dict(),
-            "num_cases": self.num_cases,
-            "evaluation_time_seconds": self.evaluation_time_seconds,
-            "timestamp": self.timestamp.isoformat(),
-            "metadata": self.metadata,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> FitzGovResult:
-        """Create from dictionary."""
-        return cls(
-            overall_accuracy=data["overall_accuracy"],
-            abstention=(
-                FitzGovCategoryResult.from_dict(data["abstention"])
-                if data.get("abstention")
-                else None
-            ),
-            dispute=(
-                FitzGovCategoryResult.from_dict(data["dispute"]) if data.get("dispute") else None
-            ),
-            qualification=(
-                FitzGovCategoryResult.from_dict(data["qualification"])
-                if data.get("qualification")
-                else None
-            ),
-            confidence=(
-                FitzGovCategoryResult.from_dict(data["confidence"])
-                if data.get("confidence")
-                else None
-            ),
-            grounding=(
-                FitzGovCategoryResult.from_dict(data["grounding"])
-                if data.get("grounding")
-                else None
-            ),
-            relevance=(
-                FitzGovCategoryResult.from_dict(data["relevance"])
-                if data.get("relevance")
-                else None
-            ),
-            confusion_matrix=FitzGovConfusionMatrix.from_dict(data["confusion_matrix"]),
-            num_cases=data["num_cases"],
-            evaluation_time_seconds=data["evaluation_time_seconds"],
-            timestamp=datetime.fromisoformat(data["timestamp"]),
-            metadata=data.get("metadata", {}),
-        )
-
-    def __str__(self) -> str:
-        lines = [
-            f"FITZ-GOV Results (n={self.num_cases}):",
-            f"  Overall Accuracy: {self.overall_accuracy:.2%}",
-            "",
-            "Governance Mode Categories:",
-        ]
-        if self.abstention:
-            lines.append(
-                f"  Abstention: {self.abstention.accuracy:.2%} ({self.abstention.num_correct}/{self.abstention.num_total})"
-            )
-        if self.dispute:
-            lines.append(
-                f"  Dispute: {self.dispute.accuracy:.2%} ({self.dispute.num_correct}/{self.dispute.num_total})"
-            )
-        if self.qualification:
-            lines.append(
-                f"  Qualification: {self.qualification.accuracy:.2%} ({self.qualification.num_correct}/{self.qualification.num_total})"
-            )
-        if self.confidence:
-            lines.append(
-                f"  Confidence: {self.confidence.accuracy:.2%} ({self.confidence.num_correct}/{self.confidence.num_total})"
-            )
-
-        # Answer Quality Categories
-        if self.grounding or self.relevance:
-            lines.append("")
-            lines.append("Answer Quality Categories:")
-            if self.grounding:
-                lines.append(
-                    f"  Grounding: {self.grounding.accuracy:.2%} ({self.grounding.num_correct}/{self.grounding.num_total})"
-                )
-            if self.relevance:
-                lines.append(
-                    f"  Relevance: {self.relevance.accuracy:.2%} ({self.relevance.num_correct}/{self.relevance.num_total})"
-                )
-
-        lines.append("")
-        lines.append(str(self.confusion_matrix))
-        return "\n".join(lines)
+def _import_fitz_gov():
+    """Lazy import fitz-gov package with helpful error message."""
+    try:
+        import fitz_gov
+
+        return fitz_gov
+    except ImportError as e:
+        raise ImportError(
+            "fitz-gov package is required for FITZ-GOV benchmark. "
+            "Install with: pip install fitz-gov "
+            "or: pip install -e path/to/fitz-gov"
+        ) from e
+
+
+# Lazy re-exports for backward compatibility
+def __getattr__(name: str):
+    """Lazy import types from fitz-gov."""
+    if name in (
+        "FitzGovCategory",
+        "FitzGovCase",
+        "FitzGovCaseResult",
+        "FitzGovCategoryResult",
+        "FitzGovConfusionMatrix",
+        "FitzGovResult",
+        "OllamaValidator",
+        "ValidatorConfig",
+        "ValidationResult",
+    ):
+        fitz_gov = _import_fitz_gov()
+        return getattr(fitz_gov, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 class FitzGovBenchmark:
     """
-    FITZ-GOV governance calibration benchmark.
+    FITZ-GOV governance calibration benchmark for Fitz RAG engine.
 
     Tests Fitz's ability to correctly classify when to:
     - Abstain (insufficient evidence)
@@ -477,13 +82,13 @@ class FitzGovBenchmark:
         results = benchmark.evaluate(engine)
 
         # Run specific category
+        from fitz_gov import FitzGovCategory
         results = benchmark.evaluate(engine, categories=[FitzGovCategory.ABSTENTION])
     """
 
     def __init__(
         self,
         data_dir: Path | str | None = None,
-        data_url: str | None = None,
         full_mode: bool = False,
         llm_validation: bool = False,
         llm_model: str = "qwen2.5:14b",
@@ -494,9 +99,7 @@ class FitzGovBenchmark:
 
         Args:
             data_dir: Directory containing test case JSON files.
-                     Defaults to ~/.fitz/fitz_gov_data/
-            data_url: URL to download benchmark data from.
-                     Defaults to FITZ-GOV GitHub releases.
+                     Defaults to fitz-gov package data directory.
             full_mode: If True, run full LLM generation for answer quality tests.
                       If False (default), test governance mode classification only.
             llm_validation: If True, use two-pass validation (regex + LLM) for
@@ -504,100 +107,46 @@ class FitzGovBenchmark:
             llm_model: Ollama model for LLM validation. Default: qwen2.5:14b
             llm_base_url: Ollama API URL. Default: http://localhost:11434
         """
-        self._data_dir = Path(data_dir) if data_dir else DATA_DIR
-        self._data_url = data_url or FITZ_GOV_DATA_URL
+        # Import fitz-gov (validates it's installed)
+        fitz_gov = _import_fitz_gov()
+
+        self._data_dir = Path(data_dir) if data_dir else None
         self._full_mode = full_mode
         self._llm_validation = llm_validation
         self._llm_model = llm_model
         self._llm_base_url = llm_base_url
-        self._validator: OllamaValidator | None = None
 
-        # Initialize LLM validator if enabled
-        if llm_validation:
-            self._init_validator()
+        # Store fitz-gov module reference for lazy access
+        self._fitz_gov = fitz_gov
 
-    def _init_validator(self) -> None:
-        """Initialize LLM validator for two-pass evaluation."""
-        from fitz_ai.evaluation.benchmarks.llm_validator import OllamaValidator, ValidatorConfig
-
-        config = ValidatorConfig(
-            model=self._llm_model,
-            base_url=self._llm_base_url,
+        # Create evaluator from fitz-gov
+        self._evaluator = fitz_gov.FitzGovEvaluator(
+            llm_validation=llm_validation,
+            llm_model=llm_model,
+            llm_base_url=llm_base_url,
         )
-        self._validator = OllamaValidator(config)
 
-        if not self._validator.is_available():
-            logger.warning(
-                f"LLM validation enabled but Ollama not available at {self._llm_base_url}. "
-                f"Falling back to regex-only evaluation. "
-                f"Start Ollama and pull {self._llm_model} to enable two-pass validation."
-            )
-
-    def download_data(self, force: bool = False) -> Path:
-        """
-        Download FITZ-GOV benchmark data from GitHub.
-
-        Args:
-            force: If True, re-download even if data exists.
-
-        Returns:
-            Path to data directory.
-        """
-        import tempfile
-        import urllib.request
-        import zipfile
-
-        if self._data_dir.exists() and not force:
-            # Check if data looks valid (has at least one category dir)
-            # Check both flat structure and nested data/cases/ structure
-            category_dirs = ["abstention", "dispute", "qualification", "confidence"]
-            has_flat = any((self._data_dir / cat).exists() for cat in category_dirs)
-            nested_path = self._data_dir / "data" / "cases"
-            has_nested = any((nested_path / cat).exists() for cat in category_dirs)
-            if has_flat or has_nested:
-                logger.info(f"FITZ-GOV data already exists at {self._data_dir}")
-                return self._data_dir
-
-        logger.info(f"Downloading FITZ-GOV benchmark data from {self._data_url}")
-        self._data_dir.mkdir(parents=True, exist_ok=True)
-
-        try:
-            # Download zip to temp file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
-                urllib.request.urlretrieve(self._data_url, tmp.name)
-                tmp_path = Path(tmp.name)
-
-            # Extract to data directory
-            with zipfile.ZipFile(tmp_path, "r") as zf:
-                zf.extractall(self._data_dir)
-
-            # Clean up temp file
-            tmp_path.unlink()
-
-            logger.info(f"FITZ-GOV data downloaded to {self._data_dir}")
-            return self._data_dir
-
-        except Exception as e:
-            logger.error(f"Failed to download FITZ-GOV data: {e}")
-            raise RuntimeError(
-                f"Failed to download FITZ-GOV benchmark data from {self._data_url}. "
-                f"Please check your internet connection or manually download the data. "
-                f"Error: {e}"
-            ) from e
+        # Build mode mapping
+        self._mode_to_fitz_gov = {
+            AnswerMode.ABSTAIN: fitz_gov.AnswerMode.ABSTAIN,
+            AnswerMode.DISPUTED: fitz_gov.AnswerMode.DISPUTED,
+            AnswerMode.QUALIFIED: fitz_gov.AnswerMode.QUALIFIED,
+            AnswerMode.CONFIDENT: fitz_gov.AnswerMode.CONFIDENT,
+        }
 
     def evaluate(
         self,
         engine: FitzRagEngine,
-        categories: list[FitzGovCategory] | None = None,
-        test_cases: list[FitzGovCase] | None = None,
-    ) -> FitzGovResult:
+        categories: list | None = None,
+        test_cases: list | None = None,
+    ) -> Any:
         """
         Evaluate governance calibration.
 
         Args:
             engine: Fitz RAG engine to evaluate
-            categories: Categories to test. Defaults to all.
-            test_cases: Custom test cases. If not provided, loads from data_dir.
+            categories: Categories to test (FitzGovCategory). Defaults to all.
+            test_cases: Custom test cases (FitzGovCase). If not provided, loads from data_dir.
 
         Returns:
             FitzGovResult with accuracy and confusion matrix
@@ -606,109 +155,41 @@ class FitzGovBenchmark:
 
         start_time = time.time()
 
-        # Load test cases
+        # Load test cases from fitz-gov package
         if test_cases is None:
-            test_cases = self._load_test_cases(categories)
+            test_cases = self._fitz_gov.load_cases(categories, self._data_dir)
 
         # Filter by category if specified
         if categories:
             test_cases = [c for c in test_cases if c.category in categories]
 
-        # Group by category
-        by_category: dict[FitzGovCategory, list[FitzGovCase]] = defaultdict(list)
+        # Run engine on each case and collect responses + modes
+        responses: list[str] = []
+        modes: list = []
+
         for case in test_cases:
-            by_category[case.category].append(case)
+            answer_text, actual_mode = self._run_case(engine, case)
+            responses.append(answer_text)
+            modes.append(self._mode_to_fitz_gov.get(actual_mode) if actual_mode else None)
 
-        # Initialize confusion matrix
-        confusion_matrix = FitzGovConfusionMatrix(matrix={})
+        # Use fitz-gov evaluator for evaluation
+        result = self._evaluator.evaluate_all(test_cases, responses, modes)
 
-        # Evaluate each category
-        category_results: dict[FitzGovCategory, FitzGovCategoryResult] = {}
-        for cat, cat_cases in by_category.items():
-            cat_result = self._evaluate_category(engine, cat_cases, cat, confusion_matrix)
-            category_results[cat] = cat_result
+        # Update timing
+        result.evaluation_time_seconds = time.time() - start_time
+        result.metadata["full_mode"] = self._full_mode
 
-        evaluation_time = time.time() - start_time
+        return result
 
-        # Calculate overall accuracy
-        total_correct = sum(r.num_correct for r in category_results.values())
-        total_cases = sum(r.num_total for r in category_results.values())
-        overall_accuracy = total_correct / total_cases if total_cases > 0 else 0.0
+    def _run_case(
+        self, engine: FitzRagEngine, case: Any
+    ) -> tuple[str, AnswerMode | None]:
+        """
+        Run engine on a single test case.
 
-        return FitzGovResult(
-            overall_accuracy=overall_accuracy,
-            abstention=category_results.get(FitzGovCategory.ABSTENTION),
-            dispute=category_results.get(FitzGovCategory.DISPUTE),
-            qualification=category_results.get(FitzGovCategory.QUALIFICATION),
-            confidence=category_results.get(FitzGovCategory.CONFIDENCE),
-            grounding=category_results.get(FitzGovCategory.GROUNDING),
-            relevance=category_results.get(FitzGovCategory.RELEVANCE),
-            confusion_matrix=confusion_matrix,
-            num_cases=len(test_cases),
-            evaluation_time_seconds=evaluation_time,
-        )
-
-    # Categories that map to AnswerMode (contribute to confusion matrix)
-    GOVERNANCE_MODE_CATEGORIES = {
-        FitzGovCategory.ABSTENTION,
-        FitzGovCategory.DISPUTE,
-        FitzGovCategory.QUALIFICATION,
-        FitzGovCategory.CONFIDENCE,
-    }
-
-    # Answer quality categories (don't use confusion matrix)
-    ANSWER_QUALITY_CATEGORIES = {
-        FitzGovCategory.GROUNDING,
-        FitzGovCategory.RELEVANCE,
-    }
-
-    def _evaluate_category(
-        self,
-        engine: FitzRagEngine,
-        cases: list[FitzGovCase],
-        category: FitzGovCategory,
-        confusion_matrix: FitzGovConfusionMatrix,
-    ) -> FitzGovCategoryResult:
-        """Evaluate a single category."""
-        case_results: list[FitzGovCaseResult] = []
-        subcategory_correct: dict[str, int] = defaultdict(int)
-        subcategory_total: dict[str, int] = defaultdict(int)
-
-        # Only governance mode categories contribute to confusion matrix
-        is_governance_category = category in self.GOVERNANCE_MODE_CATEGORIES
-
-        for case in cases:
-            result = self._evaluate_case(engine, case)
-            case_results.append(result)
-
-            # Update confusion matrix only for governance mode categories
-            if is_governance_category:
-                confusion_matrix.add(case.expected_mode, result.actual_mode)
-
-            # Track subcategory stats
-            subcategory_total[case.subcategory] += 1
-            if result.passed:
-                subcategory_correct[case.subcategory] += 1
-
-        # Calculate subcategory accuracy
-        subcategory_accuracy = {
-            subcat: subcategory_correct[subcat] / total
-            for subcat, total in subcategory_total.items()
-        }
-
-        num_correct = sum(1 for r in case_results if r.passed)
-
-        return FitzGovCategoryResult(
-            category=category,
-            accuracy=num_correct / len(cases) if cases else 0.0,
-            num_correct=num_correct,
-            num_total=len(cases),
-            case_results=case_results,
-            subcategory_accuracy=subcategory_accuracy,
-        )
-
-    def _evaluate_case(self, engine: FitzRagEngine, case: FitzGovCase) -> FitzGovCaseResult:
-        """Evaluate a single test case."""
+        Returns:
+            Tuple of (answer_text, actual_mode)
+        """
         from fitz_ai.core import Query
 
         query = Query(text=case.query)
@@ -718,226 +199,15 @@ class FitzGovBenchmark:
 
         # Extract governance info
         actual_mode = self._get_answer_mode(answer)
-        triggered = self._get_triggered_constraints(answer)
+        answer_text = answer.answer if hasattr(answer, "answer") else str(answer)
 
-        # Evaluate based on category type
-        if case.category == FitzGovCategory.GROUNDING:
-            if self._full_mode:
-                passed, failure_analysis = self._evaluate_grounding(answer.answer, case)
-            else:
-                # Skip in governance-only mode
-                passed = True
-                failure_analysis = "Skipped - governance-only mode"
-        elif case.category == FitzGovCategory.RELEVANCE:
-            if self._full_mode:
-                passed, failure_analysis = self._evaluate_relevance(answer.answer, case)
-            else:
-                # Skip in governance-only mode
-                passed = True
-                failure_analysis = "Skipped - governance-only mode"
-        else:
-            # Governance mode categories: check mode match
-            passed = actual_mode == case.expected_mode
-            failure_analysis = None
-            if not passed:
-                failure_analysis = self._analyze_failure(case, actual_mode, triggered)
-
-        return FitzGovCaseResult(
-            case=case,
-            passed=passed,
-            answer=answer.answer,
-            actual_mode=actual_mode,
-            triggered_constraints=triggered,
-            failure_analysis=failure_analysis,
-        )
-
-    def _evaluate_grounding(self, answer_text: str, case: FitzGovCase) -> tuple[bool, str | None]:
-        """
-        Evaluate grounding: answer should not contain forbidden claims (hallucinations).
-
-        Uses two-pass validation if LLM validation is enabled:
-        1. Regex pass: Check for forbidden patterns
-        2. LLM pass: Validate flagged matches to reduce false positives
-        """
-        eval_config = case.evaluation_config
-        use_regex = eval_config.get("use_regex", False)
-        case_insensitive = eval_config.get("case_insensitive", True)
-        allowed_phrases = eval_config.get("allowed_phrases", [])
-
-        # Pass 1: Regex check for forbidden claims
-        regex_flags = re.IGNORECASE if case_insensitive else 0
-        found_violations = []
-
-        for pattern in case.forbidden_claims:
-            try:
-                if use_regex:
-                    matches = list(re.finditer(pattern, answer_text, regex_flags))
-                else:
-                    # Simple substring match
-                    search_text = answer_text.lower() if case_insensitive else answer_text
-                    search_pattern = pattern.lower() if case_insensitive else pattern
-                    if search_pattern in search_text:
-                        # Create a simple match-like object for substring matches
-                        match_obj = type("Match", (), {"group": lambda p=pattern: p})
-                        matches = [match_obj]
-                    else:
-                        matches = []
-
-                for match in matches:
-                    matched_text = match.group() if hasattr(match, "group") else pattern
-
-                    # Check if match is within an allowed phrase
-                    is_allowed = False
-                    for allowed in allowed_phrases:
-                        try:
-                            if re.search(allowed, answer_text, regex_flags):
-                                # Check if the matched text is part of an allowed phrase context
-                                is_allowed = True
-                                break
-                        except re.error:
-                            if allowed.lower() in answer_text.lower():
-                                is_allowed = True
-                                break
-
-                    if not is_allowed:
-                        found_violations.append({
-                            "matched_text": matched_text,
-                            "pattern": pattern,
-                        })
-            except re.error as e:
-                logger.warning(f"Invalid regex pattern '{pattern}': {e}")
-                # Fall back to substring match
-                if pattern.lower() in answer_text.lower():
-                    found_violations.append({
-                        "matched_text": pattern,
-                        "pattern": pattern,
-                    })
-
-        if not found_violations:
-            return True, None
-
-        # Pass 2: LLM validation (if enabled)
-        if self._validator and self._validator.is_available():
-            confirmed_violations = []
-            for violation in found_violations:
-                result = self._validator.validate_forbidden_claim(
-                    response=answer_text,
-                    matched_text=violation["matched_text"],
-                    pattern=violation["pattern"],
-                    context=case.contexts[0] if case.contexts else "",
-                    query=case.query,
-                    rationale=case.rationale,
-                )
-                if result.is_violation:
-                    confirmed_violations.append(violation)
-                else:
-                    matched = violation['matched_text']
-                    logger.debug(f"LLM cleared false positive: '{matched}' - {result.reasoning}")
-
-            if not confirmed_violations:
-                return True, None
-
-            violations_list = [v['matched_text'] for v in confirmed_violations]
-            return False, f"HALLUCINATION: Found forbidden claims: {violations_list}"
-
-        # No LLM: trust regex results
-        violations_list = [v['matched_text'] for v in found_violations]
-        return False, f"HALLUCINATION: Found forbidden claims: {violations_list}"
-
-    def _evaluate_relevance(self, answer_text: str, case: FitzGovCase) -> tuple[bool, str | None]:
-        """
-        Evaluate relevance: answer should contain required elements and not forbidden elements.
-
-        Uses two-pass validation if LLM validation is enabled:
-        1. Regex pass: Check for required/forbidden patterns
-        2. LLM pass: Validate flagged matches to reduce false positives
-        """
-        eval_config = case.evaluation_config
-        use_regex = eval_config.get("use_regex", False)
-        case_insensitive = eval_config.get("case_insensitive", True)
-        min_required = eval_config.get("min_required", 1)
-
-        regex_flags = re.IGNORECASE if case_insensitive else 0
-
-        # Check required elements (at least min_required must match)
-        matched_required = 0
-        for element in case.required_elements:
-            try:
-                if use_regex:
-                    if re.search(element, answer_text, regex_flags):
-                        matched_required += 1
-                else:
-                    search_text = answer_text.lower() if case_insensitive else answer_text
-                    search_element = element.lower() if case_insensitive else element
-                    if search_element in search_text:
-                        matched_required += 1
-            except re.error:
-                # Fall back to substring
-                if element.lower() in answer_text.lower():
-                    matched_required += 1
-
-        if matched_required < min_required:
-            return False, f"OFF-TOPIC: Need {min_required} required elements, found {matched_required}"
-
-        # Check forbidden elements (patterns that indicate false confidence)
-        found_forbidden = []
-        for pattern in case.forbidden_elements:
-            try:
-                if use_regex:
-                    match = re.search(pattern, answer_text, regex_flags)
-                else:
-                    search_text = answer_text.lower() if case_insensitive else answer_text
-                    search_pattern = pattern.lower() if case_insensitive else pattern
-                    match = search_pattern in search_text
-
-                if match:
-                    matched_text = match.group() if hasattr(match, "group") else pattern
-                    found_forbidden.append({
-                        "matched_text": matched_text,
-                        "pattern": pattern,
-                    })
-            except re.error:
-                if pattern.lower() in answer_text.lower():
-                    found_forbidden.append({
-                        "matched_text": pattern,
-                        "pattern": pattern,
-                    })
-
-        if not found_forbidden:
-            return True, None
-
-        # Pass 2: LLM validation for forbidden elements (if enabled)
-        if self._validator and self._validator.is_available():
-            confirmed_forbidden = []
-            for violation in found_forbidden:
-                result = self._validator.validate_forbidden_element(
-                    response=answer_text,
-                    matched_text=violation["matched_text"],
-                    pattern=violation["pattern"],
-                    context=case.contexts[0] if case.contexts else "",
-                    query=case.query,
-                )
-                if result.is_violation:
-                    confirmed_forbidden.append(violation)
-                else:
-                    matched = violation['matched_text']
-                    logger.debug(f"LLM cleared false positive: '{matched}' - {result.reasoning}")
-
-            if not confirmed_forbidden:
-                return True, None
-
-            forbidden_list = [v['matched_text'] for v in confirmed_forbidden]
-            return False, f"FALSE_CONFIDENCE: Found forbidden elements: {forbidden_list}"
-
-        # No LLM: trust regex results
-        forbidden_list = [v['matched_text'] for v in found_forbidden]
-        return False, f"FALSE_CONFIDENCE: Found forbidden elements: {forbidden_list}"
+        return answer_text, actual_mode
 
     def _run_with_contexts(self, engine: FitzRagEngine, query, contexts: list[str]):
         """
         Run governance classification on injected contexts.
 
-        In governance-only mode: tests constraint → mode classification only.
+        In governance-only mode: tests constraint -> mode classification only.
         In full mode: runs LLM generation for answer quality evaluation.
         """
         from dataclasses import dataclass
@@ -969,10 +239,11 @@ class FitzGovBenchmark:
 
         # In governance-only mode, return minimal result (no LLM)
         if not self._full_mode:
+
             @dataclass
             class GovernanceResult:
                 answer: str
-                mode: "AnswerMode"
+                mode: AnswerMode
                 triggered_constraints: set
 
             return GovernanceResult(
@@ -1010,137 +281,6 @@ class FitzGovBenchmark:
             return answer.governance.mode
         return AnswerMode.CONFIDENT
 
-    def _get_triggered_constraints(self, answer) -> list[str]:
-        """Extract triggered constraints from answer."""
-        if hasattr(answer, "triggered_constraints"):
-            return list(answer.triggered_constraints)
-        if hasattr(answer, "governance") and hasattr(answer.governance, "triggered_constraints"):
-            return list(answer.governance.triggered_constraints)
-        return []
-
-    def _analyze_failure(
-        self,
-        case: FitzGovCase,
-        actual_mode: AnswerMode,
-        triggered: list[str],
-    ) -> str:
-        """Generate failure analysis."""
-        lines = [
-            f"Expected {case.expected_mode.value}, got {actual_mode.value}",
-            f"Triggered constraints: {triggered or 'none'}",
-        ]
-
-        # Category-specific analysis
-        if case.category == FitzGovCategory.ABSTENTION:
-            if actual_mode == AnswerMode.CONFIDENT:
-                lines.append("OVER-CONFIDENT: Answered when should have abstained")
-            elif actual_mode == AnswerMode.QUALIFIED:
-                lines.append("PARTIAL: Qualified but should have fully abstained")
-
-        elif case.category == FitzGovCategory.DISPUTE:
-            if actual_mode == AnswerMode.CONFIDENT:
-                lines.append("MISSED CONFLICT: Did not detect contradicting sources")
-            elif actual_mode == AnswerMode.ABSTAIN:
-                lines.append("OVER-CAUTIOUS: Abstained instead of reporting dispute")
-
-        elif case.category == FitzGovCategory.CONFIDENCE:
-            if actual_mode == AnswerMode.ABSTAIN:
-                lines.append("UNDER-CONFIDENT: Abstained when evidence was clear")
-            elif actual_mode == AnswerMode.DISPUTED:
-                lines.append("FALSE CONFLICT: Saw conflict where none exists")
-
-        return "\n".join(lines)
-
-    def _load_test_cases(
-        self,
-        categories: list[FitzGovCategory] | None = None,
-    ) -> list[FitzGovCase]:
-        """Load test cases from data directory (downloads if needed)."""
-        cases: list[FitzGovCase] = []
-
-        # Download data if not present
-        if not self._data_dir.exists():
-            try:
-                self.download_data()
-            except RuntimeError as e:
-                logger.warning(f"Could not download FITZ-GOV data: {e}")
-                return cases
-
-        # Determine the cases root directory
-        # Support multiple structures:
-        # 1. Flat: <data_dir>/<category>/ (categories at root)
-        # 2. Nested v1: <data_dir>/data/cases/<category>/ (old structure)
-        # 3. Nested v2: <data_dir>/data/<category>/ (new handcrafted structure)
-        cases_root = self._data_dir
-        if (self._data_dir / "data" / "cases").exists():
-            cases_root = self._data_dir / "data" / "cases"
-        elif (self._data_dir / "data").exists():
-            # Check if data/ contains category directories directly
-            data_dir = self._data_dir / "data"
-            if any((data_dir / cat).exists() for cat in ["abstention", "dispute", "confidence"]):
-                cases_root = data_dir
-
-        # Map categories to directory names
-        category_dirs = {
-            # Governance mode categories
-            FitzGovCategory.ABSTENTION: "abstention",
-            FitzGovCategory.DISPUTE: "dispute",
-            FitzGovCategory.QUALIFICATION: "qualification",
-            FitzGovCategory.CONFIDENCE: "confidence",
-            # Answer quality categories
-            FitzGovCategory.GROUNDING: "grounding",
-            FitzGovCategory.RELEVANCE: "relevance",
-        }
-
-        target_categories = categories or list(FitzGovCategory)
-
-        for cat in target_categories:
-            cat_dir = cases_root / category_dirs[cat]
-            if not cat_dir.exists():
-                continue
-
-            for json_file in cat_dir.glob("*.json"):
-                try:
-                    with open(json_file, encoding="utf-8") as f:
-                        data = json.load(f)
-
-                    # Get category-level evaluation config
-                    category_eval_config = data.get("evaluation_config", {})
-
-                    for case_data in data.get("cases", []):
-                        case_data["category"] = cat.value
-                        # Use file stem as subcategory if not specified in case
-                        if "subcategory" not in case_data:
-                            case_data["subcategory"] = json_file.stem
-
-                        # Merge category-level eval config with case-level (case takes precedence)
-                        case_eval_config = case_data.get("evaluation_config", {})
-                        merged_config = {**category_eval_config, **case_eval_config}
-                        case_data["evaluation_config"] = merged_config
-
-                        cases.append(FitzGovCase.from_dict(case_data))
-
-                except Exception as e:
-                    logger.warning(f"Failed to load {json_file}: {e}")
-
-        return cases
-
-    def save_results(self, result: FitzGovResult, path: Path | str) -> None:
-        """Save results to JSON file."""
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(result.to_dict(), f, indent=2)
-        logger.info(f"Saved FITZ-GOV results to {path}")
-
-    def load_results(self, path: Path | str) -> FitzGovResult:
-        """Load results from JSON file."""
-        path = Path(path)
-        with open(path) as f:
-            data = json.load(f)
-        return FitzGovResult.from_dict(data)
-
-    @staticmethod
-    def get_available_categories() -> list[str]:
+    def get_available_categories(self) -> list[str]:
         """Get list of available categories."""
-        return [c.value for c in FitzGovCategory]
+        return [c.value for c in self._fitz_gov.FitzGovCategory]
