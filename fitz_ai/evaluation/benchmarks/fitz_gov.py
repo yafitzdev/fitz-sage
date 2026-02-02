@@ -865,10 +865,18 @@ class FitzGovBenchmark:
                 return cases
 
         # Determine the cases root directory
-        # Support both flat structure (categories at root) and nested (data/cases/<category>)
+        # Support multiple structures:
+        # 1. Flat: <data_dir>/<category>/ (categories at root)
+        # 2. Nested v1: <data_dir>/data/cases/<category>/ (old structure)
+        # 3. Nested v2: <data_dir>/data/<category>/ (new handcrafted structure)
         cases_root = self._data_dir
         if (self._data_dir / "data" / "cases").exists():
             cases_root = self._data_dir / "data" / "cases"
+        elif (self._data_dir / "data").exists():
+            # Check if data/ contains category directories directly
+            data_dir = self._data_dir / "data"
+            if any((data_dir / cat).exists() for cat in ["abstention", "dispute", "confidence"]):
+                cases_root = data_dir
 
         # Map categories to directory names
         category_dirs = {
