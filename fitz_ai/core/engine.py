@@ -1,4 +1,4 @@
-"""KnowledgeEngine Protocol - Query → Answer contract. See docs/api_reference.md for details."""
+"""KnowledgeEngine Protocol - Query → Answer contract. See docs/API_REFERENCE.md for details."""
 
 from typing import Protocol, runtime_checkable
 

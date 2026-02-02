@@ -1,5 +1,5 @@
 # fitz_ai/core/answer.py
-"""Answer - paradigm-agnostic answer representation. See docs/api_reference.md for examples."""
+"""Answer - paradigm-agnostic answer representation. See docs/API_REFERENCE.md for examples."""
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
