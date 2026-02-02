@@ -112,22 +112,16 @@ def _has_summary_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
     if not query_words:
         return True  # Can't determine, allow
 
-    # Calculate match ratio - what fraction of query words appear in any summary?
-    all_summary_words = set()
     for chunk in chunks:
         summary = chunk.metadata.get("summary", "")
         if summary:
-            all_summary_words.update(_extract_words(summary))
+            summary_words = _extract_words(summary)
+            # Require at least 1 matching word
+            overlap = query_words & summary_words
+            if overlap:
+                return True
 
-    if not all_summary_words:
-        return True  # No summaries, can't determine
-
-    overlap = query_words & all_summary_words
-    match_ratio = len(overlap) / len(query_words)
-
-    # Require at least 30% of query words to appear in summaries
-    # This catches cases where only 1 common word matches by coincidence
-    return match_ratio >= 0.3
+    return False
 
 
 def _has_lexical_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
