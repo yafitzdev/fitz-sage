@@ -762,11 +762,6 @@ class FitzGovBenchmark:
         # Step 6: Build structured answer
         answer = pipeline.rgs.build_answer(raw_response, processed_chunks, mode=governance.mode)
 
-        # Include governance metadata
-        if governance.user_explanation:
-            answer.metadata["governance_explanation"] = governance.user_explanation
-            answer.metadata["triggered_constraints"] = list(governance.triggered_constraints)
-
         return answer
 
     def _get_answer_mode(self, answer) -> AnswerMode:
