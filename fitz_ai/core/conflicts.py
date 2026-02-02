@@ -2,18 +2,20 @@
 """
 Conflict Detection - Core epistemic capability for fitz-ai.
 
-This module provides backward compatibility for code using the old
-regex-based conflict detection API.
+Conflict detection is performed at QUERY TIME using LLM-based analysis
+in ConflictAwareConstraint. This module provides an empty stub for
+ingest-time compatibility.
 
-The actual conflict detection logic is now in:
-- fitz_ai.core.guardrails.semantic.SemanticMatcher
+Architecture:
+- Query-time: ConflictAwareConstraint uses fast LLM to detect contradictions
+- Ingest-time: No conflict detection (too expensive, deferred to query time)
 
-Used by:
-- Query-time constraints (guardrails/)
-- Ingest-time enrichment (hierarchy/)
-- Any engine that needs conflict awareness
+The LLM-based approach was chosen because embedding-based conflict detection
+(cosine similarity) cannot reliably distinguish between:
+- Complementary information (should NOT be flagged)
+- Contradictory claims (SHOULD be flagged)
 
-For new code, prefer using SemanticMatcher directly.
+See fitz_ai.core.guardrails.plugins.conflict_aware for the LLM implementation.
 """
 
 from __future__ import annotations
@@ -25,28 +27,19 @@ from fitz_ai.core.chunk import Chunk
 
 def find_conflicts(chunks: Sequence[Chunk]) -> list[tuple[str, str, str, str]]:
     """
-    Backward-compatible conflict detection stub.
+    Ingest-time conflict detection stub.
 
-    This function returns an empty list for compatibility.
-    For actual conflict detection, use SemanticMatcher.find_conflicts()
-    which provides language-agnostic semantic conflict detection.
+    Returns an empty list. Actual conflict detection happens at query time
+    using LLM-based analysis in ConflictAwareConstraint.
 
-    The ingestion pipeline can optionally be configured to use
-    semantic conflict detection by providing an embedder.
+    This stub exists for hierarchy enricher compatibility during ingestion.
 
     Args:
-        chunks: Sequence of chunks to analyze
+        chunks: Sequence of chunks to analyze (unused)
 
     Returns:
-        Empty list (no conflicts detected without semantic matcher)
-
-    Note:
-        This is a compatibility stub. For production use, integrate
-        SemanticMatcher with an embedder for semantic conflict detection.
+        Empty list (conflict detection deferred to query time)
     """
-    # Stub: return empty conflicts for compatibility
-    # Semantic conflict detection requires an embedder which is not
-    # available in this legacy API. Use SemanticMatcher instead.
     return []
 
 

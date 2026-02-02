@@ -1,11 +1,11 @@
 # tests/test_epistemic_hierarchy.py
 """Tests for epistemic-aware hierarchical summarization.
 
-Note: Conflict detection at ingest time requires a semantic matcher with
-an embedder. The stub find_conflicts() function returns empty without one.
+Note: Conflict detection at ingest time is deferred - the stub find_conflicts()
+returns empty. Actual conflict detection happens at query time using LLM-based
+analysis in ConflictAwareConstraint.
 
-For actual conflict detection, see test_constraints.py which uses
-SemanticMatcher with mock embedder.
+For conflict detection tests, see test_governance_constraints.py.
 """
 
 from __future__ import annotations

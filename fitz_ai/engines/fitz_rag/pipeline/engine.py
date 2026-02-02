@@ -123,7 +123,13 @@ class RAGPipeline:
                     "Use RAGPipeline.from_config() for full constraint support."
                 )
             else:
-                self.constraints = create_default_constraints(semantic_matcher)
+                # Use fast chat tier for conflict detection (efficient LLM calls)
+                fast_chat = self.chat_factory("fast")
+                fast_model = getattr(fast_chat, "_model", "unknown")
+                logger.info(
+                    f"{PIPELINE} Creating default constraints with fast_chat model='{fast_model}'"
+                )
+                self.constraints = create_default_constraints(semantic_matcher, chat=fast_chat)
         else:
             self.constraints = list(guardrails.constraints)
 

@@ -682,7 +682,17 @@ def _display_fitz_gov_rich(result) -> None:
     table.add_column("Correct", justify="right")
     table.add_column("Total", justify="right")
 
-    for cat_result in [result.abstention, result.dispute, result.qualification, result.confidence]:
+    # Import FitzGovCategory for dict access
+    from fitz_gov import FitzGovCategory
+
+    gov_cats = [
+        FitzGovCategory.ABSTENTION,
+        FitzGovCategory.DISPUTE,
+        FitzGovCategory.QUALIFICATION,
+        FitzGovCategory.CONFIDENCE,
+    ]
+    for cat in gov_cats:
+        cat_result = result.category_results.get(cat)
         if cat_result:
             style = (
                 "green"
@@ -700,14 +710,17 @@ def _display_fitz_gov_rich(result) -> None:
     print()
 
     # Answer Quality Categories (grounding + relevance)
-    if result.grounding or result.relevance:
+    quality_cats = [FitzGovCategory.GROUNDING, FitzGovCategory.RELEVANCE]
+    has_quality = any(cat in result.category_results for cat in quality_cats)
+    if has_quality:
         quality_table = Table(title="Answer Quality", show_header=True, header_style="bold")
         quality_table.add_column("Category", style="cyan")
         quality_table.add_column("Accuracy", justify="right")
         quality_table.add_column("Correct", justify="right")
         quality_table.add_column("Total", justify="right")
 
-        for cat_result in [result.grounding, result.relevance]:
+        for cat in quality_cats:
+            cat_result = result.category_results.get(cat)
             if cat_result:
                 style = (
                     "green"
@@ -730,20 +743,32 @@ def _display_fitz_gov_rich(result) -> None:
 
 def _display_fitz_gov_plain(result) -> None:
     """Display FITZ-GOV results in plain text."""
+    from fitz_gov import FitzGovCategory
+
     print("Governance Mode Categories:")
     print("-" * 40)
-    for cat_result in [result.abstention, result.dispute, result.qualification, result.confidence]:
+    gov_cats = [
+        FitzGovCategory.ABSTENTION,
+        FitzGovCategory.DISPUTE,
+        FitzGovCategory.QUALIFICATION,
+        FitzGovCategory.CONFIDENCE,
+    ]
+    for cat in gov_cats:
+        cat_result = result.category_results.get(cat)
         if cat_result:
             print(
                 f"  {cat_result.category.value.title()}: "
                 f"{cat_result.accuracy:.2%} ({cat_result.num_correct}/{cat_result.num_total})"
             )
 
-    if result.grounding or result.relevance:
+    quality_cats = [FitzGovCategory.GROUNDING, FitzGovCategory.RELEVANCE]
+    has_quality = any(cat in result.category_results for cat in quality_cats)
+    if has_quality:
         print()
         print("Answer Quality Categories:")
         print("-" * 40)
-        for cat_result in [result.grounding, result.relevance]:
+        for cat in quality_cats:
+            cat_result = result.category_results.get(cat)
             if cat_result:
                 print(
                     f"  {cat_result.category.value.title()}: "

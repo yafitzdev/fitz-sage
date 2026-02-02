@@ -48,11 +48,14 @@ from .runner import run_constraints
 from .semantic import SemanticMatcher
 
 if TYPE_CHECKING:
+    from fitz_ai.llm.providers.base import ChatProvider
+
     from .semantic import EmbedderFunc
 
 
 def create_default_constraints(
     semantic_matcher: SemanticMatcher,
+    chat: "ChatProvider | None" = None,
 ) -> list[ConstraintPlugin]:
     """
     Create the default constraint plugins with a shared semantic matcher.
@@ -62,15 +65,18 @@ def create_default_constraints(
 
     Args:
         semantic_matcher: SemanticMatcher instance with configured embedder
+        chat: Optional ChatProvider for LLM-based conflict detection.
+              If provided, ConflictAwareConstraint uses LLM to detect conflicts.
+              If None, conflict detection is disabled.
 
     Returns:
         List of default constraint plugins:
-        - ConflictAwareConstraint
+        - ConflictAwareConstraint (with LLM if chat provided)
         - InsufficientEvidenceConstraint
         - CausalAttributionConstraint
     """
     return [
-        ConflictAwareConstraint(semantic_matcher=semantic_matcher),
+        ConflictAwareConstraint(semantic_matcher=semantic_matcher, chat=chat),
         InsufficientEvidenceConstraint(semantic_matcher=semantic_matcher),
         CausalAttributionConstraint(semantic_matcher=semantic_matcher),
     ]
