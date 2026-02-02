@@ -39,6 +39,10 @@ __all__ = [
     "FitzGovCategoryResult",
     "FitzGovResult",
     "FitzGovBenchmark",
+    # LLM Validator
+    "OllamaValidator",
+    "ValidatorConfig",
+    "ValidationResult",
 ]
 
 
@@ -91,5 +95,15 @@ def __getattr__(name: str):
         elif name == "FitzGovResult":
             return FitzGovResult
         return FitzGovBenchmark
+
+    # LLM Validator
+    if name in ("OllamaValidator", "ValidatorConfig", "ValidationResult"):
+        from .llm_validator import OllamaValidator, ValidationResult, ValidatorConfig
+
+        if name == "OllamaValidator":
+            return OllamaValidator
+        elif name == "ValidatorConfig":
+            return ValidatorConfig
+        return ValidationResult
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

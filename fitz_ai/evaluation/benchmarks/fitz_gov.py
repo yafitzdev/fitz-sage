@@ -32,6 +32,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -44,6 +45,7 @@ from fitz_ai.logging.logger import get_logger
 
 if TYPE_CHECKING:
     from fitz_ai.engines.fitz_rag.engine import FitzRagEngine
+    from fitz_ai.evaluation.benchmarks.llm_validator import OllamaValidator
 
 logger = get_logger(__name__)
 
@@ -109,10 +111,16 @@ class FitzGovCase:
 
     # Answer quality fields (for grounding/relevance categories)
     forbidden_claims: list[str] = field(default_factory=list)
-    """For GROUNDING: Claims that indicate hallucination (should NOT appear in answer)."""
+    """For GROUNDING: Regex patterns that indicate hallucination (should NOT appear in answer)."""
 
     required_elements: list[str] = field(default_factory=list)
     """For RELEVANCE: Elements that MUST appear in the answer."""
+
+    forbidden_elements: list[str] = field(default_factory=list)
+    """For RELEVANCE: Patterns that indicate false confidence (should NOT appear)."""
+
+    evaluation_config: dict[str, Any] = field(default_factory=dict)
+    """Evaluation configuration (use_regex, case_insensitive, allowed_phrases, etc.)."""
 
     metadata: dict[str, Any] = field(default_factory=dict)
     """Additional test case metadata."""
@@ -135,6 +143,10 @@ class FitzGovCase:
             result["forbidden_claims"] = self.forbidden_claims
         if self.required_elements:
             result["required_elements"] = self.required_elements
+        if self.forbidden_elements:
+            result["forbidden_elements"] = self.forbidden_elements
+        if self.evaluation_config:
+            result["evaluation_config"] = self.evaluation_config
         return result
 
     @classmethod
@@ -151,6 +163,8 @@ class FitzGovCase:
             rationale=data["rationale"],
             forbidden_claims=data.get("forbidden_claims", []),
             required_elements=data.get("required_elements", []),
+            forbidden_elements=data.get("forbidden_elements", []),
+            evaluation_config=data.get("evaluation_config", {}),
             metadata=data.get("metadata", {}),
         )
 
@@ -471,6 +485,9 @@ class FitzGovBenchmark:
         data_dir: Path | str | None = None,
         data_url: str | None = None,
         full_mode: bool = False,
+        llm_validation: bool = False,
+        llm_model: str = "qwen2.5:14b",
+        llm_base_url: str = "http://localhost:11434",
     ):
         """
         Initialize FITZ-GOV benchmark.
@@ -482,10 +499,39 @@ class FitzGovBenchmark:
                      Defaults to FITZ-GOV GitHub releases.
             full_mode: If True, run full LLM generation for answer quality tests.
                       If False (default), test governance mode classification only.
+            llm_validation: If True, use two-pass validation (regex + LLM) for
+                           grounding and relevance categories. Requires Ollama.
+            llm_model: Ollama model for LLM validation. Default: qwen2.5:14b
+            llm_base_url: Ollama API URL. Default: http://localhost:11434
         """
         self._data_dir = Path(data_dir) if data_dir else DATA_DIR
         self._data_url = data_url or FITZ_GOV_DATA_URL
         self._full_mode = full_mode
+        self._llm_validation = llm_validation
+        self._llm_model = llm_model
+        self._llm_base_url = llm_base_url
+        self._validator: OllamaValidator | None = None
+
+        # Initialize LLM validator if enabled
+        if llm_validation:
+            self._init_validator()
+
+    def _init_validator(self) -> None:
+        """Initialize LLM validator for two-pass evaluation."""
+        from fitz_ai.evaluation.benchmarks.llm_validator import OllamaValidator, ValidatorConfig
+
+        config = ValidatorConfig(
+            model=self._llm_model,
+            base_url=self._llm_base_url,
+        )
+        self._validator = OllamaValidator(config)
+
+        if not self._validator.is_available():
+            logger.warning(
+                f"LLM validation enabled but Ollama not available at {self._llm_base_url}. "
+                f"Falling back to regex-only evaluation. "
+                f"Start Ollama and pull {self._llm_model} to enable two-pass validation."
+            )
 
     def download_data(self, force: bool = False) -> Path:
         """
@@ -497,7 +543,6 @@ class FitzGovBenchmark:
         Returns:
             Path to data directory.
         """
-        import shutil
         import tempfile
         import urllib.request
         import zipfile
@@ -507,7 +552,8 @@ class FitzGovBenchmark:
             # Check both flat structure and nested data/cases/ structure
             category_dirs = ["abstention", "dispute", "qualification", "confidence"]
             has_flat = any((self._data_dir / cat).exists() for cat in category_dirs)
-            has_nested = any((self._data_dir / "data" / "cases" / cat).exists() for cat in category_dirs)
+            nested_path = self._data_dir / "data" / "cases"
+            has_nested = any((nested_path / cat).exists() for cat in category_dirs)
             if has_flat or has_nested:
                 logger.info(f"FITZ-GOV data already exists at {self._data_dir}")
                 return self._data_dir
@@ -706,30 +752,186 @@ class FitzGovBenchmark:
         )
 
     def _evaluate_grounding(self, answer_text: str, case: FitzGovCase) -> tuple[bool, str | None]:
-        """Evaluate grounding: answer should not contain forbidden claims (hallucinations)."""
-        answer_lower = answer_text.lower()
-        found_hallucinations = []
+        """
+        Evaluate grounding: answer should not contain forbidden claims (hallucinations).
 
-        for claim in case.forbidden_claims:
-            if claim.lower() in answer_lower:
-                found_hallucinations.append(claim)
+        Uses two-pass validation if LLM validation is enabled:
+        1. Regex pass: Check for forbidden patterns
+        2. LLM pass: Validate flagged matches to reduce false positives
+        """
+        eval_config = case.evaluation_config
+        use_regex = eval_config.get("use_regex", False)
+        case_insensitive = eval_config.get("case_insensitive", True)
+        allowed_phrases = eval_config.get("allowed_phrases", [])
 
-        if found_hallucinations:
-            return False, f"HALLUCINATION: Found forbidden claims: {found_hallucinations}"
-        return True, None
+        # Pass 1: Regex check for forbidden claims
+        regex_flags = re.IGNORECASE if case_insensitive else 0
+        found_violations = []
+
+        for pattern in case.forbidden_claims:
+            try:
+                if use_regex:
+                    matches = list(re.finditer(pattern, answer_text, regex_flags))
+                else:
+                    # Simple substring match
+                    search_text = answer_text.lower() if case_insensitive else answer_text
+                    search_pattern = pattern.lower() if case_insensitive else pattern
+                    if search_pattern in search_text:
+                        # Create a simple match-like object for substring matches
+                        match_obj = type("Match", (), {"group": lambda p=pattern: p})
+                        matches = [match_obj]
+                    else:
+                        matches = []
+
+                for match in matches:
+                    matched_text = match.group() if hasattr(match, "group") else pattern
+
+                    # Check if match is within an allowed phrase
+                    is_allowed = False
+                    for allowed in allowed_phrases:
+                        try:
+                            if re.search(allowed, answer_text, regex_flags):
+                                # Check if the matched text is part of an allowed phrase context
+                                is_allowed = True
+                                break
+                        except re.error:
+                            if allowed.lower() in answer_text.lower():
+                                is_allowed = True
+                                break
+
+                    if not is_allowed:
+                        found_violations.append({
+                            "matched_text": matched_text,
+                            "pattern": pattern,
+                        })
+            except re.error as e:
+                logger.warning(f"Invalid regex pattern '{pattern}': {e}")
+                # Fall back to substring match
+                if pattern.lower() in answer_text.lower():
+                    found_violations.append({
+                        "matched_text": pattern,
+                        "pattern": pattern,
+                    })
+
+        if not found_violations:
+            return True, None
+
+        # Pass 2: LLM validation (if enabled)
+        if self._validator and self._validator.is_available():
+            confirmed_violations = []
+            for violation in found_violations:
+                result = self._validator.validate_forbidden_claim(
+                    response=answer_text,
+                    matched_text=violation["matched_text"],
+                    pattern=violation["pattern"],
+                    context=case.contexts[0] if case.contexts else "",
+                    query=case.query,
+                    rationale=case.rationale,
+                )
+                if result.is_violation:
+                    confirmed_violations.append(violation)
+                else:
+                    matched = violation['matched_text']
+                    logger.debug(f"LLM cleared false positive: '{matched}' - {result.reasoning}")
+
+            if not confirmed_violations:
+                return True, None
+
+            violations_list = [v['matched_text'] for v in confirmed_violations]
+            return False, f"HALLUCINATION: Found forbidden claims: {violations_list}"
+
+        # No LLM: trust regex results
+        violations_list = [v['matched_text'] for v in found_violations]
+        return False, f"HALLUCINATION: Found forbidden claims: {violations_list}"
 
     def _evaluate_relevance(self, answer_text: str, case: FitzGovCase) -> tuple[bool, str | None]:
-        """Evaluate relevance: answer should contain all required elements."""
-        answer_lower = answer_text.lower()
-        missing_elements = []
+        """
+        Evaluate relevance: answer should contain required elements and not forbidden elements.
 
+        Uses two-pass validation if LLM validation is enabled:
+        1. Regex pass: Check for required/forbidden patterns
+        2. LLM pass: Validate flagged matches to reduce false positives
+        """
+        eval_config = case.evaluation_config
+        use_regex = eval_config.get("use_regex", False)
+        case_insensitive = eval_config.get("case_insensitive", True)
+        min_required = eval_config.get("min_required", 1)
+
+        regex_flags = re.IGNORECASE if case_insensitive else 0
+
+        # Check required elements (at least min_required must match)
+        matched_required = 0
         for element in case.required_elements:
-            if element.lower() not in answer_lower:
-                missing_elements.append(element)
+            try:
+                if use_regex:
+                    if re.search(element, answer_text, regex_flags):
+                        matched_required += 1
+                else:
+                    search_text = answer_text.lower() if case_insensitive else answer_text
+                    search_element = element.lower() if case_insensitive else element
+                    if search_element in search_text:
+                        matched_required += 1
+            except re.error:
+                # Fall back to substring
+                if element.lower() in answer_text.lower():
+                    matched_required += 1
 
-        if missing_elements:
-            return False, f"OFF-TOPIC: Missing required elements: {missing_elements}"
-        return True, None
+        if matched_required < min_required:
+            return False, f"OFF-TOPIC: Need {min_required} required elements, found {matched_required}"
+
+        # Check forbidden elements (patterns that indicate false confidence)
+        found_forbidden = []
+        for pattern in case.forbidden_elements:
+            try:
+                if use_regex:
+                    match = re.search(pattern, answer_text, regex_flags)
+                else:
+                    search_text = answer_text.lower() if case_insensitive else answer_text
+                    search_pattern = pattern.lower() if case_insensitive else pattern
+                    match = search_pattern in search_text
+
+                if match:
+                    matched_text = match.group() if hasattr(match, "group") else pattern
+                    found_forbidden.append({
+                        "matched_text": matched_text,
+                        "pattern": pattern,
+                    })
+            except re.error:
+                if pattern.lower() in answer_text.lower():
+                    found_forbidden.append({
+                        "matched_text": pattern,
+                        "pattern": pattern,
+                    })
+
+        if not found_forbidden:
+            return True, None
+
+        # Pass 2: LLM validation for forbidden elements (if enabled)
+        if self._validator and self._validator.is_available():
+            confirmed_forbidden = []
+            for violation in found_forbidden:
+                result = self._validator.validate_forbidden_element(
+                    response=answer_text,
+                    matched_text=violation["matched_text"],
+                    pattern=violation["pattern"],
+                    context=case.contexts[0] if case.contexts else "",
+                    query=case.query,
+                )
+                if result.is_violation:
+                    confirmed_forbidden.append(violation)
+                else:
+                    matched = violation['matched_text']
+                    logger.debug(f"LLM cleared false positive: '{matched}' - {result.reasoning}")
+
+            if not confirmed_forbidden:
+                return True, None
+
+            forbidden_list = [v['matched_text'] for v in confirmed_forbidden]
+            return False, f"FALSE_CONFIDENCE: Found forbidden elements: {forbidden_list}"
+
+        # No LLM: trust regex results
+        forbidden_list = [v['matched_text'] for v in found_forbidden]
+        return False, f"FALSE_CONFIDENCE: Found forbidden elements: {forbidden_list}"
 
     def _run_with_contexts(self, engine: FitzRagEngine, query, contexts: list[str]):
         """
@@ -902,9 +1104,20 @@ class FitzGovBenchmark:
                     with open(json_file, encoding="utf-8") as f:
                         data = json.load(f)
 
+                    # Get category-level evaluation config
+                    category_eval_config = data.get("evaluation_config", {})
+
                     for case_data in data.get("cases", []):
                         case_data["category"] = cat.value
-                        case_data["subcategory"] = json_file.stem
+                        # Use file stem as subcategory if not specified in case
+                        if "subcategory" not in case_data:
+                            case_data["subcategory"] = json_file.stem
+
+                        # Merge category-level eval config with case-level (case takes precedence)
+                        case_eval_config = case_data.get("evaluation_config", {})
+                        merged_config = {**category_eval_config, **case_eval_config}
+                        case_data["evaluation_config"] = merged_config
+
                         cases.append(FitzGovCase.from_dict(case_data))
 
                 except Exception as e:
