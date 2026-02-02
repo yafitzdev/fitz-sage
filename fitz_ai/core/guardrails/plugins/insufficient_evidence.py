@@ -96,14 +96,19 @@ def _extract_query_entities(query: str) -> set[str]:
     return entities
 
 
-def _extract_specific_entities(query: str) -> set[str]:
+def _extract_specific_entities(query: str) -> tuple[set[str], set[str]]:
     """
     Extract SPECIFIC entities that must appear in context for relevance.
 
     These are proper nouns, product names, years, etc. that the query is specifically about.
     If query asks about "iPhone 16", context must mention "iPhone 16" (not Samsung Galaxy).
+
+    Returns:
+        Tuple of (all_entities, critical_entities).
+        Critical entities (like years) MUST match; regular entities need ANY match.
     """
     specific = set()
+    critical = set()  # These MUST match (years, numbered qualifiers)
 
     # Common question starters and auxiliaries to exclude
     question_words = {
@@ -117,9 +122,20 @@ def _extract_specific_entities(query: str) -> set[str]:
     quoted = re.findall(r'"([^"]+)"', query)
     specific.update(q.lower() for q in quoted)
 
-    # Years (4-digit numbers)
+    # Years (4-digit numbers) - CRITICAL, must match exactly
     years = re.findall(r"\b(19\d{2}|20\d{2})\b", query)
     specific.update(years)
+    critical.update(years)
+
+    # Numbered qualifiers like "type 2", "tier 1", "phase 3", "version 2.0"
+    # These are CRITICAL - "type 2 diabetes" vs "type 1 diabetes" is a different entity
+    numbered_qualifiers = re.findall(
+        r"\b(type\s+\d+|tier\s+\d+|phase\s+\d+|version\s+[\d.]+|level\s+\d+|"
+        r"class\s+\d+|grade\s+\d+|stage\s+\d+|gen\s+\d+|generation\s+\d+)\b",
+        query.lower()
+    )
+    specific.update(numbered_qualifiers)
+    critical.update(numbered_qualifiers)
 
     # Product names, company names, etc. (multi-word capitalized sequences)
     # e.g., "iPhone 16", "World Series", "Microsoft", "Bitcoin"
@@ -143,7 +159,7 @@ def _extract_specific_entities(query: str) -> set[str]:
             if clean_lower not in STOPWORDS and clean_lower not in question_words and len(clean_word) > 2:
                 specific.add(clean_lower)
 
-    return specific
+    return specific, critical
 
 
 def _context_mentions_entities(entities: set[str], context: str) -> bool:
@@ -157,6 +173,19 @@ def _context_mentions_entities(entities: set[str], context: str) -> bool:
             return True
 
     return False
+
+
+def _context_mentions_all_critical(critical: set[str], context: str) -> bool:
+    """Check if context mentions ALL critical entities (years, numbered qualifiers)."""
+    if not critical:
+        return True  # No critical entities to check
+
+    context_lower = context.lower()
+    for entity in critical:
+        if entity not in context_lower:
+            return False  # Missing a critical entity
+
+    return True
 
 
 def _get_max_score(chunks: Sequence[Chunk]) -> float | None:
@@ -307,11 +336,12 @@ class InsufficientEvidenceConstraint:
         if not query_emb:
             return True, 0.0, "no_embedder"  # Can't check, allow
 
-        # Extract specific entities from query
-        specific_entities = _extract_specific_entities(query)
+        # Extract specific and critical entities from query
+        specific_entities, critical_entities = _extract_specific_entities(query)
 
         max_sim = 0.0
         entity_match_found = False
+        critical_match_found = False
 
         for chunk in chunks:
             chunk_emb = self._get_embedding(chunk.content)
@@ -323,18 +353,28 @@ class InsufficientEvidenceConstraint:
             if specific_entities and _context_mentions_entities(specific_entities, chunk.content):
                 entity_match_found = True
 
+            # Check critical entity matching (years, numbered qualifiers must ALL match)
+            if critical_entities and _context_mentions_all_critical(critical_entities, chunk.content):
+                critical_match_found = True
+
         # Decision logic:
         # 1. If similarity is very low (<0.45), definitely irrelevant
         if max_sim < 0.45:
             return False, max_sim, "low_similarity"
 
-        # 2. Check entity matching for same-topic-wrong-entity detection
+        # 2. CRITICAL entities (years, "type 2", etc.) MUST match - no bypass
+        # "2024 World Series" query MUST have 2024 in context, even if similarity is high
+        if critical_entities and not critical_match_found:
+            return False, max_sim, f"missing_critical:{list(critical_entities)[:3]}"
+
+        # 3. Check regular entity matching for same-topic-wrong-entity detection
         # This catches cases like: Tokyo population query vs Osaka population context
-        # Only skip entity check for VERY high similarity (>0.8) - likely direct answers
-        if specific_entities and not entity_match_found and max_sim < 0.8:
+        # Only skip entity check for VERY high similarity (>0.85) - likely direct answers
+        # Threshold rationale: 0.7-0.8 = related topic, 0.85+ = same specific subject
+        if specific_entities and not entity_match_found and max_sim < 0.85:
             return False, max_sim, f"missing_entity:{list(specific_entities)[:3]}"
 
-        # 3. If we have entity match OR no specific entities OR very high similarity, allow
+        # 4. If we have entity match OR no specific entities OR very high similarity, allow
         return True, max_sim, "relevant"
 
     def apply(
