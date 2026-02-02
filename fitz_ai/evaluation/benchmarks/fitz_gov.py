@@ -724,10 +724,10 @@ class FitzGovBenchmark:
         chunks = [
             Chunk(
                 id=f"fitz_gov_context_{i}",
-                text=ctx,
-                source_file="fitz_gov_test",
-                start_char=0,
-                end_char=len(ctx),
+                doc_id="fitz_gov_test_doc",
+                content=ctx,
+                chunk_index=i,
+                metadata={"source": "fitz_gov_benchmark"},
             )
             for i, ctx in enumerate(contexts)
         ]
