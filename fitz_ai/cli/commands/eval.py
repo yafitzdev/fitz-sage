@@ -6,7 +6,7 @@ Commands:
     fitz eval governance-stats    - Show governance decision statistics
     fitz eval beir                - Run BEIR retrieval benchmark (cross-RAG comparison)
     fitz eval rgb                 - Run RGB robustness tests
-    fitz eval fitz-gov            - Run FITZ-GOV governance benchmark (Fitz's moat)
+    fitz eval fitz-gov            - Run fitz-gov governance benchmark (Fitz's moat)
     fitz eval dashboard           - Display benchmark results dashboard
     fitz eval all                 - Run all benchmarks
 """
@@ -643,7 +643,7 @@ def fitz_gov_benchmark(
     ] = None,
 ) -> None:
     """
-    Run FITZ-GOV governance calibration benchmark.
+    Run fitz-gov governance calibration benchmark.
 
     Fitz's core differentiator - tests governance mode classification:
     - abstention: Should refuse when evidence insufficient
@@ -696,7 +696,7 @@ def fitz_gov_benchmark(
             raise typer.Exit(1)
 
     if not json_output:
-        ui.header("FITZ-GOV Governance Benchmark")
+        ui.header("fitz-gov Governance Benchmark")
         if model:
             ui.info(f"Model: {model}")
         if categories:
@@ -723,7 +723,7 @@ def fitz_gov_benchmark(
 
 
 def _display_fitz_gov_rich(result) -> None:
-    """Display FITZ-GOV results with Rich."""
+    """Display fitz-gov results with Rich."""
     # Governance Mode Categories
     table = Table(title="Governance Mode Accuracy", show_header=True, header_style="bold")
     table.add_column("Category", style="cyan")
@@ -791,7 +791,7 @@ def _display_fitz_gov_rich(result) -> None:
 
 
 def _display_fitz_gov_plain(result) -> None:
-    """Display FITZ-GOV results in plain text."""
+    """Display fitz-gov results in plain text."""
     from fitz_gov import FitzGovCategory
 
     print("Governance Mode Categories:")
@@ -840,7 +840,7 @@ def benchmark_dashboard(
     """
     Display unified benchmark results dashboard.
 
-    Loads results from all benchmarks (BEIR, RAGAS, RGB, FITZ-GOV)
+    Loads results from all benchmarks (BEIR, RAGAS, RGB, fitz-gov)
     and displays a consolidated view.
 
     Expected directory structure:
@@ -901,7 +901,7 @@ def run_all_benchmarks(
     """
     Run all benchmarks and save results.
 
-    Runs BEIR (cross-RAG comparison) and FITZ-GOV (Fitz's governance benchmark).
+    Runs BEIR (cross-RAG comparison) and fitz-gov (Fitz's governance benchmark).
     Results are saved to subdirectories for dashboard viewing.
 
     Examples:
@@ -939,15 +939,15 @@ def run_all_benchmarks(
     else:
         ui.info("Skipping BEIR benchmark")
 
-    # FITZ-GOV (no external deps)
-    ui.info("Running FITZ-GOV benchmark...")
+    # fitz-gov (no external deps)
+    ui.info("Running fitz-gov benchmark...")
     from fitz_ai.evaluation.benchmarks.fitz_gov import FitzGovBenchmark
 
     engine = _get_engine(collection)
     benchmark = FitzGovBenchmark()
     result = benchmark.evaluate(engine)
     benchmark.save_results(result, output_dir / "fitz_gov" / "results.json")
-    ui.success(f"FITZ-GOV: Accuracy = {result.overall_accuracy:.2%}")
+    ui.success(f"fitz-gov: Accuracy = {result.overall_accuracy:.2%}")
 
     print()
     ui.success(f"All results saved to {output_dir}")

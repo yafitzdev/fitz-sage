@@ -1,4 +1,4 @@
-# FITZ-GOV: Governance Calibration Benchmark
+# fitz-gov: Governance Calibration Benchmark
 
 Technical specification and evaluation results for Fitz governance mode classification.
 
@@ -6,9 +6,9 @@ Technical specification and evaluation results for Fitz governance mode classifi
 
 ## Benchmark Definition
 
-**FITZ-GOV** evaluates **epistemic governance**: whether a RAG system selects an appropriate answer posture (confident, qualified, disputed, abstain) given a query and fixed evidence.
+**fitz-gov** evaluates **epistemic governance**: whether a RAG system selects an appropriate answer posture (confident, qualified, disputed, abstain) given a query and fixed evidence.
 
-This is not standard accuracy measurement. Standard RAG benchmarks test "did you find the right documents?" FITZ-GOV tests "do you know when you don't know?"
+This is not standard accuracy measurement. Standard RAG benchmarks test "did you find the right documents?" fitz-gov tests "do you know when you don't know?"
 
 ### Test Cases
 
@@ -35,7 +35,7 @@ Each case contains:
 
 ### Non-Goals
 
-FITZ-GOV does **not** evaluate:
+fitz-gov does **not** evaluate:
 
 - **Answer factual correctness** — We don't check if the answer is true, only if the system chose the right posture
 - **Retrieval quality** — Contexts are injected, bypassing retrieval entirely
@@ -214,8 +214,34 @@ Added:
 
 ## Final Results
 
+### Production (with enrichment) — Recommended
+
+Enrichment simulates production conditions where chunks have metadata from ingestion.
+
 ```
-FITZ-GOV Results (n=200):
+fitz-gov Results (n=200, --enrich):
+  Overall Accuracy: 70.00%
+
+Governance Mode Categories:
+  abstention: 57.50% (23/40)
+  dispute: 95.00% (38/40)
+  qualification: 72.50% (29/40)
+  confidence: 86.67% (26/30)
+
+Confusion Matrix (rows=expected, cols=actual):
+              abstain   disputed   qualifie   confiden
+   abstain         23          2          0         15
+  disputed          1         38          1          0
+ qualified          1          9         29          1
+ confident          0          2          2         26
+```
+
+### Without enrichment (ablation baseline)
+
+Raw chunks without metadata enrichment. Used for ablation studies above.
+
+```
+fitz-gov Results (n=200, --no-enrich):
   Overall Accuracy: 70.50%
 
 Governance Mode Categories:
@@ -231,6 +257,8 @@ Confusion Matrix (rows=expected, cols=actual):
  qualified          1          7         31          1
  confident          0          2          2         26
 ```
+
+The enriched scenario trades qualification accuracy for abstention accuracy via the hybrid summary check. This is the recommended configuration since it matches production conditions.
 
 ---
 
@@ -371,6 +399,7 @@ print(results)
 
 ## Changelog
 
+- **2026-02-03:** Enrichment as default. Hybrid summary check for abstention (+2.5%). Fixed CausalAttributionConstraint false positives from LLM-generated summaries. Production score: 70%.
 - **2026-02-02:** Initial benchmark at 49%. Pairwise detection → 57.5%. Adaptive mode → 62.5%. Entity matching + uncertainty patterns → 70.5%.
 
 ---

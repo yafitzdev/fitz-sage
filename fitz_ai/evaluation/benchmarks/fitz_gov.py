@@ -1,6 +1,6 @@
 # fitz_ai/evaluation/benchmarks/fitz_gov.py
 """
-FITZ-GOV benchmark integration for Fitz RAG engine.
+fitz-gov benchmark integration for Fitz RAG engine.
 
 This module wraps the fitz-gov package to evaluate Fitz's governance calibration.
 The evaluation logic lives in fitz-gov so all RAG systems get identical evaluation.
@@ -40,7 +40,7 @@ def _import_fitz_gov():
         return fitz_gov
     except ImportError as e:
         raise ImportError(
-            "fitz-gov package is required for FITZ-GOV benchmark. "
+            "fitz-gov package is required for fitz-gov benchmark. "
             "Install with: pip install fitz-gov "
             "or: pip install -e path/to/fitz-gov"
         ) from e
@@ -67,7 +67,7 @@ def __getattr__(name: str):
 
 class FitzGovBenchmark:
     """
-    FITZ-GOV governance calibration benchmark for Fitz RAG engine.
+    fitz-gov governance calibration benchmark for Fitz RAG engine.
 
     Tests Fitz's ability to correctly classify when to:
     - Abstain (insufficient evidence)
@@ -100,7 +100,7 @@ class FitzGovBenchmark:
         model_override: str | None = None,
     ):
         """
-        Initialize FITZ-GOV benchmark.
+        Initialize fitz-gov benchmark.
 
         Args:
             data_dir: Directory containing test case JSON files.
@@ -192,7 +192,7 @@ class FitzGovBenchmark:
                 modules=[SummaryModule(), KeywordModule(), EntityModule()],
                 min_batch_content=50,  # Lower threshold for benchmark's short chunks
             )
-            logger.info("Initialized chunk enricher for FITZ-GOV benchmark")
+            logger.info("Initialized chunk enricher for fitz-gov benchmark")
         except Exception as e:
             logger.warning(f"Failed to initialize enricher: {e}")
             self._enricher = None

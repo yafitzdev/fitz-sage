@@ -140,10 +140,10 @@ You can—but you'll hit walls fast.
 **Super fast setup 🐆**
 > Point at a folder. Ask a question. Get an answer with sources. Even for tables! Everything else is handled by Fitz.
 
-**Honest answers ✅** → [Governance Benchmark](docs/features/governance-benchmarking.md)
+**Honest answers ✅** → [Governance Benchmark](#governance-know-what-you-dont-know)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."*
 >
-> **Measured, not claimed:** Fitz scores **70.5%** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty—detecting when to abstain (55%), dispute (95%), or qualify (77.5%) answers.
+> **Measured, not claimed:** Fitz scores **70%** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty—detecting when to abstain, dispute, or qualify answers.
 
 **Queries that actually work 📊**
 > Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, AST-aware chunking for code, and SQL execution for tabular data. No configuration—it just works.
@@ -180,7 +180,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 | Feature | Query | Naive RAG Problem | FitzRAG Solution |
 |---------|-------|-------------------|------------------|
 | [**epistemic-honesty**](docs/features/epistemic-honesty.md) | "What was our Q4 revenue?" | ❌ Hallucinated number — Info doesn't exist, but LLM won't admit it | ✅ "I don't know" |
-| [**governance-benchmarking**](docs/features/governance-benchmarking.md) | *[Benchmark: FITZ-GOV]* | ❌ No measurement — Retrieval benchmarks don't test epistemic honesty | ✅ 70.5% governance accuracy |
+| [**governance-benchmarking**](docs/features/governance-benchmarking.md) | *[Benchmark: fitz-gov]* | ❌ No measurement — Retrieval benchmarks don't test epistemic honesty | ✅ 70% governance accuracy |
 | [**keyword-vocabulary**](docs/features/keyword-vocabulary.md) | "Find TC_1000" | ❌ Wrong test case — Embeddings see TC_1000 ≈ TC_2000 (semantically similar) | ✅ Exact keyword matching |
 | [**hybrid-search**](docs/features/hybrid-search.md) | "X100 battery specs" | ❌ Returns Y200 docs — Semantic search misses exact model numbers | ✅ Hybrid search (dense + sparse) |
 | [**sparse-search**](docs/features/sparse-search.md) | "error code E_AUTH_401" | ❌ No exact match — Embeddings miss precise error codes | ✅ PostgreSQL full-text search |
@@ -202,6 +202,30 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 
 > [!IMPORTANT]
 > These features are **always on**—no configuration needed. Fitz automatically detects when to use each capability.
+
+---
+
+### Governance: Know What You Don't Know
+
+Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty.
+
+| Mode | When | Accuracy |
+|------|------|----------|
+| **ABSTAIN** | Context doesn't answer the question | 57.5% |
+| **DISPUTED** | Sources contradict each other | 95% |
+| **QUALIFIED** | Evidence exists but needs caveats | 72.5% |
+| **CONFIDENT** | Clear, consistent evidence | 86.7% |
+
+**Overall: 70% governance accuracy** on [fitz-gov](https://github.com/yafitzdev/fitz-gov) — a benchmark for epistemic honesty, not retrieval quality.
+
+```bash
+fitz eval fitz-gov --model ollama/qwen2.5:3b
+```
+
+> [!TIP]
+> Standard RAG benchmarks (BEIR, MS MARCO) test "did you find the right documents?" fitz-gov tests "do you know when you don't know?"
+
+→ [Technical spec](docs/evaluation/governance.md) · [Feature docs](docs/features/governance-benchmarking.md)
 
 ---
 
@@ -773,7 +797,7 @@ MIT
 - [Ingestion Pipeline](docs/INGESTION.md)
 - [Enrichment (Hierarchies, Entities)](docs/ENRICHMENT.md)
 - [Epistemic Constraints](docs/CONSTRAINTS.md)
-- [Governance Benchmarking (FITZ-GOV)](docs/features/governance-benchmarking.md)
+- [Governance Benchmarking (fitz-gov)](docs/features/governance-benchmarking.md)
 - [Plugin Development](docs/PLUGINS.md)
 - [Feature Control](docs/FEATURE_CONTROL.md)
 - [Custom Engines](docs/CUSTOM_ENGINES.md)

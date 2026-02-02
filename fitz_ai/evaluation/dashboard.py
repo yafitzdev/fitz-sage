@@ -2,7 +2,7 @@
 """
 Unified benchmark dashboard for displaying evaluation results.
 
-Aggregates results from BEIR, RGB, and FITZ-GOV benchmarks
+Aggregates results from BEIR, RGB, and fitz-gov benchmarks
 into a single, formatted display.
 
 Usage:
@@ -37,7 +37,7 @@ class BenchmarkDashboard:
     """RGB robustness benchmark results."""
 
     fitz_gov_results: list[Any] = field(default_factory=list)
-    """FITZ-GOV governance benchmark results (Fitz's moat)."""
+    """fitz-gov governance benchmark results (Fitz's moat)."""
 
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     """When dashboard was created."""
@@ -118,7 +118,7 @@ class BenchmarkDashboard:
                 f"Total benchmark runs: {total_benchmarks}\n"
                 f"BEIR: {len(self.beir_results)} | "
                 f"RGB: {len(self.rgb_results)} | "
-                f"FITZ-GOV: {len(self.fitz_gov_results)}",
+                f"fitz-gov: {len(self.fitz_gov_results)}",
                 title="Overview",
             )
         )
@@ -132,7 +132,7 @@ class BenchmarkDashboard:
         if self.rgb_results:
             self._print_rgb_rich()
 
-        # FITZ-GOV results
+        # fitz-gov results
         if self.fitz_gov_results:
             self._print_fitz_gov_rich()
 
@@ -199,11 +199,11 @@ class BenchmarkDashboard:
         print()
 
     def _print_fitz_gov_rich(self) -> None:
-        """Print FITZ-GOV results with Rich."""
+        """Print fitz-gov results with Rich."""
         for result in self.fitz_gov_results:
             # Summary table
             table = Table(
-                title="FITZ-GOV Governance Calibration", show_header=True, header_style="bold cyan"
+                title="fitz-gov Governance Calibration", show_header=True, header_style="bold cyan"
             )
             table.add_column("Category", style="dim")
             table.add_column("Accuracy", justify="right")
@@ -290,7 +290,7 @@ class BenchmarkDashboard:
         print(
             f"BEIR: {len(self.beir_results)} | "
             f"RGB: {len(self.rgb_results)} | "
-            f"FITZ-GOV: {len(self.fitz_gov_results)}"
+            f"fitz-gov: {len(self.fitz_gov_results)}"
         )
         print()
 
@@ -319,7 +319,7 @@ class BenchmarkDashboard:
             print()
 
         if self.fitz_gov_results:
-            print("FITZ-GOV Results:")
+            print("fitz-gov Results:")
             print("-" * 40)
             for result in self.fitz_gov_results:
                 print(f"  Overall Accuracy: {result.get('overall_accuracy', 0):.2%}")

@@ -7,7 +7,7 @@ Industry-standard benchmark:
 
 Fitz-native benchmarks:
 - RGB: Robustness (noise, rejection, conflicts)
-- FITZ-GOV: Comprehensive governance calibration (Fitz's differentiator)
+- fitz-gov: Comprehensive governance calibration (Fitz's differentiator)
   - abstention, dispute, qualification, confidence (governance modes)
   - grounding, relevance (answer quality)
 
@@ -18,7 +18,7 @@ Usage:
     beir = BEIRBenchmark()
     results = beir.evaluate(engine, dataset="scifact")
 
-    # Run FITZ-GOV governance tests (Fitz's moat)
+    # Run fitz-gov governance tests (Fitz's moat)
     gov = FitzGovBenchmark()
     results = gov.evaluate(engine)
 """
@@ -32,7 +32,7 @@ __all__ = [
     "RGBCase",
     "RGBResult",
     "RGBEvaluator",
-    # FITZ-GOV
+    # fitz-gov
     "FitzGovCategory",
     "FitzGovCase",
     "FitzGovCaseResult",
@@ -66,13 +66,13 @@ def __getattr__(name: str):
             return RGBResult
         return RGBEvaluator
 
-    # FITZ-GOV - FitzGovBenchmark is the main entry point
+    # fitz-gov - FitzGovBenchmark is the main entry point
     if name == "FitzGovBenchmark":
         from .fitz_gov import FitzGovBenchmark
 
         return FitzGovBenchmark
 
-    # FITZ-GOV types and LLM Validator - import from fitz-gov package
+    # fitz-gov types and LLM Validator - import from fitz-gov package
     if name in (
         "FitzGovCategory",
         "FitzGovCase",

@@ -8,7 +8,7 @@ This module provides tools for:
 - Detecting behavioral changes (flips) between versions
 - CLI commands for governance statistics
 - Benchmarking against industry standards (BEIR)
-- Fitz-native governance benchmarks (FITZ-GOV)
+- Fitz-native governance benchmarks (fitz-gov)
 
 Usage:
     from fitz_ai.evaluation import GovernanceLogger, GovernanceStats
@@ -29,7 +29,7 @@ Benchmarks:
     beir = BEIRBenchmark()
     results = beir.evaluate(engine, dataset="scifact")
 
-    # Run FITZ-GOV governance benchmark (Fitz's moat)
+    # Run fitz-gov governance benchmark (Fitz's moat)
     gov = FitzGovBenchmark()
     results = gov.evaluate(engine)
 """
@@ -114,7 +114,7 @@ def __getattr__(name: str):
 
         return RGBEvaluator
 
-    # FITZ-GOV
+    # fitz-gov
     if name == "FitzGovCategory":
         from .benchmarks.fitz_gov import FitzGovCategory
 

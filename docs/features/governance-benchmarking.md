@@ -1,4 +1,4 @@
-# Governance Benchmarking (FITZ-GOV)
+# Governance Benchmarking (fitz-gov)
 
 ## The Problem with RAG Benchmarks
 
@@ -8,9 +8,9 @@ They don't measure **epistemic honesty**: "Do you know when you don't know?"
 
 A RAG system that hallucinates confidently on every query would score well on retrieval benchmarks—it retrieved the right docs, after all. But it's useless for high-stakes applications where "I don't know" is the correct answer.
 
-## FITZ-GOV: Governance Calibration Benchmark
+## fitz-gov: Governance Calibration Benchmark
 
-FITZ-GOV tests whether a RAG system correctly classifies its own confidence level across 150+ test cases:
+fitz-gov tests whether a RAG system correctly classifies its own confidence level across 150+ test cases:
 
 | Mode | What It Tests | Example |
 |------|---------------|---------|
@@ -26,14 +26,14 @@ Each test case has:
 
 ## Current Results
 
-**Fitz achieves 70.5% governance accuracy:**
+**Fitz achieves 70% governance accuracy** (with enrichment, the realistic production scenario):
 
 | Category | Accuracy | What It Means |
 |----------|----------|---------------|
-| **Overall** | **70.5%** | Correct mode classification |
-| Abstention | 55% | Correctly refuses when context is irrelevant |
+| **Overall** | **70%** | Correct mode classification |
+| Abstention | 57.5% | Correctly refuses when context is irrelevant |
 | Dispute | 95% | Detects contradictions between sources |
-| Qualification | 77.5% | Adds caveats for uncertain claims |
+| Qualification | 72.5% | Adds caveats for uncertain claims |
 | Confidence | 86.67% | Confident when evidence is clear |
 
 For comparison, a naive system that always outputs CONFIDENT scores ~20% (only the confidence cases).
@@ -109,7 +109,7 @@ For the narrative exploration of how we arrived at these results:
 | **Compliance** | Auditors need to know when evidence is missing |
 | **Finance** | Disputed data should surface conflicts, not pick arbitrarily |
 
-Standard RAG benchmarks optimize for "find the right document." FITZ-GOV optimizes for "know what you don't know."
+Standard RAG benchmarks optimize for "find the right document." fitz-gov optimizes for "know what you don't know."
 
 ## Related Features
 

@@ -6,7 +6,7 @@ These tests verify the REAL constraints (InsufficientEvidenceConstraint,
 ConflictAwareConstraint) work correctly with semantic matching, using
 a deterministic mock embedder to ensure reproducible results.
 
-These tests would have caught the issues found during FITZ-GOV integration:
+These tests would have caught the issues found during fitz-gov integration:
 1. Irrelevant context being accepted as "evidence"
 2. Causal queries without causal evidence not being qualified
 3. Divergent claims not being detected as conflicts
@@ -83,7 +83,7 @@ class TestRelevanceFiltering:
     """
     Tests that irrelevant context triggers ABSTAIN.
 
-    This was the core issue found during FITZ-GOV: scientific papers about
+    This was the core issue found during fitz-gov: scientific papers about
     myelodysplasia were being accepted as "evidence" for business queries.
     """
 
@@ -501,7 +501,7 @@ class TestChunkSchemaCompatibility:
     """
     Tests that constraints work with the current Chunk schema.
 
-    This would have caught the FITZ-GOV integration errors where
+    This would have caught the fitz-gov integration errors where
     the old Chunk schema (text, source_file) didn't match the new one.
     """
 
