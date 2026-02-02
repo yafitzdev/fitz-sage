@@ -720,8 +720,8 @@ class FitzGovBenchmark:
     def _run_with_contexts(self, engine: FitzRagEngine, query, contexts: list[str]):
         """Run engine with injected contexts (bypasses retrieval for controlled testing)."""
         from fitz_ai.core import Chunk
-        from fitz_ai.engines.fitz_rag.generation.constraints import run_constraints
-        from fitz_ai.engines.fitz_rag.generation.governance import AnswerGovernor
+        from fitz_ai.core.governance import AnswerGovernor
+        from fitz_ai.core.guardrails.runner import run_constraints
 
         # Create chunks from injected contexts
         chunks = [
