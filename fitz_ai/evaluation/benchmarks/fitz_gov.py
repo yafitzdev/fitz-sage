@@ -672,9 +672,9 @@ class FitzGovBenchmark:
 
         # Evaluate based on category type
         if case.category == FitzGovCategory.GROUNDING:
-            passed, failure_analysis = self._evaluate_grounding(answer.text, case)
+            passed, failure_analysis = self._evaluate_grounding(answer.answer, case)
         elif case.category == FitzGovCategory.RELEVANCE:
-            passed, failure_analysis = self._evaluate_relevance(answer.text, case)
+            passed, failure_analysis = self._evaluate_relevance(answer.answer, case)
         else:
             # Governance mode categories: check mode match
             passed = actual_mode == case.expected_mode
@@ -685,7 +685,7 @@ class FitzGovBenchmark:
         return FitzGovCaseResult(
             case=case,
             passed=passed,
-            answer=answer.text,
+            answer=answer.answer,
             actual_mode=actual_mode,
             triggered_constraints=triggered,
             failure_analysis=failure_analysis,
