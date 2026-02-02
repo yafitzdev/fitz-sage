@@ -80,6 +80,9 @@ OPINION_QUERY_PATTERNS = (
     "is this effective",
     "is this adequate",
     "based on",  # "Based on X, should we..."
+    " better for ",  # "Is X better for Y?"
+    " better than ",  # "Is X better than Y?"
+    " best for ",  # "What is best for X?"
 )
 
 # Keywords that indicate speculative queries
@@ -159,7 +162,17 @@ def _is_predictive_query(query: str) -> bool:
 def _is_opinion_query(query: str) -> bool:
     """Check if query is asking for opinions, recommendations, or judgments."""
     q = query.lower().strip()
-    return any(pattern in q for pattern in OPINION_QUERY_PATTERNS)
+    if any(pattern in q for pattern in OPINION_QUERY_PATTERNS):
+        return True
+    # Regex patterns for comparative questions: "Is X better", "Which X is better"
+    comparative_patterns = [
+        r"^is\s+\w+.*\s+better",  # "Is remote work better..."
+        r"^which\s+\w+.*\s+better",  # "Which framework is better..."
+        r"^which\s+\w+.*\s+best",  # "Which option is best..."
+        r"\bbetter\s*\?",  # ends with "better?"
+        r"\bbest\s*\?",  # ends with "best?"
+    ]
+    return any(re.search(p, q) for p in comparative_patterns)
 
 
 def _is_speculative_query(query: str) -> bool:
