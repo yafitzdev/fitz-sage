@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Sequence
 
 from fitz_ai.core.chunk import Chunk
@@ -51,13 +52,17 @@ PREDICTIVE_QUERY_PATTERNS = (
     "next month",
     "next year",
     "next quarter",
-    "in 2025",
-    "in 2026",
-    "in 2027",
     "by year end",
     "going to be",
     "going to happen",
     "be like in",
+    "forecast",
+    "predict",
+    "projection",
+    "outlook",
+    "expect",
+    "estimate for",
+    "anticipated",
 )
 
 # Keywords that indicate opinion/judgment queries
@@ -129,10 +134,26 @@ def _is_causal_query(query: str) -> bool:
     return any(pattern in q for pattern in CAUSAL_QUERY_PATTERNS)
 
 
+def _mentions_future_year(query: str) -> bool:
+    """Check if query mentions a future year (e.g., 'in 2026' when current year is 2025)."""
+    current_year = datetime.now().year
+    # Match patterns like "in 2025", "by 2026", "2027 forecast"
+    year_pattern = r"\b(20\d{2})\b"
+    matches = re.findall(year_pattern, query)
+    for year_str in matches:
+        year = int(year_str)
+        if year > current_year:
+            return True
+    return False
+
+
 def _is_predictive_query(query: str) -> bool:
     """Check if query is asking for predictions about the future."""
     q = query.lower().strip()
-    return any(pattern in q for pattern in PREDICTIVE_QUERY_PATTERNS)
+    if any(pattern in q for pattern in PREDICTIVE_QUERY_PATTERNS):
+        return True
+    # Also check for future year mentions
+    return _mentions_future_year(query)
 
 
 def _is_opinion_query(query: str) -> bool:
