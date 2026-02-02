@@ -14,7 +14,6 @@ from fitz_ai.core.governance import AnswerGovernor, GovernanceDecision
 from fitz_ai.core.guardrails import (
     ConstraintPlugin,
     ConstraintResult,
-    SemanticMatcher,
     create_default_constraints,
     run_constraints,
 )
@@ -110,26 +109,24 @@ class RAGPipeline:
         self.rgs = components.rgs
         self.context = components.context or ContextPipeline()
 
+        # Unpack cloud components
+        cloud = components.cloud or CloudComponents()
+        self.embedder = cloud.embedder
+        self.cloud_client = cloud.client
+
         # Unpack guardrail components
         guardrails = components.guardrails or GuardrailComponents()
-        semantic_matcher = guardrails.semantic_matcher
 
         # Set up constraints with defaults
         if guardrails.constraints is None:
-            if semantic_matcher is None:
-                self.constraints: list[ConstraintPlugin] = []
-                logger.warning(
-                    f"{PIPELINE} No semantic_matcher provided, constraints disabled. "
-                    "Use RAGPipeline.from_config() for full constraint support."
-                )
-            else:
-                # Use fast chat tier for conflict detection (efficient LLM calls)
-                fast_chat = self.chat_factory("fast")
-                fast_model = getattr(fast_chat, "_model", "unknown")
-                logger.info(
-                    f"{PIPELINE} Creating default constraints with fast_chat model='{fast_model}'"
-                )
-                self.constraints = create_default_constraints(semantic_matcher, chat=fast_chat)
+            # Simple architecture: LLM YES/NO for relevance/contradiction, keywords for causal
+            fast_chat = self.chat_factory("fast")
+            fast_model = getattr(fast_chat, "_model", "unknown")
+
+            logger.info(
+                f"{PIPELINE} Creating simple constraints with fast_chat='{fast_model}'"
+            )
+            self.constraints = create_default_constraints(chat=fast_chat)
         else:
             self.constraints = list(guardrails.constraints)
 
@@ -138,11 +135,6 @@ class RAGPipeline:
         self.query_router = routing.query_router
         self.keyword_matcher = routing.keyword_matcher
         self.hop_controller = routing.hop_controller
-
-        # Unpack cloud components
-        cloud = components.cloud or CloudComponents()
-        self.embedder = cloud.embedder
-        self.cloud_client = cloud.client
 
         # Unpack structured components
         structured = components.structured or StructuredComponents()
@@ -809,9 +801,6 @@ class RAGPipeline:
         )
         rgs = RGS(config=rgs_cfg)
 
-        # Create semantic matcher for constraints using the embedder
-        semantic_matcher = SemanticMatcher(embedder=embedder.embed)
-
         # Query router (routes global queries to L2 summaries)
         # Defaults: enabled=True, threshold=0.7
         query_router = QueryRouter(
@@ -910,7 +899,6 @@ class RAGPipeline:
             context=ContextPipeline(),
             guardrails=GuardrailComponents(
                 constraints=constraints,
-                semantic_matcher=semantic_matcher,
             ),
             routing=RoutingComponents(
                 query_router=query_router,
