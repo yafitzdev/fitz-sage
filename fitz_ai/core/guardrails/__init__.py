@@ -65,20 +65,21 @@ def create_default_constraints(
 
     Args:
         semantic_matcher: SemanticMatcher instance with configured embedder
-        chat: Optional ChatProvider for LLM-based conflict detection.
-              If provided, ConflictAwareConstraint uses LLM to detect conflicts.
-              If None, conflict detection is disabled.
+        chat: Optional ChatProvider for LLM-based analysis.
+              If provided, ConflictAwareConstraint uses LLM to detect conflicts
+              and CausalAttributionConstraint uses LLM to analyze causal evidence.
+              If None, falls back to embedding-based detection.
 
     Returns:
         List of default constraint plugins:
         - ConflictAwareConstraint (with LLM if chat provided)
         - InsufficientEvidenceConstraint
-        - CausalAttributionConstraint
+        - CausalAttributionConstraint (with LLM if chat provided)
     """
     return [
         ConflictAwareConstraint(semantic_matcher=semantic_matcher, chat=chat),
         InsufficientEvidenceConstraint(semantic_matcher=semantic_matcher),
-        CausalAttributionConstraint(semantic_matcher=semantic_matcher),
+        CausalAttributionConstraint(semantic_matcher=semantic_matcher, chat=chat),
     ]
 
 

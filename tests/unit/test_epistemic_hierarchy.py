@@ -59,8 +59,13 @@ class TestEpistemicAssessment:
         assert assessment.chunk_count == 1
         assert assessment.evidence_density == "sparse"
 
-    def test_conflicting_classifications_detected(self):
-        """Test that conflicting classifications are detected via the constraint plugin."""
+    def test_ingest_time_conflict_detection_deferred(self):
+        """Test that ingest-time conflict detection is deferred to query time.
+
+        Conflict detection during ingestion was removed because embedding-based
+        detection was unreliable. Conflicts are now detected at query time using
+        LLM-based analysis in ConflictAwareConstraint.
+        """
         from fitz_ai.core.guardrails import SemanticMatcher
 
         from .mock_embedder import create_deterministic_embedder
@@ -68,7 +73,8 @@ class TestEpistemicAssessment:
         embedder = create_deterministic_embedder()
         semantic_matcher = SemanticMatcher(embedder=embedder)
 
-        # Use the same conflict patterns that ConflictAwareConstraint detects
+        # Even with conflicting content, assess_chunk_group no longer detects conflicts
+        # (conflict detection is deferred to query time)
         chunks = [
             Chunk(
                 id="c1",
@@ -87,8 +93,9 @@ class TestEpistemicAssessment:
         ]
 
         assessment = assess_chunk_group(chunks, semantic_matcher=semantic_matcher)
-        assert assessment.has_conflicts
-        assert assessment.agreement_ratio < 1.0
+        # Ingest-time conflict detection is disabled - conflicts detected at query time
+        assert assessment.has_conflicts is False
+        assert assessment.agreement_ratio == 1.0
 
     def test_evidence_density_sparse(self):
         chunks = [
@@ -269,8 +276,14 @@ class TestHierarchyEnricherEpistemic:
         level2_chunks = [c for c in result if c.metadata.get("hierarchy_level") == 2]
         assert len(level2_chunks) == 1
 
-    def test_conflict_detection_uses_constraint_plugin(self):
-        """Test that conflict detection uses the existing ConflictAwareConstraint logic."""
+    def test_enricher_adds_epistemic_metadata(self):
+        """Test that enricher adds epistemic metadata even without conflict detection.
+
+        Conflict detection during ingestion is deferred to query time using
+        LLM-based analysis in ConflictAwareConstraint. The hierarchy enricher
+        still adds epistemic metadata (evidence density, chunk count, etc.)
+        but does not detect conflicts at ingest time.
+        """
         from fitz_ai.core.guardrails import SemanticMatcher
 
         from .mock_embedder import create_deterministic_embedder
@@ -278,7 +291,7 @@ class TestHierarchyEnricherEpistemic:
         config = HierarchyConfig(group_by="source", min_group_chunks=1, min_group_content=0)
 
         mock_chat = MagicMock()
-        mock_chat.chat.return_value = "Summary acknowledging conflicts."
+        mock_chat.chat.return_value = "Summary of the incident reports."
 
         embedder = create_deterministic_embedder()
         semantic_matcher = SemanticMatcher(embedder=embedder)
@@ -289,7 +302,6 @@ class TestHierarchyEnricherEpistemic:
             semantic_matcher=semantic_matcher,
         )
 
-        # Create chunks with conflicting classifications (what ConflictAwareConstraint detects)
         chunks = [
             Chunk(
                 id="c1",
@@ -309,13 +321,16 @@ class TestHierarchyEnricherEpistemic:
 
         result = enricher.enrich(chunks)
 
-        # L1 summaries are now stored as metadata on original chunks (level 0)
+        # L1 summaries are stored as metadata on original chunks (level 0)
         level0_chunks = [c for c in result if c.metadata.get("hierarchy_level") == 0]
         assert len(level0_chunks) == 2
 
-        # All original chunks should have the same L1 summary and detect conflict
+        # Enricher adds epistemic metadata but doesn't detect conflicts at ingest time
         for chunk in level0_chunks:
-            assert chunk.metadata.get("epistemic_has_conflicts") is True
+            assert "epistemic_has_conflicts" in chunk.metadata
+            assert "epistemic_evidence_density" in chunk.metadata
+            # Conflicts are not detected at ingest time (deferred to query time)
+            assert chunk.metadata.get("epistemic_has_conflicts") is False
 
     def test_corpus_summary_includes_epistemic_aggregates(self):
         """Test that corpus summary has aggregated epistemic metadata."""
