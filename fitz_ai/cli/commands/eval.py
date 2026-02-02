@@ -598,6 +598,13 @@ def fitz_gov_benchmark(
             help="Output as JSON to stdout.",
         ),
     ] = False,
+    full: Annotated[
+        bool,
+        typer.Option(
+            "--full",
+            help="Run full LLM generation for answer quality tests (slower).",
+        ),
+    ] = False,
 ) -> None:
     """
     Run FITZ-GOV governance calibration benchmark.
@@ -629,7 +636,7 @@ def fitz_gov_benchmark(
     collection = _get_collection(collection)
     engine = _get_engine(collection)
 
-    benchmark = FitzGovBenchmark(data_dir=data_dir)
+    benchmark = FitzGovBenchmark(data_dir=data_dir, full_mode=full)
 
     # Parse categories
     categories = None

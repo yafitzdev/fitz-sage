@@ -66,6 +66,15 @@ CAUSAL_QUERY_CONCEPTS: tuple[str, ...] = (
     "explain why",
     "how did this occur",
     "what led to this",
+    # Prediction queries that need causal evidence
+    "what will be the impact",
+    "what will happen next",
+    "predict the outcome",
+    "what are the consequences",
+    # Preference/choice queries that need causal reasoning
+    "why do people prefer",
+    "why is this better",
+    "what makes this different",
 )
 
 FACT_QUERY_CONCEPTS: tuple[str, ...] = (
@@ -169,13 +178,15 @@ class SemanticMatcher:
         assertion_threshold: Similarity threshold for assertion detection
         query_threshold: Similarity threshold for query type classification
         conflict_threshold: Similarity threshold for conflict detection
+        relevance_threshold: Similarity threshold for query-context relevance
     """
 
     embedder: EmbedderFunc
     causal_threshold: float = 0.65
     assertion_threshold: float = 0.60
-    query_threshold: float = 0.65
+    query_threshold: float = 0.60  # Balance causal detection vs false positives
     conflict_threshold: float = 0.70
+    relevance_threshold: float = 0.62  # Balanced - between 0.55 and 0.65
 
     # Internal caches (not part of dataclass comparison)
     _concept_cache: dict[str, list[list[float]]] = field(
@@ -308,6 +319,45 @@ class SemanticMatcher:
         return sum(1 for chunk in chunks if self.has_assertion(chunk.content))
 
     # -------------------------------------------------------------------------
+    # Query-Context Relevance
+    # -------------------------------------------------------------------------
+
+    def is_relevant_to_query(self, query: str, text: str) -> bool:
+        """
+        Check if text is semantically relevant to the query.
+
+        This is the critical check that prevents the constraint system
+        from treating irrelevant context as "evidence". A scientific paper
+        about myelodysplasia should not count as evidence for a query
+        about Q4 2024 revenue.
+
+        Uses direct embedding similarity - if the query and text are
+        about completely different topics, similarity will be low.
+        """
+        query_vec = self._embed_text(query)
+        text_vec = self._embed_text(text)
+        similarity = cosine_similarity(query_vec, text_vec)
+        return similarity >= self.relevance_threshold
+
+    def chunk_relevance_score(self, query: str, chunk: Chunk) -> float:
+        """
+        Get the relevance score between query and chunk.
+
+        Returns similarity score in [0, 1] range.
+        """
+        query_vec = self._embed_text(query)
+        chunk_vec = self._embed_text(chunk.content)
+        return cosine_similarity(query_vec, chunk_vec)
+
+    def count_relevant_chunks(self, query: str, chunks: Sequence[Chunk]) -> int:
+        """Count chunks that are semantically relevant to the query."""
+        return sum(1 for chunk in chunks if self.is_relevant_to_query(query, chunk.content))
+
+    def get_relevant_chunks(self, query: str, chunks: Sequence[Chunk]) -> list[Chunk]:
+        """Filter chunks to only those relevant to the query."""
+        return [chunk for chunk in chunks if self.is_relevant_to_query(query, chunk.content)]
+
+    # -------------------------------------------------------------------------
     # Conflict Detection
     # -------------------------------------------------------------------------
 
@@ -360,6 +410,62 @@ class SemanticMatcher:
                 return True, conflict_type
 
         return False, None
+
+    def detect_divergent_claims(
+        self,
+        query: str,
+        chunks: Sequence[Chunk],
+        divergence_threshold: float = 0.85,
+    ) -> bool:
+        """
+        Detect if relevant chunks provide divergent (potentially conflicting) answers.
+
+        This is a more general conflict detection that catches cases where:
+        1. Multiple chunks are relevant to the query (they're all on-topic)
+        2. But the chunks have low similarity with each other (saying different things)
+
+        This catches nuanced disagreements like different theories or mechanisms,
+        not just binary oppositions like success/failure.
+
+        Args:
+            query: The user's question
+            chunks: Sequence of chunks to check
+            divergence_threshold: If mutual chunk similarity is below this,
+                                  chunks are considered divergent (default 0.50)
+
+        Returns:
+            True if divergent claims detected, False otherwise
+        """
+        if len(chunks) < 2:
+            return False
+
+        # First filter to only relevant chunks
+        relevant_chunks = self.get_relevant_chunks(query, chunks)
+
+        if len(relevant_chunks) < 2:
+            return False
+
+        # Check mutual similarity between relevant chunks
+        # If they're all relevant to the query but dissimilar to EACH OTHER,
+        # they might be giving conflicting answers
+        chunk_vecs = [self._embed_text(c.content) for c in relevant_chunks]
+
+        # Check all pairs
+        divergent_pairs = 0
+        total_pairs = 0
+
+        for i in range(len(chunk_vecs)):
+            for j in range(i + 1, len(chunk_vecs)):
+                total_pairs += 1
+                mutual_sim = cosine_similarity(chunk_vecs[i], chunk_vecs[j])
+                if mutual_sim < divergence_threshold:
+                    divergent_pairs += 1
+
+        # If majority of pairs are divergent, flag as potential conflict
+        if total_pairs > 0 and divergent_pairs / total_pairs >= 0.5:
+            return True
+
+        return False
 
     def find_conflicts(
         self,

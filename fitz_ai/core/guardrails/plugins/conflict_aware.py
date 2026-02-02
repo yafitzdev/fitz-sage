@@ -89,27 +89,39 @@ class ConflictAwareConstraint:
             logger.debug(f"{PIPELINE} ConflictAwareConstraint: resolution query detected, allowing")
             return ConstraintResult.allow()
 
-        # Detect conflicts using semantic matching
+        # Method 1: Detect explicit conflicts using opposing concept pairs
         conflicts = self.semantic_matcher.find_conflicts(chunks)
 
-        if not conflicts:
-            return ConstraintResult.allow()
+        if conflicts:
+            # Format conflict description
+            conflict_descriptions = []
+            for chunk1_id, chunk2_id, conflict_type in conflicts[:3]:  # Limit to 3
+                conflict_descriptions.append(f"[{chunk1_id}] vs [{chunk2_id}]: {conflict_type}")
 
-        # Format conflict description
-        conflict_descriptions = []
-        for chunk1_id, chunk2_id, conflict_type in conflicts[:3]:  # Limit to 3
-            conflict_descriptions.append(f"[{chunk1_id}] vs [{chunk2_id}]: {conflict_type}")
+            reason = f"Conflicting claims detected: {'; '.join(conflict_descriptions)}"
+            logger.info(f"{PIPELINE} ConflictAwareConstraint: {reason}")
 
-        reason = f"Conflicting claims detected: {'; '.join(conflict_descriptions)}"
+            return ConstraintResult.deny(
+                reason=reason,
+                signal="disputed",
+                conflicts=conflicts,
+                conflict_count=len(conflicts),
+            )
 
-        logger.info(f"{PIPELINE} ConflictAwareConstraint: {reason}")
+        # Method 2: Detect divergent claims (different answers to same question)
+        # This catches nuanced disagreements like different theories/mechanisms
+        if self.semantic_matcher.detect_divergent_claims(query, chunks):
+            logger.info(
+                f"{PIPELINE} ConflictAwareConstraint: "
+                "divergent claims - relevant chunks give different answers"
+            )
+            return ConstraintResult.deny(
+                reason="Sources provide divergent information on this topic",
+                signal="disputed",
+                conflict_type="divergent_claims",
+            )
 
-        return ConstraintResult.deny(
-            reason=reason,
-            signal="disputed",
-            conflicts=conflicts,
-            conflict_count=len(conflicts),
-        )
+        return ConstraintResult.allow()
 
 
 __all__ = ["ConflictAwareConstraint"]

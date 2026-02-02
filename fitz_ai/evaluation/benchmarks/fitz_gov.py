@@ -470,6 +470,7 @@ class FitzGovBenchmark:
         self,
         data_dir: Path | str | None = None,
         data_url: str | None = None,
+        full_mode: bool = False,
     ):
         """
         Initialize FITZ-GOV benchmark.
@@ -479,9 +480,12 @@ class FitzGovBenchmark:
                      Defaults to ~/.fitz/fitz_gov_data/
             data_url: URL to download benchmark data from.
                      Defaults to FITZ-GOV GitHub releases.
+            full_mode: If True, run full LLM generation for answer quality tests.
+                      If False (default), test governance mode classification only.
         """
         self._data_dir = Path(data_dir) if data_dir else DATA_DIR
         self._data_url = data_url or FITZ_GOV_DATA_URL
+        self._full_mode = full_mode
 
     def download_data(self, force: bool = False) -> Path:
         """
@@ -671,17 +675,20 @@ class FitzGovBenchmark:
         triggered = self._get_triggered_constraints(answer)
 
         # Evaluate based on category type
-        # Note: Grounding/Relevance require actual LLM answers to evaluate
-        # For now, skip them in governance-only mode (no LLM generation)
         if case.category == FitzGovCategory.GROUNDING:
-            # Without LLM generation, we can't evaluate grounding
-            # Mark as passed since we're not testing answer quality here
-            passed = True
-            failure_analysis = "Skipped - governance-only mode (no LLM generation)"
+            if self._full_mode:
+                passed, failure_analysis = self._evaluate_grounding(answer.answer, case)
+            else:
+                # Skip in governance-only mode
+                passed = True
+                failure_analysis = "Skipped - governance-only mode"
         elif case.category == FitzGovCategory.RELEVANCE:
-            # Without LLM generation, we can't evaluate relevance
-            passed = True
-            failure_analysis = "Skipped - governance-only mode (no LLM generation)"
+            if self._full_mode:
+                passed, failure_analysis = self._evaluate_relevance(answer.answer, case)
+            else:
+                # Skip in governance-only mode
+                passed = True
+                failure_analysis = "Skipped - governance-only mode"
         else:
             # Governance mode categories: check mode match
             passed = actual_mode == case.expected_mode
@@ -728,9 +735,11 @@ class FitzGovBenchmark:
         """
         Run governance classification on injected contexts.
 
-        This tests ONLY mode classification (constraints → governance decision).
-        No LLM generation - that's separate from governance calibration.
+        In governance-only mode: tests constraint → mode classification only.
+        In full mode: runs LLM generation for answer quality evaluation.
         """
+        from dataclasses import dataclass
+
         from fitz_ai.core import Chunk
         from fitz_ai.core.governance import AnswerGovernor
         from fitz_ai.core.guardrails.runner import run_constraints
@@ -756,21 +765,40 @@ class FitzGovBenchmark:
         governor = AnswerGovernor()
         governance = governor.decide(constraint_results)
 
-        # Return a minimal answer object with just the mode
-        # No LLM generation needed - we're testing governance classification only
-        from dataclasses import dataclass
+        # In governance-only mode, return minimal result (no LLM)
+        if not self._full_mode:
+            @dataclass
+            class GovernanceResult:
+                answer: str
+                mode: "AnswerMode"
+                triggered_constraints: set
 
-        @dataclass
-        class GovernanceResult:
-            answer: str
-            mode: "AnswerMode"
-            triggered_constraints: set
+            return GovernanceResult(
+                answer=f"[Governance test - mode: {governance.mode.value}]",
+                mode=governance.mode,
+                triggered_constraints=governance.triggered_constraints,
+            )
 
-        return GovernanceResult(
-            answer=f"[Governance test - mode: {governance.mode.value}]",
-            mode=governance.mode,
-            triggered_constraints=governance.triggered_constraints,
-        )
+        # Full mode: run LLM generation for answer quality evaluation
+        # Step 3: Process context through context pipeline
+        processed_chunks = pipeline.context.process(chunks)
+
+        # Step 4: Build prompt with governance mode
+        prompt = pipeline.rgs.build_prompt(query.text, processed_chunks)
+        prompt = pipeline._apply_answer_mode_to_prompt(prompt, governance.mode)
+
+        # Step 5: Generate answer via LLM
+        messages = [
+            {"role": "system", "content": prompt.system},
+            {"role": "user", "content": prompt.user},
+        ]
+        chat_client = pipeline._select_chat_for_routing()
+        raw_response = chat_client.chat(messages)
+
+        # Step 6: Build structured answer
+        answer = pipeline.rgs.build_answer(raw_response, processed_chunks, mode=governance.mode)
+
+        return answer
 
     def _get_answer_mode(self, answer) -> AnswerMode:
         """Extract answer mode from answer object."""

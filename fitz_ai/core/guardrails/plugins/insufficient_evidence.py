@@ -89,13 +89,36 @@ class InsufficientEvidenceConstraint:
                 evidence_count=0,
             )
 
+        # Rule 2: Check relevance FIRST - this is the critical fix
+        # A scientific paper about myelodysplasia is not evidence for a query
+        # about Q4 2024 revenue, even if it contains assertions.
+        relevant_count = self.semantic_matcher.count_relevant_chunks(query, chunks)
+
+        if relevant_count < self.min_evidence_count:
+            logger.info(
+                f"{PIPELINE} InsufficientEvidenceConstraint: "
+                f"no relevant chunks (found {relevant_count} of {len(chunks)} relevant)"
+            )
+            return ConstraintResult.deny(
+                reason="Retrieved context is not relevant to the query",
+                signal="abstain",  # Completely irrelevant = ABSTAIN
+                evidence_count=0,
+                relevant_count=relevant_count,
+                total_chunks=len(chunks),
+            )
+
+        # Filter to only relevant chunks for further analysis
+        relevant_chunks = self.semantic_matcher.get_relevant_chunks(query, chunks)
+
         # Determine query type using semantic matching
         is_causal = self.semantic_matcher.is_causal_query(query)
         is_fact = self.semantic_matcher.is_fact_query(query)
 
-        # Rule 2: Causal queries need causal evidence
+        # Rule 3: Causal queries need causal evidence in RELEVANT chunks
+        # If relevant context exists but lacks causal evidence, return QUALIFIED
+        # (not ABSTAIN - we have some relevant info, just not causal explanation)
         if is_causal:
-            evidence_count = self.semantic_matcher.count_causal_chunks(chunks)
+            evidence_count = self.semantic_matcher.count_causal_chunks(relevant_chunks)
 
             if evidence_count < self.min_evidence_count:
                 logger.info(
@@ -103,15 +126,15 @@ class InsufficientEvidenceConstraint:
                     f"causal query but no causal evidence (found {evidence_count})"
                 )
                 return ConstraintResult.deny(
-                    reason="No explicit causal evidence found",
-                    signal="abstain",
+                    reason="No explicit causal evidence found for this 'why' question",
+                    signal="qualified",  # Relevant context but no causal evidence = QUALIFIED
                     evidence_count=evidence_count,
                     query_type="causal",
                 )
 
-        # Rule 3: Fact queries need assertions
+        # Rule 4: Fact queries need assertions in RELEVANT chunks
         elif is_fact:
-            evidence_count = self.semantic_matcher.count_assertion_chunks(chunks)
+            evidence_count = self.semantic_matcher.count_assertion_chunks(relevant_chunks)
 
             if evidence_count < self.min_evidence_count:
                 logger.info(
@@ -120,7 +143,7 @@ class InsufficientEvidenceConstraint:
                 )
                 return ConstraintResult.deny(
                     reason="No direct assertion found in retrieved evidence",
-                    signal="abstain",
+                    signal="qualified",  # Relevant context but no clear assertion = QUALIFIED
                     evidence_count=evidence_count,
                     query_type="fact",
                 )
