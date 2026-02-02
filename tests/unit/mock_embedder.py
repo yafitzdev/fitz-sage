@@ -53,6 +53,10 @@ def create_deterministic_embedder(dimension: int = 384) -> Callable[[str], list[
     POSITIVE_CLUSTER = _make_cluster_vector("positive", 12)
     NEGATIVE_CLUSTER = _make_cluster_vector("negative", 13)
     NEUTRAL_CLUSTER = _make_cluster_vector("neutral", 14)
+    # Domain clusters (for relevance testing)
+    BUSINESS_CLUSTER = _make_cluster_vector("business", 15)
+    SCIENCE_CLUSTER = _make_cluster_vector("science", 16)
+    TECH_CLUSTER = _make_cluster_vector("technology", 17)
 
     def _add_noise(vec: list[float], text: str, noise_level: float = 0.005) -> list[float]:
         """Add text-specific noise to maintain uniqueness.
@@ -148,6 +152,64 @@ def create_deterministic_embedder(dimension: int = 384) -> Callable[[str], list[
         # Fact queries
         if any(text_lower.startswith(q) for q in ["what ", "which ", "who ", "where ", "when "]):
             return _add_noise(FACT_QUERY_CLUSTER, text)
+
+        # Domain: Business/Finance
+        business_markers = [
+            "revenue",
+            "earnings",
+            "market cap",
+            "quarter",
+            "fiscal",
+            "profit",
+            "stock",
+            "investor",
+            "company",
+            "corporation",
+            "ceo",
+            "executive",
+        ]
+        if any(m in text_lower for m in business_markers):
+            return _add_noise(BUSINESS_CLUSTER, text)
+
+        # Domain: Science/Biology
+        science_markers = [
+            "protein",
+            "gene",
+            "cell",
+            "dna",
+            "rna",
+            "study",
+            "experiment",
+            "hypothesis",
+            "bacterial",
+            "molecular",
+            "enzyme",
+            "tissue",
+            "organism",
+            "specimen",
+        ]
+        if any(m in text_lower for m in science_markers):
+            return _add_noise(SCIENCE_CLUSTER, text)
+
+        # Domain: Technology/Software
+        tech_markers = [
+            "server",
+            "database",
+            "deployment",
+            "code",
+            "software",
+            "api",
+            "memory",
+            "crash",
+            "error",
+            "bug",
+            "feature",
+            "component",
+            "authentication",
+            "migration",
+        ]
+        if any(m in text_lower for m in tech_markers):
+            return _add_noise(TECH_CLUSTER, text)
 
         # Default: neutral cluster (don't map assertions to ASSERTION_CLUSTER)
         # This prevents chunks like "Helios was deprecated" from matching causal concepts
