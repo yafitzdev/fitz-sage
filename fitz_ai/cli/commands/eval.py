@@ -608,10 +608,10 @@ def fitz_gov_benchmark(
     enrich: Annotated[
         bool,
         typer.Option(
-            "--enrich",
-            help="Enrich chunks with metadata (summary, keywords, entities) before constraints.",
+            "--enrich/--no-enrich",
+            help="Enrich chunks with metadata (summary, keywords, entities) before constraints. Default: enabled for realistic production simulation.",
         ),
-    ] = False,
+    ] = True,
     deterministic: Annotated[
         bool,
         typer.Option(

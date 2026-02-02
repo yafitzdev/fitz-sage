@@ -93,7 +93,7 @@ class FitzGovBenchmark:
         llm_validation: bool = False,
         llm_model: str = "qwen2.5:14b",
         llm_base_url: str = "http://localhost:11434",
-        enrich_chunks: bool = False,
+        enrich_chunks: bool = True,
         deterministic: bool = False,
         use_fusion: bool = False,
         adaptive: bool = True,
