@@ -20,9 +20,9 @@ DEFAULT_BASE_URL = "http://localhost:11434"
 
 # Default models by tier (common Ollama models)
 CHAT_MODELS: dict[ModelTier, str] = {
-    "smart": "llama3.1:70b",
-    "balanced": "llama3.1:8b",
-    "fast": "llama3.1:8b",
+    "smart": "qwen2.5:14b",
+    "balanced": "qwen2.5:7b",
+    "fast": "qwen2.5:3b",
 }
 
 EMBEDDING_MODEL = "nomic-embed-text"
