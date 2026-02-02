@@ -34,8 +34,9 @@ EmbedderFunc = Callable[[str], list[float]]
 # Below this score, vectors are nearly orthogonal (no semantic relationship)
 MIN_RELEVANCE_SCORE = 0.3
 # Embedding similarity threshold for relevance
-# Higher = stricter (rejects more as irrelevant)
-MIN_EMBEDDING_SIMILARITY = 0.5
+# Empirically tuned: unrelated content ~0.35-0.51, related content ~0.66-0.84
+# Threshold of 0.6 provides good separation
+MIN_EMBEDDING_SIMILARITY = 0.6
 
 
 def _cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
@@ -93,6 +94,69 @@ def _extract_query_entities(query: str) -> set[str]:
     entities.update(_extract_words(query))
 
     return entities
+
+
+def _extract_specific_entities(query: str) -> set[str]:
+    """
+    Extract SPECIFIC entities that must appear in context for relevance.
+
+    These are proper nouns, product names, years, etc. that the query is specifically about.
+    If query asks about "iPhone 16", context must mention "iPhone 16" (not Samsung Galaxy).
+    """
+    specific = set()
+
+    # Common question starters and auxiliaries to exclude
+    question_words = {
+        "what", "how", "why", "when", "where", "who", "which", "whom",
+        "did", "does", "do", "is", "are", "was", "were", "will", "would",
+        "can", "could", "should", "has", "have", "had", "been",
+        "the", "a", "an", "this", "that", "these", "those",
+    }
+
+    # Quoted terms are always specific
+    quoted = re.findall(r'"([^"]+)"', query)
+    specific.update(q.lower() for q in quoted)
+
+    # Years (4-digit numbers)
+    years = re.findall(r"\b(19\d{2}|20\d{2})\b", query)
+    specific.update(years)
+
+    # Product names, company names, etc. (multi-word capitalized sequences)
+    # e.g., "iPhone 16", "World Series", "Microsoft", "Bitcoin"
+    # Skip sequences at the very start of the query (likely question starters)
+    cap_sequences = re.findall(r"([A-Z][a-z]+(?:\s+[A-Z0-9][a-z0-9]*)*)", query)
+    for seq in cap_sequences:
+        seq_lower = seq.lower()
+        # Skip if it's a question word or starts with one
+        first_word = seq_lower.split()[0] if seq_lower else ""
+        if first_word not in question_words and seq_lower not in question_words:
+            # Skip if sequence is at the very beginning of query
+            if not query.lower().startswith(seq_lower):
+                specific.add(seq_lower)
+
+    # Single capitalized words that aren't at sentence start (position > 0)
+    words = query.split()
+    for i, word in enumerate(words):
+        clean_word = re.sub(r"[^\w]", "", word)
+        if i > 0 and clean_word and clean_word[0].isupper():
+            clean_lower = clean_word.lower()
+            if clean_lower not in STOPWORDS and clean_lower not in question_words and len(clean_word) > 2:
+                specific.add(clean_lower)
+
+    return specific
+
+
+def _context_mentions_entities(entities: set[str], context: str) -> bool:
+    """Check if context mentions any of the specific entities."""
+    if not entities:
+        return True  # No specific entities to check
+
+    context_lower = context.lower()
+    for entity in entities:
+        if entity in context_lower:
+            return True
+
+    return False
 
 
 def _get_max_score(chunks: Sequence[Chunk]) -> float | None:
@@ -233,24 +297,45 @@ class InsufficientEvidenceConstraint:
 
     def _check_embedding_relevance(
         self, query: str, chunks: Sequence[Chunk]
-    ) -> tuple[bool, float]:
+    ) -> tuple[bool, float, str]:
         """
-        Check relevance using embedding similarity.
+        Check relevance using embedding similarity + entity matching.
 
-        Returns (is_relevant, max_similarity).
+        Returns (is_relevant, max_similarity, reason).
         """
         query_emb = self._get_embedding(query)
         if not query_emb:
-            return True, 0.0  # Can't check, allow
+            return True, 0.0, "no_embedder"  # Can't check, allow
+
+        # Extract specific entities from query
+        specific_entities = _extract_specific_entities(query)
 
         max_sim = 0.0
+        entity_match_found = False
+
         for chunk in chunks:
             chunk_emb = self._get_embedding(chunk.content)
             if chunk_emb:
                 sim = _cosine_similarity(query_emb, chunk_emb)
                 max_sim = max(max_sim, sim)
 
-        return max_sim >= self.min_similarity, max_sim
+            # Check entity matching
+            if specific_entities and _context_mentions_entities(specific_entities, chunk.content):
+                entity_match_found = True
+
+        # Decision logic:
+        # 1. If similarity is very low (<0.45), definitely irrelevant
+        if max_sim < 0.45:
+            return False, max_sim, "low_similarity"
+
+        # 2. Check entity matching for same-topic-wrong-entity detection
+        # This catches cases like: Tokyo population query vs Osaka population context
+        # Only skip entity check for VERY high similarity (>0.8) - likely direct answers
+        if specific_entities and not entity_match_found and max_sim < 0.8:
+            return False, max_sim, f"missing_entity:{list(specific_entities)[:3]}"
+
+        # 3. If we have entity match OR no specific entities OR very high similarity, allow
+        return True, max_sim, "relevant"
 
     def apply(
         self,
@@ -279,22 +364,23 @@ class InsufficientEvidenceConstraint:
                 evidence_count=0,
             )
 
-        # Rule 2: Check embedding similarity (most reliable, if available)
+        # Rule 2: Check embedding similarity + entity matching (most reliable, if available)
         if self.embedder:
-            is_relevant, max_sim = self._check_embedding_relevance(query, chunks)
+            is_relevant, max_sim, reason = self._check_embedding_relevance(query, chunks)
             if not is_relevant:
                 logger.info(
-                    f"{PIPELINE} InsufficientEvidenceConstraint: low embedding similarity "
-                    f"({max_sim:.3f} < {self.min_similarity}) -> ABSTAIN"
+                    f"{PIPELINE} InsufficientEvidenceConstraint: {reason} "
+                    f"(similarity={max_sim:.3f}) -> ABSTAIN"
                 )
                 return ConstraintResult.deny(
-                    reason=f"Context not semantically relevant (similarity={max_sim:.3f})",
+                    reason=f"Context not relevant: {reason} (similarity={max_sim:.3f})",
                     signal="abstain",
                     evidence_count=len(chunks),
                     max_similarity=max_sim,
+                    detection_reason=reason,
                 )
             logger.debug(
-                f"{PIPELINE} InsufficientEvidenceConstraint: embedding similarity OK ({max_sim:.3f})"
+                f"{PIPELINE} InsufficientEvidenceConstraint: {reason} (similarity={max_sim:.3f})"
             )
             return ConstraintResult.allow()
 

@@ -322,8 +322,10 @@ class FitzGovBenchmark:
             )
 
             fast_chat = pipeline.chat_factory("fast")
+            # Get embedder from pipeline for semantic relevance checking
+            embedder = self._embedder if self._embedder else pipeline.embedder.embed
             constraints = [
-                InsufficientEvidenceConstraint(),
+                InsufficientEvidenceConstraint(embedder=embedder),
                 CausalAttributionConstraint(),
                 ConflictAwareConstraint(
                     chat=fast_chat,
