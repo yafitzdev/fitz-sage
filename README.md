@@ -140,8 +140,10 @@ You can—but you'll hit walls fast.
 **Super fast setup 🐆**
 > Point at a folder. Ask a question. Get an answer with sources. Even for tables! Everything else is handled by Fitz.
 
-**Honest answers ✅**
+**Honest answers ✅** → [Governance Benchmark](docs/features/governance-benchmarking.md)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."*
+>
+> **Measured, not claimed:** Fitz scores **70.5%** on [FITZ-GOV](docs/features/governance-benchmarking.md), a benchmark for epistemic honesty—detecting when to abstain (55%), dispute (95%), or qualify (77.5%) answers.
 
 **Queries that actually work 📊**
 > Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, AST-aware chunking for code, and SQL execution for tabular data. No configuration—it just works.
@@ -179,6 +181,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 | Feature | Query | Naive RAG Problem | FitzRAG Solution |
 |---------|-------|-------------------|------------------|
 | [**epistemic-honesty**](docs/features/epistemic-honesty.md) | "What was our Q4 revenue?" | ❌ Hallucinated number — Info doesn't exist, but LLM won't admit it | ✅ "I don't know" |
+| [**governance-benchmarking**](docs/features/governance-benchmarking.md) | *[Benchmark: FITZ-GOV]* | ❌ No measurement — Retrieval benchmarks don't test epistemic honesty | ✅ 70.5% governance accuracy |
 | [**keyword-vocabulary**](docs/features/keyword-vocabulary.md) | "Find TC_1000" | ❌ Wrong test case — Embeddings see TC_1000 ≈ TC_2000 (semantically similar) | ✅ Exact keyword matching |
 | [**hybrid-search**](docs/features/hybrid-search.md) | "X100 battery specs" | ❌ Returns Y200 docs — Semantic search misses exact model numbers | ✅ Hybrid search (dense + sparse) |
 | [**sparse-search**](docs/features/sparse-search.md) | "error code E_AUTH_401" | ❌ No exact match — Embeddings miss precise error codes | ✅ PostgreSQL full-text search |
@@ -771,6 +774,7 @@ MIT
 - [Ingestion Pipeline](docs/INGESTION.md)
 - [Enrichment (Hierarchies, Entities)](docs/ENRICHMENT.md)
 - [Epistemic Constraints](docs/CONSTRAINTS.md)
+- [Governance Benchmarking (FITZ-GOV)](docs/features/governance-benchmarking.md)
 - [Plugin Development](docs/PLUGINS.md)
 - [Feature Control](docs/FEATURE_CONTROL.md)
 - [Custom Engines](docs/CUSTOM_ENGINES.md)
