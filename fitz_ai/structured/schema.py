@@ -317,12 +317,16 @@ class SchemaStore:
         # Convert to SchemaSearchResult
         schema_results = []
         for result in results:
-            score = getattr(result, "score", None) or result.get("score", 0.0)
+            # Handle both dict and object results
+            if isinstance(result, dict):
+                score = result.get("score", 0.0)
+                payload = result.get("payload", {})
+            else:
+                score = getattr(result, "score", 0.0)
+                payload = getattr(result, "payload", {})
 
             if score < min_score:
                 continue
-
-            payload = getattr(result, "payload", None) or result.get("payload", {})
             try:
                 schema = TableSchema.from_payload(payload)
                 schema_results.append(SchemaSearchResult(schema=schema, score=score))
