@@ -45,49 +45,45 @@ class TestChatHelpers:
 
     def test_load_fitz_rag_config_returns_tuple(self):
         """Test load_fitz_rag_config returns raw and typed config."""
-        # Create a mock CLIContext with the config values
+        # Create a mock CLIContext with the config values (new flat format)
         mock_ctx = MagicMock()
         mock_ctx.raw_config = {
-            "chat": {"plugin_name": "cohere"},
-            "embedding": {"plugin_name": "cohere"},
-            "vector_db": {"plugin_name": "pgvector"},
-            "retrieval": {"plugin_name": "dense", "collection": "test"},
+            "chat": "cohere",
+            "embedding": "cohere",
+            "vector_db": "pgvector",
+            "retrieval_plugin": "dense",
+            "collection": "test",
         }
         mock_ctx.typed_config = MagicMock()
-        mock_ctx.typed_config.retrieval.collection = "test"
+        mock_ctx.typed_config.collection = "test"
 
         with patch("fitz_ai.cli.utils.CLIContext.load", return_value=mock_ctx):
             from fitz_ai.cli.utils import load_fitz_rag_config
 
             raw, typed = load_fitz_rag_config()
 
-        assert raw["chat"]["plugin_name"] == "cohere"
-        assert typed.retrieval.collection == "test"
+        assert raw["chat"] == "cohere"
+        assert typed.collection == "test"
 
     def test_get_collections_returns_sorted_list(self):
         """Test get_collections returns sorted collection list."""
-        mock_vdb = MagicMock()
-        mock_vdb.list_collections.return_value = ["zebra", "apple", "middle"]
+        mock_ctx = MagicMock()
+        mock_ctx.get_collections.return_value = ["apple", "middle", "zebra"]
 
-        with patch(
-            "fitz_ai.vector_db.registry.get_vector_db_plugin",
-            return_value=mock_vdb,
-        ):
-            from fitz_ai.cli.utils import get_collections
+        from fitz_ai.cli.utils import get_collections
 
-            collections = get_collections({"vector_db": {"plugin_name": "pgvector"}})
+        collections = get_collections(mock_ctx)
 
         assert collections == ["apple", "middle", "zebra"]
 
     def test_get_collections_handles_error(self):
         """Test get_collections returns empty list on error."""
-        with patch(
-            "fitz_ai.vector_db.registry.get_vector_db_plugin",
-            side_effect=Exception("connection failed"),
-        ):
-            from fitz_ai.cli.utils import get_collections
+        mock_ctx = MagicMock()
+        mock_ctx.get_collections.return_value = []
 
-            collections = get_collections({})
+        from fitz_ai.cli.utils import get_collections
+
+        collections = get_collections(mock_ctx)
 
         assert collections == []
 

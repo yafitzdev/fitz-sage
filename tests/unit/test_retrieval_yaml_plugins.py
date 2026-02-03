@@ -98,12 +98,14 @@ class MockReranker:
 
     def rerank(
         self, query: str, documents: list[str], top_n: int | None = None
-    ) -> list[tuple[int, float]]:
+    ) -> list:
+        from fitz_ai.llm.providers.base import RerankResult
+
         self.rerank_calls.append({"query": query, "documents": documents, "top_n": top_n})
         # Return in original order with descending scores
         # Start at 0.99 to avoid triggering VIP handling (score=1.0)
         n = top_n or len(documents)
-        results = [(i, 0.99 - i * 0.1) for i in range(min(n, len(documents)))]
+        results = [RerankResult(index=i, score=0.99 - i * 0.1) for i in range(min(n, len(documents)))]
         return results
 
 

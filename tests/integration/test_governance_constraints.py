@@ -159,8 +159,7 @@ class TestRelevanceFiltering:
 
         try:
             embedder = get_embedder("ollama", config={"model": "nomic-embed-text:latest"})
-            matcher = SemanticMatcher(embedder=embedder.embed)
-            constraint = InsufficientEvidenceConstraint(semantic_matcher=matcher)
+            constraint = InsufficientEvidenceConstraint(embedder=embedder.embed)
 
             query = "What was the revenue last quarter?"
             chunks = [
@@ -234,8 +233,7 @@ class TestCausalQueryDetection:
 
         try:
             embedder = get_embedder("ollama", config={"model": "nomic-embed-text:latest"})
-            matcher = SemanticMatcher(embedder=embedder.embed)
-            constraint = InsufficientEvidenceConstraint(semantic_matcher=matcher)
+            constraint = InsufficientEvidenceConstraint(embedder=embedder.embed)
 
             query = "Why did the server crash?"
             chunks = [

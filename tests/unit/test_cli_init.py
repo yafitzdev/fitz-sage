@@ -174,7 +174,7 @@ class TestGenerateConfig:
         assert config["default_engine"] == "fitz_rag"
 
     def test_generate_fitz_rag_config_basic(self):
-        """Test generate_fitz_rag_config produces valid YAML."""
+        """Test generate_fitz_rag_config produces valid YAML with flat format."""
         import yaml
 
         from fitz_ai.cli.commands.init_config import generate_fitz_rag_config
@@ -194,15 +194,16 @@ class TestGenerateConfig:
             chunk_overlap=200,
         )
 
-        # Should be valid YAML
+        # Should be valid YAML with flat format
         config = yaml.safe_load(config_str)
 
-        assert config["chat"]["plugin_name"] == "cohere"
-        assert config["chat"]["kwargs"]["models"]["smart"] == "command-a-03-2025"
-        assert config["chat"]["kwargs"]["models"]["fast"] == "command-r7b-12-2024"
-        assert config["embedding"]["plugin_name"] == "cohere"
-        assert config["vector_db"]["plugin_name"] == "pgvector"
-        assert config["retrieval"]["plugin_name"] == "dense"
+        # New flat format: plugins are strings, not dicts
+        assert config["chat"] == "cohere"
+        assert config["embedding"] == "cohere"
+        assert config["vector_db"] == "pgvector"
+        assert config["retrieval_plugin"] == "dense"
+        assert config["chunk_size"] == 1000
+        assert config["chunk_overlap"] == 200
 
     def test_generate_fitz_rag_config_with_rerank(self):
         """Test generate_fitz_rag_config includes rerank when provided."""
@@ -227,12 +228,11 @@ class TestGenerateConfig:
 
         config = yaml.safe_load(config_str)
 
-        # Rerank section has plugin_name and kwargs (no enabled flag)
-        assert config["rerank"]["plugin_name"] == "cohere"
-        assert "model" in config["rerank"]["kwargs"]
+        # Rerank is a string in flat format
+        assert config["rerank"] == "cohere"
 
     def test_generate_fitz_rag_config_without_rerank(self):
-        """Test generate_fitz_rag_config omits rerank when not provided."""
+        """Test generate_fitz_rag_config sets rerank to null when not provided."""
         import yaml
 
         from fitz_ai.cli.commands.init_config import generate_fitz_rag_config
@@ -254,11 +254,11 @@ class TestGenerateConfig:
 
         config = yaml.safe_load(config_str)
 
-        # Rerank section is commented out (not present in config)
-        assert "rerank" not in config
+        # Rerank is null in flat format
+        assert config["rerank"] is None
 
     def test_generate_fitz_rag_config_chunking(self):
-        """Test generate_fitz_rag_config includes chunking settings."""
+        """Test generate_fitz_rag_config includes chunking settings in flat format."""
         import yaml
 
         from fitz_ai.cli.commands.init_config import generate_fitz_rag_config
@@ -280,9 +280,9 @@ class TestGenerateConfig:
 
         config = yaml.safe_load(config_str)
 
-        assert config["chunking"]["default"]["plugin_name"] == "recursive"
-        assert config["chunking"]["default"]["kwargs"]["chunk_size"] == 500
-        assert config["chunking"]["default"]["kwargs"]["chunk_overlap"] == 100
+        # Flat format: chunk_size and chunk_overlap are top-level
+        assert config["chunk_size"] == 500
+        assert config["chunk_overlap"] == 100
 
 
 class TestInitValidation:

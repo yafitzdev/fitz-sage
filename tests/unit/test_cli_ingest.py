@@ -195,59 +195,55 @@ class TestIngestAdapters:
 
 
 class TestBuildChunkingRouterConfig:
-    """Tests for _build_chunking_router_config."""
+    """Tests for build_chunking_router_config."""
 
     def test_build_default_config(self):
-        """Test building config with defaults."""
+        """Test building config with CLIContext."""
         from fitz_ai.cli.commands.ingest_config import (
             build_chunking_router_config as _build_chunking_router_config,
         )
 
-        config = {
-            "chunking": {
-                "default": {"plugin_name": "simple", "kwargs": {"chunk_size": 500}},
-                "warn_on_fallback": True,
-            }
-        }
+        # Mock CLIContext with chunk_size and chunk_overlap
+        mock_ctx = MagicMock()
+        mock_ctx.chunk_size = 500
+        mock_ctx.chunk_overlap = 50
 
-        result = _build_chunking_router_config(config)
+        result = _build_chunking_router_config(mock_ctx)
 
-        assert result.default.plugin_name == "simple"
+        assert result.default.plugin_name == "recursive"
         assert result.default.kwargs["chunk_size"] == 500
-        assert result.warn_on_fallback is True
+        assert result.default.kwargs["chunk_overlap"] == 50
 
-    def test_build_config_with_extensions(self):
-        """Test building config with per-extension chunkers."""
+    def test_build_config_with_different_sizes(self):
+        """Test building config with different chunk sizes."""
         from fitz_ai.cli.commands.ingest_config import (
             build_chunking_router_config as _build_chunking_router_config,
         )
 
-        config = {
-            "chunking": {
-                "default": {"plugin_name": "simple"},
-                "by_extension": {
-                    ".md": {"plugin_name": "markdown", "kwargs": {}},
-                    ".py": {"plugin_name": "python_code", "kwargs": {}},
-                },
-            }
-        }
+        mock_ctx = MagicMock()
+        mock_ctx.chunk_size = 1000
+        mock_ctx.chunk_overlap = 200
 
-        result = _build_chunking_router_config(config)
+        result = _build_chunking_router_config(mock_ctx)
 
-        assert ".md" in result.by_extension
-        assert result.by_extension[".md"].plugin_name == "markdown"
-        assert ".py" in result.by_extension
-
-    def test_build_config_empty(self):
-        """Test building config with empty input."""
-        from fitz_ai.cli.commands.ingest_config import (
-            build_chunking_router_config as _build_chunking_router_config,
-        )
-
-        result = _build_chunking_router_config({})
-
-        assert result.default.plugin_name == "simple"
         assert result.default.kwargs["chunk_size"] == 1000
+        assert result.default.kwargs["chunk_overlap"] == 200
+
+    def test_build_config_zero_overlap(self):
+        """Test building config with zero overlap."""
+        from fitz_ai.cli.commands.ingest_config import (
+            build_chunking_router_config as _build_chunking_router_config,
+        )
+
+        mock_ctx = MagicMock()
+        mock_ctx.chunk_size = 512
+        mock_ctx.chunk_overlap = 0
+
+        result = _build_chunking_router_config(mock_ctx)
+
+        assert result.default.kwargs["chunk_size"] == 512
+        assert result.default.kwargs["chunk_overlap"] == 0
+        assert result.warn_on_fallback is False
 
 
 class TestIngestOptions:
