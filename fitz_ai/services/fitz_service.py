@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from fitz_ai.core import Answer
 from fitz_ai.logging.logger import get_logger
@@ -61,6 +61,12 @@ class IngestResult:
     chunks_updated: int = 0
     chunks_deleted: int = 0
     errors: list[str] = field(default_factory=list)
+    scanned: int = 0
+    skipped: int = 0
+    enriched: int = 0
+    artifacts_generated: int = 0
+    hierarchy_summaries: int = 0
+    duration_seconds: float = 0.0
 
 
 @dataclass
@@ -126,6 +132,29 @@ class QueryError(FitzServiceError):
     """Query failed."""
 
     pass
+
+
+# =============================================================================
+# Adapters
+# =============================================================================
+
+
+class _VectorDBWriterAdapter:
+    """Adapts vector DB client to VectorDBWriter protocol."""
+
+    def __init__(self, client):
+        self._client = client
+
+    def upsert(
+        self, collection: str, points: list[dict[str, Any]], defer_persist: bool = False
+    ) -> None:
+        """Upsert points into collection."""
+        self._client.upsert(collection, points, defer_persist=defer_persist)
+
+    def flush(self) -> None:
+        """Flush any pending writes to disk."""
+        if hasattr(self._client, "flush"):
+            self._client.flush()
 
 
 # =============================================================================
@@ -251,21 +280,21 @@ class FitzService:
         source: str | Path,
         collection: str,
         *,
-        clear_existing: bool = False,
-        enable_enrichment: bool = True,
-        chunk_size: int | None = None,
-        chunk_overlap: int | None = None,
+        force: bool = False,
+        artifacts: str | None = "none",
+        on_progress: Callable[[int, int, str], None] | None = None,
     ) -> IngestResult:
         """
         Ingest documents into a collection.
 
+        Incremental by default - only processes new/changed files.
+
         Args:
             source: Path to file or directory
             collection: Target collection name
-            clear_existing: Delete existing data before ingesting
-            enable_enrichment: Run LLM enrichment (summaries, entities, etc.)
-            chunk_size: Override default chunk size
-            chunk_overlap: Override default chunk overlap
+            force: Re-ingest everything regardless of state
+            artifacts: "none", "all", or comma-separated list
+            on_progress: Callback(current, total, file_path)
 
         Returns:
             IngestResult with statistics
@@ -281,30 +310,122 @@ class FitzService:
             raise ValueError(f"Source path does not exist: {source_path}")
 
         try:
-            if clear_existing:
-                self.delete_collection(collection)
+            (
+                state_manager,
+                writer,
+                embedder,
+                parser_router,
+                chunking_router,
+                embedding_id,
+                vector_db_plugin,
+                enrichment_pipeline,
+            ) = self._build_ingest_components(source_path, artifacts)
 
-            # Run diff-based ingestion
-            result = run_diff_ingest(
+            has_artifacts = artifacts and artifacts != "none"
+
+            summary = run_diff_ingest(
                 source=str(source_path),
+                state_manager=state_manager,
+                vector_db_writer=writer,
+                embedder=embedder,
+                parser_router=parser_router,
+                chunking_router=chunking_router,
                 collection=collection,
-                enable_enrichment=enable_enrichment,
-                chunk_size=chunk_size,
-                chunk_overlap=chunk_overlap,
+                embedding_id=embedding_id,
+                vector_db_id=vector_db_plugin,
+                enrichment_pipeline=enrichment_pipeline,
+                force=force,
+                on_progress=on_progress,
+                skip_artifacts=not has_artifacts,
             )
 
-            return IngestResult(
-                collection=collection,
-                documents_processed=result.documents_processed,
-                chunks_created=result.new_chunks + result.updated_chunks,
-                chunks_new=result.new_chunks,
-                chunks_updated=result.updated_chunks,
-                chunks_deleted=result.deleted_chunks,
-            )
+            return self._summary_to_result(summary, collection)
 
         except Exception as e:
             logger.error(f"Ingestion failed: {e}")
             raise IngestError(f"Ingestion failed: {e}") from e
+
+    def _build_ingest_components(
+        self, source: Path, artifacts: str | None = None
+    ) -> tuple:
+        """Build all components required for diff ingestion."""
+        from fitz_ai.cli.context import CLIContext
+        from fitz_ai.cli.commands.ingest_config import build_chunking_router_config
+        from fitz_ai.ingestion.chunking.router import ChunkingRouter
+        from fitz_ai.ingestion.parser import ParserRouter
+        from fitz_ai.ingestion.state import IngestStateManager
+
+        ctx = CLIContext.load()
+
+        state_manager = IngestStateManager()
+        state_manager.load()
+
+        parser_router = ParserRouter(docling_parser=ctx.parser)
+        router_config = build_chunking_router_config(ctx)
+        chunking_router = ChunkingRouter.from_config(router_config)
+
+        embedder = ctx.get_embedder()
+        vector_client = ctx.get_vector_db_client()
+        writer = _VectorDBWriterAdapter(vector_client)
+
+        enrichment_pipeline = self._build_enrichment_pipeline(ctx, source, artifacts)
+
+        return (
+            state_manager,
+            writer,
+            embedder,
+            parser_router,
+            chunking_router,
+            ctx.embedding_id,
+            ctx.vector_db_plugin,
+            enrichment_pipeline,
+        )
+
+    def _build_enrichment_pipeline(self, ctx, source: Path, artifacts: str | None):
+        """Build enrichment pipeline with artifact configuration."""
+        from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
+
+        # Parse artifact selection
+        if artifacts == "none" or artifacts is None:
+            selected_artifacts: list[str] = []
+        elif artifacts == "all":
+            from fitz_ai.cli.commands.ingest_helpers import get_available_artifacts
+
+            available = get_available_artifacts(has_llm=bool(ctx.chat_plugin))
+            selected_artifacts = [name for name, _ in available]
+        else:
+            selected_artifacts = [a.strip() for a in artifacts.split(",") if a.strip()]
+
+        enrichment_cfg: dict[str, Any] = {"enabled": True}
+        if selected_artifacts:
+            enrichment_cfg["artifacts"] = {"enabled": selected_artifacts}
+
+        config = EnrichmentConfig.model_validate(enrichment_cfg)
+        chat_factory = ctx.get_chat_factory() if ctx.chat_plugin else None
+
+        return EnrichmentPipeline(
+            config=config,
+            project_root=source.resolve(),
+            chat_factory=chat_factory,
+        )
+
+    def _summary_to_result(self, summary, collection: str) -> IngestResult:
+        """Convert IngestSummary to IngestResult."""
+        return IngestResult(
+            collection=collection,
+            documents_processed=summary.ingested,
+            chunks_created=summary.ingested,
+            chunks_new=summary.ingested - summary.rechunked,
+            chunks_updated=summary.rechunked,
+            chunks_deleted=summary.marked_deleted,
+            errors=summary.error_details,
+            scanned=summary.scanned,
+            skipped=summary.skipped,
+            enriched=summary.enriched,
+            artifacts_generated=summary.artifacts_generated,
+            hierarchy_summaries=summary.hierarchy_summaries,
+            duration_seconds=summary.duration_seconds,
+        )
 
     def ingest_text(
         self,

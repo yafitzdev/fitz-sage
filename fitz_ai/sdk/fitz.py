@@ -105,14 +105,19 @@ class fitz:
     def ingest(
         self,
         source: Union[str, Path],
-        clear_existing: bool = False,
+        *,
+        force: bool = False,
+        artifacts: Optional[str] = "none",
     ) -> IngestStats:
         """
         Ingest documents into the knowledge base.
 
+        Incremental by default - only processes new/changed files.
+
         Args:
             source: Path to a file or directory to ingest.
-            clear_existing: If True, clear the collection before ingesting.
+            force: Re-ingest all files regardless of state.
+            artifacts: "none", "all", or comma-separated list of artifact types.
 
         Returns:
             IngestStats with document and chunk counts.
@@ -128,7 +133,8 @@ class fitz:
         result = self._service.ingest(
             source=source,
             collection=self._collection,
-            clear_existing=clear_existing,
+            force=force,
+            artifacts=artifacts,
         )
 
         logger.info(
