@@ -5,7 +5,7 @@ Tests for the Fitz SDK.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -65,7 +65,7 @@ class TestFitzConfigCreation:
         assert config_path.exists()
 
     def test_config_has_required_sections(self, tmp_path):
-        """Test that created config has all required sections."""
+        """Test that created config has all required keys (flat format)."""
         from fitz_ai.sdk import fitz
 
         config_path = tmp_path / "config.yaml"
@@ -76,12 +76,13 @@ class TestFitzConfigCreation:
 
         config = yaml.safe_load(config_path.read_text())
 
+        # Flat format keys (v0.8.0+)
         assert "chat" in config
         assert "embedding" in config
         assert "vector_db" in config
-        assert "retrieval" in config
+        assert "retrieval_plugin" in config
         assert "rerank" in config
-        assert "rgs" in config
+        assert "collection" in config
 
     def test_config_uses_collection_name(self, tmp_path):
         """Test that config uses the fitz instance's collection name."""
@@ -94,7 +95,8 @@ class TestFitzConfigCreation:
 
         config = yaml.safe_load(config_path.read_text())
 
-        assert config["retrieval"]["collection"] == "my_collection"
+        # Flat format: collection is top-level
+        assert config["collection"] == "my_collection"
 
     def test_raises_without_auto_init(self, tmp_path):
         """Test that ConfigurationError is raised when auto_init=False and no config."""
@@ -121,8 +123,9 @@ class TestFitzIngest:
             f.ingest("/nonexistent/path")
 
     def test_raises_on_empty_source(self, tmp_path):
-        """Test that ValueError is raised when no documents found."""
+        """Test that IngestError is raised when no documents found."""
         from fitz_ai.sdk import fitz
+        from fitz_ai.services.fitz_service import IngestError
 
         config_path = tmp_path / "config.yaml"
         f = fitz(config_path=config_path)
@@ -134,13 +137,11 @@ class TestFitzIngest:
         # Create config first
         f._create_default_config(config_path)
 
-        # Mock the FileScanner to return no files
-        with patch("fitz_ai.ingestion.diff.scanner.FileScanner") as mock_scanner_cls:
-            mock_scanner = MagicMock()
-            mock_scanner.scan.return_value = MagicMock(files=[])  # No files found
-            mock_scanner_cls.return_value = mock_scanner
+        # Mock FitzService.ingest to raise IngestError (no documents)
+        with patch.object(f._service, "ingest") as mock_ingest:
+            mock_ingest.side_effect = IngestError("No documents found")
 
-            with pytest.raises(ValueError, match="No documents found"):
+            with pytest.raises(IngestError, match="No documents found"):
                 f.ingest(docs_path)
 
 
@@ -148,21 +149,27 @@ class TestFitzAsk:
     """Tests for fitz.ask() method."""
 
     def test_raises_on_empty_question(self, tmp_path):
-        """Test that ValueError is raised for empty question."""
+        """Test that QueryError is raised for empty question."""
         from fitz_ai.sdk import fitz
+        from fitz_ai.services.fitz_service import QueryError
 
-        f = fitz(config_path=tmp_path / "config.yaml")
+        config_path = tmp_path / "config.yaml"
+        f = fitz(config_path=config_path)
+        f._create_default_config(config_path)
 
-        with pytest.raises(ValueError, match="cannot be empty"):
+        with pytest.raises(QueryError, match="cannot be empty"):
             f.ask("")
 
     def test_raises_on_whitespace_question(self, tmp_path):
-        """Test that ValueError is raised for whitespace-only question."""
+        """Test that QueryError is raised for whitespace-only question."""
         from fitz_ai.sdk import fitz
+        from fitz_ai.services.fitz_service import QueryError
 
-        f = fitz(config_path=tmp_path / "config.yaml")
+        config_path = tmp_path / "config.yaml"
+        f = fitz(config_path=config_path)
+        f._create_default_config(config_path)
 
-        with pytest.raises(ValueError, match="cannot be empty"):
+        with pytest.raises(QueryError, match="cannot be empty"):
             f.ask("   ")
 
 
@@ -172,11 +179,14 @@ class TestFitzQuery:
     def test_query_is_alias_for_ask(self, tmp_path):
         """Test that query() is an alias for ask()."""
         from fitz_ai.sdk import fitz
+        from fitz_ai.services.fitz_service import QueryError
 
-        f = fitz(config_path=tmp_path / "config.yaml")
+        config_path = tmp_path / "config.yaml"
+        f = fitz(config_path=config_path)
+        f._create_default_config(config_path)
 
         # Both should raise the same error
-        with pytest.raises(ValueError, match="cannot be empty"):
+        with pytest.raises(QueryError, match="cannot be empty"):
             f.query("")
 
 

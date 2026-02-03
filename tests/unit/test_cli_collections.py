@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from fitz_ai.cli.cli import app
+from fitz_ai.services.fitz_service import CollectionInfo
 
 runner = CliRunner()
 
@@ -26,26 +27,11 @@ class TestCollectionsCommand:
 
     def test_collections_starts_correctly(self):
         """Test that collections starts and shows header with defaults."""
-        # CLIContext.load() always succeeds with package defaults
-        mock_ctx = MagicMock()
-        mock_ctx.vector_db_plugin = "pgvector"
-        mock_ctx.vector_db_kwargs = {}
+        # Mock FitzService to return no collections
+        mock_service = MagicMock()
+        mock_service.list_collections.return_value = []
 
-        # Mock vector DB client returned by require_vector_db_client
-        mock_vdb = MagicMock()
-        mock_vdb.list_collections.return_value = []  # No collections
-        mock_ctx.require_vector_db_client.return_value = mock_vdb
-
-        # Mock to return only one available DB (skips selection prompt)
-        mock_available = [{"name": "pgvector", "kwargs": {}, "is_configured": True}]
-
-        with (
-            patch("fitz_ai.cli.commands.collections.CLIContext.load", return_value=mock_ctx),
-            patch(
-                "fitz_ai.cli.commands.collections._get_available_vector_dbs",
-                return_value=mock_available,
-            ),
-        ):
+        with patch("fitz_ai.cli.commands.collections.FitzService", return_value=mock_service):
             result = runner.invoke(app, ["collections"])
 
         # Should succeed (no collections found message)
@@ -69,24 +55,6 @@ class TestCollectionsHelpers:
         assert ctx is not None
         assert ctx.vector_db_plugin == "pgvector"
 
-    def test_get_available_vector_dbs(self):
-        """Test _get_available_vector_dbs returns sorted list."""
-        mock_ctx = MagicMock()
-        mock_ctx.vector_db_plugin = "pgvector"
-        mock_ctx.vector_db_kwargs = {}
-
-        with patch(
-            "fitz_ai.vector_db.registry.available_vector_db_plugins",
-            return_value=["pgvector"],
-        ):
-            from fitz_ai.cli.commands.collections import _get_available_vector_dbs
-
-            result = _get_available_vector_dbs(mock_ctx)
-
-        # Configured one should be first
-        assert result[0]["name"] == "pgvector"
-        assert result[0]["is_configured"] is True
-
 
 class TestDisplayCollectionsTable:
     """Tests for _display_collections_table."""
@@ -97,8 +65,8 @@ class TestDisplayCollectionsTable:
             from fitz_ai.cli.commands.collections import _display_collections_table
 
             collections = [
-                {"name": "docs", "count": 100, "status": "ready"},
-                {"name": "code", "count": 50, "status": "ready"},
+                {"name": "docs", "count": 100},
+                {"name": "code", "count": 50},
             ]
 
             _display_collections_table(collections)
@@ -118,13 +86,11 @@ class TestDisplayCollectionInfo:
         with patch("fitz_ai.cli.commands.collections.RICH", False):
             from fitz_ai.cli.commands.collections import _display_collection_info
 
-            stats = {
-                "points_count": 150,
-                "vector_size": 768,
-                "status": "ready",
-            }
-
-            _display_collection_info("my_collection", stats)
+            _display_collection_info(
+                name="my_collection",
+                chunk_count=150,
+                metadata={"vector_size": 768},
+            )
 
         captured = capsys.readouterr()
         assert "my_collection" in captured.out
@@ -136,9 +102,11 @@ class TestDisplayCollectionInfo:
         with patch("fitz_ai.cli.commands.collections.RICH", False):
             from fitz_ai.cli.commands.collections import _display_collection_info
 
-            stats = {"vectors_count": 200}
-
-            _display_collection_info("test", stats)
+            _display_collection_info(
+                name="test",
+                chunk_count=200,
+                metadata={},
+            )
 
         captured = capsys.readouterr()
         assert "200" in captured.out
@@ -149,25 +117,10 @@ class TestCollectionsNoCollections:
 
     def test_collections_empty_shows_message(self):
         """Test collections shows helpful message when no collections."""
-        mock_ctx = MagicMock()
-        mock_ctx.vector_db_plugin = "pgvector"
-        mock_ctx.vector_db_kwargs = {}
+        mock_service = MagicMock()
+        mock_service.list_collections.return_value = []
 
-        # Mock vector DB client returned by require_vector_db_client
-        mock_vdb = MagicMock()
-        mock_vdb.list_collections.return_value = []  # No collections
-        mock_ctx.require_vector_db_client.return_value = mock_vdb
-
-        # Mock to return only one available DB (skips selection prompt)
-        mock_available = [{"name": "pgvector", "kwargs": {}, "is_configured": True}]
-
-        with (
-            patch("fitz_ai.cli.commands.collections.CLIContext.load", return_value=mock_ctx),
-            patch(
-                "fitz_ai.cli.commands.collections._get_available_vector_dbs",
-                return_value=mock_available,
-            ),
-        ):
+        with patch("fitz_ai.cli.commands.collections.FitzService", return_value=mock_service):
             result = runner.invoke(app, ["collections"])
 
         assert "no collection" in result.output.lower() or "ingest" in result.output.lower()
@@ -178,70 +131,36 @@ class TestCollectionsWithData:
 
     def test_collections_lists_and_exits(self):
         """Test collections can list and exit."""
-        mock_ctx = MagicMock()
-        mock_ctx.vector_db_plugin = "pgvector"
-        mock_ctx.vector_db_kwargs = {}
+        mock_service = MagicMock()
+        mock_service.list_collections.return_value = [
+            CollectionInfo(name="docs", chunk_count=100),
+            CollectionInfo(name="code", chunk_count=50),
+        ]
 
-        # Mock vector DB client
-        mock_vdb = MagicMock()
-        mock_vdb.list_collections.return_value = ["docs", "code"]
-        mock_vdb.get_collection_stats.return_value = {
-            "points_count": 100,
-            "status": "ready",
-        }
-        mock_ctx.require_vector_db_client.return_value = mock_vdb
-
-        # Mock to return only one available DB
-        mock_available = [{"name": "pgvector", "kwargs": {}, "is_configured": True}]
-
-        with (
-            patch("fitz_ai.cli.commands.collections.CLIContext.load", return_value=mock_ctx),
-            patch(
-                "fitz_ai.cli.commands.collections._get_available_vector_dbs",
-                return_value=mock_available,
-            ),
-        ):
+        with patch("fitz_ai.cli.commands.collections.FitzService", return_value=mock_service):
             # Select "Exit" (option 3 - after docs, code)
             result = runner.invoke(app, ["collections"], input="3\n")
 
         assert "docs" in result.output
         assert "code" in result.output
 
-    def test_collections_show_example_chunks(self):
-        """Test collections can show example chunks."""
-        mock_ctx = MagicMock()
-        mock_ctx.vector_db_plugin = "pgvector"
-        mock_ctx.vector_db_kwargs = {}
+    def test_collections_select_and_exit(self):
+        """Test collections can select a collection and exit."""
+        mock_service = MagicMock()
+        mock_service.list_collections.return_value = [
+            CollectionInfo(name="docs", chunk_count=10),
+        ]
+        mock_service.get_collection.return_value = CollectionInfo(
+            name="docs",
+            chunk_count=10,
+            metadata={"vector_size": 768},
+        )
 
-        mock_record = MagicMock()
-        mock_record.payload = {"content": "Sample chunk content", "doc_id": "doc1"}
-        mock_record.id = "chunk_1"
+        with patch("fitz_ai.cli.commands.collections.FitzService", return_value=mock_service):
+            # Select first collection, then Exit
+            result = runner.invoke(app, ["collections"], input="1\n3\n")
 
-        # Mock vector DB client
-        mock_vdb = MagicMock()
-        mock_vdb.list_collections.return_value = ["docs"]
-        mock_vdb.get_collection_stats.return_value = {
-            "points_count": 10,
-            "status": "ready",
-        }
-        mock_vdb.scroll.return_value = ([mock_record], None)
-        mock_ctx.require_vector_db_client.return_value = mock_vdb
-
-        # Mock to return only one available DB
-        mock_available = [{"name": "pgvector", "kwargs": {}, "is_configured": True}]
-
-        with (
-            patch("fitz_ai.cli.commands.collections.CLIContext.load", return_value=mock_ctx),
-            patch(
-                "fitz_ai.cli.commands.collections._get_available_vector_dbs",
-                return_value=mock_available,
-            ),
-            patch("fitz_ai.cli.commands.collections.RICH", False),
-        ):
-            # Select first collection, show chunks, then exit
-            result = runner.invoke(app, ["collections"], input="1\n1\n\n4\n")
-
-        assert "Sample chunk" in result.output or mock_vdb.scroll.called
+        assert "docs" in result.output
 
 
 class TestCollectionsDelete:
@@ -249,29 +168,24 @@ class TestCollectionsDelete:
 
     def test_collections_delete_cancelled(self):
         """Test delete can be cancelled."""
-        mock_ctx = MagicMock()
-        mock_ctx.vector_db_plugin = "pgvector"
-        mock_ctx.vector_db_kwargs = {}
+        mock_service = MagicMock()
+        mock_service.list_collections.return_value = [
+            CollectionInfo(name="docs", chunk_count=10),
+        ]
+        mock_service.get_collection.return_value = CollectionInfo(
+            name="docs",
+            chunk_count=10,
+            metadata={},
+        )
 
-        # Mock vector DB client
-        mock_vdb = MagicMock()
-        mock_vdb.list_collections.return_value = ["docs"]
-        mock_vdb.get_collection_stats.return_value = {"points_count": 10}
-        mock_ctx.require_vector_db_client.return_value = mock_vdb
+        with patch("fitz_ai.cli.commands.collections.FitzService", return_value=mock_service):
+            # Menu ordering (UI puts default first):
+            # [1] docs (default) [2] Exit -> select 1 (docs)
+            # [1] Back to list (default) [2] Delete collection [3] Exit -> select 2 (delete)
+            # Confirm delete: n
+            # Then exit: 3
+            result = runner.invoke(app, ["collections"], input="1\n2\nn\n3\n")
 
-        # Mock to return only one available DB
-        mock_available = [{"name": "pgvector", "kwargs": {}, "is_configured": True}]
-
-        with (
-            patch("fitz_ai.cli.commands.collections.CLIContext.load", return_value=mock_ctx),
-            patch(
-                "fitz_ai.cli.commands.collections._get_available_vector_dbs",
-                return_value=mock_available,
-            ),
-        ):
-            # Select collection, select delete, answer no, exit
-            result = runner.invoke(app, ["collections"], input="1\n2\nn\n4\n")
-
-        # Delete should not be called
-        mock_vdb.delete_collection.assert_not_called()
+        # Delete should not be called (user said 'n')
+        mock_service.delete_collection.assert_not_called()
         assert "cancel" in result.output.lower()

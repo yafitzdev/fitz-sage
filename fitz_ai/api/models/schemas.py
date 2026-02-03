@@ -108,4 +108,4 @@ class HealthResponse(BaseModel):
 
     status: str = Field(..., description="Health status: healthy or unhealthy")
     version: str = Field(..., description="Fitz version")
-    config_exists: bool = Field(..., description="Whether config file exists")
+    components: Dict[str, bool] = Field(default_factory=dict, description="Component health status")

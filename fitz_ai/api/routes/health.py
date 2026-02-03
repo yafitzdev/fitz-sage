@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from fitz_ai.api.dependencies import config_exists, get_fitz_version
+from fitz_ai.api.dependencies import get_fitz_version, get_service
 from fitz_ai.api.models.schemas import HealthResponse
 
 router = APIRouter(tags=["health"])
@@ -16,10 +16,13 @@ async def health() -> HealthResponse:
     """
     Health check endpoint.
 
-    Returns server status, version, and configuration state.
+    Returns server status, version, and component health.
     """
+    service = get_service()
+    health_result = service.health_check()
+
     return HealthResponse(
-        status="healthy",
+        status="healthy" if health_result.healthy else "unhealthy",
         version=get_fitz_version(),
-        config_exists=config_exists(),
+        components=health_result.components,
     )

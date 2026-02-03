@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from fitz_ai.api.dependencies import get_fitz_instance
+from fitz_ai.api.dependencies import get_service
 from fitz_ai.api.error_handlers import handle_api_errors
 from fitz_ai.api.models.schemas import IngestRequest, IngestResponse
 
@@ -21,11 +21,16 @@ async def ingest(request: IngestRequest) -> IngestResponse:
     Provide a path to a file or directory. Documents will be chunked,
     embedded, and stored in the vector database.
     """
-    f = get_fitz_instance(request.collection)
-    stats = f.ingest(request.source, clear_existing=request.clear_existing)
+    service = get_service()
+
+    result = service.ingest(
+        source=request.source,
+        collection=request.collection,
+        clear_existing=request.clear_existing,
+    )
 
     return IngestResponse(
-        documents=stats.documents,
-        chunks=stats.chunks,
-        collection=stats.collection,
+        documents=result.documents_processed,
+        chunks=result.chunks_created,
+        collection=result.collection,
     )

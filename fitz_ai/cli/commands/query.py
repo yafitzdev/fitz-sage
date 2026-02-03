@@ -17,11 +17,11 @@ from typing import Optional
 
 import typer
 
-from fitz_ai.cli.context import CLIContext
 from fitz_ai.cli.ui import display_answer, ui
-from fitz_ai.core import Query
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.runtime import create_engine, get_default_engine, get_engine_registry
+from fitz_ai.services import FitzService
+from fitz_ai.services.fitz_service import CollectionNotFoundError, QueryError
 
 logger = get_logger(__name__)
 
@@ -127,7 +127,7 @@ def command(
     # Engines with persistent ingest support
     if caps.supports_persistent_ingest:
         _run_persistent_ingest_query(question, collection, engine)
-    # Engines with collection support use collection-based query
+    # Engines with collection support use FitzService
     elif caps.supports_collections:
         _run_collection_query(question, collection, engine)
     else:
@@ -156,64 +156,34 @@ def _show_documents_required_message(engine_name: str, caps) -> None:
     print()
 
 
-def _warn_if_collection_missing(collection: str, typed_config) -> None:
-    """
-    Check if collection exists and warn with helpful suggestions if not.
+def _select_collection(service: FitzService, requested: Optional[str]) -> str:
+    """Select collection interactively or use requested."""
+    collections = service.list_collections()
 
-    This prevents the confusing "I don't know" answer when the user simply
-    hasn't ingested any documents yet, or is using the wrong collection name.
-    """
-    from fitz_ai.vector_db.registry import get_vector_db_plugin
+    if not collections:
+        print()
+        ui.warning("No collections found in vector database.")
+        ui.info("Run 'fitz ingest ./docs' first to ingest documents.")
+        raise typer.Exit(0)
 
-    try:
-        # Get vector DB client from config (V2 flat structure)
-        # Convert PluginKwargs to dict, excluding None values
-        # Handle both PluginKwargs model and plain dict (for mocks/backwards compat)
-        if hasattr(typed_config.vector_db_kwargs, "model_dump"):
-            vdb_kwargs = {
-                k: v for k, v in typed_config.vector_db_kwargs.model_dump().items() if v is not None
-            }
-        else:
-            vdb_kwargs = (
-                typed_config.vector_db_kwargs
-                if isinstance(typed_config.vector_db_kwargs, dict)
-                else {}
-            )
-        client = get_vector_db_plugin(typed_config.vector_db, **vdb_kwargs)
+    collection_names = [c.name for c in collections]
 
-        # Get available collections
-        collections = client.list_collections()
-
-        if not collections:
+    if requested is not None:
+        if requested not in collection_names:
             print()
-            ui.warning("No collections found in vector database.")
-            ui.info("Run 'fitz ingest ./docs' first to ingest documents.")
-            raise typer.Exit(0)
-
-        if collection not in collections:
-            print()
-            ui.warning(f"Collection '{collection}' not found.")
-            ui.info(f"Available collections: {', '.join(collections)}")
+            ui.warning(f"Collection '{requested}' not found.")
+            ui.info(f"Available collections: {', '.join(collection_names)}")
             ui.info("Use -c <collection> to specify another, or run 'fitz ingest' to create it.")
             raise typer.Exit(0)
+        return requested
 
-        # Check if collection is empty
-        try:
-            count = client.count(collection)
-            if count == 0:
-                print()
-                ui.warning(f"Collection '{collection}' is empty (0 documents).")
-                ui.info("Run 'fitz ingest ./docs' to add documents.")
-                raise typer.Exit(0)
-        except Exception:
-            # count() may not be supported by all backends, skip check
-            pass
+    # Auto-select if only one
+    if len(collection_names) == 1:
+        return collection_names[0]
 
-    except typer.Exit:
-        raise
-    except Exception as e:
-        # Connection errors are handled elsewhere - log and continue
-        logger.debug(f"Could not check collection: {e}")
+    # Prompt user
+    print()
+    return ui.prompt_numbered_choice("Collection", collection_names, collection_names[0])
 
 
 def _run_persistent_ingest_query(
@@ -260,6 +230,8 @@ def _run_persistent_ingest_query(
         engine_instance.load(collection)
 
         ui.info("Querying...")
+        from fitz_ai.core import Query
+
         query = Query(text=question_text)
         answer = engine_instance.answer(query)
         display_answer(answer)
@@ -273,11 +245,11 @@ def _run_persistent_ingest_query(
 def _run_collection_query(
     question: Optional[str], collection: Optional[str], engine_name: str
 ) -> None:
-    """Run query using an engine with collection support."""
+    """Run query using FitzService for fitz_rag engine."""
+    service = FitzService()
 
-    # Load config via CLIContext (always succeeds with defaults)
-    ctx = CLIContext.load()
-    typed_config = ctx.require_typed_config()
+    # Collection selection
+    selected_collection = _select_collection(service, collection)
 
     # Prompt for question if not provided
     if question is None:
@@ -285,24 +257,24 @@ def _run_collection_query(
     else:
         question_text = question
 
-    # Collection selection (keeps ctx and typed_config in sync)
-    ctx.select_collection(collection, require=False)
-
-    # Check if collection exists and warn if empty/missing
-    _warn_if_collection_missing(ctx.retrieval_collection, typed_config)
-
     # Display info
     print()
-    ui.info(ctx.info_line())
+    ui.info(f"Engine: {engine_name} | Collection: {selected_collection}")
     print()
 
-    # Execute query using runtime
+    # Execute query via FitzService
     try:
-        engine_instance = create_engine(engine_name, config=typed_config)
-        query = Query(text=question_text)
-        answer = engine_instance.answer(query)
+        answer = service.query(
+            question=question_text,
+            collection=selected_collection,
+            engine=engine_name,
+        )
         display_answer(answer)
-    except Exception as e:
+    except CollectionNotFoundError as e:
+        ui.error(f"Collection '{e.collection}' not found.")
+        ui.info("Run 'fitz collections' to see available collections.")
+        raise typer.Exit(1)
+    except QueryError as e:
         # Show clean error message, full traceback only at debug level
         ui.error(f"Query failed: {_get_root_cause(e)}")
         logger.debug("Query error", exc_info=True)
@@ -323,6 +295,8 @@ def _run_generic_query(question: Optional[str], engine_name: str) -> None:
 
     try:
         engine_instance = create_engine(engine_name)
+        from fitz_ai.core import Query
+
         query = Query(text=question_text)
         answer = engine_instance.answer(query)
         display_answer(answer)

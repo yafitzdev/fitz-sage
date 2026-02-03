@@ -8,50 +8,17 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
-import typer
 
-from fitz_ai.cli.context import CLIContext
 from fitz_ai.cli.ui import RICH, console, ui
 from fitz_ai.logging.logger import get_logger
+from fitz_ai.services import FitzService
 
 logger = get_logger(__name__)
 
 
-def _get_available_vector_dbs(ctx: CLIContext) -> List[Dict[str, Any]]:
-    """Get list of available vector DBs from config and installed plugins."""
-    from fitz_ai.vector_db.registry import available_vector_db_plugins
-
-    # Get configured default
-    configured = ctx.vector_db_plugin
-    configured_kwargs = ctx.vector_db_kwargs
-
-    # Convert PluginKwargs to dict, excluding None values
-    # Handle both PluginKwargs model and plain dict (for mocks/backwards compat)
-    if hasattr(configured_kwargs, "model_dump"):
-        kwargs_dict = {k: v for k, v in configured_kwargs.model_dump().items() if v is not None}
-    else:
-        kwargs_dict = configured_kwargs if isinstance(configured_kwargs, dict) else {}
-
-    # Get all available plugins
-    available = available_vector_db_plugins()
-
-    result = []
-    for plugin in available:
-        entry = {
-            "name": plugin,
-            "kwargs": kwargs_dict if plugin == configured else {},
-            "is_configured": plugin == configured,
-        }
-        result.append(entry)
-
-    # Sort: configured first, then alphabetically
-    result.sort(key=lambda x: (not x["is_configured"], x["name"]))
-    return result
-
-
-def _display_collections_table(collections: List[Dict[str, Any]]) -> None:
+def _display_collections_table(collections: list[dict[str, Any]]) -> None:
     """Display collections in a table."""
     if RICH:
         from rich.table import Table
@@ -60,14 +27,12 @@ def _display_collections_table(collections: List[Dict[str, Any]]) -> None:
         table.add_column("#", style="dim", width=3)
         table.add_column("Collection", style="cyan")
         table.add_column("Chunks", justify="right")
-        table.add_column("Status")
 
         for i, coll in enumerate(collections, 1):
             table.add_row(
                 str(i),
                 coll["name"],
                 str(coll.get("count", "?")),
-                coll.get("status", "ready"),
             )
 
         console.print(table)
@@ -76,7 +41,7 @@ def _display_collections_table(collections: List[Dict[str, Any]]) -> None:
             print(f"  {i}. {coll['name']} ({coll.get('count', '?')} chunks)")
 
 
-def _display_collection_info(name: str, stats: Dict[str, Any]) -> None:
+def _display_collection_info(name: str, chunk_count: int, metadata: dict[str, Any]) -> None:
     """Display detailed collection info."""
     print()
     if RICH:
@@ -88,43 +53,14 @@ def _display_collection_info(name: str, stats: Dict[str, Any]) -> None:
         table.add_column("Value", style="cyan")
 
         table.add_row("Name", name)
-        table.add_row("Chunks", str(stats.get("points_count", stats.get("vectors_count", "?"))))
-        table.add_row("Vector Size", str(stats.get("vector_size", "?")))
-        table.add_row("Status", stats.get("status", "ready"))
+        table.add_row("Chunks", str(chunk_count))
+        table.add_row("Vector Size", str(metadata.get("vector_size", "?")))
 
         console.print(Panel(table, title=f"[bold]{name}[/bold]", border_style="blue"))
     else:
         print(f"  Name: {name}")
-        print(f"  Chunks: {stats.get('points_count', stats.get('vectors_count', '?'))}")
-        print(f"  Vector Size: {stats.get('vector_size', '?')}")
-        print(f"  Status: {stats.get('status', 'ready')}")
-
-
-def _load_collections_with_stats(client: Any) -> List[Dict[str, Any]]:
-    """Load collections from client and get stats for each."""
-    collections_list = client.list_collections()
-    collections = []
-    for name in collections_list:
-        try:
-            stats = client.get_collection_stats(name)
-            count = stats.get("points_count", stats.get("vectors_count", "?"))
-            status = stats.get("status", "ready")
-        except Exception:
-            count = "?"
-            status = "unknown"
-        collections.append({"name": name, "count": count, "status": status})
-    return collections
-
-
-def _delete_vocabulary(collection: str) -> None:
-    """Delete vocabulary associated with a collection.
-
-    Note: Vocabulary is now stored in PostgreSQL (same database as collection),
-    so it's automatically deleted when the collection database is dropped.
-    This function is kept for backwards compatibility but is now a no-op.
-    """
-    # No-op: vocabulary is in PostgreSQL and deleted with the collection database
-    pass
+        print(f"  Chunks: {chunk_count}")
+        print(f"  Vector Size: {metadata.get('vector_size', '?')}")
 
 
 def _delete_table_registry(collection: str) -> None:
@@ -140,56 +76,6 @@ def _delete_table_registry(collection: str) -> None:
             logger.warning(f"Failed to delete table registry: {e}")
 
 
-def _delete_entity_graph(collection: str) -> None:
-    """Delete entity graph associated with a collection.
-
-    Note: Entity graph is now stored in PostgreSQL (same database as collection),
-    so it's automatically deleted when the collection database is dropped.
-    This function is kept for backwards compatibility but is now a no-op.
-    """
-    # No-op: entity graph is in PostgreSQL and deleted with the collection database
-    pass
-
-
-def _display_example_chunks(client: Any, collection: str, limit: int = 3) -> None:
-    """Display example chunks from a collection."""
-    print()
-    ui.info(f"Example chunks from '{collection}':")
-    print()
-
-    try:
-        # Use scroll to get sample chunks
-        if hasattr(client, "scroll"):
-            records, _ = client.scroll(collection=collection, limit=limit, offset=0)
-            for i, record in enumerate(records, 1):
-                payload = record.payload if hasattr(record, "payload") else {}
-                content = payload.get("content", payload.get("text", ""))
-                doc_id = payload.get("doc_id", record.id if hasattr(record, "id") else "?")
-
-                # Truncate content
-                if len(content) > 200:
-                    content = content[:200] + "..."
-
-                if RICH:
-                    from rich.panel import Panel
-
-                    console.print(
-                        Panel(
-                            content or "[dim]No content[/dim]",
-                            title=f"[bold]#{i}[/bold] {doc_id}",
-                            border_style="dim",
-                        )
-                    )
-                else:
-                    print(f"  #{i} [{doc_id}]")
-                    print(f"     {content}")
-                    print()
-        else:
-            ui.warning("This vector DB doesn't support browsing chunks.")
-    except Exception as e:
-        ui.error(f"Failed to fetch chunks: {e}")
-
-
 def command() -> None:
     """
     Manage vector database collections.
@@ -198,66 +84,27 @@ def command() -> None:
     """
     ui.header("Collections", "Manage vector database collections")
 
-    # Load config via CLIContext (always succeeds with defaults)
-    ctx = CLIContext.load()
+    service = FitzService()
 
     # =========================================================================
-    # Step 1: Select Vector DB (if multiple available)
-    # =========================================================================
-
-    available_dbs = _get_available_vector_dbs(ctx)
-
-    if not available_dbs:
-        ui.error("No vector DB plugins found.")
-        raise typer.Exit(1)
-
-    if len(available_dbs) == 1:
-        selected_db = available_dbs[0]
-        ui.info(f"Vector DB: {selected_db['name']}")
-    else:
-        # Multiple DBs available - let user choose
-        print()
-        db_names = [
-            f"{db['name']} {'(configured)' if db['is_configured'] else ''}" for db in available_dbs
-        ]
-        selected_name = ui.prompt_numbered_choice(
-            "Select vector database",
-            db_names,
-            db_names[0],  # Default to configured one
-        )
-        # Find the selected DB
-        selected_idx = db_names.index(selected_name)
-        selected_db = available_dbs[selected_idx]
-
-    # Connect to selected DB
-    if selected_db["is_configured"]:
-        client = ctx.require_vector_db_client()
-    else:
-        from fitz_ai.vector_db.registry import get_vector_db_plugin
-
-        try:
-            client = get_vector_db_plugin(selected_db["name"], **selected_db["kwargs"])
-        except Exception as e:
-            ui.error(f"Failed to connect to '{selected_db['name']}': {e}")
-            raise typer.Exit(1)
-
-    # =========================================================================
-    # Step 2: List Collections
+    # Step 1: List Collections
     # =========================================================================
 
     print()
-    collections = _load_collections_with_stats(client)
+    collection_infos = service.list_collections()
 
-    if not collections:
+    if not collection_infos:
         ui.info("No collections found.")
         ui.info("Run 'fitz ingest' to create one.")
         return
 
+    # Convert to display format
+    collections = [{"name": c.name, "count": c.chunk_count} for c in collection_infos]
     _display_collections_table(collections)
     print()
 
     # =========================================================================
-    # Step 3: Select Collection
+    # Step 2: Select Collection
     # =========================================================================
 
     collection_names = [c["name"] for c in collections]
@@ -271,43 +118,38 @@ def command() -> None:
         return
 
     # =========================================================================
-    # Step 4: Collection Menu
+    # Step 3: Collection Menu
     # =========================================================================
 
     while True:
-        # Get fresh stats
+        # Get fresh info
         try:
-            stats = client.get_collection_stats(selected_collection)
+            info = service.get_collection(selected_collection)
+            chunk_count = info.chunk_count
+            metadata = info.metadata
         except Exception:
-            stats = {}
+            chunk_count = 0
+            metadata = {}
 
-        _display_collection_info(selected_collection, stats)
+        _display_collection_info(selected_collection, chunk_count, metadata)
 
         print()
         action = ui.prompt_numbered_choice(
             "Action",
-            ["Show example chunks", "Delete collection", "Back to list", "Exit"],
-            "Show example chunks",
+            ["Delete collection", "Back to list", "Exit"],
+            "Back to list",
         )
 
-        if action == "Show example chunks":
-            _display_example_chunks(client, selected_collection)
-            print()
-            ui.prompt_text("Press Enter to continue", "")
-
-        elif action == "Delete collection":
-            count = stats.get("points_count", stats.get("vectors_count", "?"))
-            ui.warning(f"This will delete '{selected_collection}' with {count} chunks.")
+        if action == "Delete collection":
+            ui.warning(f"This will delete '{selected_collection}' with {chunk_count} chunks.")
 
             if ui.prompt_confirm("Are you sure?", default=False):
                 try:
-                    deleted = client.delete_collection(selected_collection)
-                    ui.success(f"Deleted '{selected_collection}' ({deleted} chunks)")
+                    service.delete_collection(selected_collection)
+                    ui.success(f"Deleted '{selected_collection}'")
 
-                    # Also delete associated files
-                    _delete_vocabulary(selected_collection)
+                    # Also delete associated table registry
                     _delete_table_registry(selected_collection)
-                    _delete_entity_graph(selected_collection)
 
                     return  # Exit after deletion
                 except Exception as e:
@@ -318,11 +160,12 @@ def command() -> None:
         elif action == "Back to list":
             # Refresh and show list again
             print()
-            collections = _load_collections_with_stats(client)
-            if not collections:
+            collection_infos = service.list_collections()
+            if not collection_infos:
                 ui.info("No collections remaining.")
                 return
 
+            collections = [{"name": c.name, "count": c.chunk_count} for c in collection_infos]
             _display_collections_table(collections)
             print()
 
