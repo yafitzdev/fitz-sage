@@ -712,31 +712,17 @@ def _run_query(
 
     Returns an RGSAnswer object.
     """
-    import yaml
+    from fitz_ai.cli.context import CLIContext
 
-    from fitz_ai.engines.fitz_rag.config import FitzRagConfig
-    from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
-
-    # Load typed config from engine-specific path
-    config_path = FitzPaths.engine_config("fitz_rag")
-    with config_path.open("r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f) or {}
-
-    if "fitz_rag" in raw:
-        config_dict = raw["fitz_rag"]
-    else:
-        config_dict = raw
-
-    typed_config = FitzRagConfig(**config_dict)
-
-    # Override collection (flat config - collection is a direct attribute)
-    typed_config.collection = collection
+    # Load config via CLIContext and select collection
+    ctx = CLIContext.load()
+    ctx.select_collection(collection)
 
     if verbose:
         ui.info(f"Querying collection: {collection}")
 
     # Create pipeline and run
-    pipeline = RAGPipeline.from_config(typed_config)
+    pipeline = ctx.get_pipeline()
     answer = pipeline.run(question)
 
     return answer

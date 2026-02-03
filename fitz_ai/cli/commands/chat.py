@@ -180,22 +180,17 @@ def command(
 
 def _run_collection_chat(collection: Optional[str]) -> None:
     """Run chat using fitz_rag engine."""
-    from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
-
     # Load config via CLIContext (always succeeds with defaults)
     ctx = CLIContext.load()
-    typed_config = ctx.require_typed_config()
+
+    # Ensure valid typed config before proceeding
+    ctx.require_typed_config()
 
     # Collection selection (keeps ctx and typed_config in sync)
     selected_collection = ctx.select_collection(collection)
 
     # Create pipeline
-    try:
-        pipeline = RAGPipeline.from_config(typed_config)
-    except Exception as e:
-        ui.error(f"Failed to initialize pipeline: {e}")
-        logger.debug("Pipeline initialization error", exc_info=True)
-        raise typer.Exit(1)
+    pipeline = ctx.require_pipeline()
 
     # Chat loop
     _display_welcome(selected_collection)

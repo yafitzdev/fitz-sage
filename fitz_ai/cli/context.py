@@ -541,6 +541,29 @@ class CLIContext:
             ui.error(f"Failed to initialize chat: {e}")
             raise typer.Exit(1)
 
+    def get_pipeline(self):
+        """Get RAGPipeline instance from typed config."""
+        from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
+
+        if self.typed_config is None:
+            raise ValueError("No typed config available")
+        return RAGPipeline.from_config(self.typed_config)
+
+    def require_pipeline(self):
+        """Get RAGPipeline or exit with error."""
+        import typer
+
+        from fitz_ai.cli.ui import ui
+
+        # First ensure we have a valid typed config
+        self.require_typed_config()
+
+        try:
+            return self.get_pipeline()
+        except Exception as e:
+            ui.error(f"Failed to initialize pipeline: {e}")
+            raise typer.Exit(1)
+
     # -------------------------------------------------------------------------
     # Helper Methods
     # -------------------------------------------------------------------------
