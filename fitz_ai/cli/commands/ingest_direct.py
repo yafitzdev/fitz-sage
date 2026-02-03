@@ -17,7 +17,6 @@ def ingest_direct_text(
     text: str,
     collection: str,
     ctx: CLIContext,
-    config: dict,
 ) -> None:
     """
     Ingest direct text into the vector database.
@@ -25,8 +24,7 @@ def ingest_direct_text(
     Args:
         text: The text to ingest
         collection: Collection name
-        ctx: CLI context
-        config: Raw config dict
+        ctx: CLI context (contains all config values)
     """
     from fitz_ai.core.chunk import Chunk
     from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
@@ -46,9 +44,8 @@ def ingest_direct_text(
     ui.info(f"Text: {preview}")
     print()
 
-    # Get components
-    embedding_config = config.get("embedding", {}).get("kwargs", {})
-    embedder = get_embedder(ctx.embedding_plugin, config=embedding_config)
+    # Get components using ctx (typed access)
+    embedder = get_embedder(ctx.embedding_plugin, config=ctx.embedding_kwargs)
 
     vector_client = get_vector_db_plugin(ctx.vector_db_plugin)
 

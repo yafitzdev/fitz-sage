@@ -137,6 +137,16 @@ class CLIContext:
     rgs_citations: bool = True
     rgs_strict_grounding: bool = True
 
+    # Chunking/Parser
+    parser: str = "docling"
+    chunk_size: int = 512
+    chunk_overlap: int = 0
+
+    # Plugin kwargs (for factory functions)
+    chat_kwargs: dict = field(default_factory=dict)
+    embedding_kwargs: dict = field(default_factory=dict)
+    rerank_kwargs: dict = field(default_factory=dict)
+
     # -------------------------------------------------------------------------
     # Display Properties (formatted strings for UI)
     # -------------------------------------------------------------------------
@@ -279,6 +289,12 @@ class CLIContext:
             config.get("rerank"), config.get("rerank_kwargs", {})
         )
 
+        # Extract kwargs (may be PluginKwargs objects or dicts)
+        chat_kwargs = cls._to_dict(config.get("chat_kwargs", {}))
+        embedding_kwargs = cls._to_dict(config.get("embedding_kwargs", {}))
+        rerank_kwargs = cls._to_dict(config.get("rerank_kwargs", {}))
+        vector_db_kwargs = cls._to_dict(config.get("vector_db_kwargs", {}))
+
         return cls(
             raw_config=config,
             typed_config=typed,
@@ -294,7 +310,7 @@ class CLIContext:
             embedding_model=emb_model,
             # Vector DB
             vector_db_plugin=vdb_plugin_name,
-            vector_db_kwargs=config.get("vector_db_kwargs", {}),
+            vector_db_kwargs=vector_db_kwargs,
             # Retrieval
             retrieval_plugin=config.get("retrieval_plugin", "dense"),
             retrieval_collection=config.get("collection", "default"),
@@ -306,7 +322,27 @@ class CLIContext:
             # RGS
             rgs_citations=config.get("enable_citations", True),
             rgs_strict_grounding=config.get("strict_grounding", True),
+            # Chunking/Parser
+            parser=config.get("parser", "docling"),
+            chunk_size=config.get("chunk_size", 512),
+            chunk_overlap=config.get("chunk_overlap", 0),
+            # Plugin kwargs
+            chat_kwargs=chat_kwargs,
+            embedding_kwargs=embedding_kwargs,
+            rerank_kwargs=rerank_kwargs,
         )
+
+    @staticmethod
+    def _to_dict(obj: Any) -> dict:
+        """Convert PluginKwargs or dict to plain dict."""
+        if obj is None:
+            return {}
+        if hasattr(obj, "model_dump"):
+            # Pydantic model - convert and filter None values
+            return {k: v for k, v in obj.model_dump().items() if v is not None}
+        if isinstance(obj, dict):
+            return obj
+        return {}
 
     @staticmethod
     def _parse_plugin_string(plugin: str | None) -> str:

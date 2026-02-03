@@ -570,8 +570,7 @@ def _run_ingestion(
 
     Returns dict with 'documents', 'chunks', and 'hierarchy_summaries' counts.
     """
-    import yaml
-
+    from fitz_ai.cli.context import CLIContext
     from fitz_ai.engines.fitz_rag.config import (
         ChunkingRouterConfig,
         ExtensionChunkerConfig,
@@ -586,20 +585,8 @@ def _run_ingestion(
     from fitz_ai.vector_db.registry import get_vector_db_plugin
     from fitz_ai.vector_db.writer import VectorDBWriter
 
-    # Load config from engine-specific path
-    config_path = FitzPaths.engine_config("fitz_rag")
-    with config_path.open("r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f) or {}
-
-    if "fitz_rag" in raw:
-        config = raw["fitz_rag"]
-    else:
-        config = raw
-
-    # Get plugin configs
-    embedding_config = config.get("embedding", {})
-    vector_db_config = config.get("vector_db", {})
-    chat_config = config.get("chat", {})
+    # Load config via CLIContext (typed access)
+    ctx = CLIContext.load()
 
     # Step 1: Discover and parse documents
     if verbose:
@@ -638,41 +625,15 @@ def _run_ingestion(
     if verbose:
         ui.info("Chunking documents...")
 
-    # Load chunking config from user config, fall back to package defaults
-    chunking_cfg = config.get("chunking") or config.get("ingest", {}).get("chunking")
-    if chunking_cfg:
-        default_cfg = chunking_cfg.get("default", {})
-        chunking_config = ChunkingRouterConfig(
-            default=ExtensionChunkerConfig(
-                plugin_name=default_cfg.get("plugin_name", "recursive"),
-                kwargs=default_cfg.get("kwargs", {}),
-            ),
-            by_extension={
-                ext: ExtensionChunkerConfig(
-                    plugin_name=ext_cfg.get("plugin_name", "simple"),
-                    kwargs=ext_cfg.get("kwargs", {}),
-                )
-                for ext, ext_cfg in chunking_cfg.get("by_extension", {}).items()
-            },
-            warn_on_fallback=chunking_cfg.get("warn_on_fallback", False),
-        )
-    else:
-        # Fall back to package defaults from default.yaml
-        defaults_path = (
-            Path(__file__).parent.parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
-        )
-        with defaults_path.open("r", encoding="utf-8") as f:
-            default_config = yaml.safe_load(f) or {}
-
-        default_ingest = default_config.get("ingest", {})
-        default_chunking = default_ingest.get("chunking", {}).get("default", {})
-        chunking_config = ChunkingRouterConfig(
-            default=ExtensionChunkerConfig(
-                plugin_name=default_chunking.get("plugin_name", "recursive"),
-                kwargs=default_chunking.get("kwargs", {}),
-            ),
-            warn_on_fallback=False,
-        )
+    # Build chunking config from CLIContext
+    chunking_config = ChunkingRouterConfig(
+        default=ExtensionChunkerConfig(
+            plugin_name="recursive",
+            kwargs={"chunk_size": ctx.chunk_size, "chunk_overlap": ctx.chunk_overlap},
+        ),
+        by_extension={},
+        warn_on_fallback=False,
+    )
     chunking_router = ChunkingRouter.from_config(chunking_config)
 
     chunks: List = []
@@ -680,6 +641,10 @@ def _run_ingestion(
         ext = Path(parsed_doc.metadata.get("source_file", ".txt")).suffix or ".txt"
         chunker = chunking_router.get_chunker(ext)
         doc_chunks = chunker.chunk(parsed_doc)
+        # Set source metadata for hierarchy grouping
+        source_file = parsed_doc.metadata.get("source_file", "unknown")
+        for chunk in doc_chunks:
+            chunk.metadata["source"] = source_file
         chunks.extend(doc_chunks)
 
     if not chunks:
@@ -692,11 +657,8 @@ def _run_ingestion(
     if verbose:
         ui.info("Generating hierarchical summaries...")
 
-    # Get chat factory for summarization
-    chat_factory = get_chat_factory(
-        chat_config.get("plugin_name", "cohere"),
-        config=chat_config.get("kwargs", {}),
-    )
+    # Get chat factory for summarization using CLIContext
+    chat_factory = get_chat_factory(ctx.chat_plugin, config=ctx.chat_kwargs)
 
     # Create hierarchy enricher with simple mode defaults
     hierarchy_config = HierarchyConfig(group_by="source")
@@ -714,10 +676,7 @@ def _run_ingestion(
     if verbose:
         ui.info("Generating embeddings...")
 
-    embedder = get_embedder(
-        embedding_config.get("plugin_name", "cohere"),
-        config=embedding_config.get("kwargs", {}),
-    )
+    embedder = get_embedder(ctx.embedding_plugin, config=ctx.embedding_kwargs)
 
     vectors = []
     for chunk in chunks:
@@ -728,10 +687,7 @@ def _run_ingestion(
     if verbose:
         ui.info("Storing vectors...")
 
-    vdb_plugin = get_vector_db_plugin(
-        vector_db_config.get("plugin_name", "pgvector"),
-        **vector_db_config.get("kwargs", {}),
-    )
+    vdb_plugin = get_vector_db_plugin(ctx.vector_db_plugin)
 
     writer = VectorDBWriter(client=vdb_plugin)
     writer.upsert(collection=collection, chunks=chunks, vectors=vectors)
@@ -775,8 +731,8 @@ def _run_query(
 
     typed_config = FitzRagConfig(**config_dict)
 
-    # Override collection
-    typed_config.retrieval.collection = collection
+    # Override collection (flat config - collection is a direct attribute)
+    typed_config.collection = collection
 
     if verbose:
         ui.info(f"Querying collection: {collection}")
@@ -806,8 +762,6 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
     6. Execute and display answer
     7. Cleanup
     """
-    import yaml
-
     from fitz_ai.llm import get_chat_factory
     from fitz_ai.tabular import DirectTableQuery
 
@@ -831,24 +785,15 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
         _create_provider_config(engine_config_path, provider, extra)
 
     # =========================================================================
-    # Step 2: Load config and get chat client
+    # Step 2: Load config and get chat client via CLIContext
     # =========================================================================
 
-    with engine_config_path.open("r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f) or {}
+    from fitz_ai.cli.context import CLIContext
 
-    if "fitz_rag" in raw:
-        config = raw["fitz_rag"]
-    else:
-        config = raw
+    ctx = CLIContext.load()
 
-    chat_config = config.get("chat", {})
-
-    # Get chat factory
-    chat_factory = get_chat_factory(
-        chat_config.get("plugin_name", "cohere"),
-        config=chat_config.get("kwargs", {}),
-    )
+    # Get chat factory using CLIContext
+    chat_factory = get_chat_factory(ctx.chat_plugin, config=ctx.chat_kwargs)
 
     # =========================================================================
     # Step 3: Run Direct Table Query

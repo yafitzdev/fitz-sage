@@ -31,48 +31,40 @@ def load_fitz_rag_config() -> Tuple[dict, Any]:
     return ctx.raw_config, ctx.typed_config
 
 
-def get_collections(config: dict) -> List[str]:
+def get_collections(ctx: CLIContext = None) -> List[str]:
     """
     Get list of collections from vector DB.
 
     Args:
-        config: Raw config dictionary containing vector_db settings.
+        ctx: CLIContext (optional, will load if not provided)
 
     Returns:
         Sorted list of collection names, or empty list on error.
 
     Note:
-        Prefer using ctx.get_collections() from CLIContext.
+        Prefer using ctx.get_collections() from CLIContext directly.
     """
-    from fitz_ai.vector_db.registry import get_vector_db_plugin
-
-    try:
-        vdb_plugin = config.get("vector_db", {}).get("plugin_name", "pgvector")
-        vdb_kwargs = config.get("vector_db", {}).get("kwargs", {})
-        vdb = get_vector_db_plugin(vdb_plugin, **vdb_kwargs)
-        return sorted(vdb.list_collections())
-    except Exception:
-        return []
+    if ctx is None:
+        ctx = CLIContext.load()
+    return ctx.get_collections()
 
 
-def get_vector_db_client(config: dict):
+def get_vector_db_client(ctx: CLIContext = None):
     """
-    Get vector DB client from config.
+    Get vector DB client from ctx.
 
     Args:
-        config: Raw config dictionary containing vector_db settings.
+        ctx: CLIContext (optional, will load if not provided)
 
     Returns:
         Vector DB client instance.
 
     Note:
-        Prefer using ctx.get_vector_db_client() from CLIContext.
+        Prefer using ctx.get_vector_db_client() from CLIContext directly.
     """
-    from fitz_ai.vector_db.registry import get_vector_db_plugin
-
-    vdb_plugin = config.get("vector_db", {}).get("plugin_name", "pgvector")
-    vdb_kwargs = config.get("vector_db", {}).get("kwargs", {})
-    return get_vector_db_plugin(vdb_plugin, **vdb_kwargs)
+    if ctx is None:
+        ctx = CLIContext.load()
+    return ctx.get_vector_db_client()
 
 
 __all__ = [

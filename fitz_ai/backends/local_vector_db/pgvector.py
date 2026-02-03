@@ -531,8 +531,56 @@ class PgVectorDB:
             ]
 
     def list_collections(self) -> List[str]:
-        """List all known collections."""
-        return sorted(self._initialized_collections.keys())
+        """List all collections (databases with chunks table)."""
+        try:
+            # Each collection is stored as database "fitz_{collection_name}"
+            # Query postgres for databases starting with fitz_
+            with self._manager.connection("postgres") as conn:
+                result = conn.execute(
+                    """
+                    SELECT datname FROM pg_database
+                    WHERE datistemplate = false
+                    AND datname LIKE 'fitz_%'
+                    AND datname NOT LIKE 'fitz_fitz_%'
+                    ORDER BY datname
+                    """
+                ).fetchall()
+                candidate_dbs = [row[0] for row in result]
+
+            # Check each database for chunks table and extract collection name
+            collections = []
+            for db_name in candidate_dbs:
+                # Extract collection name by removing fitz_ prefix
+                collection_name = db_name[5:]  # Remove "fitz_"
+
+                # Skip internal databases
+                if collection_name in ("c__ingest_state", "public", "postgres", "default"):
+                    continue
+
+                try:
+                    # Check if chunks table exists (use collection name, manager adds prefix)
+                    with self._manager.connection(collection_name) as conn:
+                        result = conn.execute(
+                            """
+                            SELECT 1 FROM information_schema.tables
+                            WHERE table_name = 'chunks' AND table_schema = 'public'
+                            LIMIT 1
+                            """
+                        ).fetchone()
+                        if result:
+                            collections.append(collection_name)
+                            # Discover dimension if not already known
+                            if collection_name not in self._initialized_collections:
+                                self._discover_collection(collection_name)
+                except Exception:
+                    # Database exists but we can't connect or no chunks table - skip it
+                    pass
+
+            return sorted(collections)
+        except Exception as e:
+            logger.warning(f"{VECTOR_DB} Failed to list collections: {e}")
+            # Fall back to in-memory list
+            return sorted(self._initialized_collections.keys())
 
     def get_collection_stats(self, collection: str) -> Dict[str, Any]:
         """Get statistics for a collection."""

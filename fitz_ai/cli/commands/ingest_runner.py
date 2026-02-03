@@ -91,16 +91,15 @@ def command(
     # =========================================================================
 
     if source is not None and is_direct_text(source):
-        # Load context for collection and config
+        # Load context for collection
         ctx = CLIContext.load()
-        config = ctx.raw_config
 
         # Get collection name
         if collection is None:
             collection = ctx.retrieval_collection
 
         # Ingest direct text and return
-        ingest_direct_text(source, collection, ctx, config)
+        ingest_direct_text(source, collection, ctx)
         return
 
     # =========================================================================
@@ -155,7 +154,6 @@ def _run_fitz_rag_ingest(
     # =========================================================================
 
     ctx = CLIContext.load()
-    config = ctx.raw_config
     embedding_id = ctx.embedding_id
     vector_db_plugin = ctx.vector_db_plugin
     default_collection = ctx.retrieval_collection
@@ -169,6 +167,9 @@ def _run_fitz_rag_ingest(
     # Interactive Prompts
     # =========================================================================
 
+    # Check if chat LLM is configured (for artifact generation)
+    has_chat_llm = bool(ctx.chat_plugin)
+
     if non_interactive:
         if source is None:
             ui.error("Source path required in non-interactive mode.")
@@ -180,7 +181,6 @@ def _run_fitz_rag_ingest(
 
         # Auto-detect content type and configure enrichment
         content_type, _ = detect_content_type(source)
-        has_chat_llm = bool(config.get("chat", {}).get("plugin_name"))
 
         if content_type == "codebase":
             if artifacts is None:
@@ -207,7 +207,6 @@ def _run_fitz_rag_ingest(
 
         # 3. Auto-detect content type and configure enrichment accordingly
         content_type, _ = detect_content_type(source)
-        has_chat_llm = bool(config.get("chat", {}).get("plugin_name"))
 
         if content_type == "codebase":
             # CODEBASE: Enable codebase analysis artifacts
@@ -242,27 +241,22 @@ def _run_fitz_rag_ingest(
         state_manager.load()
 
         # Parser router - uses docling_vision if configured for VLM
-        chunking_cfg = config.get("chunking", {})
-        default_chunking = chunking_cfg.get("default", {})
-        docling_parser = default_chunking.get("parser", "docling")
+        parser_router = ParserRouter(docling_parser=ctx.parser)
 
-        parser_router = ParserRouter(docling_parser=docling_parser)
-
-        # Build chunking router from config
-        router_config = build_chunking_router_config(config)
+        # Build chunking router from ctx
+        router_config = build_chunking_router_config(ctx)
         chunking_router = ChunkingRouter.from_config(router_config)
 
         # Embedder
-        embedding_config = config.get("embedding", {}).get("kwargs", {})
-        embedder = get_embedder(ctx.embedding_plugin, config=embedding_config)
+        embedder = get_embedder(ctx.embedding_plugin, config=ctx.embedding_kwargs)
 
         # Vector DB writer
         vector_client = get_vector_db_plugin(vector_db_plugin)
         writer = VectorDBWriterAdapter(vector_client)
 
-        # Enrichment pipeline (from config, CLI selection can override)
+        # Enrichment pipeline
         enrichment_pipeline = _build_enrichment_pipeline(
-            config=config,
+            ctx=ctx,
             artifacts=artifacts,
             source=source,
         )
@@ -405,32 +399,26 @@ def _prompt_collection(ctx: CLIContext, source: str, default_collection: str) ->
 
 
 def _build_enrichment_pipeline(
-    config: dict,
+    ctx,
     artifacts: Optional[str],
     source: str,
 ):
-    """Build the enrichment pipeline from config and CLI args."""
+    """Build the enrichment pipeline from CLIContext and CLI args."""
     from fitz_ai.llm import get_chat_factory
-
-    enrichment_cfg = config.get("enrichment", {})
 
     # Parse artifact selection from CLI or config
     available_artifact_names = [name for name, _ in get_available_artifacts(has_llm=False)]
     selected_artifacts = parse_artifact_selection(artifacts, available_artifact_names)
 
-    # If artifacts were selected (via CLI or interactive), enable enrichment
+    # Build enrichment config
+    enrichment_cfg = {"enabled": True}
+
+    # If artifacts were selected (via CLI or interactive), configure them
     if selected_artifacts is not None and len(selected_artifacts) > 0:
-        enrichment_cfg["enabled"] = True
         enrichment_cfg["artifacts"] = {"enabled": selected_artifacts}
     elif selected_artifacts is not None and len(selected_artifacts) == 0:
-        # Explicitly disabled via 'none'
-        enrichment_cfg["enabled"] = False
-
-    # Enrichment is always enabled (hierarchy is always on)
-    enrichment_cfg["enabled"] = True
-
-    if not enrichment_cfg.get("enabled", False):
-        return None
+        # Explicitly disabled via 'none' - but hierarchy still runs
+        pass
 
     from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
     from fitz_ai.ingestion.enrichment.artifacts.registry import get_artifact_registry
@@ -451,10 +439,8 @@ def _build_enrichment_pipeline(
         )
 
     if needs_llm:
-        # Get chat factory from config
-        chat_plugin = config.get("chat", {}).get("plugin_name", "cohere")
-        chat_config = config.get("chat", {}).get("kwargs", {})
-        chat_factory = get_chat_factory(chat_plugin, config=chat_config)
+        # Get chat factory from ctx
+        chat_factory = get_chat_factory(ctx.chat_plugin, config=ctx.chat_kwargs)
 
     return EnrichmentPipeline(
         config=enrichment_config,

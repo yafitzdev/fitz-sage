@@ -81,14 +81,16 @@ class RerankStep(RetrievalStep):
         documents = [chunk.content for chunk in regular_chunks]
 
         try:
-            # Reranker returns [(index, score), ...] sorted by relevance
+            # Reranker returns list[RerankResult] sorted by relevance
             ranked_results = self.reranker.rerank(query, documents, top_n=self.k)
         except Exception as exc:
             raise RerankError(f"Reranking failed: {exc}") from exc
 
         # Reorder chunks based on rerank results
+        # Results are RerankResult objects with .index and .score attributes
         reranked: list[Chunk] = []
-        for idx, score in ranked_results:
+        for result in ranked_results:
+            idx, score = result.index, result.score
             if 0 <= idx < len(regular_chunks):
                 chunk = regular_chunks[idx]
                 # Add rerank score to metadata

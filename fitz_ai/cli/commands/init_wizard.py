@@ -66,22 +66,31 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
         ui.info("Ensure pgvector packages are installed: pip install psycopg pgvector pgserver")
         raise typer.Exit(1)
 
-    # Load defaults from default.yaml
+    # Load defaults from default.yaml (flat format)
     default_config = load_default_config()
 
-    # Plugin defaults
-    default_chat = default_config.get("chat", {}).get("plugin_name", "cohere")
-    default_embedding = default_config.get("embedding", {}).get("plugin_name", "cohere")
-    default_vector_db = default_config.get("vector_db", {}).get("plugin_name", "pgvector")
-    default_retrieval = default_config.get("retrieval", {}).get("plugin_name", "dense")
-    default_rerank = default_config.get("rerank", {}).get("plugin_name", "cohere")
+    # Helper to extract plugin name from flat format (string) or old nested format (dict)
+    def _get_plugin(key: str, fallback: str) -> str:
+        val = default_config.get(key)
+        if isinstance(val, dict):
+            # Old nested format: {"plugin_name": "cohere", "kwargs": {...}}
+            return val.get("plugin_name", fallback)
+        elif isinstance(val, str):
+            # New flat format: "cohere" or "cohere/model-name"
+            return val.split("/")[0] if val else fallback
+        return fallback
 
-    # Chunking defaults
-    default_ingest = default_config.get("ingest", {})
-    default_chunking = default_ingest.get("chunking", {}).get("default", {})
-    default_chunker = default_chunking.get("plugin_name", "recursive")
-    default_chunk_size = default_chunking.get("kwargs", {}).get("chunk_size", 1000)
-    default_chunk_overlap = default_chunking.get("kwargs", {}).get("chunk_overlap", 200)
+    # Plugin defaults (new flat format)
+    default_chat = _get_plugin("chat", "cohere")
+    default_embedding = _get_plugin("embedding", "cohere")
+    default_vector_db = _get_plugin("vector_db", "pgvector")
+    default_retrieval = _get_plugin("retrieval_plugin", "dense")
+    default_rerank = _get_plugin("rerank", "cohere")
+
+    # Chunking defaults (new flat format)
+    default_chunker = "recursive"
+    default_chunk_size = default_config.get("chunk_size", 512)
+    default_chunk_overlap = default_config.get("chunk_overlap", 0)
 
     if non_interactive:
         # Use defaults if available
