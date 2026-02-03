@@ -146,8 +146,6 @@ def _run_fitz_rag_ingest(
     from fitz_ai.ingestion.chunking.router import ChunkingRouter
     from fitz_ai.ingestion.parser import ParserRouter
     from fitz_ai.ingestion.state import IngestStateManager
-    from fitz_ai.llm import get_embedder
-    from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     # =========================================================================
     # Load config via CLIContext (always succeeds with defaults)
@@ -248,10 +246,10 @@ def _run_fitz_rag_ingest(
         chunking_router = ChunkingRouter.from_config(router_config)
 
         # Embedder
-        embedder = get_embedder(ctx.embedding_plugin, config=ctx.embedding_kwargs)
+        embedder = ctx.get_embedder()
 
         # Vector DB writer
-        vector_client = get_vector_db_plugin(vector_db_plugin)
+        vector_client = ctx.get_vector_db_client()
         writer = VectorDBWriterAdapter(vector_client)
 
         # Enrichment pipeline
@@ -404,8 +402,6 @@ def _build_enrichment_pipeline(
     source: str,
 ):
     """Build the enrichment pipeline from CLIContext and CLI args."""
-    from fitz_ai.llm import get_chat_factory
-
     # Parse artifact selection from CLI or config
     available_artifact_names = [name for name, _ in get_available_artifacts(has_llm=False)]
     selected_artifacts = parse_artifact_selection(artifacts, available_artifact_names)
@@ -440,7 +436,7 @@ def _build_enrichment_pipeline(
 
     if needs_llm:
         # Get chat factory from ctx
-        chat_factory = get_chat_factory(ctx.chat_plugin, config=ctx.chat_kwargs)
+        chat_factory = ctx.get_chat_factory()
 
     return EnrichmentPipeline(
         config=enrichment_config,

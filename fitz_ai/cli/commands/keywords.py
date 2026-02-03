@@ -308,7 +308,6 @@ def suggest_keywords(
     """Suggest keywords from the corpus."""
     from fitz_ai.cli.context import CLIContext
     from fitz_ai.retrieval.vocabulary import KeywordDetector, VocabularyStore
-    from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     ctx = CLIContext.load()
 
@@ -319,7 +318,7 @@ def suggest_keywords(
 
     # Load chunks from vector DB
     try:
-        vector_client = get_vector_db_plugin(ctx.vector_db_plugin)
+        vector_client = ctx.get_vector_db_client()
         chunks = vector_client.get_all_chunks(collection)
     except Exception as e:
         ui.error(f"Failed to load chunks: {e}")
@@ -404,7 +403,6 @@ def detect_keywords(
     """Re-detect keywords from collection and update vocabulary."""
     from fitz_ai.cli.context import CLIContext
     from fitz_ai.retrieval.vocabulary import KeywordDetector, VocabularyStore
-    from fitz_ai.vector_db.registry import get_vector_db_plugin
 
     ctx = CLIContext.load()
 
@@ -423,7 +421,7 @@ def detect_keywords(
 
     # Load chunks from vector DB
     try:
-        vector_client = get_vector_db_plugin(ctx.vector_db_plugin)
+        vector_client = ctx.get_vector_db_client()
         chunks = vector_client.get_all_chunks(collection)
     except Exception as e:
         ui.error(f"Failed to load chunks: {e}")

@@ -105,12 +105,10 @@ def _check_optional_dependencies() -> list[tuple[str, bool, str]]:
 def _test_embedding(ctx: CLIContext) -> tuple[bool, str]:
     """Test embedding provider."""
     try:
-        from fitz_ai.llm import get_embedder
-
         if not ctx.embedding_plugin:
             return False, "Not configured"
 
-        embedder = get_embedder(ctx.embedding_plugin)
+        embedder = ctx.get_embedder()
 
         # Try a test embedding
         vector = embedder.embed("test")
@@ -125,13 +123,11 @@ def _test_embedding(ctx: CLIContext) -> tuple[bool, str]:
 def _test_chat(ctx: CLIContext) -> tuple[bool, str]:
     """Test chat provider (without making actual call)."""
     try:
-        from fitz_ai.llm import get_chat
-
         if not ctx.chat_plugin:
             return False, "Not configured"
 
         # Just try to instantiate
-        get_chat(ctx.chat_plugin)
+        ctx.get_chat()
         return True, f"{ctx.chat_plugin} ready"
 
     except Exception as e:
@@ -160,13 +156,11 @@ def _test_rerank(ctx: CLIContext) -> tuple[bool, str]:
         return True, "Disabled (optional)"
 
     try:
-        from fitz_ai.llm import get_reranker
-
         if not ctx.rerank_plugin:
             return False, "Enabled but no plugin"
 
         # Just try to instantiate
-        reranker = get_reranker(ctx.rerank_plugin)
+        reranker = ctx.get_reranker()
         if reranker:
             return True, f"{ctx.rerank_plugin} ready"
         return False, "Failed to create"

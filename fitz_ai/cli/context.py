@@ -477,7 +477,7 @@ class CLIContext:
             return ""
 
     # -------------------------------------------------------------------------
-    # Helper Methods
+    # Component Accessors
     # -------------------------------------------------------------------------
 
     def get_vector_db_client(self):
@@ -491,6 +491,59 @@ class CLIContext:
         else:
             kwargs = self.vector_db_kwargs if isinstance(self.vector_db_kwargs, dict) else {}
         return get_vector_db_plugin(self.vector_db_plugin, **kwargs)
+
+    def get_embedder(self):
+        """Get initialized embedder instance using configured plugin."""
+        from fitz_ai.llm import get_embedder
+
+        return get_embedder(self.embedding_plugin, config=self.embedding_kwargs)
+
+    def get_chat_factory(self):
+        """Get chat factory for per-task tier selection."""
+        from fitz_ai.llm import get_chat_factory
+
+        return get_chat_factory(self.chat_plugin, config=self.chat_kwargs)
+
+    def get_chat(self, tier: str = "smart"):
+        """Get chat client for specified tier."""
+        factory = self.get_chat_factory()
+        return factory(tier)
+
+    def get_reranker(self):
+        """Get reranker instance (None if not enabled)."""
+        if not self.rerank_plugin:
+            return None
+        from fitz_ai.llm import get_reranker
+
+        return get_reranker(self.rerank_plugin)
+
+    def require_embedder(self):
+        """Get embedder or exit with error."""
+        import typer
+
+        from fitz_ai.cli.ui import ui
+
+        try:
+            return self.get_embedder()
+        except Exception as e:
+            ui.error(f"Failed to initialize embedder: {e}")
+            raise typer.Exit(1)
+
+    def require_chat_factory(self):
+        """Get chat factory or exit with error."""
+        import typer
+
+        from fitz_ai.cli.ui import ui
+
+        try:
+            return self.get_chat_factory()
+        except Exception as e:
+            ui.error(f"Failed to initialize chat: {e}")
+            raise typer.Exit(1)
+
+    # -------------------------------------------------------------------------
+    # Helper Methods
+    # -------------------------------------------------------------------------
 
     def get_collections(self) -> list[str]:
         """Get list of collections from vector DB."""

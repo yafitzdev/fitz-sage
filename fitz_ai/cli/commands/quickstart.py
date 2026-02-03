@@ -581,8 +581,6 @@ def _run_ingestion(
     from fitz_ai.ingestion.enrichment.hierarchy.enricher import HierarchyEnricher
     from fitz_ai.ingestion.parser import ParserRouter
     from fitz_ai.ingestion.source.base import SourceFile
-    from fitz_ai.llm import get_chat_factory, get_embedder
-    from fitz_ai.vector_db.registry import get_vector_db_plugin
     from fitz_ai.vector_db.writer import VectorDBWriter
 
     # Load config via CLIContext (typed access)
@@ -658,7 +656,7 @@ def _run_ingestion(
         ui.info("Generating hierarchical summaries...")
 
     # Get chat factory for summarization using CLIContext
-    chat_factory = get_chat_factory(ctx.chat_plugin, config=ctx.chat_kwargs)
+    chat_factory = ctx.get_chat_factory()
 
     # Create hierarchy enricher with simple mode defaults
     hierarchy_config = HierarchyConfig(group_by="source")
@@ -676,7 +674,7 @@ def _run_ingestion(
     if verbose:
         ui.info("Generating embeddings...")
 
-    embedder = get_embedder(ctx.embedding_plugin, config=ctx.embedding_kwargs)
+    embedder = ctx.get_embedder()
 
     vectors = []
     for chunk in chunks:
@@ -687,7 +685,7 @@ def _run_ingestion(
     if verbose:
         ui.info("Storing vectors...")
 
-    vdb_plugin = get_vector_db_plugin(ctx.vector_db_plugin)
+    vdb_plugin = ctx.get_vector_db_client()
 
     writer = VectorDBWriter(client=vdb_plugin)
     writer.upsert(collection=collection, chunks=chunks, vectors=vectors)
@@ -762,7 +760,6 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
     6. Execute and display answer
     7. Cleanup
     """
-    from fitz_ai.llm import get_chat_factory
     from fitz_ai.tabular import DirectTableQuery
 
     engine_config_path = FitzPaths.engine_config("fitz_rag")
@@ -793,7 +790,7 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
     ctx = CLIContext.load()
 
     # Get chat factory using CLIContext
-    chat_factory = get_chat_factory(ctx.chat_plugin, config=ctx.chat_kwargs)
+    chat_factory = ctx.get_chat_factory()
 
     # =========================================================================
     # Step 3: Run Direct Table Query
