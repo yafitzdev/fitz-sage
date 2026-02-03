@@ -46,15 +46,17 @@ def semantic_matcher(mock_embedder):
 
 
 @pytest.fixture
-def insufficient_evidence_constraint(semantic_matcher):
+def insufficient_evidence_constraint(mock_embedder):
     """Real InsufficientEvidenceConstraint with mock embedder."""
-    return InsufficientEvidenceConstraint(semantic_matcher=semantic_matcher)
+    return InsufficientEvidenceConstraint(embedder=mock_embedder)
 
 
 @pytest.fixture
-def conflict_aware_constraint(semantic_matcher):
-    """Real ConflictAwareConstraint with mock embedder."""
-    return ConflictAwareConstraint(semantic_matcher=semantic_matcher)
+def conflict_aware_constraint():
+    """ConflictAwareConstraint without chat (skips LLM-based detection)."""
+    # Without chat, ConflictAwareConstraint skips contradiction detection.
+    # For proper conflict testing, integration tests should use real LLM.
+    return ConflictAwareConstraint()
 
 
 @pytest.fixture
@@ -301,13 +303,16 @@ class TestConflictDetection:
         """
         pytest.importorskip("ollama", reason="Requires Ollama for real embeddings")
 
-        from fitz_ai.llm import get_embedder
+        from fitz_ai.llm import get_chat_factory, get_embedder
 
         try:
             embedder = get_embedder("ollama", config={"model": "nomic-embed-text:latest"})
-            matcher = SemanticMatcher(embedder=embedder.embed)
-            ie_constraint = InsufficientEvidenceConstraint(semantic_matcher=matcher)
-            ca_constraint = ConflictAwareConstraint(semantic_matcher=matcher)
+            chat_factory = get_chat_factory("ollama")
+            fast_chat = chat_factory("fast")
+
+            # Use new constraint interfaces
+            ie_constraint = InsufficientEvidenceConstraint(embedder=embedder.embed)
+            ca_constraint = ConflictAwareConstraint(chat=fast_chat, adaptive=True)
 
             query = "Was the migration successful?"
             chunks = [

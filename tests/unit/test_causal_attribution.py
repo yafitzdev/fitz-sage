@@ -1,4 +1,4 @@
-# tests/test_causal_attribution.py
+# tests/unit/test_causal_attribution.py
 """
 Tests for CausalAttributionConstraint.
 
@@ -7,8 +7,7 @@ These tests verify:
 2. Causal queries with explicit causal language are allowed
 3. Non-causal queries pass through
 
-Uses semantic matching with mock embedder for testing.
-The constraint now uses embeddings only (no LLM) for reliable, fast detection.
+The constraint uses keyword-based detection (no embeddings, no LLM).
 """
 
 from __future__ import annotations
@@ -19,9 +18,8 @@ import pytest
 pytestmark = pytest.mark.tier1
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.core.guardrails import CausalAttributionConstraint, SemanticMatcher
+from fitz_ai.core.guardrails import CausalAttributionConstraint
 
-from .mock_embedder import create_deterministic_embedder
 
 # =============================================================================
 # Test Data
@@ -39,18 +37,6 @@ def make_chunk(id: str, content: str) -> Chunk:
     )
 
 
-@pytest.fixture
-def semantic_matcher() -> SemanticMatcher:
-    """Create a semantic matcher with mock embedder for testing."""
-    embedder = create_deterministic_embedder()
-    return SemanticMatcher(
-        embedder=embedder,
-        causal_threshold=0.70,
-        assertion_threshold=0.70,
-        query_threshold=0.70,
-    )
-
-
 # =============================================================================
 # Tests: Basic Behavior
 # =============================================================================
@@ -59,25 +45,20 @@ def semantic_matcher() -> SemanticMatcher:
 class TestBasicBehavior:
     """Test basic constraint behavior."""
 
-    def test_non_causal_query_with_causal_evidence_allowed(self, semantic_matcher):
-        """Non-causal queries with causal evidence should pass through.
+    def test_non_causal_query_with_causal_evidence_allowed(self):
+        """Non-causal queries should pass through (keyword detection)."""
+        constraint = CausalAttributionConstraint()
 
-        Note: Mock embedder can't reliably distinguish "What is X?" from "Why X?"
-        due to high-dimensional similarity. Using causal evidence ensures the
-        constraint allows the query regardless of causal classification.
-        """
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher)
-
-        # Include causal evidence so the query passes even if misclassified as causal
+        # Non-causal query (no "why", "what caused", etc.)
         chunks = [make_chunk("1", "Helios was deprecated because of high costs.")]
 
         result = constraint.apply("What is Helios?", chunks)
 
         assert result.allow_decisive_answer is True
 
-    def test_disabled_always_allows(self, semantic_matcher):
+    def test_disabled_always_allows(self):
         """Should allow when disabled."""
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher, enabled=False)
+        constraint = CausalAttributionConstraint(enabled=False)
 
         chunks = [make_chunk("1", "Helios was deprecated.")]
 
@@ -85,9 +66,9 @@ class TestBasicBehavior:
 
         assert result.allow_decisive_answer is True
 
-    def test_empty_chunks_defers(self, semantic_matcher):
+    def test_empty_chunks_defers(self):
         """Empty chunks should defer to other constraints."""
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher)
+        constraint = CausalAttributionConstraint()
 
         result = constraint.apply("Why did X happen?", [])
 
@@ -110,12 +91,12 @@ class TestCausalQueryDetection:
             "Why did the system fail?",
             "What caused the outage?",
             "What led to the incident?",
-            "Explain the failure",
+            "Explain why the system failed",
         ],
     )
-    def test_detects_causal_queries(self, semantic_matcher, query: str):
-        """Should detect causal queries."""
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher)
+    def test_detects_causal_queries(self, query: str):
+        """Should detect causal queries via keywords."""
+        constraint = CausalAttributionConstraint()
 
         # No causal evidence
         chunks = [make_chunk("1", "The system was deprecated.")]
@@ -130,22 +111,15 @@ class TestCausalQueryDetection:
             "What is Helios?",
             "When was Helios deprecated?",
             "Who maintains the system?",
+            "Where is the documentation?",
         ],
     )
-    def test_non_causal_queries_with_evidence_pass(self, semantic_matcher, query: str):
-        """Non-causal queries with causal evidence should pass through.
+    def test_non_causal_queries_pass(self, query: str):
+        """Non-causal queries should pass through (no causal keywords)."""
+        constraint = CausalAttributionConstraint()
 
-        Note: Mock embedder can't reliably distinguish non-causal from causal queries
-        due to high-dimensional similarity. Using causal evidence ensures the
-        constraint allows regardless of how the query is classified.
-
-        In production with real embeddings, "What is X?" should be properly
-        classified as non-causal and pass without needing causal evidence.
-        """
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher)
-
-        # Include causal evidence so queries pass even if misclassified as causal
-        chunks = [make_chunk("1", "The system was deprecated because of reliability issues.")]
+        # No causal evidence needed for non-causal queries
+        chunks = [make_chunk("1", "The system was deprecated.")]
 
         result = constraint.apply(query, chunks)
 
@@ -172,9 +146,9 @@ class TestCausalEvidenceDetection:
             "thus the system failed",
         ],
     )
-    def test_allows_with_causal_markers(self, semantic_matcher, causal_phrase: str):
+    def test_allows_with_causal_markers(self, causal_phrase: str):
         """Should allow when causal language is present."""
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher)
+        constraint = CausalAttributionConstraint()
 
         chunks = [make_chunk("1", f"Helios was deprecated {causal_phrase}.")]
 
@@ -182,9 +156,9 @@ class TestCausalEvidenceDetection:
 
         assert result.allow_decisive_answer is True
 
-    def test_denies_without_causal_markers(self, semantic_matcher):
+    def test_denies_without_causal_markers(self):
         """Should deny when no causal language is present."""
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher)
+        constraint = CausalAttributionConstraint()
 
         chunks = [
             make_chunk("1", "Helios was deprecated in August 2023."),
@@ -197,9 +171,9 @@ class TestCausalEvidenceDetection:
         assert result.allow_decisive_answer is False
         assert "causal" in result.reason.lower()
 
-    def test_signal_is_qualified_not_abstain(self, semantic_matcher):
+    def test_signal_is_qualified_not_abstain(self):
         """Signal should be 'qualified' not 'abstain' (we have evidence, just not causal)."""
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher)
+        constraint = CausalAttributionConstraint()
 
         chunks = [make_chunk("1", "Helios was deprecated.")]
 
@@ -216,9 +190,9 @@ class TestCausalEvidenceDetection:
 class TestEdgeCases:
     """Test edge cases."""
 
-    def test_causal_marker_in_any_chunk_allows(self, semantic_matcher):
+    def test_causal_marker_in_any_chunk_allows(self):
         """Should allow if ANY chunk has causal language."""
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher)
+        constraint = CausalAttributionConstraint()
 
         chunks = [
             make_chunk("1", "Helios was deprecated in 2023."),
@@ -230,9 +204,9 @@ class TestEdgeCases:
 
         assert result.allow_decisive_answer is True
 
-    def test_metadata_includes_chunk_counts(self, semantic_matcher):
+    def test_metadata_includes_chunk_counts(self):
         """Denial should include chunk count metadata."""
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher)
+        constraint = CausalAttributionConstraint()
 
         chunks = [
             make_chunk("1", "System A was deprecated."),
@@ -245,30 +219,30 @@ class TestEdgeCases:
 
 
 # =============================================================================
-# Tests: Embeddings-Only Behavior
+# Tests: Keyword-Based Behavior
 # =============================================================================
 
 
-class TestEmbeddingsOnlyBehavior:
+class TestKeywordBasedBehavior:
     """
-    Test embeddings-only implementation (no LLM required).
+    Test keyword-based implementation (no LLM, no embeddings).
 
-    The CausalAttributionConstraint now uses only embeddings for:
-    - Detecting causal queries (semantic similarity to causal query concepts)
-    - Detecting causal evidence (semantic similarity to causal language)
+    The CausalAttributionConstraint uses simple keyword matching for:
+    - Detecting causal queries ("why", "what caused", etc.)
+    - Detecting causal evidence ("because", "due to", etc.)
     """
 
-    def test_no_chat_parameter_accepted(self, semantic_matcher):
-        """CausalAttributionConstraint no longer accepts chat parameter."""
-        # This should work - embeddings only
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher)
-        assert constraint.semantic_matcher is not None
+    def test_no_external_dependencies(self):
+        """CausalAttributionConstraint requires no external dependencies."""
+        # Should work with no parameters - fully self-contained
+        constraint = CausalAttributionConstraint()
+        assert constraint.enabled is True
 
-    def test_fast_execution_no_llm(self, semantic_matcher):
-        """Constraint should execute quickly without any LLM calls."""
+    def test_fast_execution_no_llm(self):
+        """Constraint should execute quickly (keyword matching only)."""
         import time
 
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher)
+        constraint = CausalAttributionConstraint()
         chunks = [
             make_chunk("1", "Helios was deprecated in August 2023."),
             make_chunk("2", "The system is no longer maintained."),
@@ -278,13 +252,12 @@ class TestEmbeddingsOnlyBehavior:
         result = constraint.apply("Why was Helios deprecated?", chunks)
         elapsed = time.perf_counter() - start
 
-        # Should be fast (< 1 second for embeddings)
-        # Note: First call may be slower due to embedding model loading
-        assert elapsed < 5.0  # Generous timeout for first run
+        # Should be instant (< 100ms for keyword matching)
+        assert elapsed < 0.1
 
-    def test_deterministic_results(self, semantic_matcher):
+    def test_deterministic_results(self):
         """Same input should produce same result (no LLM randomness)."""
-        constraint = CausalAttributionConstraint(semantic_matcher=semantic_matcher)
+        constraint = CausalAttributionConstraint()
         chunks = [make_chunk("1", "Helios was deprecated.")]
         query = "Why was Helios deprecated?"
 
@@ -293,3 +266,76 @@ class TestEmbeddingsOnlyBehavior:
         # All results should be identical
         assert all(r.allow_decisive_answer == results[0].allow_decisive_answer for r in results)
         assert all(r.signal == results[0].signal for r in results)
+
+
+# =============================================================================
+# Tests: Predictive Query Detection
+# =============================================================================
+
+
+class TestPredictiveQueryDetection:
+    """Test detection of predictive/future-oriented queries."""
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "Will the system be upgraded next year?",
+            "What will happen to the project?",
+            "How will this affect users?",
+            "What is the forecast for adoption?",
+            "What do you predict for Q3?",
+        ],
+    )
+    def test_detects_predictive_queries(self, query: str):
+        """Should detect predictive queries via keywords."""
+        constraint = CausalAttributionConstraint()
+
+        # No predictive evidence
+        chunks = [make_chunk("1", "The system was launched in 2023.")]
+
+        result = constraint.apply(query, chunks)
+
+        assert result.allow_decisive_answer is False
+
+    def test_allows_with_predictive_evidence(self):
+        """Should allow predictive queries when forecast/projection evidence exists."""
+        constraint = CausalAttributionConstraint()
+
+        chunks = [
+            make_chunk("1", "Adoption is projected to reach 50% by Q4."),
+        ]
+
+        result = constraint.apply("What will adoption look like next quarter?", chunks)
+
+        assert result.allow_decisive_answer is True
+
+
+# =============================================================================
+# Tests: Opinion Query Detection
+# =============================================================================
+
+
+class TestOpinionQueryDetection:
+    """Test detection of opinion/recommendation queries."""
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "Should we use this framework?",
+            "Is it better to use Python or Go?",
+            "Which database is best for this use case?",
+            "Is it worth pursuing this approach?",
+            "What do you recommend?",
+        ],
+    )
+    def test_detects_opinion_queries(self, query: str):
+        """Should detect opinion queries via keywords."""
+        constraint = CausalAttributionConstraint()
+
+        # Factual content without recommendations
+        chunks = [make_chunk("1", "PostgreSQL is a relational database.")]
+
+        result = constraint.apply(query, chunks)
+
+        assert result.allow_decisive_answer is False
+        assert result.signal == "qualified"

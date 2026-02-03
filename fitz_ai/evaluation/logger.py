@@ -234,8 +234,9 @@ class GovernanceLogger:
         ]
 
         with self.pool.connection() as conn:
-            # Use executemany for batched execution
-            conn.executemany(sql, params_list)
+            with conn.cursor() as cur:
+                # Use executemany for batched execution
+                cur.executemany(sql, params_list)
             conn.commit()
 
     def pending_count(self) -> int:

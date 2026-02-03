@@ -74,6 +74,8 @@ class RGSAnswer:
     Set by the pipeline based on constraint evaluation.
     None if constraints were not applied.
     """
+    metadata: dict[str, Any] = field(default_factory=dict)
+    """Additional metadata about the answer (e.g., governance_explanation)."""
 
 
 # Type alias for chunk-like inputs

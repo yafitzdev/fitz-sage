@@ -226,7 +226,7 @@ class TestOllamaProviders:
         """Ollama provider doesn't require auth."""
         with patch("httpx.Client"):
             provider = create_chat_provider("ollama")
-            assert provider._model == "llama3.1:70b"
+            assert provider._model == "qwen2.5:14b"
 
     def test_chat_with_model(self) -> None:
         """Ollama provider with specific model."""
