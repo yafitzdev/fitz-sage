@@ -20,7 +20,6 @@ pytestmark = pytest.mark.tier1
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.core.guardrails import CausalAttributionConstraint
 
-
 # =============================================================================
 # Test Data
 # =============================================================================
@@ -249,7 +248,7 @@ class TestKeywordBasedBehavior:
         ]
 
         start = time.perf_counter()
-        result = constraint.apply("Why was Helios deprecated?", chunks)
+        _ = constraint.apply("Why was Helios deprecated?", chunks)  # noqa: F841
         elapsed = time.perf_counter() - start
 
         # Should be instant (< 100ms for keyword matching)

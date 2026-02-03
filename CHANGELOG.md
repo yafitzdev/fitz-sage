@@ -11,6 +11,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.0] - 2026-02-03
+
+### 🎉 Highlights
+
+**FITZ-GOV Benchmark Integration** - New governance-focused evaluation benchmark using the fitz-gov package. Enables systematic testing of epistemic governance constraints (conflict detection, causal attribution, insufficient evidence) across 6 categories with two-pass LLM validation.
+
+**Enhanced Governance Constraints** - Improved accuracy and observability for all governance constraint plugins with semantic relevance checks and better integration with the RAG pipeline.
+
+### 🚀 Added
+
+#### Benchmarking & Evaluation
+- FITZ-GOV benchmark integration using external `fitz-gov` package
+- Two-pass LLM validation for governance constraint accuracy
+- Support for 6 governance categories: conflict awareness, causal attribution, insufficient evidence, qualification, dispute, and semantic relevance
+- CLI display for all 6 evaluation categories
+- Integration tests for governance constraints
+
+#### Governance & Constraints
+- Semantic relevance checking in governance constraints
+- Improved governance analyzer accuracy with better chunk handling
+- Enhanced conflict-aware, causal-attribution, and insufficient-evidence plugins
+- Governance-only evaluation mode (skips answer quality categories)
+- Better observability for governance constraint violations
+
+### 🔧 Fixed
+
+- FITZ-GOV loader to support new data structure from GitHub releases
+- Chunk instantiation in benchmark evaluations (pass Chunk objects instead of dicts)
+- RGSAnswer attribute access (use `answer` instead of `text`)
+- Import paths for constraints and governance modules
+- Engine configuration schema handling in benchmarks
+
+### 📚 Documentation
+
+- Multiple documentation updates and clarifications
+- Step-by-step guides for governance constraint usage
+- Benchmark evaluation examples
+
+### 🧹 Refactoring
+
+- Refactored FitzGovBenchmark to use external fitz-gov package
+- Simplified benchmark structure to focus on governance validation
+- Removed metadata assignment from RGSAnswer for cleaner separation
+- Better pipeline component integration
+
+---
+
 ## [0.7.1] - 2026-02-01
 
 ### 🎉 Highlights
@@ -1375,7 +1422,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.1...v0.6.2

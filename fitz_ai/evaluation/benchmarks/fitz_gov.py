@@ -262,9 +262,7 @@ class FitzGovBenchmark:
 
         return result
 
-    def _run_case(
-        self, engine: FitzRagEngine, case: Any
-    ) -> tuple[str, AnswerMode | None]:
+    def _run_case(self, engine: FitzRagEngine, case: Any) -> tuple[str, AnswerMode | None]:
         """
         Run engine on a single test case.
 

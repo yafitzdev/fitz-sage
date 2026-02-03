@@ -14,13 +14,12 @@ Commands:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
 
-from fitz_ai.cli.ui import RICH, Panel, Table, console, ui
+from fitz_ai.cli.ui import RICH, Table, console, ui
 from fitz_ai.logging.logger import get_logger
 
 logger = get_logger(__name__)

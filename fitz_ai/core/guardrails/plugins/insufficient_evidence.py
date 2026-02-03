@@ -50,23 +50,132 @@ def _cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
 
     return dot_product / (norm1 * norm2)
 
+
 # Common stopwords to ignore in overlap check
-STOPWORDS = frozenset({
-    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "must", "shall", "can", "need", "dare",
-    "to", "of", "in", "for", "on", "with", "at", "by", "from", "as",
-    "into", "through", "during", "before", "after", "above", "below",
-    "between", "under", "again", "further", "then", "once", "here",
-    "there", "when", "where", "why", "how", "all", "each", "few",
-    "more", "most", "other", "some", "such", "no", "nor", "not", "only",
-    "own", "same", "so", "than", "too", "very", "just", "and", "but",
-    "if", "or", "because", "until", "while", "about", "what", "which",
-    "who", "whom", "this", "that", "these", "those", "i", "you", "he",
-    "she", "it", "we", "they", "me", "him", "her", "us", "them", "my",
-    "your", "his", "its", "our", "their", "mine", "yours", "hers", "ours",
-    "theirs", "any", "both", "either", "neither", "much", "many",
-})
+STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "need",
+        "dare",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "under",
+        "again",
+        "further",
+        "then",
+        "once",
+        "here",
+        "there",
+        "when",
+        "where",
+        "why",
+        "how",
+        "all",
+        "each",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "no",
+        "nor",
+        "not",
+        "only",
+        "own",
+        "same",
+        "so",
+        "than",
+        "too",
+        "very",
+        "just",
+        "and",
+        "but",
+        "if",
+        "or",
+        "because",
+        "until",
+        "while",
+        "about",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "this",
+        "that",
+        "these",
+        "those",
+        "i",
+        "you",
+        "he",
+        "she",
+        "it",
+        "we",
+        "they",
+        "me",
+        "him",
+        "her",
+        "us",
+        "them",
+        "my",
+        "your",
+        "his",
+        "its",
+        "our",
+        "their",
+        "mine",
+        "yours",
+        "hers",
+        "ours",
+        "theirs",
+        "any",
+        "both",
+        "either",
+        "neither",
+        "much",
+        "many",
+    }
+)
 
 
 def _extract_words(text: str) -> set[str]:
@@ -112,10 +221,37 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str]]:
 
     # Common question starters and auxiliaries to exclude
     question_words = {
-        "what", "how", "why", "when", "where", "who", "which", "whom",
-        "did", "does", "do", "is", "are", "was", "were", "will", "would",
-        "can", "could", "should", "has", "have", "had", "been",
-        "the", "a", "an", "this", "that", "these", "those",
+        "what",
+        "how",
+        "why",
+        "when",
+        "where",
+        "who",
+        "which",
+        "whom",
+        "did",
+        "does",
+        "do",
+        "is",
+        "are",
+        "was",
+        "were",
+        "will",
+        "would",
+        "can",
+        "could",
+        "should",
+        "has",
+        "have",
+        "had",
+        "been",
+        "the",
+        "a",
+        "an",
+        "this",
+        "that",
+        "these",
+        "those",
     }
 
     # Quoted terms are always specific
@@ -132,7 +268,7 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str]]:
     numbered_qualifiers = re.findall(
         r"\b(type\s+\d+|tier\s+\d+|phase\s+\d+|version\s+[\d.]+|level\s+\d+|"
         r"class\s+\d+|grade\s+\d+|stage\s+\d+|gen\s+\d+|generation\s+\d+)\b",
-        query.lower()
+        query.lower(),
     )
     specific.update(numbered_qualifiers)
     critical.update(numbered_qualifiers)
@@ -156,7 +292,11 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str]]:
         clean_word = re.sub(r"[^\w]", "", word)
         if i > 0 and clean_word and clean_word[0].isupper():
             clean_lower = clean_word.lower()
-            if clean_lower not in STOPWORDS and clean_lower not in question_words and len(clean_word) > 2:
+            if (
+                clean_lower not in STOPWORDS
+                and clean_lower not in question_words
+                and len(clean_word) > 2
+            ):
                 specific.add(clean_lower)
 
     return specific, critical
@@ -354,7 +494,9 @@ class InsufficientEvidenceConstraint:
                 entity_match_found = True
 
             # Check critical entity matching (years, numbered qualifiers must ALL match)
-            if critical_entities and _context_mentions_all_critical(critical_entities, chunk.content):
+            if critical_entities and _context_mentions_all_critical(
+                critical_entities, chunk.content
+            ):
                 critical_match_found = True
 
         # Decision logic:
@@ -454,14 +596,10 @@ class InsufficientEvidenceConstraint:
         is_relevant, method = _check_enriched_relevance(query, chunks)
         if method != "no_enrichment":
             if is_relevant:
-                logger.debug(
-                    f"{PIPELINE} InsufficientEvidenceConstraint: relevant via {method}"
-                )
+                logger.debug(f"{PIPELINE} InsufficientEvidenceConstraint: relevant via {method}")
                 return ConstraintResult.allow()
             else:
-                logger.info(
-                    f"{PIPELINE} InsufficientEvidenceConstraint: {method} -> ABSTAIN"
-                )
+                logger.info(f"{PIPELINE} InsufficientEvidenceConstraint: {method} -> ABSTAIN")
                 return ConstraintResult.deny(
                     reason="Context not relevant (no entity or summary overlap)",
                     signal="abstain",
@@ -471,18 +609,14 @@ class InsufficientEvidenceConstraint:
 
         # Rule 5: Fallback to lexical overlap
         if not _has_lexical_overlap(query, chunks):
-            logger.info(
-                f"{PIPELINE} InsufficientEvidenceConstraint: no lexical overlap -> ABSTAIN"
-            )
+            logger.info(f"{PIPELINE} InsufficientEvidenceConstraint: no lexical overlap -> ABSTAIN")
             return ConstraintResult.deny(
                 reason="Context does not appear related to query",
                 signal="abstain",
                 evidence_count=len(chunks),
             )
 
-        logger.debug(
-            f"{PIPELINE} InsufficientEvidenceConstraint: allowing (lexical overlap found)"
-        )
+        logger.debug(f"{PIPELINE} InsufficientEvidenceConstraint: allowing (lexical overlap found)")
         return ConstraintResult.allow()
 
 

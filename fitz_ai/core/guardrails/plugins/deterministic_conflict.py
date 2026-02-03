@@ -37,25 +37,49 @@ EmbedderFunc = Callable[[str], list[float]]
 # Format: (pattern_a, pattern_b) - if chunk1 has A and chunk2 has B (or vice versa), contradiction
 ANTONYM_PAIRS: list[tuple[str, str]] = [
     # Success/Failure (expanded)
-    (r"\b(success|succeeded|successful|successfully|complete success)\b", r"\b(fail|failed|failure|unsuccessful|catastroph)\b"),
+    (
+        r"\b(success|succeeded|successful|successfully|complete success)\b",
+        r"\b(fail|failed|failure|unsuccessful|catastroph)\b",
+    ),
     # Approval/Rejection
-    (r"\b(approved|accepted|granted|authorized|passed|full approval)\b", r"\b(rejected|denied|refused|declined|rejection|failed to pass)\b"),
+    (
+        r"\b(approved|accepted|granted|authorized|passed|full approval)\b",
+        r"\b(rejected|denied|refused|declined|rejection|failed to pass)\b",
+    ),
     # Increase/Decrease (expanded with surge/plunge)
-    (r"\b(increased|grew|rose|gained|improved|growth|up|surged|soared|jumped)\b", r"\b(decreased|declined|fell|dropped|worsened|down|decline|plunged|tumbled)\b"),
+    (
+        r"\b(increased|grew|rose|gained|improved|growth|up|surged|soared|jumped)\b",
+        r"\b(decreased|declined|fell|dropped|worsened|down|decline|plunged|tumbled)\b",
+    ),
     # Profit/Loss
-    (r"\b(profitable|profit|profits|gains?|record profits?)\b", r"\b(loss|losses|unprofitable|deficit|net loss)\b"),
+    (
+        r"\b(profitable|profit|profits|gains?|record profits?)\b",
+        r"\b(loss|losses|unprofitable|deficit|net loss)\b",
+    ),
     # Positive/Negative outcome
-    (r"\b(positive|good|excellent|strong|exceeded|better)\b", r"\b(negative|bad|poor|weak|missed|worse|disappointing)\b"),
+    (
+        r"\b(positive|good|excellent|strong|exceeded|better)\b",
+        r"\b(negative|bad|poor|weak|missed|worse|disappointing)\b",
+    ),
     # Confirm/Deny
     (r"\b(confirmed|verified|validated|proven)\b", r"\b(denied|refuted|disproven|contradicted)\b"),
     # Start/Stop/Cancel (expanded)
-    (r"\b(started|began|launched|initiated|went ahead|proceeded|are now open)\b", r"\b(stopped|ended|terminated|cancelled|called off|delayed|postponed)\b"),
+    (
+        r"\b(started|began|launched|initiated|went ahead|proceeded|are now open)\b",
+        r"\b(stopped|ended|terminated|cancelled|called off|delayed|postponed)\b",
+    ),
     # Open/Closed
     (r"\b(open|opened|available|accessible)\b", r"\b(closed|shut|unavailable|inaccessible)\b"),
     # Guilty/Innocent
-    (r"\b(guilty|convicted|responsible|guilty plea|pleaded guilty)\b", r"\b(innocent|acquitted|not guilty|exonerated|pleaded not guilty)\b"),
+    (
+        r"\b(guilty|convicted|responsible|guilty plea|pleaded guilty)\b",
+        r"\b(innocent|acquitted|not guilty|exonerated|pleaded not guilty)\b",
+    ),
     # Win/Lose (expanded)
-    (r"\b(won|winning|victory|victorious|champion)\b", r"\b(lost|losing|defeat|defeated|runner-up)\b"),
+    (
+        r"\b(won|winning|victory|victorious|champion)\b",
+        r"\b(lost|losing|defeat|defeated|runner-up)\b",
+    ),
     # Alive/Dead
     (r"\b(alive|living|survived|surviving)\b", r"\b(dead|died|deceased|killed)\b"),
     # True/False
@@ -67,19 +91,37 @@ ANTONYM_PAIRS: list[tuple[str, str]] = [
     # Legal/Illegal
     (r"\b(legal|lawful|legitimate)\b", r"\b(illegal|unlawful|illegitimate)\b"),
     # Resign/Remain
-    (r"\b(resign|resigned|resignation|stepping down|leaving|departure)\b", r"\b(remain|remaining|staying|continue|will remain|will stay)\b"),
+    (
+        r"\b(resign|resigned|resignation|stepping down|leaving|departure)\b",
+        r"\b(remain|remaining|staying|continue|will remain|will stay)\b",
+    ),
     # Support/Oppose
-    (r"\b(support|supports|supported|favor|favors|endorses?)\b", r"\b(oppose|opposes|opposed|against|opposition|rejects?)\b"),
+    (
+        r"\b(support|supports|supported|favor|favors|endorses?)\b",
+        r"\b(oppose|opposes|opposed|against|opposition|rejects?)\b",
+    ),
     # Effective/Ineffective
-    (r"\b(effective|works|working|efficacy|efficient)\b", r"\b(ineffective|doesn't work|not working|no effect|inefficient)\b"),
+    (
+        r"\b(effective|works|working|efficacy|efficient)\b",
+        r"\b(ineffective|doesn't work|not working|no effect|inefficient)\b",
+    ),
     # Higher/Lower
     (r"\b(higher|more|greater|above|exceeded)\b", r"\b(lower|less|fewer|below|missed|short)\b"),
     # Agree/Disagree
-    (r"\b(agree|agrees|agreed|consensus|unanimous)\b", r"\b(disagree|disagrees|disagreed|divided|split)\b"),
+    (
+        r"\b(agree|agrees|agreed|consensus|unanimous)\b",
+        r"\b(disagree|disagrees|disagreed|divided|split)\b",
+    ),
     # Allow/Prohibit
-    (r"\b(allow|allows|allowed|permit|permits|permitted)\b", r"\b(prohibit|prohibits|prohibited|ban|bans|banned|forbid)\b"),
+    (
+        r"\b(allow|allows|allowed|permit|permits|permitted)\b",
+        r"\b(prohibit|prohibits|prohibited|ban|bans|banned|forbid)\b",
+    ),
     # Include/Exclude
-    (r"\b(include|includes|included|contains?)\b", r"\b(exclude|excludes|excluded|omit|omits|omitted)\b"),
+    (
+        r"\b(include|includes|included|contains?)\b",
+        r"\b(exclude|excludes|excluded|omit|omits|omitted)\b",
+    ),
 ]
 
 # Negation patterns - "X is approved" vs "X is not approved"
@@ -290,7 +332,7 @@ class DeterministicConflictConstraint:
         chunks_to_check = list(chunks[:5])
 
         for i, chunk1 in enumerate(chunks_to_check):
-            for chunk2 in chunks_to_check[i + 1:]:
+            for chunk2 in chunks_to_check[i + 1 :]:
                 is_contradiction, explanation = self._check_pair(chunk1, chunk2)
 
                 if is_contradiction:

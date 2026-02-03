@@ -133,9 +133,7 @@ class GovernanceAnalyzer:
     def name(self) -> str:
         return "governance_analyzer"
 
-    def _analyze(
-        self, query: str, chunks: Sequence[Chunk]
-    ) -> dict[str, Any]:
+    def _analyze(self, query: str, chunks: Sequence[Chunk]) -> dict[str, Any]:
         """
         Use LLM to analyze governance issues.
 

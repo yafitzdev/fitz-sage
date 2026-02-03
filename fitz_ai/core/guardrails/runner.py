@@ -61,9 +61,7 @@ def run_constraints(
                     signal=result.signal,
                     metadata=metadata,
                 )
-                logger.info(
-                    f"{PIPELINE} Constraint '{constraint.name}' denied: {result.reason}"
-                )
+                logger.info(f"{PIPELINE} Constraint '{constraint.name}' denied: {result.reason}")
             else:
                 logger.debug(f"{PIPELINE} Constraint '{constraint.name}' passed")
 
@@ -72,9 +70,7 @@ def run_constraints(
         except Exception as e:
             # Fail-safe: if constraint crashes, log and skip
             # Do NOT block the answer due to constraint errors
-            logger.warning(
-                f"{PIPELINE} Constraint '{constraint.name}' raised exception: {e}"
-            )
+            logger.warning(f"{PIPELINE} Constraint '{constraint.name}' raised exception: {e}")
             continue
 
     denied_count = sum(1 for r in results if not r.allow_decisive_answer)

@@ -1,7 +1,6 @@
 # tests/integration/test_governance_pipeline.py
 """Integration test for governance in the RAG pipeline."""
 
-import pytest
 
 from fitz_ai.core.answer_mode import AnswerMode
 from fitz_ai.core.governance import AnswerGovernor

@@ -291,16 +291,12 @@ class CausalAttributionConstraint:
         is_uncertainty, query_type = _is_uncertainty_query(query)
 
         if not is_uncertainty:
-            logger.debug(
-                f"{PIPELINE} CausalAttributionConstraint: not an uncertainty query"
-            )
+            logger.debug(f"{PIPELINE} CausalAttributionConstraint: not an uncertainty query")
             return ConstraintResult.allow()
 
         # Check if chunks have appropriate evidence
         if _has_appropriate_evidence(query_type, chunks):
-            logger.debug(
-                f"{PIPELINE} CausalAttributionConstraint: {query_type} evidence found"
-            )
+            logger.debug(f"{PIPELINE} CausalAttributionConstraint: {query_type} evidence found")
             return ConstraintResult.allow()
 
         # Uncertainty query without appropriate evidence - deny

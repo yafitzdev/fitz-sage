@@ -10,10 +10,9 @@ from __future__ import annotations
 from typing import Sequence
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.core.governance import AnswerGovernor, GovernanceDecision
+from fitz_ai.core.governance import AnswerGovernor
 from fitz_ai.core.guardrails import (
     ConstraintPlugin,
-    ConstraintResult,
     create_default_constraints,
     run_constraints,
 )
@@ -123,9 +122,7 @@ class RAGPipeline:
             fast_chat = self.chat_factory("fast")
             fast_model = getattr(fast_chat, "_model", "unknown")
 
-            logger.info(
-                f"{PIPELINE} Creating simple constraints with fast_chat='{fast_model}'"
-            )
+            logger.info(f"{PIPELINE} Creating simple constraints with fast_chat='{fast_model}'")
             self.constraints = create_default_constraints(chat=fast_chat)
         else:
             self.constraints = list(guardrails.constraints)
@@ -276,7 +273,6 @@ class RAGPipeline:
 
         # Log to PostgreSQL for observability (Phase 2: Governance Observability)
         if self._governance_logger:
-            collection = getattr(self.retrieval, "collection", "default")
             try:
                 self._governance_logger.log(
                     decision=governance,

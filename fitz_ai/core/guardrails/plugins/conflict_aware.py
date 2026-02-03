@@ -66,7 +66,6 @@ Text B: {text2}
 
 Answer CONTRADICT if they make opposite claims, AGREE if compatible, UNCLEAR if uncertain.
 Reply with ONE word: CONTRADICT, AGREE, or UNCLEAR""",
-
     # Consistency framing (inverted)
     """Are these two texts CONSISTENT with each other regarding the question?
 
@@ -76,7 +75,6 @@ Second text: {text2}
 
 Answer YES if they agree or are compatible, NO if they contradict, UNCLEAR if uncertain.
 Reply with ONE word: YES, NO, or UNCLEAR""",
-
     # Logical compatibility framing
     """If the first statement is true, could the second statement also be true?
 
@@ -332,7 +330,11 @@ class ConflictAwareConstraint:
         if self.adaptive:
             # Adaptive mode: use fusion for uncertainty queries, standard for factual
             use_fusion_for_query = _is_uncertainty_query(query)
-            check_method = self._check_pairwise_fusion if use_fusion_for_query else self._check_pairwise_contradiction
+            check_method = (
+                self._check_pairwise_fusion
+                if use_fusion_for_query
+                else self._check_pairwise_contradiction
+            )
             method_name = "adaptive-fusion" if use_fusion_for_query else "adaptive-pairwise"
             logger.debug(
                 f"{PIPELINE} ConflictAwareConstraint: adaptive mode selected {method_name} "
@@ -340,7 +342,11 @@ class ConflictAwareConstraint:
             )
         else:
             # Fixed mode: use fusion if explicitly enabled
-            check_method = self._check_pairwise_fusion if self.use_fusion else self._check_pairwise_contradiction
+            check_method = (
+                self._check_pairwise_fusion
+                if self.use_fusion
+                else self._check_pairwise_contradiction
+            )
             method_name = "fusion" if self.use_fusion else "pairwise"
 
         for other_chunk in chunks_to_check[1:]:

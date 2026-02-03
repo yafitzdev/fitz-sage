@@ -27,7 +27,6 @@ from fitz_ai.core.guardrails.plugins.insufficient_evidence import (
 from fitz_ai.core.guardrails.semantic import SemanticMatcher
 from tests.unit.mock_embedder import create_deterministic_embedder
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -89,9 +88,7 @@ class TestRelevanceFiltering:
     myelodysplasia were being accepted as "evidence" for business queries.
     """
 
-    def test_completely_unrelated_context_triggers_abstain(
-        self, all_constraints, mock_embedder
-    ):
+    def test_completely_unrelated_context_triggers_abstain(self, all_constraints, mock_embedder):
         """
         Query about business + context about science = ABSTAIN.
 
@@ -118,9 +115,7 @@ class TestRelevanceFiltering:
             f"Reasons: {decision.reasons}"
         )
 
-    def test_same_domain_but_wrong_entity_triggers_abstain(
-        self, all_constraints, mock_embedder
-    ):
+    def test_same_domain_but_wrong_entity_triggers_abstain(self, all_constraints, mock_embedder):
         """
         Query about Company A + context about Company B = ABSTAIN.
         """
@@ -134,7 +129,7 @@ class TestRelevanceFiltering:
 
         governor = AnswerGovernor()
         results = run_constraints(query, chunks, all_constraints)
-        decision = governor.decide(results)
+        _ = governor.decide(results)  # noqa: F841
 
         # This should ideally abstain, but entity-level relevance is harder
         # For now, we accept it might pass - document the expected behavior
@@ -200,9 +195,7 @@ class TestCausalQueryDetection:
     confident answer - it should be qualified.
     """
 
-    def test_why_query_without_because_triggers_qualified(
-        self, all_constraints, mock_embedder
-    ):
+    def test_why_query_without_because_triggers_qualified(self, all_constraints, mock_embedder):
         """
         "Why did X happen?" + context without causal language = QUALIFIED.
         """
@@ -263,9 +256,7 @@ class TestCausalQueryDetection:
         except Exception as e:
             pytest.skip(f"Ollama not available: {e}")
 
-    def test_what_caused_query_needs_causal_evidence(
-        self, all_constraints, mock_embedder
-    ):
+    def test_what_caused_query_needs_causal_evidence(self, all_constraints, mock_embedder):
         """
         "What caused X?" is also a causal query.
         """
@@ -337,9 +328,7 @@ class TestConflictDetection:
         except Exception as e:
             pytest.skip(f"Ollama not available: {e}")
 
-    def test_divergent_but_not_opposing_may_dispute(
-        self, all_constraints, mock_embedder
-    ):
+    def test_divergent_but_not_opposing_may_dispute(self, all_constraints, mock_embedder):
         """
         Different explanations for the same thing may trigger DISPUTED.
 
@@ -395,9 +384,10 @@ class TestConflictDetection:
 
         # Both say successful → no conflict → CONFIDENT
         # May also get ABSTAIN if mock embedder relevance is strict
-        assert decision.mode in (AnswerMode.CONFIDENT, AnswerMode.ABSTAIN), (
-            f"Expected CONFIDENT or ABSTAIN, got {decision.mode}"
-        )
+        assert decision.mode in (
+            AnswerMode.CONFIDENT,
+            AnswerMode.ABSTAIN,
+        ), f"Expected CONFIDENT or ABSTAIN, got {decision.mode}"
 
 
 # =============================================================================

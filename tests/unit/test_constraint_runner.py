@@ -1,9 +1,7 @@
 # tests/unit/test_constraint_runner.py
 """Tests for constraint runner."""
 
-import pytest
 
-from fitz_ai.core.chunk import Chunk
 from fitz_ai.core.guardrails.base import ConstraintResult
 from fitz_ai.core.guardrails.runner import run_constraints
 
