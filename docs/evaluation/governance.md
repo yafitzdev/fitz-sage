@@ -6,7 +6,7 @@ Technical specification and evaluation results for Fitz governance mode classifi
 
 ## Benchmark Definition
 
-**fitz-gov** evaluates **epistemic governance**: whether a RAG system selects an appropriate answer posture (confident, qualified, disputed, abstain) given a query and fixed evidence.
+**fitz-gov** evaluates **epistemic governance**: whether a RAG system selects an appropriate answer posture (confident, qualified, disputed, abstain) given a query and fixed evidence. It is designed to be model-agnostic, retrieval-independent, and governance-specific.
 
 This is not standard accuracy measurement. Standard RAG benchmarks test "did you find the right documents?" fitz-gov tests "do you know when you don't know?"
 
@@ -213,6 +213,8 @@ Added:
 ---
 
 ## Final Results
+
+> **Why 70% is meaningful:** Governance is fundamentally harder than retrieval because it requires reasoning about *absence*, *conflict*, and *uncertainty*—not just relevance. A 70% accuracy on governance classification represents strong calibration for a task where even human experts frequently disagree.
 
 ### Production (with enrichment) — Recommended
 
