@@ -576,6 +576,9 @@ class TestGovernanceLogger:
 
         mock_pool = MagicMock()
         mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         mock_pool.connection.return_value.__enter__ = MagicMock(return_value=mock_conn)
         mock_pool.connection.return_value.__exit__ = MagicMock(return_value=False)
 
@@ -595,8 +598,8 @@ class TestGovernanceLogger:
         # Should have flushed, buffer should be empty
         assert logger.pending_count() == 0
 
-        # executemany should have been called
-        mock_conn.executemany.assert_called_once()
+        # executemany should have been called on cursor
+        mock_cursor.executemany.assert_called_once()
 
     def test_logger_explicit_flush(self):
         """flush() should persist all buffered entries."""
@@ -604,6 +607,9 @@ class TestGovernanceLogger:
 
         mock_pool = MagicMock()
         mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         mock_pool.connection.return_value.__enter__ = MagicMock(return_value=mock_conn)
         mock_pool.connection.return_value.__exit__ = MagicMock(return_value=False)
 
@@ -627,7 +633,7 @@ class TestGovernanceLogger:
 
         assert count == 3
         assert logger.pending_count() == 0
-        mock_conn.executemany.assert_called_once()
+        mock_cursor.executemany.assert_called_once()
 
     def test_logger_flush_empty_buffer(self):
         """flush() with empty buffer should return 0."""

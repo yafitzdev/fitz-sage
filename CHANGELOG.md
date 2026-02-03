@@ -15,14 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🎉 Highlights
 
-**FITZ-GOV Benchmark Integration** - New governance-focused evaluation benchmark using the fitz-gov package. Enables systematic testing of epistemic governance constraints (conflict detection, causal attribution, insufficient evidence) across 6 categories with two-pass LLM validation.
+**fitz-gov Benchmark Integration** - New governance-focused evaluation benchmark using the fitz-gov package. Enables systematic testing of epistemic governance constraints (conflict detection, causal attribution, insufficient evidence) across 6 categories with two-pass LLM validation.
 
 **Enhanced Governance Constraints** - Improved accuracy and observability for all governance constraint plugins with semantic relevance checks and better integration with the RAG pipeline.
 
 ### 🚀 Added
 
 #### Benchmarking & Evaluation
-- FITZ-GOV benchmark integration using external `fitz-gov` package
+- fitz-gov benchmark integration using external `fitz-gov` package
 - Two-pass LLM validation for governance constraint accuracy
 - Support for 6 governance categories: conflict awareness, causal attribution, insufficient evidence, qualification, dispute, and semantic relevance
 - CLI display for all 6 evaluation categories
@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔧 Fixed
 
-- FITZ-GOV loader to support new data structure from GitHub releases
+- fitz-gov loader to support new data structure from GitHub releases
 - Chunk instantiation in benchmark evaluations (pass Chunk objects instead of dicts)
 - RGSAnswer attribute access (use `answer` instead of `text`)
 - Import paths for constraints and governance modules
