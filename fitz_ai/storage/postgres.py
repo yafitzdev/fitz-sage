@@ -448,6 +448,8 @@ class PostgresConnectionManager:
 
     def _restart_pgserver(self) -> None:
         """Restart pgserver after connection failure."""
+        import fitz_pgserver as pgserver
+
         logger.warning(f"{STORAGE} Restarting pgserver...")
 
         with self._lock:
@@ -472,7 +474,17 @@ class PostgresConnectionManager:
             self._base_uri = None
             self._started = False
 
-            # _start_pgserver handles all cleanup (kills postgres, clears cache, etc.)
+            # Clear pgserver's internal cache - without this, get_server() returns
+            # the dead cached instance instead of creating a new one
+            data_dir = self.config.data_dir or FitzPaths.ensure_pgdata()
+            resolved_path = Path(data_dir).expanduser().resolve()
+            if resolved_path in pgserver.PostgresServer._instances:
+                del pgserver.PostgresServer._instances[resolved_path]
+
+            # Kill zombie postgres processes that may be holding resources
+            _kill_zombie_postgres_processes()
+            time.sleep(0.5 if sys.platform == "win32" else 0.2)
+
             self._start_pgserver()
             self._started = True
 

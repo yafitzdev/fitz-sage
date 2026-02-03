@@ -70,10 +70,15 @@ from .exceptions import (
 )
 
 # Epistemic guardrails (constraint plugins)
+from .governance import AnswerGovernor, GovernanceDecision, GovernanceLog, decide_answer_mode
 from .guardrails import ConstraintPlugin as ConstraintPluginProtocol
-from .guardrails import ConstraintResult, SemanticMatcher
-from .guardrails import apply_constraints as apply_constraint_plugins
-from .guardrails import create_default_constraints, create_semantic_matcher
+from .guardrails import (
+    ConstraintResult,
+    SemanticMatcher,
+    create_default_constraints,
+    create_semantic_matcher,
+    run_constraints,
+)
 from .guardrails.plugins import (
     CausalAttributionConstraint,
     ConflictAwareConstraint,
@@ -106,9 +111,14 @@ __all__ = [
     "ConflictAwareConstraint",
     "InsufficientEvidenceConstraint",
     "CausalAttributionConstraint",
-    "apply_constraint_plugins",
+    "run_constraints",
     "create_default_constraints",
     "create_semantic_matcher",
+    # Governance
+    "AnswerGovernor",
+    "GovernanceDecision",
+    "GovernanceLog",
+    "decide_answer_mode",
     # Path Management
     "FitzPaths",
     "get_workspace",

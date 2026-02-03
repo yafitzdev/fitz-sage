@@ -13,7 +13,7 @@ from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
     RGS,
     RGSConfig,
 )
-from fitz_ai.engines.fitz_rag.pipeline.components import PipelineComponents
+from fitz_ai.engines.fitz_rag.pipeline.components import CloudComponents, PipelineComponents
 from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
 
 
@@ -49,15 +49,27 @@ class MockRetrievalPipeline:
 class FailingLLM:
     """Mock LLM that always raises an exception."""
 
-    def chat(self, messages: list[dict]) -> str:
+    def chat(self, messages: list[dict], **kwargs) -> str:
         raise RuntimeError("LLM service unavailable")
 
 
+class MockEmbedder:
+    """Mock embedder for testing."""
+
+    def embed(self, text: str) -> list[float]:
+        """Return a fixed embedding vector."""
+        return [0.1] * 384
+
+
 def test_rag_pipeline_llm_failure():
+    # MockEmbedder is required for constraint initialization (hybrid architecture)
+    mock_embedder = MockEmbedder()
+
     components = PipelineComponents(
         retrieval=MockRetrievalPipeline(),
         chat_factory=create_mock_chat_factory(FailingLLM()),
         rgs=RGS(RGSConfig()),
+        cloud=CloudComponents(embedder=mock_embedder),
     )
     pipe = RAGPipeline(components)
 

@@ -3,64 +3,531 @@
 Insufficient Evidence Constraint - Default guardrail for evidence coverage.
 
 This constraint prevents the system from giving confident answers when
-there is not enough direct evidence in the retrieved chunks.
+there is no relevant evidence in the retrieved chunks.
 
-Uses semantic matching for language-agnostic evidence detection.
+Priority order:
+1. Embedding similarity (if embedder provided) - most reliable
+2. Enriched metadata (entity/summary overlap)
+3. Lexical overlap fallback
 
-It does NOT:
-- Rank authority
-- Resolve ambiguity
-- Guess intent
-- Use LLM calls
-
-It only enforces: "Is there explicit evidence to justify a decisive answer?"
+No LLM calls. Deterministic with tunable thresholds.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Sequence
+import math
+import re
+from dataclasses import dataclass, field
+from typing import Any, Callable, Sequence
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
 from ..base import ConstraintResult
-from ..semantic import SemanticMatcher
 
 logger = get_logger(__name__)
 
+# Type alias for embedder function
+EmbedderFunc = Callable[[str], list[float]]
 
-# =============================================================================
-# Constraint Implementation
-# =============================================================================
+# Below this score, vectors are nearly orthogonal (no semantic relationship)
+MIN_RELEVANCE_SCORE = 0.3
+# Embedding similarity threshold for relevance
+# Empirically tuned: unrelated content ~0.35-0.51, related content ~0.66-0.84
+# Threshold of 0.6 provides good separation
+MIN_EMBEDDING_SIMILARITY = 0.6
+
+
+def _cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
+    """Compute cosine similarity between two vectors."""
+    dot_product = sum(a * b for a, b in zip(vec1, vec2))
+    norm1 = math.sqrt(sum(a * a for a in vec1))
+    norm2 = math.sqrt(sum(b * b for b in vec2))
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+
+    return dot_product / (norm1 * norm2)
+
+
+# Common stopwords to ignore in overlap check
+STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "need",
+        "dare",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "under",
+        "again",
+        "further",
+        "then",
+        "once",
+        "here",
+        "there",
+        "when",
+        "where",
+        "why",
+        "how",
+        "all",
+        "each",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "no",
+        "nor",
+        "not",
+        "only",
+        "own",
+        "same",
+        "so",
+        "than",
+        "too",
+        "very",
+        "just",
+        "and",
+        "but",
+        "if",
+        "or",
+        "because",
+        "until",
+        "while",
+        "about",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "this",
+        "that",
+        "these",
+        "those",
+        "i",
+        "you",
+        "he",
+        "she",
+        "it",
+        "we",
+        "they",
+        "me",
+        "him",
+        "her",
+        "us",
+        "them",
+        "my",
+        "your",
+        "his",
+        "its",
+        "our",
+        "their",
+        "mine",
+        "yours",
+        "hers",
+        "ours",
+        "theirs",
+        "any",
+        "both",
+        "either",
+        "neither",
+        "much",
+        "many",
+    }
+)
+
+
+def _extract_words(text: str) -> set[str]:
+    """Extract meaningful words (lowercase, no stopwords, min 3 chars)."""
+    words = re.findall(r"\b[a-zA-Z]{3,}\b", text.lower())
+    return {w for w in words if w not in STOPWORDS}
+
+
+def _extract_query_entities(query: str) -> set[str]:
+    """Extract potential entities from query (proper nouns, capitalized words, quoted terms)."""
+    entities = set()
+
+    # Quoted terms
+    quoted = re.findall(r'"([^"]+)"', query)
+    entities.update(q.lower() for q in quoted)
+
+    # Capitalized words (potential proper nouns) - excluding sentence starters
+    words = query.split()
+    for i, word in enumerate(words):
+        # Skip first word and common question starters
+        if i > 0 and word[0].isupper() and word.lower() not in STOPWORDS:
+            entities.add(word.lower())
+
+    # Also extract meaningful words as potential topics
+    entities.update(_extract_words(query))
+
+    return entities
+
+
+def _extract_specific_entities(query: str) -> tuple[set[str], set[str]]:
+    """
+    Extract SPECIFIC entities that must appear in context for relevance.
+
+    These are proper nouns, product names, years, etc. that the query is specifically about.
+    If query asks about "iPhone 16", context must mention "iPhone 16" (not Samsung Galaxy).
+
+    Returns:
+        Tuple of (all_entities, critical_entities).
+        Critical entities (like years) MUST match; regular entities need ANY match.
+    """
+    specific = set()
+    critical = set()  # These MUST match (years, numbered qualifiers)
+
+    # Common question starters and auxiliaries to exclude
+    question_words = {
+        "what",
+        "how",
+        "why",
+        "when",
+        "where",
+        "who",
+        "which",
+        "whom",
+        "did",
+        "does",
+        "do",
+        "is",
+        "are",
+        "was",
+        "were",
+        "will",
+        "would",
+        "can",
+        "could",
+        "should",
+        "has",
+        "have",
+        "had",
+        "been",
+        "the",
+        "a",
+        "an",
+        "this",
+        "that",
+        "these",
+        "those",
+    }
+
+    # Quoted terms are always specific
+    quoted = re.findall(r'"([^"]+)"', query)
+    specific.update(q.lower() for q in quoted)
+
+    # Years (4-digit numbers) - CRITICAL, must match exactly
+    years = re.findall(r"\b(19\d{2}|20\d{2})\b", query)
+    specific.update(years)
+    critical.update(years)
+
+    # Numbered qualifiers like "type 2", "tier 1", "phase 3", "version 2.0"
+    # These are CRITICAL - "type 2 diabetes" vs "type 1 diabetes" is a different entity
+    numbered_qualifiers = re.findall(
+        r"\b(type\s+\d+|tier\s+\d+|phase\s+\d+|version\s+[\d.]+|level\s+\d+|"
+        r"class\s+\d+|grade\s+\d+|stage\s+\d+|gen\s+\d+|generation\s+\d+)\b",
+        query.lower(),
+    )
+    specific.update(numbered_qualifiers)
+    critical.update(numbered_qualifiers)
+
+    # Product names, company names, etc. (multi-word capitalized sequences)
+    # e.g., "iPhone 16", "World Series", "Microsoft", "Bitcoin"
+    # Skip sequences at the very start of the query (likely question starters)
+    cap_sequences = re.findall(r"([A-Z][a-z]+(?:\s+[A-Z0-9][a-z0-9]*)*)", query)
+    for seq in cap_sequences:
+        seq_lower = seq.lower()
+        # Skip if it's a question word or starts with one
+        first_word = seq_lower.split()[0] if seq_lower else ""
+        if first_word not in question_words and seq_lower not in question_words:
+            # Skip if sequence is at the very beginning of query
+            if not query.lower().startswith(seq_lower):
+                specific.add(seq_lower)
+
+    # Single capitalized words that aren't at sentence start (position > 0)
+    words = query.split()
+    for i, word in enumerate(words):
+        clean_word = re.sub(r"[^\w]", "", word)
+        if i > 0 and clean_word and clean_word[0].isupper():
+            clean_lower = clean_word.lower()
+            if (
+                clean_lower not in STOPWORDS
+                and clean_lower not in question_words
+                and len(clean_word) > 2
+            ):
+                specific.add(clean_lower)
+
+    return specific, critical
+
+
+def _context_mentions_entities(entities: set[str], context: str) -> bool:
+    """Check if context mentions any of the specific entities."""
+    if not entities:
+        return True  # No specific entities to check
+
+    context_lower = context.lower()
+    for entity in entities:
+        if entity in context_lower:
+            return True
+
+    return False
+
+
+def _context_mentions_all_critical(critical: set[str], context: str) -> bool:
+    """Check if context mentions ALL critical entities (years, numbered qualifiers)."""
+    if not critical:
+        return True  # No critical entities to check
+
+    context_lower = context.lower()
+    for entity in critical:
+        if entity not in context_lower:
+            return False  # Missing a critical entity
+
+    return True
+
+
+def _get_max_score(chunks: Sequence[Chunk]) -> float | None:
+    """Get the highest vector_score from chunks, or None if no scores."""
+    scores = []
+    for chunk in chunks:
+        score = chunk.metadata.get("vector_score")
+        if score is not None:
+            scores.append(float(score))
+    return max(scores) if scores else None
+
+
+def _has_entity_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
+    """Check if query entities appear in chunk entities (enriched metadata)."""
+    query_entities = _extract_query_entities(query)
+    if not query_entities:
+        return True  # Can't determine, allow
+
+    for chunk in chunks:
+        chunk_entities = chunk.metadata.get("entities", [])
+        if chunk_entities:
+            # Extract entity names from enriched data
+            chunk_entity_names = {
+                e.get("name", "").lower()
+                for e in chunk_entities
+                if isinstance(e, dict) and e.get("name")
+            }
+            if query_entities & chunk_entity_names:
+                return True
+
+    return False
+
+
+def _has_summary_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
+    """Check if query topics appear in chunk summaries (less noise than raw content)."""
+    query_words = _extract_words(query)
+    if not query_words:
+        return True  # Can't determine, allow
+
+    for chunk in chunks:
+        summary = chunk.metadata.get("summary", "")
+        if summary:
+            summary_words = _extract_words(summary)
+            # Require at least 1 matching word
+            overlap = query_words & summary_words
+            if overlap:
+                return True
+
+    return False
+
+
+def _has_lexical_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
+    """Check if query shares any meaningful words with chunks (fallback)."""
+    query_words = _extract_words(query)
+    if not query_words:
+        return True  # Can't determine overlap, allow
+
+    for chunk in chunks:
+        chunk_words = _extract_words(chunk.content)
+        if query_words & chunk_words:  # Intersection
+            return True
+
+    return False
+
+
+def _check_enriched_relevance(query: str, chunks: Sequence[Chunk]) -> tuple[bool, str]:
+    """
+    Check relevance using enriched metadata.
+
+    Returns (is_relevant, method_used).
+    """
+    # Check if chunks have enrichment
+    has_entities = any(chunk.metadata.get("entities") for chunk in chunks)
+    has_summaries = any(chunk.metadata.get("summary") for chunk in chunks)
+
+    if has_entities or has_summaries:
+        # Use enriched data - stricter checks
+        entity_match = _has_entity_overlap(query, chunks) if has_entities else False
+        summary_match = _has_summary_overlap(query, chunks) if has_summaries else False
+
+        if entity_match:
+            return True, "entity_overlap"
+        if summary_match:
+            return True, "summary_overlap"
+
+        # Enriched but no match - this is a reliable ABSTAIN signal
+        return False, "no_enriched_match"
+
+    # No enrichment - can't use this method
+    return True, "no_enrichment"
 
 
 @dataclass
 class InsufficientEvidenceConstraint:
     """
-    Constraint that prevents confident answers without sufficient evidence.
+    Constraint that prevents confident answers without relevant evidence.
 
-    This constraint checks:
-    1. Are there any chunks at all?
-    2. For causal questions: is there causal language?
-    3. For fact questions: are there direct assertions?
-
-    Uses semantic embedding similarity for language-agnostic detection.
+    Priority order (deterministic, no LLM):
+    1. No chunks = ABSTAIN
+    2. Embedding similarity (if embedder provided) - most reliable
+    3. Vector score from retrieval (if available)
+    4. Enriched metadata (entity/summary overlap)
+    5. Fallback: lexical overlap on raw content
 
     Attributes:
-        semantic_matcher: SemanticMatcher instance for embedding-based detection
+        embedder: Optional function to embed text (enables semantic similarity)
         enabled: Whether this constraint is active (default: True)
-        min_evidence_count: Minimum chunks with evidence required (default: 1)
+        min_score: Minimum vector score to consider relevant (default: 0.3)
+        min_similarity: Minimum embedding similarity (default: 0.4)
     """
 
-    semantic_matcher: SemanticMatcher
+    embedder: EmbedderFunc | None = None
     enabled: bool = True
-    min_evidence_count: int = 1
+    min_score: float = MIN_RELEVANCE_SCORE
+    min_similarity: float = MIN_EMBEDDING_SIMILARITY
+    _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     @property
     def name(self) -> str:
         return "insufficient_evidence"
+
+    def _get_embedding(self, text: str) -> list[float] | None:
+        """Get embedding with caching."""
+        if not self.embedder:
+            return None
+
+        cache_key = hash(text[:200])
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        try:
+            embedding = self.embedder(text)
+            self._cache[cache_key] = embedding
+            return embedding
+        except Exception as e:
+            logger.warning(f"{PIPELINE} InsufficientEvidence: embedding failed: {e}")
+            return None
+
+    def _check_embedding_relevance(
+        self, query: str, chunks: Sequence[Chunk]
+    ) -> tuple[bool, float, str]:
+        """
+        Check relevance using embedding similarity + entity matching.
+
+        Returns (is_relevant, max_similarity, reason).
+        """
+        query_emb = self._get_embedding(query)
+        if not query_emb:
+            return True, 0.0, "no_embedder"  # Can't check, allow
+
+        # Extract specific and critical entities from query
+        specific_entities, critical_entities = _extract_specific_entities(query)
+
+        max_sim = 0.0
+        entity_match_found = False
+        critical_match_found = False
+
+        for chunk in chunks:
+            chunk_emb = self._get_embedding(chunk.content)
+            if chunk_emb:
+                sim = _cosine_similarity(query_emb, chunk_emb)
+                max_sim = max(max_sim, sim)
+
+            # Check entity matching
+            if specific_entities and _context_mentions_entities(specific_entities, chunk.content):
+                entity_match_found = True
+
+            # Check critical entity matching (years, numbered qualifiers must ALL match)
+            if critical_entities and _context_mentions_all_critical(
+                critical_entities, chunk.content
+            ):
+                critical_match_found = True
+
+        # Decision logic:
+        # 1. If similarity is very low (<0.45), definitely irrelevant
+        if max_sim < 0.45:
+            return False, max_sim, "low_similarity"
+
+        # 2. CRITICAL entities (years, "type 2", etc.) MUST match - no bypass
+        # "2024 World Series" query MUST have 2024 in context, even if similarity is high
+        if critical_entities and not critical_match_found:
+            return False, max_sim, f"missing_critical:{list(critical_entities)[:3]}"
+
+        # 3. Check regular entity matching for same-topic-wrong-entity detection
+        # This catches cases like: Tokyo population query vs Osaka population context
+        # Only skip entity check for VERY high similarity (>0.85) - likely direct answers
+        # Threshold rationale: 0.7-0.8 = related topic, 0.85+ = same specific subject
+        if specific_entities and not entity_match_found and max_sim < 0.85:
+            return False, max_sim, f"missing_entity:{list(specific_entities)[:3]}"
+
+        # 4. ENRICHMENT BOOST: Use summaries for "same topic, wrong aspect" detection
+        # Only activates when chunks are enriched (have summaries)
+        # Only applies in ambiguous similarity range where embeddings aren't decisive
+        if 0.45 <= max_sim < 0.70:
+            has_summaries = any(chunk.metadata.get("summary") for chunk in chunks)
+            if has_summaries:
+                summary_match = _has_summary_overlap(query, chunks)
+                if not summary_match:
+                    return False, max_sim, "no_summary_overlap"
+
+        # 5. If we have entity match OR no specific entities OR very high similarity, allow
+        return True, max_sim, "relevant"
 
     def apply(
         self,
@@ -68,19 +535,19 @@ class InsufficientEvidenceConstraint:
         chunks: Sequence[Chunk],
     ) -> ConstraintResult:
         """
-        Check if there is sufficient evidence to answer the query.
+        Check if there is relevant evidence to answer the query.
 
         Args:
             query: The user's question
             chunks: Retrieved chunks
 
         Returns:
-            ConstraintResult - denies if insufficient evidence
+            ConstraintResult - denies if no chunks or evidence is off-topic
         """
         if not self.enabled:
             return ConstraintResult.allow()
 
-        # Rule 1: Empty context
+        # Rule 1: No chunks at all
         if not chunks:
             logger.info(f"{PIPELINE} InsufficientEvidenceConstraint: no chunks retrieved")
             return ConstraintResult.deny(
@@ -89,44 +556,67 @@ class InsufficientEvidenceConstraint:
                 evidence_count=0,
             )
 
-        # Determine query type using semantic matching
-        is_causal = self.semantic_matcher.is_causal_query(query)
-        is_fact = self.semantic_matcher.is_fact_query(query)
-
-        # Rule 2: Causal queries need causal evidence
-        if is_causal:
-            evidence_count = self.semantic_matcher.count_causal_chunks(chunks)
-
-            if evidence_count < self.min_evidence_count:
+        # Rule 2: Check embedding similarity + entity matching (most reliable, if available)
+        if self.embedder:
+            is_relevant, max_sim, reason = self._check_embedding_relevance(query, chunks)
+            if not is_relevant:
                 logger.info(
-                    f"{PIPELINE} InsufficientEvidenceConstraint: "
-                    f"causal query but no causal evidence (found {evidence_count})"
+                    f"{PIPELINE} InsufficientEvidenceConstraint: {reason} "
+                    f"(similarity={max_sim:.3f}) -> ABSTAIN"
                 )
                 return ConstraintResult.deny(
-                    reason="No explicit causal evidence found",
+                    reason=f"Context not relevant: {reason} (similarity={max_sim:.3f})",
                     signal="abstain",
-                    evidence_count=evidence_count,
-                    query_type="causal",
+                    evidence_count=len(chunks),
+                    max_similarity=max_sim,
+                    detection_reason=reason,
                 )
+            logger.debug(
+                f"{PIPELINE} InsufficientEvidenceConstraint: {reason} (similarity={max_sim:.3f})"
+            )
+            return ConstraintResult.allow()
 
-        # Rule 3: Fact queries need assertions
-        elif is_fact:
-            evidence_count = self.semantic_matcher.count_assertion_chunks(chunks)
-
-            if evidence_count < self.min_evidence_count:
+        # Rule 3: Check vector_score if available (from retrieval)
+        max_score = _get_max_score(chunks)
+        if max_score is not None:
+            if max_score < self.min_score:
                 logger.info(
-                    f"{PIPELINE} InsufficientEvidenceConstraint: "
-                    f"fact query but no direct assertion (found {evidence_count})"
+                    f"{PIPELINE} InsufficientEvidenceConstraint: score {max_score:.3f} "
+                    f"< {self.min_score} -> ABSTAIN"
                 )
                 return ConstraintResult.deny(
-                    reason="No direct assertion found in retrieved evidence",
+                    reason=f"Retrieved content not relevant (score={max_score:.3f})",
                     signal="abstain",
-                    evidence_count=evidence_count,
-                    query_type="fact",
+                    evidence_count=len(chunks),
+                    max_score=max_score,
+                )
+            return ConstraintResult.allow()
+
+        # Rule 4: Check enriched metadata
+        is_relevant, method = _check_enriched_relevance(query, chunks)
+        if method != "no_enrichment":
+            if is_relevant:
+                logger.debug(f"{PIPELINE} InsufficientEvidenceConstraint: relevant via {method}")
+                return ConstraintResult.allow()
+            else:
+                logger.info(f"{PIPELINE} InsufficientEvidenceConstraint: {method} -> ABSTAIN")
+                return ConstraintResult.deny(
+                    reason="Context not relevant (no entity or summary overlap)",
+                    signal="abstain",
+                    evidence_count=len(chunks),
+                    method=method,
                 )
 
-        # For other query types (or if evidence found), allow
-        logger.debug(f"{PIPELINE} InsufficientEvidenceConstraint: sufficient evidence")
+        # Rule 5: Fallback to lexical overlap
+        if not _has_lexical_overlap(query, chunks):
+            logger.info(f"{PIPELINE} InsufficientEvidenceConstraint: no lexical overlap -> ABSTAIN")
+            return ConstraintResult.deny(
+                reason="Context does not appear related to query",
+                signal="abstain",
+                evidence_count=len(chunks),
+            )
+
+        logger.debug(f"{PIPELINE} InsufficientEvidenceConstraint: allowing (lexical overlap found)")
         return ConstraintResult.allow()
 
 

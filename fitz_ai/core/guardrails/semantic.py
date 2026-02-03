@@ -66,6 +66,15 @@ CAUSAL_QUERY_CONCEPTS: tuple[str, ...] = (
     "explain why",
     "how did this occur",
     "what led to this",
+    # Prediction queries that need causal evidence
+    "what will be the impact",
+    "what will happen next",
+    "predict the outcome",
+    "what are the consequences",
+    # Preference/choice queries that need causal reasoning
+    "why do people prefer",
+    "why is this better",
+    "what makes this different",
 )
 
 FACT_QUERY_CONCEPTS: tuple[str, ...] = (
@@ -84,27 +93,6 @@ RESOLUTION_QUERY_CONCEPTS: tuple[str, ...] = (
     "which is the correct version",
     "reconcile these differences",
     "why do these disagree",
-)
-
-# Opposing concept pairs for conflict detection
-# Each tuple contains (concept_a, concept_b) that are mutually exclusive
-OPPOSING_CONCEPTS: tuple[tuple[str, str], ...] = (
-    # State oppositions
-    ("this was successful and completed", "this failed and did not complete"),
-    ("this was approved and accepted", "this was rejected and denied"),
-    ("this is active and enabled", "this is inactive and disabled"),
-    ("this is confirmed and verified", "this is unconfirmed and unverified"),
-    # Trend oppositions
-    ("this improved and increased", "this declined and decreased"),
-    ("this grew and expanded", "this shrank and contracted"),
-    ("this remained stable and unchanged", "this changed significantly"),
-    # Sentiment oppositions
-    ("this is positive and good", "this is negative and bad"),
-    ("the outcome was excellent", "the outcome was poor and terrible"),
-    # Classification oppositions
-    ("this is a security incident", "this is an operational incident"),
-    ("this is internal", "this is external"),
-    ("this is primary and main", "this is secondary and auxiliary"),
 )
 
 
@@ -168,14 +156,14 @@ class SemanticMatcher:
         causal_threshold: Similarity threshold for causal language detection
         assertion_threshold: Similarity threshold for assertion detection
         query_threshold: Similarity threshold for query type classification
-        conflict_threshold: Similarity threshold for conflict detection
+        relevance_threshold: Similarity threshold for query-context relevance
     """
 
     embedder: EmbedderFunc
     causal_threshold: float = 0.65
     assertion_threshold: float = 0.60
-    query_threshold: float = 0.65
-    conflict_threshold: float = 0.70
+    query_threshold: float = 0.60  # Balance causal detection vs false positives
+    relevance_threshold: float = 0.62  # Balanced - between 0.55 and 0.65
 
     # Internal caches (not part of dataclass comparison)
     _concept_cache: dict[str, list[list[float]]] = field(
@@ -308,87 +296,43 @@ class SemanticMatcher:
         return sum(1 for chunk in chunks if self.has_assertion(chunk.content))
 
     # -------------------------------------------------------------------------
-    # Conflict Detection
+    # Query-Context Relevance
     # -------------------------------------------------------------------------
 
-    def _get_opposing_vectors(self) -> list[tuple[list[float], list[float]]]:
-        """Get cached opposing concept vector pairs."""
-        if "opposing_pairs" not in self._concept_cache:
-            pairs = []
-            for concept_a, concept_b in OPPOSING_CONCEPTS:
-                vec_a = self.embedder(concept_a)
-                vec_b = self.embedder(concept_b)
-                pairs.append((vec_a, vec_b))
-            self._concept_cache["opposing_pairs"] = pairs
-        return self._concept_cache["opposing_pairs"]
-
-    def detect_conflict(
-        self,
-        text_a: str,
-        text_b: str,
-    ) -> tuple[bool, str | None]:
+    def is_relevant_to_query(self, query: str, text: str) -> bool:
         """
-        Detect if two texts make conflicting claims.
+        Check if text is semantically relevant to the query.
 
-        Uses opposing concept pairs to check if text_a is similar to
-        one side of an opposition while text_b is similar to the other.
+        This is the critical check that prevents the constraint system
+        from treating irrelevant context as "evidence". A scientific paper
+        about myelodysplasia should not count as evidence for a query
+        about Q4 2024 revenue.
 
-        Returns:
-            (is_conflict, conflict_type) - conflict_type describes the
-            nature of the conflict if found, None otherwise.
+        Uses direct embedding similarity - if the query and text are
+        about completely different topics, similarity will be low.
         """
-        vec_a = self._embed_text(text_a)
-        vec_b = self._embed_text(text_b)
-        opposing_pairs = self._get_opposing_vectors()
+        query_vec = self._embed_text(query)
+        text_vec = self._embed_text(text)
+        similarity = cosine_similarity(query_vec, text_vec)
+        return similarity >= self.relevance_threshold
 
-        for i, (concept_pos, concept_neg) in enumerate(opposing_pairs):
-            # Check if text_a aligns with positive and text_b with negative
-            sim_a_pos = cosine_similarity(vec_a, concept_pos)
-            sim_a_neg = cosine_similarity(vec_a, concept_neg)
-            sim_b_pos = cosine_similarity(vec_b, concept_pos)
-            sim_b_neg = cosine_similarity(vec_b, concept_neg)
-
-            # Conflict if one text strongly aligns with one side and
-            # the other text strongly aligns with the opposite side
-            a_is_positive = sim_a_pos >= self.conflict_threshold and sim_a_pos > sim_a_neg
-            a_is_negative = sim_a_neg >= self.conflict_threshold and sim_a_neg > sim_a_pos
-            b_is_positive = sim_b_pos >= self.conflict_threshold and sim_b_pos > sim_b_neg
-            b_is_negative = sim_b_neg >= self.conflict_threshold and sim_b_neg > sim_b_pos
-
-            if (a_is_positive and b_is_negative) or (a_is_negative and b_is_positive):
-                conflict_type = f"{OPPOSING_CONCEPTS[i][0]} vs {OPPOSING_CONCEPTS[i][1]}"
-                return True, conflict_type
-
-        return False, None
-
-    def find_conflicts(
-        self,
-        chunks: Sequence[Chunk],
-    ) -> list[tuple[str, str, str]]:
+    def chunk_relevance_score(self, query: str, chunk: Chunk) -> float:
         """
-        Find all conflicting claim pairs across chunks.
+        Get the relevance score between query and chunk.
 
-        Args:
-            chunks: Sequence of chunks to analyze
-
-        Returns:
-            List of (chunk_id_a, chunk_id_b, conflict_type) tuples
+        Returns similarity score in [0, 1] range.
         """
-        conflicts: list[tuple[str, str, str]] = []
+        query_vec = self._embed_text(query)
+        chunk_vec = self._embed_text(chunk.content)
+        return cosine_similarity(query_vec, chunk_vec)
 
-        # Compare all pairs
-        chunk_list = list(chunks)
-        for i in range(len(chunk_list)):
-            for j in range(i + 1, len(chunk_list)):
-                chunk_a = chunk_list[i]
-                chunk_b = chunk_list[j]
+    def count_relevant_chunks(self, query: str, chunks: Sequence[Chunk]) -> int:
+        """Count chunks that are semantically relevant to the query."""
+        return sum(1 for chunk in chunks if self.is_relevant_to_query(query, chunk.content))
 
-                is_conflict, conflict_type = self.detect_conflict(chunk_a.content, chunk_b.content)
-
-                if is_conflict and conflict_type:
-                    conflicts.append((chunk_a.id, chunk_b.id, conflict_type))
-
-        return conflicts
+    def get_relevant_chunks(self, query: str, chunks: Sequence[Chunk]) -> list[Chunk]:
+        """Filter chunks to only those relevant to the query."""
+        return [chunk for chunk in chunks if self.is_relevant_to_query(query, chunk.content)]
 
 
 __all__ = [
@@ -401,5 +345,4 @@ __all__ = [
     "CAUSAL_QUERY_CONCEPTS",
     "FACT_QUERY_CONCEPTS",
     "RESOLUTION_QUERY_CONCEPTS",
-    "OPPOSING_CONCEPTS",
 ]

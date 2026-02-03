@@ -10,12 +10,11 @@ from __future__ import annotations
 from typing import Sequence
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.core.answer_mode_resolver import resolve_answer_mode
+from fitz_ai.core.governance import AnswerGovernor
 from fitz_ai.core.guardrails import (
     ConstraintPlugin,
-    ConstraintResult,
-    SemanticMatcher,
     create_default_constraints,
+    run_constraints,
 )
 from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 from fitz_ai.engines.fitz_rag.exceptions import (
@@ -36,6 +35,7 @@ from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
 from fitz_ai.engines.fitz_rag.pipeline.components import (
     CloudComponents,
     GuardrailComponents,
+    ObservabilityComponents,
     PipelineComponents,
     RoutingComponents,
     StructuredComponents,
@@ -108,20 +108,22 @@ class RAGPipeline:
         self.rgs = components.rgs
         self.context = components.context or ContextPipeline()
 
+        # Unpack cloud components
+        cloud = components.cloud or CloudComponents()
+        self.embedder = cloud.embedder
+        self.cloud_client = cloud.client
+
         # Unpack guardrail components
         guardrails = components.guardrails or GuardrailComponents()
-        semantic_matcher = guardrails.semantic_matcher
 
         # Set up constraints with defaults
         if guardrails.constraints is None:
-            if semantic_matcher is None:
-                self.constraints: list[ConstraintPlugin] = []
-                logger.warning(
-                    f"{PIPELINE} No semantic_matcher provided, constraints disabled. "
-                    "Use RAGPipeline.from_config() for full constraint support."
-                )
-            else:
-                self.constraints = create_default_constraints(semantic_matcher)
+            # Simple architecture: LLM YES/NO for relevance/contradiction, keywords for causal
+            fast_chat = self.chat_factory("fast")
+            fast_model = getattr(fast_chat, "_model", "unknown")
+
+            logger.info(f"{PIPELINE} Creating simple constraints with fast_chat='{fast_model}'")
+            self.constraints = create_default_constraints(chat=fast_chat)
         else:
             self.constraints = list(guardrails.constraints)
 
@@ -131,11 +133,6 @@ class RAGPipeline:
         self.keyword_matcher = routing.keyword_matcher
         self.hop_controller = routing.hop_controller
 
-        # Unpack cloud components
-        cloud = components.cloud or CloudComponents()
-        self.embedder = cloud.embedder
-        self.cloud_client = cloud.client
-
         # Unpack structured components
         structured = components.structured or StructuredComponents()
         self.structured_router = structured.router
@@ -143,6 +140,10 @@ class RAGPipeline:
         self.sql_generator = structured.sql_generator
         self.result_formatter = structured.result_formatter
         self.derived_store = structured.derived_store
+
+        # Unpack observability components
+        observability = components.observability or ObservabilityComponents()
+        self._governance_logger = observability.governance_logger
 
         # Log initialization status
         routing_status = (
@@ -154,11 +155,13 @@ class RAGPipeline:
         )
         cloud_routing_status = "enabled" if cloud.is_enabled() else "disabled"
         structured_status = "enabled" if structured.is_enabled() else "disabled"
+        governance_status = "enabled" if observability.is_enabled() else "disabled"
         logger.info(
             f"{PIPELINE} RAGPipeline initialized with {self.retrieval.plugin_name} retrieval, "
             f"{len(self.constraints)} constraint(s), routing={routing_status}, "
             f"keywords={keyword_status}, multihop={multihop_status}, "
-            f"cloud_routing={cloud_routing_status}, structured={structured_status}"
+            f"cloud_routing={cloud_routing_status}, structured={structured_status}, "
+            f"governance_logging={governance_status}"
         )
 
     def _wrap_step(self, name: str, fn, *args, error_class=None, **kwargs):
@@ -252,12 +255,37 @@ class RAGPipeline:
                 )
             raw_chunks = filtered_chunks
 
-        # Step 2: Apply constraints
-        constraint_results = self._apply_all_constraints(query, raw_chunks)
+        # Step 2: Run constraints (preserves individual results)
+        constraint_results = run_constraints(query, raw_chunks, self.constraints)
 
-        # Step 3: Resolve answer mode from constraint signals
-        answer_mode = resolve_answer_mode(constraint_results)
-        logger.info(f"{PIPELINE} Answer mode resolved: {answer_mode.value}")
+        # Step 3: Governance decision (resolves mode from signals)
+        import time
+
+        governance_start = time.perf_counter()
+        governor = AnswerGovernor()
+        governance = governor.decide(constraint_results)
+        governance_ms = (time.perf_counter() - governance_start) * 1000
+
+        logger.info(
+            f"{PIPELINE} Governance decision: mode={governance.mode.value}, "
+            f"triggered={governance.triggered_constraints}"
+        )
+
+        # Log to PostgreSQL for observability (Phase 2: Governance Observability)
+        if self._governance_logger:
+            try:
+                self._governance_logger.log(
+                    decision=governance,
+                    query=query,
+                    chunks=raw_chunks,
+                    latency_ms=governance_ms,
+                )
+            except Exception as e:
+                # Fail-open: don't block pipeline on logging errors
+                logger.warning(f"{PIPELINE} Failed to log governance decision: {e}")
+
+        # Use governance.mode for downstream processing
+        answer_mode = governance.mode
 
         # Step 4: Process context (dedupe, group, merge, pack)
         chunks = self._wrap_step("Context processing", self.context.process, raw_chunks)
@@ -282,6 +310,12 @@ class RAGPipeline:
         # Step 7: Structure the answer with mode
         def _build_answer():
             answer = self.rgs.build_answer(raw, chunks, mode=answer_mode)
+
+            # Include governance explanation in metadata when not confident
+            if governance.user_explanation:
+                answer.metadata["governance_explanation"] = governance.user_explanation
+                answer.metadata["triggered_constraints"] = list(governance.triggered_constraints)
+
             logger.info(f"{PIPELINE} Pipeline run completed (mode={answer_mode.value})")
 
             # Step 8: Store in cloud cache
@@ -291,25 +325,6 @@ class RAGPipeline:
             return answer
 
         return self._wrap_step("Build RGS answer", _build_answer, error_class=RGSGenerationError)
-
-    def _apply_all_constraints(
-        self,
-        query: str,
-        chunks,
-    ) -> list[ConstraintResult]:
-        """Apply all constraints and return individual results."""
-        results: list[ConstraintResult] = []
-
-        for constraint in self.constraints:
-            try:
-                result = constraint.apply(query, chunks)
-                results.append(result)
-            except Exception as e:
-                logger.warning(f"{PIPELINE} Constraint '{constraint.name}' raised exception: {e}")
-                # Fail-safe: continue without this constraint's result
-                continue
-
-        return results
 
     def _handle_structured_prefetch(self, query: str) -> None:
         """
@@ -782,9 +797,6 @@ class RAGPipeline:
         )
         rgs = RGS(config=rgs_cfg)
 
-        # Create semantic matcher for constraints using the embedder
-        semantic_matcher = SemanticMatcher(embedder=embedder.embed)
-
         # Query router (routes global queries to L2 summaries)
         # Defaults: enabled=True, threshold=0.7
         query_router = QueryRouter(
@@ -860,6 +872,19 @@ class RAGPipeline:
                 logger.warning(f"{PIPELINE} Failed to initialize structured components: {e}")
                 structured_router = None
 
+        # Governance logger for observability (fail-open: disabled if storage unavailable)
+        governance_logger = None
+        try:
+            from fitz_ai.evaluation.logger import GovernanceLogger
+            from fitz_ai.storage.postgres import get_connection_manager
+
+            manager = get_connection_manager()
+            pool = manager.get_pool(cfg.collection)
+            governance_logger = GovernanceLogger(pool, collection=cfg.collection)
+            logger.info(f"{PIPELINE} Governance logging enabled for collection='{cfg.collection}'")
+        except Exception as e:
+            logger.debug(f"{PIPELINE} Governance logging disabled: {e}")
+
         logger.info(f"{PIPELINE} RAGPipeline successfully created")
 
         # Build component groups
@@ -870,7 +895,6 @@ class RAGPipeline:
             context=ContextPipeline(),
             guardrails=GuardrailComponents(
                 constraints=constraints,
-                semantic_matcher=semantic_matcher,
             ),
             routing=RoutingComponents(
                 query_router=query_router,
@@ -887,6 +911,9 @@ class RAGPipeline:
                 sql_generator=sql_generator,
                 result_formatter=result_formatter,
                 derived_store=derived_store,
+            ),
+            observability=ObservabilityComponents(
+                governance_logger=governance_logger,
             ),
         )
 

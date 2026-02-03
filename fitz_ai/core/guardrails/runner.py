@@ -2,7 +2,8 @@
 """
 Constraint Runner - Applies constraint plugins to retrieved context.
 
-This module provides the function that orchestrates constraint evaluation.
+Returns individual results from each constraint (not combined).
+Signal aggregation happens in the governance layer, not here.
 """
 
 from __future__ import annotations
@@ -18,16 +19,17 @@ from .base import ConstraintPlugin, ConstraintResult
 logger = get_logger(__name__)
 
 
-def apply_constraints(
+def run_constraints(
     query: str,
     chunks: Sequence[Chunk],
     constraints: Sequence[ConstraintPlugin],
-) -> ConstraintResult:
+) -> list[ConstraintResult]:
     """
-    Apply all constraints to retrieved context.
+    Apply all constraints and return individual results.
 
-    If ANY constraint denies a decisive answer, the combined result denies.
-    This is fail-safe: constraints only restrict, never expand.
+    Each constraint's result is preserved separately so signals
+    are not lost during aggregation. Signal resolution happens
+    in the governance layer via AnswerGovernor.decide().
 
     Args:
         query: The user's question
@@ -35,41 +37,46 @@ def apply_constraints(
         constraints: List of constraint plugins to apply
 
     Returns:
-        Combined ConstraintResult (deny if any constraint denies)
+        List of individual ConstraintResult objects (one per constraint)
     """
     if not constraints:
-        return ConstraintResult.allow()
+        return []
 
-    logger.debug(f"{PIPELINE} Applying {len(constraints)} constraint(s)")
+    logger.debug(f"{PIPELINE} Running {len(constraints)} constraint(s)")
 
-    denial_reasons: list[str] = []
-    all_metadata: dict = {}
+    results: list[ConstraintResult] = []
 
     for constraint in constraints:
         try:
             result = constraint.apply(query, chunks)
 
+            # Inject constraint name into metadata for traceability
             if not result.allow_decisive_answer:
+                # Create new result with constraint name in metadata
+                metadata = dict(result.metadata)
+                metadata["constraint_name"] = constraint.name
+                result = ConstraintResult(
+                    allow_decisive_answer=result.allow_decisive_answer,
+                    reason=result.reason,
+                    signal=result.signal,
+                    metadata=metadata,
+                )
                 logger.info(f"{PIPELINE} Constraint '{constraint.name}' denied: {result.reason}")
-                if result.reason:
-                    denial_reasons.append(result.reason)
-                all_metadata[constraint.name] = result.metadata
+            else:
+                logger.debug(f"{PIPELINE} Constraint '{constraint.name}' passed")
+
+            results.append(result)
 
         except Exception as e:
-            # Fail-safe: if constraint crashes, log and continue
+            # Fail-safe: if constraint crashes, log and skip
             # Do NOT block the answer due to constraint errors
             logger.warning(f"{PIPELINE} Constraint '{constraint.name}' raised exception: {e}")
             continue
 
-    if denial_reasons:
-        combined_reason = "; ".join(denial_reasons)
-        return ConstraintResult.deny(
-            reason=combined_reason,
-            constraint_results=all_metadata,
-        )
+    denied_count = sum(1 for r in results if not r.allow_decisive_answer)
+    logger.debug(f"{PIPELINE} Constraints complete: {denied_count} denied")
 
-    logger.debug(f"{PIPELINE} All constraints passed")
-    return ConstraintResult.allow()
+    return results
 
 
-__all__ = ["apply_constraints"]
+__all__ = ["run_constraints"]

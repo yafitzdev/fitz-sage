@@ -3,14 +3,16 @@
 Tests for the Constraint Plugin system.
 
 These tests verify:
-1. ConflictAwareConstraint detects contradictions
+1. ConflictAwareConstraint detects contradictions using simple YES/NO stance detection
 2. Resolution queries bypass conflict detection
 3. Pipeline integration works correctly
 
-Uses semantic matching with mock embedder for testing.
+Uses mock chat provider for stance detection.
 """
 
 from __future__ import annotations
+
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -18,14 +20,12 @@ import pytest
 pytestmark = pytest.mark.tier1
 
 from fitz_ai.core.chunk import Chunk
+from fitz_ai.core.governance import AnswerGovernor
 from fitz_ai.core.guardrails import (
     ConflictAwareConstraint,
     ConstraintResult,
-    SemanticMatcher,
-    apply_constraints,
+    run_constraints,
 )
-
-from .mock_embedder import create_deterministic_embedder
 
 # =============================================================================
 # Test Data
@@ -43,17 +43,42 @@ def make_chunk(id: str, content: str) -> Chunk:
     )
 
 
+def create_mock_chat_yes_no(stances: list[str]):
+    """
+    Create a mock chat provider that returns YES/NO stances.
+
+    Args:
+        stances: List of responses for each call ("YES", "NO", or "UNCLEAR")
+    """
+    mock = MagicMock()
+    mock.chat.side_effect = stances
+    return mock
+
+
+def create_mock_chat_no_conflict():
+    """Mock chat that returns AGREE (no contradiction) for pairwise checks."""
+    mock = MagicMock()
+    mock.chat.return_value = "AGREE"
+    return mock
+
+
+def create_mock_chat_with_conflict():
+    """Mock chat that returns CONTRADICT for pairwise checks."""
+    mock = MagicMock()
+    mock.chat.return_value = "CONTRADICT"
+    return mock
+
+
 @pytest.fixture
-def semantic_matcher() -> SemanticMatcher:
-    """Create a semantic matcher with mock embedder for testing."""
-    embedder = create_deterministic_embedder()
-    return SemanticMatcher(
-        embedder=embedder,
-        causal_threshold=0.70,
-        assertion_threshold=0.70,
-        query_threshold=0.70,
-        conflict_threshold=0.70,
-    )
+def mock_chat_no_conflict():
+    """Mock chat that returns no conflicts."""
+    return create_mock_chat_no_conflict()
+
+
+@pytest.fixture
+def mock_chat_with_conflict():
+    """Mock chat that returns a conflict."""
+    return create_mock_chat_with_conflict()
 
 
 # =============================================================================
@@ -82,11 +107,15 @@ class TestConstraintResult:
 
 
 class TestConflictAwareConstraint:
-    """Test the default conflict detection constraint."""
+    """Test the default conflict detection constraint.
 
-    def test_no_conflict_allows_answer(self, semantic_matcher):
+    Note: ConflictAwareConstraint now uses simple YES/NO stance detection.
+    Tests use mock chat providers to simulate LLM responses.
+    """
+
+    def test_no_conflict_allows_answer(self, mock_chat_no_conflict):
         """Should allow decisive answer when no conflicts."""
-        constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher)
+        constraint = ConflictAwareConstraint(chat=mock_chat_no_conflict)
 
         chunks = [
             make_chunk("1", "Incident 17B was a security incident."),
@@ -97,9 +126,9 @@ class TestConflictAwareConstraint:
 
         assert result.allow_decisive_answer is True
 
-    def test_detects_security_vs_operational_conflict(self, semantic_matcher):
-        """Should detect conflicting security vs operational classifications."""
-        constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher)
+    def test_detects_conflict_via_stance(self, mock_chat_with_conflict):
+        """Should detect conflicts when stances are YES vs NO."""
+        constraint = ConflictAwareConstraint(chat=mock_chat_with_conflict)
 
         chunks = [
             make_chunk("1", "Incident 17B was a security incident with unauthorized access."),
@@ -111,18 +140,28 @@ class TestConflictAwareConstraint:
         result = constraint.apply("Was Incident 17B a security incident?", chunks)
 
         assert result.allow_decisive_answer is False
+        assert result.signal == "disputed"
 
-    def test_empty_chunks_allows_answer(self, semantic_matcher):
+    def test_empty_chunks_allows_answer(self, mock_chat_with_conflict):
         """Should allow when no chunks retrieved."""
-        constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher)
+        constraint = ConflictAwareConstraint(chat=mock_chat_with_conflict)
 
         result = constraint.apply("Any question?", [])
 
         assert result.allow_decisive_answer is True
 
-    def test_disabled_constraint_always_allows(self, semantic_matcher):
+    def test_single_chunk_allows_answer(self, mock_chat_with_conflict):
+        """Should allow when only one chunk (can't have conflict)."""
+        constraint = ConflictAwareConstraint(chat=mock_chat_with_conflict)
+
+        chunks = [make_chunk("1", "This is a security incident.")]
+        result = constraint.apply("What type?", chunks)
+
+        assert result.allow_decisive_answer is True
+
+    def test_disabled_constraint_always_allows(self, mock_chat_with_conflict):
         """Should allow when constraint is disabled."""
-        constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher, enabled=False)
+        constraint = ConflictAwareConstraint(chat=mock_chat_with_conflict, enabled=False)
 
         chunks = [
             make_chunk("1", "This is a security incident."),
@@ -133,16 +172,16 @@ class TestConflictAwareConstraint:
 
         assert result.allow_decisive_answer is True
 
-    def test_resolution_query_allows_despite_conflict(self, semantic_matcher):
+    def test_resolution_query_allows_despite_conflict(self, mock_chat_with_conflict):
         """Should allow decisive answer when query asks for resolution."""
-        constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher)
+        constraint = ConflictAwareConstraint(chat=mock_chat_with_conflict)
 
         chunks = [
             make_chunk("1", "Source A says: security incident."),
             make_chunk("2", "Source B says: operational incident."),
         ]
 
-        # Explicitly asking for resolution
+        # Explicitly asking for resolution - this bypasses conflict detection
         result = constraint.apply(
             "Which classification should be considered authoritative, and why?",
             chunks,
@@ -150,56 +189,86 @@ class TestConflictAwareConstraint:
 
         assert result.allow_decisive_answer is True
 
-    def test_detects_trend_conflict_improved_vs_declined(self, semantic_matcher):
-        """Should detect conflicting trend claims."""
-        constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher)
+    def test_no_chat_skips_conflict_detection(self):
+        """Should skip conflict detection when no chat provider available."""
+        constraint = ConflictAwareConstraint(chat=None)
 
         chunks = [
-            make_chunk("1", "Customer satisfaction improved significantly this quarter."),
-            make_chunk("2", "Customer satisfaction declined compared to last year."),
+            make_chunk("1", "This is a security incident."),
+            make_chunk("2", "This is an operational incident."),
         ]
 
-        result = constraint.apply("How did customer satisfaction change?", chunks)
+        # Without chat, conflict detection is skipped
+        result = constraint.apply("What type?", chunks)
 
-        assert result.allow_decisive_answer is False
+        assert result.allow_decisive_answer is True
 
-    def test_detects_sentiment_conflict(self, semantic_matcher):
-        """Should detect conflicting sentiment claims."""
-        constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher)
+    def test_llm_error_gracefully_allows(self):
+        """Should gracefully handle LLM errors and allow."""
+        mock_chat = MagicMock()
+        mock_chat.chat.side_effect = Exception("LLM error")
+
+        constraint = ConflictAwareConstraint(chat=mock_chat)
 
         chunks = [
-            make_chunk("1", "The overall feedback was positive."),
-            make_chunk("2", "Customer response was negative."),
+            make_chunk("1", "Positive feedback."),
+            make_chunk("2", "Negative feedback."),
         ]
 
-        result = constraint.apply("What was the customer feedback?", chunks)
+        result = constraint.apply("What was the feedback?", chunks)
 
-        assert result.allow_decisive_answer is False
+        # Errors should not block the answer (returns UNCLEAR for both)
+        assert result.allow_decisive_answer is True
 
-    def test_detects_state_conflict_successful_vs_failed(self, semantic_matcher):
-        """Should detect conflicting state claims."""
-        constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher)
+    def test_unclear_stances_allow_answer(self):
+        """Should allow when all stances are UNCLEAR."""
+        mock_chat = MagicMock()
+        mock_chat.chat.return_value = "UNCLEAR"
+
+        constraint = ConflictAwareConstraint(chat=mock_chat)
 
         chunks = [
-            make_chunk("1", "The deployment was successful and completed."),
-            make_chunk("2", "The deployment failed with errors."),
+            make_chunk("1", "Some tangential information."),
+            make_chunk("2", "Other tangential information."),
         ]
 
-        result = constraint.apply("Was the deployment successful?", chunks)
+        result = constraint.apply("What happened?", chunks)
 
-        assert result.allow_decisive_answer is False
+        # UNCLEAR stances don't create conflict
+        assert result.allow_decisive_answer is True
 
-    def test_no_conflict_for_agreeing_trends(self, semantic_matcher):
-        """Should not flag conflict when trends agree."""
-        constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher)
+    def test_mixed_yes_unclear_allows_answer(self):
+        """Should allow when stances are YES and UNCLEAR (no NO)."""
+        mock_chat = MagicMock()
+        mock_chat.chat.side_effect = ["YES", "UNCLEAR"]
+
+        constraint = ConflictAwareConstraint(chat=mock_chat)
 
         chunks = [
-            make_chunk("1", "Sales improved this quarter."),
-            make_chunk("2", "Revenue also improved significantly."),
+            make_chunk("1", "Yes, it was approved."),
+            make_chunk("2", "The project involved many stakeholders."),
         ]
 
-        result = constraint.apply("How did the business perform?", chunks)
+        result = constraint.apply("Was it approved?", chunks)
 
+        # YES + UNCLEAR is not a conflict
+        assert result.allow_decisive_answer is True
+
+    def test_mixed_no_unclear_allows_answer(self):
+        """Should allow when stances are NO and UNCLEAR (no YES)."""
+        mock_chat = MagicMock()
+        mock_chat.chat.side_effect = ["NO", "UNCLEAR"]
+
+        constraint = ConflictAwareConstraint(chat=mock_chat)
+
+        chunks = [
+            make_chunk("1", "The proposal was rejected."),
+            make_chunk("2", "Budget discussions continued."),
+        ]
+
+        result = constraint.apply("Was it approved?", chunks)
+
+        # NO + UNCLEAR is not a conflict
         assert result.allow_decisive_answer is True
 
 
@@ -208,29 +277,32 @@ class TestConflictAwareConstraint:
 # =============================================================================
 
 
-class TestApplyConstraints:
+class TestRunConstraints:
     """Test the constraint runner."""
 
-    def test_no_constraints_allows(self):
-        """Should allow when no constraints configured."""
-        result = apply_constraints("query", [], [])
-        assert result.allow_decisive_answer is True
+    def test_no_constraints_returns_empty(self):
+        """Should return empty list when no constraints configured."""
+        results = run_constraints("query", [], [])
+        assert results == []
 
-    def test_single_constraint_deny(self, semantic_matcher):
-        """Should deny when single constraint denies."""
-        constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher)
+    def test_single_constraint_deny(self, mock_chat_with_conflict):
+        """Should preserve denial signal when single constraint denies."""
+        constraint = ConflictAwareConstraint(chat=mock_chat_with_conflict)
 
         chunks = [
             make_chunk("1", "This is a security incident with unauthorized access."),
             make_chunk("2", "This is an operational incident from misconfiguration."),
         ]
 
-        result = apply_constraints("What type?", chunks, [constraint])
+        results = run_constraints("What type?", chunks, [constraint])
+        governor = AnswerGovernor()
+        decision = governor.decide(results)
 
-        assert result.allow_decisive_answer is False
+        assert decision.mode.value in ("disputed", "qualified", "abstain")
+        assert not decision.is_confident
 
     def test_multiple_constraints_any_deny(self):
-        """Should deny if any constraint denies."""
+        """Should preserve all signals when multiple constraints deny."""
 
         class AlwaysAllowConstraint:
             name = "always_allow"
@@ -246,10 +318,12 @@ class TestApplyConstraints:
 
         constraints = [AlwaysAllowConstraint(), AlwaysDenyConstraint()]
 
-        result = apply_constraints("query", [], constraints)
+        results = run_constraints("query", [], constraints)
+        governor = AnswerGovernor()
+        decision = governor.decide(results)
 
-        assert result.allow_decisive_answer is False
-        assert "test denial" in result.reason
+        assert not decision.is_confident
+        assert "test denial" in decision.reasons
 
     def test_constraint_exception_continues(self):
         """Should continue if a constraint raises an exception."""
@@ -269,9 +343,11 @@ class TestApplyConstraints:
         constraints = [CrashingConstraint(), WorkingConstraint()]
 
         # Should not raise, should allow (fail-safe)
-        result = apply_constraints("query", [], constraints)
+        results = run_constraints("query", [], constraints)
+        governor = AnswerGovernor()
+        decision = governor.decide(results)
 
-        assert result.allow_decisive_answer is True
+        assert decision.is_confident
 
 
 # =============================================================================
@@ -286,7 +362,7 @@ class TestAcceptanceCriteria:
     These are the key behavioral tests that must pass.
     """
 
-    def test_contradiction_query_must_surface_disagreement(self, semantic_matcher):
+    def test_contradiction_query_must_surface_disagreement(self, mock_chat_with_conflict):
         """
         Acceptance test: Contradiction detection.
 
@@ -295,7 +371,7 @@ class TestAcceptanceCriteria:
         With conflicting docs, the constraint MUST deny decisive answer.
         The system should then surface disagreement (handled by generation).
         """
-        constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher)
+        constraint = ConflictAwareConstraint(chat=mock_chat_with_conflict)
 
         chunks = [
             make_chunk(
@@ -316,7 +392,7 @@ class TestAcceptanceCriteria:
         assert result.allow_decisive_answer is False
         assert result.reason is not None
 
-    def test_authority_resolution_query_allowed(self, semantic_matcher):
+    def test_authority_resolution_query_allowed(self, mock_chat_with_conflict):
         """
         Acceptance test: Authority resolution.
 
@@ -325,7 +401,8 @@ class TestAcceptanceCriteria:
         Even with conflicting docs, this query explicitly asks for resolution,
         so the constraint should allow a decisive answer.
         """
-        constraint = ConflictAwareConstraint(semantic_matcher=semantic_matcher)
+        # Note: resolution query bypasses stance check entirely
+        constraint = ConflictAwareConstraint(chat=mock_chat_with_conflict)
 
         chunks = [
             make_chunk(

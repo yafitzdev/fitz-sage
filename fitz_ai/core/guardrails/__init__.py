@@ -7,70 +7,123 @@ They are orthogonal to retrieval (what's relevant) and generation (how to answer
 
 This is a core platform capability supporting epistemic honesty across all engines.
 
-All guardrails use semantic embedding similarity for language-agnostic detection.
-This means they work across any language supported by the embedding model.
+## Two Modes
 
-Default guardrails (all enabled by default):
-- ConflictAwareConstraint: blocks confident answers when sources contradict
-- InsufficientEvidenceConstraint: blocks confident answers without explicit evidence
-- CausalAttributionConstraint: prevents implicit causality claims
+1. **LLM-based** (create_default_constraints):
+   - Uses LLM for contradiction detection
+   - Subject to model variance
+   - Better for edge cases
+
+2. **Deterministic** (create_deterministic_constraints):
+   - Uses embeddings + regex for contradiction detection
+   - No LLM variance - fully deterministic
+   - Tunable thresholds
+   - Explainable results
 
 Usage:
     from fitz_ai.core.guardrails import (
         ConstraintResult,
-        ConstraintPlugin,
-        SemanticMatcher,
-        create_default_constraints,
-        apply_constraints,
+        create_deterministic_constraints,
+        run_constraints,
     )
+    from fitz_ai.core.governance import AnswerGovernor
 
-    # Create semantic matcher with your embedder
-    matcher = SemanticMatcher(embedder=my_embedder.embed)
+    # Deterministic constraints (recommended)
+    constraints = create_deterministic_constraints(embedder=embed_func)
 
-    # Get default constraints
-    constraints = create_default_constraints(matcher)
-
-    # Apply to query + chunks
-    result = apply_constraints(query, chunks, constraints)
+    # Run constraints and get governance decision
+    results = run_constraints(query, chunks, constraints)
+    decision = AnswerGovernor().decide(results)
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from .base import ConstraintPlugin, ConstraintResult
 from .plugins.causal_attribution import CausalAttributionConstraint
 from .plugins.conflict_aware import ConflictAwareConstraint
+from .plugins.deterministic_conflict import DeterministicConflictConstraint
+from .plugins.governance_analyzer import GovernanceAnalyzer
 from .plugins.insufficient_evidence import InsufficientEvidenceConstraint
-from .runner import apply_constraints
+from .runner import run_constraints
 from .semantic import SemanticMatcher
 
 if TYPE_CHECKING:
+    from fitz_ai.llm.providers.base import ChatProvider
+
     from .semantic import EmbedderFunc
+
+# Type alias
+EmbedderFunc = Callable[[str], list[float]]
+
+
+def create_deterministic_constraints(
+    embedder: EmbedderFunc,
+    similarity_threshold: float = 0.6,
+    relevance_threshold: float = 0.4,
+) -> list[ConstraintPlugin]:
+    """
+    Create deterministic constraint plugins using embeddings + regex.
+
+    NO LLM calls. Fully deterministic. Tunable thresholds.
+
+    Pipeline:
+    - Abstention: embedding similarity (query ↔ chunks) < relevance_threshold
+    - Dispute: embedding similarity (chunk ↔ chunk) > similarity_threshold AND antonym pairs
+    - Qualification: keyword-based causal detection (already deterministic)
+
+    Args:
+        embedder: Function to embed text into vectors
+        similarity_threshold: Min similarity to consider "same topic" for contradiction (default: 0.6)
+        relevance_threshold: Min similarity to consider chunks relevant to query (default: 0.4)
+
+    Returns:
+        List of deterministic constraint plugins
+    """
+    return [
+        # Embedding-based relevance check
+        InsufficientEvidenceConstraint(
+            embedder=embedder,
+            min_similarity=relevance_threshold,
+        ),
+        # Keywords: "why" query + no "because" evidence
+        CausalAttributionConstraint(),
+        # Embeddings + regex antonyms: no LLM variance
+        DeterministicConflictConstraint(
+            embedder=embedder,
+            similarity_threshold=similarity_threshold,
+        ),
+    ]
 
 
 def create_default_constraints(
-    semantic_matcher: SemanticMatcher,
+    chat: "ChatProvider | None" = None,
+    # Legacy parameters - kept for backwards compatibility but ignored
+    semantic_matcher: SemanticMatcher | None = None,
+    embedder: "EmbedderFunc | None" = None,
 ) -> list[ConstraintPlugin]:
     """
-    Create the default constraint plugins with a shared semantic matcher.
+    Create the default constraint plugins using LLM-based detection.
 
-    All constraints share the same SemanticMatcher instance for efficiency
-    (concept vectors are cached and reused).
+    Note: Subject to LLM model variance. For deterministic results,
+    use create_deterministic_constraints() instead.
 
     Args:
-        semantic_matcher: SemanticMatcher instance with configured embedder
+        chat: ChatProvider for LLM-based contradiction detection
+        semantic_matcher: DEPRECATED - ignored
+        embedder: DEPRECATED - ignored
 
     Returns:
-        List of default constraint plugins:
-        - ConflictAwareConstraint
-        - InsufficientEvidenceConstraint
-        - CausalAttributionConstraint
+        List of constraint plugins
     """
     return [
-        ConflictAwareConstraint(semantic_matcher=semantic_matcher),
-        InsufficientEvidenceConstraint(semantic_matcher=semantic_matcher),
-        CausalAttributionConstraint(semantic_matcher=semantic_matcher),
+        # Empty context only - abstain if no chunks retrieved
+        InsufficientEvidenceConstraint(),
+        # Keywords: "why" query + no "because" evidence
+        CausalAttributionConstraint(),
+        # LLM pairwise comparison: detect contradictions
+        ConflictAwareConstraint(chat=chat),
     ]
 
 
@@ -78,11 +131,10 @@ def create_semantic_matcher(embedder: "EmbedderFunc") -> SemanticMatcher:
     """
     Create a SemanticMatcher with the given embedder function.
 
-    This is a convenience factory for creating a SemanticMatcher.
+    DEPRECATED: Use create_deterministic_constraints() instead.
 
     Args:
         embedder: Function that converts text to embedding vector.
-                  Signature: (text: str) -> list[float]
 
     Returns:
         Configured SemanticMatcher instance
@@ -96,11 +148,15 @@ __all__ = [
     "ConstraintPlugin",
     "SemanticMatcher",
     # Constraint implementations
+    "GovernanceAnalyzer",
     "ConflictAwareConstraint",
+    "DeterministicConflictConstraint",
     "InsufficientEvidenceConstraint",
     "CausalAttributionConstraint",
-    # Functions
-    "apply_constraints",
+    # Factory functions
+    "create_deterministic_constraints",
     "create_default_constraints",
     "create_semantic_matcher",
+    # Runner
+    "run_constraints",
 ]

@@ -232,9 +232,11 @@ def ingest_table(
 
 def _register_subcommands() -> None:
     """Register subcommand groups with lazy imports."""
+    from fitz_ai.cli.commands.eval import app as eval_app
     from fitz_ai.cli.commands.keywords import app as keywords_app
     from fitz_ai.cli.commands.tables import app as tables_app
 
+    app.add_typer(eval_app, name="eval")
     app.add_typer(keywords_app, name="keywords")
     app.add_typer(tables_app, name="tables")
 

@@ -1,5 +1,5 @@
 # fitz_ai/core/chunk.py
-"""Chunk - fundamental unit of knowledge. See docs/api_reference.md for examples."""
+"""Chunk - fundamental unit of knowledge. See docs/API_REFERENCE.md for examples."""
 
 from __future__ import annotations
 

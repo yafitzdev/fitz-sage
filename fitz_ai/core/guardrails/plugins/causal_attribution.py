@@ -1,58 +1,265 @@
 # fitz_ai/core/guardrails/plugins/causal_attribution.py
 """
-Causal Attribution Constraint - Prevents implicit causality claims.
+Causal Attribution Constraint - Prevents implicit causality and speculation.
 
-This constraint prevents the system from synthesizing causal explanations
-when documents only describe outcomes without explicit causal language.
+This constraint prevents the system from:
+1. Synthesizing causal explanations when documents only describe outcomes
+2. Making predictions when documents only contain historical data
+3. Providing opinions/recommendations when documents only contain facts
 
-Uses semantic matching for language-agnostic causal detection.
+Uses simple keyword detection - no embeddings, no thresholds.
 
-It enforces: "Don't invent causality that isn't explicitly stated."
-
-This is NOT reasoning suppression. It's epistemic honesty enforcement.
+It enforces: "Don't extrapolate beyond what the evidence explicitly states."
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Sequence
+import re
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Sequence
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
 from ..base import ConstraintResult
-from ..semantic import SemanticMatcher
 
 logger = get_logger(__name__)
 
 
-# =============================================================================
-# Constraint Implementation
-# =============================================================================
+# Keywords that indicate a causal query
+CAUSAL_QUERY_PATTERNS = (
+    "why ",
+    "why?",
+    "what caused",
+    "what led to",
+    "what leads to",
+    "explain why",
+    "what's the reason",
+    "what is the reason",
+    "how come",
+    "what made",
+)
+
+# Keywords that indicate predictive queries (future-oriented)
+PREDICTIVE_QUERY_PATTERNS = (
+    "will ",
+    "will?",
+    "what will",
+    "how will",
+    "next week",
+    "next month",
+    "next year",
+    "next quarter",
+    "by year end",
+    "going to be",
+    "going to happen",
+    "be like in",
+    "forecast",
+    "predict",
+    "projection",
+    "outlook",
+    "expect",
+    "estimate for",
+    "anticipated",
+)
+
+# Keywords that indicate opinion/judgment queries
+OPINION_QUERY_PATTERNS = (
+    "should we",
+    "should i",
+    "is it better",
+    "is it best",
+    "which is better",
+    "which is best",
+    "what's the best",
+    "what is the best",
+    "recommend",
+    "is it worth",
+    "is this effective",
+    "is this adequate",
+    "based on",  # "Based on X, should we..."
+    " better for ",  # "Is X better for Y?"
+    " better than ",  # "Is X better than Y?"
+    " best for ",  # "What is best for X?"
+)
+
+# Keywords that indicate speculative queries
+SPECULATIVE_QUERY_PATTERNS = (
+    "what percentage will",
+    "how many will",
+    "what impact will",
+    "will succeed",
+    "will fail",
+    "will be approved",
+    "will become",
+    "be successful",
+    "be mainstream",
+)
+
+# Keywords that indicate causal evidence in text
+CAUSAL_EVIDENCE_KEYWORDS = (
+    "because",
+    "due to",
+    "caused by",
+    "led to",
+    "leads to",
+    "as a result",
+    "result of",
+    "therefore",
+    "thus",
+    "consequently",
+    "owing to",
+    "reason is",
+    "reason was",
+    "the cause",
+    "attributed to",
+)
+
+# Keywords that indicate predictive/forward-looking evidence
+PREDICTIVE_EVIDENCE_KEYWORDS = (
+    "forecast",
+    "projected",
+    "prediction",
+    "expected to",
+    "likely to",
+    "will likely",
+    "estimated to reach",
+    "anticipated",
+    "outlook",
+)
+
+
+def _is_causal_query(query: str) -> bool:
+    """Check if query is asking for causal explanation using keywords."""
+    q = query.lower().strip()
+    return any(pattern in q for pattern in CAUSAL_QUERY_PATTERNS)
+
+
+def _mentions_future_year(query: str) -> bool:
+    """Check if query mentions a future year (e.g., 'in 2026' when current year is 2025)."""
+    current_year = datetime.now().year
+    # Match patterns like "in 2025", "by 2026", "2027 forecast"
+    year_pattern = r"\b(20\d{2})\b"
+    matches = re.findall(year_pattern, query)
+    for year_str in matches:
+        year = int(year_str)
+        if year > current_year:
+            return True
+    return False
+
+
+def _is_predictive_query(query: str) -> bool:
+    """Check if query is asking for predictions about the future."""
+    q = query.lower().strip()
+    if any(pattern in q for pattern in PREDICTIVE_QUERY_PATTERNS):
+        return True
+    # Also check for future year mentions
+    return _mentions_future_year(query)
+
+
+def _is_opinion_query(query: str) -> bool:
+    """Check if query is asking for opinions, recommendations, or judgments."""
+    q = query.lower().strip()
+    if any(pattern in q for pattern in OPINION_QUERY_PATTERNS):
+        return True
+    # Regex patterns for comparative questions: "Is X better", "Which X is better"
+    comparative_patterns = [
+        r"^is\s+\w+.*\s+better",  # "Is remote work better..."
+        r"^which\s+\w+.*\s+better",  # "Which framework is better..."
+        r"^which\s+\w+.*\s+best",  # "Which option is best..."
+        r"\bbetter\s*\?",  # ends with "better?"
+        r"\bbest\s*\?",  # ends with "best?"
+    ]
+    return any(re.search(p, q) for p in comparative_patterns)
+
+
+def _is_speculative_query(query: str) -> bool:
+    """Check if query requires speculation beyond available facts."""
+    q = query.lower().strip()
+    return any(pattern in q for pattern in SPECULATIVE_QUERY_PATTERNS)
+
+
+def _is_uncertainty_query(query: str) -> tuple[bool, str]:
+    """
+    Check if query requires qualification due to inherent uncertainty.
+
+    Returns (is_uncertainty_query, query_type).
+    """
+    if _is_causal_query(query):
+        return True, "causal"
+    if _is_predictive_query(query):
+        return True, "predictive"
+    if _is_opinion_query(query):
+        return True, "opinion"
+    if _is_speculative_query(query):
+        return True, "speculative"
+    return False, "none"
+
+
+def _has_causal_evidence(chunks: Sequence[Chunk]) -> bool:
+    """Check if any chunk contains causal language using keywords.
+
+    Only checks raw content - NOT summaries. LLM-generated summaries often
+    use causal language in a meta way ("This describes X because...") which
+    creates false positives for evidence detection.
+    """
+    for chunk in chunks:
+        content = chunk.content.lower()
+        if any(kw in content for kw in CAUSAL_EVIDENCE_KEYWORDS):
+            return True
+
+    return False
+
+
+def _has_predictive_evidence(chunks: Sequence[Chunk]) -> bool:
+    """Check if any chunk contains forward-looking/predictive language.
+
+    Only checks raw content - NOT summaries (same rationale as causal evidence).
+    """
+    for chunk in chunks:
+        content = chunk.content.lower()
+        if any(kw in content for kw in PREDICTIVE_EVIDENCE_KEYWORDS):
+            return True
+
+    return False
+
+
+def _has_appropriate_evidence(query_type: str, chunks: Sequence[Chunk]) -> bool:
+    """Check if chunks have evidence appropriate to the query type."""
+    if query_type == "causal":
+        return _has_causal_evidence(chunks)
+    elif query_type in ("predictive", "speculative"):
+        return _has_predictive_evidence(chunks)
+    elif query_type == "opinion":
+        # Opinion queries almost never have definitive evidence
+        # Would need explicit recommendations in the text
+        return False
+    return True
 
 
 @dataclass
 class CausalAttributionConstraint:
     """
-    Constraint that prevents implicit causal synthesis.
+    Constraint that prevents implicit causal synthesis and speculation.
 
-    When a query requests causal explanation (why, what caused, etc.),
-    this constraint verifies that retrieved documents contain explicit
-    causal language before allowing a causal answer.
+    Uses simple keyword detection to identify queries that require qualification:
+    - Causal queries: "why", "what caused" → need "because", "due to"
+    - Predictive queries: "will", "next year" → need forecasts/projections
+    - Opinion queries: "should we", "is it better" → almost always qualified
+    - Speculative queries: "will succeed" → need explicit predictions
 
-    Uses semantic embedding similarity for language-agnostic detection.
+    If query asks for extrapolation but chunks only have facts → QUALIFIED.
 
-    This prevents the LLM from inventing causal relationships that
-    aren't explicitly stated in the evidence.
+    No embeddings, no thresholds - just keyword matching.
 
     Attributes:
-        semantic_matcher: SemanticMatcher instance for embedding-based detection
         enabled: Whether this constraint is active (default: True)
     """
 
-    semantic_matcher: SemanticMatcher
     enabled: bool = True
+    _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     @property
     def name(self) -> str:
@@ -64,43 +271,43 @@ class CausalAttributionConstraint:
         chunks: Sequence[Chunk],
     ) -> ConstraintResult:
         """
-        Check if causal queries have explicit causal evidence.
+        Check if uncertainty queries have sufficient evidence.
 
         Args:
             query: The user's question
             chunks: Retrieved chunks
 
         Returns:
-            ConstraintResult - denies causal synthesis if no explicit causal evidence
+            ConstraintResult - denies confident answer if evidence is insufficient
         """
         if not self.enabled:
-            return ConstraintResult.allow()
-
-        # Only applies to causal queries
-        if not self.semantic_matcher.is_causal_query(query):
             return ConstraintResult.allow()
 
         # Empty chunks - defer to InsufficientEvidenceConstraint
         if not chunks:
             return ConstraintResult.allow()
 
-        # Check for explicit causal language using semantic matching
-        causal_count = self.semantic_matcher.count_causal_chunks(chunks)
+        # Check if query requires qualification
+        is_uncertainty, query_type = _is_uncertainty_query(query)
 
-        if causal_count > 0:
-            logger.debug(f"{PIPELINE} CausalAttributionConstraint: causal evidence found")
+        if not is_uncertainty:
+            logger.debug(f"{PIPELINE} CausalAttributionConstraint: not an uncertainty query")
             return ConstraintResult.allow()
 
-        # Causal query but no explicit causal language in evidence
-        logger.info(
-            f"{PIPELINE} CausalAttributionConstraint: causal query but no explicit "
-            f"causal language in {len(chunks)} chunks"
-        )
+        # Check if chunks have appropriate evidence
+        if _has_appropriate_evidence(query_type, chunks):
+            logger.debug(f"{PIPELINE} CausalAttributionConstraint: {query_type} evidence found")
+            return ConstraintResult.allow()
 
+        # Uncertainty query without appropriate evidence - deny
+        logger.info(
+            f"{PIPELINE} CausalAttributionConstraint: {query_type} query but no "
+            f"supporting evidence"
+        )
         return ConstraintResult.deny(
-            reason="No explicit causal language found in sources",
-            signal="qualified",  # Not abstain - we have evidence, just not causal
-            causal_chunks=causal_count,
+            reason=f"{query_type.capitalize()} query but no supporting evidence in context",
+            signal="qualified",
+            query_type=query_type,
             total_chunks=len(chunks),
         )
 

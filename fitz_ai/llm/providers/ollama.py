@@ -20,9 +20,9 @@ DEFAULT_BASE_URL = "http://localhost:11434"
 
 # Default models by tier (common Ollama models)
 CHAT_MODELS: dict[ModelTier, str] = {
-    "smart": "llama3.1:70b",
-    "balanced": "llama3.1:8b",
-    "fast": "llama3.1:8b",
+    "smart": "qwen2.5:14b",
+    "balanced": "qwen2.5:7b",
+    "fast": "qwen2.5:3b",
 }
 
 EMBEDDING_MODEL = "nomic-embed-text"
@@ -63,6 +63,16 @@ class OllamaChat:
             "messages": messages,
             "stream": False,
         }
+
+        # Map standard parameters to Ollama options format
+        options = params.pop("options", {})
+        if "max_tokens" in params:
+            options["num_predict"] = params.pop("max_tokens")
+        if "temperature" in params:
+            options["temperature"] = params.pop("temperature")
+        if options:
+            payload["options"] = options
+
         payload.update(params)
 
         response = self._client.post("/api/chat", json=payload)
@@ -82,6 +92,16 @@ class OllamaChat:
             "messages": messages,
             "stream": True,
         }
+
+        # Map standard parameters to Ollama options format
+        options = params.pop("options", {})
+        if "max_tokens" in params:
+            options["num_predict"] = params.pop("max_tokens")
+        if "temperature" in params:
+            options["temperature"] = params.pop("temperature")
+        if options:
+            payload["options"] = options
+
         payload.update(params)
 
         with self._client.stream("POST", "/api/chat", json=payload) as response:

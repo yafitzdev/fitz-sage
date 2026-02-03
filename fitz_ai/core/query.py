@@ -1,4 +1,4 @@
-"""Query - paradigm-agnostic query representation. See docs/api_reference.md for examples."""
+"""Query - paradigm-agnostic query representation. See docs/API_REFERENCE.md for examples."""
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional

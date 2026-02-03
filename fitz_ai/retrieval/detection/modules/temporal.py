@@ -56,6 +56,16 @@ class TemporalModule(DetectionModule):
             except ValueError:
                 pass
 
+        # Extract time_focused_queries, normalizing to list of strings
+        # LLM may return either strings or dicts like {"query": str, "periods": []}
+        raw_queries = data.get("time_focused_queries", [])
+        transformations = []
+        for q in raw_queries:
+            if isinstance(q, str):
+                transformations.append(q)
+            elif isinstance(q, dict) and "query" in q:
+                transformations.append(q["query"])
+
         return DetectionResult(
             detected=True,
             category=self.category,
@@ -65,5 +75,5 @@ class TemporalModule(DetectionModule):
             metadata={
                 "references": data.get("references", []),
             },
-            transformations=data.get("time_focused_queries", []),
+            transformations=transformations,
         )

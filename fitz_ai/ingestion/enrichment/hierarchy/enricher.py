@@ -92,13 +92,16 @@ def assess_chunk_group(
     """
     Assess the epistemic status of a chunk group before summarization.
 
+    Note: Conflict detection during ingestion is deferred. Conflict detection
+    is more accurately performed at query time using LLM-based analysis in
+    ConflictAwareConstraint.
+
     Args:
         chunks: List of chunks to assess
-        semantic_matcher: Optional SemanticMatcher for semantic conflict detection.
-                         If not provided, falls back to legacy find_conflicts() stub.
+        semantic_matcher: Unused, kept for API compatibility. Will be removed.
 
     Returns:
-        EpistemicAssessment with conflict and density information
+        EpistemicAssessment with evidence density information
     """
     if not chunks:
         return EpistemicAssessment(evidence_density="sparse", chunk_count=0)
@@ -106,11 +109,9 @@ def assess_chunk_group(
     chunk_count = len(chunks)
     total_chars = sum(len(c.content) for c in chunks)
 
-    # Find conflicts using semantic matcher if available, otherwise stub
-    if semantic_matcher is not None:
-        conflicts = semantic_matcher.find_conflicts(chunks)
-    else:
-        conflicts = find_conflicts(chunks)
+    # Conflict detection deferred to query time (LLM-based in ConflictAwareConstraint)
+    # Ingest-time embedding-based detection was unreliable
+    conflicts = find_conflicts(chunks)  # Returns empty list (stub)
 
     # Calculate agreement ratio
     if chunk_count > 1 and conflicts:

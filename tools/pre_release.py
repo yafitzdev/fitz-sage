@@ -132,21 +132,20 @@ def main() -> int:
         else:
             print(f"  OK: {desc}")
 
-    # Step 4: Run a quick subset of tests (actually run them, not just collect)
-    step("4. Quick Test Subset")
+    # Step 4: Run all unit tests (not just a subset - catches mock/interface mismatches)
+    step("4. Unit Tests")
     result = run(
         [
             "python",
             "-m",
             "pytest",
-            "tests/unit/llm/",  # LLM tests (use patch() which catches missing deps)
-            "tests/unit/property/",  # Property tests (use hypothesis)
+            "tests/unit/",  # All unit tests - catches interface mismatches
             "-v",
             "--tb=line",
             "-x",  # Stop on first failure
             "-q",
             "-m",
-            "not postgres and not slow",
+            "not postgres and not slow and not integration",
             "--ignore=tests/unit/llm/test_auth_adapters.py",  # Skip slow/complex tests
         ],
         check=False,
