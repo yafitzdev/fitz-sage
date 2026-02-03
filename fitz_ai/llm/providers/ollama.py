@@ -12,7 +12,7 @@ from typing import Any, Iterator
 
 import httpx
 
-from fitz_ai.llm.providers.base import ModelTier
+from fitz_ai.llm.providers.base import ModelTier, RerankResult
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ CHAT_MODELS: dict[ModelTier, str] = {
 }
 
 EMBEDDING_MODEL = "nomic-embed-text"
+RERANK_MODEL = "qllama/bge-reranker-v2-m3"
 
 
 class OllamaChat:
@@ -192,10 +193,128 @@ class OllamaEmbedding:
             self._client.close()
 
 
+class OllamaRerank:
+    """
+    Ollama reranker using cross-encoder models like qwen3-reranker.
+
+    Uses the chat API to score query-document relevance.
+
+    Args:
+        model: Model name (e.g., "sam860/qwen3-reranker").
+        base_url: Ollama server URL.
+    """
+
+    def __init__(
+        self,
+        model: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
+        self._base_url = base_url or DEFAULT_BASE_URL
+        self._model = model or RERANK_MODEL
+        self._client = httpx.Client(base_url=self._base_url, timeout=60.0)
+
+    def rerank(
+        self,
+        query: str,
+        documents: list[str],
+        top_n: int | None = None,
+    ) -> list[RerankResult]:
+        """Rerank documents by relevance to query."""
+        if not documents:
+            return []
+
+        # Score each document
+        scored: list[tuple[int, float]] = []
+        for i, doc in enumerate(documents):
+            score = self._score_document(query, doc)
+            scored.append((i, score))
+
+        # Sort by score descending
+        scored.sort(key=lambda x: x[1], reverse=True)
+
+        # Apply top_n limit
+        if top_n is not None:
+            scored = scored[:top_n]
+
+        return [RerankResult(index=idx, score=score) for idx, score in scored]
+
+    def _score_document(self, query: str, document: str) -> float:
+        """Score a single document's relevance to the query."""
+        # Truncate long documents to avoid token limits
+        max_doc_chars = 2000
+        if len(document) > max_doc_chars:
+            document = document[:max_doc_chars] + "..."
+
+        # Use a simple relevance scoring prompt
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a relevance scoring assistant. "
+                    "Given a query and a document, output ONLY a relevance score "
+                    "from 0.0 to 1.0 where 1.0 means highly relevant. "
+                    "Output nothing but the number."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Query: {query}\n\nDocument: {document}\n\nRelevance score:",
+            },
+        ]
+
+        payload = {
+            "model": self._model,
+            "messages": messages,
+            "stream": False,
+            "options": {"temperature": 0.0, "num_predict": 10},
+        }
+
+        try:
+            response = self._client.post("/api/chat", json=payload)
+            response.raise_for_status()
+            data = response.json()
+
+            if "message" in data and "content" in data["message"]:
+                content = data["message"]["content"].strip()
+                # Parse the score - handle various formats
+                score = self._parse_score(content)
+                return score
+        except Exception as e:
+            logger.warning(f"Failed to score document: {e}")
+
+        return 0.0  # Default to low score on error
+
+    def _parse_score(self, content: str) -> float:
+        """Parse a relevance score from model output."""
+        import re
+
+        # Try to extract a number from the response
+        # Handle formats like "0.8", "0.8/1.0", "Score: 0.8", etc.
+        match = re.search(r"(\d+\.?\d*)", content)
+        if match:
+            score = float(match.group(1))
+            # Normalize if score > 1 (might be out of 10 or 100)
+            if score > 1.0:
+                if score <= 10:
+                    score = score / 10.0
+                elif score <= 100:
+                    score = score / 100.0
+                else:
+                    score = 1.0
+            return min(max(score, 0.0), 1.0)  # Clamp to [0, 1]
+        return 0.0
+
+    def __del__(self) -> None:
+        if hasattr(self, "_client"):
+            self._client.close()
+
+
 __all__ = [
     "OllamaChat",
     "OllamaEmbedding",
+    "OllamaRerank",
     "CHAT_MODELS",
     "EMBEDDING_MODEL",
+    "RERANK_MODEL",
     "DEFAULT_BASE_URL",
 ]

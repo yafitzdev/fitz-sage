@@ -36,6 +36,7 @@ MODEL_DEFAULTS = {
     },
     "rerank": {
         "cohere": "rerank-v3.5",
+        "local_ollama": "qllama/bge-reranker-v2-m3",
     },
     "vision": {
         "cohere": "command-a-vision-07-2025",

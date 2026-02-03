@@ -89,6 +89,10 @@ def _get_rerank_model_default(provider: str) -> str:
         from fitz_ai.llm.providers.cohere import RERANK_MODEL
 
         return RERANK_MODEL
+    elif provider in ("ollama", "local_ollama"):
+        from fitz_ai.llm.providers.ollama import RERANK_MODEL
+
+        return RERANK_MODEL
     return ""
 
 
@@ -609,6 +613,10 @@ class CLIContext:
         registry = get_engine_registry()
 
         if engine is None:
+            # Skip selection if only one engine available
+            if len(available) == 1:
+                return available[0]
+
             print()
             descriptions = registry.list_with_descriptions()
             default = get_default_engine()

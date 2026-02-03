@@ -23,7 +23,7 @@ from .init_config import (
     generate_global_config,
 )
 from .init_detector import detect_system, filter_available_plugins, load_default_config
-from .init_models import get_default_model, get_default_or_first, prompt_model
+from .init_models import get_default_model, get_default_or_first
 
 
 def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
@@ -100,8 +100,8 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
         chat_model_balanced = get_default_model("chat", chat_choice, "balanced")
         embedding_choice = get_default_or_first(avail_embedding, default_embedding)
         embedding_model = get_default_model("embedding", embedding_choice)
-        rerank_choice = get_default_or_first(avail_rerank, default_rerank) if avail_rerank else None
-        rerank_model = get_default_model("rerank", rerank_choice) if rerank_choice else ""
+        rerank_choice = None  # Default to no reranking (user can enable via config)
+        rerank_model = ""
         vector_db_choice = get_default_or_first(avail_vector_db, default_vector_db)
         retrieval_choice = get_default_or_first(avail_retrieval, default_retrieval)
         chunker_choice = default_chunker
@@ -114,64 +114,58 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
         # Interactive selection
         ui.section("Configuration")
 
-        # Chat plugin with smart/fast/balanced model selection
+        # Chat plugin (use default models - user can edit config later)
         chat_choice = ui.prompt_numbered_choice(
             "Chat plugin", avail_chat, get_default_or_first(avail_chat, default_chat)
         )
-        chat_model_smart = prompt_model("chat", chat_choice, "smart")
-        chat_model_fast = prompt_model("chat", chat_choice, "fast")
-        chat_model_balanced = prompt_model("chat", chat_choice, "balanced")
+        chat_model_smart = get_default_model("chat", chat_choice, "smart")
+        chat_model_fast = get_default_model("chat", chat_choice, "fast")
+        chat_model_balanced = get_default_model("chat", chat_choice, "balanced")
 
-        # Embedding
+        # Embedding (use default model)
         print()
         embedding_choice = ui.prompt_numbered_choice(
             "Embedding plugin",
             avail_embedding,
             get_default_or_first(avail_embedding, default_embedding),
         )
-        embedding_model = prompt_model("embedding", embedding_choice)
+        embedding_model = get_default_model("embedding", embedding_choice)
 
-        # Rerank provider
+        # Rerank provider (optional - None means no reranking)
         rerank_choice = None
         rerank_model = ""
-        if avail_rerank:
-            print()
-            rerank_choice = ui.prompt_numbered_choice(
-                "Rerank plugin",
-                avail_rerank,
-                get_default_or_first(avail_rerank, default_rerank),
-            )
-            rerank_model = prompt_model("rerank", rerank_choice)
-        else:
-            print()
-            ui.info("Rerank: not available (no rerank plugins detected)")
+        print()
+        # Add "None" option to allow skipping reranking
+        rerank_options = ["None (no reranking)"] + avail_rerank
+        selected = ui.prompt_numbered_choice(
+            "Rerank plugin (optional, improves retrieval accuracy)",
+            rerank_options,
+            rerank_options[0],  # Default to None
+        )
+        if selected != "None (no reranking)":
+            rerank_choice = selected
+            rerank_model = get_default_model("rerank", rerank_choice)
 
-        # Vision provider
+        # Vision provider (use default model)
         vision_choice = None
         vision_model = ""
         if avail_vision:
             print()
             vision_choice = ui.prompt_numbered_choice(
-                "Vision plugin",
+                "Vision plugin (for image/figure descriptions)",
                 avail_vision,
                 avail_vision[0],
             )
-            vision_model = prompt_model("vision", vision_choice)
+            vision_model = get_default_model("vision", vision_choice)
         else:
             print()
             ui.info("Vision: not available (no vision plugins detected)")
 
-        # Vector DB
-        print()
-        vector_db_choice = ui.prompt_numbered_choice(
-            "Vector database",
-            avail_vector_db,
-            get_default_or_first(avail_vector_db, default_vector_db),
-        )
+        # Vector DB - always pgvector (no selection needed)
+        vector_db_choice = "pgvector"
 
         # Retrieval
         print()
-        ui.info("Retrieval plugin determines if reranking is used")
         retrieval_choice = ui.prompt_numbered_choice(
             "Retrieval strategy",
             avail_retrieval,

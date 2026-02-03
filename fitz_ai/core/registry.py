@@ -426,7 +426,7 @@ _LLM_PROVIDER_CAPABILITIES: Dict[str, List[str]] = {
     "cohere": ["chat", "embedding", "rerank"],
     "openai": ["chat", "embedding"],
     "anthropic": ["chat"],
-    "ollama": ["chat", "embedding"],
+    "ollama": ["chat", "embedding", "rerank"],
 }
 
 

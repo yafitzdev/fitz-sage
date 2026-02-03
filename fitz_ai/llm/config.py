@@ -401,8 +401,13 @@ def create_rerank_provider(
 
         return CohereRerank(auth, **kwargs)  # type: ignore[arg-type]
 
+    elif provider in ("ollama", "local_ollama"):
+        from fitz_ai.llm.providers.ollama import OllamaRerank
+
+        return OllamaRerank(**kwargs)
+
     else:
-        raise ValueError(f"Unknown rerank provider: {provider}. Only 'cohere' is supported.")
+        raise ValueError(f"Unknown rerank provider: {provider}. Supported: 'cohere', 'ollama'.")
 
 
 def create_vision_provider(
