@@ -85,7 +85,6 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
     default_embedding = _get_plugin("embedding", "cohere")
     default_vector_db = _get_plugin("vector_db", "pgvector")
     default_retrieval = _get_plugin("retrieval_plugin", "dense")
-    default_rerank = _get_plugin("rerank", "cohere")
 
     # Chunking defaults (new flat format)
     default_chunker = "recursive"
