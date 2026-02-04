@@ -24,6 +24,7 @@ from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
 from ..base import ConstraintResult
+from ..numerical_detector import NumericalConflictDetector
 
 if TYPE_CHECKING:
     from fitz_ai.llm.providers.base import ChatProvider
@@ -144,6 +145,11 @@ class ConflictAwareConstraint:
         - Uncertainty/causal queries → Fusion (fewer false disputes)
         - Factual queries → Standard (catch more contradictions)
 
+    Numerical variance filtering:
+    - Before LLM check, extracts numeric mentions from both chunks
+    - If same unit + same direction + ≤25% relative difference → variance (not contradiction)
+    - Prevents "10% growth" vs "12% growth" from being flagged as dispute
+
     Attributes:
         chat: ChatProvider for contradiction detection
         enabled: Whether this constraint is active (default: True)
@@ -156,6 +162,9 @@ class ConflictAwareConstraint:
     use_fusion: bool = False
     adaptive: bool = False
     _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    _numerical_detector: NumericalConflictDetector = field(
+        default_factory=NumericalConflictDetector, repr=False, compare=False
+    )
 
     @property
     def name(self) -> str:
@@ -201,6 +210,9 @@ class ConflictAwareConstraint:
         """
         Check if two chunks contradict each other about the query.
 
+        First checks for numerical variance (same direction, similar values).
+        If variance detected, skips LLM call and returns False.
+
         Uses a single LLM call to compare both chunks together,
         which is more reliable than separate stance detection.
         """
@@ -209,6 +221,12 @@ class ConflictAwareConstraint:
 
         text1 = chunk1.content[:400] if len(chunk1.content) > 400 else chunk1.content
         text2 = chunk2.content[:400] if len(chunk2.content) > 400 else chunk2.content
+
+        # Check for numerical variance BEFORE LLM call
+        is_variance, reason = self._numerical_detector.check_chunk_pair_variance(text1, text2)
+        if is_variance:
+            logger.debug(f"{PIPELINE} ConflictAwareConstraint: skipping LLM check - {reason}")
+            return False  # Variance, not contradiction
 
         prompt = CONTRADICTION_PROMPT.format(query=query, text1=text1, text2=text2)
 
@@ -230,6 +248,9 @@ class ConflictAwareConstraint:
         """
         Check for contradiction using 3-prompt fusion with majority voting.
 
+        First checks for numerical variance (same direction, similar values).
+        If variance detected, skips LLM calls and returns False.
+
         Asks the same question 3 different ways:
         1. Direct: "Do these CONTRADICT?"
         2. Inverted: "Are these CONSISTENT?" (NO = contradict)
@@ -243,6 +264,12 @@ class ConflictAwareConstraint:
 
         text1 = chunk1.content[:400] if len(chunk1.content) > 400 else chunk1.content
         text2 = chunk2.content[:400] if len(chunk2.content) > 400 else chunk2.content
+
+        # Check for numerical variance BEFORE LLM calls
+        is_variance, reason = self._numerical_detector.check_chunk_pair_variance(text1, text2)
+        if is_variance:
+            logger.debug(f"{PIPELINE} ConflictAwareConstraint: skipping fusion check - {reason}")
+            return False  # Variance, not contradiction
 
         contradict_votes = 0
         responses = []
