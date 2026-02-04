@@ -41,6 +41,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable
 
 from .base import ConstraintPlugin, ConstraintResult
+from .plugins.answer_verification import AnswerVerificationConstraint
 from .plugins.causal_attribution import CausalAttributionConstraint
 from .plugins.conflict_aware import ConflictAwareConstraint
 from .plugins.deterministic_conflict import DeterministicConflictConstraint
@@ -124,6 +125,8 @@ def create_default_constraints(
         CausalAttributionConstraint(),
         # LLM pairwise comparison: detect contradictions
         ConflictAwareConstraint(chat=chat),
+        # LLM jury: verify chunks actually answer the query
+        AnswerVerificationConstraint(chat=chat),
     ]
 
 
@@ -153,6 +156,7 @@ __all__ = [
     "DeterministicConflictConstraint",
     "InsufficientEvidenceConstraint",
     "CausalAttributionConstraint",
+    "AnswerVerificationConstraint",
     # Factory functions
     "create_deterministic_constraints",
     "create_default_constraints",

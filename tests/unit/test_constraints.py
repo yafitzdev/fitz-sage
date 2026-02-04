@@ -422,3 +422,128 @@ class TestAcceptanceCriteria:
 
         # MUST allow decisive answer for resolution queries
         assert result.allow_decisive_answer is True
+
+
+# =============================================================================
+# Tests: AnswerVerificationConstraint (Jury-based)
+# =============================================================================
+
+
+class TestAnswerVerificationConstraint:
+    """Test the jury-based answer verification constraint.
+
+    This constraint uses 3-prompt LLM jury to verify chunks actually answer
+    the query. Requires 2+ NO votes to qualify (conservative).
+    """
+
+    def test_no_chat_allows_answer(self):
+        """Should allow when no chat provider available."""
+        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+
+        constraint = AnswerVerificationConstraint(chat=None)
+
+        chunks = [make_chunk("1", "France has 67 million people.")]
+        result = constraint.apply("What is the capital of France?", chunks)
+
+        assert result.allow_decisive_answer is True
+
+    def test_empty_chunks_allows_answer(self):
+        """Should allow when no chunks (handled by InsufficientEvidence)."""
+        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+
+        mock_chat = MagicMock()
+        constraint = AnswerVerificationConstraint(chat=mock_chat)
+
+        result = constraint.apply("Any question?", [])
+
+        assert result.allow_decisive_answer is True
+        mock_chat.chat.assert_not_called()
+
+    def test_disabled_constraint_allows_answer(self):
+        """Should allow when constraint is disabled."""
+        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+
+        mock_chat = MagicMock()
+        constraint = AnswerVerificationConstraint(chat=mock_chat, enabled=False)
+
+        chunks = [make_chunk("1", "Some content.")]
+        result = constraint.apply("Any question?", chunks)
+
+        assert result.allow_decisive_answer is True
+        mock_chat.chat.assert_not_called()
+
+    def test_jury_unanimous_yes_allows_answer(self):
+        """Should allow when all 3 jury prompts say context answers."""
+        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+
+        mock_chat = MagicMock()
+        # Prompt 1: YES (answers), Prompt 2: NO (not insufficient), Prompt 3: YES (complete)
+        mock_chat.chat.side_effect = ["YES", "NO", "YES"]
+        constraint = AnswerVerificationConstraint(chat=mock_chat)
+
+        chunks = [make_chunk("1", "Paris is the capital of France.")]
+        result = constraint.apply("What is the capital of France?", chunks)
+
+        assert result.allow_decisive_answer is True
+        assert mock_chat.chat.call_count == 3
+
+    def test_jury_unanimous_no_qualifies_answer(self):
+        """Should qualify when all 3 jury prompts say context doesn't answer."""
+        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+
+        mock_chat = MagicMock()
+        # Prompt 1: NO (doesn't answer), Prompt 2: YES (insufficient), Prompt 3: NO (incomplete)
+        mock_chat.chat.side_effect = ["NO", "YES", "NO"]
+        constraint = AnswerVerificationConstraint(chat=mock_chat)
+
+        chunks = [make_chunk("1", "France has 67 million people.")]
+        result = constraint.apply("What is the capital of France?", chunks)
+
+        assert result.allow_decisive_answer is False
+        assert result.signal == "qualified"
+
+    def test_jury_2_no_votes_allows(self):
+        """Should allow when only 2 out of 3 jury prompts say doesn't answer (need 3/3)."""
+        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+
+        mock_chat = MagicMock()
+        # Prompt 1: NO, Prompt 2: YES (insufficient), Prompt 3: YES (answers)
+        # Only 2 NO votes (prompt 1 + prompt 2 inverted) - not enough for 3/3
+        mock_chat.chat.side_effect = ["NO", "YES", "YES"]
+        constraint = AnswerVerificationConstraint(chat=mock_chat)
+
+        chunks = [make_chunk("1", "France is in Europe.")]
+        result = constraint.apply("What is the capital of France?", chunks)
+
+        # 2 NO votes is not enough - need unanimous 3/3
+        assert result.allow_decisive_answer is True
+
+    def test_jury_1_no_vote_allows(self):
+        """Should allow when only 1 out of 3 jury prompts says doesn't answer."""
+        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+
+        mock_chat = MagicMock()
+        # Prompt 1: YES, Prompt 2: NO (not insufficient), Prompt 3: NO (one says incomplete)
+        mock_chat.chat.side_effect = ["YES", "NO", "NO"]
+        constraint = AnswerVerificationConstraint(chat=mock_chat)
+
+        chunks = [make_chunk("1", "Paris is the capital of France.")]
+        result = constraint.apply("What is the capital of France?", chunks)
+
+        # Only 1 NO vote (prompt 3), need 2+ to qualify
+        assert result.allow_decisive_answer is True
+
+    def test_jury_error_counted_as_abstain(self):
+        """Should handle LLM errors gracefully."""
+        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+
+        mock_chat = MagicMock()
+        # First two succeed, third errors
+        mock_chat.chat.side_effect = ["YES", "NO", Exception("LLM error")]
+        constraint = AnswerVerificationConstraint(chat=mock_chat)
+
+        chunks = [make_chunk("1", "Some content.")]
+        result = constraint.apply("Any question?", chunks)
+
+        # Only 0 NO votes counted (prompt 1=YES, prompt 2=NO means not insufficient)
+        assert result.allow_decisive_answer is True

@@ -328,6 +328,7 @@ class FitzGovBenchmark:
         elif self._use_fusion or self._adaptive or self._model_override:
             # Create constraints with fusion/adaptive mode for contradiction detection
             from fitz_ai.core.guardrails import (
+                AnswerVerificationConstraint,
                 CausalAttributionConstraint,
                 ConflictAwareConstraint,
                 InsufficientEvidenceConstraint,
@@ -348,6 +349,7 @@ class FitzGovBenchmark:
                     use_fusion=self._use_fusion,
                     adaptive=self._adaptive,
                 ),
+                AnswerVerificationConstraint(chat=fast_chat),
             ]
             constraint_results = run_constraints(query.text, chunks, constraints)
         else:
