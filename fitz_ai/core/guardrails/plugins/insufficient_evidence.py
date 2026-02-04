@@ -24,6 +24,7 @@ from fitz_ai.core.chunk import Chunk
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
+from ..aspect_classifier import AspectClassifier, QueryAspect
 from ..base import ConstraintResult
 
 logger = get_logger(__name__)
@@ -442,6 +443,9 @@ class InsufficientEvidenceConstraint:
     min_score: float = MIN_RELEVANCE_SCORE
     min_similarity: float = MIN_EMBEDDING_SIMILARITY
     _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    _aspect_classifier: AspectClassifier = field(
+        default_factory=AspectClassifier, repr=False, compare=False
+    )
 
     @property
     def name(self) -> str:
@@ -526,7 +530,57 @@ class InsufficientEvidenceConstraint:
                 if not summary_match:
                     return False, max_sim, "no_summary_overlap"
 
-        # 5. If we have entity match OR no specific entities OR very high similarity, allow
+        # 5. ASPECT COMPATIBILITY CHECK: Entity matches but aspect might differ
+        # e.g., Query "What causes Alzheimer's?" vs Chunk "Alzheimer's symptoms include..."
+        # Also check when similarity is moderate (0.5-0.85) even without entity match
+        # This catches cases like "aspirin mechanism" where entity is lowercase
+        query_aspect = self._aspect_classifier.classify_query(query)
+
+        # Run aspect check when:
+        # 1. Entity match found AND similarity in ambiguous range (0.5-0.78), OR
+        # 2. Moderate similarity (0.5-0.78) with no entities to verify (possible related content)
+        # Skip aspect check for high similarity (>0.78) - embeddings are reliable there
+        should_check_aspect = (
+            (entity_match_found and 0.5 <= max_sim < 0.78)
+            or (not specific_entities and 0.5 <= max_sim < 0.78)
+        )
+
+        logger.debug(
+            f"{PIPELINE} InsufficientEvidence: aspect check - "
+            f"entity_match={entity_match_found}, query_aspect={query_aspect.value}, "
+            f"should_check={should_check_aspect}, sim={max_sim:.3f}"
+        )
+        if should_check_aspect and query_aspect != QueryAspect.GENERAL:
+            # ASPECT MISMATCH DETECTION:
+            # Only abstain if ALL chunks with specific aspects CONFLICT with query aspect
+            # - GENERAL chunks are neutral (don't trigger abstention by themselves)
+            # - If any chunk has matching or compatible aspect, allow
+            # - Only abstain if there are conflicting aspects AND no matching aspects
+            has_matching_aspect = False
+            has_conflicting_aspect = False
+            conflicting_aspects = []
+
+            for chunk in chunks:
+                chunk_aspects = self._aspect_classifier.extract_chunk_aspects(chunk.content)
+
+                # Skip GENERAL chunks - they're neutral
+                if chunk_aspects == [QueryAspect.GENERAL]:
+                    continue
+
+                # Check if this chunk has the matching aspect
+                if query_aspect in chunk_aspects:
+                    has_matching_aspect = True
+                    break
+
+                # This chunk has specific aspects that don't include the query aspect
+                has_conflicting_aspect = True
+                conflicting_aspects.extend([a.value for a in chunk_aspects])
+
+            # Only abstain if we found conflicting aspects but NO matching aspects
+            if has_conflicting_aspect and not has_matching_aspect:
+                return False, max_sim, f"aspect_mismatch:query asks {query_aspect.value}, chunks have {list(set(conflicting_aspects))}"
+
+        # 6. If we have entity match OR no specific entities OR very high similarity, allow
         return True, max_sim, "relevant"
 
     def apply(
