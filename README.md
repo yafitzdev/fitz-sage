@@ -143,7 +143,7 @@ You can—but you'll hit walls fast.
 **Honest answers ✅** → [Governance Benchmark](#governance-know-what-you-dont-know)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."*
 >
-> **Measured, not claimed:** Fitz scores **70%** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty—detecting when to abstain, dispute, or qualify answers.
+> **Measured, not claimed:** Fitz scores **72%** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty—detecting when to abstain, dispute, or qualify answers.
 
 **Queries that actually work 📊**
 > Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, AST-aware chunking for code, and SQL execution for tabular data. No configuration—it just works.
@@ -180,7 +180,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 | Feature | Query | Naive RAG Problem | FitzRAG Solution |
 |---------|-------|-------------------|------------------|
 | [**epistemic-honesty**](docs/features/epistemic-honesty.md) | "What was our Q4 revenue?" | ❌ Hallucinated number — Info doesn't exist, but LLM won't admit it | ✅ "I don't know" |
-| [**governance-benchmarking**](docs/features/governance-benchmarking.md) | *[Benchmark: fitz-gov]* | ❌ No measurement — Retrieval benchmarks don't test epistemic honesty | ✅ 70% governance accuracy |
+| [**governance-benchmarking**](docs/features/governance-benchmarking.md) | *[Benchmark: fitz-gov]* | ❌ No measurement — Retrieval benchmarks don't test epistemic honesty | ✅ 72% governance accuracy |
 | [**keyword-vocabulary**](docs/features/keyword-vocabulary.md) | "Find TC_1000" | ❌ Wrong test case — Embeddings see TC_1000 ≈ TC_2000 (semantically similar) | ✅ Exact keyword matching |
 | [**hybrid-search**](docs/features/hybrid-search.md) | "X100 battery specs" | ❌ Returns Y200 docs — Semantic search misses exact model numbers | ✅ Hybrid search (dense + sparse) |
 | [**sparse-search**](docs/features/sparse-search.md) | "error code E_AUTH_401" | ❌ No exact match — Embeddings miss precise error codes | ✅ PostgreSQL full-text search |
@@ -211,12 +211,12 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 
 | Mode | When | Accuracy |
 |------|------|----------|
-| **ABSTAIN** | Context doesn't answer the question | 57.5% |
-| **DISPUTED** | Sources contradict each other | 95% |
+| **ABSTAIN** | Context doesn't answer the question | 72.5% |
+| **DISPUTED** | Sources contradict each other | 90% |
 | **QUALIFIED** | Evidence exists but needs caveats | 72.5% |
 | **CONFIDENT** | Clear, consistent evidence | 86.7% |
 
-**Overall: 70% governance accuracy** on [fitz-gov](https://github.com/yafitzdev/fitz-gov) — a benchmark for epistemic honesty, not retrieval quality.
+**Overall: 72% governance accuracy** on [fitz-gov](https://github.com/yafitzdev/fitz-gov) — a benchmark for epistemic honesty, not retrieval quality.
 
 ```bash
 fitz eval fitz-gov --model ollama/qwen2.5:3b
