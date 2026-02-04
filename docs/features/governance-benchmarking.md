@@ -26,17 +26,19 @@ Each test case has:
 
 ## Current Results
 
-**Fitz achieves 70% governance accuracy** (with enrichment, the realistic production scenario):
+**Fitz achieves 72% governance accuracy** with aspect-aware matching, numerical variance detection, and LLM jury verification:
 
 | Category | Accuracy | What It Means |
 |----------|----------|---------------|
-| **Overall** | **70%** | Correct mode classification |
-| Abstention | 57.5% | Correctly refuses when context is irrelevant |
-| Dispute | 95% | Detects contradictions between sources |
+| **Overall** | **72%** | Correct mode classification |
+| Abstention | 72.5% | Correctly refuses when context is irrelevant |
+| Dispute | 90% | Detects contradictions between sources |
 | Qualification | 72.5% | Adds caveats for uncertain claims |
 | Confidence | 86.67% | Confident when evidence is clear |
 
 For comparison, a naive system that always outputs CONFIDENT scores ~20% (only the confidence cases).
+
+**Design philosophy:** We prioritize a defensible system over maximum metrics. The LLM jury adds epistemic safety—when all 3 prompts unanimously agree context doesn't answer, we qualify rather than risk false confidence.
 
 ## Running the Benchmark
 

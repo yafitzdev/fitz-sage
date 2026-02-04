@@ -343,6 +343,44 @@ Added:
 
 **Files:** `fitz_ai/core/guardrails/plugins/answer_verification.py`
 
+### Approach 12: Enhanced Enrichment for Abstention (FAILED)
+
+**Problem:** Abstention at 72.5% leaves ~27% of cases where context is retrieved but doesn't match query topic. Approach 2 showed enrichment could help (+15% abstention) but hurt dispute detection.
+
+**Hypothesis:** With better dispute detection (Approaches 9-11), we can now safely expand enrichment-based abstention.
+
+**Experiments:**
+
+#### 12a: Expanded Enrichment Range
+
+Extended summary overlap check from (0.45-0.70) to (0.45-0.80):
+
+| Category | Before | After | Change |
+|----------|--------|-------|--------|
+| Overall | 72% | 70.5% | -1.5% |
+| Qualification | 72.5% | 67.5% | **-5%** |
+| Confidence | 86.67% | 83.33% | **-3.3%** |
+
+**Why it failed:** Summary overlap is too crude. Checking if ANY query word appears in ANY summary causes false abstentions for semantically related but lexically different content.
+
+#### 12b: Relevance Verification Jury
+
+Created `RelevanceVerificationConstraint` using 3-prompt jury for borderline similarity cases (0.50-0.75):
+
+| Category | Before | After | Change |
+|----------|--------|-------|--------|
+| Overall | 72% | 71.5% | -0.5% |
+| Confidence | 86.67% | 83.33% | **-3.3%** |
+| Abstention | 72.5% | 72.5% | — |
+
+**Why it failed:**
+1. Constraint couldn't access similarity scores (computed inside InsufficientEvidence, not passed to other constraints)
+2. Without similarity gating, the jury ran on all cases and was too aggressive
+
+**Conclusion:** The remaining 27.5% abstention failures are genuinely hard cases—high embedding similarity, entity matches, but wrong topic. Simple heuristics and even jury-based approaches don't improve them without causing regressions elsewhere.
+
+**Code deleted:** `relevance_verification.py` removed after experiments.
+
 ---
 
 ## Final Results
@@ -562,6 +600,7 @@ print(results)
 
 ## Changelog
 
+- **2026-02-04:** Enhanced enrichment experiments (Approach 12, FAILED). Expanded summary range caused regressions (confidence 86.67%→83.33%). RelevanceVerification jury couldn't access similarity scores. Remaining 27.5% abstention failures are genuinely hard cases. Code deleted.
 - **2026-02-04:** AnswerVerificationConstraint with LLM jury (ENABLED BY DEFAULT). Uses 3-prompt jury with unanimous (3/3) threshold. Catches egregious "relevant but doesn't answer" cases while preserving baseline accuracy (86.67% confidence). Design philosophy: epistemic safety over metric chasing.
 - **2026-02-04:** Jury threshold experiments. Single-call: 26-40% confidence. 2+ NO votes: 53.33%. 3/3 unanimous: 86.67% (baseline preserved). Unanimous threshold selected for minimal false positives.
 - **2026-02-04:** PositiveConfirmationConstraint experiment (ABANDONED). Attempted word-overlap heuristics. Caused massive regression (86.67% → 46.67%). Word-overlap cannot handle semantic equivalence.
