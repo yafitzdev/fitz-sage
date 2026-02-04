@@ -396,6 +396,33 @@ Note: `--enrich` adds latency (LLM calls for enrichment) but better simulates pr
 
 **Mitigation:** Numerical detector checks for source indicators ("according to", "claims", "reports") and skips variance detection when different sources are cited.
 
+### 6. Relevant Context That Doesn't Answer (UNSOLVED)
+
+**Rate:** Unknown (false confidence cases)
+
+**Example:**
+- Query: "What is the capital of France?"
+- Context: "France has 67 million people and is famous for wine."
+- Expected: QUALIFIED (context is about France but doesn't answer)
+- Actual: CONFIDENT (no constraint triggers)
+
+**Root cause:** CONFIDENT is the default fallback when no constraint triggers. The context is semantically relevant (passes InsufficientEvidence) and doesn't contradict anything (passes ConflictAware), so it falls through to CONFIDENT.
+
+**Attempted solution:** PositiveConfirmationConstraint using word-overlap heuristics.
+
+**Why it failed:** Word-overlap cannot distinguish "relevant but doesn't answer" from "valid answer with different wording." Example:
+- Query: "What caused the 2024 outage?"
+- Context: "The incident lasted 4 hours and affected 2 million users..."
+- Coverage: 0% (neither "caused" nor "outage" in context)
+- But this IS a valid confident case—the context answers the question
+
+The constraint caused a massive regression (Confidence 86.67% → 46.67%) because many valid answers use different words than the query.
+
+**Future work:** This problem likely requires LLM-based verification ("Does this context answer this question?"), not deterministic heuristics. Alternative approaches:
+- Fine-tuned classifier for answer presence detection
+- Extractive QA model to check if answer can be extracted
+- Multi-stage verification with explicit "answerable?" prompt
+
 ---
 
 ## Reproduction
@@ -449,6 +476,7 @@ print(results)
 
 ## Changelog
 
+- **2026-02-04:** PositiveConfirmationConstraint experiment (ABANDONED). Attempted word-overlap heuristics to catch "relevant but doesn't answer" cases. Caused Confidence regression 86.67% → 46.67%. Word-overlap cannot distinguish valid answers with different wording. Code deleted. See "Known Failure Modes #6" for details.
 - **2026-02-04:** Numerical variance detection (Approach 10). Prevents statistical variations from triggering false disputes. Qualification stable at 77.5%, qualified→disputed errors reduced. Production score: 73%.
 - **2026-02-04:** Aspect-aware entity matching (Approach 9). Catches "same entity, different aspect" failures. Abstention improved 55% → 72.5%. Production score: 72.5%.
 - **2026-02-03:** Enrichment as default. Hybrid summary check for abstention (+2.5%). Fixed CausalAttributionConstraint false positives from LLM-generated summaries. Production score: 70%.
