@@ -396,7 +396,7 @@ Note: `--enrich` adds latency (LLM calls for enrichment) but better simulates pr
 
 **Mitigation:** Numerical detector checks for source indicators ("according to", "claims", "reports") and skips variance detection when different sources are cited.
 
-### 6. Relevant Context That Doesn't Answer (UNSOLVED)
+### 6. Relevant Context That Doesn't Answer (PARTIALLY ADDRESSED)
 
 **Rate:** Unknown (false confidence cases)
 
@@ -408,20 +408,26 @@ Note: `--enrich` adds latency (LLM calls for enrichment) but better simulates pr
 
 **Root cause:** CONFIDENT is the default fallback when no constraint triggers. The context is semantically relevant (passes InsufficientEvidence) and doesn't contradict anything (passes ConflictAware), so it falls through to CONFIDENT.
 
-**Attempted solution:** PositiveConfirmationConstraint using word-overlap heuristics.
+**Attempted solutions:**
 
-**Why it failed:** Word-overlap cannot distinguish "relevant but doesn't answer" from "valid answer with different wording." Example:
-- Query: "What caused the 2024 outage?"
-- Context: "The incident lasted 4 hours and affected 2 million users..."
-- Coverage: 0% (neither "caused" nor "outage" in context)
-- But this IS a valid confident case—the context answers the question
+1. **Word-overlap heuristics (ABANDONED):** PositiveConfirmationConstraint using query word coverage. Caused massive regression (Confidence 86.67% → 46.67%) because valid answers often use different words than the query.
 
-The constraint caused a massive regression (Confidence 86.67% → 46.67%) because many valid answers use different words than the query.
+2. **LLM-based verification (IMPLEMENTED, DISABLED BY DEFAULT):** `AnswerVerificationConstraint` asks LLM "Can this question be answered using this context?" With smaller models (qwen2.5:3b), this was overly conservative (Confidence → 26-40%). Available for opt-in use with larger models.
 
-**Future work:** This problem likely requires LLM-based verification ("Does this context answer this question?"), not deterministic heuristics. Alternative approaches:
-- Fine-tuned classifier for answer presence detection
-- Extractive QA model to check if answer can be extracted
-- Multi-stage verification with explicit "answerable?" prompt
+**Why LLM verification fails with small models:** Smaller LLMs are overly conservative, classifying valid confident cases as "not answerable" even with lenient prompts. The problem requires a model capable of nuanced judgment.
+
+**Current status:** `AnswerVerificationConstraint` exists at `fitz_ai/core/guardrails/plugins/answer_verification.py` but is disabled by default. Enable for high-stakes use cases with larger models:
+
+```python
+from fitz_ai.core.guardrails import AnswerVerificationConstraint
+
+constraint = AnswerVerificationConstraint(chat=chat_provider, enabled=True)
+```
+
+**Future work:**
+- Benchmark with larger models (GPT-4, Claude) to validate approach
+- Fine-tune prompt per model family
+- Hybrid approach: deterministic pre-filter + LLM verification for edge cases only
 
 ---
 
@@ -468,6 +474,7 @@ print(results)
 | InsufficientEvidence constraint | `fitz_ai/core/guardrails/plugins/insufficient_evidence.py` |
 | ConflictAware constraint | `fitz_ai/core/guardrails/plugins/conflict_aware.py` |
 | CausalAttribution constraint | `fitz_ai/core/guardrails/plugins/causal_attribution.py` |
+| AnswerVerification constraint | `fitz_ai/core/guardrails/plugins/answer_verification.py` (disabled by default) |
 | Constraint runner | `fitz_ai/core/guardrails/runner.py` |
 | Aspect classifier | `fitz_ai/core/guardrails/aspect_classifier.py` |
 | Numerical variance detector | `fitz_ai/core/guardrails/numerical_detector.py` |
@@ -476,6 +483,7 @@ print(results)
 
 ## Changelog
 
+- **2026-02-04:** AnswerVerificationConstraint implemented (DISABLED BY DEFAULT). LLM-based answer verification catches "relevant but doesn't answer" cases. With qwen2.5:3b, caused Confidence regression to 26-40%. Available for opt-in use with larger models. See `fitz_ai/core/guardrails/plugins/answer_verification.py`.
 - **2026-02-04:** PositiveConfirmationConstraint experiment (ABANDONED). Attempted word-overlap heuristics to catch "relevant but doesn't answer" cases. Caused Confidence regression 86.67% → 46.67%. Word-overlap cannot distinguish valid answers with different wording. Code deleted. See "Known Failure Modes #6" for details.
 - **2026-02-04:** Numerical variance detection (Approach 10). Prevents statistical variations from triggering false disputes. Qualification stable at 77.5%, qualified→disputed errors reduced. Production score: 73%.
 - **2026-02-04:** Aspect-aware entity matching (Approach 9). Catches "same entity, different aspect" failures. Abstention improved 55% → 72.5%. Production score: 72.5%.
