@@ -147,12 +147,9 @@ loadtest = [
 ]
 
 # Benchmarking (BEIR for cross-RAG comparison, fitz-gov for governance)
-# Note: fitz-gov is not yet on PyPI. Install from local path or GitHub:
-#   pip install -e path/to/fitz-gov
-#   pip install git+https://github.com/yafitzdev/fitz-gov.git
 benchmarks = [
     "beir>=2.0.0",
-    # "fitz-gov>=0.9.0",  # Uncomment when published to PyPI
+    "fitz-gov>=2.0.0",  # RAG governance benchmark (epistemic honesty)
 ]
 
 # Install everything at once (core deps include pgvector now)
