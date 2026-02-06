@@ -1085,4 +1085,61 @@ Viable alternatives for reducing ConflictAware FP rate:
 
 ---
 
+## Experiment 008: ConflictAware Relevance Gate + Prompt Improvement
+
+**Started**: Feb 6, 2026, ~5:30 PM
+**Goal**: Reduce ConflictAware false positive rate via (A) embedding-based relevance gate and (B) improved contradiction prompt.
+
+### Hypothesis
+
+Two independent improvements:
+- **Relevance gate**: Skip conflict detection for chunks that aren't relevant to the query (embedding similarity < threshold). Should eliminate false disputes from irrelevant content.
+- **Prompt improvement**: Reframe from "do these CONTRADICT" to "do these make MUTUALLY EXCLUSIVE factual claims" + explicit exclusion list (different time periods, complementary info, mixed feedback).
+
+### Implementation
+
+**Relevance gate**: Added `embedder` parameter to `ConflictAwareConstraint`. In `apply()`, embed the query, compute cosine similarity with each chunk, filter out chunks below threshold before pairwise LLM comparison.
+
+**Prompt change**: Replaced `CONTRADICTION_PROMPT` with stricter "MUTUALLY EXCLUSIVE factual claims" framing, added "NOT contradictions:" exclusion list, removed UNCLEAR option to force binary decision.
+
+### Critical methodological note
+
+Initial runs combined both changes. After poor results, isolated each variable independently (4 total runs).
+
+### Results (isolated)
+
+| Category | Baseline | Gate only (0.45) | Prompt only | Both combined |
+|----------|----------|------------------|-------------|---------------|
+| Dispute | 89.09% (49) | 90.91% (50) | **92.73% (51)** | 92.73% (51) |
+| Confidence | 79.37% (50) | **80.95% (51)** | 79.37% (50) | 76.19% (48) |
+| Qualification | **54.41% (37)** | 51.47% (35) | 47.06% (32) | 50.00% (34) |
+| Abstention | 34.92% (22) | **36.51% (23)** | **36.51% (23)** | 34.92% (22) |
+| Relevance | 52.50% | 52.50% | 52.50% | 50.00% |
+| **Overall** | **66.47%** | **66.77%** | 65.86% | 65.26% |
+
+### Analysis
+
+**Gate only (+0.3pp)**: Small net positive. Dispute +1, confidence +1, abstention +1. The gate at threshold 0.45 filters irrelevant chunks for ~5% of cases. However, the embedding model gives even totally unrelated chunks similarity >= 0.34, so the gate can only catch the most extreme cases.
+
+**Prompt only (-0.6pp)**: Net negative. Dispute +2 (best recall!) but qualification **-5** (worst!). The stricter "MUTUALLY EXCLUSIVE" framing helps the 3B model catch real contradictions but also makes it more trigger-happy on qualification cases where evidence is partial/mixed.
+
+**Both combined (-1.2pp)**: Worse than either alone. The changes interfere destructively.
+
+Additional finding: Adding UNCLEAR back as escape hatch (tested in Run 2) killed dispute to 81.82% (-7pp). The 3B model uses UNCLEAR to dodge real contradictions. Binary CONTRADICT/AGREE forces a decision, which is better for recall.
+
+### Key Insights
+
+1. **Embedding similarity floor is high**: Even irrelevant chunks get 0.34+ similarity. The relevance gate needs a higher threshold to matter, but raising it risks filtering real content.
+2. **Prompt strictness trades dispute for qualification**: More precise prompts help dispute but hurt qualification - zero-sum with 3B model.
+3. **Always isolate variables**: Combined testing masked that the prompt was harmful while the gate was helpful.
+4. **UNCLEAR kills recall**: For small models, forcing binary choice (CONTRADICT/AGREE) maintains recall. Adding a third option gives the model an escape hatch it overuses.
+
+### Decision
+
+**Keep gate only. Revert prompt to original.** Net improvement: +0.3pp (66.47% -> 66.77%).
+
+The gate infrastructure is valuable even if the current threshold only catches extreme cases. It can be tuned later with different embedders.
+
+---
+
 *This is a living document. Update continuously with new findings.*

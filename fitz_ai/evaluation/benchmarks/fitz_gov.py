@@ -350,6 +350,7 @@ class FitzGovBenchmark:
                     chat=fast_chat,
                     use_fusion=self._use_fusion,
                     adaptive=self._adaptive,
+                    embedder=embedder,
                 ),
                 AnswerVerificationConstraint(chat=fast_chat),
             ]

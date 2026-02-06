@@ -1,10 +1,10 @@
 fitz-gov Results (n=331):
-  Overall Accuracy: 66.47%
+  Overall Accuracy: 65.86%
 
 Governance Mode Categories:
-  abstention: 34.92% (22/63)
-  dispute: 89.09% (49/55)
-  qualification: 54.41% (37/68)
+  abstention: 36.51% (23/63)
+  dispute: 92.73% (51/55)
+  qualification: 47.06% (32/68)
   confidence: 79.37% (50/63)
 
 Answer Quality Categories:
@@ -13,7 +13,7 @@ Answer Quality Categories:
 
   Confusion Matrix (rows=expected, cols=actual):
                 ABST    DISP    QUAL    CONF
-      ABST      22      10      14      17
-      DISP       1      49       2       3
-      QUAL       9      22      56      18
-      CONF       5       5       4      52
+      ABST      23      10      14      16
+      DISP       1      51       1       2
+      QUAL      11      23      51      20
+      CONF       3       7       4      52

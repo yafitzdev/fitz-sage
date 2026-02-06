@@ -16,8 +16,9 @@ This uses a simple per-chunk stance classification:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.logging.logger import get_logger
@@ -169,17 +170,26 @@ class ConflictAwareConstraint:
     - If same unit + same direction + ≤25% relative difference → variance (not contradiction)
     - Prevents "10% growth" vs "12% growth" from being flagged as dispute
 
+    Relevance gate:
+    - If embedder is provided, skips chunk pairs where either chunk has
+      low similarity to the query. Prevents false disputes from irrelevant content.
+    - Uses cosine similarity with configurable threshold (default: 0.3)
+
     Attributes:
         chat: ChatProvider for contradiction detection
         enabled: Whether this constraint is active (default: True)
         use_fusion: If True, always use 3-prompt fusion (default: False)
         adaptive: If True, select method based on query type (default: False)
+        embedder: Optional embedding function for relevance gating
+        relevance_threshold: Min query-chunk similarity to check for conflicts (default: 0.3)
     """
 
     chat: "ChatProvider | None" = None
     enabled: bool = True
     use_fusion: bool = False
     adaptive: bool = False
+    embedder: Callable[[str], list[float]] | None = None
+    relevance_threshold: float = 0.45
     _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
     _numerical_detector: NumericalConflictDetector = field(
         default_factory=NumericalConflictDetector, repr=False, compare=False
@@ -188,6 +198,28 @@ class ConflictAwareConstraint:
     @property
     def name(self) -> str:
         return "conflict_aware"
+
+    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
+        """Compute cosine similarity between two vectors."""
+        dot = sum(a * b for a, b in zip(vec1, vec2))
+        norm1 = math.sqrt(sum(a * a for a in vec1))
+        norm2 = math.sqrt(sum(b * b for b in vec2))
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+        return dot / (norm1 * norm2)
+
+    def _is_chunk_relevant(self, query_embedding: list[float], chunk: Chunk) -> bool:
+        """Check if a chunk is relevant to the query via embedding similarity."""
+        if not self.embedder:
+            return True  # No embedder = assume relevant
+
+        try:
+            chunk_embedding = self.embedder(chunk.content[:500])
+            sim = self._cosine_similarity(query_embedding, chunk_embedding)
+            return sim >= self.relevance_threshold
+        except Exception as e:
+            logger.warning(f"{PIPELINE} ConflictAwareConstraint: relevance check failed: {e}")
+            return True  # Fail open
 
     def _get_chunk_stance(self, query: str, chunk: Chunk) -> str:
         """
@@ -367,9 +399,29 @@ class ConflictAwareConstraint:
             )
             return ConstraintResult.allow()
 
-        # Use pairwise contradiction detection (more reliable than per-chunk stance)
-        # Check first chunk against all others (limit to 4 comparisons)
+        # Relevance gate: filter out chunks not relevant to the query
+        # This prevents false disputes from irrelevant content pairs
         chunks_to_check = list(chunks[:5])
+        if self.embedder:
+            try:
+                query_embedding = self.embedder(query)
+                relevant_chunks = [
+                    c for c in chunks_to_check
+                    if self._is_chunk_relevant(query_embedding, c)
+                ]
+                filtered = len(chunks_to_check) - len(relevant_chunks)
+                if filtered > 0:
+                    logger.debug(
+                        f"{PIPELINE} ConflictAwareConstraint: relevance gate filtered "
+                        f"{filtered}/{len(chunks_to_check)} chunks"
+                    )
+                chunks_to_check = relevant_chunks
+            except Exception as e:
+                logger.warning(f"{PIPELINE} ConflictAwareConstraint: relevance gate failed: {e}")
+
+        if len(chunks_to_check) < 2:
+            return ConstraintResult.allow()
+
         first_chunk = chunks_to_check[0]
 
         # Choose detection method based on settings
