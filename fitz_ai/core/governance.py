@@ -221,6 +221,11 @@ class AnswerGovernor:
     2. "disputed" → DISPUTED (conflicting sources)
     3. any denial → QUALIFIED (some limitation)
     4. all pass → CONFIDENT (no restrictions)
+
+    Context-aware resolution:
+    When InsufficientEvidenceConstraint fires, dispute signals are
+    subordinated because contradictions in irrelevant or partially-relevant
+    content are noise, not meaningful disagreement.
     """
 
     def decide(self, results: Sequence["ConstraintResult"]) -> GovernanceDecision:
@@ -240,6 +245,8 @@ class AnswerGovernor:
         triggered: list[str] = []
         reasons: list[str] = []
         signals: set[str] = set()
+        constraint_signals: dict[str, str | None] = {}
+        constraint_metadata: dict[str, dict] = {}
 
         for result in results:
             if not result.allow_decisive_answer:
@@ -251,9 +258,13 @@ class AnswerGovernor:
                     reasons.append(result.reason)
                 if result.signal:
                     signals.add(result.signal)
+                constraint_signals[name] = result.signal
+                constraint_metadata[name] = result.metadata
 
-        # Resolve mode using signal priority
-        mode = self._resolve_mode(signals, has_denials=bool(triggered))
+        # Resolve mode using signal priority with context-aware resolution
+        mode = self._resolve_mode(
+            signals, constraint_signals, constraint_metadata, has_denials=bool(triggered)
+        )
 
         return GovernanceDecision(
             mode=mode,
@@ -262,20 +273,77 @@ class AnswerGovernor:
             signals=frozenset(signals),
         )
 
-    def _resolve_mode(self, signals: set[str], has_denials: bool) -> AnswerMode:
+    # Similarity threshold below which IE's "qualified" signal indicates
+    # content is only loosely related, making dispute signals unreliable.
+    # Above this threshold, content is genuinely related and disputes may
+    # reflect real contradictions.
+    _IE_LOW_RELEVANCE_THRESHOLD = 0.70
+
+    def _resolve_mode(
+        self,
+        signals: set[str],
+        constraint_signals: dict[str, str | None],
+        constraint_metadata: dict[str, dict],
+        has_denials: bool,
+    ) -> AnswerMode:
         """
-        Resolve answer mode from signals using priority order.
+        Resolve answer mode from signals using priority order with
+        context-aware dispute subordination.
 
         Priority:
-        1. "abstain" present → ABSTAIN
-        2. "disputed" present → DISPUTED
+        1. "abstain" present → ABSTAIN (includes dispute subordination)
+        2. "disputed" present → DISPUTED (unless subordinated)
         3. Any denials (even without signal) → QUALIFIED
         4. Otherwise → CONFIDENT
+
+        Dispute subordination:
+        When insufficient_evidence fires abstain, disputes are always
+        subordinated. When IE fires qualified with LOW similarity (below
+        _IE_LOW_RELEVANCE_THRESHOLD), the content is only loosely related
+        and disputes are noise. When IE fires qualified with HIGH
+        similarity, the content is genuinely related and disputes may
+        reflect real contradictions -- these are NOT subordinated.
         """
+        # Check for explicit abstain from insufficient_evidence even when
+        # the abstain signal might be overridden by other processing.
+        # This ensures IE's abstain always takes priority over disputes.
+        ie_signal = constraint_signals.get("insufficient_evidence")
+        if ie_signal == "abstain":
+            return AnswerMode.ABSTAIN
+
         if "abstain" in signals:
             return AnswerMode.ABSTAIN
+
         if "disputed" in signals:
+            # When IE fires qualified, check similarity to determine if
+            # the content is genuinely related (disputes meaningful) or
+            # only loosely related (disputes are noise).
+            if ie_signal == "qualified":
+                ie_meta = constraint_metadata.get("insufficient_evidence", {})
+                ie_similarity = ie_meta.get("max_similarity", 1.0)
+                if ie_similarity < self._IE_LOW_RELEVANCE_THRESHOLD:
+                    # Low similarity + IE qualified = content loosely related.
+                    # Disputes in loosely-related content are noise.
+                    return AnswerMode.QUALIFIED
+                # High similarity + IE qualified = content genuinely related
+                # but missing specific info. Disputes may be meaningful.
+                # Fall through to normal dispute resolution below.
+
+            # When multiple constraints fire qualified and only conflict_aware
+            # fires disputed, the qualified consensus is more trustworthy.
+            # This handles cases where complementary perspectives are
+            # misidentified as contradictions.
+            if "qualified" in signals:
+                qualified_count = sum(
+                    1 for s in constraint_signals.values() if s == "qualified"
+                )
+                disputed_count = sum(
+                    1 for s in constraint_signals.values() if s == "disputed"
+                )
+                if qualified_count >= 2 and disputed_count <= 1:
+                    return AnswerMode.QUALIFIED
             return AnswerMode.DISPUTED
+
         if has_denials:
             return AnswerMode.QUALIFIED
         return AnswerMode.CONFIDENT

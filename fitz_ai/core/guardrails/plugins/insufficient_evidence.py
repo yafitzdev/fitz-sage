@@ -618,13 +618,25 @@ class InsufficientEvidenceConstraint:
                     f"{PIPELINE} InsufficientEvidenceConstraint: {reason} "
                     f"(similarity={max_sim:.3f}) -> ABSTAIN"
                 )
-                return ConstraintResult.deny(
-                    reason=f"Context not relevant: {reason} (similarity={max_sim:.3f})",
-                    signal="abstain",
-                    evidence_count=len(chunks),
-                    max_similarity=max_sim,
-                    detection_reason=reason,
-                )
+                # RELEVANCE_FIX_APPLIED: Distinguish between abstain and qualified
+                # If similarity is moderate-high but missing specific entities, return qualified not abstain
+                if max_sim >= 0.57 and "missing_entity" in reason:  # THRESHOLD_TUNED: 0.6->0.55->0.50->0.57
+                    return ConstraintResult.deny(
+                        reason=f"Context is related but lacks specific information: {reason} (similarity={max_sim:.3f})",
+                        signal="qualified",  # Changed from abstain - context IS related
+                        evidence_count=len(chunks),
+                        max_similarity=max_sim,
+                        detection_reason=reason,
+                    )
+                else:
+                    # Low similarity or critical issues -> abstain
+                    return ConstraintResult.deny(
+                        reason=f"Context not relevant: {reason} (similarity={max_sim:.3f})",
+                        signal="abstain",
+                        evidence_count=len(chunks),
+                        max_similarity=max_sim,
+                        detection_reason=reason,
+                    )
             logger.debug(
                 f"{PIPELINE} InsufficientEvidenceConstraint: {reason} (similarity={max_sim:.3f})"
             )

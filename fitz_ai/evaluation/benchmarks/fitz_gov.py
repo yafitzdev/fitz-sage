@@ -332,6 +332,7 @@ class FitzGovBenchmark:
                 CausalAttributionConstraint,
                 ConflictAwareConstraint,
                 InsufficientEvidenceConstraint,
+                SpecificInfoTypeConstraint,
             )
 
             # Use model override if specified, otherwise use engine's chat factory
@@ -343,6 +344,7 @@ class FitzGovBenchmark:
             embedder = self._embedder if self._embedder else pipeline.embedder.embed
             constraints = [
                 InsufficientEvidenceConstraint(embedder=embedder),
+                SpecificInfoTypeConstraint(),  # NEW: Detect missing specific info types
                 CausalAttributionConstraint(),
                 ConflictAwareConstraint(
                     chat=fast_chat,

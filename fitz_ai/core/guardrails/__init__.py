@@ -47,6 +47,7 @@ from .plugins.conflict_aware import ConflictAwareConstraint
 from .plugins.deterministic_conflict import DeterministicConflictConstraint
 from .plugins.governance_analyzer import GovernanceAnalyzer
 from .plugins.insufficient_evidence import InsufficientEvidenceConstraint
+from .plugins.specific_info_type import SpecificInfoTypeConstraint
 from .runner import run_constraints
 from .semantic import SemanticMatcher
 
@@ -155,6 +156,7 @@ __all__ = [
     "ConflictAwareConstraint",
     "DeterministicConflictConstraint",
     "InsufficientEvidenceConstraint",
+    "SpecificInfoTypeConstraint",
     "CausalAttributionConstraint",
     "AnswerVerificationConstraint",
     # Factory functions

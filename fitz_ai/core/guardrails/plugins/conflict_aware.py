@@ -100,20 +100,39 @@ RESOLUTION_KEYWORDS = (
     "which is correct",
 )
 
-# Keywords that indicate uncertainty/causal queries (use conservative detection)
+# Keywords that indicate uncertainty/causal/opinion queries (use conservative detection)
+# These query types often have legitimately mixed evidence that should NOT trigger
+# dispute mode. Routing them through fusion (3-prompt majority vote) reduces false
+# disputes while preserving true contradiction detection for factual queries.
 UNCERTAINTY_QUERY_PATTERNS = (
+    # Causal/explanatory
     "why ",
     "why?",
     "what caused",
     "what led to",
     "how come",
     "what made",
+    # Uncertainty language
     "might",
     "could",
     "possibly",
     "potentially",
     "likely",
     "unlikely",
+    # Impact/effect queries (often have legitimately varied evidence)
+    "what impact",
+    "what effect",
+    "how does",
+    "how do ",
+    # Prediction phrases (specific, not just "will")
+    "will be in ",
+    "predict",
+    "forecast",
+    # Subjective evaluation
+    "is it worth",
+    "do you think",
+    "should we",
+    "should i",
 )
 
 
@@ -256,8 +275,8 @@ class ConflictAwareConstraint:
         2. Inverted: "Are these CONSISTENT?" (NO = contradict)
         3. Logical: "If A is true, can B be true?" (NO = contradict)
 
-        Returns True if 2+ prompts indicate contradiction.
-        This reduces variance by requiring consensus.
+        Returns True if 2+ prompts indicate contradiction (majority vote).
+        This reduces variance by requiring consensus across differently-framed prompts.
         """
         if not self.chat:
             return False
