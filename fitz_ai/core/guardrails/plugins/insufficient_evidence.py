@@ -339,10 +339,29 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str], set[str]
     # Quoted terms are primary — user explicitly highlighted them
     primary.update(q.lower() for q in quoted)
 
-    # Years (4-digit numbers) - CRITICAL, must match exactly
+    # Years (4-digit numbers) - usually CRITICAL, must match exactly
+    # Exception: forecasting queries ("will X be in 2026", "predict by 2030")
+    # where trend/forecast data without the exact year is still useful (→ qualified not abstain)
     years = re.findall(r"\b(19\d{2}|20\d{2})\b", query)
     specific.update(years)
-    critical.update(years)
+
+    q_lower = query.lower()
+    _FORECAST_PATTERNS = (
+        "will be in ",
+        "by 20",
+        "by 19",
+        "in the next ",
+        "forecast",
+        "predict",
+        "projection",
+        "expected by",
+        "estimated by",
+        "outlook for",
+    )
+    is_forecast = any(p in q_lower for p in _FORECAST_PATTERNS)
+
+    if years and not is_forecast:
+        critical.update(years)
 
     # Numbered qualifiers like "type 2", "tier 1", "phase 3", "version 2.0"
     # These are CRITICAL - "type 2 diabetes" vs "type 1 diabetes" is a different entity

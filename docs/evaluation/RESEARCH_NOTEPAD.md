@@ -1311,4 +1311,79 @@ The +16 net improvement is the largest single-experiment gain in the entire rese
 
 ---
 
+## Experiment 011: Evidence Character Gate + Forecast Year Relaxation (Feb 6, 2026)
+
+**Branch**: `refactor/staged-constraint-pipeline`
+
+Two targeted fixes applied after Experiment 010's primary referent rule.
+
+### Fix 2: Evidence Character Classification (CA Gate)
+
+**Problem**: ConflictAware treats all chunk pairs identically. A hedged/preliminary source pair ("preliminary findings suggest...") looks like a contradiction to the 3B model, when it's really two uncertain sources reaching tentatively different conclusions.
+
+**Implementation**: Added binary regex classification in `conflict_aware.py`:
+- `_classify_evidence_character(text)` returns `"assertive"`, `"hedged"`, or `"mixed"`
+- Uses `_HEDGE_PATTERNS` (20 patterns: may, might, suggests, preliminary, limited evidence...) and `_ASSERT_PATTERNS` (13 patterns: confirmed, proven, FDA approved, p-values, percentages...)
+- Classification rule: `hedge >= 3 && assert <= 1` → hedged; `hedge >= 2 && assert >= 2` → mixed; else → assertive
+
+**Pair-conditioned truth table**:
+| Chunk A | Chunk B | Routing |
+|---------|---------|---------|
+| hedged | hedged | SKIP (no conflict check) |
+| assertive | assertive | Standard pairwise |
+| mixed/hedged | assertive | Fusion (higher bar) |
+| assertive | mixed/hedged | Fusion (higher bar) |
+| mixed | mixed | Fusion (higher bar) |
+
+**Benchmark Impact**: Zero on fitz-gov 2.0 — 100% of benchmark chunks classify as assertive. This is expected: the benchmark uses short factual statements, not hedged academic prose.
+
+**Rationale for keeping** (despite zero benchmark impact):
+1. Real-world RAG queries over academic/medical documents WILL have hedged sources
+2. Epistemic honesty > benchmark chasing — the feature is conceptually correct
+3. Zero negative impact on any metric
+4. Will be exercised by fitz-gov 3.0 with more complex evidence types
+
+### Fix 3: Forecasting Year Relaxation (IE)
+
+**Problem**: InsufficientEvidenceConstraint treats years as critical entities. For historical queries ("2024 World Series results"), this is correct — a 2023 source can't answer a 2024 question. But for forecast queries ("GDP forecast for 2026"), trend data from any recent year is relevant.
+
+**Implementation**: Added forecast pattern detection in `_extract_specific_entities()`:
+```python
+_FORECAST_PATTERNS = (
+    "will be in ", "by 20", "by 19", "in the next ",
+    "forecast", "predict", "projection", "expected by",
+    "estimated by", "outlook for",
+)
+is_forecast = any(p in q_lower for p in _FORECAST_PATTERNS)
+if years and not is_forecast:
+    critical.update(years)  # Only historical queries get year-critical
+```
+
+**Validation**:
+| Query | Year Critical? | Correct? |
+|-------|---------------|----------|
+| "What happened in the 2024 World Series?" | Yes | Historical |
+| "Will autonomous vehicles be mainstream by 2030?" | No | Forecast |
+| "What is the GDP forecast for 2026?" | No | Forecast |
+| "What were the election results in 2020?" | Yes | Historical |
+| "Predict Bitcoin price in 2025" | No | Forecast |
+| "What is the population projection by 2050?" | No | Forecast |
+| "How many people lived in NYC in 1990?" | Yes | Historical |
+
+**Benchmark Impact**: Zero on fitz-gov 2.0 — no benchmark cases hit the forecast path. Same rationale as Fix 2: epistemically correct, zero downside, will matter for real-world queries.
+
+### Combined State After All Three Fixes
+
+| Metric | Pre-Fix Baseline | Post Exp 010-011 |
+|--------|------------------|------------------|
+| Overall (gov) | 63.9% | **70.3%** |
+| Abstention | 31.7% | **57.1%** |
+| Dispute | 90.9% | 87.3% |
+| Qualification | 54.4% | 55.9% |
+| Confidence | 82.5% | 84.1% |
+
+The +6.4pp overall gain comes entirely from Experiment 010 (primary referent rule). Experiments 011's two fixes add zero benchmark impact but strengthen real-world epistemic honesty.
+
+---
+
 *This is a living document. Update continuously with new findings.*
