@@ -17,6 +17,7 @@ This uses a simple per-chunk stance classification:
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Sequence
 
@@ -135,6 +136,88 @@ UNCERTAINTY_QUERY_PATTERNS = (
     "should we",
     "should i",
 )
+
+
+# ---------------------------------------------------------------------------
+# Evidence character classification (deterministic, no LLM)
+# ---------------------------------------------------------------------------
+# Hedging markers: language indicating uncertainty, preliminary findings, tentative claims
+_HEDGE_PATTERNS = [
+    r"\bmay\b",
+    r"\bmight\b",
+    r"\bcould\b",
+    r"\bsuggests?\b",
+    r"\bpreliminary\b",
+    r"\blimited evidence\b",
+    r"\bmore research\b",
+    r"\bcannot conclude\b",
+    r"\binconclusive\b",
+    r"\bassociated with\b",
+    r"\bcorrelated\b",
+    r"\bobservational\b",
+    r"\btentative\b",
+    r"\bappears? to\b",
+    r"\bseems? to\b",
+    r"\bpossibly\b",
+    r"\bpotentially\b",
+    r"\bunclear\b",
+    r"\bnot (yet |fully )?established\b",
+    r"\bearly (results?|findings?|data|studies?|evidence)\b",
+    r"\bwarrants? further\b",
+    r"\bnot definitive\b",
+    r"\brequires? (more|further|additional)\b",
+]
+
+# Assertive markers: language indicating firm claims, established facts, confirmed findings
+_ASSERT_PATTERNS = [
+    r"\bconfirmed?\b",
+    r"\bproven\b",
+    r"\bestablished\b",
+    r"\bdefinitely\b",
+    r"\bclearly\b",
+    r"\bFDA approved\b",
+    r"\bbanned\b",
+    r"\brequires?\b",
+    r"\bmust\b",
+    r"\bcauses?\b",
+    r"\bproves?\b",
+    r"\b\d+(\.\d+)?%\b",  # Specific percentages
+    r"\bn\s*=\s*\d+\b",  # Sample sizes
+    r"\bp\s*[<>=]\s*0?\.\d+\b",  # p-values
+]
+
+_HEDGE_RE = [re.compile(p, re.IGNORECASE) for p in _HEDGE_PATTERNS]
+_ASSERT_RE = [re.compile(p, re.IGNORECASE) for p in _ASSERT_PATTERNS]
+
+
+def _classify_evidence_character(text: str) -> str:
+    """
+    Classify a chunk's evidence character as 'assertive', 'hedged', or 'mixed'.
+
+    Uses weighted regex pattern matching. No LLM call.
+    Default is 'assertive' — hedged classification requires positive evidence
+    of uncertainty language. This prevents short factual statements from being
+    classified as 'mixed' due to lack of explicit assertive markers.
+
+    Returns:
+        'assertive' - firm claims, established facts, or neutral factual statements
+        'hedged' - preliminary, uncertain, tentative language dominates
+        'mixed' - both assertive and hedged language present in significant amounts
+    """
+    hedge_count = sum(1 for pat in _HEDGE_RE if pat.search(text))
+    assert_count = sum(1 for pat in _ASSERT_RE if pat.search(text))
+
+    # Hedged: multiple hedge markers and few/no assertive markers
+    if hedge_count >= 3 and assert_count <= 1:
+        return "hedged"
+
+    # Mixed: significant presence of both hedge and assertive language
+    if hedge_count >= 2 and assert_count >= 2:
+        return "mixed"
+
+    # Default: assertive. Factual statements without hedge language are assertive
+    # even if they lack explicit assertive markers (e.g., "Revenue was $5M").
+    return "assertive"
 
 
 def _is_resolution_query(query: str) -> bool:
@@ -424,39 +507,60 @@ class ConflictAwareConstraint:
 
         first_chunk = chunks_to_check[0]
 
-        # Choose detection method based on settings
+        # Classify evidence character for the first chunk (reused across pairs)
+        first_char = _classify_evidence_character(first_chunk.content)
+
+        # Choose base detection method based on settings
         if self.adaptive:
-            # Adaptive mode: use fusion for uncertainty queries, standard for factual
             use_fusion_for_query = _is_uncertainty_query(query)
-            check_method = (
+            base_method = (
                 self._check_pairwise_fusion
                 if use_fusion_for_query
                 else self._check_pairwise_contradiction
             )
-            method_name = "adaptive-fusion" if use_fusion_for_query else "adaptive-pairwise"
+            base_method_name = "adaptive-fusion" if use_fusion_for_query else "adaptive-pairwise"
             logger.debug(
-                f"{PIPELINE} ConflictAwareConstraint: adaptive mode selected {method_name} "
+                f"{PIPELINE} ConflictAwareConstraint: adaptive mode selected {base_method_name} "
                 f"(uncertainty_query={use_fusion_for_query})"
             )
         else:
-            # Fixed mode: use fusion if explicitly enabled
-            check_method = (
+            base_method = (
                 self._check_pairwise_fusion
                 if self.use_fusion
                 else self._check_pairwise_contradiction
             )
-            method_name = "fusion" if self.use_fusion else "pairwise"
+            base_method_name = "fusion" if self.use_fusion else "pairwise"
 
         for other_chunk in chunks_to_check[1:]:
+            other_char = _classify_evidence_character(other_chunk.content)
+
+            # Evidence character gating (pair-conditioned truth table):
+            # hedged vs hedged → skip (most "contradictions" are nuance/caveats)
+            if first_char == "hedged" and other_char == "hedged":
+                logger.debug(
+                    f"{PIPELINE} ConflictAwareConstraint: skipping hedged-hedged pair"
+                )
+                continue
+
+            # assertive vs assertive → standard method (likely real contradictions)
+            # any hedged/mixed involved → use fusion for higher bar
+            if first_char == "assertive" and other_char == "assertive":
+                check_method = base_method
+                method_name = base_method_name
+            else:
+                check_method = self._check_pairwise_fusion
+                method_name = f"{base_method_name}+evidence-gate-fusion"
+
             if check_method(query, first_chunk, other_chunk):
                 logger.info(
                     f"{PIPELINE} ConflictAwareConstraint ({method_name}): contradiction detected "
-                    f"between chunks"
+                    f"between chunks (chars: {first_char} vs {other_char})"
                 )
                 return ConstraintResult.deny(
                     reason="Retrieved chunks contain contradictory information",
                     signal="disputed",
                     method=method_name,
+                    evidence_characters=f"{first_char}_vs_{other_char}",
                 )
 
         logger.debug(f"{PIPELINE} ConflictAwareConstraint: no contradiction detected")
