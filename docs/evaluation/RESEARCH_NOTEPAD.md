@@ -1223,6 +1223,99 @@ The 20 false positive disputes and the 45 correct disputes look **identical** fr
 
 ---
 
+## Experiment 009.5: Staged Constraint Pipeline Architecture (Feb 6, 2026)
+
+**Goal**: Replace the flat constraint runner with a hierarchical staged pipeline where stages execute in dependency order and share context — addressing the architectural root cause identified in Experiment 009.
+
+**Branch**: `refactor/staged-constraint-pipeline`
+**Commit**: `7132ab6`
+
+### The Problem (from Experiment 009)
+
+The constraint system was fragmented — 5 independent constraints made isolated decisions, then `AnswerGovernor` tried to reconcile contradictory signals after the fact. Experiment 009 proved this architecture was fundamentally limited: the governor couldn't distinguish correct disputes from false positives because both looked identical at the signal level (45/50 correct and 16/20 false positive disputes were all "lone CA fires" with IE=allow).
+
+The core issue: constraints didn't share context. ConflictAware didn't know that IE already assessed relevance. The governor couldn't reason about *why* a constraint fired — only *that* it fired.
+
+### Architecture: Three-Stage Pipeline
+
+```
+Stage 1: RELEVANCE          → Can we even talk about this topic?
+  InsufficientEvidenceConstraint
+  SpecificInfoTypeConstraint
+        │
+        │ short-circuits on "abstain" (skip stages 2-3)
+        │ passes: max_similarity, relevance_signal
+        ▼
+Stage 2: SUFFICIENCY         → Does the evidence cover what was asked?
+  CausalAttributionConstraint
+  AnswerVerificationConstraint
+        │
+        │ passes: evidence_gaps
+        ▼
+Stage 3: CONSISTENCY         → Do the relevant chunks agree?
+  ConflictAwareConstraint (or DeterministicConflictConstraint)
+        │
+        ▼
+list[ConstraintResult] → AnswerGovernor.decide() (unchanged)
+```
+
+### Implementation
+
+**New file**: `fitz_ai/core/guardrails/staged.py`
+
+Key components:
+- **`StageContext`** dataclass — accumulated context passed between stages (relevance_confirmed, max_similarity, relevance_signal, evidence_gaps, etc.)
+- **`ConstraintStage`** dataclass — groups constraints into a named stage with optional short_circuit_signals
+- **`StagedConstraintPipeline`** class — executes stages in order, passes context forward, short-circuits when Stage 1 emits "abstain"
+- **`run_staged_constraints()`** free function — drop-in replacement for `run_constraints()`, auto-classifies constraints into stages by their `.name` property
+
+**Modified**: `fitz_ai/core/guardrails/runner.py` — `run_constraints()` now delegates to `run_staged_constraints()`. Flat logic preserved as `_run_constraints_flat()`.
+
+**Stage classification** (by constraint name):
+| Constraint | Stage |
+|------------|-------|
+| `insufficient_evidence` | Relevance |
+| `specific_info_type` | Relevance |
+| `causal_attribution` | Sufficiency |
+| `answer_verification` | Sufficiency |
+| `conflict_aware` | Consistency |
+| `deterministic_conflict` | Consistency |
+| Unknown names | Sufficiency (safe default) |
+| `governance_analyzer` | Bypasses staging (single unified stage) |
+
+### Key Design Decisions
+
+1. **Short-circuit on abstain only**: When IE fires `abstain`, stages 2-3 are skipped entirely. `qualified` does NOT short-circuit — the system still needs to check for contradictions in relevant-but-incomplete content.
+
+2. **Context propagation via StageContext**: Each stage reads and writes to a shared dataclass. This enables future improvements where downstream constraints can use upstream findings (e.g., CA could check IE's similarity score).
+
+3. **Same output contract**: Returns `list[ConstraintResult]` — AnswerGovernor is completely unchanged. The refactor is invisible to the governance layer.
+
+4. **Fail-safe preserved**: If a constraint raises an exception, it's caught and logged (same as flat runner). The stage continues with remaining constraints.
+
+### Benchmark Impact
+
+**Zero** — the staged pipeline produces identical results to the flat runner for all fitz-gov 2.0 cases. This is by design: the architecture change enables future improvements (like the short-circuit preventing false disputes on irrelevant content) but doesn't change any constraint logic.
+
+The pipeline's value is structural: it provides the foundation for experiments 010-011 and future work where constraints need to share context.
+
+### Test Coverage
+
+22 new tests in `tests/unit/test_staged_pipeline.py`:
+- Stages execute in correct order (relevance → sufficiency → consistency)
+- Abstain short-circuits: IE abstain → CA never called
+- Qualified does NOT short-circuit
+- Stage context propagates correctly
+- Result metadata includes stage name
+- Auto-classification groups constraints correctly
+- Unknown constraints default to sufficiency
+- Crashing constraints are skipped (fail-safe)
+- GovernanceAnalyzer bypasses stages
+
+All existing tests pass unchanged (`test_constraint_runner.py`, `test_governance.py`, `test_constraints.py`).
+
+---
+
 ## Experiment 010: Primary Referent Abstain Rule (Feb 6, 2026)
 
 **Goal**: Fix the core abstention failure — when the primary subject entity is missing from context, always abstain regardless of embedding similarity.
