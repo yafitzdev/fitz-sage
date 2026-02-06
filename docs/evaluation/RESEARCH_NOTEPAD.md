@@ -1026,4 +1026,63 @@ The estimates were too optimistic because they assumed fixes would be orthogonal
 
 ---
 
+## Experiment 007: Fusion-for-All ConflictAware
+
+**Started**: Feb 6, 2026, ~3:30 PM
+**Goal**: Reduce ConflictAware false positive rate (29.3%) by using 3-prompt fusion for ALL queries, not just uncertainty queries.
+
+### Hypothesis
+
+True contradictions will be consistently detected by 2/3 or 3/3 fusion prompts, while false positives (different perspectives, unrelated content) will only trigger 1/3 and be filtered out by majority vote.
+
+### Change
+
+One-line change in `conflict_aware.py` `apply()` method:
+```python
+# Before (adaptive selects method based on query type):
+use_fusion_for_query = _is_uncertainty_query(query)
+
+# After (always use fusion):
+use_fusion_for_query = True
+```
+
+### Results
+
+| Category | Before | After | Delta |
+|----------|--------|-------|-------|
+| Qualification | 54.4% (37/68) | 55.9% (38/68) | +1.5% (+1 case) |
+| **Dispute** | **89.1% (49/55)** | **61.8% (34/55)** | **-27.3% (-15 cases)** |
+
+### Analysis
+
+**SEVERE REGRESSION on dispute detection. Change reverted.**
+
+The qwen2.5:3b model is too small to give consistent answers across 3 differently-framed fusion prompts. True contradictions that the single pairwise prompt detects reliably get only 0/3 or 1/3 fusion votes because the model interprets the inverted/logical framings inconsistently.
+
+Breakdown of dispute failures:
+- `disputed->confident`: 16 cases (fusion missed true contradictions)
+- `disputed->qualified`: 4 cases
+- `disputed->abstain`: 1 case
+
+The qualification improvement was real: `qualified->disputed` dropped from 22 to 12 cases (10 fewer false disputes). But this was completely overshadowed by the 15 true disputes being missed.
+
+### Key Insight
+
+**Fusion is a model-size dependent technique.** With a 3B model:
+- Single pairwise: high recall (catches contradictions) but high FP rate (29%)
+- Fusion (2/3 vote): lower FP rate but kills true positives (-27pp dispute)
+
+The 3B model cannot maintain consistent reasoning across differently-framed prompts. This is a fundamental constraint of the model size, not a prompt engineering issue.
+
+### Conclusion
+
+**REVERTED. Not viable with qwen2.5:3b.**
+
+Viable alternatives for reducing ConflictAware FP rate:
+1. **Pre-filter**: Skip conflict detection when chunks are topically unrelated (embedding similarity between chunks < threshold)
+2. **Better single prompt**: Improve the pairwise prompt to reduce FP without multiple calls
+3. **Larger model**: The fusion approach would likely work with qwen2.5:7b or 14b
+
+---
+
 *This is a living document. Update continuously with new findings.*
