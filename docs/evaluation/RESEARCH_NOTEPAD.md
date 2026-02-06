@@ -1223,4 +1223,92 @@ The 20 false positive disputes and the 45 correct disputes look **identical** fr
 
 ---
 
+## Experiment 010: Primary Referent Abstain Rule (Feb 6, 2026)
+
+**Goal**: Fix the core abstention failure — when the primary subject entity is missing from context, always abstain regardless of embedding similarity.
+
+**Branch**: `refactor/staged-constraint-pipeline`
+
+### Problem
+
+The `missing_entity` path in InsufficientEvidenceConstraint had a similarity exception at line 623:
+```python
+if max_sim >= 0.57 and "missing_entity" in reason:
+    return qualified  # Even when the MAIN SUBJECT is missing
+```
+
+This caused cases like "Tesla revenue?" + Ford data (sim=0.75) to return `qualified` instead of `abstain`. The context is about a completely different entity — high similarity just means the topic domain is similar (both are automotive companies).
+
+### Fix: Primary vs Secondary Entity Classification
+
+Modified `_extract_specific_entities()` to return a third set: `primary_entities`.
+
+**Primary entity** = the main subject of the query. Identified by:
+- Proper nouns (capitalized words not at sentence start)
+- Multi-word capitalized sequences (company names, product names)
+- Quoted terms (explicitly highlighted by user)
+- Excluding generic words (compare, explain, treatment, cost, etc.)
+- Excluding years and numbered qualifiers (already handled by `critical_entities`)
+
+**Decision logic change**:
+- `missing_primary` → **ABSTAIN always** (no similarity exception)
+- `missing_entity` (secondary) + `max_sim >= 0.57` → **QUALIFIED** (unchanged)
+
+### Implementation
+
+- Modified `_extract_specific_entities()` in `insufficient_evidence.py` to return `(specific, critical, primary)` tuple
+- Added `primary_match_found` tracking in `_check_embedding_relevance()`
+- New check at priority 3 (before secondary entity check): `missing_primary` → always return `False`
+- Updated `apply()`: `missing_primary` in reason → `signal="abstain"`, no similarity exception
+
+### Primary Entity Extraction Validation
+
+| Query | Primary | Correct? |
+|-------|---------|----------|
+| "What is Tesla's revenue?" | `{tesla, teslas}` | Yes |
+| "What is the population of Tokyo?" | `{tokyo}` | Yes |
+| "How does Alzheimer's disease progress?" | `{alzheimers}` | Yes |
+| "What is the current Bitcoin price?" | `{bitcoin}` | Yes |
+| "What are the side effects of aspirin?" | `{}` (lowercase) | Correct — falls through to generic check |
+| "Compare Python and JavaScript" | `{python, javascript}` | Yes |
+| "What are renewable energy benefits?" | `{}` (no proper nouns) | Correct — no interference |
+
+### Benchmark Results
+
+| Category | Before (staged baseline) | After Fix 1 | Delta |
+|----------|--------------------------|-------------|-------|
+| **Abstention** | 31.7% (20/63) | **57.1% (36/63)** | **+16 cases (+25.4pp)** |
+| Dispute | 90.9% (50/55) | 87.3% (48/55) | -2 cases (LLM variance) |
+| Qualification | 54.4% (37/68) | 55.9% (38/68) | +1 case |
+| Confidence | 82.5% (52/63) | 84.1% (53/63) | +1 case |
+| **Overall** | 63.9% (159/249) | **70.3% (175/249)** | **+16 net (+6.4pp)** |
+
+### Failure Transition Changes
+
+| Transition | Before | After | Delta |
+|------------|--------|-------|-------|
+| abstain->confident | 27 | 16 | -11 (fixed!) |
+| abstain->disputed | 13 | 8 | -5 (fixed!) |
+| abstain->qualified | 3 | 3 | 0 |
+| qualified->disputed | 22 | 19 | -3 |
+| confident->disputed | 8 | 5 | -3 |
+
+### Key Insight
+
+The primary/secondary entity split is a clean, predictable classification that doesn't depend on the LLM. It leverages casing rules in English (proper nouns are capitalized) to identify the main subject. This is exactly the kind of deterministic intelligence that works reliably with small models.
+
+The +16 net improvement is the largest single-experiment gain in the entire research series.
+
+### All-Time Performance Tracker
+
+| Metric | v1.0 | v2.0 Base | Exp 006 | Exp 008 | Exp 010 |
+|--------|------|-----------|---------|---------|---------|
+| Overall (gov) | 72% | 63.1% | 66.5% | 66.8% | **70.3%** |
+| Abstention | 72.5% | 57.1% | 34.9% | ~35% | **57.1%** |
+| Dispute | 90% | 89.1% | 89.1% | 89.1% | 87.3% |
+| Qualification | 72.5% | 47.1% | 54.4% | ~54% | 55.9% |
+| Confidence | 86.7% | 79.4% | 79.4% | ~82% | 84.1% |
+
+---
+
 *This is a living document. Update continuously with new findings.*

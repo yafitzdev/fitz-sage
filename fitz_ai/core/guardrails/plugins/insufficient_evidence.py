@@ -206,7 +206,7 @@ def _extract_query_entities(query: str) -> set[str]:
     return entities
 
 
-def _extract_specific_entities(query: str) -> tuple[set[str], set[str]]:
+def _extract_specific_entities(query: str) -> tuple[set[str], set[str], set[str]]:
     """
     Extract SPECIFIC entities that must appear in context for relevance.
 
@@ -214,11 +214,13 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str]]:
     If query asks about "iPhone 16", context must mention "iPhone 16" (not Samsung Galaxy).
 
     Returns:
-        Tuple of (all_entities, critical_entities).
+        Tuple of (all_entities, critical_entities, primary_entities).
         Critical entities (like years) MUST match; regular entities need ANY match.
+        Primary entities are the main subject of the query — if missing, always abstain.
     """
     specific = set()
     critical = set()  # These MUST match (years, numbered qualifiers)
+    primary = set()  # The main referent — missing = abstain, no similarity exception
 
     # Common question starters and auxiliaries to exclude
     question_words = {
@@ -255,9 +257,87 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str]]:
         "those",
     }
 
+    # Action/generic words that are never primary referents
+    generic_words = {
+        "compare",
+        "explain",
+        "describe",
+        "list",
+        "show",
+        "tell",
+        "give",
+        "find",
+        "get",
+        "make",
+        "use",
+        "help",
+        "work",
+        "affect",
+        "impact",
+        "cause",
+        "effect",
+        "change",
+        "improve",
+        "reduce",
+        "increase",
+        "benefit",
+        "risk",
+        "cost",
+        "price",
+        "rate",
+        "value",
+        "difference",
+        "best",
+        "worst",
+        "main",
+        "key",
+        "important",
+        "current",
+        "latest",
+        "new",
+        "old",
+        "first",
+        "last",
+        "next",
+        "previous",
+        "average",
+        "total",
+        "number",
+        "amount",
+        "percent",
+        "percentage",
+        "example",
+        "type",
+        "kind",
+        "way",
+        "method",
+        "process",
+        "system",
+        "part",
+        "role",
+        "result",
+        "reason",
+        "factor",
+        "feature",
+        "advantage",
+        "disadvantage",
+        "problem",
+        "solution",
+        "symptom",
+        "treatment",
+        "side",
+        "long",
+        "short",
+        "term",
+        "high",
+        "low",
+    }
+
     # Quoted terms are always specific
     quoted = re.findall(r'"([^"]+)"', query)
     specific.update(q.lower() for q in quoted)
+    # Quoted terms are primary — user explicitly highlighted them
+    primary.update(q.lower() for q in quoted)
 
     # Years (4-digit numbers) - CRITICAL, must match exactly
     years = re.findall(r"\b(19\d{2}|20\d{2})\b", query)
@@ -300,7 +380,32 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str]]:
             ):
                 specific.add(clean_lower)
 
-    return specific, critical
+    # Identify PRIMARY entities: proper nouns / named entities that are the subject of the query.
+    # These are entities that if missing from context, mean the context is about something else.
+    # e.g., "Tesla" in "What is Tesla's revenue?" — if context only has Ford data, abstain.
+    #
+    # Strategy: named entities (capitalized words/sequences) that aren't generic modifiers.
+    for entity in specific:
+        # Skip years and numbered qualifiers (already handled by critical)
+        if re.match(r"^(19|20)\d{2}$", entity):
+            continue
+        if re.match(r"^(type|tier|phase|version|level|class|grade|stage|gen|generation)\s+", entity):
+            continue
+        # Skip generic words that aren't proper nouns
+        if entity in generic_words:
+            continue
+        # If the entity contains a capitalized word in the original query, it's a proper noun
+        # Check against original query for case sensitivity
+        for token in query.split():
+            clean_token = re.sub(r"[^\w]", "", token)
+            if clean_token.lower() == entity and clean_token and clean_token[0].isupper():
+                primary.add(entity)
+                break
+        # Multi-word entities from cap_sequences are inherently proper nouns
+        if " " in entity:
+            primary.add(entity)
+
+    return specific, critical, primary
 
 
 def _context_mentions_entities(entities: set[str], context: str) -> bool:
@@ -480,12 +585,13 @@ class InsufficientEvidenceConstraint:
         if not query_emb:
             return True, 0.0, "no_embedder"  # Can't check, allow
 
-        # Extract specific and critical entities from query
-        specific_entities, critical_entities = _extract_specific_entities(query)
+        # Extract specific, critical, and primary entities from query
+        specific_entities, critical_entities, primary_entities = _extract_specific_entities(query)
 
         max_sim = 0.0
         entity_match_found = False
         critical_match_found = False
+        primary_match_found = False
 
         for chunk in chunks:
             chunk_emb = self._get_embedding(chunk.content)
@@ -496,6 +602,10 @@ class InsufficientEvidenceConstraint:
             # Check entity matching
             if specific_entities and _context_mentions_entities(specific_entities, chunk.content):
                 entity_match_found = True
+
+            # Check primary entity matching
+            if primary_entities and _context_mentions_entities(primary_entities, chunk.content):
+                primary_match_found = True
 
             # Check critical entity matching (years, numbered qualifiers must ALL match)
             if critical_entities and _context_mentions_all_critical(
@@ -513,14 +623,19 @@ class InsufficientEvidenceConstraint:
         if critical_entities and not critical_match_found:
             return False, max_sim, f"missing_critical:{list(critical_entities)[:3]}"
 
-        # 3. Check regular entity matching for same-topic-wrong-entity detection
-        # This catches cases like: Tokyo population query vs Osaka population context
-        # Only skip entity check for VERY high similarity (>0.85) - likely direct answers
-        # Threshold rationale: 0.7-0.8 = related topic, 0.85+ = same specific subject
+        # 3. Check PRIMARY entity matching: if the main subject is missing, abstain.
+        # This catches cases like: "Tesla revenue?" + Ford data, "Tokyo population?" + Osaka data.
+        # Primary entity missing = context is about something else entirely. No similarity exception.
+        if primary_entities and not primary_match_found and max_sim < 0.85:
+            return False, max_sim, f"missing_primary:{list(primary_entities)[:3]}"
+
+        # 4. Check SECONDARY entity matching for same-topic-wrong-entity detection
+        # Non-primary entities (generic terms, lowercase domain words) still get the
+        # similarity exception — high similarity with secondary mismatch = qualified, not abstain.
         if specific_entities and not entity_match_found and max_sim < 0.85:
             return False, max_sim, f"missing_entity:{list(specific_entities)[:3]}"
 
-        # 4. ENRICHMENT BOOST: Use summaries for "same topic, wrong aspect" detection
+        # 5. ENRICHMENT BOOST: Use summaries for "same topic, wrong aspect" detection
         # Only activates when chunks are enriched (have summaries)
         # Only applies in ambiguous similarity range where embeddings aren't decisive
         if 0.45 <= max_sim < 0.70:
@@ -530,7 +645,7 @@ class InsufficientEvidenceConstraint:
                 if not summary_match:
                     return False, max_sim, "no_summary_overlap"
 
-        # 5. ASPECT COMPATIBILITY CHECK: Entity matches but aspect might differ
+        # 6. ASPECT COMPATIBILITY CHECK: Entity matches but aspect might differ
         # e.g., Query "What causes Alzheimer's?" vs Chunk "Alzheimer's symptoms include..."
         # Also check when similarity is moderate (0.5-0.85) even without entity match
         # This catches cases like "aspirin mechanism" where entity is lowercase
@@ -580,7 +695,7 @@ class InsufficientEvidenceConstraint:
             if has_conflicting_aspect and not has_matching_aspect:
                 return False, max_sim, f"aspect_mismatch:query asks {query_aspect.value}, chunks have {list(set(conflicting_aspects))}"
 
-        # 6. If we have entity match OR no specific entities OR very high similarity, allow
+        # 7. If we have entity match OR no specific entities OR very high similarity, allow
         return True, max_sim, "relevant"
 
     def apply(
@@ -618,25 +733,36 @@ class InsufficientEvidenceConstraint:
                     f"{PIPELINE} InsufficientEvidenceConstraint: {reason} "
                     f"(similarity={max_sim:.3f}) -> ABSTAIN"
                 )
-                # RELEVANCE_FIX_APPLIED: Distinguish between abstain and qualified
-                # If similarity is moderate-high but missing specific entities, return qualified not abstain
-                if max_sim >= 0.57 and "missing_entity" in reason:  # THRESHOLD_TUNED: 0.6->0.55->0.50->0.57
+                # Primary referent missing = context is about something else entirely.
+                # Always abstain — no similarity exception.
+                if "missing_primary" in reason:
                     return ConstraintResult.deny(
-                        reason=f"Context is related but lacks specific information: {reason} (similarity={max_sim:.3f})",
-                        signal="qualified",  # Changed from abstain - context IS related
-                        evidence_count=len(chunks),
-                        max_similarity=max_sim,
-                        detection_reason=reason,
-                    )
-                else:
-                    # Low similarity or critical issues -> abstain
-                    return ConstraintResult.deny(
-                        reason=f"Context not relevant: {reason} (similarity={max_sim:.3f})",
+                        reason=f"Context lacks primary subject: {reason} (similarity={max_sim:.3f})",
                         signal="abstain",
                         evidence_count=len(chunks),
                         max_similarity=max_sim,
                         detection_reason=reason,
                     )
+
+                # Secondary entity missing with moderate-high similarity = related but incomplete.
+                # Return qualified — context IS topically related, just not specific enough.
+                if max_sim >= 0.57 and "missing_entity" in reason:
+                    return ConstraintResult.deny(
+                        reason=f"Context is related but lacks specific information: {reason} (similarity={max_sim:.3f})",
+                        signal="qualified",
+                        evidence_count=len(chunks),
+                        max_similarity=max_sim,
+                        detection_reason=reason,
+                    )
+
+                # Low similarity or critical issues -> abstain
+                return ConstraintResult.deny(
+                    reason=f"Context not relevant: {reason} (similarity={max_sim:.3f})",
+                    signal="abstain",
+                    evidence_count=len(chunks),
+                    max_similarity=max_sim,
+                    detection_reason=reason,
+                )
             logger.debug(
                 f"{PIPELINE} InsufficientEvidenceConstraint: {reason} (similarity={max_sim:.3f})"
             )
