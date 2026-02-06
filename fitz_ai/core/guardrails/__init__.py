@@ -50,6 +50,7 @@ from .plugins.insufficient_evidence import InsufficientEvidenceConstraint
 from .plugins.specific_info_type import SpecificInfoTypeConstraint
 from .runner import run_constraints
 from .semantic import SemanticMatcher
+from .staged import ConstraintStage, StagedConstraintPipeline, StageContext, run_staged_constraints
 
 if TYPE_CHECKING:
     from fitz_ai.llm.providers.base import ChatProvider
@@ -165,4 +166,9 @@ __all__ = [
     "create_semantic_matcher",
     # Runner
     "run_constraints",
+    # Staged pipeline
+    "StagedConstraintPipeline",
+    "StageContext",
+    "ConstraintStage",
+    "run_staged_constraints",
 ]
