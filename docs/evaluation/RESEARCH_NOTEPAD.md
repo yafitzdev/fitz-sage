@@ -1142,4 +1142,85 @@ The gate infrastructure is valuable even if the current threshold only catches e
 
 ---
 
+## Experiment 009: Constraint Dependency Gating Analysis (Feb 6, 2026)
+
+**Hypothesis**: If InsufficientEvidence fires abstain/qualified before ConflictAware runs, skipping ConflictAware would eliminate false disputes on irrelevant content.
+
+**Approach**: Diagnostic analysis (no code changes). Ran all 249 governance cases, tracked per-constraint signals.
+
+### Diagnostic 1: IE + CA Co-Firing Patterns
+
+| When CA fires disputed, what did IE say? | Count |
+|------------------------------------------|-------|
+| IE=allow (content is relevant) | 84 |
+| IE=abstain | 5 |
+| IE=qualified | 3 |
+| **Total CA fires** | **92** |
+
+**Key finding**: 84/92 (91%) of CA fires happen when IE allows. The content IS relevant. Gating CA on IE signals would only affect 8/92 cases.
+
+### Diagnostic 2: Would Gating Fix Failures?
+
+Of 39 CA-related failures:
+- 36 have IE=allow → gating cannot help
+- 2 have IE=abstain → gating could help
+- 1 has IE=qualified+low_sim → gating could help
+- **Total fixable: 3/39 failures**
+
+But gating would also break 1 correct dispute (t1_dispute_medium_001 where IE=abstain but CA correctly detects contradiction).
+
+**Net impact: +2 cases at best.** Not worth the complexity.
+
+### Diagnostic 3: Lone Dispute Downgrade Analysis
+
+Tested alternative approach: "If ConflictAware is the ONLY constraint that fires (no other constraints deny), downgrade disputed to qualified."
+
+**Correct dispute cases (expected=disputed, CA fires correctly):**
+- Total: 50
+- Lone CA (only CA fires, no other constraint): **45**
+- Corroborated (CA + another constraint): **5**
+
+**Result: Downgrading lone CA would DESTROY dispute accuracy** (45/50 correct disputes are lone CA). The approach is catastrophically wrong.
+
+### Diagnostic 4: qualified->disputed Failure Analysis (20 cases)
+
+Deep dive into the 20 qualification cases wrongly classified as disputed:
+
+**Pattern A (16/20): Only CA fires, qualified_count=0, disputed_count=1**
+- No other constraint triggers qualified, so governance subordination rule (qualified>=2 beats disputed<=1) cannot help
+- Examples: "Does intermittent fasting improve cognitive function?", "Is this new cancer treatment effective?", "Will autonomous vehicles be mainstream by 2030?"
+- These are all nuanced/uncertain queries with legitimately mixed evidence
+
+**Pattern B (4/20): CA fires disputed + one other fires qualified (1:1 tie)**
+- Subordination rule needs qualified>=2 to override, but only 1 qualified fires
+- Examples: "Why do customers leave negative reviews?", "How do I use componentWillMount?"
+
+### Root Cause (Critical Insight)
+
+The 20 false positive disputes and the 45 correct disputes look **identical** from the governance layer:
+- Both are "lone CA fires" with no other constraints triggering
+- Both have IE=allow (content is relevant)
+- The ONLY difference is in the **content character**:
+  - **Correct disputes**: Direct factual contradictions ("FDA approved" vs "FDA rejected")
+  - **False positive disputes**: Nuanced/mixed evidence ("preliminary findings encouraging" + "more research needed")
+
+**No governance-level fix can distinguish these.** The fix must happen inside ConflictAwareConstraint itself - it needs to distinguish "factual contradiction" from "nuanced/uncertain evidence".
+
+### Implications
+
+1. **Constraint dependency gating**: Not viable. Almost all CA fires happen on relevant content.
+2. **Governance subordination**: Already optimal. Current rules handle what they can.
+3. **The problem is ConflictAware's sensitivity**: The 3B model can't distinguish genuine contradictions from legitimate nuance.
+4. **Possible approaches for Experiment 010**:
+   a. Aspect-aware contradiction detection (only flag contradictions about the SAME specific claim)
+   b. Evidence quality signal (preliminary/uncertain language should suppress dispute)
+   c. Model upgrade for conflict detection only (7B or 14B just for CA)
+   d. Two-stage CA: first classify if evidence is uncertain/preliminary, then only check for contradictions if evidence is assertive
+
+### Decision
+
+**No code changes.** This was a diagnostic-only experiment that proved dependency gating is not the right approach. The findings redirect future work toward improving ConflictAware's internal detection quality.
+
+---
+
 *This is a living document. Update continuously with new findings.*
