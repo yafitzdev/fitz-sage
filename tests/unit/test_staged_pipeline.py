@@ -331,9 +331,9 @@ class TestBuildStagedPipeline:
 
         assert len(pipeline.stages) == 3
         assert pipeline.stages[0].name == "relevance"
-        assert len(pipeline.stages[0].constraints) == 2
+        assert len(pipeline.stages[0].constraints) == 1
         assert pipeline.stages[1].name == "sufficiency"
-        assert len(pipeline.stages[1].constraints) == 2
+        assert len(pipeline.stages[1].constraints) == 3
         assert pipeline.stages[2].name == "consistency"
         assert len(pipeline.stages[2].constraints) == 1
 

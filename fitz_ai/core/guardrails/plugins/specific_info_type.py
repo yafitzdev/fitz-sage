@@ -212,6 +212,19 @@ class SpecificInfoTypeConstraint:
         ):
             return "warranty"
 
+        # RATE: Only when explicitly asking for a rate, percentage, salary, or average
+        # "what is the X rate" or "what is the rate of/for X"
+        if re.search(
+            r'\bwhat\b.*\b(rate|percentage|percent|ratio)\b',
+            query_lower,
+        ):
+            return "rate"
+        if re.search(
+            r'\b(average|median|mean)\b.*\b(salary|wage|income|pay|compensation)\b',
+            query_lower,
+        ):
+            return "rate"
+
         # DECISION: Only very explicit decision-seeking patterns
         if re.search(
             r'\b(should we|should i|is it worth|worth the risk|should we proceed)\b',
@@ -317,6 +330,23 @@ class SpecificInfoTypeConstraint:
                 return True
             # If context discusses the topic at all with evaluative language, count it
             if re.search(r'(good|bad|better|worse|best|worst|effective|efficient)', combined_text):
+                return True
+
+        elif info_type == "rate":
+            # Look for percentages, rates, ratios, salary figures
+            if re.search(r'\d+(\.\d+)?\s*%', combined_text):
+                return True
+            if re.search(r'\d+\s*percent', combined_text):
+                return True
+            if re.search(r'(rate|ratio)\s*(of|is|was|:)\s*\d', combined_text):
+                return True
+            if re.search(r'\$[\d,]+', combined_text):
+                return True
+            if re.search(r'\d+\s*(per|/)\s*(year|month|hour|annum|capita)', combined_text):
+                return True
+            if re.search(r'(salary|wage|income|compensation|pay).*?\d', combined_text):
+                return True
+            if re.search(r'\d+.*(salary|wage|income|compensation|pay)', combined_text):
                 return True
 
         elif info_type == "warranty":

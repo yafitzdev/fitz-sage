@@ -32,7 +32,7 @@ STAGE_CONSISTENCY = "consistency"
 # Constraint name -> stage mapping
 _STAGE_MAP: dict[str, str] = {
     "insufficient_evidence": STAGE_RELEVANCE,
-    "specific_info_type": STAGE_RELEVANCE,
+    "specific_info_type": STAGE_SUFFICIENCY,
     "causal_attribution": STAGE_SUFFICIENCY,
     "answer_verification": STAGE_SUFFICIENCY,
     "conflict_aware": STAGE_CONSISTENCY,

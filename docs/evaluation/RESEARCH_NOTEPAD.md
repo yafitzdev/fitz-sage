@@ -1594,4 +1594,63 @@ The 7b is only ~10% slower — model loading is amortized and the CA prompt is s
 
 ---
 
+## Experiment 013: SIT Stage Relocation + Answer Form Detection (Feb 7, 2026)
+
+**Goal**: Move SpecificInfoTypeConstraint from Stage 1 (Relevance) to Stage 2 (Sufficiency) and add new answer-form detection types (rates/percentages, versions) to catch `abstain→confident` and `qualified→confident` failures where the answer *form* is missing.
+
+**Branch**: `refactor/staged-constraint-pipeline`
+
+### Rationale
+
+Based on external analysis: regex is safe as a **confidence brake** when it only emits `qualified`, never decides modes. In Stage 2, SIT only runs on content already deemed relevant by Stage 1, eliminating the risk of abstention cascades.
+
+### Change 1: Move SIT to Stage 2 (Sufficiency)
+
+**File**: `fitz_ai/core/guardrails/staged.py` — changed `_STAGE_MAP["specific_info_type"]` from `STAGE_RELEVANCE` to `STAGE_SUFFICIENCY`.
+
+**Benchmark Impact**: Zero. Identical 70.3% (175/249). Expected — the move changes *when* SIT runs (after IE) but not *whether* it runs. The only behavioral difference: if IE short-circuits with `abstain`, SIT is now skipped (correct — no point checking info types in irrelevant content).
+
+**Structural value**: SIT now correctly lives in the sufficiency layer. It answers "does the relevant content contain the answer form?" not "is this content relevant at all?"
+
+### Change 2: Add `rate` Info Type
+
+Added detection for rate/percentage/salary queries:
+- Query patterns: `\bwhat\b.*\b(rate|percentage|percent|ratio)\b`, `\b(average|median|mean)\b.*\b(salary|wage|income|pay|compensation)\b`
+- Evidence patterns: `\d+(\.\d+)?\s*%`, `\$[\d,]+`, `(salary|wage).*\d`, rate/ratio with numbers, per-unit patterns
+
+**Benchmark Impact**: Zero. All three benchmarked runs (stage move, initial rate patterns, broadened rate patterns) produced identical 70.3%.
+
+### Why Zero Impact: The Decoy Data Problem
+
+Investigation of specific failure cases revealed why regex answer-form detection cannot help with fitz-gov 2.0:
+
+| Query | Expected | Chunk Content | SIT Behavior |
+|-------|----------|---------------|--------------|
+| "What is the capital gains tax rate?" | abstain | Income tax rates 10%-37%, corporate tax 21% | Detects `rate`, finds `%` in chunks → ALLOW |
+| "Average salary in Austin, Texas?" | abstain | National average $120k, California $145k | Detects `rate`, finds `$` in chunks → ALLOW |
+| "Customer retention rate per region?" | abstain | Revenue data with YoY growth percentages | Detects `rate`, finds `%` in chunks → ALLOW |
+
+**The benchmark chunks contain the right *form* but the wrong *entity*.** The contexts have percentages, salaries, and rates — just not for the specific thing being asked about. SIT correctly identifies the query needs a rate and correctly finds rate-like patterns in chunks. It cannot determine that "income tax rate" is not "capital gains tax rate" — that requires semantic understanding.
+
+This is the **decoy data pattern**: chunks that are topically related with the right answer morphology but for the wrong specific entity. It's the same fundamental limitation as the entity mismatch problem in IE — high embedding similarity + matching surface patterns + wrong referent.
+
+### Decision: Keep Changes, Skip Version Type
+
+The SIT→Stage 2 move and rate type are kept because:
+1. **Stage 2 placement is architecturally correct** (sufficiency, not relevance)
+2. **Rate detection is epistemically correct** — real-world queries where rate data is genuinely absent will benefit
+3. **Zero negative impact** on any benchmark metric
+4. Version type was analyzed and found to have the same decoy data problem — skipped
+
+### Key Insight
+
+The remaining `abstain→confident` and `qualified→confident` failures (16 + 7 = 23 cases) are **not answer-form problems**. They're **entity discrimination problems**: the system can't tell that "income tax" ≠ "capital gains tax" or "California salary" ≠ "Austin salary" when both are rates/salaries in the same domain.
+
+This problem sits between IE's entity extraction (which catches "Tesla" vs "Ford") and SIT's form detection (which catches "no number at all"). The gap is: **same domain, same form, different specific entity**. Solving this likely requires either:
+1. More granular entity extraction in IE (not just proper nouns but specific qualifiers like "capital gains" vs "income")
+2. LLM-based relevance checking (expensive but accurate)
+3. Cross-referencing query entities against chunk entities (entity alignment)
+
+---
+
 *This is a living document. Update continuously with new findings.*
