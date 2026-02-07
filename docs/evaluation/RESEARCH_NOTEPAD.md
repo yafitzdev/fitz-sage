@@ -1737,4 +1737,93 @@ This follows the same pattern as Experiments 011 and 013: **epistemically correc
 
 ---
 
+## Experiment 015: SIT Entity-Relevance LLM Verifier — NEGATIVE RESULT (Feb 7, 2026)
+
+**Hypothesis**: After SIT's regex finds an answer-form pattern (%, $, rates), an LLM can verify whether the matched data is about the **right entity** — catching the "decoy data" problem from Exp 013.
+
+**Branch**: `refactor/staged-constraint-pipeline`
+**Baseline**: 70.3% (175/249) from Exp 014
+
+### The Decoy Data Problem (from Exp 013)
+
+SIT's `_check_for_info_type()` uses regex to find answer-form patterns in chunks. It correctly identifies the answer *form* but cannot tell if the data is for the *right entity*:
+
+| Query | Expected | Chunk Content | SIT Behavior |
+|-------|----------|---------------|--------------|
+| "Capital gains tax rate?" | abstain | Income tax 10%-37%, corporate 21% | Finds `%` → ALLOW |
+| "Average salary in Austin?" | abstain | National avg $120k, California $145k | Finds `$` → ALLOW |
+| "Customer retention rate?" | abstain | Revenue YoY growth percentages | Finds `%` → ALLOW |
+
+### Design (Bounded LLM Selector)
+
+Added `chat` parameter to `SpecificInfoTypeConstraint`. After regex match, LLM verifies relevance:
+
+```
+_regex_check_info_type() finds match → chat available?
+  No → return True (graceful degradation)
+  Yes → LLM: "Is this data about the query subject?" → YES/NO
+    YES → return True (info found)
+    NO → return False (decoy data → trigger qualified)
+```
+
+### Variant A: Extracted Subject Prompt
+
+Prompt: `"Does this text contain {info_type} information specifically about '{subject}'?"`
+Subject extracted via existing `_extract_query_subject()`.
+
+**Result: 69.1% (172/249) — REGRESSION (-1.2%)**
+
+Problem: `_extract_query_subject()` returns poor subjects. E.g., "What is the deadline for the grant application?" → `['grant', 'application']` instead of the full query intent.
+
+### Variant B: Full Query Prompt
+
+Prompt: `"Does this text contain {info_type} information that answers this question: '{query}'?"`
+Uses full query directly — no lossy extraction.
+
+**Result: 69.1% (172/249) — SAME REGRESSION**
+
+### Failure Analysis
+
+| Transition | Count | Description |
+|-----------|-------|-------------|
+| `abstain→confident` fixed | +3 | LLM correctly rejected decoy data |
+| `confident→qualified` broken | -6 | LLM incorrectly rejected correct data |
+| Net | **-3** | More damage than benefit |
+
+**False positive examples** (LLM says NO on correct data):
+
+| Query | Chunk | LLM verdict |
+|-------|-------|-------------|
+| "How many employees does TechCorp have?" | "TechCorp employs 15,000 professionals" | NO |
+| "What is the deadline for the grant application?" | "Applications must be submitted by March 15, 2025" | NO |
+| "What is the retention rate for the loyalty program?" | "Loyalty program retains 78% of members" | NO |
+
+All six broken cases have clearly correct answers that the 3b model incorrectly rejects.
+
+### Root Cause
+
+**qwen2.5:3b cannot reliably perform YES/NO binary classification** for entity-relevance verification. The false negative rate (saying NO on correct data) exceeds the true positive rate (catching decoy data).
+
+This is the same fundamental 3b limitation documented in:
+- Exp 007: Fusion voting (3b outputs too noisy for majority voting)
+- Exp 012: Model scaling analysis (3b TP and FP drawn from same distribution)
+- Exp 012b: Query-type routing (conditional strategy doesn't help when base signal is noisy)
+
+### Decision: REVERTED
+
+All changes reverted. SIT remains regex-only. The bounded LLM selector pattern works for **selection from multiple candidates** (Exp 014: 5/6 correct) but fails for **binary verification** with 3b models. The discrimination task requires more model capacity than simple selection.
+
+### Implication for Remaining Proposals
+
+| Proposal | Task Type | 3b Viable? |
+|----------|-----------|-----------|
+| #1 SIT Verifier (this) | Binary YES/NO | No |
+| #2 Dispute Disambiguator | Binary classification | Likely no |
+| #3 Aspect Classifier | Multi-class selection | Possibly yes (similar to Exp 014) |
+| #4 Causal Evidence Verifier | Binary YES/NO | Likely no |
+
+Proposals #2 and #4 require the same binary classification capability that failed here. Proposal #3 (aspect classifier) is a multi-class selection task more similar to Exp 014's successful pattern.
+
+---
+
 *This is a living document. Update continuously with new findings.*
