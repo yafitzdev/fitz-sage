@@ -1899,4 +1899,121 @@ All changes reverted. Aspect classifier remains regex-only. The LLM bounded sele
 
 ---
 
+## Experiment 017: conflict_aware Deep-Dive and Attempted Fixes (Feb 7, 2026)
+
+**Objective**: Reduce the 34 conflict_aware false fires (46% of all 74 failures at 70.3%).
+
+**Branch**: `refactor/staged-constraint-pipeline`
+**Baseline**: 70.3% (175/249)
+
+### Failure Analysis Summary
+
+Full analysis of all 74 failures produced three dominant clusters:
+
+| Cluster | Failures | Root Cause |
+|---------|----------|------------|
+| **A: conflict_aware over-fire** | **34** | CA can't distinguish contradiction from nuance |
+| B: decoy data (abstain→confident) | 16 | No constraint detects off-topic evidence |
+| C: causal_attribution false fires | 6 | Process/comparison queries misclassified |
+
+Cluster A breakdown:
+- 19 qualified→disputed: CA calls nuanced/mixed evidence "contradictory"
+- 8 abstain→disputed: IE misses, CA fires wrong signal
+- 5 confident→disputed: CA fires on clearly answerable questions
+- 2 other transitions
+
+### conflict_aware Architecture
+
+```
+apply() → top 5 chunks → relevance gate (sim ≥ 0.45)
+  → for each pair:
+    → evidence character (hedged/assertive/mixed)
+    → hedged-hedged → skip
+    → assertive-assertive → base method (adaptive: std or fusion)
+    → any hedged/mixed → force fusion
+```
+
+**Adaptive mode** routes uncertainty queries to fusion (3-prompt, 2/3 majority) and factual queries to standard (1 pairwise prompt). Current config: `use_fusion=True, adaptive=True`.
+
+**Key metrics**: 48/55 dispute recall (87%), 34 false fires → 58.5% precision.
+
+### Approach 1: Fusion-Only — FAILED (63.9%)
+
+Removed adaptive routing. All queries use fusion (3-prompt majority vote).
+
+| Category | Baseline | Fusion-Only | Delta |
+|----------|----------|-------------|-------|
+| Dispute | 87.3% (48/55) | 56.4% (31/55) | **-17** |
+| Qualification | 55.9% (38/68) | 54.4% (37/68) | -1 |
+| Confidence | 84.1% (53/63) | 87.3% (55/63) | +2 |
+
+Fusion kills dispute recall. 18 disputed→confident. The 2/3 majority bar is too high — many true disputes fail it.
+
+### Approach 2: Standard + Fusion Confirmation Gate — FAILED (63.5%)
+
+Standard pairwise runs first; on CONTRADICT, confirm with fusion before firing. Effectively requires 3/4 agreement.
+
+| Category | Baseline | Confirmation | Delta |
+|----------|----------|-------------|-------|
+| Dispute | 87.3% (48/55) | 54.5% (30/55) | **-18** |
+
+Even worse. Same root cause: fusion confirmation rejects too many true disputes.
+
+### Approach 3: Stance Pre-Filter — NOT VIABLE
+
+Classify each chunk's stance (YES/NO/UNCLEAR) before pairwise. Only proceed when stances disagree.
+
+**Small sample (10 cases)**: Perfect discrimination — 5/5 true disputes show YES vs NO, 5/5 false fires show same-direction.
+
+**Full benchmark (55 disputes)**: Only 49% recall. Non-polar disputes ("How many?", "When?", "What causes?") have both chunks answering YES/YES or UNCLEAR/UNCLEAR even when the actual answers contradict. Stance only discriminates polar yes/no questions.
+
+Key data from full stance test (37 CA false-fire cases):
+- 29/37 false fires correctly filtered (no stance disagreement)
+- 8/37 false fires still pass (have stance disagreement)
+- But 28/55 true disputes also filtered out (no stance disagreement) — unacceptable
+
+### Approach 4: Widen Uncertainty Patterns — NOT VIABLE
+
+Broader patterns (adding "does ", "when was ", "did the ", "will ", "what is the current") to route more queries to fusion.
+
+- Catches 9/10 qualified→disputed false fires (up from 5/10)
+- But also catches 22/55 true disputes (up from 2/55)
+- Would kill dispute recall for those 20 newly-routed cases
+
+The patterns that catch false fires also catch genuine disputes — no asymmetric filter exists.
+
+### Approach 5: Governor-Level Lone-CA Rule — NOT VIABLE
+
+In 27/34 false fires, CA is the only constraint that fires. But same for true disputes — CA fires alone normally. Governor cannot distinguish lone-CA-true-dispute from lone-CA-false-fire.
+
+### Evidence Character Gating: Dead Feature
+
+Every single benchmark pair classifies as `assertive-assertive`. The hedge/mixed regex patterns are too specific for real data. The hedged-hedged skip and mixed-upgrade-to-fusion paths never fire on the benchmark.
+
+### Root Cause
+
+**The fundamental tension**: any approach that makes CA harder to trigger proportionally affects both true disputes and false fires. The 3b model cannot distinguish:
+
+- "Revenue was $5M" vs "Revenue was $8M" → TRUE contradiction
+- "Studies show benefits" vs "Some limitations noted" → FALSE contradiction (perspectives)
+
+Both look like "contradictory information" to qwen2.5:3b. This is the same discrimination limit from Exp 007, 012, 015, 016.
+
+### Outcome
+
+No code changes. All approaches either regress or are not viable. Cluster A (34 conflict_aware false fires) is **blocked by the 3b model's discrimination capacity**.
+
+### Revised Ceiling Assessment
+
+**With qwen2.5:3b only**:
+- Cluster A (34 CA): Blocked
+- Cluster B (16 decoy data): Blocked (from Exp 015)
+- Cluster C (6 causal_attribution): **Fixable** with regex
+- Other scattered (18): Partially fixable
+
+**Revised 3b ceiling: ~73-75%** (from 70.3%, by fixing Cluster C + other)
+**With model upgrade for CA: 75-80%+**
+
+---
+
 *This is a living document. Update continuously with new findings.*
