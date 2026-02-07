@@ -427,6 +427,110 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str], set[str]
     return specific, critical, primary
 
 
+# ── LLM-assisted primary entity extraction ────────────────────────────────────
+# When heuristics produce an empty primary set, optionally ask an LLM to select
+# the primary subject from deterministic candidates. The LLM cannot invent
+# entities — it must choose from a closed set or answer NONE.
+
+_PRIMARY_ENTITY_PROMPT = """Given this question, which of the following candidates is the PRIMARY SUBJECT being asked about?
+
+Question: {query}
+
+Candidates:
+{candidates}
+
+Rules:
+- Pick the ONE candidate that is the main subject of the question
+- If none are the primary subject, answer NONE
+- Answer with ONLY the candidate text or NONE, nothing else"""
+
+# Words that should never be accepted as primary entities even if LLM selects them
+_LLM_PRIMARY_REJECT = frozenset({
+    "compare", "explain", "describe", "list", "show", "tell", "find", "get",
+    "make", "use", "help", "work", "affect", "impact", "cause", "effect",
+    "change", "improve", "reduce", "increase", "benefit", "risk", "cost",
+    "price", "rate", "value", "difference", "best", "worst", "main", "key",
+    "important", "current", "latest", "new", "old", "first", "last", "next",
+    "average", "total", "number", "amount", "percent", "percentage", "example",
+    "type", "kind", "way", "method", "process", "system", "part", "role",
+    "result", "reason", "factor", "feature", "advantage", "disadvantage",
+    "problem", "solution", "symptom", "treatment", "side", "long", "short",
+    "term", "high", "low", "company", "product", "service", "customer",
+    "user", "team", "project", "data", "information", "question", "answer",
+})
+
+
+def _llm_rank_primary_entity(
+    query: str,
+    specific_entities: set[str],
+    chat: Any,
+) -> set[str]:
+    """
+    Ask LLM to select the primary subject from deterministic candidates.
+
+    Returns a set with at most one entity, or empty set if LLM says NONE
+    or validation rejects the choice.
+    """
+    if not chat or not specific_entities:
+        return set()
+
+    # Build candidate list from specific entities (deterministic, closed set)
+    # Also add noun phrases from the query that aren't in specific_entities
+    candidates = set(specific_entities)
+
+    # Extract lowercase noun-like phrases (2-3 word sequences) as additional candidates
+    words = query.lower().split()
+    for i in range(len(words)):
+        for length in (2, 3):
+            if i + length <= len(words):
+                phrase = " ".join(words[i : i + length])
+                # Skip if starts with question word or stopword
+                if words[i] not in STOPWORDS and len(words[i]) > 2:
+                    candidates.add(phrase)
+
+    # Remove obvious non-entities
+    candidates = {
+        c for c in candidates
+        if c not in _LLM_PRIMARY_REJECT
+        and not re.match(r"^(19|20)\d{2}$", c)
+        and len(c) > 2
+    }
+
+    if not candidates:
+        return set()
+
+    candidates_str = "\n".join(f"- {c}" for c in sorted(candidates))
+    prompt = _PRIMARY_ENTITY_PROMPT.format(query=query, candidates=candidates_str)
+
+    try:
+        messages = [{"role": "user", "content": prompt}]
+        response = chat.chat(messages).strip()
+
+        # Validate: must be one of the candidates or NONE
+        response_lower = response.lower().strip().strip('"').strip("'").strip("-").strip()
+
+        if response_lower == "none" or not response_lower:
+            return set()
+
+        # Check if response matches any candidate (exact or close)
+        for candidate in candidates:
+            if candidate == response_lower or candidate in response_lower:
+                # Final validation: reject abstract/generic terms
+                if candidate in _LLM_PRIMARY_REJECT:
+                    return set()
+                return {candidate}
+
+        # LLM returned something not in candidates — reject
+        logger.debug(
+            f"{PIPELINE} LLM primary entity '{response_lower}' not in candidates, rejected"
+        )
+        return set()
+
+    except Exception as e:
+        logger.warning(f"{PIPELINE} LLM primary entity extraction failed: {e}")
+        return set()
+
+
 def _context_mentions_entities(entities: set[str], context: str) -> bool:
     """Check if context mentions any of the specific entities."""
     if not entities:
@@ -563,6 +667,7 @@ class InsufficientEvidenceConstraint:
     """
 
     embedder: EmbedderFunc | None = None
+    chat: Any | None = None
     enabled: bool = True
     min_score: float = MIN_RELEVANCE_SCORE
     min_similarity: float = MIN_EMBEDDING_SIMILARITY
@@ -606,6 +711,17 @@ class InsufficientEvidenceConstraint:
 
         # Extract specific, critical, and primary entities from query
         specific_entities, critical_entities, primary_entities = _extract_specific_entities(query)
+
+        # LLM fallback: if heuristic found no primary entities, ask LLM to rank candidates
+        if not primary_entities and self.chat and specific_entities:
+            llm_primary = _llm_rank_primary_entity(query, specific_entities, self.chat)
+            if llm_primary:
+                primary_entities = llm_primary
+                # Also ensure these are in specific_entities
+                specific_entities |= llm_primary
+                logger.debug(
+                    f"{PIPELINE} LLM-assisted primary entity: {llm_primary}"
+                )
 
         max_sim = 0.0
         entity_match_found = False

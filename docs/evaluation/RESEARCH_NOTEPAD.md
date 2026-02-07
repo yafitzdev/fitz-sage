@@ -1653,4 +1653,88 @@ This problem sits between IE's entity extraction (which catches "Tesla" vs "Ford
 
 ---
 
+## Experiment 014: LLM-Assisted Primary Entity Extraction (Feb 7, 2026)
+
+**Goal**: Replace regex-only primary entity extraction with an LLM-assisted fallback when heuristics return an empty primary set. Regex is inherently prone to overfitting — for real-world robustness, the system needs to handle lowercase domain terms ("autonomous vehicles", "unemployment rate") that heuristics miss because they aren't proper nouns.
+
+**Branch**: `refactor/staged-constraint-pipeline`
+
+### Architecture: Bounded Selector Pattern
+
+The LLM cannot invent entities. It must choose from a **closed set** of deterministic candidates:
+
+```
+Query → _extract_specific_entities() → (specific, critical, primary)
+                                              │
+                                    primary empty? ─No─→ use heuristic result
+                                              │
+                                             Yes
+                                              │
+                                    chat available? ─No─→ use empty set (graceful degradation)
+                                              │
+                                             Yes
+                                              │
+                            Build candidate set from:
+                            • specific_entities (deterministic)
+                            • 2-3 word noun phrases from query
+                            • Filter: remove years, stopwords, _LLM_PRIMARY_REJECT
+                                              │
+                            LLM prompt: "which candidate is the PRIMARY SUBJECT?"
+                            → Must answer with exact candidate text or NONE
+                                              │
+                            Validate: response ∈ candidates? Not in reject set?
+                            → Return {entity} or empty set
+```
+
+### Key Design Decisions
+
+1. **Closed set only** — LLM selects from deterministic candidates, cannot hallucinate entities
+2. **Deterministic validation** — `_LLM_PRIMARY_REJECT` frozenset rejects generic/abstract terms even if LLM selects them
+3. **Graceful degradation** — if no chat client is provided (e.g., deterministic mode), falls back silently to heuristic-only behavior
+4. **Minimal blast radius** — only fires when primary set is empty AND specific entities exist (6/249 governance cases)
+
+### Files Modified
+
+- `fitz_ai/core/guardrails/plugins/insufficient_evidence.py` — added `_PRIMARY_ENTITY_PROMPT`, `_LLM_PRIMARY_REJECT`, `_llm_rank_primary_entity()`, `chat` parameter on dataclass, LLM fallback in `_check_embedding_relevance()`
+- `fitz_ai/core/guardrails/__init__.py` — `create_default_constraints()` now passes `chat` to IE
+- `fitz_ai/evaluation/benchmarks/fitz_gov.py` — benchmark passes `fast_chat` to IE
+- `run_targeted_benchmark.py` — targeted benchmark passes `fast_chat` to IE
+
+### Benchmark Results
+
+| Metric | Before | After | Delta |
+|--------|--------|-------|-------|
+| Overall | 70.3% (175/249) | 70.3% (175/249) | 0 |
+| Abstention | 57.1% (36/63) | 57.1% (36/63) | 0 |
+| Dispute | 87.3% (48/55) | 87.3% (48/55) | 0 |
+| Qualification | 55.9% (38/68) | 55.9% (38/68) | 0 |
+| Confidence | 84.1% (53/63) | 84.1% (53/63) | 0 |
+
+### LLM Activation Analysis
+
+Of 249 governance cases, the LLM fallback fired on **6 cases** (heuristic returned empty primary set + specific entities existed):
+
+| Query | LLM Found | Correct? |
+|-------|-----------|----------|
+| "What are the symptoms of type 2 diabetes?" | `type 2` | Yes (already critical) |
+| "What was the unemployment rate in 2024?" | `unemployment rate` | Yes |
+| "Why did the 2008 financial crisis happen?" | `financial crisis` | Yes |
+| "Will autonomous vehicles be mainstream by 2030?" | `autonomous vehicles` | Yes |
+| "What will the electric vehicle market share be in 2026?" | `electric vehicle` | Yes |
+| "What caused the 2024 outage?" | NONE | Correct (year-only, no domain entity) |
+
+**5/6 correctly identified**, 1/6 correctly returned NONE. Zero false selections.
+
+### Why Zero Benchmark Impact
+
+The 6 affected cases all have context that correctly contains the identified entities (e.g., "autonomous vehicles" appears in the context about autonomous vehicles). The LLM-assisted extraction doesn't change the *outcome* for these cases because entity matching succeeds regardless.
+
+**Where this matters**: Real-world queries where context does NOT match — e.g., user asks about "autonomous vehicles" but retrieval returns content about "manual transmission cars". The heuristic would return empty primary set → no entity checking → allow. With LLM assist, `autonomous vehicles` becomes a primary entity → entity mismatch detected → abstain.
+
+### Key Insight
+
+This follows the same pattern as Experiments 011 and 013: **epistemically correct changes with zero benchmark impact**. The benchmark's test cases are designed with topically related contexts, so entity extraction improvements don't change outcomes. But for real-world deployment where retrieval may return semantically similar but referent-mismatched content, having robust primary entity detection is critical for correct abstention.
+
+---
+
 *This is a living document. Update continuously with new findings.*

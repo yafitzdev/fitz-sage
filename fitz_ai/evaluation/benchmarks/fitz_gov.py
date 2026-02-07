@@ -343,7 +343,7 @@ class FitzGovBenchmark:
             # Get embedder from pipeline for semantic relevance checking
             embedder = self._embedder if self._embedder else pipeline.embedder.embed
             constraints = [
-                InsufficientEvidenceConstraint(embedder=embedder),
+                InsufficientEvidenceConstraint(embedder=embedder, chat=fast_chat),
                 SpecificInfoTypeConstraint(),  # NEW: Detect missing specific info types
                 CausalAttributionConstraint(),
                 ConflictAwareConstraint(

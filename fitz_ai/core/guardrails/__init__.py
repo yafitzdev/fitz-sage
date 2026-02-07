@@ -122,7 +122,7 @@ def create_default_constraints(
     """
     return [
         # Empty context only - abstain if no chunks retrieved
-        InsufficientEvidenceConstraint(),
+        InsufficientEvidenceConstraint(chat=chat),
         # Keywords: "why" query + no "because" evidence
         CausalAttributionConstraint(),
         # LLM pairwise comparison: detect contradictions
