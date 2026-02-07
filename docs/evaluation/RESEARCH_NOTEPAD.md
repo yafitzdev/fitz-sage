@@ -1479,4 +1479,119 @@ The +6.4pp overall gain comes entirely from Experiment 010 (primary referent rul
 
 ---
 
+## Experiment 012: CA-Only Model Scaling (Feb 7, 2026)
+
+**Goal**: Measure the effect of swapping ONLY the ConflictAware constraint to a larger model while keeping everything else on qwen2.5:3b. Specifically: does a bigger model reduce qualified→disputed false positives while retaining dispute recall?
+
+**Branch**: `refactor/staged-constraint-pipeline`
+
+### Setup
+
+- **Base model** (IE, SIT, CausalAttribution, AnswerVerification): `qwen2.5:3b` (unchanged)
+- **CA model**: `qwen2.5:3b` (baseline) vs `qwen2.5:7b` (experiment)
+- **Script**: `exp012_ca_model_scaling.py` — creates separate chat factories for CA and all other constraints
+- 249 governance cases, all other code identical
+
+### Results
+
+| Metric | CA=3b (baseline) | CA=7b | Delta |
+|--------|-------------------|-------|-------|
+| **Overall** | **70.3% (175/249)** | **68.3% (170/249)** | **-2.0pp** |
+| Abstention | 57.1% (36/63) | 57.1% (36/63) | 0 |
+| **Dispute** | **87.3% (48/55)** | **67.3% (37/55)** | **-20.0pp (-11)** |
+| **Qualification** | **55.9% (38/68)** | **60.3% (41/68)** | **+4.4pp (+3)** |
+| **Confidence** | **84.1% (53/63)** | **88.9% (56/63)** | **+4.8pp (+3)** |
+
+### Key Metrics
+
+| Metric | CA=3b | CA=7b | Delta |
+|--------|-------|-------|-------|
+| qualified→disputed (FP) | 19 | 7 | **-12 (63% reduction)** |
+| dispute recall | 87.3% (48/55) | 67.3% (37/55) | **-20.0pp (-11)** |
+| abstain→disputed (FP) | 8 | 1 | **-7** |
+| confident→disputed (FP) | 5 | 1 | **-4** |
+
+### Failure Transition Comparison
+
+| Transition | 3b | 7b | Delta |
+|------------|----|----|-------|
+| qualified→disputed | 19 | 7 | -12 |
+| qualified→confident | 7 | 16 | +9 |
+| disputed→confident | 3 | 12 | +9 |
+| abstain→disputed | 8 | 1 | -7 |
+| abstain→confident | 16 | 22 | +6 |
+| confident→disputed | 5 | 1 | -4 |
+
+### Analysis
+
+**The 7b model is dramatically more conservative about calling contradictions.** It almost never fires `disputed` unless the contradiction is extremely obvious.
+
+**What improved**:
+- qual→disputed dropped from 19 to 7 (the false positive problem we were trying to fix)
+- abstain→disputed dropped from 8 to 1 (fewer false disputes on irrelevant content)
+- confident→disputed dropped from 5 to 1 (fewer false disputes on agreeing sources)
+- Confidence +4.8pp and qualification +4.4pp (both benefit from fewer false disputes)
+
+**What regressed**:
+- **Dispute recall collapsed**: 87.3% → 67.3% (-20pp, -11 true disputes missed)
+- disputed→confident jumped from 3 to 12 — the 7b model fails to detect genuine contradictions and lets them pass as confident
+- qualified→confident jumped from 7 to 16 — without the (sometimes false) dispute signal, qualification cases also lose their safety net
+
+**The net is negative** (-2pp overall) because losing 11 true dispute detections outweighs gaining 12 fewer false disputes. The 7b model shifts the entire precision-recall curve toward precision — great for false positive reduction, but at catastrophic cost to recall.
+
+### Why This Happens
+
+The 3b model is "trigger-happy" — it sees tension everywhere, which produces both high recall (catches real contradictions) and high FP rate (calls complementary info contradictory). The 7b model has better calibration but is too conservative for our binary CONTRADICT/AGREE prompt. It defaults to AGREE when uncertain.
+
+This is the **same pattern as Experiment 007** (fusion-for-all), just via a different mechanism:
+- Exp 007: Fusion voting filtered out borderline cases → dispute recall collapsed
+- Exp 012: Larger model self-filters borderline cases → dispute recall collapsed
+
+Both confirm: **the 3b model's false positives and true positives are drawn from the same pool of "borderline" cases.** Any technique that reduces borderline sensitivity will hurt recall proportionally.
+
+### Implication
+
+Model scaling alone cannot solve the CA precision problem without also losing recall. The fix must be **structural**, not scaling-based:
+1. Better prompt design that separates "different perspectives" from "factual contradictions"
+2. Evidence character gating (Exp 011 Fix 2) — will help when benchmark has hedged content
+3. Aspect-aware contradiction detection (not yet attempted)
+4. Possibly: use 7b model but with a more aggressive prompt that lowers its threshold
+
+### Decision
+
+**No code changes.** The 3b model remains the better choice for CA — its high recall is more valuable than the 7b's precision. The 87.3% dispute recall is a hard-won asset that we should not trade away.
+
+### Timing
+
+| Model | Time (249 cases) | Per-case |
+|-------|-----------------|----------|
+| CA=3b | 451s | 1.81s |
+| CA=7b | 493s | 1.98s |
+
+The 7b is only ~10% slower — model loading is amortized and the CA prompt is short. Latency is not a factor in this decision.
+
+### Experiment 012b: Model Routing (3b→7b)
+
+**Hypothesis**: Use 3b as high-recall first pass, then route only cases where 3b fires "disputed" through 7b as precision filter. Get 3b's recall + 7b's precision.
+
+**Setup**: Run all 249 cases with 3b CA. For the cases where 3b's CA fires disputed (95 cases), re-run with 7b CA. If 7b confirms → keep disputed. If 7b rejects → use 7b's mode instead.
+
+**Results**:
+
+| Metric | 3b-only | Routed (3b→7b) | Delta |
+|--------|---------|----------------|-------|
+| Overall | **70.3%** | 67.9% | -2.4pp |
+| Dispute recall | **87.3% (48/55)** | 65.5% (36/55) | **-21.8pp** |
+| qual→disputed FP | 19 | 7 | -12 |
+| Qualification | 55.9% | 60.3% | +4.4pp |
+| Confidence | 84.1% | 88.9% | +4.8pp |
+
+**Routing stats**: Of 95 cases 3b flagged, 7b confirmed 48 and rejected 47 (nearly half). Of the 47 rejections, **12 were true disputes** (BROKE) and only 6 were correctly fixed (FIXED). The rest changed from one wrong answer to another.
+
+**Verdict**: Routing produces results nearly identical to running 7b alone (67.9% vs 68.3%). The 7b confirmation step doesn't add value because it can't distinguish the 3b's true positives from false positives — it just applies a uniformly higher threshold.
+
+**Key Insight**: This is the third independent confirmation (Exp 007 fusion, Exp 012 scaling, Exp 012b routing) that **the CA false positive problem is not solvable by model-level techniques**. The 3b's true disputes and false disputes are drawn from the same pool of "borderline tension" and no model in the qwen2.5 family can reliably separate them. The fix must be structural (evidence character gating, aspect-aware detection, or domain-specific heuristics).
+
+---
+
 *This is a living document. Update continuously with new findings.*
