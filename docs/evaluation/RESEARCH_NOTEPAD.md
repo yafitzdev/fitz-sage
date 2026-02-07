@@ -1826,4 +1826,77 @@ Proposals #2 and #4 require the same binary classification capability that faile
 
 ---
 
+## Experiment 016: Aspect Classifier LLM Fallback — NEGATIVE RESULT (Feb 7, 2026)
+
+**Hypothesis**: When `AspectClassifier.classify_query()` returns GENERAL (all regex patterns failed), an LLM can pick the correct aspect from the 12-value `QueryAspect` enum — similar to Exp 014's successful multi-class selection.
+
+**Branch**: `refactor/staged-constraint-pipeline`
+**Baseline**: 70.3% (175/249) from Exp 014
+
+### Design
+
+Added `chat` parameter to `AspectClassifier`. In `classify_query()`, when regex returns GENERAL and chat is available, LLM selects from the closed enum set:
+
+```
+regex → GENERAL → chat available?
+  No → return GENERAL
+  Yes → LLM: "Pick ONE: CAUSE, EFFECT, SYMPTOM, ..., GENERAL"
+       → validate against enum → return
+```
+
+Wired through IE's `__post_init__` — `AspectClassifier(chat=self.chat)`.
+
+### Result: 67.9% (169/249) — REGRESSION (-2.4%)
+
+| Category | Baseline | Exp 016 | Delta |
+|----------|----------|---------|-------|
+| Abstention | 57.1% (36/63) | 58.7% (37/63) | +1 |
+| Dispute | 89.1% (49/55) | 80.0% (44/55) | **-5** |
+| Qualification | 55.9% (38/68) | 52.9% (36/68) | -2 |
+| Confidence | 84.1% (53/63) | 82.5% (52/63) | -1 |
+
+### Root Cause: Cascading Misclassification
+
+The 3b model assigns **wrong specific aspects** to queries that should be GENERAL. A wrong aspect is worse than GENERAL because:
+
+1. LLM assigns e.g. PROCESS to a general question
+2. IE checks ALL chunks for PROCESS content markers
+3. No chunk has PROCESS markers → **false aspect mismatch**
+4. IE triggers abstention on a query that should proceed
+
+The **dispute** category was hardest hit (-5 cases) because dispute queries often have general formulations ("Is the company profitable?") that regex correctly returns GENERAL for but the LLM misclassifies as PRICING or DEFINITION.
+
+### Key Insight
+
+**Multi-class selection ≠ safe with 3b models.** Exp 014 succeeded because:
+- Selection was from *concrete entities found in text* (anchored to evidence)
+- Wrong selection → still a valid entity, just not the primary one
+- Impact was limited to entity matching, not mode determination
+
+This experiment failed because:
+- Selection was from *abstract categories* (no textual anchor)
+- Wrong selection → triggers false mismatch → changes the governance mode
+- The consequence of a wrong aspect is **strictly worse** than GENERAL
+
+The bounded LLM selector pattern only works with 3b when:
+1. Candidates are **grounded in evidence** (not abstract categories)
+2. Wrong selection has **bounded consequences** (doesn't cascade)
+
+### Decision: REVERTED
+
+All changes reverted. Aspect classifier remains regex-only. The LLM bounded selector pattern with qwen2.5:3b is now confirmed to work **only** for evidence-grounded selection (Exp 014), not abstract classification (Exp 015, 016).
+
+### Updated Assessment: All 4 Proposals Resolved
+
+| # | Proposal | Result | Reason |
+|---|----------|--------|--------|
+| 1 | SIT Entity-Relevance Verifier | **Failed (Exp 015)** | Binary YES/NO unreliable |
+| 2 | Governance Dispute Disambiguator | **Skip** | Binary classification, same 3b limitation |
+| 3 | Aspect Classifier Fallback | **Failed (Exp 016)** | Abstract multi-class, cascading misclassification |
+| 4 | Causal Evidence Verifier | **Skip** | Binary YES/NO, same 3b limitation |
+
+**Conclusion**: The bounded LLM selector pattern with qwen2.5:3b has reached its useful limit. Only evidence-grounded selection (Exp 014) works. Further accuracy improvements require non-LLM approaches or a larger model.
+
+---
+
 *This is a living document. Update continuously with new findings.*

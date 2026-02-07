@@ -237,17 +237,19 @@ only shift between `qualified` and `confident` — lowest severity boundary.
 
 ---
 
-## Impact Summary
+## Impact Summary (Updated Feb 7, 2026)
 
-| # | Proposal | Est. Cases Fixed | Cumulative | Risk |
-|---|----------|-----------------|------------|------|
-| 1 | SIT Entity-Relevance Verifier | +5 to +8 | 72-73% | Low |
-| 2 | Governance Dispute Disambiguator | +9 to +10 | 75-76% | Med-High |
-| 3 | Aspect Classifier LLM Fallback | +3 to +5 | 76-78% | Low-Med |
-| 4 | Causal Evidence Verifier | +1 to +3 | 77-79% | Low |
+| # | Proposal | Est. Cases | Actual Result | Status |
+|---|----------|-----------|---------------|--------|
+| 1 | SIT Entity-Relevance Verifier | +5 to +8 | **-3 (69.1%)** | Failed (Exp 015) |
+| 2 | Governance Dispute Disambiguator | +9 to +10 | — | Skipped (3b limitation) |
+| 3 | Aspect Classifier LLM Fallback | +3 to +5 | **-6 (67.9%)** | Failed (Exp 016) |
+| 4 | Causal Evidence Verifier | +1 to +3 | — | Skipped (3b limitation) |
 
-Combined theoretical ceiling: ~78% (from 70.3%). Actual gains will be lower due to
-overlapping failure cases and LLM nondeterminism (~5% noise band per Exp 006).
+**Conclusion**: The bounded LLM selector pattern with qwen2.5:3b only works for
+evidence-grounded selection from concrete candidates (Exp 014). It fails for both
+binary verification (Exp 015) and abstract category classification (Exp 016).
+Further accuracy improvements require non-LLM approaches or a larger model.
 
 ---
 
