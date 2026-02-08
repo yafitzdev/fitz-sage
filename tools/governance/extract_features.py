@@ -57,8 +57,8 @@ _BOOL_FEATURES = {
 
 _NUMERIC_FEATURES = {
     "ie_max_similarity", "ie_summary_overlap",
-    "ca_skipped_hedged_pairs", "ca_pairs_checked", "ca_first_evidence_char",
-    "ca_relevance_filtered_count", "ca_evidence_characters",
+    "ca_skipped_hedged_pairs", "ca_pairs_checked",
+    "ca_relevance_filtered_count",
     "av_jury_votes_no",
     "num_constraints_fired",
     "query_word_count", "num_chunks", "num_unique_sources",
@@ -68,6 +68,7 @@ _NUMERIC_FEATURES = {
 
 _STRING_FEATURES = {
     "ie_signal", "ie_query_aspect", "ca_signal",
+    "ca_first_evidence_char", "ca_evidence_characters",
     "caa_query_type", "sit_info_type_requested",
     "dominant_content_type",
 }

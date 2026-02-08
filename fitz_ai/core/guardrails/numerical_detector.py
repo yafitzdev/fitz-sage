@@ -173,7 +173,7 @@ class NumericalConflictDetector:
         self,
         mention1: NumericMention,
         mention2: NumericMention,
-        variance_threshold: float = 0.05,  # 5% relative difference
+        variance_threshold: float = 0.15,  # 15% relative difference
     ) -> bool:
         """
         Check if two numeric mentions are variance vs contradiction.

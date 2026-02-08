@@ -104,7 +104,7 @@ def _extract_constraint_features(
         features["ca_pairs_checked"] = m.get("ca_pairs_checked")
         features["ca_first_evidence_char"] = m.get("ca_first_evidence_char")
         features["ca_relevance_filtered_count"] = m.get("ca_relevance_filtered_count")
-        features["ca_evidence_characters"] = m.get("evidence_characters")
+        features["ca_evidence_characters"] = m.get("ca_evidence_characters")
     else:
         features["ca_fired"] = None
 

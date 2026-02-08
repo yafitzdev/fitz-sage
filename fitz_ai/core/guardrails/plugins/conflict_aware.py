@@ -51,8 +51,12 @@ Text 1: {text1}
 
 Text 2: {text2}
 
-CONTRADICT = they make OPPOSITE claims about the SAME thing (one says yes, the other says no).
-AGREE = they are compatible. Texts about different aspects, different time periods, or different entities are compatible, NOT contradictions.
+CONTRADICT = they make OPPOSITE or INCOMPATIBLE claims. This includes:
+- Direct opposites (one says yes, the other says no)
+- Competing explanations for the same thing
+- Different conclusions from the same evidence
+- Mutually exclusive claims (if one is true, the other cannot be)
+AGREE = they are genuinely compatible and could both be true simultaneously.
 UNCLEAR = cannot determine.
 
 Reply with ONLY one word: CONTRADICT, AGREE, or UNCLEAR"""
@@ -67,8 +71,8 @@ Question: {query}
 Text A: {text1}
 Text B: {text2}
 
-CONTRADICT = they make OPPOSITE claims about the SAME specific thing.
-AGREE = they are compatible (including texts about different aspects, time periods, or entities).
+CONTRADICT = they make opposite or incompatible claims (including competing explanations, different conclusions from the same evidence, or mutually exclusive claims).
+AGREE = they are genuinely compatible and could both be true simultaneously.
 Reply with ONE word: CONTRADICT, AGREE, or UNCLEAR""",
     # Consistency framing (inverted)
     """Are these two texts CONSISTENT with each other regarding the question?
@@ -77,8 +81,8 @@ Question: {query}
 First text: {text1}
 Second text: {text2}
 
-YES = they agree, are compatible, or discuss different aspects of the topic.
-NO = they make opposite claims about the same specific thing.
+YES = they genuinely agree and could both be true simultaneously.
+NO = they make opposite or incompatible claims (including competing explanations or mutually exclusive conclusions).
 Reply with ONE word: YES, NO, or UNCLEAR""",
     # Logical compatibility framing
     """If the first statement is true, could the second statement also be true?
@@ -87,8 +91,8 @@ Question context: {query}
 Statement 1: {text1}
 Statement 2: {text2}
 
-YES = both could be true (including if they discuss different aspects or entities).
-NO = they are mutually exclusive about the same claim.
+YES = both could genuinely be true at the same time.
+NO = they are mutually exclusive or incompatible (including competing explanations for the same thing).
 Reply with ONE word: YES, NO, or UNCLEAR""",
 ]
 
@@ -360,8 +364,8 @@ class ConflictAwareConstraint:
         if not self.chat:
             return False
 
-        text1 = chunk1.content[:400] if len(chunk1.content) > 400 else chunk1.content
-        text2 = chunk2.content[:400] if len(chunk2.content) > 400 else chunk2.content
+        text1 = chunk1.content[:800] if len(chunk1.content) > 800 else chunk1.content
+        text2 = chunk2.content[:800] if len(chunk2.content) > 800 else chunk2.content
 
         # Check for numerical variance BEFORE LLM call
         is_variance, reason = self._numerical_detector.check_chunk_pair_variance(text1, text2)
@@ -403,8 +407,8 @@ class ConflictAwareConstraint:
         if not self.chat:
             return False
 
-        text1 = chunk1.content[:400] if len(chunk1.content) > 400 else chunk1.content
-        text2 = chunk2.content[:400] if len(chunk2.content) > 400 else chunk2.content
+        text1 = chunk1.content[:800] if len(chunk1.content) > 800 else chunk1.content
+        text2 = chunk2.content[:800] if len(chunk2.content) > 800 else chunk2.content
 
         # Check for numerical variance BEFORE LLM calls
         is_variance, reason = self._numerical_detector.check_chunk_pair_variance(text1, text2)
@@ -551,8 +555,11 @@ class ConflictAwareConstraint:
             )
             base_method_name = "fusion" if self.use_fusion else "pairwise"
 
+        evidence_chars_seen = []
+
         for other_chunk in chunks_to_check[1:]:
             other_char = _classify_evidence_character(other_chunk.content)
+            evidence_chars_seen.append(f"{first_char}_vs_{other_char}")
 
             # Pair-level evidence character: combine both chunks' text
             # to catch hedging distributed across chunks (e.g., "may" in
@@ -575,8 +582,8 @@ class ConflictAwareConstraint:
 
             # Track numerical variance (checked again inside pairwise methods, but
             # tracked here for classifier feature extraction)
-            text1 = first_chunk.content[:400] if len(first_chunk.content) > 400 else first_chunk.content
-            text2 = other_chunk.content[:400] if len(other_chunk.content) > 400 else other_chunk.content
+            text1 = first_chunk.content[:800] if len(first_chunk.content) > 800 else first_chunk.content
+            text2 = other_chunk.content[:800] if len(other_chunk.content) > 800 else other_chunk.content
             is_var, _ = self._numerical_detector.check_chunk_pair_variance(text1, text2)
             if is_var:
                 ca_diag["ca_numerical_variance_detected"] = True
@@ -599,9 +606,12 @@ class ConflictAwareConstraint:
                     reason="Retrieved chunks contain contradictory information",
                     signal="disputed",
                     method=method_name,
-                    evidence_characters=f"{first_char}_vs_{other_char}",
+                    ca_evidence_characters=f"{first_char}_vs_{other_char}",
                     **ca_diag,
                 )
+
+        # Expose evidence characters even on allow path for classifier features
+        ca_diag["ca_evidence_characters"] = evidence_chars_seen[0] if evidence_chars_seen else "none"
 
         logger.debug(f"{PIPELINE} ConflictAwareConstraint: no contradiction detected")
         return ConstraintResult.allow(**ca_diag)

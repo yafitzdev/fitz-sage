@@ -1,7 +1,7 @@
 # Governance Classifier — Living Notepad
 
 **Goal**: Replace hand-coded `AnswerGovernor.decide()` priority rules with a trained tabular classifier.
-**Status**: Training pipeline complete. Best model: RF at 71.0% (vs 33.3% governor baseline on synthetic data). Dispute recall improved from 28% to 69% via ensemble.
+**Status**: Training pipeline complete. CA sensitivity tuned. Best dispute recall: Ensemble 76% (Exp 3). Best accuracy: RF 69.4%. Tradeoff: +7pp dispute recall at -1.6pp accuracy vs Exp 2.
 
 ---
 
@@ -611,6 +611,56 @@ The governor gets ~70% in the full eval pipeline (real retrieval, vector scores,
 
 The classifier compensates by learning from text-level proxies (context length, word overlap, contradiction markers) that the governor's priority rules can't access. With real pipeline data, the classifier would have much richer features and should significantly exceed the governor's ~70%.
 
+### Experiment 3: Tuned CA Sensitivity
+
+**Changes made:**
+1. **Tightened CONTRADICTION_PROMPT** — Removed "different aspects, time periods, entities = compatible" escape hatch. Added explicit examples: competing explanations, different conclusions from same evidence, mutually exclusive claims.
+2. **Tightened FUSION_PROMPTS** — Same narrowing for all 3 fusion prompts.
+3. **Increased chunk truncation** — 400 → 800 chars. Long-context cases had 100% failure rate at 400 chars.
+4. **Widened numerical variance** — 5% → 15%. Prevents masking real contradictions while still catching close numbers.
+5. **Exposed `ca_evidence_characters`** — Now available on allow path too, so classifier always has evidence character info.
+
+**Impact on CA constraint:**
+- Governor now predicts "disputed" for 549/914 cases (was ~221 before) — much more aggressive
+- Governor baseline dropped to 27.3% (over-predicts disputes now, which is expected)
+
+**Results (914 samples, 80/20 split, seed=42):**
+
+| Model | Accuracy | Disputed Recall | D→Q Confusion |
+|-------|----------|-----------------|---------------|
+| RF (tuned) | **69.4%** | 52% (15/29) | 13/29 |
+| ET (tuned) | 66.7% | 48% (14/29) | 12/29 |
+| GBT (tuned) | 63.9% | **72%** (21/29) | 6/29 |
+| **Ensemble** | 63.9% | **76%** (22/29) | **5/29** |
+| Governor | 27.3% | 100% (over-predicts) | — |
+
+**Comparison to Experiment 2:**
+
+| Metric | Exp 2 | Exp 3 | Delta |
+|--------|-------|-------|-------|
+| RF accuracy | 71.0% | 69.4% | -1.6pp |
+| Ensemble accuracy | 66.1% | 63.9% | -2.2pp |
+| Disputed recall (GBT) | 62% | 72% | **+10pp** |
+| Disputed recall (Ensemble) | 69% | 76% | **+7pp** |
+| D→Q confusion (Ensemble) | — | 5/29 | improved |
+
+**Key insight:** The tighter CA prompts create a clear tradeoff — we gained +7-10pp disputed recall at the cost of ~2pp overall accuracy. The `ca_signal` feature jumped to #7 importance (from lower), showing the tighter prompts make it more discriminative. `ca_evidence_characters` entered top 20 at #18.
+
+**Feature importance top 10 (RF tuned):**
+
+| Rank | Feature | Importance | Context? |
+|------|---------|------------|------|
+| 1 | ctx_length_std | 0.1025 | YES |
+| 2 | ctx_total_chars | 0.1024 | YES |
+| 3 | ctx_length_mean | 0.1000 | YES |
+| 4 | ctx_number_variance | 0.0698 | YES |
+| 5 | query_word_count | 0.0561 | |
+| 6 | ctx_number_count | 0.0524 | YES |
+| 7 | **ca_signal** | **0.0458** | |
+| 8 | ctx_mean_pairwise_sim | 0.0452 | YES |
+| 9 | ctx_min_pairwise_sim | 0.0422 | YES |
+| 10 | ctx_max_pairwise_sim | 0.0405 | YES |
+
 ---
 
 ## 9. Files Created
@@ -632,7 +682,7 @@ The classifier compensates by learning from text-level proxies (context length, 
 3. **Which model to ship?** RF (best accuracy) vs Ensemble (best dispute recall) vs GBT (balanced)
 4. **Integration**: How to integrate classifier into the full pipeline? Replace AnswerGovernor.decide() or add as parallel path?
 5. **Real pipeline evaluation**: Need to test with full retrieval pipeline data (vector scores, detection summaries) to get realistic accuracy numbers
-6. **Dispute recall improvement**: Can we tune CA constraint sensitivity? Add more disputed training data? Two-stage prediction (RF + dispute refinement)?
+6. ~~**Dispute recall improvement**: Can we tune CA constraint sensitivity?~~ RESOLVED — Exp 3 improved dispute recall from 69% to 76% by tightening CA prompts.
 7. **Fallback strategy**: Hard cutoff (classifier only) or soft (classifier + priority rules for low-confidence predictions)?
 
 ---
@@ -640,9 +690,10 @@ The classifier compensates by learning from text-level proxies (context length, 
 ## 11. Next Steps
 
 ### Short-term (improve current results)
-1. **Tune CA sensitivity** — CA only fired 221/914 cases. Many disputed cases lack the signal. Lower thresholds = more dispute features for classifier.
+1. ~~**Tune CA sensitivity**~~ DONE — Exp 3: +7-10pp disputed recall. CA now fires on 549/914 cases (was 221).
 2. **More disputed training data** — 145 disputed cases vs 420 qualified. Add 50-100 more hard dispute cases.
-3. **Two-stage model** — RF for general prediction, then dispute-specific check on cases predicted as "qualified" (catches the 16/29 D->Q confusions).
+3. **Two-stage model** — RF for general prediction, then dispute-specific check on cases predicted as "qualified" (catches the D->Q confusions).
+4. **Model selection** — Ship GBT (best balance: 63.9% acc, 72% dispute recall) or Ensemble (76% dispute recall)?
 
 ### Medium-term (integration)
 4. **Integration prototype** — `fitz_ai/core/guardrails/classifier.py` wrapper that loads model_v1.joblib, runs at inference time.
@@ -668,3 +719,4 @@ The classifier compensates by learning from text-level proxies (context length, 
 | 2026-02-08 | Feature extraction pipeline built (`extract_features.py`). 914 cases extracted with Cohere command-r7b, 1 worker, 0 errors, 52 columns. Governor baseline: 33.9%. |
 | 2026-02-08 | Experiment 1 (baseline GBT): 57.4% accuracy vs 33.3% governor. Disputed recall: 28% (8/29). |
 | 2026-02-08 | Experiment 2 (v2 — context features + class weighting + multi-model + hyperparam search): RF 71.0%, Ensemble 69% dispute recall. 11 new context features dominate importance. |
+| 2026-02-08 | Experiment 3 (CA sensitivity tuning): Tightened prompts, 400→800 char truncation, 5%→15% variance threshold. Disputed recall: Ensemble 76% (+7pp), GBT 72% (+10pp). Accuracy trade: RF 69.4% (-1.6pp). |

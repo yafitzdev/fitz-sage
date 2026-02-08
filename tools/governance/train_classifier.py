@@ -53,6 +53,7 @@ _META_COLS = {"case_id", "expected_mode", "governor_predicted", "difficulty", "s
 # Categorical features that need label encoding
 _CATEGORICAL_FEATURES = {
     "ie_signal", "ie_query_aspect", "ca_signal",
+    "ca_first_evidence_char", "ca_evidence_characters",
     "caa_query_type", "sit_info_type_requested",
     "dominant_content_type",
 }
