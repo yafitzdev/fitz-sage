@@ -2170,4 +2170,79 @@ Committed. Relevance recovered from 22.5% to 35.0%. The remaining 21 confident f
 
 ---
 
+## Experiment 020: NLI Cross-Encoder for Contradiction Detection (NEGATIVE RESULT)
+
+**Date**: February 8, 2026
+**Hypothesis**: A pre-trained NLI cross-encoder (nli-deberta-v3-small, ~70MB) can distinguish true contradictions from false-fire "contradictions" better than qwen2.5:3b, because NLI models are specifically trained on entailment/contradiction/neutral classification.
+**Target**: The 34 conflict_aware false positives (cases where CA incorrectly fires "disputed")
+
+### Rationale
+
+The 3b LLM's biggest weakness is conflict_aware false fires — 34 cases where it says "contradiction detected" on non-dispute cases (19 qualification, 8 abstention, 7 confidence). NLI models are trained on millions of premise/hypothesis pairs for exactly this task. The NLI model would slot into the same pairwise interface that conflict_aware already uses (chunk_A, chunk_B pairs truncated to ~400 chars).
+
+### Method
+
+1. Ran full governance baseline (249 cases) to identify exact CA behavior per case
+2. Loaded `cross-encoder/nli-deberta-v3-small` (DeBERTa-v3 trained on SNLI+MultiNLI)
+3. Scored all chunk pairs for each case using NLI, taking max contradiction score per case
+4. Compared score distributions between true positives (49 dispute cases correctly caught) and false positives (34 non-dispute cases incorrectly fired)
+5. Swept thresholds 0.3-0.9 to find optimal operating point
+
+### CA Baseline (3b LLM)
+
+| Metric | Value |
+|--------|-------|
+| True positives (dispute, CA fires) | 49 |
+| False positives (not dispute, CA fires) | 34 |
+| True negatives (not dispute, CA quiet) | 160 |
+| False negatives (dispute, CA quiet) | 6 |
+| Precision | 59.0% |
+| Recall | 89.1% |
+
+False positive breakdown: qualification 19, abstention 8, confidence 7.
+
+### NLI Score Distribution
+
+| Group | Mean | Min | Max |
+|-------|------|-----|-----|
+| True positives (should be HIGH) | 3.77 | -1.45 | 6.99 |
+| False positives (should be LOW) | 2.57 | -1.73 | 6.71 |
+
+**Distributions heavily overlap.** No clean separation point exists.
+
+### Threshold Sweep
+
+| Threshold | TP caught | FP remaining | Precision | Recall | F1 |
+|-----------|-----------|--------------|-----------|--------|-----|
+| 0.3 (best) | 41/49 | 24/34 | 63.1% | 83.7% | 0.72 |
+| 0.5 | 40/49 | 24/34 | 62.5% | 81.6% | 0.71 |
+| 0.8 | 39/49 | 23/34 | 62.9% | 79.6% | 0.70 |
+
+Best operating point (threshold=0.3): 84% recall, 63% precision. Compared to 3b LLM baseline of 100% recall, 59% precision.
+
+### Why NLI Fails
+
+1. **Loses 8 true disputes** (84% recall vs 100%). These are nuanced paragraph-level contradictions (organic food health claims, treatment effectiveness, methodological conflicts) that NLI models trained on sentence-level pairs cannot detect.
+
+2. **Only removes 10/34 false positives** (29% reduction). The false positives with the HIGHEST NLI scores are genuinely ambiguous cases:
+   - `t1_qualify_hard_033` (6.71): "Who is the team lead?" — scope ambiguity, NLI correctly sees conflicting answers
+   - `t1_qualify_hard_029` (6.57): "When was Mercury program completed?" — entity ambiguity
+   - `t1_abstain_hard_017` (5.99): React Router v6 auth config — version mismatch
+
+3. **The problem isn't contradiction detection — it's disambiguation.** The false fires ARE contradictions in the text. The governance question is whether those contradictions should be classified as "disputed" (present both sides) or "qualified" (acknowledge ambiguity but still answer). NLI can't make that distinction because it's a governance judgment, not a textual entailment judgment.
+
+### Key Insight
+
+The 34 false positives aren't cases where the 3b LLM hallucinates contradictions. They're cases where real textual contradictions exist, but the correct governance response is "qualified" rather than "disputed." The distinction between dispute and qualification is semantic/pragmatic (is this a genuine factual conflict or just ambiguity/conditionality?) — not something an NLI model is trained to discriminate.
+
+This means **no contradiction-detection model** (NLI or otherwise) will solve this problem. The bottleneck is governance classification, not contradiction detection. A model upgrade to 7b+ for the governance judgment (not just the contradiction detection) is the path forward.
+
+### Outcome
+
+**Negative result.** NLI cross-encoder does not improve conflict_aware discrimination. The approach trades 8 true positives for 10 false positive reductions — a net loss. The fundamental issue is not contradiction detection accuracy but governance classification of detected contradictions.
+
+**Running total**: Governance 71.5% (stable), Relevance 35.0% (Exp 019), Grounding 90.5%
+
+---
+
 *This is a living document. Update continuously with new findings.*
