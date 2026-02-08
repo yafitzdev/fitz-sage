@@ -33,9 +33,9 @@ class ConstraintResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def allow(cls) -> "ConstraintResult":
+    def allow(cls, **metadata: Any) -> "ConstraintResult":
         """Factory for allowing decisive answers."""
-        return cls(allow_decisive_answer=True)
+        return cls(allow_decisive_answer=True, metadata=metadata)
 
     @classmethod
     def deny(cls, reason: str, signal: str | None = None, **metadata: Any) -> "ConstraintResult":

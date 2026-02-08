@@ -1,10 +1,19 @@
 # Governance Case Taxonomy
 
 Complete taxonomy of governance case types for the fitz-gov benchmark.
-Derived from 21 experiments of failure analysis, then used to generate 525 new test cases
-via LLM-assisted boundary sampling with independent blind label validation.
 
-**Status**: Generated, validated, merged into fitz-gov tier1_core.
+**Status**: Complete. All cases merged into `fitz-gov/data/tier1_core/`.
+
+**Repository**: `C:\Users\yanfi\PycharmProjects\fitz-gov`
+
+**Data structure** (after cleanup):
+```
+fitz-gov/data/
+├── tier0_sanity/    60 sanity cases (baseline, models should score 95%+)
+├── tier1_core/      914 cases (848 governance + 66 grounding/relevance)
+├── corpus/          378 test documents
+└── queries/         Query-to-document mappings for Mode B evaluation
+```
 
 ---
 
@@ -12,26 +21,74 @@ via LLM-assisted boundary sampling with independent blind label validation.
 
 | Metric | Value |
 |--------|-------|
-| Total cases (tier0 + tier1) | 851 |
-| Governance cases (abstain/dispute/qualify/confident) | 769 |
+| Total cases (tier0 + tier1) | 974 |
+| Governance cases (abstain/dispute/qualify/confident) | 892 |
 | Other cases (grounding/relevance) | 82 |
-| Unique subcategories (governance) | 156 |
-| New cases generated from this taxonomy | 525 |
-| Cases removed (duplicates) | 5 |
-| Cases relabeled (blind validation disagreements) | 7 |
-| Blind label agreement rate | 95.4% |
+| Unique subcategories (consolidated) | 54 |
+| Total cases removed (duplicates) | 7 |
+| Total cases relabeled (blind validation) | 11 |
 
 ### Per-Mode Distribution (tier1_core, governance only)
 
 | Mode | Cases | % |
 |------|-------|---|
-| Qualification | 318 | 43.9% |
-| Abstention | 156 | 21.6% |
-| Confidence | 142 | 19.6% |
-| Dispute | 109 | 15.0% |
-| **Total** | **725** | 100% |
+| Qualification | 357 | 42.1% |
+| Abstention | 192 | 22.6% |
+| Confidence | 154 | 18.2% |
+| Dispute | 145 | 17.1% |
+| **Total** | **848** | 100% |
 
 Qualification dominance is expected — it is the central mode involved in every boundary pair.
+
+---
+
+## Data Expansion History
+
+### v1.0: Original 200 cases (from 21 experiments)
+
+Hand-crafted cases derived from failure analysis across 21 evaluation experiments. These form the seed data for the benchmark.
+
+| Category | Cases | Difficulty |
+|----------|-------|-----------|
+| Abstention | 40 | easy/medium |
+| Dispute | 40 | easy/medium |
+| Qualification | 40 | easy/medium |
+| Confidence | 30 | easy/medium |
+| Grounding | 25 | easy/medium |
+| Relevance | 25 | easy/medium |
+| **Total** | **200** | |
+
+These 200 cases were split into tier0 (60 sanity, re-IDed as `t0_*`) and tier1 (141 baseline, re-IDed as `t1_*`).
+
+### v2.0: +525 generated cases (LLM-assisted boundary sampling)
+
+Generated using Claude to produce hard boundary cases across all subcategory types. Cases were organized into 7 generation batches targeting specific boundaries and mode pairs.
+
+| Generation batch | Cases | Mode distribution | Subcategories | Target |
+|-----------------|-------|-------------------|---------------|--------|
+| Pure abstain + dispute | 90 | 50 abstain, 40 disputed | 18 | Core pure cases for both modes |
+| Pure qualify + confident | 95 | 60 qualified, 35 confident | 19 | Core pure cases for both modes |
+| D-Q boundary part 1 | 70 | 50 qualified, 20 disputed | 7 | Primary bottleneck: dispute vs qualify |
+| D-Q boundary part 2 | 70 | 50 qualified, 10 disputed, 10 confident | 7 | D-Q boundary + confident edge |
+| Abstain boundary | 65 | 40 abstain, 25 qualified | 13 | Abstain vs qualify/confident |
+| Confident boundary | 45 | 35 confident, 10 qualified | 9 | Confident vs qualify |
+| Three-way ambiguity | 90 | 66 qualified, 12 abstain, 12 confident | 13 | Multi-signal competition |
+| **Total** | **525** | **102 abs, 70 disp, 261 qual, 92 conf** | | |
+
+**Validation**: Independent blind label validation achieved 95.4% agreement. 5 duplicates removed, 7 cases relabeled (see Validation Results below). 513 cases merged into tier1_core (12 excluded as duplicates or cross-mode conflicts).
+
+### v3.0: +123 generated cases (targeted gaps)
+
+Targeted specific coverage gaps identified after v2.0 merge: dispute class underrepresentation, edge cases, and code/adversarial scenarios.
+
+| Generation batch | Cases | Mode distribution | Target |
+|-----------------|-------|-------------------|--------|
+| Dispute boundary | 48 | 25 disputed, 13 qualified, 10 abstain | D-Q and A-D boundary expansion |
+| Edge cases | 40 | 15 abstain, 10 mixed, 15 mixed | Empty context, short queries, long contexts |
+| Code/adversarial | 35 | 20 mixed, 5 mixed, 10 mixed | Code/structured, multi-entity, adversarial |
+| **Total** | **123** | | |
+
+**Validation**: 94% blind label agreement. 4 cases relabeled (all disputed/abstain -> qualified). All 123 merged into tier1_core.
 
 ---
 
@@ -269,6 +326,22 @@ A separate Claude instance labeled all 525 cases without seeing the original lab
 | `t1_qualify_hard_634` | qualified | abstain | `t1_abstain_hard_705` | Wrong country (Australia/Argentina for Chile) |
 | `t1_qualify_hard_635` | qualified | abstain | `t1_abstain_hard_706` | Wrong platform (GitHub/Jenkins/Azure for GitLab) |
 
+### v3.0 Blind Label Validation (4 relabeled)
+
+123 new cases across 3 files, validated at 94% agreement. 4 relabeled:
+
+| Original ID | Original | Relabeled | Pattern |
+|-------------|----------|-----------|---------|
+| `t1_dispute_hard_407` | disputed | qualified | Methodology difference (EPA vs ACC plastic recycling definitions) |
+| `t1_dispute_hard_419` | disputed | qualified | Different metrics (median hourly FT vs total annual all-workers pay gap) |
+| `t1_abstain_hard_867` | abstain | qualified | Engineering practices ARE compliance controls under SOC 2/ISO 27001 |
+| `t1_dispute_hard_506` | disputed | qualified | False premise with unanimous refutation, not a dispute between sources |
+
+**v3.0 expansion categories:**
+- Dispute boundary cases (48): D-Q boundary (methodology_difference vs genuine conflict), A-D boundary (off-topic contradiction)
+- Edge cases (40): empty context (15), short queries (10), long contexts (15)
+- Code/adversarial (35): code/structured data (20), multi-entity comparison (5), adversarial queries (10)
+
 ### Key Validation Findings
 
 1. **Dispute vs qualify at methodology/scope boundary**: The hardest labeling decision. When sources report different numbers because they measure different things (pro forma vs as-reported, count vs mass), this is qualify (methodology difference), not dispute. The validator established the rule: if the gap is FULLY EXPLAINED by a stated methodology/scope difference, it should be qualified.
@@ -279,20 +352,21 @@ A separate Claude instance labeled all 525 cases without seeing the original lab
 
 ---
 
-## Coverage Summary
+## Coverage Summary (post v3.0 expansion)
 
-| Region | Subcategories | Cases | Density |
-|--------|--------------|-------|---------|
-| Pure: Abstain | 36 | 156 | 4.3/subcat |
-| Pure: Dispute | 26 | 109 | 4.2/subcat |
-| Pure: Qualify | 56 | 318 | 5.7/subcat |
-| Pure: Confident | 38 | 142 | 3.7/subcat |
-| Boundary: Dispute <-> Qualify | 14 | ~140 | 10.0/subcat |
-| Boundary: Abstain <-> Confident | 6 | ~38 | 6.3/subcat |
-| Boundary: Abstain <-> Qualify | 5 | ~25 | 5.0/subcat |
-| Boundary: Abstain <-> Dispute | 2 | ~10 | 5.0/subcat |
-| Boundary: Qualify <-> Confident | 6 | ~30 | 5.0/subcat |
-| Boundary: Dispute <-> Confident | 3 | ~15 | 5.0/subcat |
-| Three-way / Four-way | 13 | ~85 | 6.5/subcat |
+| Region | Cases | Notes |
+|--------|-------|-------|
+| Pure: Abstain | 192 | +36 from edge/code cases |
+| Pure: Dispute | 145 | +36 from boundary expansion |
+| Pure: Qualify | 357 | +39 from boundary relabels + edge/code |
+| Pure: Confident | 154 | +12 from edge/code cases |
+| Boundary: Dispute <-> Qualify | ~175 | Primary bottleneck, well-covered |
+| Boundary: Abstain <-> Dispute | ~20 | Expanded from 10 |
+| Empty context | 15 | New in v3.0 |
+| Short queries (<20 chars) | 10 | New in v3.0 |
+| Long contexts (1500+ chars) | 15 | New in v3.0 |
+| Code/structured data | 20 | New in v3.0 |
+| Adversarial/trick queries | 10 | New in v3.0 |
+| Multi-entity comparison | 5 | New in v3.0 |
 
-**Dispute <-> Qualify has the highest density** (10 cases per subcategory) — correctly prioritized as the primary bottleneck from the original failure analysis.
+**Subcategories consolidated**: 156 raw slugs -> 54 canonical types via `scripts/consolidate_subcategories.py`. Only 3 subcategories have <5 cases.

@@ -482,12 +482,22 @@ class ConflictAwareConstraint:
             logger.debug(f"{PIPELINE} ConflictAwareConstraint: resolution query detected, allowing")
             return ConstraintResult.allow()
 
+        # Diagnostics for classifier feature extraction
+        ca_diag = {
+            "ca_numerical_variance_detected": False,
+            "ca_is_uncertainty_query": False,
+            "ca_skipped_hedged_pairs": 0,
+            "ca_relevance_filtered_count": 0,
+            "ca_pairs_checked": 0,
+            "ca_first_evidence_char": None,
+        }
+
         # Skip conflict detection if no LLM available
         if not self.chat:
             logger.debug(
                 f"{PIPELINE} ConflictAwareConstraint: no chat provider, skipping conflict detection"
             )
-            return ConstraintResult.allow()
+            return ConstraintResult.allow(**ca_diag)
 
         # Relevance gate: filter out chunks not relevant to the query
         # This prevents false disputes from irrelevant content pairs
@@ -500,6 +510,7 @@ class ConflictAwareConstraint:
                     if self._is_chunk_relevant(query_embedding, c)
                 ]
                 filtered = len(chunks_to_check) - len(relevant_chunks)
+                ca_diag["ca_relevance_filtered_count"] = filtered
                 if filtered > 0:
                     logger.debug(
                         f"{PIPELINE} ConflictAwareConstraint: relevance gate filtered "
@@ -510,16 +521,18 @@ class ConflictAwareConstraint:
                 logger.warning(f"{PIPELINE} ConflictAwareConstraint: relevance gate failed: {e}")
 
         if len(chunks_to_check) < 2:
-            return ConstraintResult.allow()
+            return ConstraintResult.allow(**ca_diag)
 
         first_chunk = chunks_to_check[0]
 
         # Classify evidence character for the first chunk (reused across pairs)
         first_char = _classify_evidence_character(first_chunk.content)
+        ca_diag["ca_first_evidence_char"] = first_char
 
         # Choose base detection method based on settings
         if self.adaptive:
             use_fusion_for_query = _is_uncertainty_query(query)
+            ca_diag["ca_is_uncertainty_query"] = use_fusion_for_query
             base_method = (
                 self._check_pairwise_fusion
                 if use_fusion_for_query
@@ -551,11 +564,22 @@ class ConflictAwareConstraint:
             # Evidence character gating (pair-conditioned truth table):
             # hedged vs hedged OR pair-level hedged → skip
             if (first_char == "hedged" and other_char == "hedged") or pair_char == "hedged":
+                ca_diag["ca_skipped_hedged_pairs"] += 1
                 logger.debug(
                     f"{PIPELINE} ConflictAwareConstraint: skipping hedged pair "
                     f"({first_char} vs {other_char}, pair={pair_char})"
                 )
                 continue
+
+            ca_diag["ca_pairs_checked"] += 1
+
+            # Track numerical variance (checked again inside pairwise methods, but
+            # tracked here for classifier feature extraction)
+            text1 = first_chunk.content[:400] if len(first_chunk.content) > 400 else first_chunk.content
+            text2 = other_chunk.content[:400] if len(other_chunk.content) > 400 else other_chunk.content
+            is_var, _ = self._numerical_detector.check_chunk_pair_variance(text1, text2)
+            if is_var:
+                ca_diag["ca_numerical_variance_detected"] = True
 
             # assertive vs assertive → standard method (likely real contradictions)
             # any hedged/mixed involved → use fusion for higher bar
@@ -576,10 +600,11 @@ class ConflictAwareConstraint:
                     signal="disputed",
                     method=method_name,
                     evidence_characters=f"{first_char}_vs_{other_char}",
+                    **ca_diag,
                 )
 
         logger.debug(f"{PIPELINE} ConflictAwareConstraint: no contradiction detected")
-        return ConstraintResult.allow()
+        return ConstraintResult.allow(**ca_diag)
 
 
 __all__ = ["ConflictAwareConstraint"]

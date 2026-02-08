@@ -404,5 +404,12 @@ class RetrievalPipelineFromYaml:
             logger.debug(f"{RETRIEVER} Step {i + 1}/{len(self.steps)}: {step.name}")
             chunks = step.execute(query, chunks)
 
+        # Extract detection summary from VectorSearchStep for governance feature extraction
+        self._last_detection_summary = None
+        for step in self.steps:
+            if isinstance(step, VectorSearchStep):
+                self._last_detection_summary = getattr(step, "_last_detection_summary", None)
+                break
+
         logger.info(f"{RETRIEVER} Pipeline complete: {len(chunks)} chunks")
         return chunks

@@ -58,27 +58,36 @@ class SpecificInfoTypeConstraint:
             return ConstraintResult.allow()
 
         # Check for entity mismatch (e.g., ProTab X1 vs ProTab X2)
-        if self._has_entity_mismatch(query, chunks):
-            logger.info(f"SpecificInfoTypeConstraint: Entity mismatch detected -> QUALIFIED")
-            return ConstraintResult.deny(
-                reason="Context discusses a different entity or version",
-                signal="qualified",
-                entity_mismatch=True,
-            )
+        entity_mismatch = self._has_entity_mismatch(query, chunks)
 
         # Identify what type of information is requested (strict detection)
         info_type = self._identify_info_type(query)
 
+        # Check if chunks contain the requested info type
+        has_specific_info = self._check_for_info_type(chunks, info_type, query) if info_type else None
+
+        # Build diagnostics for classifier feature extraction
+        sit_diag = {
+            "sit_entity_mismatch": entity_mismatch,
+            "sit_info_type_requested": info_type,
+            "sit_has_specific_info": has_specific_info,
+        }
+
+        if entity_mismatch:
+            logger.info(f"SpecificInfoTypeConstraint: Entity mismatch detected -> QUALIFIED")
+            return ConstraintResult.deny(
+                reason="Context discusses a different entity or version",
+                signal="qualified",
+                **sit_diag,
+            )
+
         if not info_type:
             # No specific info type detected, allow confident answer
-            return ConstraintResult.allow()
-
-        # Check if any chunk contains that type of information (generous detection)
-        has_specific_info = self._check_for_info_type(chunks, info_type, query)
+            return ConstraintResult.allow(**sit_diag)
 
         if has_specific_info:
             # Found the specific info, allow confident answer
-            return ConstraintResult.allow()
+            return ConstraintResult.allow(**sit_diag)
 
         # Context is related but missing specific info -> qualified
         logger.info(f"SpecificInfoTypeConstraint: Missing {info_type} information -> QUALIFIED")
@@ -86,7 +95,7 @@ class SpecificInfoTypeConstraint:
         return ConstraintResult.deny(
             reason=f"Context discusses the topic but lacks specific {info_type} information",
             signal="qualified",
-            info_type=info_type,
+            **sit_diag,
         )
 
     def _has_entity_mismatch(self, query: str, chunks: Sequence[Chunk]) -> bool:

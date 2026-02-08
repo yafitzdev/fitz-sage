@@ -148,16 +148,18 @@ class StagedConstraintPipeline:
             try:
                 result = constraint.apply(query, chunks)
 
+                # Always inject constraint_name and stage for feature extraction
+                metadata = dict(result.metadata)
+                metadata["constraint_name"] = constraint.name
+                metadata["stage"] = stage.name
+                result = ConstraintResult(
+                    allow_decisive_answer=result.allow_decisive_answer,
+                    reason=result.reason,
+                    signal=result.signal,
+                    metadata=metadata,
+                )
+
                 if not result.allow_decisive_answer:
-                    metadata = dict(result.metadata)
-                    metadata["constraint_name"] = constraint.name
-                    metadata["stage"] = stage.name
-                    result = ConstraintResult(
-                        allow_decisive_answer=result.allow_decisive_answer,
-                        reason=result.reason,
-                        signal=result.signal,
-                        metadata=metadata,
-                    )
                     logger.info(
                         f"{PIPELINE} Constraint '{constraint.name}' "
                         f"(stage={stage.name}) denied: {result.reason}"

@@ -310,14 +310,23 @@ class CausalAttributionConstraint:
         # Check if query requires qualification
         is_uncertainty, query_type = _is_uncertainty_query(query)
 
+        # Compute evidence signals for classifier feature extraction
+        has_causal = _has_causal_evidence(chunks)
+        has_predictive = _has_predictive_evidence(chunks)
+        caa_diag = {
+            "caa_query_type": query_type,
+            "caa_has_causal_evidence": has_causal,
+            "caa_has_predictive_evidence": has_predictive,
+        }
+
         if not is_uncertainty:
             logger.debug(f"{PIPELINE} CausalAttributionConstraint: not an uncertainty query")
-            return ConstraintResult.allow()
+            return ConstraintResult.allow(**caa_diag)
 
         # Check if chunks have appropriate evidence
         if _has_appropriate_evidence(query_type, chunks):
             logger.debug(f"{PIPELINE} CausalAttributionConstraint: {query_type} evidence found")
-            return ConstraintResult.allow()
+            return ConstraintResult.allow(**caa_diag)
 
         # Uncertainty query without appropriate evidence - deny
         logger.info(
@@ -329,6 +338,7 @@ class CausalAttributionConstraint:
             signal="qualified",
             query_type=query_type,
             total_chunks=len(chunks),
+            **caa_diag,
         )
 
 

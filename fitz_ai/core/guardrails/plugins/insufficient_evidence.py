@@ -778,15 +778,15 @@ class InsufficientEvidenceConstraint:
 
     def _check_embedding_relevance(
         self, query: str, chunks: Sequence[Chunk]
-    ) -> tuple[bool, float, str]:
+    ) -> tuple[bool, float, str, dict]:
         """
         Check relevance using embedding similarity + entity matching.
 
-        Returns (is_relevant, max_similarity, reason).
+        Returns (is_relevant, max_similarity, reason, diagnostics).
         """
         query_emb = self._get_embedding(query)
         if not query_emb:
-            return True, 0.0, "no_embedder"  # Can't check, allow
+            return True, 0.0, "no_embedder", {}  # Can't check, allow
 
         # Extract specific, critical, and primary entities from query
         specific_entities, critical_entities, primary_entities = _extract_specific_entities(query)
@@ -827,27 +827,38 @@ class InsufficientEvidenceConstraint:
             ):
                 critical_match_found = True
 
+        # Build diagnostics dict for classifier feature extraction
+        diag = {
+            "ie_entity_match_found": entity_match_found,
+            "ie_primary_match_found": primary_match_found,
+            "ie_critical_match_found": critical_match_found,
+            "ie_query_aspect": None,  # Set below if aspect classifier runs
+            "ie_summary_overlap": None,  # Set below if summary check runs
+            "ie_has_matching_aspect": None,  # Set below if aspect check runs
+            "ie_has_conflicting_aspect": None,  # Set below if aspect check runs
+        }
+
         # Decision logic:
         # 1. If similarity is very low (<0.45), definitely irrelevant
         if max_sim < 0.45:
-            return False, max_sim, "low_similarity"
+            return False, max_sim, "low_similarity", diag
 
         # 2. CRITICAL entities (years, "type 2", etc.) MUST match - no bypass
         # "2024 World Series" query MUST have 2024 in context, even if similarity is high
         if critical_entities and not critical_match_found:
-            return False, max_sim, f"missing_critical:{list(critical_entities)[:3]}"
+            return False, max_sim, f"missing_critical:{list(critical_entities)[:3]}", diag
 
         # 3. Check PRIMARY entity matching: if the main subject is missing, abstain.
         # This catches cases like: "Tesla revenue?" + Ford data, "Tokyo population?" + Osaka data.
         # Primary entity missing = context is about something else entirely. No similarity exception.
         if primary_entities and not primary_match_found and max_sim < 0.85:
-            return False, max_sim, f"missing_primary:{list(primary_entities)[:3]}"
+            return False, max_sim, f"missing_primary:{list(primary_entities)[:3]}", diag
 
         # 4. Check SECONDARY entity matching for same-topic-wrong-entity detection
         # Non-primary entities (generic terms, lowercase domain words) still get the
         # similarity exception — high similarity with secondary mismatch = qualified, not abstain.
         if specific_entities and not entity_match_found and max_sim < 0.85:
-            return False, max_sim, f"missing_entity:{list(specific_entities)[:3]}"
+            return False, max_sim, f"missing_entity:{list(specific_entities)[:3]}", diag
 
         # 5. ENRICHMENT BOOST: Use summaries for "same topic, wrong aspect" detection
         # Only activates when chunks are enriched (have summaries)
@@ -856,14 +867,16 @@ class InsufficientEvidenceConstraint:
             has_summaries = any(chunk.metadata.get("summary") for chunk in chunks)
             if has_summaries:
                 summary_match = _has_summary_overlap(query, chunks)
+                diag["ie_summary_overlap"] = summary_match
                 if not summary_match:
-                    return False, max_sim, "no_summary_overlap"
+                    return False, max_sim, "no_summary_overlap", diag
 
         # 6. ASPECT COMPATIBILITY CHECK: Entity matches but aspect might differ
         # e.g., Query "What causes Alzheimer's?" vs Chunk "Alzheimer's symptoms include..."
         # Also check when similarity is moderate (0.5-0.85) even without entity match
         # This catches cases like "aspirin mechanism" where entity is lowercase
         query_aspect = self._aspect_classifier.classify_query(query)
+        diag["ie_query_aspect"] = query_aspect.value
 
         # Run aspect check when:
         # 1. Entity match found AND similarity in ambiguous range (0.5-0.78), OR
@@ -905,12 +918,15 @@ class InsufficientEvidenceConstraint:
                 has_conflicting_aspect = True
                 conflicting_aspects.extend([a.value for a in chunk_aspects])
 
+            diag["ie_has_matching_aspect"] = has_matching_aspect
+            diag["ie_has_conflicting_aspect"] = has_conflicting_aspect
+
             # Only abstain if we found conflicting aspects but NO matching aspects
             if has_conflicting_aspect and not has_matching_aspect:
-                return False, max_sim, f"aspect_mismatch:query asks {query_aspect.value}, chunks have {list(set(conflicting_aspects))}"
+                return False, max_sim, f"aspect_mismatch:query asks {query_aspect.value}, chunks have {list(set(conflicting_aspects))}", diag
 
         # 7. If we have entity match OR no specific entities OR very high similarity, allow
-        return True, max_sim, "relevant"
+        return True, max_sim, "relevant", diag
 
     def apply(
         self,
@@ -941,7 +957,7 @@ class InsufficientEvidenceConstraint:
 
         # Rule 2: Check embedding similarity + entity matching (most reliable, if available)
         if self.embedder:
-            is_relevant, max_sim, reason = self._check_embedding_relevance(query, chunks)
+            is_relevant, max_sim, reason, ie_diag = self._check_embedding_relevance(query, chunks)
             if not is_relevant:
                 logger.info(
                     f"{PIPELINE} InsufficientEvidenceConstraint: {reason} "
@@ -956,6 +972,7 @@ class InsufficientEvidenceConstraint:
                         evidence_count=len(chunks),
                         max_similarity=max_sim,
                         detection_reason=reason,
+                        **ie_diag,
                     )
 
                 # Secondary entity missing with moderate-high similarity = related but incomplete.
@@ -967,6 +984,7 @@ class InsufficientEvidenceConstraint:
                         evidence_count=len(chunks),
                         max_similarity=max_sim,
                         detection_reason=reason,
+                        **ie_diag,
                     )
 
                 # Low similarity or critical issues -> abstain
@@ -976,11 +994,16 @@ class InsufficientEvidenceConstraint:
                     evidence_count=len(chunks),
                     max_similarity=max_sim,
                     detection_reason=reason,
+                    **ie_diag,
                 )
             logger.debug(
                 f"{PIPELINE} InsufficientEvidenceConstraint: {reason} (similarity={max_sim:.3f})"
             )
-            return ConstraintResult.allow()
+            return ConstraintResult.allow(
+                evidence_count=len(chunks),
+                max_similarity=max_sim,
+                **ie_diag,
+            )
 
         # Rule 3: Check vector_score if available (from retrieval)
         max_score = _get_max_score(chunks)

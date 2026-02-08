@@ -113,6 +113,9 @@ class VectorSearchStep(RetrievalStep):
     # Current rewrite result (for strategies to access)
     _current_rewrite: Any = field(default=None, init=False, repr=False)
 
+    # Last detection summary (for governance feature extraction)
+    _last_detection_summary: Any = field(default=None, init=False, repr=False)
+
     def execute(self, query: str, chunks: list[Chunk]) -> list[Chunk]:
         """
         Execute vector search with automatic query routing.
@@ -129,6 +132,7 @@ class VectorSearchStep(RetrievalStep):
 
         # Step 1: Run unified detection
         detection = self._get_detection_summary(effective_query)
+        self._last_detection_summary = detection
 
         # Step 2: Route to strategy based on detection
         # Check aggregation first (highest priority for list/count queries)

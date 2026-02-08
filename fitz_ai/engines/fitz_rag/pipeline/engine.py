@@ -164,6 +164,35 @@ class RAGPipeline:
             f"governance_logging={governance_status}"
         )
 
+        # Last governance feature vector (available after run() completes)
+        self._last_governance_features: dict | None = None
+
+    def _extract_governance_features(
+        self,
+        query: str,
+        chunks: list,
+        constraint_results: list,
+        detection_summary=None,
+    ) -> dict:
+        """
+        Extract governance features from constraint results for classifier training/inference.
+
+        Returns a flat dict of feature_name -> value.
+        """
+        try:
+            from fitz_ai.core.guardrails.feature_extractor import extract_features
+
+            # Build constraint_name -> result mapping
+            result_map = {}
+            for result in constraint_results:
+                name = result.metadata.get("constraint_name", "unknown")
+                result_map[name] = result
+
+            return extract_features(query, chunks, result_map, detection_summary)
+        except Exception as e:
+            logger.debug(f"{PIPELINE} Feature extraction failed (non-fatal): {e}")
+            return {}
+
     def _wrap_step(self, name: str, fn, *args, error_class=None, **kwargs):
         """
         Execute pipeline step with consistent error handling.
@@ -257,6 +286,12 @@ class RAGPipeline:
 
         # Step 2: Run constraints (preserves individual results)
         constraint_results = run_constraints(query, raw_chunks, self.constraints)
+
+        # Step 2.5: Extract governance features for classifier training/inference
+        detection_summary = getattr(self.retrieval, "_last_detection_summary", None)
+        self._last_governance_features = self._extract_governance_features(
+            query, raw_chunks, constraint_results, detection_summary
+        )
 
         # Step 3: Governance decision (resolves mode from signals)
         import time
