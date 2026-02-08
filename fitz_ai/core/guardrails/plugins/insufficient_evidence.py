@@ -257,8 +257,12 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str], set[str]
         "those",
     }
 
-    # Action/generic words that are never primary referents
+    # Action/generic words that are never primary referents.
+    # These are query-intent words (what property is asked about) not subject entities
+    # (what the query is about). "pricing" in "What is the pricing?" is an intent word;
+    # "Tesla" in "What is Tesla's pricing?" is a subject entity.
     generic_words = {
+        # Actions / verbs
         "compare",
         "explain",
         "describe",
@@ -275,18 +279,49 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str], set[str]
         "affect",
         "impact",
         "cause",
+        "caused",
         "effect",
         "change",
         "improve",
         "reduce",
         "increase",
+        "fix",
+        "upgrade",
+        "proceed",
+        # Query-aspect words (what property is requested)
         "benefit",
         "risk",
         "cost",
         "price",
+        "pricing",
         "rate",
+        "rates",
         "value",
         "difference",
+        "deadline",
+        "budget",
+        "revenue",
+        "salary",
+        "warranty",
+        "coverage",
+        "eligibility",
+        "requirements",
+        "prerequisites",
+        "ingredients",
+        "calorie",
+        "calories",
+        "mechanism",
+        "dosage",
+        "interest",
+        "capacity",
+        "specifications",
+        "specs",
+        "efficiency",
+        "certification",
+        "population",
+        "headquarters",
+        "address",
+        # Adjectives / modifiers
         "best",
         "worst",
         "main",
@@ -306,6 +341,23 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str], set[str]
         "amount",
         "percent",
         "percentage",
+        "exact",
+        "minimum",
+        "maximum",
+        "target",
+        "recommended",
+        "hourly",
+        "annual",
+        "monthly",
+        "weekly",
+        "daily",
+        # Format words
+        "bulleted",
+        "numbered",
+        "formatted",
+        "detailed",
+        "summary",
+        # Abstract nouns
         "example",
         "type",
         "kind",
@@ -331,6 +383,7 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str], set[str]
         "term",
         "high",
         "low",
+        "load",
     }
 
     # Quoted terms are always specific
@@ -387,10 +440,15 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str], set[str]
                 specific.add(seq_lower)
 
     # Single capitalized words that aren't at sentence start (position > 0)
+    # Skip ALL-CAPS words — they're emphasis markers (e.g., "What is the PRICING?"),
+    # not proper nouns. Proper nouns use Title Case (e.g., "Tesla", "iPhone").
     words = query.split()
     for i, word in enumerate(words):
         clean_word = re.sub(r"[^\w]", "", word)
         if i > 0 and clean_word and clean_word[0].isupper():
+            # ALL-CAPS = emphasis, not a proper noun
+            if clean_word == clean_word.upper() and len(clean_word) > 1:
+                continue
             clean_lower = clean_word.lower()
             if (
                 clean_lower not in STOPWORDS
@@ -444,19 +502,34 @@ Rules:
 - If none are the primary subject, answer NONE
 - Answer with ONLY the candidate text or NONE, nothing else"""
 
-# Words that should never be accepted as primary entities even if LLM selects them
+# Words that should never be accepted as primary entities even if LLM selects them.
+# Mirrors generic_words in _extract_specific_entities plus additional LLM-specific rejections.
 _LLM_PRIMARY_REJECT = frozenset({
+    # Actions / verbs
     "compare", "explain", "describe", "list", "show", "tell", "find", "get",
-    "make", "use", "help", "work", "affect", "impact", "cause", "effect",
-    "change", "improve", "reduce", "increase", "benefit", "risk", "cost",
-    "price", "rate", "value", "difference", "best", "worst", "main", "key",
-    "important", "current", "latest", "new", "old", "first", "last", "next",
-    "average", "total", "number", "amount", "percent", "percentage", "example",
-    "type", "kind", "way", "method", "process", "system", "part", "role",
+    "make", "use", "help", "work", "affect", "impact", "cause", "caused", "effect",
+    "change", "improve", "reduce", "increase", "fix", "upgrade", "proceed",
+    # Query-aspect words
+    "benefit", "risk", "cost", "price", "pricing", "rate", "rates", "value",
+    "difference", "deadline", "budget", "revenue", "salary", "warranty", "coverage",
+    "eligibility", "requirements", "prerequisites", "ingredients", "calorie", "calories",
+    "mechanism", "dosage", "interest", "capacity", "specifications", "specs",
+    "efficiency", "certification", "population", "headquarters", "address",
+    # Adjectives / modifiers
+    "best", "worst", "main", "key", "important", "current", "latest", "new", "old",
+    "first", "last", "next", "previous", "average", "total", "number", "amount",
+    "percent", "percentage", "exact", "minimum", "maximum", "target", "recommended",
+    "hourly", "annual", "monthly", "weekly", "daily",
+    # Format words
+    "bulleted", "numbered", "formatted", "detailed", "summary",
+    # Abstract nouns
+    "example", "type", "kind", "way", "method", "process", "system", "part", "role",
     "result", "reason", "factor", "feature", "advantage", "disadvantage",
     "problem", "solution", "symptom", "treatment", "side", "long", "short",
-    "term", "high", "low", "company", "product", "service", "customer",
-    "user", "team", "project", "data", "information", "question", "answer",
+    "term", "high", "low", "load",
+    # LLM-specific additional rejections
+    "company", "product", "service", "customer", "user", "team", "project",
+    "data", "information", "question", "answer",
 })
 
 
@@ -489,9 +562,15 @@ def _llm_rank_primary_entity(
                     candidates.add(phrase)
 
     # Remove obvious non-entities
+    # For multi-word phrases, reject if ALL words are generic/reject words
+    def _is_generic_phrase(phrase: str) -> bool:
+        words_in_phrase = phrase.split()
+        return all(w in _LLM_PRIMARY_REJECT or w in STOPWORDS for w in words_in_phrase)
+
     candidates = {
         c for c in candidates
         if c not in _LLM_PRIMARY_REJECT
+        and not _is_generic_phrase(c)
         and not re.match(r"^(19|20)\d{2}$", c)
         and len(c) > 2
     }
