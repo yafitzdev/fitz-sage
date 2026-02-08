@@ -2245,4 +2245,82 @@ This means **no contradiction-detection model** (NLI or otherwise) will solve th
 
 ---
 
+## Experiment 021: CA False Positive Reduction (3 Cluster Fixes)
+
+**Date**: February 8, 2026
+**Branch**: `refactor/staged-constraint-pipeline`
+**Hypothesis**: Exp 020 identified 4 clusters of CA false positives. Three are fixable without a model upgrade: (1) numerical variance in prose, (2) hedged evidence gating, (3) prompt precision for "different aspects" vs "contradiction".
+
+### Baseline
+
+69.9% (174/249) — note: lower than previous 71.5% due to LLM nondeterminism.
+
+### Fix 1: Numerical Variance Detector (Cluster 2, 7 target cases)
+
+**Problem**: NumericalConflictDetector couldn't extract comma-separated numbers ("299,792,458") or physical units ("meters", "m/s"). It also had an overly generous 25% variance threshold, and lacked protection against cross-matching unrelated numbers with the same unit.
+
+**Changes to `numerical_detector.py`**:
+- Added comma-separated number support in `_NUM` pattern
+- Added physical measurement unit patterns (meters, km, m/s, °C, etc.)
+- Reordered UNIT_PATTERNS so compound units (m/s) match before single-letter ambiguities (M=million)
+- Tightened variance threshold: 25% → 5% (catches "$42.8B vs $43.1B" but rejects "85% vs 78%")
+- Added ambiguous-unit filter: when a chunk contains multiple values with the same unit (e.g., "85%, 95%, 80%, 90%" from CI bounds), skip variance detection for that unit
+- Removed unused `_has_conflicting_sources()` and `SOURCE_PATTERNS` (context similarity and source checks added complexity without benefit)
+
+**Result**: +5 cases (71.9%, 179/249)
+- 3 confidence cases no longer falsely disputed (Python usage 40%/42%, temperature 1.1°C/1.2°C, speed of light)
+- 2 dispute cases correctly classified (marketing ROI, population)
+- 0 regressions
+
+### Fix 2: Pair-Level Hedged Evidence Gating (Cluster 3, 6 target cases)
+
+**Problem**: Evidence character classification was per-chunk only. When hedging markers are distributed across chunks (e.g., "may" in chunk A, "preliminary" in chunk B), neither chunk individually reaches the ≥3 hedge marker threshold, so both are classified as "assertive" and get standard (less robust) contradiction detection.
+
+**Changes to `conflict_aware.py`**:
+- Added pair-level evidence classification: combine both chunks' text before classifying
+- When pair-level classification is "hedged", skip the pair (same as hedged-hedged)
+- When pair-level is "mixed" but individual chunks are "assertive", force fusion mode
+- Expanded hedge patterns: `\bearly\b.{0,20}\b(trial)\b`, `\bcannot\b.{0,20}\b(definitive|conclusive|confirm|conclude)\b`, `\blikely\b`, `\buncertain\b`, `\bevolve[ds]?\b`
+
+**Result**: 0 net change. The pair-level hedging correctly skips some pairs, but the LLM finds contradictions via remaining non-hedged pairs in the same case. The fix is structurally correct but limited in impact because most cases have >2 chunks, so at least one non-hedged pair remains.
+
+### Fix 3: Contradiction Prompt Refinement (Cluster 1, 11 target cases)
+
+**Problem**: The 3b LLM classifies complementary information (different metrics, different entities, different time periods) as "contradiction". The pairwise and fusion prompts didn't explicitly distinguish "different aspects" from "opposite claims".
+
+**Changes to `conflict_aware.py`**:
+- Refined CONTRADICTION_PROMPT: added "Texts about different aspects, different time periods, or different entities are compatible, NOT contradictions"
+- Refined all 3 FUSION_PROMPTS with consistent guidance: AGREE/YES covers "different aspects, time periods, or entities"
+- Key insight: "different aspects" wording works well for complementary data (reviews stats, time vs cost efficiency) but can cause false negatives on competing causal theories (dinosaur extinction). However, the net effect is positive.
+
+**Result**: +1 additional case (72.3%, 180/249). The prompt refinement is inherently noisy with a 3b model — benefit varies across runs.
+
+### Cumulative Result
+
+| Metric | Baseline | After All Fixes | Delta |
+|--------|----------|----------------|-------|
+| **Overall** | 69.9% (174/249) | **72.3% (180/249)** | **+6 cases** |
+| Confidence | 84.1% (53/63) | **90.5% (57/63)** | +4 |
+| Dispute | 89.1% (49/55) | 90.9% (50/55) | +1 |
+| Qualification | 55.9% (38/68) | 57.4% (39/68) | +1 |
+| Abstention | 54.0% (34/63) | 54.0% (34/63) | 0 |
+| qualified→disputed | 18 | **15** | -3 |
+| confident→disputed | 7 | **2** | -5 |
+
+**8 cases fixed, 2 broken** (net +6):
+- Fixed: Python data science %, temperature °C, speed of light, reviews, website traffic, outage cause, marketing ROI, population
+- Broken: dinosaur extinction (prompt "different aspects" → LLM misclassifies competing theories), remote work productivity (LLM nondeterminism)
+
+### Key Insight
+
+Deterministic pre-filters (numerical variance, hedging gating) are more reliable than prompt engineering with a 3b model. The numerical variance fix produced a clean +5 with zero regressions. The prompt fix is noisy (+1 to +3 depending on run). For the remaining 15 qualified→disputed cases, the bottleneck remains the 3b model's inability to distinguish "ambiguity requiring qualification" from "genuine factual conflict."
+
+### Outcome
+
+**Positive result.** Governance improved from ~70% to ~72.3%. The numerical variance detector is the most impactful change. The 3b ceiling is now estimated at 73-74%.
+
+**Running total**: Governance 72.3%, Relevance 35.0% (Exp 019), Grounding 90.5%
+
+---
+
 *This is a living document. Update continuously with new findings.*

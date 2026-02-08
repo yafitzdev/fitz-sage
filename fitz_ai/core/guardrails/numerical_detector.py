@@ -48,33 +48,27 @@ class NumericalConflictDetector:
         r"less|reduced?|reduction|lost|losses?|shrunk|contracted?|slipped?)\b",
     ]
 
-    # Source indicators - suggest different authoritative sources (potential dispute)
-    SOURCE_PATTERNS = [
-        r"\baccording to\b",
-        r"\breported?\b",
-        r"\bclaims?\b",
-        r"\bstates?\b",
-        r"\bsays?\b",
-        r"\bfinds?\b",
-        r"\bshows?\b",
-        r"\bestimates?\b",
-        r"\bsurvey\b",
-        r"\bstudy\b",
-        r"\bresearch\b",
-        r"\banalysis\b",
-        r"\binternal\b",
-        r"\bexternal\b",
-    ]
+    # Number pattern fragment: matches "42.8", "165,000", "299,792,458"
+    _NUM = r"(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)"
 
     # Unit patterns - capture value and unit
+    # Order matters: compound units before single-letter ambiguities (m/s before M=million)
     UNIT_PATTERNS = [
-        (r"(\d+(?:\.\d+)?)\s*(%|percent|percentage)", "%"),
-        (r"(\d+(?:\.\d+)?)\s*(million|mil|M)\b", "million"),
-        (r"(\d+(?:\.\d+)?)\s*(billion|bil|B)\b", "billion"),
-        (r"(\d+(?:\.\d+)?)\s*(thousand|K)\b", "thousand"),
-        (r"(\d+(?:\.\d+)?)\s*(GB|MB|KB|TB)", "bytes"),
-        (r"\$\s*(\d+(?:\.\d+)?)\s*(million|bil|billion|M|B|K|thousand)?", "currency"),
-        (r"(\d+(?:\.\d+)?)\s*(USD|EUR|dollars?|euros?)", "currency"),
+        (rf"{_NUM}\s*(%|percent|percentage)", "%"),
+        (rf"{_NUM}\s*(GB|MB|KB|TB)", "bytes"),
+        # Compound units before single-letter multipliers
+        (rf"{_NUM}\s*(m/s|km/h|mph|ft/s)", "measurement"),
+        (rf"{_NUM}\s*(million|mil)\b", "million"),
+        (rf"{_NUM}\s*(billion|bil)\b", "billion"),
+        (rf"{_NUM}\s*(thousand)\b", "thousand"),
+        # Single-letter multipliers after compound units
+        (rf"{_NUM}\s+(M)\b", "million"),
+        (rf"{_NUM}\s+(B)\b", "billion"),
+        (rf"{_NUM}\s+(K)\b", "thousand"),
+        (rf"\$\s*{_NUM}\s*(million|bil|billion|M|B|K|thousand)?", "currency"),
+        (rf"{_NUM}\s*(USD|EUR|dollars?|euros?)", "currency"),
+        # Physical units (e.g., "299,792,458 meters", "1.1°C")
+        (rf"{_NUM}\s*(meters?|km|miles?|kg|lbs?|°[CF]|degrees?)", "measurement"),
     ]
 
     def extract_numeric_mentions(self, text: str) -> list[NumericMention]:
@@ -92,7 +86,7 @@ class NumericalConflictDetector:
         for pattern, unit_type in self.UNIT_PATTERNS:
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 try:
-                    value_str = match.group(1)
+                    value_str = match.group(1).replace(",", "")
                     value = float(value_str)
                 except (ValueError, IndexError):
                     continue
@@ -179,7 +173,7 @@ class NumericalConflictDetector:
         self,
         mention1: NumericMention,
         mention2: NumericMention,
-        variance_threshold: float = 0.25,  # 25% relative difference
+        variance_threshold: float = 0.05,  # 5% relative difference
     ) -> bool:
         """
         Check if two numeric mentions are variance vs contradiction.
@@ -257,6 +251,11 @@ class NumericalConflictDetector:
 
         This is the main entry point for conflict_aware.py integration.
 
+        Multi-source convergence: when different sources cite nearly identical
+        numbers (e.g., Gartner $42.8B vs IDC $43.1B), that's agreement, not
+        dispute. The source check only blocks variance when numbers differ
+        significantly.
+
         Args:
             content1: First chunk content
             content2: Second chunk content
@@ -266,59 +265,40 @@ class NumericalConflictDetector:
             - is_variance=True means skip LLM check (it's just variance)
             - is_variance=False means proceed with LLM check
         """
-        # If both chunks cite different sources, it's likely a dispute, not variance
-        # e.g., "Gartner says 32%" vs "Company claims 38%" = dispute
-        if self._has_conflicting_sources(content1, content2):
-            return False, ""
-
         nums1 = self.extract_numeric_mentions(content1)
         nums2 = self.extract_numeric_mentions(content2)
 
-        # Check all pairs for variance
+        # Count mentions per unit in each chunk. When a chunk contains
+        # multiple values of the same unit (e.g., "85%, 95%, 80%, 90%"),
+        # we can't reliably determine which value is "the" stat being
+        # reported. Be conservative: only detect variance when each chunk
+        # has exactly one mention per unit.
+        from collections import Counter
+
+        units1 = Counter(n.unit for n in nums1 if n.unit)
+        units2 = Counter(n.unit for n in nums2 if n.unit)
+        ambiguous_units = {u for u, c in units1.items() if c > 1} | {
+            u for u, c in units2.items() if c > 1
+        }
+
         for n1 in nums1:
             for n2 in nums2:
-                # Same unit required
                 if n1.unit != n2.unit:
                     continue
 
-                # Check if contexts are about the same thing
-                # Use moderate threshold (0.18) to balance:
-                # - Catching variance: "Sales grew 10%" vs "Sales grew 12%"
-                # - Avoiding false positives: "Gartner says 32%" vs "Company claims 38%"
-                if self._context_similarity(n1.context, n2.context) < 0.18:
-                    continue  # Different topics
+                if n1.unit in ambiguous_units:
+                    continue
 
-                if self.is_numerical_variance(n1, n2):
-                    return (
-                        True,
-                        f"Numerical variance detected: {n1.value}{n1.unit or ''} vs "
-                        f"{n2.value}{n2.unit or ''} (same direction, within threshold)",
-                    )
+                if not self.is_numerical_variance(n1, n2):
+                    continue
+
+                return (
+                    True,
+                    f"Numerical variance detected: {n1.value}{n1.unit or ''} vs "
+                    f"{n2.value}{n2.unit or ''} (same direction, within threshold)",
+                )
 
         return False, ""
-
-    def _has_conflicting_sources(self, content1: str, content2: str) -> bool:
-        """
-        Check if both chunks cite different sources.
-
-        If both chunks have source indicators (e.g., "according to", "claims"),
-        it suggests different authorities making claims - potential dispute.
-
-        Returns:
-            True if both chunks have source indicators (potential dispute)
-        """
-        content1_lower = content1.lower()
-        content2_lower = content2.lower()
-
-        has_source1 = any(
-            re.search(pattern, content1_lower) for pattern in self.SOURCE_PATTERNS
-        )
-        has_source2 = any(
-            re.search(pattern, content2_lower) for pattern in self.SOURCE_PATTERNS
-        )
-
-        # Both chunks citing sources = likely a dispute between sources
-        return has_source1 and has_source2
 
     def _detect_direction(self, context: str) -> Optional[str]:
         """Detect direction from context."""
@@ -340,6 +320,26 @@ class NumericalConflictDetector:
             return "currency"
         if unit_type == "bytes":
             return "bytes"
+        if unit_type == "measurement":
+            if raw_unit:
+                raw_lower = raw_unit.lower().rstrip("s")
+                if raw_lower in ("meter", "m", "m/"):
+                    return "meters"
+                if raw_lower in ("m/s", "ft/s"):
+                    return "speed"
+                if raw_lower in ("km/h", "mph"):
+                    return "speed"
+                if raw_lower in ("km", "kilometer"):
+                    return "km"
+                if raw_lower in ("mile"):
+                    return "miles"
+                if raw_lower in ("kg", "kilogram"):
+                    return "kg"
+                if raw_lower in ("lb"):
+                    return "lbs"
+                if raw_lower in ("°c", "°f", "degree"):
+                    return raw_lower
+            return "measurement"
         if raw_unit:
             raw_lower = raw_unit.lower()
             if raw_lower in ("%", "percent", "percentage"):

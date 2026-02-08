@@ -51,9 +51,9 @@ Text 1: {text1}
 
 Text 2: {text2}
 
-If they say OPPOSITE things (one says yes, one says no), answer CONTRADICT.
-If they agree or are compatible, answer AGREE.
-If unclear, answer UNCLEAR.
+CONTRADICT = they make OPPOSITE claims about the SAME thing (one says yes, the other says no).
+AGREE = they are compatible. Texts about different aspects, different time periods, or different entities are compatible, NOT contradictions.
+UNCLEAR = cannot determine.
 
 Reply with ONLY one word: CONTRADICT, AGREE, or UNCLEAR"""
 
@@ -67,7 +67,8 @@ Question: {query}
 Text A: {text1}
 Text B: {text2}
 
-Answer CONTRADICT if they make opposite claims, AGREE if compatible, UNCLEAR if uncertain.
+CONTRADICT = they make OPPOSITE claims about the SAME specific thing.
+AGREE = they are compatible (including texts about different aspects, time periods, or entities).
 Reply with ONE word: CONTRADICT, AGREE, or UNCLEAR""",
     # Consistency framing (inverted)
     """Are these two texts CONSISTENT with each other regarding the question?
@@ -76,7 +77,8 @@ Question: {query}
 First text: {text1}
 Second text: {text2}
 
-Answer YES if they agree or are compatible, NO if they contradict, UNCLEAR if uncertain.
+YES = they agree, are compatible, or discuss different aspects of the topic.
+NO = they make opposite claims about the same specific thing.
 Reply with ONE word: YES, NO, or UNCLEAR""",
     # Logical compatibility framing
     """If the first statement is true, could the second statement also be true?
@@ -85,7 +87,8 @@ Question context: {query}
 Statement 1: {text1}
 Statement 2: {text2}
 
-Answer YES if both could be true, NO if they are mutually exclusive, UNCLEAR if uncertain.
+YES = both could be true (including if they discuss different aspects or entities).
+NO = they are mutually exclusive about the same claim.
 Reply with ONE word: YES, NO, or UNCLEAR""",
 ]
 
@@ -162,10 +165,14 @@ _HEDGE_PATTERNS = [
     r"\bpotentially\b",
     r"\bunclear\b",
     r"\bnot (yet |fully )?established\b",
-    r"\bearly (results?|findings?|data|studies?|evidence)\b",
+    r"\bearly\b.{0,20}\b(results?|findings?|data|studies?|evidence|trial)\b",
     r"\bwarrants? further\b",
     r"\bnot definitive\b",
+    r"\bcannot\b.{0,20}\b(definitive|conclusive|confirm|conclude)\b",
     r"\brequires? (more|further|additional)\b",
+    r"\blikely\b",
+    r"\buncertain\b",
+    r"\bevolve[ds]?\b",
 ]
 
 # Assertive markers: language indicating firm claims, established facts, confirmed findings
@@ -534,17 +541,25 @@ class ConflictAwareConstraint:
         for other_chunk in chunks_to_check[1:]:
             other_char = _classify_evidence_character(other_chunk.content)
 
+            # Pair-level evidence character: combine both chunks' text
+            # to catch hedging distributed across chunks (e.g., "may" in
+            # chunk A + "preliminary" in chunk B = hedged pair)
+            pair_char = _classify_evidence_character(
+                first_chunk.content + " " + other_chunk.content
+            )
+
             # Evidence character gating (pair-conditioned truth table):
-            # hedged vs hedged → skip (most "contradictions" are nuance/caveats)
-            if first_char == "hedged" and other_char == "hedged":
+            # hedged vs hedged OR pair-level hedged → skip
+            if (first_char == "hedged" and other_char == "hedged") or pair_char == "hedged":
                 logger.debug(
-                    f"{PIPELINE} ConflictAwareConstraint: skipping hedged-hedged pair"
+                    f"{PIPELINE} ConflictAwareConstraint: skipping hedged pair "
+                    f"({first_char} vs {other_char}, pair={pair_char})"
                 )
                 continue
 
             # assertive vs assertive → standard method (likely real contradictions)
             # any hedged/mixed involved → use fusion for higher bar
-            if first_char == "assertive" and other_char == "assertive":
+            if first_char == "assertive" and other_char == "assertive" and pair_char == "assertive":
                 check_method = base_method
                 method_name = base_method_name
             else:
