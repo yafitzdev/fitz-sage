@@ -219,7 +219,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 **Overall: 69.1%** on [fitz-gov](https://github.com/yafitzdev/fitz-gov) — a benchmark for epistemic honesty, not retrieval quality.
 
 > [!NOTE]
-> **Why 69% and not 95%?** Retrieval benchmarks ask "is this document relevant?" — a binary question with clean ground truth. Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. Standard RAG benchmarks routinely hit 90%+. No system in the literature exceeds 75% on calibrated epistemic governance. 92% of our test cases are rated "hard."
+> **Why 69% and not 95%?** Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. No system in the literature exceeds 75% on calibrated epistemic governance. 92% of our test cases are rated "hard."
 
 **How it works:** Five epistemic constraints (contradiction detection, evidence sufficiency, causal attribution, answer verification) extract 58 features from each query. A gradient-boosted tree classifier — trained on fitz-gov's 1,100 labeled boundary cases with independent blind validation — replaces hand-coded priority rules. The constraints stay; only the decision logic learned from data.
 
