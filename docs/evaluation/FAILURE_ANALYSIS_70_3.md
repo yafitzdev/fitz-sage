@@ -248,8 +248,8 @@ differently (pairwise contradiction detection vs binary classification vs multi-
 ### Remaining Viable Approaches
 
 1. **Larger model** — 7b or 14b model for CA only (the rest stays 3b)
-2. **Cluster C fix** — causal_attribution false fires are fixable with regex (6 cases)
-3. **Accept 70.3%** as the 3b ceiling for dispute-related governance
+2. **Cluster C fix** — causal_attribution false fires are fixable with regex (6 cases) **→ DONE (Exp 018): +3 cases, 70.3% → 71.5%**
+3. **Accept 71.5%** as the 3b ceiling for dispute-related governance
 
 ---
 
@@ -258,9 +258,10 @@ differently (pairwise contradiction detection vs binary classification vs multi-
 **With qwen2.5:3b only**:
 - Cluster A: **Blocked** — fundamental 3b discrimination limit
 - Cluster B (decoy data): **Blocked** — needs entity-relevance discrimination
-- Cluster C (causal_attribution): **Fixable** — regex-level changes (+3 to +5)
+- Cluster C (causal_attribution): **Fixed (Exp 018)** — +3 cases via regex tightening
 - Other scattered: Partially fixable (+2 to +3)
 
-**Revised realistic ceiling with 3b: ~73-75%** (from 70.3%)
+**Current: 71.5% (178/249)** after Exp 018
+**Revised realistic ceiling with 3b: ~73-75%** (from 71.5%)
 
 **With model upgrade for CA**: 75-80%+ (removes the 3b discrimination bottleneck)

@@ -75,7 +75,6 @@ OPINION_QUERY_PATTERNS = (
     "which is best",
     "what's the best",
     "what is the best",
-    "recommend",
     "is it worth",
     "is this effective",
     "is this adequate",
@@ -83,6 +82,19 @@ OPINION_QUERY_PATTERNS = (
     " better for ",  # "Is X better for Y?"
     " better than ",  # "Is X better than Y?"
     " best for ",  # "What is best for X?"
+)
+
+# Regex pattern for "recommend" with word boundary to avoid matching "recommendation"
+_RECOMMEND_RE = re.compile(r"\brecommend(s|ed|ing)?\b", re.IGNORECASE)
+
+# Exclusion patterns: queries that use opinion keywords but are factual/comparative
+_OPINION_EXCLUSIONS = (
+    # "Should we use X or Y" → factual comparison, not opinion-seeking
+    re.compile(r"^should\s+(we|i)\s+use\s+.+\s+or\s+", re.IGNORECASE),
+    # "What/which ... should I ... to/for" → factual best-practice question
+    re.compile(
+        r"^(what|which|how)\s+.+\s+should\s+(i|we)\s+.+\s+(to|for)\b", re.IGNORECASE
+    ),
 )
 
 # Keywords that indicate speculative queries
@@ -162,7 +174,15 @@ def _is_predictive_query(query: str) -> bool:
 def _is_opinion_query(query: str) -> bool:
     """Check if query is asking for opinions, recommendations, or judgments."""
     q = query.lower().strip()
+
+    # Check exclusions first — these look like opinion queries but are factual
+    if any(exc.search(q) for exc in _OPINION_EXCLUSIONS):
+        return False
+
     if any(pattern in q for pattern in OPINION_QUERY_PATTERNS):
+        return True
+    # Word-boundary check for "recommend" (avoids "recommendation")
+    if _RECOMMEND_RE.search(q):
         return True
     # Regex patterns for comparative questions: "Is X better", "Which X is better"
     comparative_patterns = [

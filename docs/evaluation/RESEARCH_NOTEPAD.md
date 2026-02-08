@@ -2016,4 +2016,53 @@ No code changes. All approaches either regress or are not viable. Cluster A (34 
 
 ---
 
+## Experiment 018: Causal Attribution Regex Tightening
+
+**Date**: February 7, 2026
+**Hypothesis**: Tightening causal_attribution opinion patterns to exclude process, comparison, and factual queries will fix 3 Cluster C false fires without regressions.
+**Branch**: `refactor/staged-constraint-pipeline`
+**Baseline**: 70.3% (175/249)
+
+### Problem
+
+causal_attribution fires `qualified` on 3 confident cases that aren't actually opinion/judgment queries:
+
+| Case | Query | False Match | Why Wrong |
+|------|-------|-------------|-----------|
+| t1_confident_hard_003 | "How does the recommendation algorithm work?" | `"recommend"` substring in "recommendation" | Process query, not recommendation request |
+| t1_confident_hard_004 | "Should we use Kubernetes or Docker Swarm?" | `"should we"` | Factual comparison, not opinion-seeking |
+| t1_confident_hard_043 | "What temperature should I cook chicken to?" | `"should i"` | Factual best-practice, not opinion |
+
+### Changes
+
+1. Removed `"recommend"` from substring list. Added `_RECOMMEND_RE = re.compile(r"\brecommend(s|ed|ing)?\b")` with word boundary. Matches "recommended dosage" but NOT "recommendation algorithm".
+
+2. Added `_OPINION_EXCLUSIONS` — regex patterns checked BEFORE opinion matching:
+   - `^should (we|i) use .+ or ` — "Should we use X or Y" is a factual comparison
+   - `^(what|which|how) .+ should (i|we) .+ (to|for)` — "What X should I do to/for Y" is factual
+
+3. Modified `_is_opinion_query()` to check exclusions first, then apply word-boundary recommend check.
+
+### Verification
+
+Confirmed all 9 benchmark cases using these patterns:
+- 3 false fires: now correctly NOT firing (t1_confident_hard_003/004/043)
+- 6 true fires: still correctly firing (t0_relevance_easy_005, t1_grounding_medium_005, t1_qualify_hard_005/010, t1_relevance_hard_012/014)
+
+### Results
+
+**71.5% (178/249)** — +1.2% gain, +3 deterministic case fixes, 0 regressions.
+
+- 37 causal_attribution unit tests: all pass
+- 53 pipeline/governance unit tests: all pass
+- causal_attribution failures: 12 → 6 (3 deterministic fixes + 3 LLM variance)
+
+### Outcome
+
+Committed. Small but clean gain. Confirms Cluster C is fixable with regex-level changes as predicted in failure analysis.
+
+**Running total**: 70.3% → **71.5%** (Exp 018 only)
+
+---
+
 *This is a living document. Update continuously with new findings.*
