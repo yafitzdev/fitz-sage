@@ -48,7 +48,7 @@ _DEFAULT_DATA_DIR = (
 )
 
 # Metadata columns (not features)
-_META_COLS = {"case_id", "expected_mode", "governor_predicted", "difficulty", "subcategory"}
+_META_COLS = {"case_id", "expected_mode", "governor_predicted", "classifier_predicted", "difficulty", "subcategory"}
 
 # Categorical features that need label encoding
 _CATEGORICAL_FEATURES = {
