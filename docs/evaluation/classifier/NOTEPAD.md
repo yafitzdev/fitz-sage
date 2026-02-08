@@ -1,7 +1,7 @@
 # Governance Classifier — Living Notepad
 
 **Goal**: Replace hand-coded `AnswerGovernor.decide()` priority rules with a trained tabular classifier.
-**Status**: Feature extraction complete, ready for classifier training
+**Status**: Training pipeline complete. Best model: RF at 71.0% (vs 33.3% governor baseline on synthetic data). Dispute recall improved from 28% to 69% via ensemble.
 
 ---
 
@@ -426,31 +426,233 @@ All tiers (1-3) are now implemented in the codebase:
 
 ---
 
-## 7. Open Questions
+## 7. Training Pipeline
 
-1. ~~**Staging merge**: Is the staging data ready to merge?~~ RESOLVED — all data merged (848 tier1 cases)
-2. ~~**Feature extraction**: What features are available and how to surface them?~~ RESOLVED — 40 features implemented across Tiers 1-3
-3. **Training approach**: Start with all ~40 features, or iteratively add feature tiers?
-4. **Cross-validation strategy**: Stratified k-fold by subcategory? Or random?
-5. **Fallback strategy**: Hard cutoff (classifier only) or soft (classifier + priority rules for low-confidence predictions)?
-6. ~~**When to generate more data**: Before first training run?~~ RESOLVED — generated 123 new cases, all validated and merged
+### 7a. Feature Extraction Script
+
+**File**: `tools/governance/extract_features.py`
+
+Loads labeled cases from fitz-gov, runs each constraint individually (bypassing staged short-circuit), extracts features via `feature_extractor.py`, saves to CSV.
+
+```bash
+python -m tools.governance.extract_features --chat cohere --workers 1
+```
+
+**Key design decisions**:
+- **Constraints run individually, not staged** — The staged pipeline short-circuits (if IE fires abstain, CA/AV never run). For training we need ALL features, so each constraint runs independently.
+- **Thread-local constraint instances** — Each worker thread gets its own constraint set to avoid shared state.
+- **Governor baseline** — Also runs `AnswerGovernor.decide()` on each case's results, stored as `governor_predicted` for comparison.
+- **Typed defaults** — None values replaced with False (bool), 0 (numeric), "none" (string).
+
+**LLM requirement**: IE, CA, and AV constraints use LLM calls. ~5-7 LLM calls per case. Cohere command-r7b via fast tier. 914 cases = ~5000 LLM calls.
+
+**Concurrency lessons learned**:
+- 100 workers: massive 429 rate limits, AV features almost all zeros (879/914 had 0 jury votes)
+- 10 workers: still hit limits
+- 3 workers: some 429s mid-run, ~80% clean data
+- 2 workers: occasional 429s, ~90% clean data
+- **1 worker: zero errors, 100% clean data, ~15 min runtime**
+
+**Output**: `tools/governance/data/features.csv` — 914 rows x 52 columns
+
+**Data note**: fitz-gov has 914 tier1 cases (was 848 at last doc update — the 66 grounding/relevance cases map to `expected_mode=qualified` and are included since the classifier just predicts the mode, not the reason).
+
+### 7b. Training Script
+
+**File**: `tools/governance/train_classifier.py`
+
+```bash
+python -m tools.governance.train_classifier --time-budget 600
+```
+
+**Pipeline**:
+1. Load features.csv (52 constraint-derived columns)
+2. Enrich with 11 context-based features from raw case text (no LLM)
+3. Encode categoricals (LabelEncoder), bools to int
+4. Stratified 80/20 train/test split
+5. Quick model comparison (5 models, 5-fold CV, class-weighted)
+6. Hyperparameter search on top 3 models (RandomizedSearchCV with time budget)
+7. Build stacking ensemble from tuned models
+8. Evaluate all models + ensemble on held-out test set
+9. Save winner as joblib artifact
+
+**Features**: 58 total (47 constraint-derived + 11 context-based)
 
 ---
 
-## 8. Next Steps: Classifier Training
+## 8. Training Experiments
 
-### Ready to train
-- 848 labeled cases (tier1) + 44 tier0 sanity cases
-- ~40 features extractable from the pipeline
-- Feature extraction code complete and tested
+### Experiment 1: Baseline (single GBT, constraint features only)
 
-### Training pipeline needed
-1. **Feature matrix generation**: Run each test case through `extract_features()` to build X matrix
-2. **Label vector**: Map `expected_mode` to 4-class target (abstain=0, disputed=1, qualified=2, confident=3)
-3. **Train/test split**: 80/20 stratified by `expected_mode`
-4. **Model selection**: XGBoost or scikit-learn GBT, 5-fold cross-validation
-5. **Evaluation**: Per-class precision/recall, confusion matrix, feature importance
-6. **Integration**: Replace `AnswerGovernor.decide()` with classifier inference
+**Config**: GradientBoostingClassifier, n_estimators=200, max_depth=4, lr=0.1, no class weighting, 47 features.
+
+```
+CV accuracy: 0.595 +/- 0.016
+
+                 precision    recall  f1-score   support
+     abstain       0.75      0.62      0.68        39
+   confident       0.39      0.35      0.37        31
+    disputed       0.50      0.28      0.36        29
+   qualified       0.58      0.74      0.65        84
+
+Classifier accuracy: 0.574 (105/183)
+Governor baseline:   0.333 (61/183)
+Delta:               +0.240
+```
+
+**Dispute diagnostic**: 8/29 correct (28% recall), 17/29 misclassified as qualified.
+
+**Feature importance** (top 5): query_word_count (0.18), vocab_overlap_ratio (0.17), num_chunks (0.12), av_jury_votes_no (0.08), num_constraints_fired (0.07).
+
+**Key insight**: Generic query features dominate over constraint signals. Classifier is learning surface-level patterns, not governance logic. Dispute recall is terrible because CA only fired on 221/914 cases.
+
+### Experiment 2: All improvements (v2)
+
+**4 improvements applied simultaneously**:
+1. **Context features** (+11 features): ctx_length_mean/std/total, ctx_contradiction_count, ctx_negation_count, ctx_number_count/variance, ctx_pairwise_sim (max/mean/min), query_ctx_content_overlap
+2. **Class weighting**: `compute_sample_weight("balanced")` for GBT, `class_weight="balanced"` for RF/ET/SVM/LR
+3. **Multi-model comparison**: GBT, RandomForest, ExtraTrees, SVM, LogisticRegression
+4. **Hyperparameter search**: RandomizedSearchCV, 600s budget, top 3 models, 330 fits each
+
+**Quick model comparison (5-fold CV, class-weighted)**:
+
+| Model | CV Accuracy | Time |
+|-------|-------------|------|
+| ET    | 0.711 +/- 0.031 | 2.8s |
+| RF    | 0.699 +/- 0.018 | 3.5s |
+| GBT   | 0.683 +/- 0.028 | 14.3s |
+| LR    | 0.424 +/- 0.074 | 0.6s |
+| SVM   | 0.250 +/- 0.105 | 0.9s |
+
+SVM and LR were poor (features aren't scaled, and the problem isn't linearly separable).
+
+**Hyperparameter search results** (600s budget):
+
+| Model | Best CV Score | Key Params |
+|-------|--------------|------------|
+| ET    | 0.707 | n_estimators=502, max_depth=30, max_features=0.7 |
+| RF    | 0.702 | n_estimators=502, max_depth=30, max_features=0.7 |
+| GBT   | 0.672 | n_estimators=485, max_depth=3, lr=0.016, subsample=0.67 |
+
+**Test set results (held-out 183 samples)**:
+
+| Model | Accuracy | Disputed Recall | D->Q Confusion |
+|-------|----------|-----------------|----------------|
+| Governor baseline | 33.3% (61/183) | 55% (16/29) | N/A |
+| ET (tuned) | 65.6% (120/183) | 34% (10/29) | 14/29 |
+| GBT (tuned) | 66.7% (122/183) | **62% (18/29)** | **8/29** |
+| **RF (tuned)** | **71.0% (130/183)** | 45% (13/29) | 16/29 |
+| Stacking Ensemble | 66.1% (121/183) | **69% (20/29)** | **5/29** |
+
+**Per-class breakdown (RF — best overall)**:
+
+```
+              precision    recall  f1-score   support
+     abstain       0.94      0.77      0.85        39
+   confident       0.64      0.45      0.53        31
+    disputed       0.76      0.45      0.57        29
+   qualified       0.65      0.87      0.74        84
+```
+
+**Per-class breakdown (Ensemble — best dispute detection)**:
+
+```
+              precision    recall  f1-score   support
+     abstain       0.80      0.82      0.81        39
+   confident       0.47      0.45      0.46        31
+    disputed       0.54      0.69      0.61        29
+   qualified       0.72      0.65      0.69        84
+```
+
+**Feature importance (RF, top 20)**:
+
+| Rank | Feature | Importance | New? |
+|------|---------|------------|------|
+| 1 | ctx_total_chars | 0.1137 | YES |
+| 2 | ctx_length_mean | 0.1059 | YES |
+| 3 | ctx_length_std | 0.0792 | YES |
+| 4 | ca_signal | 0.0607 | |
+| 5 | ctx_number_variance | 0.0602 | YES |
+| 6 | ctx_number_count | 0.0597 | YES |
+| 7 | query_word_count | 0.0548 | |
+| 8 | ctx_min_pairwise_sim | 0.0469 | YES |
+| 9 | av_jury_votes_no | 0.0412 | |
+| 10 | ctx_max_pairwise_sim | 0.0406 | YES |
+| 11 | av_fired | 0.0388 | |
+| 12 | ctx_mean_pairwise_sim | 0.0387 | YES |
+| 13 | query_ctx_content_overlap | 0.0355 | YES |
+| 14 | vocab_overlap_ratio | 0.0353 | |
+| 15 | ctx_negation_count | 0.0242 | YES |
+| 16 | num_chunks | 0.0215 | |
+| 17 | ca_fired | 0.0198 | |
+| 18 | has_disputed_signal | 0.0184 | |
+| 19 | ctx_contradiction_count | 0.0164 | YES |
+| 20 | caa_has_causal_evidence | 0.0116 | |
+
+**11 of top 20 features are the new context-based ones.** They provide raw text signal that constraint features miss.
+
+### Key Tradeoff: Accuracy vs Dispute Recall
+
+There's a fundamental tension between overall accuracy and dispute detection:
+
+- **RF (71.0% accuracy)** is best overall but only catches 45% of disputes
+- **Ensemble (66.1% accuracy)** catches 69% of disputes but sacrifices 5% overall
+- **GBT (66.7% accuracy)** catches 62% of disputes with minimal overall cost
+
+This suggests we might want: RF for the general case, with dispute-specific thresholds or a two-stage approach (RF predicts, then dispute-check on qualified predictions).
+
+### Why Governor Baseline is 33.3% (not ~70%)
+
+The governor gets ~70% in the full eval pipeline (real retrieval, vector scores, detection summaries). Here it gets 33.3% because:
+
+1. **No real retrieval signals** — Synthetic cases have inline contexts with no vector scores, no embedding similarities, no metadata. IE sees `max_similarity=0` → doesn't fire → governor defaults to "confident".
+2. **Governor predicted "confident" on 472/914 cases** but only 157 should be — it's just the default when nothing fires.
+3. **Governor predicted "abstain" on only 55 cases** but 192 are expected — IE can't detect insufficient evidence without real embeddings.
+
+The classifier compensates by learning from text-level proxies (context length, word overlap, contradiction markers) that the governor's priority rules can't access. With real pipeline data, the classifier would have much richer features and should significantly exceed the governor's ~70%.
+
+---
+
+## 9. Files Created
+
+| File | Purpose |
+|------|---------|
+| `tools/governance/__init__.py` | Package init |
+| `tools/governance/extract_features.py` | Feature extraction from fitz-gov cases (LLM-based) |
+| `tools/governance/train_classifier.py` | Multi-model training with hyperparameter search |
+| `tools/governance/data/features.csv` | 914 rows x 52 columns (constraint features) |
+| `tools/governance/data/model_v1.joblib` | Best model artifact (RF tuned) + encoders + feature names |
+
+---
+
+## 10. Open Questions
+
+1. ~~**Training approach**: Start with all ~40 features, or iteratively add feature tiers?~~ RESOLVED — used all Tier 1-2 features + 11 new context features = 58 total
+2. ~~**Cross-validation strategy**: Stratified k-fold by subcategory? Or random?~~ RESOLVED — Stratified 5-fold by expected_mode
+3. **Which model to ship?** RF (best accuracy) vs Ensemble (best dispute recall) vs GBT (balanced)
+4. **Integration**: How to integrate classifier into the full pipeline? Replace AnswerGovernor.decide() or add as parallel path?
+5. **Real pipeline evaluation**: Need to test with full retrieval pipeline data (vector scores, detection summaries) to get realistic accuracy numbers
+6. **Dispute recall improvement**: Can we tune CA constraint sensitivity? Add more disputed training data? Two-stage prediction (RF + dispute refinement)?
+7. **Fallback strategy**: Hard cutoff (classifier only) or soft (classifier + priority rules for low-confidence predictions)?
+
+---
+
+## 11. Next Steps
+
+### Short-term (improve current results)
+1. **Tune CA sensitivity** — CA only fired 221/914 cases. Many disputed cases lack the signal. Lower thresholds = more dispute features for classifier.
+2. **More disputed training data** — 145 disputed cases vs 420 qualified. Add 50-100 more hard dispute cases.
+3. **Two-stage model** — RF for general prediction, then dispute-specific check on cases predicted as "qualified" (catches the 16/29 D->Q confusions).
+
+### Medium-term (integration)
+4. **Integration prototype** — `fitz_ai/core/guardrails/classifier.py` wrapper that loads model_v1.joblib, runs at inference time.
+5. **Full pipeline eval** — Run classifier on real retrieval results (not synthetic) to measure actual improvement over governor's ~70%.
+6. **A/B comparison** — Run both governor and classifier on same queries, compare decisions.
+
+### Longer-term
+7. **Production deployment** — Ship model in package, load at engine startup, replace governor.
+8. **Online learning** — Track predictions, collect corrections, retrain periodically.
+9. **Confidence calibration** — Use classifier probabilities for soft decisions (high confidence = direct, low = fall back to priority rules).
 
 ---
 
@@ -463,3 +665,6 @@ All tiers (1-3) are now implemented in the codebase:
 | 2025-02-08 | Staging merge verified (was already merged). Subcategories consolidated: 156 -> 54 canonical types |
 | 2025-02-08 | Generated 123 new cases (dispute boundary, edge cases, code/adversarial). Blind validated at 94% agreement. 4 relabeled. Merged into tier1_core. Total: 848 cases |
 | 2026-02-08 | Feature extraction implementation complete (Tier 1-3). ~40 features flowing through pipeline. Verified with integration tests (22 passed). |
+| 2026-02-08 | Feature extraction pipeline built (`extract_features.py`). 914 cases extracted with Cohere command-r7b, 1 worker, 0 errors, 52 columns. Governor baseline: 33.9%. |
+| 2026-02-08 | Experiment 1 (baseline GBT): 57.4% accuracy vs 33.3% governor. Disputed recall: 28% (8/29). |
+| 2026-02-08 | Experiment 2 (v2 — context features + class weighting + multi-model + hyperparam search): RF 71.0%, Ensemble 69% dispute recall. 11 new context features dominate importance. |
