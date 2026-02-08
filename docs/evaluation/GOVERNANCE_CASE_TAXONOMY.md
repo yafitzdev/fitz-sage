@@ -1,220 +1,298 @@
 # Governance Case Taxonomy
 
-Complete taxonomy of governance case types for fitz-gov benchmark generation.
-Derived from 21 experiments of failure analysis on the dispute/qualify/abstain/confident classification task.
+Complete taxonomy of governance case types for the fitz-gov benchmark.
+Derived from 21 experiments of failure analysis, then used to generate 525 new test cases
+via LLM-assisted boundary sampling with independent blind label validation.
 
-**Coverage target**: ~70 distinct case types across 4 pure categories and 6 boundary pairs.
-Each row is a generation prompt for expanding fitz-gov.
+**Status**: Generated, validated, merged into fitz-gov tier1_core.
+
+---
+
+## Dataset Overview
+
+| Metric | Value |
+|--------|-------|
+| Total cases (tier0 + tier1) | 851 |
+| Governance cases (abstain/dispute/qualify/confident) | 769 |
+| Other cases (grounding/relevance) | 82 |
+| Unique subcategories (governance) | 156 |
+| New cases generated from this taxonomy | 525 |
+| Cases removed (duplicates) | 5 |
+| Cases relabeled (blind validation disagreements) | 7 |
+| Blind label agreement rate | 95.4% |
+
+### Per-Mode Distribution (tier1_core, governance only)
+
+| Mode | Cases | % |
+|------|-------|---|
+| Qualification | 318 | 43.9% |
+| Abstention | 156 | 21.6% |
+| Confidence | 142 | 19.6% |
+| Dispute | 109 | 15.0% |
+| **Total** | **725** | 100% |
+
+Qualification dominance is expected — it is the central mode involved in every boundary pair.
 
 ---
 
 ## Pure Cases
 
-Cases where classification is unambiguous.
+Cases where classification is unambiguous. These test basic signal recognition.
 
-### Abstain — context doesn't answer the query
+### Abstain — context doesn't answer the query (156 cases, 36 subcategories)
 
-| Case type | Example | Signal |
-|-----------|---------|--------|
-| Wrong entity entirely | Query: Parkinson's treatment. Context: Alzheimer's research | Different subject |
-| Wrong domain | Query: Python (language). Context: Python (snake) | Homonym mismatch |
-| Wrong version | Query: Python 3.12 features. Context: Python 3.10 docs | Version mismatch |
-| Wrong jurisdiction | Query: EU privacy law. Context: US HIPAA | Region mismatch |
-| Wrong time period | Query: 2026 pricing. Context: 2019 catalog | Temporal staleness |
-| Wrong specificity | Query: Austin salary data. Context: national averages | Granularity mismatch |
-| Wrong product | Query: iPhone 15 Pro Max specs. Context: iPhone 14 specs | Adjacent product |
-| Missing data entirely | Query: phone number for support. Context: FAQ with no phone number | Information absence |
-| Topic adjacent, no answer | Query: API rate limits. Context: API authentication docs | Same system, wrong section |
-| Format impossible | Query: full text of law. Context: summary of law | Can't satisfy format need |
+| Case type | Subcategory | Cases | Signal |
+|-----------|-------------|-------|--------|
+| Wrong entity entirely | `wrong_entity`, `wrong_entity_pure` | 14 | Different subject |
+| Wrong domain | `wrong_domain` | 5 | Homonym mismatch |
+| Wrong version | `wrong_version` | 5 | Version mismatch |
+| Wrong jurisdiction | `wrong_jurisdiction` | 5 | Region mismatch |
+| Wrong time period | `wrong_time_period` | 8 | Temporal staleness |
+| Wrong specificity | `wrong_specificity` | 5 | Granularity mismatch |
+| Wrong product | `wrong_product` | 5 | Adjacent product |
+| Missing data entirely | `missing_data` | 5 | Information absence |
+| Topic adjacent, no answer | `topic_adjacent` | 5 | Same system, wrong section |
+| Format impossible | `format_impossible` | 5 | Can't satisfy format need |
+| Decoy keywords | `decoy_keywords` | 11 | Shares vocabulary, different topic |
+| Domain bleed | `domain_bleed` | 7 | Closely related field |
+| Wrong aspect | `wrong_aspect` | 6 | Right entity, wrong dimension |
+| Code abstention | `code_abstention` | 3 | Code-specific irrelevance |
+| Cross-domain insufficient | `cross_domain_insufficient` | 3 | Concept transfer too weak for answer |
 
-### Dispute — sources make mutually exclusive factual claims
+Also includes: `adjacent_product` (5), `high_similarity_wrong_entity` (5), `irrelevant_internal_tension` (5), `off_topic_contradicting` (6), `off_topic_contradiction` (5), `partial_schema_match` (5), `version_near_miss` (5), `wrong_jurisdiction_conflicts` (6), and 13 more low-count subcategories from pre-expansion cases.
 
-| Case type | Example | Signal |
-|-----------|---------|--------|
-| Same metric, different values | Revenue: $5M vs $8M | Numerical conflict |
-| Opposing conclusions | "X is effective" vs "X is ineffective" | Direct opposition |
-| Contradictory dates | "Launched March 2024" vs "Launched June 2024" | Timeline conflict |
-| Contradictory attribution | "A invented X" vs "B invented X" | Credit conflict |
-| Contradictory status | "Project completed" vs "Project still in progress" | State conflict |
-| Opposing recommendations | "Use framework X" vs "Never use framework X" | Prescriptive conflict |
-| Statistical direction conflict | "Grew 10%" vs "Declined 5%" | Trend conflict |
-| Binary fact conflict | "Feature is supported" vs "Feature is not supported" | Boolean conflict |
+### Dispute — sources make mutually exclusive factual claims (109 cases, 26 subcategories)
 
-### Qualify — answer requires caveats or hedging
+| Case type | Subcategory | Cases | Signal |
+|-----------|-------------|-------|--------|
+| Same metric, different values | `same_metric_different_values`, `same_claim_different_values` | 12 | Numerical conflict |
+| Opposing conclusions | `opposing_conclusions`, `opposing_conclusions_genuine` | 15 | Direct opposition |
+| Contradictory dates | `contradictory_dates` | 5 | Timeline conflict |
+| Contradictory attribution | `contradictory_attribution` | 5 | Credit conflict |
+| Contradictory status | `contradictory_status` | 4 | State conflict |
+| Opposing recommendations | `opposing_recommendations` | 5 | Prescriptive conflict |
+| Statistical direction conflict | `statistical_direction_conflict` | 5 | Trend conflict |
+| Binary fact conflict | `binary_fact_conflict` | 5 | Boolean conflict |
+| Implicit contradiction | `implicit_contradiction` | 11 | Implications conflict |
+| Competing theories | `competing_theories` | 6 | Scientific disagreement |
+| Conditional conflict | `conditional_conflict` | 6 | Context-dependent contradiction |
 
-| Case type | Example | Signal |
-|-----------|---------|--------|
-| Different aspects discussed | Speed: excellent. Accuracy: poor | Multi-faceted |
-| Mixed evidence | 3 studies support, 2 studies oppose | Inconclusive |
-| Conditional applicability | Works for enterprise, fails for startups | Scoped validity |
-| Hedged/uncertain claims | "May improve outcomes" "Preliminary results suggest" | Epistemic weakness |
-| Temporal ambiguity | "Currently X" but doc is 2 years old | Freshness uncertain |
-| Entity ambiguity | "Apple" — company or fruit? | Referent unclear |
-| Scope ambiguity | "The project" with 3 projects in context | Underspecified reference |
-| Deprecated but documented | React componentWillMount — works but deprecated | Valid with caveat |
-| Partial correlation | Price increase correlates with churn, but not proven causal | Causal uncertainty |
-| Small sample / weak methodology | "Survey of 12 people shows..." | Evidence quality concern |
-| Source quality variance | Peer-reviewed study vs blog post | Authority mismatch |
-| Multiple valid interpretations | "How is performance?" — speed? accuracy? sales? | Metric ambiguity |
+Also includes: `numerical_disagreement` (6), `temporal_conflict` (3), `source_conflict` (4), `methodological_conflict` (3), `scope_conflict` (2), and 10 more low-count subcategories.
 
-### Confident — clear, consistent evidence
+### Qualify — answer requires caveats or hedging (318 cases, 56 subcategories)
 
-| Case type | Example | Signal |
-|-----------|---------|--------|
-| Direct factual answer | "What is X?" Context: "X is defined as..." | Explicit answer |
-| Multiple sources converge | 3 chunks all state same fact | Corroborated |
-| Clear procedural answer | "How do I X?" Context: step-by-step guide | Complete procedure |
-| Unambiguous extraction | "What is the value?" Context: table with the value | Structured data match |
-| Well-documented technical | "What language is React written in?" Context: React docs | Authoritative source |
-| Clear causal explanation | "What caused the outage?" Context: post-mortem with root cause | Complete explanation |
-| Quantitative answer available | "How many employees?" Context: "The company has 5,000 employees" | Exact match |
+| Case type | Subcategory | Cases | Signal |
+|-----------|-------------|-------|--------|
+| Same topic, different aspects | `same_topic_different_aspects`, `different_aspects` | 15 | Multi-faceted |
+| Mixed evidence | `mixed_evidence` | 5 | Inconclusive |
+| Conditional applicability | `conditional_applicability` | 5 | Scoped validity |
+| Hedged/uncertain claims | `hedged_claims`, `hedged_source` | 8 | Epistemic weakness |
+| Temporal ambiguity | `temporal_ambiguity` | 7 | Freshness uncertain |
+| Entity ambiguity | `entity_ambiguity` | 8 | Referent unclear |
+| Scope ambiguity | `scope_ambiguity`, `scope_ambiguity_pure` | 8 | Underspecified reference |
+| Deprecated but documented | `deprecated_documented` | 5 | Valid with caveat |
+| Partial correlation | `partial_correlation` | 5 | Causal uncertainty |
+| Small sample / weak methodology | `small_sample`, `small_sample_weak` | 9 | Evidence quality concern |
+| Source quality variance | `source_quality_variance`, `source_quality` | 7 | Authority mismatch |
+| Multiple valid interpretations | `multiple_interpretations` | 5 | Metric ambiguity |
+| Methodology difference | `methodology_difference`, `methodology_difference_relabeled` | 14 | Measurement approach differs |
+| Hedged vs assertive | `hedged_vs_assertive` | 10 | Asymmetric evidence strength |
+| Numerical near-miss | `numerical_near_miss` | 10 | Rounding, not conflict |
+| Same claim, different conditions | `same_claim_different_conditions` | 10 | Both true in different contexts |
+| Same claim, different time periods | `same_claim_different_timeperiods` | 10 | Both true at different times |
+| Evolving facts | `evolving_facts` | 9 | Superseded, not contradicted |
+| Source quality asymmetry | `source_quality_asymmetry` | 10 | Study vs anecdote disagree |
+| Pros vs cons | `pros_cons_same_thing` | 10 | Balanced assessment |
+| Risk vs benefit | `risk_vs_benefit` | 10 | Both true simultaneously |
+| Correlation / causation | `correlation_causation` | 8 | Causal leap |
+
+Also includes: `adjacent_entity_overlap` (5), `partial_answer` (5), `related_missing_specific` (5), `right_topic_wrong_infotype` (5), `tangential_useful` (5), `implicit_assumptions` (5), `old_likely_valid` (5), `cross_domain_transfer` (4), `prediction_insufficient_data` (6), and 18 more subcategories from pre-expansion and three-way cases.
+
+### Confident — clear, consistent evidence (142 cases, 38 subcategories)
+
+| Case type | Subcategory | Cases | Signal |
+|-----------|-------------|-------|--------|
+| Direct factual answer | `direct_factual`, `direct_factual_pure` | 5 | Explicit answer |
+| Multiple sources converge | `multi_source_convergence`, `multi_source_convergence_pure`, `multi_source_agreement` | 11 | Corroborated |
+| Clear procedural answer | `clear_procedural`, `procedural_complete` | 7 | Complete procedure |
+| Unambiguous extraction | `unambiguous_extraction`, `table_extraction` | 9 | Structured data match |
+| Well-documented technical | `well_documented_technical` | 5 | Authoritative source |
+| Clear causal explanation | `clear_causal_explanation`, `explicit_causal` | 10 | Complete explanation |
+| Quantitative answer available | `quantitative_available`, `quantitative_clear` | 6 | Exact match |
+| Different framing, same fact | `different_framing_same_fact` | 10 | Apparent contradiction resolves |
+| Opposing with consensus | `opposing_with_consensus` | 6 | Overwhelming agreement |
+| Numerical diff, methodology explained | `numerical_diff_methodology_explained` | 5 | Difference is explained |
+| Clear answer, minor edge case | `clear_answer_minor_edge` | 5 | Exception doesn't matter |
+| Single authoritative source | `single_authoritative` | 5 | Definitive without corroboration |
+| Contradiction with clear winner | `contradiction_clear_winner` | 5 | One source obviously wrong |
+
+Also includes: `apparent_contradiction_granularity` (5), `minor_disagreement_clear_answer` (5), `near_complete_evidence` (5), `slight_variation_same_answer` (5), `code_documentation` (3), `api_confidence` (3), and 15 more subcategories.
 
 ---
 
 ## Boundary Cases
 
-Cases where classification is hard. These are the highest-value test cases.
+Cases where classification is hard. These are the highest-value test cases and were the primary focus of the expansion.
 
-### Abstain <-> Confident
+### Abstain <-> Confident (11 subcategories)
 
-| Case type | Correct mode | Why it's confusing |
-|-----------|--------------|--------------------|
-| Decoy keywords | abstain | Shares vocabulary, different topic |
-| Domain bleed | abstain | Closely related field (Parkinson's/Alzheimer's) |
-| Adjacent product | abstain | Same product line, wrong model |
-| Version near-miss | abstain | Same software, wrong version |
-| Partial schema match | abstain | Table has some columns asked about, missing key one |
-| High embedding similarity, wrong entity | abstain | Embeddings can't distinguish entities in same domain |
+| Case type | Correct mode | Subcategory | Cases | Why it's confusing |
+|-----------|--------------|-------------|-------|--------------------|
+| Decoy keywords | abstain | `decoy_keywords` | 11 | Shares vocabulary, different topic |
+| Domain bleed | abstain | `domain_bleed` | 7 | Closely related field |
+| Adjacent product | abstain | `adjacent_product` | 5 | Same product line, wrong model |
+| Version near-miss | abstain | `version_near_miss` | 5 | Same software, wrong version |
+| Partial schema match | abstain | `partial_schema_match` | 5 | Table has some columns, missing key one |
+| High embedding similarity, wrong entity | abstain | `high_similarity_wrong_entity` | 5 | Embeddings can't distinguish |
 
-### Abstain <-> Qualify
+### Abstain <-> Qualify (5 subcategories)
 
-| Case type | Correct mode | Why it's confusing |
-|-----------|--------------|--------------------|
-| Related topic, missing specific info | qualify | Context IS about the topic, just lacks the specific answer |
-| Partial answer | qualify | Has 1 of 3 things asked about |
-| Adjacent entity, some overlap | qualify | iPhone 14 context for iPhone 15 query — some specs shared |
-| Right topic, wrong info type | qualify | Asks for pricing, gets features of same product |
-| Tangential but useful context | qualify | Doesn't answer directly but provides relevant background |
+| Case type | Correct mode | Subcategory | Cases | Why it's confusing |
+|-----------|--------------|-------------|-------|--------------------|
+| Related topic, missing specific info | qualify | `related_missing_specific` | 5 | Context IS about the topic |
+| Partial answer | qualify | `partial_answer` | 5 | Has 1 of 3 things asked about |
+| Adjacent entity, some overlap | qualify | `adjacent_entity_overlap` | 5 | Some specs shared |
+| Right topic, wrong info type | qualify | `right_topic_wrong_infotype` | 5 | Gets features, asked for pricing |
+| Tangential but useful context | qualify | `tangential_useful` | 5 | Relevant background, no direct answer |
 
-### Abstain <-> Dispute
+### Abstain <-> Dispute (2 subcategories)
 
-| Case type | Correct mode | Why it's confusing |
-|-----------|--------------|--------------------|
-| Irrelevant content with internal tension | abstain | Chunks contradict each other but neither answers the query |
-| Off-topic contradiction | abstain | Real contradiction but about a different subject |
+| Case type | Correct mode | Subcategory | Cases | Why it's confusing |
+|-----------|--------------|-------------|-------|--------------------|
+| Irrelevant content with internal tension | abstain | `irrelevant_internal_tension` | 5 | Chunks contradict but don't answer |
+| Off-topic contradiction | abstain | `off_topic_contradiction` | 5 | Real contradiction, wrong subject |
 
-### Dispute <-> Qualify (primary bottleneck — 34 failures)
+### Dispute <-> Qualify (14 subcategories — primary bottleneck)
 
-| Case type | Correct mode | Why it's confusing |
-|-----------|--------------|--------------------|
-| Same claim, different values | dispute | Factual conflict on same measurement |
-| Same topic, different aspects | qualify | Complementary info misread as conflict |
-| Same claim, different time periods | qualify | Both true at different times |
-| Same claim, different conditions/scope | qualify | Both true in different contexts |
-| Same metric, methodology difference | qualify | Measurement approach differs |
-| Directly opposing conclusions | dispute | Genuine disagreement on same question |
-| Hedged claim vs assertive counterclaim | qualify | Asymmetric evidence strength |
-| Numerical near-miss (rounding) | qualify | $5.0M vs $5.2M — methodology, not conflict |
-| Pros vs cons of same thing | qualify | Balanced assessment, not contradiction |
-| Risk vs benefit | qualify | Both true simultaneously |
-| Evolving facts (old vs new) | qualify | Superseded, not contradicted |
-| Source quality asymmetry | qualify | Study vs anecdote disagree |
-| Implicit contradiction | dispute | Neither states it directly but implications conflict |
-| Different framing, same underlying fact | confident | Apparent contradiction resolves with reading |
+The densest boundary in the taxonomy. 140+ cases across both dispute and qualify sides.
 
-### Qualify <-> Confident
+| Case type | Correct mode | Subcategory | Cases | Why it's confusing |
+|-----------|--------------|-------------|-------|--------------------|
+| Same claim, different values | dispute | `same_claim_different_values` | 7 | Factual conflict on same measurement |
+| Opposing conclusions (genuine) | dispute | `opposing_conclusions_genuine` | 10 | Genuine disagreement |
+| Implicit contradiction | dispute | `implicit_contradiction` | 11 | Implications conflict |
+| Same topic, different aspects | qualify | `same_topic_different_aspects` | 10 | Complementary info misread as conflict |
+| Same claim, different time periods | qualify | `same_claim_different_timeperiods` | 10 | Both true at different times |
+| Same claim, different conditions | qualify | `same_claim_different_conditions` | 10 | Both true in different contexts |
+| Methodology difference | qualify | `methodology_difference` | 14 | Measurement approach differs |
+| Hedged vs assertive | qualify | `hedged_vs_assertive` | 10 | Asymmetric evidence strength |
+| Numerical near-miss | qualify | `numerical_near_miss` | 10 | $5.0M vs $5.2M — methodology |
+| Pros vs cons | qualify | `pros_cons_same_thing` | 10 | Balanced assessment |
+| Risk vs benefit | qualify | `risk_vs_benefit` | 10 | Both true simultaneously |
+| Evolving facts | qualify | `evolving_facts` | 9 | Superseded, not contradicted |
+| Source quality asymmetry | qualify | `source_quality_asymmetry` | 10 | Study vs anecdote disagree |
+| Different framing, same fact | confident | `different_framing_same_fact` | 10 | Apparent contradiction resolves |
 
-| Case type | Correct mode | Why it's confusing |
-|-----------|--------------|--------------------|
-| Clear answer with minor edge case | confident | Exception exists but main answer is clear |
-| Single authoritative source | confident | No corroboration but source is definitive |
-| Old but likely still valid | qualify | Info is probably still correct but undated |
-| Answer with implicit assumptions | qualify | Correct IF certain conditions hold |
-| Near-complete evidence | confident | 95% of answer present, minor detail missing |
-| Multiple sources agree with slight variation | confident | Phrasing differs but substance matches |
+### Qualify <-> Confident (6 subcategories)
 
-### Dispute <-> Confident
+| Case type | Correct mode | Subcategory | Cases | Why it's confusing |
+|-----------|--------------|-------------|-------|--------------------|
+| Clear answer with minor edge case | confident | `clear_answer_minor_edge` | 5 | Exception exists but main answer clear |
+| Single authoritative source | confident | `single_authoritative` | 5 | Definitive without corroboration |
+| Old but likely still valid | qualify | `old_likely_valid` | 5 | Probably correct but undated |
+| Answer with implicit assumptions | qualify | `implicit_assumptions` | 5 | Correct IF conditions hold |
+| Near-complete evidence | confident | `near_complete_evidence` | 5 | 95% present, minor detail missing |
+| Multiple sources, slight variation | confident | `slight_variation_same_answer` | 5 | Phrasing differs, substance matches |
 
-| Case type | Correct mode | Why it's confusing |
-|-----------|--------------|--------------------|
-| Apparent contradiction, different granularity | confident | "Revenue grew" vs "Q3 revenue dipped" — both true |
-| Contradiction with clear winner | confident | One source is clearly outdated/wrong |
-| Minor disagreement in otherwise clear answer | confident | Noise, not signal |
+### Dispute <-> Confident (3 subcategories)
+
+| Case type | Correct mode | Subcategory | Cases | Why it's confusing |
+|-----------|--------------|-------------|-------|--------------------|
+| Apparent contradiction, different granularity | confident | `apparent_contradiction_granularity` | 5 | "Revenue grew" vs "Q3 dipped" — both true |
+| Contradiction with clear winner | confident | `contradiction_clear_winner` | 5 | One source is clearly wrong |
+| Minor disagreement in clear answer | confident | `minor_disagreement_clear_answer` | 5 | Noise, not signal |
 
 ---
 
 ## Three-Way Ambiguity Cases
 
-Cases where multiple signals compete and the correct classification depends on which signal dominates.
-These are the hardest cases and where hand-tuned priority rules break down.
+Cases where multiple signals compete. These are the hardest cases and where hand-tuned priority rules break down. Generated as 90 cases across 13 subcategories.
 
 ### Dispute <-> Qualify <-> Confident
 
-| Case type | Correct mode | Competing signals | Why it's a three-way |
-|-----------|--------------|-------------------|----------------------|
-| Evolving facts with source quality asymmetry | qualify | Old peer-reviewed study says X, new blog post says Y | Dispute (different claims), qualify (source quality varies), confident (newer info wins) — depends on which signal you trust |
-| Numerical difference with clear methodology explanation | confident | "$5.0M (audited)" vs "$5.2M (estimated)" | Dispute (different values), qualify (methodology caveat), confident (audited figure is definitive) |
-| Opposing conclusions with consensus | confident | 9 studies say X, 1 study says Y | Dispute (contradiction exists), qualify (not unanimous), confident (overwhelming consensus) |
-| Hedged contradiction with corroboration | qualify | "X may cause Y" vs "X does not cause Y" + 2 more sources support the negative | Dispute (opposing claims), qualify (hedging present), confident (corroborated negative) |
+| Case type | Correct mode | Subcategory | Cases | Competing signals |
+|-----------|--------------|-------------|-------|-------------------|
+| Evolving facts with source quality | qualify | `evolving_facts_source_quality` | 8 | Old study vs new blog — dispute/qualify/confident |
+| Numerical diff, methodology explained | confident | `numerical_diff_methodology_explained` | 5 | Different values but explanation resolves it |
+| Opposing with consensus | confident | `opposing_with_consensus` | 6 | 9 studies say X, 1 says Y |
+| Hedged contradiction, corroborated | qualify | `hedged_contradiction_corroborated` | 8 | "X may cause Y" vs "X does not" + corroboration |
 
 ### Abstain <-> Qualify <-> Confident
 
-| Case type | Correct mode | Competing signals | Why it's a three-way |
-|-----------|--------------|-------------------|----------------------|
-| Adjacent version with partial overlap | qualify | Query: React 19 hooks. Context: React 18 hooks (80% same API) | Abstain (wrong version), qualify (most info still valid), confident (shared APIs are identical) |
-| Stale authoritative source | qualify | Query: current CEO. Context: 2023 annual report naming CEO X | Abstain (outdated), qualify (was true, may still be), confident (authoritative source) |
-| Partial answer from definitive source | qualify | Query: full pricing. Context: official docs with only enterprise tier pricing | Abstain (missing tiers), qualify (partial), confident (what's there is authoritative) |
-| Cross-domain transfer | qualify | Query: Python async best practices. Context: JavaScript async patterns | Abstain (wrong language), qualify (concepts transfer), confident (patterns are identical) |
+| Case type | Correct mode | Subcategory | Cases | Competing signals |
+|-----------|--------------|-------------|-------|-------------------|
+| Adjacent version with overlap | qualify | `adjacent_version_overlap` | 7 | Wrong version but 80% same API |
+| Stale authoritative source | qualify | `stale_authoritative` | 7 | Outdated but was authoritative |
+| Partial answer from definitive source | qualify | `partial_answer_definitive` | 7 | Partial but what's there is authoritative |
+| Cross-domain transfer | qualify | `cross_domain_transfer` | 4 | Concepts transfer across domains |
 
 ### Abstain <-> Dispute <-> Qualify
 
-| Case type | Correct mode | Competing signals | Why it's a three-way |
-|-----------|--------------|-------------------|----------------------|
-| Off-topic sources that contradict each other about a related entity | abstain | Query about Company A. Context: two chunks about Company B disagree on a metric Company A also has | Abstain (wrong entity), dispute (real contradiction), qualify (related entity provides context) |
-| Wrong jurisdiction with conflicting local rules | abstain | Query: EU data law. Context: US vs California privacy laws disagreeing | Abstain (wrong jurisdiction), dispute (US vs CA conflict), qualify (privacy law concepts overlap) |
-| Version mismatch with breaking changes documented | qualify | Query: API v3. Context: v2 migration guide documenting what changed in v3 | Abstain (wrong version), dispute (v2 vs v3 behavior differs), qualify (migration guide describes v3 changes) |
+| Case type | Correct mode | Subcategory | Cases | Competing signals |
+|-----------|--------------|-------------|-------|-------------------|
+| Off-topic contradicting sources | abstain | `off_topic_contradicting` | 6 | Real contradiction about wrong entity |
+| Wrong jurisdiction with conflicts | abstain | `wrong_jurisdiction_conflicts` | 6 | Wrong jurisdiction but real conflict |
+| Version mismatch with breaking changes | qualify | `version_mismatch_breaking` | 7 | Wrong version but migration guide is relevant |
 
 ### Full Four-Way Ambiguity
 
-| Case type | Correct mode | Competing signals | Why it's a four-way |
-|-----------|--------------|-------------------|---------------------|
-| Adjacent entity with contradictory sources and partial answer | qualify | Query about Drug A. Context: Drug A side effect data (hedged) + Drug B efficacy data (contradicts Drug A claims) | Abstain (Drug B is wrong entity), dispute (contradictory efficacy claims), qualify (hedged side effect data), confident (side effect data is from clinical trial) |
-| Stale contradictory sources with partial coverage | qualify | Query: 2026 pricing. Context: 2024 pricing ($100) vs 2025 pricing ($120), both partial | Abstain (outdated), dispute ($100 vs $120), qualify (trend is informative), confident (price trajectory is clear) |
+| Case type | Correct mode | Subcategory | Cases | Competing signals |
+|-----------|--------------|-------------|-------|-------------------|
+| Adjacent entity, contradictory, hedged | qualify | `adjacent_entity_contradictory_hedged` | 8 | Wrong entity + contradiction + hedging + clinical data |
+| Stale contradictory, partial coverage | qualify | `stale_contradictory_partial` | 6 | Outdated + contradiction + partial + trend |
+
+---
+
+## Validation Results
+
+### Duplicate Removal (5 cases)
+
+| Removed ID | Reason |
+|------------|--------|
+| `t1_qualify_hard_332` | Exact duplicate of `t1_qualify_hard_215` (EV market share Norway) |
+| `t1_confident_hard_104` | Cross-mode conflict with `t1_dispute_hard_117` (WWW invention) |
+| `t1_confident_hard_132` | Cross-mode conflict with existing `t1_abstain_medium_004` (Tokyo population) |
+| `t1_confident_hard_605` | Same-mode duplicate of existing `t1_confident_hard_030` (speed of light) |
+| `t1_qualify_hard_660` | Cross-mode conflict with existing `t1_abstain_medium_013` (Bitcoin price) |
+
+### Independent Blind Label Validation (7 relabeled)
+
+A separate Claude instance labeled all 525 cases without seeing the original labels. 95.4% agreement. 7 firm disagreements, all accepted and relabeled:
+
+| Original ID | Original | Relabeled | New ID | Pattern |
+|-------------|----------|-----------|--------|---------|
+| `t1_dispute_hard_200` | disputed | qualified | `t1_qualify_hard_700` | Scope difference (as-reported vs pro forma) |
+| `t1_dispute_hard_205` | disputed | qualified | `t1_qualify_hard_701` | Scope difference (direct vs total cost) |
+| `t1_dispute_hard_206` | disputed | qualified | `t1_qualify_hard_702` | Methodology difference (count vs mass) |
+| `t1_dispute_hard_120` | disputed | qualified | `t1_qualify_hard_703` | Semantic ambiguity, not factual contradiction |
+| `t1_qualify_hard_630` | qualified | abstain | `t1_abstain_hard_704` | Wrong language (JS/Node/C# for Python query) |
+| `t1_qualify_hard_634` | qualified | abstain | `t1_abstain_hard_705` | Wrong country (Australia/Argentina for Chile) |
+| `t1_qualify_hard_635` | qualified | abstain | `t1_abstain_hard_706` | Wrong platform (GitHub/Jenkins/Azure for GitLab) |
+
+### Key Validation Findings
+
+1. **Dispute vs qualify at methodology/scope boundary**: The hardest labeling decision. When sources report different numbers because they measure different things (pro forma vs as-reported, count vs mass), this is qualify (methodology difference), not dispute. The validator established the rule: if the gap is FULLY EXPLAINED by a stated methodology/scope difference, it should be qualified.
+
+2. **Cross-domain transfer boundary**: Concept transfer from one language/platform/country to another does not constitute a partial answer when the query asks about a specific target. Python async != JavaScript async. Chile mining law != Argentina mining law. Three cases were reclassified from qualify to abstain.
+
+3. **Strongest subcategories** (zero disagreements): `wrong_entity_pure`, `wrong_domain`, `version_near_miss`, `domain_bleed`, `same_topic_different_aspects`, `same_claim_different_timeperiods`, `same_claim_different_conditions`, `opposing_conclusions_genuine`.
 
 ---
 
 ## Coverage Summary
 
-| Category | Case types | Target examples each | Total target |
-|----------|-----------|---------------------|-------------|
-| Pure: Abstain | 10 | 10 | 100 |
-| Pure: Dispute | 8 | 10 | 80 |
-| Pure: Qualify | 12 | 10 | 120 |
-| Pure: Confident | 7 | 10 | 70 |
-| Boundary: Abstain <-> Confident | 6 | 10 | 60 |
-| Boundary: Abstain <-> Qualify | 5 | 10 | 50 |
-| Boundary: Abstain <-> Dispute | 2 | 10 | 20 |
-| Boundary: Dispute <-> Qualify | 14 | 15 | 210 |
-| Boundary: Qualify <-> Confident | 6 | 10 | 60 |
-| Boundary: Dispute <-> Confident | 3 | 10 | 30 |
-| Three-way ambiguity | 13 | 10 | 130 |
-| **Total** | **86** | — | **~930** |
+| Region | Subcategories | Cases | Density |
+|--------|--------------|-------|---------|
+| Pure: Abstain | 36 | 156 | 4.3/subcat |
+| Pure: Dispute | 26 | 109 | 4.2/subcat |
+| Pure: Qualify | 56 | 318 | 5.7/subcat |
+| Pure: Confident | 38 | 142 | 3.7/subcat |
+| Boundary: Dispute <-> Qualify | 14 | ~140 | 10.0/subcat |
+| Boundary: Abstain <-> Confident | 6 | ~38 | 6.3/subcat |
+| Boundary: Abstain <-> Qualify | 5 | ~25 | 5.0/subcat |
+| Boundary: Abstain <-> Dispute | 2 | ~10 | 5.0/subcat |
+| Boundary: Qualify <-> Confident | 6 | ~30 | 5.0/subcat |
+| Boundary: Dispute <-> Confident | 3 | ~15 | 5.0/subcat |
+| Three-way / Four-way | 13 | ~85 | 6.5/subcat |
 
-Current coverage: ~331 cases covering ~40 types (~8 per type).
-Priority generation order:
-1. **Dispute <-> Qualify** (14 types, 34 failures — highest ROI)
-2. **Three-way ambiguity** (13 types, currently ~0 coverage)
-3. **Abstain <-> Confident** (6 types, decoy data problem)
-4. Everything else
-
----
-
-## Generation Process
-
-For each case type row:
-
-1. Write 2-3 seed examples from existing failures or manually
-2. Prompt a large LLM: "Generate 10 examples of [case type] across domains (medical, financial, legal, technical, consumer). Each needs: query, 2 context chunks, correct governance mode, and why."
-3. Run each through the pipeline 5x — keep cases where accuracy < 60%
-4. Manual verification of kept cases
-5. Cross-validate: classifier trained on old+new should not regress on old test set
+**Dispute <-> Qualify has the highest density** (10 cases per subcategory) — correctly prioritized as the primary bottleneck from the original failure analysis.
