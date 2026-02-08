@@ -1,0 +1,381 @@
+================================================================================
+GOVERNANCE CLASSIFIER TEST CASE VALIDATION REPORT
+================================================================================
+Date: 2026-02-08
+Validator: Independent label review (Claude Opus 4.6)
+Target: 90%+ agreement rate
+
+Dataset: 5 batch files, 200 total cases
+  - gen_confident_batch1.json: 55 cases (opposing_with_consensus, contradiction_resolved)
+  - gen_confident_batch2.json: 40 cases (different_framing, clear_explanation, technical_documented)
+  - gen_dispute_batch3.json: 30 cases (implicit_contradiction, binary_conflict)
+  - gen_dispute_batch4.json: 30 cases (statistical_direction_conflict, temporal_conflict, numerical_conflict)
+  - gen_abstain_batch.json: 45 cases (wrong_entity, off_topic_contradiction, temporal_mismatch, wrong_specificity, cross_domain_insufficient)
+
+Governance modes:
+  - confident: Sources converge on a clear answer
+  - disputed: Sources genuinely disagree on a factual claim
+  - abstain: Contexts cannot answer the query
+  - qualified: Sources uncertain, hedging, or partial evidence
+
+================================================================================
+PER-FILE RESULTS
+================================================================================
+
+------------------------------------------------------------------------------
+FILE 1: gen_confident_batch1.json (55 cases)
+------------------------------------------------------------------------------
+Agreement: 51/55 = 92.7%
+Disagreements: 4
+
+DISAGREEMENT 1:
+  Case ID: t1_confident_hard_828
+  Expected: confident
+  My label: qualified
+  Query: "Does the evidence show that masks reduce transmission of respiratory viruses in community settings?"
+  Reason: The Cochrane review (gold-standard evidence synthesis) found non-significant results for surgical masks. The Nature Medicine review found 18% reduction. WHO recommends but does not present conclusive data. When the most rigorous evidence synthesis (Cochrane) reaches a different conclusion than a narrative review, the appropriate mode is "qualified" rather than "confident" because genuine methodological uncertainty exists. The rationale acknowledges the Cochrane review found non-significant results but dismisses it as pre-COVID. This is debatable -- the Cochrane review IS the most authoritative evidence type.
+
+  SEVERITY: BORDERLINE. The case rationale makes a reasonable argument that Nature Medicine + WHO outweigh Cochrane. This could go either way. The case is defensible as confident but would also be reasonable as qualified.
+
+DISAGREEMENT 2:
+  Case ID: t1_confident_hard_844
+  Expected: confident
+  My label: qualified
+  Query: "What is the effectiveness of the seasonal influenza vaccine?"
+  Reason: The three sources cite 42%, 16%, and 40-60%. The rationale resolves this by distinguishing relative VE from absolute efficacy. However, the Cochrane review's NNT=71 and finding of no convincing evidence in older adults represents a genuinely cautious assessment from a high-quality source. A governance classifier asked whether sources converge should recognize that while the CDC/ACIP are consistent with each other, the Cochrane finding introduces genuine qualification to any confident claim. The correct answer depends on which metric you consider clinically relevant, which itself is a judgment call.
+
+  SEVERITY: BORDERLINE. The case rationale is reasonable in distinguishing metrics. Keeping as "confident" is defensible since the question's framing allows for a specific metric to be selected.
+
+DISAGREEMENT 3:
+  Case ID: t1_confident_hard_847
+  Expected: confident
+  My label: qualified
+  Query: "What percentage of software projects fail?"
+  Reason: Sources give 19% (Standish, widely cited), 9-12% (IEEE critique + PMI). The resolution relies on methodological critique to dismiss the Standish figure. However, the Standish Group's CHAOS report, despite methodological criticism, remains the most-cited figure in the industry. The IEEE critique is itself a single reanalysis. While PMI data is strong, the fact that the most widely-cited source gives a substantially different answer (19% vs 9.4%) means a governance system should flag this as requiring qualification rather than pure confidence. The answer depends on which source you trust.
+
+  SEVERITY: BORDERLINE. The case makes a good argument that the methodological critique resolves the dispute. Defensible either way.
+
+DISAGREEMENT 4:
+  Case ID: t1_confident_hard_510 -- CORRECTION: This ID is in batch 3. See batch 3 section below.
+
+  Replacing with: No fourth disagreement in batch 1. Revised count: 52/55 = 94.5% wait -- let me re-examine.
+
+  Upon re-examination, case t1_confident_hard_859 (intermittent fasting):
+  Case ID: t1_confident_hard_859
+  Expected: confident
+  My label: confident
+  Confirmed: The meta-analysis resolves the apparent NEJM vs DRIFT conflict. IF works for weight loss but is comparable to conventional caloric restriction. Correct as confident.
+
+REVISED: 52/55 = 94.5% agreement (3 disagreements)
+
+------------------------------------------------------------------------------
+FILE 2: gen_confident_batch2.json (40 cases)
+------------------------------------------------------------------------------
+Agreement: 40/40 = 100.0%
+Disagreements: 0
+
+All 20 "different_framing" cases (861-880): AGREE as confident. Each presents the same concept described at technical, plain-language, and analogy levels. The semantic agreement is complete despite vocabulary differences. All correctly labeled.
+
+All 10 "clear_explanation" cases (881-890): AGREE as confident. Each presents consistent numerical data expressed in different units, formats, or levels of precision. The underlying facts are consistent when units are reconciled. All correctly labeled.
+
+All 10 "technical_documented" cases (891-900): AGREE as confident. Each presents a well-documented technical fact confirmed by multiple authoritative sources. Alternative values mentioned are clearly distinguished as different products, options, or historical values. All correctly labeled.
+
+NOTE: This batch is exceptionally well-constructed. The different_framing cases are particularly valuable because they test whether a classifier can detect semantic agreement despite low lexical overlap.
+
+------------------------------------------------------------------------------
+FILE 3: gen_dispute_batch3.json (30 cases)
+------------------------------------------------------------------------------
+Agreement: 26/30 = 86.7%
+Disagreements: 4
+
+DISAGREEMENT 1:
+  Case ID: t1_dispute_medium_510
+  Expected: disputed
+  My label: confident (or qualified)
+  Query: "What is the unemployment rate in the manufacturing sector?"
+  Reason: BLS reports 3.1% unemployment while NAM found 8.4% "actively seeking new employment." These are measuring DIFFERENT things. Unemployment (BLS definition: jobless, actively looking, available) is not the same as "actively seeking new employment" (which includes employed people looking to switch jobs). The NAM figure includes job-switchers, not just unemployed people. This is a definitional mismatch, not a genuine factual dispute. A system encountering these should recognize the metrics are not comparable.
+
+  SEVERITY: MODERATE. The case conflates job-seekers with unemployed. The rationale acknowledges "methodological difference" but insists they "directly contradict each other on the same metric" -- they do NOT measure the same metric.
+
+DISAGREEMENT 2:
+  Case ID: t1_dispute_medium_515
+  Expected: disputed
+  My label: confident (or qualified)
+  Query: "What percentage of employees returned to the office after the mandate?"
+  Reason: HR says 92% badge-in compliance while sensors show 54% occupancy. The rationale says "both purport to measure how many employees are actually in the office." But they explicitly measure different things: badge-in compliance measures whether employees came to the office at all that day, while occupancy measures average utilization throughout the day. Employees who badge in and attend a few meetings then leave would show up as compliant in badge data but would reduce average occupancy. These metrics are genuinely non-competing -- they measure different aspects of office presence.
+
+  SEVERITY: MODERATE. The two metrics have a plausible non-contradictory explanation (employees badge in but don't stay all day). A "disputed" label overstates the conflict.
+
+DISAGREEMENT 3:
+  Case ID: t1_dispute_hard_516
+  Expected: disputed
+  My label: disputed (but with reservation)
+  Query: "What is the recidivism rate for the rehabilitation program participants?"
+  Reason: 12% (felony convictions only) vs 38% (arrests, violations, returns to custody). I agree this is disputed, but the rationale claims they measure "the same metric." They explicitly measure recidivism with DIFFERENT definitions. The dispute is real (does the program work?) but the numeric disagreement is partially explained by definitional scope. Keeping as disputed because the core question (program effectiveness) IS genuinely contested.
+
+  SEVERITY: LOW. I agree with the label, just noting the rationale overstates the metric equivalence.
+
+DISAGREEMENT 4:
+  Case ID: t1_dispute_hard_522
+  Expected: disputed
+  My label: qualified (or confident with qualification)
+  Query: "How many residents were displaced by the flood?"
+  Reason: County says 1,200 displaced, Red Cross says 4,100 requesting emergency assistance. The rationale acknowledges these are "different metrics (displaced vs. requesting assistance)" but then insists the gap "suggests the county undercounted." However, requesting emergency assistance (food, medical supplies, temporary housing) has a much broader scope than being displaced from your home. Many people can request emergency assistance while still living in their home (e.g., temporary power outage, flooded basement, need for food because stores are closed). The 3x gap is largely explained by definitional differences, not undercounting.
+
+  SEVERITY: MODERATE. "Displaced" and "requesting emergency assistance" are genuinely different categories. This is better labeled as qualified rather than disputed.
+
+------------------------------------------------------------------------------
+FILE 4: gen_dispute_batch4.json (30 cases)
+------------------------------------------------------------------------------
+Agreement: 23/30 = 76.7%
+Disagreements: 7
+
+DISAGREEMENT 1:
+  Case ID: t1_dispute_medium_548
+  Expected: disputed
+  My label: confident (the answer is NO, batch processing is not currently supported)
+  Query: "Does the Meridian API support batch processing of transactions?"
+  Reason: The v4.2 docs (March 2024) say yes, but the v5.0 migration guide (November 2024) says the endpoint was removed. Context 3 says the platform is currently on v5.1. This is a temporal supersession case, not a genuine dispute. The newer source explicitly supersedes the older one. The current answer is clearly "no" (removed in v5.0, current version is v5.1). This pattern is identical to the "contradiction_resolved" cases in the confident batch (e.g., the acetaminophen dosage case where the newer guideline supersedes the older).
+
+  SEVERITY: HIGH. This is mislabeled. It follows the exact pattern of confident/contradiction_resolved cases. The current state is unambiguous.
+
+DISAGREEMENT 2:
+  Case ID: t1_dispute_hard_549
+  Expected: disputed
+  My label: confident (bridge is NOT safe for heavy vehicles as of 2024)
+  Query: "Is the Greenfield Bridge safe for heavy vehicle traffic?"
+  Reason: 2023 inspection rated it for 40 tons, but October 2024 emergency bulletin restricted it to 15 tons due to corrosion. The October 2024 bulletin supersedes the April 2023 assessment because new structural information (corrosion) was discovered. This is not a dispute between two sources -- it's a temporal update where newer evidence invalidates the older assessment. The bridge's CURRENT safety status is clearly 15-ton limit.
+
+  SEVERITY: HIGH. This is mislabeled. The emergency bulletin explicitly replaces the earlier assessment based on new findings.
+
+DISAGREEMENT 3:
+  Case ID: t1_dispute_hard_550
+  Expected: disputed
+  My label: disputed (AGREE)
+  Query: "What is the water quality status of Lake Champlain?"
+  Reason: Actually, upon reflection, I agree this is disputed because both sources could represent the current reality: water quality improved in the main lake body but worsened in specific bays. The two assessments measure different parts of the lake (main body vs. Missisquoi/St. Albans Bay). HOWEVER, the 2024 EPA assessment placing it on the impaired list does supersede the 2022 positive trend for regulatory purposes. I'll keep my agreement.
+
+  WITHDRAWAL: Not a disagreement. Agree as disputed.
+
+DISAGREEMENT 3 (REVISED):
+  Case ID: t1_dispute_medium_551
+  Expected: disputed
+  My label: confident (Python 3.8 is NOT supported in current version)
+  Query: "Does the TerraForm framework support Python 3.8?"
+  Reason: January 2024 docs say yes for TerraForm 2.x, September 2024 release notes say dropped in 3.0. Latest version is 3.2. This is identical to the Meridian API case -- the newer version explicitly drops support, and the current version is past the cutoff. The current answer is unambiguously "No, not in the current version (3.2)."
+
+  SEVERITY: HIGH. Same pattern as t1_dispute_medium_548. Temporal supersession, not dispute.
+
+DISAGREEMENT 4:
+  Case ID: t1_dispute_medium_553
+  Expected: disputed
+  My label: confident (Denver office is NOT available for client meetings)
+  Query: "Is the company's Denver office open for client meetings?"
+  Reason: February 2024 memo says meeting rooms available. January 2025 notice says they've been converted. The January 2025 notice explicitly supersedes the 2024 memo. This is a temporal update, not a dispute.
+
+  SEVERITY: HIGH. Same pattern as above. Clear temporal supersession.
+
+DISAGREEMENT 5:
+  Case ID: t1_dispute_medium_556
+  Expected: disputed
+  My label: confident (current rate is 3.20% APY)
+  Query: "What interest rate does First National Bank offer on its savings accounts?"
+  Reason: January 2024 product sheet says 4.75% APY. December 2024 rate update says 3.20% effective January 2025. The rate update explicitly replaces the earlier rate. This is not a dispute -- it's a rate change. The current rate is unambiguously 3.20%.
+
+  SEVERITY: HIGH. Same pattern as above. Explicit temporal supersession.
+
+DISAGREEMENT 6:
+  Case ID: t1_dispute_hard_561
+  Expected: disputed
+  My label: disputed (AGREE, but borderline with confident)
+  Query: "What is the recommended maximum dosage of acetaminophen for adults?"
+  Reason: This is essentially a duplicate of t1_confident_medium_852 in batch 1, which has nearly identical sources and is labeled CONFIDENT. The batch 1 case has FDA (4000mg) + ACG (3000mg) + Tylenol label (3000mg) and is labeled confident because the newer clinical recommendation is clearly 3000mg. This batch 4 case has FDA (4000mg) + American Liver Foundation (3000mg) and is labeled disputed. The inconsistency between these two labels is a problem. However, this batch 4 version only has 2 medical sources without the manufacturer's label change, making the resolution less clear. I'll keep my agreement as disputed, but flag the cross-batch inconsistency.
+
+  SEVERITY: MODERATE (cross-batch inconsistency). The same essential question appears in both confident and disputed batches with different labels.
+
+DISAGREEMENT 7:
+  Case ID: t1_dispute_hard_557
+  Expected: disputed
+  My label: disputed (AGREE, but borderline)
+  Query: "What is the population of the critically endangered Sumatran rhinoceros?"
+  Reason: IUCN (2022) says 80, Indonesian survey (2024) says 34-40. The more recent survey explicitly supersedes the older IUCN assessment with newer field data. However, unlike the API version cases above, population counts can legitimately be disputed -- the IUCN assessment hasn't been officially updated, and both represent different methodological approaches. I'll agree as disputed.
+
+  WITHDRAWAL: Not a disagreement. Agree as disputed.
+
+REVISED DISAGREEMENTS: 5 (t1_dispute_medium_548, t1_dispute_hard_549, t1_dispute_medium_551, t1_dispute_medium_553, t1_dispute_medium_556)
+
+REVISED Agreement: 25/30 = 83.3%
+
+------------------------------------------------------------------------------
+FILE 5: gen_abstain_batch.json (45 cases)
+------------------------------------------------------------------------------
+Agreement: 43/45 = 95.6%
+Disagreements: 2
+
+DISAGREEMENT 1:
+  Case ID: t1_abstain_medium_927
+  Expected: abstain
+  My label: confident (or qualified)
+  Query: "What is the current U.S. federal minimum wage as of 2025?"
+  Reason: The contexts from 2015-2017 state the federal minimum wage has been $7.25/hr since 2009. The rationale says the contexts "do not confirm the 2025 rate." However, the federal minimum wage is set by Congress and requires legislative action to change. The 2015 DOL source explicitly states "$7.25 per hour since July 24, 2009." If no legislation has changed it (and these contexts show the last change was in 2009), the answer from these contexts would be $7.25. The contexts contain the factual answer even though they're dated, because the law hasn't changed since 2009. The system should be able to confidently state the last known rate is $7.25 and note it has not been updated since 2009.
+
+  SEVERITY: MODERATE. The rationale applies temporal-mismatch logic to a value that changes only by legislation, not by time passage alone. This is different from stock prices or interest rates. However, the abstain label is defensible if the system cannot verify whether legislation passed between 2017-2025.
+
+DISAGREEMENT 2:
+  Case ID: t1_abstain_hard_916
+  Expected: abstain
+  My label: abstain (AGREE -- upon closer reading the contexts genuinely do not state the speed of light in vacuum)
+
+  WITHDRAWAL: Not a disagreement.
+
+REVISED: 44/45 = 97.8% (1 disagreement)
+
+================================================================================
+OVERALL RESULTS
+================================================================================
+
+File                        Cases   Agree   Rate
+---------------------------------------------------------
+gen_confident_batch1.json     55      52    94.5%
+gen_confident_batch2.json     40      40   100.0%
+gen_dispute_batch3.json       30      26    86.7%
+gen_dispute_batch4.json       30      25    83.3%
+gen_abstain_batch.json        45      44    97.8%
+---------------------------------------------------------
+TOTAL                        200     187    93.5%
+---------------------------------------------------------
+
+OVERALL AGREEMENT RATE: 93.5% (187/200)
+
+================================================================================
+COMPLETE DISAGREEMENT LIST
+================================================================================
+
+Total disagreements: 13
+
+HIGH SEVERITY (5 cases - mislabeled):
+  1. t1_dispute_medium_548 | expected: disputed | my_label: confident
+     Meridian API batch processing removed in v5.0, current is v5.1. Temporal supersession.
+  2. t1_dispute_hard_549 | expected: disputed | my_label: confident
+     Bridge downgraded to 15-ton limit by emergency bulletin. Temporal supersession.
+  3. t1_dispute_medium_551 | expected: disputed | my_label: confident
+     TerraForm dropped Python 3.8 in v3.0, current is v3.2. Temporal supersession.
+  4. t1_dispute_medium_553 | expected: disputed | my_label: confident
+     Denver meeting rooms converted, January 2025 notice supersedes. Temporal supersession.
+  5. t1_dispute_medium_556 | expected: disputed | my_label: confident
+     Bank rate updated to 3.20%, December 2024 update supersedes. Temporal supersession.
+
+MODERATE SEVERITY (6 cases - borderline/debatable):
+  6. t1_confident_hard_828 | expected: confident | my_label: qualified
+     Masks: Cochrane review non-significant vs Nature Medicine positive. Methodological tension.
+  7. t1_confident_hard_844 | expected: confident | my_label: qualified
+     Flu vaccine: 42% relative VE vs 16% absolute efficacy. Metric-dependent answer.
+  8. t1_confident_hard_847 | expected: confident | my_label: qualified
+     Software project failure: 19% (Standish) vs 9.4% (PMI). Source credibility judgment.
+  9. t1_dispute_medium_510 | expected: disputed | my_label: confident
+     Manufacturing unemployment: BLS 3.1% vs NAM 8.4% measure different things.
+  10. t1_dispute_medium_515 | expected: disputed | my_label: confident
+      Office return: badge-in (92%) vs occupancy (54%) measure different things.
+  11. t1_dispute_hard_522 | expected: disputed | my_label: qualified
+      Flood displacement: 1,200 displaced vs 4,100 requesting assistance are different metrics.
+
+LOW SEVERITY (1 case - minor concern):
+  12. t1_abstain_medium_927 | expected: abstain | my_label: confident
+      Minimum wage: $7.25 since 2009, changes only by legislation. Dated sources may still be correct.
+
+CROSS-BATCH INCONSISTENCY (flagged but counted as agreement):
+  13. t1_dispute_hard_561 vs t1_confident_medium_852:
+      Nearly identical acetaminophen dosage question labeled "disputed" in batch 4 but
+      "confident" in batch 1. Both involve FDA (4000mg) vs clinical guideline (3000mg).
+      Recommend reconciling labels to be consistent.
+
+================================================================================
+PATTERN ANALYSIS OF DISAGREEMENTS
+================================================================================
+
+PATTERN 1: TEMPORAL SUPERSESSION IN DISPUTE BATCH (5 of 13 disagreements)
+  Cases: 548, 549, 551, 553, 556 (all in temporal_conflict subcategory of batch 4)
+
+  Issue: These cases follow an identical pattern to the "contradiction_resolved"
+  cases in batch 1 (where older sources are superseded by newer ones, and the label
+  is "confident"). In the dispute batch, the same pattern (older source explicitly
+  replaced by newer source) is labeled "disputed."
+
+  The key distinction SHOULD be: if the newer source EXPLICITLY replaces the older
+  one and the current state is clear, it's "confident." If both sources describe
+  overlapping time periods with genuine uncertainty about which is correct, it's
+  "disputed."
+
+  In all 5 flagged cases, the newer source explicitly supersedes the older one:
+    - API endpoint removed in newer version
+    - Emergency bulletin restricts bridge load
+    - Release notes drop Python 3.8 support
+    - Operations notice converts meeting rooms
+    - Rate update changes APY
+
+  Recommendation: Relabel these 5 cases as "confident" OR move them to a
+  "temporal_superseded" subcategory under the confident category.
+
+PATTERN 2: DIFFERENT METRICS LABELED AS DISPUTES (3 of 13 disagreements)
+  Cases: 510, 515, 522 (in implicit_contradiction subcategory of batch 3)
+
+  Issue: These cases present two sources measuring genuinely different things
+  (unemployment vs job-seeking, badge-in vs occupancy, displaced vs requesting
+  assistance) and label the difference as a "dispute." A well-constructed dispute
+  case should have sources making competing claims about the SAME factual question.
+
+  Recommendation: Either relabel as "qualified" (sources provide partial/non-comparable
+  data) or revise the contexts so both sources explicitly claim to measure the same
+  thing.
+
+PATTERN 3: BORDERLINE CONFIDENT/QUALIFIED (3 of 13 disagreements)
+  Cases: 828, 844, 847 (in confident batch 1)
+
+  Issue: These cases involve a high-quality dissenting source (Cochrane review,
+  industry-standard report) that is dismissed via methodological critique. While
+  the dismissal is defensible, a strict reader would see genuine tension.
+
+  Recommendation: These are acceptable as-is for a TRAINING set (the classifier
+  should learn to resolve these toward confident), but they should be acknowledged
+  as borderline in evaluation metrics.
+
+================================================================================
+SUMMARY ASSESSMENT
+================================================================================
+
+Overall agreement rate: 93.5% (187/200)
+  Exceeds the 90% quality threshold: YES
+
+Quality by category:
+  - Confident cases: 96.8% agreement (92/95) -- EXCELLENT
+  - Dispute cases: 85.0% agreement (51/60) -- ACCEPTABLE but needs attention
+  - Abstain cases: 97.8% agreement (44/45) -- EXCELLENT
+
+The dataset is SUFFICIENT for training, with the following caveats:
+
+1. CRITICAL FIX NEEDED: The 5 temporal_conflict dispute cases (548, 549, 551, 553,
+   556) should be relabeled as "confident" or reclassified. They follow the exact
+   same temporal supersession pattern used in the confident/contradiction_resolved
+   subcategory. Training on these as "disputed" will teach the classifier to
+   incorrectly flag temporal supersessions as disputes.
+
+2. RECOMMENDED FIX: The 3 different-metrics cases (510, 515, 522) should be
+   reviewed. They test an interesting pattern but the "disputed" label may confuse
+   the classifier about what constitutes a genuine factual dispute vs. non-comparable
+   metrics.
+
+3. CONSISTENCY FIX: The acetaminophen dosage case (t1_dispute_hard_561) should be
+   reconciled with the nearly identical case (t1_confident_medium_852) in batch 1
+   that has the opposite label.
+
+4. MINOR: The 3 borderline confident/qualified cases (828, 844, 847) are acceptable
+   for training but should be flagged in any evaluation set.
+
+If the 5 temporal supersession cases are relabeled, agreement rises to:
+  192/200 = 96.0% overall
+  Dispute batch 4: 30/30 = 100%
+
+VERDICT: Dataset quality is GOOD. Fix the 5 temporal supersession mislabels
+before training. The remaining 8 borderline cases are within acceptable tolerance
+for training data and represent genuinely hard discrimination problems the
+classifier should learn from.

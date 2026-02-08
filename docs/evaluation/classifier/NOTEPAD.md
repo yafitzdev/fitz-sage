@@ -1,7 +1,7 @@
 # Governance Classifier — Living Notepad
 
 **Goal**: Replace hand-coded `AnswerGovernor.decide()` priority rules with a trained tabular classifier.
-**Status**: Retrained on real features (Exp 5). RF 68.9% accuracy, **83% disputed recall** (+31pp vs Exp 3 synthetic). D→Q confusion dropped from 13/29 → 4/29. Tier 2 vector features now #4/#8/#9 importance.
+**Status**: Exp 6 complete (1113 cases, +199 new). GBT 69.1% accuracy. Confident recall improved 48%→62%, but **disputed recall regressed 83%→67%**. Investigating regression before shipping.
 
 ---
 
@@ -90,17 +90,18 @@ fitz-gov/data/
   - Mode distribution: 102 abstain, 70 disputed, 261 qualified, 92 confident
   - Validated at 95.4% agreement, 5 dupes removed, 7 relabeled, 513 merged into tier1
 - v3.0: +123 generated (dispute boundary, edge cases, code/adversarial), validated at 94% agreement, 4 relabeled, all merged
+- v4.0: +199 generated per CLASSIFIER_V1_TEST_PLAN.md (95 confident, 60 disputed, 45 abstain). Blind validated at 93.5% agreement. 5 temporal supersession→confident, 3 metric-mismatch→qualified, 1 duplicate removed. Merged into tier1_core.
 
-### Class distribution (848 tier1 cases)
+### Class distribution (1047 tier1 governance cases)
 
 ```
-qualified:  357 (42.1%)
-abstain:    192 (22.6%)
-confident:  154 (18.2%)
-disputed:   145 (17.1%)
+qualified:  360 (34.4%)
+confident:  254 (24.3%)
+abstain:    237 (22.6%)
+disputed:   196 (18.7%)
 ```
 
-Imbalance is moderate (2.5x max/min). Workable without oversampling. Disputed class significantly strengthened from 109 to 145 (33% increase).
+Max:min ratio 2.2:1 (was 2.9:1). Confident class nearly doubled from 154 to 254. All classes now >18%.
 
 ### Difficulty distribution
 
@@ -785,6 +786,67 @@ The RF model learned to split on Tier 1 features (constraint metadata + context 
 
 The massive disputed recall improvement (+31pp RF, +7pp Ensemble) with negligible accuracy loss (-0.5pp) confirms that the distribution shift was the sole cause of Exp 4's poor results, and real Tier 2 features are highly discriminative for the dispute/qualify boundary.
 
+### Experiment 6: Expanded Dataset (+199 Cases)
+
+**Goal**: Add 199 new cases per CLASSIFIER_V1_TEST_PLAN.md to rebalance classes and target specific failure modes (confident patterns, subtle disputes).
+
+**Data changes**:
+- Generated 200 cases across 5 parallel batches (45 abstain, 95 confident, 60 disputed)
+- Blind validation: 93.5% agreement (187/200) — exceeds 90% threshold
+- Fixed 9 mislabeled cases: 5 temporal supersession→confident, 3 metric-mismatch→qualified, 1 duplicate removed
+- Final: 1113 cases (254 confident, 237 abstain, 360 qualified, 196 disputed)
+- Max:min ratio: 2.2:1 (was 2.9:1)
+
+**Full pipeline eval**: Ran eval_pipeline.py on all 1113 cases (41.7 min, 0 errors). Output: `eval_results_v2.csv`.
+
+**Results (1113 samples, 80/20 split, seed=42):**
+
+| Model | Accuracy | vs Governor | Disputed Recall | Confident Recall |
+|-------|----------|-------------|-----------------|------------------|
+| **GBT (tuned)** | **69.1%** | **+42.2pp** | 67% (26/39) | 62% (32/52) |
+| RF (tuned) | 66.4% | +39.5pp | — | — |
+| ET (tuned) | 65.9% | +39.0pp | — | — |
+| Ensemble | 67.7% | +40.8pp | — | — |
+| Governor | 26.9% | — | — | — |
+
+**Per-class breakdown (GBT — best overall):**
+
+```
+              precision    recall  f1-score   support
+     abstain       0.77      0.85      0.81        47
+   confident       0.60      0.62      0.61        52
+    disputed       0.59      0.67      0.63        39
+   qualified       0.77      0.66      0.71        85
+```
+
+**Comparison to Experiment 5:**
+
+| Metric | Exp 5 (914 cases, RF) | Exp 6 (1113 cases, GBT) | Delta |
+|--------|----------------------|------------------------|-------|
+| Overall accuracy | 68.9% | 69.1% | +0.2pp |
+| Abstain recall | 79% | 85% | **+6pp** |
+| Confident recall | 48% | 62% | **+14pp** |
+| Disputed recall | **83%** | 67% | **-16pp** |
+| Qualified recall | 67% | 66% | -1pp |
+| Winner model | RF | GBT | changed |
+
+**Feature importance (GBT, top 5):**
+1. ctx_length_mean (0.1286)
+2. ctx_total_chars (0.0900)
+3. ctx_length_std (0.0648)
+4. mean_vector_score (0.0627)
+5. has_disputed_signal (0.0520)
+
+**Key concern: Disputed recall regressed from 83% to 67% (-16pp).** Possible causes:
+1. **Model change**: RF → GBT may handle disputed differently
+2. **New case difficulty**: The 51 new disputed cases target subtle/implicit conflicts (by design harder)
+3. **Class rebalancing**: Reducing qualified's dominance may have shifted decision boundaries
+4. **Larger test set**: 39 disputed test cases (vs 29 in Exp 5) — more statistical power but different sample
+
+**Confident recall improved from 48% to 62% (+14pp)** — this was the primary goal of the new cases. The opposing_with_consensus and contradiction_resolved patterns are now better recognized.
+
+Saved as `model_v3.joblib` (GBT tuned). **Investigation needed before shipping** — the disputed regression is unacceptable for a classifier whose primary value proposition is dispute detection.
+
 ---
 
 ## 9. Files Created
@@ -799,6 +861,9 @@ The massive disputed recall improvement (+31pp RF, +7pp Ensemble) with negligibl
 | `tools/governance/eval_pipeline.py` | Full pipeline eval with real embeddings + detection + 3-way comparison |
 | `tools/governance/data/eval_results.csv` | 914 rows with real features + governor/classifier predictions |
 | `tools/governance/data/model_v2.joblib` | Best model retrained on real features (RF tuned, 68.9% acc, 83% dispute recall) |
+| `tools/governance/data/eval_results_v2.csv` | 1113 rows with real features from expanded dataset |
+| `tools/governance/data/model_v3.joblib` | GBT tuned on 1113 cases (69.1% acc, 67% dispute recall) |
+| `tools/governance/data/validation_report.txt` | Blind validation report for 200 generated cases (93.5% agreement) |
 
 ---
 
@@ -819,9 +884,9 @@ The massive disputed recall improvement (+31pp RF, +7pp Ensemble) with negligibl
 ### Short-term
 1. ~~**Retrain on real features**~~ DONE — Exp 5: RF 68.9% acc, 83% dispute recall. model_v2.joblib saved.
 2. ~~**Tune CA sensitivity**~~ DONE — Exp 3: +7-10pp disputed recall.
-3. **More disputed training data** — 145 disputed cases vs 420 qualified. Add 50-100 more hard dispute cases.
-4. **Two-stage model** — RF for general prediction, then dispute-specific check on cases predicted as "qualified".
-5. **Model selection** — Ship RF (best overall: 68.9% acc, 83% dispute recall) or Ensemble (83% dispute recall, lower acc)?
+3. ~~**More training data**~~ DONE — Exp 6: +199 cases (1113 total). Confident recall 48%→62%. But disputed regressed 83%→67%.
+4. **Investigate disputed regression** — Run RF on Exp 6 data (GBT won but RF may handle disputes better). Compare per-model disputed recall. Check if new cases are creating confusion.
+5. **Model selection** — May need RF (better disputes) over GBT (better overall). Or ensemble with dispute-specific threshold.
 
 ### Medium-term (integration)
 6. **Integration prototype** — `fitz_ai/core/guardrails/classifier.py` wrapper that loads model artifact, runs at inference time.
@@ -850,3 +915,5 @@ The massive disputed recall improvement (+31pp RF, +7pp Ensemble) with negligibl
 | 2026-02-08 | Experiment 3 (CA sensitivity tuning): Tightened prompts, 400→800 char truncation, 5%→15% variance threshold. Disputed recall: Ensemble 76% (+7pp), GBT 72% (+10pp). Accuracy trade: RF 69.4% (-1.6pp). |
 | 2026-02-08 | Experiment 4 (full pipeline eval): Added real embeddings + DetectionSummary. Distribution shift confirmed — classifier drops from 69.4% → 41.0% on real Tier 2/3 features. Governor stays at 27.9%. Need to retrain on real features. |
 | 2026-02-08 | Experiment 5 (retrained on real features): RF 68.9% (+41.0pp vs governor), **83% disputed recall** (+31pp vs Exp 3). Tier 2 vector features now #4/#8/#9 importance. D→Q confusion dropped from 13/29 → 4/29. model_v2.joblib saved. |
+| 2026-02-08 | Generated 199 new cases per test plan. Blind validated (93.5% agreement). Fixed 9 mislabeled. fitz-gov updated to 1113 cases. |
+| 2026-02-08 | Experiment 6 (expanded dataset): GBT 69.1% (+42.2pp vs governor). Confident recall 48%→62% (+14pp). **Disputed recall regressed 83%→67% (-16pp)**. model_v3.joblib saved. Investigation needed. |
