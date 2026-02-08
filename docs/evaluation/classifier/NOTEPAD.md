@@ -1,7 +1,7 @@
 # Governance Classifier — Living Notepad
 
 **Goal**: Replace hand-coded `AnswerGovernor.decide()` priority rules with a trained tabular classifier.
-**Status**: Training pipeline complete. CA sensitivity tuned. Best dispute recall: Ensemble 76% (Exp 3). Best accuracy: RF 69.4%. Tradeoff: +7pp dispute recall at -1.6pp accuracy vs Exp 2.
+**Status**: Full pipeline eval complete (Exp 4). Distribution shift confirmed: classifier trained on synthetic Tier 2/3=0 data drops from 69.4% → 41.0% on real embeddings. Next: retrain with real features.
 
 ---
 
@@ -601,15 +601,15 @@ There's a fundamental tension between overall accuracy and dispute detection:
 
 This suggests we might want: RF for the general case, with dispute-specific thresholds or a two-stage approach (RF predicts, then dispute-check on qualified predictions).
 
-### Why Governor Baseline is 33.3% (not ~70%)
+### Why Governor Baseline is ~28% (even with real features)
 
-The governor gets ~70% in the full eval pipeline (real retrieval, vector scores, detection summaries). Here it gets 33.3% because:
+The governor gets ~28% in both synthetic (Exp 1-3) and real-feature (Exp 4, 27.9%) evaluations. This is because:
 
-1. **No real retrieval signals** — Synthetic cases have inline contexts with no vector scores, no embedding similarities, no metadata. IE sees `max_similarity=0` → doesn't fire → governor defaults to "confident".
-2. **Governor predicted "confident" on 472/914 cases** but only 157 should be — it's just the default when nothing fires.
-3. **Governor predicted "abstain" on only 55 cases** but 192 are expected — IE can't detect insufficient evidence without real embeddings.
+1. **Governor uses constraint allow/deny results, NOT features** — Adding real embeddings and detection doesn't change constraint outcomes. Constraints run on chunk text, not on vector_score or detection flags.
+2. **After CA tuning (Exp 3)**, governor over-predicts "disputed" (549/914). Before tuning, it over-predicted "confident" (472/914). Both lead to ~28% accuracy.
+3. **The governor's ~70% accuracy in production** likely comes from the full answer generation pipeline (where IE can check actual answer quality, not just raw contexts). Our eval runs constraints on raw contexts without answer generation.
 
-The classifier compensates by learning from text-level proxies (context length, word overlap, contradiction markers) that the governor's priority rules can't access. With real pipeline data, the classifier would have much richer features and should significantly exceed the governor's ~70%.
+The classifier compensates by learning from text-level proxies (context length, word overlap, contradiction markers) that the governor's priority rules can't access.
 
 ### Experiment 3: Tuned CA Sensitivity
 
@@ -661,6 +661,73 @@ The classifier compensates by learning from text-level proxies (context length, 
 | 9 | ctx_min_pairwise_sim | 0.0422 | YES |
 | 10 | ctx_max_pairwise_sim | 0.0405 | YES |
 
+### Experiment 4: Full Pipeline Eval (Real Embeddings + Detection)
+
+**Goal**: Test whether the classifier (trained on synthetic data with Tier 2/3 = 0) generalizes to production-like data with real embeddings and detection features.
+
+**What changed:**
+1. **Real embeddings** — Computed query + chunk embeddings via ollama, set `chunk.metadata["vector_score"]` = cosine_similarity. Gives real values for `mean_vector_score`, `std_vector_score`, `score_spread`.
+2. **Real DetectionSummary** — Ran `DetectionOrchestrator.detect_for_retrieval(query)` per case. Gives real values for `detection_temporal`, `detection_aggregation`, `detection_comparison`, etc.
+3. **3-way comparison** — expected_mode vs governor vs classifier side-by-side.
+
+**Results (914 cases, full run, 34.5 min):**
+
+| Metric | Value |
+|--------|-------|
+| Governor accuracy | 27.9% (255/914) |
+| Classifier accuracy | 41.0% (375/914) |
+| Agreement rate | 5.1% (47/914) |
+| Classifier vs governor delta | +13.1pp |
+
+**Per-class accuracy:**
+
+| Mode | Count | Governor | Classifier |
+|------|-------|----------|------------|
+| abstain | 192 | 7.8% (15) | **84.4%** (162) |
+| disputed | 145 | **97.2%** (141) | 0.0% (0) |
+| qualified | 420 | 7.9% (33) | **50.7%** (213) |
+| confident | 157 | **42.0%** (66) | 0.0% (0) |
+
+**Classifier confusion matrix:**
+```
+        predicted ->    abstain  confident   disputed  qualified
+      actual abstain        162          0         30          0
+     actual disputed         87          0         58          0
+    actual qualified        207          0        213          0
+    actual confident         73          0         84          0
+```
+
+**Critical finding: Distribution shift.**
+
+The classifier was trained on synthetic data where Tier 2/3 features were all zeros:
+- Training: `mean_vector_score = 0`, `detection_temporal = 0`, etc.
+- Real data: `mean_vector_score = 0.689 (std=0.124)`, `detection_temporal = 38/914`, `detection_comparison = 16/914`
+
+The RF model learned to split on Tier 1 features (constraint metadata + context features) while ignoring Tier 2/3 (all-zero = no variance). When real non-zero values appear at prediction time, they fall on unexpected sides of learned thresholds, causing systematic errors:
+
+1. **Classifier never predicts "confident" or "disputed"** — only outputs "abstain" (529 predictions) and "qualified" (385 predictions via the "disputed" column — renamed in confusion matrix)
+2. **Abstain is strong** (84.4%) because context features (ctx_length_std, ctx_total_chars) are similar in both synthetic and real data
+3. **Disputed and confident are 0%** — the model can't distinguish these without proper Tier 2/3 feature distributions
+
+**Governor analysis:**
+- Governor accuracy (27.9%) matches the synthetic baseline (27.3%) — expected since governor uses constraint allow/deny results, not Tier 2/3 features
+- Governor over-predicts "confident" and "disputed" due to CA sensitivity tuning from Exp 3
+
+**Disagreement analysis:**
+- 867/914 cases (94.9%) had disagreements between governor and classifier
+- When they disagreed: governor was right 212 times, classifier was right 332 times, neither was right 323 times
+
+**Tier 2/3 feature distribution (confirms real values):**
+- `mean_vector_score`: mean=0.689, std=0.124, non-zero=899/914
+- `detection_temporal`: 38/914 (4.2%)
+- `detection_aggregation`: 0/914
+- `detection_comparison`: 16/914 (1.7%)
+
+**Key takeaway**: The classifier MUST be retrained on data with real Tier 2/3 feature values. Options:
+1. **Re-extract features with embeddings** — Run `eval_pipeline.py` output as new training data (already have `eval_results.csv` with 914 rows of real features + ground truth labels)
+2. **Train on mixed data** — Combine synthetic (Tier 2/3 = 0) + real (Tier 2/3 = non-zero) to handle both scenarios
+3. **Feature subset** — Train only on features that are consistent between synthetic and real (Tier 1 + context features)
+
 ---
 
 ## 9. Files Created
@@ -672,6 +739,8 @@ The classifier compensates by learning from text-level proxies (context length, 
 | `tools/governance/train_classifier.py` | Multi-model training with hyperparameter search |
 | `tools/governance/data/features.csv` | 914 rows x 52 columns (constraint features) |
 | `tools/governance/data/model_v1.joblib` | Best model artifact (RF tuned) + encoders + feature names |
+| `tools/governance/eval_pipeline.py` | Full pipeline eval with real embeddings + detection + 3-way comparison |
+| `tools/governance/data/eval_results.csv` | 914 rows with real features + governor/classifier predictions |
 
 ---
 
@@ -681,7 +750,7 @@ The classifier compensates by learning from text-level proxies (context length, 
 2. ~~**Cross-validation strategy**: Stratified k-fold by subcategory? Or random?~~ RESOLVED — Stratified 5-fold by expected_mode
 3. **Which model to ship?** RF (best accuracy) vs Ensemble (best dispute recall) vs GBT (balanced)
 4. **Integration**: How to integrate classifier into the full pipeline? Replace AnswerGovernor.decide() or add as parallel path?
-5. **Real pipeline evaluation**: Need to test with full retrieval pipeline data (vector scores, detection summaries) to get realistic accuracy numbers
+5. ~~**Real pipeline evaluation**: Need to test with full retrieval pipeline data (vector scores, detection summaries) to get realistic accuracy numbers~~ RESOLVED — Exp 4 ran full pipeline eval. Classifier drops to 41% due to distribution shift (trained on synthetic Tier 2/3 = 0)
 6. ~~**Dispute recall improvement**: Can we tune CA constraint sensitivity?~~ RESOLVED — Exp 3 improved dispute recall from 69% to 76% by tightening CA prompts.
 7. **Fallback strategy**: Hard cutoff (classifier only) or soft (classifier + priority rules for low-confidence predictions)?
 
@@ -689,16 +758,17 @@ The classifier compensates by learning from text-level proxies (context length, 
 
 ## 11. Next Steps
 
-### Short-term (improve current results)
-1. ~~**Tune CA sensitivity**~~ DONE — Exp 3: +7-10pp disputed recall. CA now fires on 549/914 cases (was 221).
-2. **More disputed training data** — 145 disputed cases vs 420 qualified. Add 50-100 more hard dispute cases.
-3. **Two-stage model** — RF for general prediction, then dispute-specific check on cases predicted as "qualified" (catches the D->Q confusions).
-4. **Model selection** — Ship GBT (best balance: 63.9% acc, 72% dispute recall) or Ensemble (76% dispute recall)?
+### Short-term (fix distribution shift — Exp 5)
+1. **Retrain on real features** — Use `eval_results.csv` (914 rows with real Tier 2/3 values) as training data. This is the most direct fix.
+2. **Or: Tier 1-only model** — Train on only Tier 1 + context features (consistent between synthetic and real). Simpler but loses Tier 2/3 signal.
+3. ~~**Tune CA sensitivity**~~ DONE — Exp 3: +7-10pp disputed recall.
+4. **More disputed training data** — 145 disputed cases vs 420 qualified. Add 50-100 more hard dispute cases.
+5. **Two-stage model** — RF for general prediction, then dispute-specific check on cases predicted as "qualified".
 
 ### Medium-term (integration)
-4. **Integration prototype** — `fitz_ai/core/guardrails/classifier.py` wrapper that loads model_v1.joblib, runs at inference time.
-5. **Full pipeline eval** — Run classifier on real retrieval results (not synthetic) to measure actual improvement over governor's ~70%.
-6. **A/B comparison** — Run both governor and classifier on same queries, compare decisions.
+6. **Integration prototype** — `fitz_ai/core/guardrails/classifier.py` wrapper that loads model artifact, runs at inference time.
+7. ~~**Full pipeline eval**~~ DONE — Exp 4 completed. Distribution shift identified.
+8. **A/B comparison** — Run both governor and classifier on same queries, compare decisions.
 
 ### Longer-term
 7. **Production deployment** — Ship model in package, load at engine startup, replace governor.
@@ -720,3 +790,4 @@ The classifier compensates by learning from text-level proxies (context length, 
 | 2026-02-08 | Experiment 1 (baseline GBT): 57.4% accuracy vs 33.3% governor. Disputed recall: 28% (8/29). |
 | 2026-02-08 | Experiment 2 (v2 — context features + class weighting + multi-model + hyperparam search): RF 71.0%, Ensemble 69% dispute recall. 11 new context features dominate importance. |
 | 2026-02-08 | Experiment 3 (CA sensitivity tuning): Tightened prompts, 400→800 char truncation, 5%→15% variance threshold. Disputed recall: Ensemble 76% (+7pp), GBT 72% (+10pp). Accuracy trade: RF 69.4% (-1.6pp). |
+| 2026-02-08 | Experiment 4 (full pipeline eval): Added real embeddings + DetectionSummary. Distribution shift confirmed — classifier drops from 69.4% → 41.0% on real Tier 2/3 features. Governor stays at 27.9%. Need to retrain on real features. |
