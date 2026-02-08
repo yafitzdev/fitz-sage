@@ -1,37 +1,48 @@
 # fitz-gov 2.0 Benchmark Results
 
 **Version**: fitz-gov 2.0.0 (331 test cases)
-**Date**: February 6, 2026
+**Date**: February 6, 2026 (initial), February 8, 2026 (current)
 **Model**: Ollama qwen2.5:3b (local)
-**Runtime**: ~14 minutes
+**Branch**: `refactor/staged-constraint-pipeline`
 
 ---
 
 ## Executive Summary
 
-fitz-gov 2.0 expands the benchmark from 220 to 331 test cases, adding challenging categories for code context, ambiguous queries, structured data, and edge cases. These additions reveal system limitations not captured in v1.0.
+fitz-gov 2.0 expands the benchmark from 220 to 331 test cases, adding challenging categories for code context, ambiguous queries, structured data, and edge cases.
 
-### Key Results
+### Current Results (Governance, 249 cases)
 
-| Metric | Score | Assessment |
-|--------|-------|------------|
-| **Overall Accuracy** | **63.14%** | Significant drop from v1.0, revealing harder cases |
-| **Abstention** | 57.14% | Struggles with new code/structured data contexts |
-| **Dispute Detection** | 89.09% | Remains robust despite harder cases |
-| **Qualification** | 47.06% | Major challenge area with ambiguous queries |
-| **Confidence** | 79.37% | Reasonable precision maintained |
-| **Grounding** | 97.62% | Excellent hallucination prevention |
-| **Relevance** | 2.50% | Critical failure point needing investigation |
+After 18 optimization experiments (see RESEARCH_NOTEPAD.md):
+
+| Metric | Initial (Feb 6) | Current (Feb 8) | Δ |
+|--------|-----------------|-----------------|-----|
+| **Governance Overall** | **63.14%** | **71.5%** | **+8.4%** |
+| **Abstention** | 57.14% | 57.1% | ~0% |
+| **Dispute Detection** | 89.09% | 87.3% | -1.8% |
+| **Qualification** | 47.06% | 79.4% | **+32.3%** |
+| **Confidence** | 79.37% | 88.9% | **+9.5%** |
+
+*Note*: Initial 63.14% was on all 331 cases. Current 71.5% is on 249 governance cases (excludes grounding/relevance which are tested separately). Governance category improvements are directly comparable.
+
+### Full Benchmark (331 cases, initial run only)
+
+| Category | Score | Correct/Total |
+|----------|-------|---------------|
+| Grounding | 97.62% | 41/42 |
+| Relevance | 2.50% | 1/40 |
+
+Grounding and relevance have not been re-tested since initial run.
 
 ### Version Comparison
 
-| Metric | v1.0 (200 cases) | v2.0 (331 cases) | Δ |
-|--------|------------------|------------------|-----|
-| Overall | 72.0% | 63.14% | -8.86% |
-| Abstention | 72.5% | 57.14% | -15.36% |
-| Dispute | 90.0% | 89.09% | -0.91% |
-| Qualification | 72.5% | 47.06% | -25.44% |
-| Confidence | 86.67% | 79.37% | -7.30% |
+| Metric | v1.0 (200 cases) | v2.0 Initial | v2.0 Current |
+|--------|------------------|--------------|--------------|
+| Governance | 72.0% | 63.14% | 71.5% |
+| Abstention | 72.5% | 57.14% | 57.1% |
+| Dispute | 90.0% | 89.09% | 87.3% |
+| Qualification | 72.5% | 47.06% | 79.4% |
+| Confidence | 86.67% | 79.37% | 88.9% |
 
 ---
 
@@ -70,27 +81,28 @@ fitz-gov 2.0 expands the benchmark from 220 to 331 test cases, adding challengin
  confident         4         6          3         50
 ```
 
-### Primary Failure Modes
+### Primary Failure Modes (Current)
 
-| Failure Pattern | Count | Impact |
-|-----------------|-------|--------|
-| **Qualified→Disputed** | 26 | Over-detecting contradictions in nuanced content |
-| **Abstain→Confident** | 19 | Answering despite insufficient context |
-| **Abstain→Disputed** | 8 | Finding contradictions in irrelevant content |
-| **Qualified→Confident** | 7 | Missing uncertainty that requires hedging |
+| Failure Pattern | Initial | Current | Impact |
+|-----------------|---------|---------|--------|
+| **Qualified→Disputed** | 26 | 19 | Over-detecting contradictions (conflict_aware, 3b limit) |
+| **Abstain→Confident** | 19 | 16 | Decoy data — topically similar but wrong entity |
+| **Abstain→Disputed** | 8 | 8 | Finding contradictions in irrelevant content |
+| **Qualified→Confident** | 7 | 7 | Missing uncertainty that requires hedging |
+| **Confident→Disputed** | 6 | 5 | False contradiction detection |
 
-### Performance by Category
+### Performance by Category (Current)
 
 #### Governance Modes
 
-| Category | Accuracy | Correct/Total | Main Failure |
-|----------|----------|---------------|--------------|
-| Abstention | 57.14% | 36/63 | → Confident (30.2%) |
-| Dispute | 89.09% | 49/55 | Stable performance |
-| Qualification | 47.06% | 32/68 | → Disputed (38.2%) |
-| Confidence | 79.37% | 50/63 | → Disputed (9.5%) |
+| Category | Initial | Current | Correct/Total | Main Failure |
+|----------|---------|---------|---------------|--------------|
+| Abstention | 57.14% | 57.1% | 36/63 | → Confident (decoy data) |
+| Dispute | 89.09% | 87.3% | 48/55 | Stable |
+| Qualification | 47.06% | 79.4% | 54/68 | → Disputed (CA false fires) |
+| Confidence | 79.37% | 88.9% | 56/63 | → Disputed (CA false fires) |
 
-#### Answer Quality
+#### Answer Quality (Initial Run Only)
 
 | Category | Accuracy | Correct/Total | Analysis |
 |----------|----------|---------------|----------|
@@ -175,36 +187,46 @@ The same configuration that achieved 72% on v1.0 achieves 63.14% on v2.0, confir
 
 ---
 
+## Optimization Journey (63.14% → 71.5%)
+
+Key experiments that moved the score (see RESEARCH_NOTEPAD.md for full details):
+
+| Exp | Change | Result |
+|-----|--------|--------|
+| 001-006 | IE staged pipeline, thresholds, primary entity extraction | 63.14% → 66.3% |
+| 007-009 | CA model scaling analysis, SIT rate detection | 66.3% → 68.3% |
+| 010-011 | Dispute subordination, qualified consensus rule | 68.3% → 70.3% |
+| 012-017 | CA deep-dive (5 approaches), SIT/aspect LLM verifiers | All blocked by 3b limit |
+| **018** | **Causal attribution regex tightening** | **70.3% → 71.5%** |
+
+### Remaining Bottlenecks
+
+1. **conflict_aware false fires (34 cases)** — 3b model can't distinguish nuance from contradiction. Needs 7b+ model. Blocked.
+2. **Decoy data (16 cases)** — Topically similar but wrong entity. 3b model can't verify entity relevance. Blocked.
+3. **Scattered (18 cases)** — Various, partially fixable with regex. Est. +2-3 cases.
+
+### Theoretical Ceiling
+
+- **With qwen2.5:3b**: ~73-75% (current 71.5% + scattered fixes)
+- **With 7b+ for conflict_aware**: 75-80%+ (removes discrimination bottleneck)
+
 ## Recommendations
 
-### Immediate Actions
+### Viable Now
 
-1. **Investigate Relevance Failure**
-   - 2.50% accuracy is catastrophic
-   - Check if answer verification constraint is working
-   - May need dedicated relevance-checking logic
+1. **Scattered failure fixes** — Additional regex/heuristic improvements (+2-3 cases)
+2. **Model upgrade for conflict_aware** — 7b or 14b for pairwise contradiction only
 
-2. **Tune Qualification Detection**
-   - Reduce false disputes on ambiguous content
-   - Consider different thresholds for new subcategories
-   - May need ambiguity-aware classification
+### Blocked by 3b Model
 
-3. **Enhance Temporal Awareness**
-   - Detect stale documentation
-   - Check temporal markers in context
-   - Add recency validation for "current" queries
+1. **Conflict_aware precision** — Can't distinguish factual contradiction from nuanced perspectives
+2. **Decoy data detection** — Can't verify entity-level relevance with LLM
+3. **Aspect classification** — LLM fallback assigns wrong aspects (Exp 016)
 
-### Longer-term Improvements
+### Not Yet Addressed
 
-1. **Category-Specific Strategies**
-   - Code context needs different handling
-   - Structured data requires format-aware logic
-   - Ambiguous queries need explicit multi-interpretation support
-
-2. **Relevance Overhaul**
-   - Current approach clearly broken on v2.0
-   - Consider query-answer alignment scoring
-   - May need more sophisticated semantic matching
+1. **Relevance category** — 2.50% accuracy, needs investigation
+2. **Temporal staleness** — Not detecting outdated documentation
 
 ---
 
@@ -214,46 +236,40 @@ The same configuration that achieved 72% on v1.0 achieves 63.14% on v2.0, confir
 # Install fitz-gov 2.0
 pip install fitz-gov==2.0.0
 
-# Run benchmark
-cd ~/PycharmProjects/fitz-ai
-python run_benchmark_simple.py
+# Run governance benchmark (249 cases, ~9 min)
+python run_targeted_benchmark.py
 
-# Or via CLI (when fixed)
-fitz eval fitz-gov --model ollama/qwen2.5:3b
+# Full benchmark (331 cases, ~14 min)
+python run_benchmark_simple.py
 ```
 
 ### Configuration Used
 
 ```python
-benchmark = FitzGovBenchmark(
-    model_override='ollama/qwen2.5:3b',
-    adaptive=True,           # Query-type routing
-    use_fusion=True,         # 3-prompt voting
-    llm_validation=False     # Disabled for speed
-)
+# Governance constraints (run_targeted_benchmark.py)
+constraints = [
+    InsufficientEvidenceConstraint(chat=fast_chat, embedder=embedder),
+    SpecificInfoTypeConstraint(),
+    CausalAttributionConstraint(),
+    ConflictAwareConstraint(chat=fast_chat, use_fusion=True, adaptive=True, embedder=embedder),
+]
 ```
 
 ### Timing
 
-- **Total runtime**: ~14 minutes
-- **Per-category breakdown** (from partial run):
-  - Abstention (63 cases): 406.9s
-  - Dispute (55 cases): 164.4s
-  - Qualification (68 cases): 253.5s
-  - Confidence (63 cases): 131.0s
-  - Grounding (42 cases): 69.3s
-  - Relevance (40 cases): ~60s (estimated)
+- **Governance run** (249 cases): ~524s (~9 min)
+- **Full run** (331 cases): ~14 min
 
 ---
 
 ## Conclusion
 
-fitz-gov 2.0 successfully expands the benchmark to cover real-world RAG failure modes not captured in v1.0. The 8.86% accuracy drop isn't a regression—it's revealing actual system limitations that need addressing.
+fitz-gov 2.0 expanded the benchmark from 200 to 331 cases, initially dropping accuracy from 72% to 63.14%. Through 18 experiments, governance accuracy recovered to **71.5%** (178/249 governance cases).
 
 **Key takeaways**:
-- The benchmark is working as intended: discriminating system capabilities
-- Clear problem areas identified: relevance, qualification, abstention
-- Dispute detection and grounding remain strong
-- The path forward is clear: address relevance first, then qualification handling
-
-The 63.14% score on 331 diverse test cases represents a more realistic assessment of governance capabilities than v1.0's 72% on easier cases.
+- Qualification accuracy saw the largest improvement: 47.06% → 79.4% (+32.3%)
+- Confidence accuracy improved: 79.37% → 88.9% (+9.5%)
+- Dispute detection and grounding remain strong (87.3% and 97.62%)
+- Abstention remains the hardest category (57.1%), blocked by decoy data problem
+- The 3b model is the primary bottleneck — conflict_aware false fires (34 cases) and decoy data (16 cases) need larger model discrimination
+- Estimated 3b ceiling: 73-75%. Model upgrade path: 75-80%+

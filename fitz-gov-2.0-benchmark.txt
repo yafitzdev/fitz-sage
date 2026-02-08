@@ -1,8 +1,0 @@
-============================================================
-fitz-gov 2.0 Benchmark
-============================================================
-Model: ollama/qwen2.5:3b
-Test cases: 331
-Configuration: Adaptive mode, 3-prompt fusion
-------------------------------------------------------------
-Running benchmark... (this will take ~5-10 minutes)
