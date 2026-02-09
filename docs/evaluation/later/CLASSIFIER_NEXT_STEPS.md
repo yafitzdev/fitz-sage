@@ -22,37 +22,24 @@ Disputed and qualified are close. Confident needs the most work.
 
 Do these in sequence. Each builds on the previous.
 
-### Step 1: Per-Class Calibrated Thresholds (fastest win, zero retraining)
+### Step 1: Per-Class Calibrated Thresholds — DONE
 
-**The insight**: Different classes have different error costs. A false confident is dangerous. A false qualified is annoying. The threshold should reflect that.
+**Result**: +0.9pp accuracy (69.1% → 70.0%), +1.9pp min recall (61.5% → 63.5%).
 
-**What to do**:
-- Load model_v3.joblib and the held-out test set
-- Extract `predict_proba()` for all test cases
-- Sweep per-class thresholds:
-  - **Confident**: needs high confidence (`proba > 0.7`) — the cost of false confidence is dangerous
-  - **Qualified**: can tolerate ambiguity (`proba > 0.4`) — over-hedging is safe
-  - **Disputed**: should err early (`proba > 0.5`) — missing a conflict is worse than a false alarm
-  - **Abstain**: keep default — already at 85%
-- When no class exceeds its threshold, fall back to governor
+Swept all 4-class threshold combinations via grid search. Optimal thresholds: abstain=0.60, confident=0.50, disputed=0.00, qualified=0.00. Only 5/223 test cases (2.2%) fall back to governor. On those 5, classifier was 0/5 correct, governor was 2/5.
 
-**Expected impact**: +2-5pp overall. May push past 70% without touching features.
+**Why limited impact**: The governor is only 27% accurate overall (massively over-predicts disputed). Fallback to a bad governor can't help much. As the governor improves, this infrastructure becomes more valuable — every fallback case automatically benefits from better rules with no retraining.
 
-**Effort**: An afternoon. No retraining, no new features, no LLM calls. Pure threshold tuning on existing predictions.
+**Per-class results**:
 
-**Implementation**:
-```python
-# Pseudocode
-thresholds = {"confident": 0.7, "disputed": 0.5, "qualified": 0.4, "abstain": 0.5}
-probas = model.predict_proba(X_test)
-for i, proba_row in enumerate(probas):
-    max_class = classes[proba_row.argmax()]
-    max_proba = proba_row.max()
-    if max_proba < thresholds[max_class]:
-        prediction = governor_decision[i]  # fallback
-    else:
-        prediction = max_class
-```
+| Class | Before | After | Delta |
+|-------|--------|-------|-------|
+| Abstain | 85.1% | 85.1% | +0.0pp |
+| Confident | 61.5% | 63.5% | +1.9pp |
+| Disputed | 66.7% | 69.2% | +2.6pp |
+| Qualified | 65.9% | 65.9% | +0.0pp |
+
+**Files**: `tools/governance/calibrate_thresholds.py`, `tools/governance/data/model_v3_calibrated.joblib`
 
 ### Step 2: Continuous CA Signals (the #1 feature unlock)
 
@@ -127,6 +114,42 @@ How many distinct conclusions are present?"
 4. Returns `GovernanceDecision(mode, source, confidence, features)`
 
 **Effort**: Integration work (~4h). No ML changes — this is pure architecture.
+
+---
+
+### Step 5: Cascade Classifier for Uncertain Cases
+
+**The insight**: Instead of falling back to the governor (27% accuracy) when the classifier is uncertain, train a second specialist classifier on the uncertain cases. The first classifier handles the easy 95%+, the second learns the hard boundary cases.
+
+**Prerequisites**: Exhaust Steps 2-4 first. Each of those directly improves the primary classifier's features, which is higher-leverage than adding a second model. The cascade is most useful after the main model's ceiling is truly hit.
+
+**Design**:
+1. Set thresholds to route ~15-25% of cases to the second stage (not the current 2.2%)
+2. Train a specialist on the low-confidence cases, possibly with different features or model type
+3. The specialist could use subcategory as a feature (risky for the main model, but the specialist sees a narrower problem)
+
+**Open question**: Artificially raising thresholds to get more second-stage training data is tempting but risks overfitting. With 223 test cases and 15-25% routed = ~35-55 cases for the specialist — marginal for a 4-class problem. Cross-validation on the full dataset might work better than a single held-out split. Alternatively, the specialist could be a binary classifier for just the confused pairs (e.g., "confident vs qualified" and "disputed vs qualified") rather than a full 4-class model.
+
+**Blocked on**: Governor improvement (Step 4) and primary classifier improvements (Steps 2-3). Revisit after those are exhausted.
+
+### Step 6: Split Qualified into Sub-Classes
+
+**The insight**: Qualified is the chaos class — 18 subcategories, 360 cases, every boundary touches it. The classifier treats "methodology_difference" and "hedged_claims" identically even though they have very different constraint signatures.
+
+**Potential split** (needs validation):
+
+| Sub-class | Subcategories | Signal pattern |
+|-----------|---------------|---------------|
+| **Evidence quality** | hedged_claims, small_sample, source_quality, source_quality_asymmetry | IE fires but evidence is weak |
+| **Scope mismatch** | different_aspects, same_claim_different_conditions, methodology_difference, conditional_applicability | CA might fire but contexts aren't really contradicting |
+| **Temporal caveat** | temporal_ambiguity, evolving_facts, same_claim_different_timeperiods, deprecated_documented | Detection temporal + freshness signals |
+| **Partial answer** | partial_answer, related_missing_specific, right_topic_wrong_infotype | IE fires weakly, SIT fires |
+
+**Risk**: Splitting reduces per-class sample sizes (360/4 = ~90 each, with some sub-classes having <20 cases). The classifier might overfit. Also, the product still needs a single "qualified" mode — the split is purely internal to improve classification, then map back to qualified for the user.
+
+**Approach**: First analyze whether the sub-classes actually have different feature distributions (box plots of key features per sub-class). If they overlap heavily, the split won't help. If they cluster clearly, the multi-class problem becomes easier.
+
+**Blocked on**: Requires subcategory analysis tooling. Lower priority than Steps 2-4.
 
 ---
 
@@ -207,15 +230,17 @@ How many distinct conclusions are present?"
 
 ## Priority Summary
 
-| Step | Action | Target | Expected Impact | Effort | Retraining? |
-|------|--------|--------|----------------|--------|-------------|
-| **1** | **Per-class calibrated thresholds** | All | +2-5pp overall | **Low** | No |
-| **2** | **Continuous CA signals** | Disputed | +3-5pp disputed | **Low-Medium** | Yes |
-| **3** | **Source agreement features** | Confident | +3-5pp confident | **Medium** | Yes |
-| **4** | **Governor-classifier hybrid** | All | Architectural | **Medium** | No |
-| 5 | Pairwise embedding similarity | Disputed/Confident | +1-2pp | Medium | Yes |
-| 6 | Cross-validation + per-class optimization | All | +2-3pp | Low | Yes |
-| 7 | Real-world failure collection | All | Compound | Ongoing | Yes |
-| 8 | Feature selection / RFE | All | +1-2pp | Medium | Yes |
+| Step | Action | Target | Expected Impact | Effort | Retraining? | Status |
+|------|--------|--------|----------------|--------|-------------|--------|
+| **1** | **Per-class calibrated thresholds** | All | +0.9pp accuracy, +1.9pp min recall | **Low** | No | **DONE** |
+| **2** | **Continuous CA signals** | Disputed | +3-5pp disputed | **Low-Medium** | Yes | Next |
+| **3** | **Source agreement features** | Confident | +3-5pp confident | **Medium** | Yes | |
+| **4** | **Governor-classifier hybrid** | All | Architectural (also improves Step 1 fallback) | **Medium** | No | |
+| **5** | **Cascade classifier** | Low-confidence cases | +2-4pp on uncertain cases | **Medium** | Yes (2nd model) | Blocked on 2-4 |
+| **6** | **Split qualified sub-classes** | Qualified | +2-5pp qualified | **Medium** | Yes | Needs analysis |
+| 7 | Pairwise embedding similarity | Disputed/Confident | +1-2pp | Medium | Yes | |
+| 8 | Cross-validation + per-class optimization | All | +2-3pp | Low | Yes | |
+| 9 | Real-world failure collection | All | Compound | Ongoing | Yes | |
+| 10 | Feature selection / RFE | All | +1-2pp | Medium | Yes | |
 
-**Steps 1-4 are the critical path.** Step 1 alone might push past 70% overall. Steps 2-3 target the weakest classes directly. Step 4 makes the system production-ready and auditable.
+**Steps 2-4 are the critical path.** Step 1 is done (+0.9pp). Steps 2-3 target the weakest classes directly with better features. Step 4 makes the governor better (which retroactively improves Step 1's fallback). Steps 5-6 are structural changes to attempt after the feature-level improvements are exhausted.
