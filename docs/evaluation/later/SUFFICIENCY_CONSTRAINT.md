@@ -1,8 +1,8 @@
 # Sufficiency Constraint Analysis
 
-**Status**: Deferred — governance classifier will learn these patterns from 851-case test set
-**Date**: 2025-02-08
-**Related**: Experiments 1–21 (relevance optimization), fitz-gov v2.0/v3.0
+**Status**: Deferred — governance classifier will learn these patterns from 1113-case training set
+**Date**: 2026-02-08
+**Related**: Experiments 1–21 (relevance optimization), fitz-gov v3.0
 
 ## What Is the Sufficiency Constraint?
 
@@ -88,7 +88,7 @@ The 3/3 threshold is a workaround for the 3b model's inconsistency, not a design
 1. **Heterogeneous patterns**: Patterns 1–9 span different domains and detection logic — no single rule covers them
 2. **Diminishing returns**: Expanding SIT regex (8 → 23+ types) increases brittleness and maintenance
 3. **Context-dependent**: Whether context is "sufficient" depends on subtle query–context interactions that are inherently hard to hand-code
-4. **Learns from real data**: The 851-case test set represents realistic failure modes; a classifier generalizes without manual enumeration
+4. **Learns from real data**: The 1113-case test set represents realistic failure modes; a classifier generalizes without manual enumeration
 
 ## Implementation Options (When Revisited)
 
@@ -98,7 +98,7 @@ The 3/3 threshold is a workaround for the 3b model's inconsistency, not a design
 - **Not recommended**
 
 ### Option B: Governance Classifier (Recommended)
-- Train on 851 cases: "Is retrieved context sufficient to answer this query?"
+- Train on 1113 cases: "Is retrieved context sufficient to answer this query?"
 - Learns patterns instead of hand-coding
 - Can use cloud API for training, lightweight local inference
 - Fits local-first philosophy
@@ -110,7 +110,7 @@ The 3/3 threshold is a workaround for the 3b model's inconsistency, not a design
 
 ## Test Set Context
 
-**851-case distribution (v3.0):**
+**1113-case distribution (v3.0):**
 
 | Category | Count | Notes |
 |----------|-------|-------|
@@ -130,5 +130,5 @@ The 3/3 threshold is a workaround for the 3b model's inconsistency, not a design
 ## Testing Strategy
 
 - **Quick regression**: v2.0 subset (249 cases, ~2 min) — run on every commit
-- **Full suite**: 851 cases — nightly or pre-release
+- **Full suite**: 1113 cases — nightly or pre-release
 - **Comparability**: Don't mix Ollama (3b) with cloud models in same benchmark run

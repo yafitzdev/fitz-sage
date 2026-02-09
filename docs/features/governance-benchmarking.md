@@ -93,10 +93,10 @@ The classifier is tiny (~5MB), runs in microseconds, and adds zero latency to th
 
 | Mode | Precision | Recall | F1 | Support |
 |------|-----------|--------|-----|---------|
-| **Abstain** | 75% | **85%** | 80% | 47 |
-| **Confident** | 73% | 62% | 67% | 52 |
-| **Disputed** | 62% | 67% | 64% | 39 |
-| **Qualified** | 67% | 66% | 66% | 85 |
+| **Abstain** | 77% | **85%** | 81% | 47 |
+| **Confident** | 60% | 62% | 61% | 52 |
+| **Disputed** | 59% | 67% | 63% | 39 |
+| **Qualified** | 77% | 66% | 71% | 85 |
 
 For comparison, the rule-based governor achieves 27% accuracy on the same test set (it over-predicts "disputed" after conflict detection tuning). A naive baseline that always predicts "qualified" would score 38%.
 
@@ -191,7 +191,7 @@ fitz eval fitz-gov --collection test
 
 For the full experimental record with ablation results, confusion matrices, and training history:
 
-**[Classifier NOTEPAD](../evaluation/classifier/NOTEPAD.md)** — Living document with all 6 experiments
+**[Classifier NOTEPAD](../evaluation/classifier/NOTEPAD.md)** — Living document with all 7 experiments
 
 For future improvement plans:
 

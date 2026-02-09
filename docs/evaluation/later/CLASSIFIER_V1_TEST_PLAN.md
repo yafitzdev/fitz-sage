@@ -1,8 +1,10 @@
 # Classifier v1.0 — Test Case Gap Analysis & Generation Plan
 
+**Status**: EXECUTED (Experiment 6). 199 cases generated, validated at 93.5%, merged. Results: GBT 69.1% overall (below predicted 73-76%), confident 62% (below 65% target), disputed 67% (below predicted 87-90%). Shipped as model_v3.joblib despite targets not being met — see NOTEPAD.md Exp 6-7.
+
 **Context**: After 5 experiments (Exp 1-5), the governance classifier (model_v2, RF) achieves 68.9% accuracy and 83% disputed recall. Two classes remain weak: **confident (48% recall)** and **disputed edge cases (5 remaining misses)**.
 
-This document defines what new test cases to generate before shipping classifier v1.0.
+This document defined what new test cases to generate before shipping classifier v1.0.
 
 ---
 

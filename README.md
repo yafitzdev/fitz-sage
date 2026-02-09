@@ -143,7 +143,7 @@ You can—but you'll hit walls fast.
 **Honest answers ✅** → [Governance Benchmark](#governance-know-what-you-dont-know)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."*
 >
-> **Measured, not claimed:** Fitz scores **69.1%** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 1,100-case benchmark for epistemic honesty — detecting when to abstain, dispute, or qualify answers. An ML classifier trained on labeled boundary cases replaces hand-coded rules.
+> **Measured, not claimed:** Fitz scores **69.1%** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 1,100+ case benchmark for epistemic honesty — detecting when to abstain, dispute, or qualify answers. An ML classifier trained on labeled boundary cases replaces hand-coded rules.
 
 **Queries that actually work 📊**
 > Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, AST-aware chunking for code, and SQL execution for tabular data. No configuration—it just works.
@@ -219,9 +219,9 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 **Overall: 69.1%** on [fitz-gov](https://github.com/yafitzdev/fitz-gov) — a benchmark for epistemic honesty, not retrieval quality.
 
 > [!NOTE]
-> **Why 69% and not 95%?** Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. No system in the literature exceeds 75% on calibrated epistemic governance. 92% of our test cases are rated "hard."
+> **What this score means?** Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. 92% of our test cases are rated "hard."
 
-**How it works:** Five epistemic constraints (contradiction detection, evidence sufficiency, causal attribution, answer verification) extract 58 features from each query. A gradient-boosted tree classifier — trained on fitz-gov's 1,100 labeled boundary cases with independent blind validation — replaces hand-coded priority rules. The constraints stay; only the decision logic learned from data.
+**How it works:** Five epistemic constraints (contradiction detection, evidence sufficiency, causal attribution, answer verification) extract 58 features from each query. A gradient-boosted tree classifier — trained on fitz-gov's 1,100+ labeled boundary cases with independent blind validation — replaces hand-coded priority rules. The constraints stay; only the decision logic learned from data.
 
 **The system fails safe.** When the classifier is wrong, it over-hedges (says "qualified" instead of "confident") — annoying but not dangerous. Over-confidence (the dangerous failure) is the rarest error mode.
 
@@ -229,7 +229,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 fitz eval fitz-gov --model ollama/qwen2.5:3b
 ```
 
-> [Feature docs](docs/features/governance-benchmarking.md) · [Technical spec](docs/evaluation/governance.md) · [Classifier experiments](docs/evaluation/classifier/NOTEPAD.md)
+> [Feature docs](docs/features/governance-benchmarking.md) · [Benchmark results](docs/evaluation/fitz-gov-3.0-results.md) · [Classifier experiments](docs/evaluation/classifier/NOTEPAD.md)
 
 ---
 

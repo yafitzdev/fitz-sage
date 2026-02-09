@@ -2,7 +2,7 @@
 
 Complete taxonomy of governance case types for the fitz-gov benchmark.
 
-**Status**: Complete. All cases merged into `fitz-gov/data/tier1_core/`.
+**Status**: Complete. All cases merged into `fitz-gov/data/tier1_core/`. Current version: **v3.0.0**.
 
 **Repository**: `C:\Users\yanfi\PycharmProjects\fitz-gov`
 
@@ -10,7 +10,7 @@ Complete taxonomy of governance case types for the fitz-gov benchmark.
 ```
 fitz-gov/data/
 ├── tier0_sanity/    60 sanity cases (baseline, models should score 95%+)
-├── tier1_core/      914 cases (848 governance + 66 grounding/relevance)
+├── tier1_core/      1113 cases (1047 governance + 66 grounding/relevance)
 ├── corpus/          378 test documents
 └── queries/         Query-to-document mappings for Mode B evaluation
 ```
@@ -21,24 +21,24 @@ fitz-gov/data/
 
 | Metric | Value |
 |--------|-------|
-| Total cases (tier0 + tier1) | 974 |
-| Governance cases (abstain/dispute/qualify/confident) | 892 |
+| Total cases (tier0 + tier1) | 1173 |
+| Governance cases (abstain/dispute/qualify/confident) | 1091 (1047 tier1 + 44 tier0) |
 | Other cases (grounding/relevance) | 82 |
 | Unique subcategories (consolidated) | 54 |
-| Total cases removed (duplicates) | 7 |
-| Total cases relabeled (blind validation) | 11 |
+| Total cases removed (duplicates) | 8 |
+| Total cases relabeled (blind validation) | 20 |
 
 ### Per-Mode Distribution (tier1_core, governance only)
 
 | Mode | Cases | % |
 |------|-------|---|
-| Qualification | 357 | 42.1% |
-| Abstention | 192 | 22.6% |
-| Confidence | 154 | 18.2% |
-| Dispute | 145 | 17.1% |
-| **Total** | **848** | 100% |
+| Qualification | 360 | 34.4% |
+| Confidence | 254 | 24.3% |
+| Abstention | 237 | 22.6% |
+| Dispute | 196 | 18.7% |
+| **Total** | **1047** | 100% |
 
-Qualification dominance is expected — it is the central mode involved in every boundary pair.
+Max:min class ratio is 2.2:1. Qualification remains largest but class balance improved significantly from v2.0 (was 2.9:1).
 
 ---
 
@@ -89,6 +89,19 @@ Targeted specific coverage gaps identified after v2.0 merge: dispute class under
 | **Total** | **123** | | |
 
 **Validation**: 94% blind label agreement. 4 cases relabeled (all disputed/abstain -> qualified). All 123 merged into tier1_core.
+
+### v4.0: +199 generated cases (classifier failure-mode targeting)
+
+Generated per `CLASSIFIER_V1_TEST_PLAN.md` to address specific classifier failure modes identified in Experiments 1-5. Focused on confident patterns (opposing_with_consensus, contradiction_resolved, different_framing), subtle disputes, and abstain edge cases.
+
+| Generation batch | Cases | Mode distribution | Target |
+|-----------------|-------|-------------------|--------|
+| Confident patterns | 95 | 95 confident | Confident recall 48% → 70%+ |
+| Subtle disputes | 60 | 60 disputed | Implicit contradiction, binary conflict, temporal conflict |
+| Abstain edge cases | 45 | 45 abstain | Near-miss topics, entity confusion, temporal staleness |
+| **Total** | **200** | **45 abs, 60 disp, 0 qual, 95 conf** | |
+
+**Validation**: 93.5% blind label agreement (187/200). 9 cases fixed: 5 temporal supersession reclassified to confident, 3 metric-mismatch to qualified, 1 duplicate removed. 199 cases merged into tier1_core.
 
 ---
 
