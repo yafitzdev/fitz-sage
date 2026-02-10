@@ -227,16 +227,16 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
              ▼
   ┌─────────────────────┐
   │ Stage 1: RF         │     Can the evidence answer this query?
-  │ Answerability       ├───► NO ──► ABSTAIN (81.2% recall)
+  │ Answerability       ├───► NO ──► ABSTAIN
   └──────────┬──────────┘
              │ YES
              ▼
   ┌─────────────────────┐     Do the sources conflict?
-  │ Stage 2: ET         ├───► YES ──► DISPUTED (89.7% recall)
-  │ Conflict Detection  │     
+  │ Stage 2: ET         ├───► YES ──► DISPUTED
+  │ Conflict Detection  │
   └──────────┬──────────┘
              │                Consistent evidence found
-             └──────────────► NO ──► TRUSTWORTHY (70.6% recall)          
+             └──────────────► NO ──► TRUSTWORTHY          
               
 ```
 
