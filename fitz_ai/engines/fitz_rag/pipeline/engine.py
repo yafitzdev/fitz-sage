@@ -10,13 +10,12 @@ from __future__ import annotations
 from typing import Sequence
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.core.governance import AnswerGovernor
-from fitz_ai.core.guardrails.governance_decider import GovernanceDecider
 from fitz_ai.core.guardrails import (
     ConstraintPlugin,
     create_default_constraints,
     run_constraints,
 )
+from fitz_ai.core.guardrails.governance_decider import GovernanceDecider
 from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 from fitz_ai.engines.fitz_rag.exceptions import (
     LLMError,

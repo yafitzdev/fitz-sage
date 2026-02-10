@@ -33,18 +33,27 @@ logger = logging.getLogger(__name__)
 
 # Feature type sets (must match train_classifier.py exactly)
 _CATEGORICAL_FEATURES = {
-    "ie_signal", "ca_signal",
-    "ca_first_evidence_char", "ca_evidence_characters",
-    "caa_query_type", "sit_info_type_requested",
+    "ie_signal",
+    "ca_signal",
+    "ca_first_evidence_char",
+    "ca_evidence_characters",
+    "caa_query_type",
+    "sit_info_type_requested",
 }
 
 _BOOL_FEATURES = {
     "ie_fired",
-    "ca_fired", "ca_numerical_variance_detected",
-    "caa_fired", "caa_has_causal_evidence", "caa_has_predictive_evidence",
-    "sit_fired", "sit_entity_mismatch", "sit_has_specific_info",
+    "ca_fired",
+    "ca_numerical_variance_detected",
+    "caa_fired",
+    "caa_has_causal_evidence",
+    "caa_has_predictive_evidence",
+    "sit_fired",
+    "sit_entity_mismatch",
+    "sit_has_specific_info",
     "has_qualified_signal",
-    "detection_temporal", "detection_comparison",
+    "detection_temporal",
+    "detection_comparison",
     "has_distinct_years",
 }
 
@@ -57,7 +66,10 @@ def _find_model_path() -> Path | None:
     candidates = [
         # Development: tools/governance/data/
         Path(__file__).resolve().parent.parent.parent.parent
-        / "tools" / "governance" / "data" / _MODEL_FILENAME,
+        / "tools"
+        / "governance"
+        / "data"
+        / _MODEL_FILENAME,
     ]
     for path in candidates:
         if path.exists():
@@ -134,8 +146,6 @@ class GovernanceDecider:
 
     def _predict(self, features: dict[str, Any]) -> tuple[str, float]:
         """Run two-stage prediction. Returns (label, confidence)."""
-        import numpy as np
-        import pandas as pd
 
         X = self._prepare_features(features)
 
@@ -159,7 +169,7 @@ class GovernanceDecider:
         else:
             return "disputed", 1.0 - p_trustworthy
 
-    def _prepare_features(self, features: dict[str, Any]) -> "pd.DataFrame":
+    def _prepare_features(self, features: dict[str, Any]):
         """Convert raw feature dict to a model-ready single-row DataFrame."""
         import pandas as pd
 
@@ -186,7 +196,7 @@ class GovernanceDecider:
             else:
                 X[col] = (
                     X[col]
-                    .map({"True": 1, "False": 0, True: 1, False: 0, 1: 1, 0: 0})
+                    .map({"True": 1, "False": 0, True: 1, False: 0})
                     .fillna(0)
                     .astype(int)
                 )

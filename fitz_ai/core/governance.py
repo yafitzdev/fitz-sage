@@ -334,12 +334,8 @@ class AnswerGovernor:
             # This handles cases where complementary perspectives are
             # misidentified as contradictions.
             if "qualified" in signals:
-                qualified_count = sum(
-                    1 for s in constraint_signals.values() if s == "qualified"
-                )
-                disputed_count = sum(
-                    1 for s in constraint_signals.values() if s == "disputed"
-                )
+                qualified_count = sum(1 for s in constraint_signals.values() if s == "qualified")
+                disputed_count = sum(1 for s in constraint_signals.values() if s == "disputed")
                 if qualified_count >= 2 and disputed_count <= 1:
                     return AnswerMode.QUALIFIED
             return AnswerMode.DISPUTED

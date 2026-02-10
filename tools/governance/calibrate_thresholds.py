@@ -33,17 +33,19 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
 from tools.governance.train_classifier import (
+    _3CLASS_LABELS,
     _BOOL_FEATURES,
     _CATEGORICAL_FEATURES,
     _META_COLS,
-    _3CLASS_LABELS,
     _collapse_to_3class,
     compute_context_features,
     load_cases_by_id,
 )
 
 _DATA_DIR = Path(__file__).resolve().parent / "data"
-_FITZGOV_DIR = Path(__file__).resolve().parent.parent.parent.parent / "fitz-gov" / "data" / "tier1_core"
+_FITZGOV_DIR = (
+    Path(__file__).resolve().parent.parent.parent.parent / "fitz-gov" / "data" / "tier1_core"
+)
 
 # Two-stage defaults
 _TWOSTAGE_MODEL_PATH = _DATA_DIR / "model_v5_twostage.joblib"
@@ -63,9 +65,8 @@ TEST_SIZE = 0.2
 # Feature preparation (mirrors train_classifier.prepare_features)
 # ---------------------------------------------------------------------------
 
-def prepare_features(
-    df: pd.DataFrame, encoders: dict[str, LabelEncoder]
-) -> pd.DataFrame:
+
+def prepare_features(df: pd.DataFrame, encoders: dict[str, LabelEncoder]) -> pd.DataFrame:
     """Prepare feature matrix using pre-fitted encoders from the saved artifact."""
     feature_cols = [c for c in df.columns if c not in _META_COLS]
     X = df[feature_cols].copy()
@@ -86,10 +87,7 @@ def prepare_features(
         if col not in X.columns:
             continue
         X[col] = (
-            X[col]
-            .map({"True": 1, "False": 0, True: 1, False: 0, 1: 1, 0: 0})
-            .fillna(0)
-            .astype(int)
+            X[col].map({"True": 1, "False": 0, True: 1, False: 0, 1: 1, 0: 0}).fillna(0).astype(int)
         )
 
     X = X.fillna(0)
@@ -106,7 +104,9 @@ def enrich_with_context_features(df: pd.DataFrame, data_dir: Path) -> pd.DataFra
     """
     ctx_cols = [c for c in df.columns if c.startswith("ctx_")]
     if ctx_cols:
-        print(f"  Context features already present in CSV ({len(ctx_cols)} cols), skipping enrichment")
+        print(
+            f"  Context features already present in CSV ({len(ctx_cols)} cols), skipping enrichment"
+        )
         return df
 
     print(f"Computing context features from {data_dir}...")
@@ -140,6 +140,7 @@ def align_features(X: pd.DataFrame, model_feature_names: list[str]) -> pd.DataFr
 # Display helpers
 # ---------------------------------------------------------------------------
 
+
 def print_confusion_matrix(y_true, y_pred, labels):
     """Print a formatted confusion matrix."""
     cm = confusion_matrix(y_true, y_pred, labels=labels)
@@ -147,9 +148,7 @@ def print_confusion_matrix(y_true, y_pred, labels):
     print(header)
     print("-" * len(header))
     for i, label in enumerate(labels):
-        row = f"actual {label}".rjust(20) + "".join(
-            f"{cm[i, j]:>15}" for j in range(len(labels))
-        )
+        row = f"actual {label}".rjust(20) + "".join(f"{cm[i, j]:>15}" for j in range(len(labels)))
         print(row)
     print()
 
@@ -168,9 +167,13 @@ def per_class_recall(y_true, y_pred, labels) -> dict[str, float]:
 # Two-stage calibration
 # ---------------------------------------------------------------------------
 
+
 def twostage_predict(
-    s1_model, s2_model, X: pd.DataFrame,
-    s1_threshold: float = 0.5, s2_threshold: float = 0.5,
+    s1_model,
+    s2_model,
+    X: pd.DataFrame,
+    s1_threshold: float = 0.5,
+    s2_threshold: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Run two-stage prediction with confidence thresholds.
 
@@ -213,7 +216,10 @@ def twostage_predict(
 
 
 def sweep_twostage_thresholds(
-    s1_model, s2_model, X_test: pd.DataFrame, y_test: np.ndarray,
+    s1_model,
+    s2_model,
+    X_test: pd.DataFrame,
+    y_test: np.ndarray,
 ) -> tuple[float, float, float, dict[str, float]]:
     """Sweep Stage 1 and Stage 2 thresholds to maximize minimum per-class recall."""
 
@@ -278,7 +284,11 @@ def calibrate_twostage(model_path: Path, eval_csv: Path, output_path: Path):
 
     # Reproduce exact train/test split (stratify on 3-class)
     X_train, X_test, y3_train, y3_test = train_test_split(
-        X, y_3class, test_size=TEST_SIZE, random_state=SEED, stratify=y_3class,
+        X,
+        y_3class,
+        test_size=TEST_SIZE,
+        random_state=SEED,
+        stratify=y_3class,
     )
 
     print(f"Train: {len(X_train)} | Test: {len(X_test)}")
@@ -290,7 +300,11 @@ def calibrate_twostage(model_path: Path, eval_csv: Path, output_path: Path):
     print(f"{'='*70}")
 
     baseline_preds, s1_probas, s2_probas = twostage_predict(
-        s1_model, s2_model, X_test, 0.5, 0.5,
+        s1_model,
+        s2_model,
+        X_test,
+        0.5,
+        0.5,
     )
     baseline_acc = accuracy_score(y3_test, baseline_preds)
     baseline_recalls = per_class_recall(y3_test, baseline_preds, _3CLASS_LABELS)
@@ -308,7 +322,7 @@ def calibrate_twostage(model_path: Path, eval_csv: Path, output_path: Path):
     governor_3class = _collapse_to_3class(governor_4class)
     gov_acc = accuracy_score(y3_test, governor_3class)
     gov_recalls = per_class_recall(y3_test, governor_3class, _3CLASS_LABELS)
-    print(f"\n--- Governor baseline (3-class) ---")
+    print("\n--- Governor baseline (3-class) ---")
     print(f"Accuracy: {gov_acc:.4f}")
     print("Per-class recall:")
     for label, recall in gov_recalls.items():
@@ -333,8 +347,10 @@ def calibrate_twostage(model_path: Path, eval_csv: Path, output_path: Path):
         mask = y_s1_true == true_label
         if mask.sum() > 0:
             probs = s1_probas[mask, answerable_idx]
-            print(f"  {true_label:12s}: mean={probs.mean():.3f} "
-                  f"median={np.median(probs):.3f} min={probs.min():.3f} max={probs.max():.3f}")
+            print(
+                f"  {true_label:12s}: mean={probs.mean():.3f} "
+                f"median={np.median(probs):.3f} min={probs.min():.3f} max={probs.max():.3f}"
+            )
 
     # Stage 2 proba stats (for answerable cases only)
     s2_classes = list(s2_model.classes_)
@@ -349,8 +365,10 @@ def calibrate_twostage(model_path: Path, eval_csv: Path, output_path: Path):
             mask = y_answerable_true == true_label
             if mask.sum() > 0:
                 probs = s2_preds_probas[mask, trustworthy_idx]
-                print(f"  {true_label:12s}: mean={probs.mean():.3f} "
-                      f"median={np.median(probs):.3f} min={probs.min():.3f} max={probs.max():.3f}")
+                print(
+                    f"  {true_label:12s}: mean={probs.mean():.3f} "
+                    f"median={np.median(probs):.3f} min={probs.min():.3f} max={probs.max():.3f}"
+                )
 
     # --- Threshold sweep ---
     print(f"\n{'='*70}")
@@ -358,11 +376,18 @@ def calibrate_twostage(model_path: Path, eval_csv: Path, output_path: Path):
     print(f"{'='*70}")
 
     best_s1_t, best_s2_t, best_min_recall, best_recalls = sweep_twostage_thresholds(
-        s1_model, s2_model, X_test, y3_test,
+        s1_model,
+        s2_model,
+        X_test,
+        y3_test,
     )
 
     calibrated_preds, _, _ = twostage_predict(
-        s1_model, s2_model, X_test, best_s1_t, best_s2_t,
+        s1_model,
+        s2_model,
+        X_test,
+        best_s1_t,
+        best_s2_t,
     )
     calibrated_acc = accuracy_score(y3_test, calibrated_preds)
 
@@ -370,7 +395,7 @@ def calibrate_twostage(model_path: Path, eval_csv: Path, output_path: Path):
     print("CALIBRATED RESULTS")
     print(f"{'='*70}")
 
-    print(f"\nOptimal thresholds:")
+    print("\nOptimal thresholds:")
     print(f"  Stage 1 (answerable): {best_s1_t:.2f}")
     print(f"  Stage 2 (trustworthy): {best_s2_t:.2f}")
 
@@ -394,7 +419,7 @@ def calibrate_twostage(model_path: Path, eval_csv: Path, output_path: Path):
     s1_answerable_mask = s1_model.predict_proba(X_test)[:, answerable_idx] >= best_s1_t
     n_to_s2 = s1_answerable_mask.sum()
     n_abstain = (~s1_answerable_mask).sum()
-    print(f"\nRouting analysis:")
+    print("\nRouting analysis:")
     print(f"  Stage 1 -> abstain: {n_abstain}/{len(y3_test)} ({100*n_abstain/len(y3_test):.1f}%)")
     print(f"  Stage 1 -> Stage 2: {n_to_s2}/{len(y3_test)} ({100*n_to_s2/len(y3_test):.1f}%)")
 
@@ -405,7 +430,9 @@ def calibrate_twostage(model_path: Path, eval_csv: Path, output_path: Path):
     print(f"  {'':20s} {'Accuracy':>10s}  {'Min Recall':>10s}")
     print(f"  {'Governor (3-class)':20s} {gov_acc:>10.4f}  {min(gov_recalls.values()):>10.4f}")
     print(f"  {'Raw (0.5/0.5)':20s} {baseline_acc:>10.4f}  {min(baseline_recalls.values()):>10.4f}")
-    print(f"  {'Calibrated':20s} {calibrated_acc:>10.4f}  {min(calibrated_recalls.values()):>10.4f}")
+    print(
+        f"  {'Calibrated':20s} {calibrated_acc:>10.4f}  {min(calibrated_recalls.values()):>10.4f}"
+    )
 
     # --- Save calibrated artifact ---
     calibrated_artifact = artifact.copy()
@@ -424,6 +451,7 @@ def calibrate_twostage(model_path: Path, eval_csv: Path, output_path: Path):
 # ---------------------------------------------------------------------------
 # Legacy 4-class calibration
 # ---------------------------------------------------------------------------
+
 
 def apply_thresholds(
     probas: np.ndarray,
@@ -545,10 +573,15 @@ def calibrate_4class(model_path: Path, eval_csv: Path, output_path: Path):
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(description="Calibrate governance classifier thresholds")
-    parser.add_argument("--mode", choices=["twostage", "4class"], default="twostage",
-                        help="Model type to calibrate (default: twostage)")
+    parser.add_argument(
+        "--mode",
+        choices=["twostage", "4class"],
+        default="twostage",
+        help="Model type to calibrate (default: twostage)",
+    )
     parser.add_argument("--model", type=Path, default=None, help="Model artifact path")
     parser.add_argument("--input", type=Path, default=_EVAL_CSV, help="Eval results CSV")
     parser.add_argument("--output", type=Path, default=None, help="Output calibrated model path")

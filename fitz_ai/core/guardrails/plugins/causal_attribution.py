@@ -92,9 +92,7 @@ _OPINION_EXCLUSIONS = (
     # "Should we use X or Y" → factual comparison, not opinion-seeking
     re.compile(r"^should\s+(we|i)\s+use\s+.+\s+or\s+", re.IGNORECASE),
     # "What/which ... should I ... to/for" → factual best-practice question
-    re.compile(
-        r"^(what|which|how)\s+.+\s+should\s+(i|we)\s+.+\s+(to|for)\b", re.IGNORECASE
-    ),
+    re.compile(r"^(what|which|how)\s+.+\s+should\s+(i|we)\s+.+\s+(to|for)\b", re.IGNORECASE),
 )
 
 # Keywords that indicate speculative queries

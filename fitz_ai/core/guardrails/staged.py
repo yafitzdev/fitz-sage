@@ -165,8 +165,7 @@ class StagedConstraintPipeline:
                     )
                 else:
                     logger.debug(
-                        f"{PIPELINE} Constraint '{constraint.name}' "
-                        f"(stage={stage.name}) passed"
+                        f"{PIPELINE} Constraint '{constraint.name}' " f"(stage={stage.name}) passed"
                     )
 
                 results.append(result)

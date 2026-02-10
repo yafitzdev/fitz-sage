@@ -25,14 +25,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from .base import ConstraintPlugin, ConstraintResult
-from .semantic import SemanticMatcher
 from .plugins.answer_verification import AnswerVerificationConstraint
 from .plugins.causal_attribution import CausalAttributionConstraint
 from .plugins.conflict_aware import ConflictAwareConstraint
 from .plugins.insufficient_evidence import InsufficientEvidenceConstraint
 from .plugins.specific_info_type import SpecificInfoTypeConstraint
 from .runner import run_constraints
-from .staged import ConstraintStage, StagedConstraintPipeline, StageContext, run_staged_constraints
+from .semantic import SemanticMatcher
+from .staged import ConstraintStage, StageContext, StagedConstraintPipeline, run_staged_constraints
 
 if TYPE_CHECKING:
     from fitz_ai.llm.providers.base import ChatProvider

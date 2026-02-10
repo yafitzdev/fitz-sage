@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 from fitz_ai.cli.ui import RICH, console, ui
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.services import FitzService

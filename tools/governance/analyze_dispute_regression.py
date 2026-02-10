@@ -14,11 +14,8 @@ Usage:
 
 from __future__ import annotations
 
-import json
-import re
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
@@ -43,6 +40,7 @@ SEED = 42
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def identify_new_case_ids(v1_path: Path, v2_path: Path) -> set[str]:
     """Identify case IDs present in v2 but not v1 (the 199 new cases)."""
@@ -86,7 +84,7 @@ def evaluate_and_report(name: str, model, X_test, y_test, labels):
     # Disputed → X confusion breakdown
     cm = confusion_matrix(y_test, y_pred, labels=labels)
     d_idx = labels.index("disputed")
-    print(f"  Disputed row in confusion matrix:")
+    print("  Disputed row in confusion matrix:")
     for j, lbl in enumerate(labels):
         if j != d_idx and cm[d_idx, j] > 0:
             print(f"    disputed -> {lbl}: {cm[d_idx, j]}")
@@ -97,6 +95,7 @@ def evaluate_and_report(name: str, model, X_test, y_test, labels):
 # ---------------------------------------------------------------------------
 # Main analysis
 # ---------------------------------------------------------------------------
+
 
 def main():
     # ------------------------------------------------------------------
@@ -159,8 +158,11 @@ def main():
     # GBT with sample weights
     sample_weights_train = compute_sample_weight("balanced", y_train)
     gbt = GradientBoostingClassifier(
-        n_estimators=200, max_depth=4, learning_rate=0.1,
-        min_samples_leaf=5, random_state=SEED,
+        n_estimators=200,
+        max_depth=4,
+        learning_rate=0.1,
+        min_samples_leaf=5,
+        random_state=SEED,
     )
     gbt.fit(X_train, y_train, sample_weight=sample_weights_train)
 
@@ -196,7 +198,7 @@ def main():
             if len(old_wrong) > 0:
                 print(f"    Misclassified as: {old_wrong.value_counts().to_dict()}")
         else:
-            print(f"  OLD disputed cases: 0 in test set")
+            print("  OLD disputed cases: 0 in test set")
 
         if new_disp_mask.sum() > 0:
             c, t, r = disputed_recall(y_test[new_disp_mask], y_pred[new_disp_mask])
@@ -206,7 +208,7 @@ def main():
             if len(new_wrong) > 0:
                 print(f"    Misclassified as: {new_wrong.value_counts().to_dict()}")
         else:
-            print(f"  NEW disputed cases: 0 in test set")
+            print("  NEW disputed cases: 0 in test set")
 
     # ------------------------------------------------------------------
     # 8. Subcategory breakdown for new disputed misclassifications
@@ -263,8 +265,11 @@ def main():
     # Also train GBT on old for comparison
     sw_old = compute_sample_weight("balanced", y_old_train)
     gbt_old = GradientBoostingClassifier(
-        n_estimators=200, max_depth=4, learning_rate=0.1,
-        min_samples_leaf=5, random_state=SEED,
+        n_estimators=200,
+        max_depth=4,
+        learning_rate=0.1,
+        min_samples_leaf=5,
+        random_state=SEED,
     )
     gbt_old.fit(X_old_train, y_old_train, sample_weight=sw_old)
     gbt_old_pred, gbt_old_acc, gbt_old_disp_recall = evaluate_and_report(
@@ -305,20 +310,30 @@ def main():
 
     print("\nBy RF importance:")
     for i, (feat, row) in enumerate(imp_df.head(15).iterrows()):
-        print(f"  {i+1:2d}. {feat:40s} RF={row['RF']:.4f}  GBT={row['GBT']:.4f}  diff={row['diff']:+.4f}")
+        print(
+            f"  {i+1:2d}. {feat:40s} RF={row['RF']:.4f}  GBT={row['GBT']:.4f}  diff={row['diff']:+.4f}"
+        )
 
     print("\nBy GBT importance:")
     imp_df_gbt = imp_df.sort_values("GBT", ascending=False)
     for i, (feat, row) in enumerate(imp_df_gbt.head(15).iterrows()):
-        print(f"  {i+1:2d}. {feat:40s} RF={row['RF']:.4f}  GBT={row['GBT']:.4f}  diff={row['diff']:+.4f}")
+        print(
+            f"  {i+1:2d}. {feat:40s} RF={row['RF']:.4f}  GBT={row['GBT']:.4f}  diff={row['diff']:+.4f}"
+        )
 
     # ------------------------------------------------------------------
     # Summary
     # ------------------------------------------------------------------
     print_section("SUMMARY OF FINDINGS")
 
-    h1_verdict = "YES, model matters" if abs(rf_disp_recall - gbt_disp_recall) > 5 else "Similar performance"
-    h3_verdict = "YES, data mix matters" if abs(rf_old_disp_recall - rf_disp_recall) > 5 else "Similar, data mix not main issue"
+    h1_verdict = (
+        "YES, model matters" if abs(rf_disp_recall - gbt_disp_recall) > 5 else "Similar performance"
+    )
+    h3_verdict = (
+        "YES, data mix matters"
+        if abs(rf_old_disp_recall - rf_disp_recall) > 5
+        else "Similar, data mix not main issue"
+    )
     if rf_old_disp_recall < 78:
         h4_verdict = "CONCERNING: old cases degraded too"
     elif rf_old_disp_recall >= 83:
@@ -326,7 +341,8 @@ def main():
     else:
         h4_verdict = "Moderate regression"
 
-    print(f"""
+    print(
+        f"""
     +--------------------------------------------------------------------+
     | DISPUTED RECALL COMPARISON                                         |
     +--------------------------------------------------------------------+
@@ -355,7 +371,8 @@ def main():
     |      -> {h4_verdict}
     |                                                                    |
     +--------------------------------------------------------------------+
-    """)
+    """
+    )
 
 
 if __name__ == "__main__":

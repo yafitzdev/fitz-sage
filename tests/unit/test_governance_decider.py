@@ -15,10 +15,10 @@ from fitz_ai.core.governance import GovernanceDecision
 from fitz_ai.core.guardrails.base import ConstraintResult
 from fitz_ai.core.guardrails.governance_decider import GovernanceDecider
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 def _make_constraint_result(
     allow: bool = True,
@@ -62,6 +62,7 @@ def _make_mock_artifact():
 # Test: Fallback behavior (no model)
 # ---------------------------------------------------------------------------
 
+
 class TestFallbackBehavior:
     def test_unavailable_without_model(self):
         decider = GovernanceDecider(model_path=Path("nonexistent_model.joblib"))
@@ -92,13 +93,18 @@ class TestFallbackBehavior:
 # Test: ML prediction
 # ---------------------------------------------------------------------------
 
+
 class TestMLPrediction:
     @pytest.fixture
     def decider(self):
         artifact = _make_mock_artifact()
-        with patch("fitz_ai.core.guardrails.governance_decider.GovernanceDecider.__init__", lambda self, **kw: None):
+        with patch(
+            "fitz_ai.core.guardrails.governance_decider.GovernanceDecider.__init__",
+            lambda self, **kw: None,
+        ):
             d = GovernanceDecider.__new__(GovernanceDecider)
         from fitz_ai.core.governance import AnswerGovernor
+
         d._available = True
         d._governor = AnswerGovernor()
         d._s1_model = artifact["stage1_model"]
@@ -111,6 +117,7 @@ class TestMLPrediction:
 
     def test_trustworthy_no_constraints_returns_confident(self, decider):
         import numpy as np
+
         decider._s2_model.predict_proba.return_value = np.array([[0.1, 0.9]])
         results = [_make_constraint_result(allow=True)]
         features = {"num_constraints_fired": 0, "query_word_count": 5, "num_chunks": 3}
@@ -119,8 +126,11 @@ class TestMLPrediction:
 
     def test_trustworthy_with_constraints_returns_qualified(self, decider):
         import numpy as np
+
         decider._s2_model.predict_proba.return_value = np.array([[0.1, 0.9]])
-        results = [_make_constraint_result(allow=False, signal="qualified", reason="hedged", name="ie")]
+        results = [
+            _make_constraint_result(allow=False, signal="qualified", reason="hedged", name="ie")
+        ]
         features = {"num_constraints_fired": 1, "query_word_count": 5, "num_chunks": 3}
         decision = decider.decide(results, features)
         assert decision.mode == AnswerMode.QUALIFIED
@@ -129,6 +139,7 @@ class TestMLPrediction:
 
     def test_disputed_prediction(self, decider):
         import numpy as np
+
         decider._s2_model.predict_proba.return_value = np.array([[0.8, 0.2]])
         results = [_make_constraint_result(allow=False, signal="disputed", name="conflict_aware")]
         features = {"num_constraints_fired": 1, "query_word_count": 5, "num_chunks": 3}
@@ -137,8 +148,11 @@ class TestMLPrediction:
 
     def test_abstain_prediction(self, decider):
         import numpy as np
+
         decider._s1_model.predict_proba.return_value = np.array([[0.8, 0.2]])
-        results = [_make_constraint_result(allow=False, signal="abstain", name="insufficient_evidence")]
+        results = [
+            _make_constraint_result(allow=False, signal="abstain", name="insufficient_evidence")
+        ]
         features = {"num_constraints_fired": 1, "query_word_count": 5, "num_chunks": 3}
         decision = decider.decide(results, features)
         assert decision.mode == AnswerMode.ABSTAIN
@@ -148,13 +162,18 @@ class TestMLPrediction:
 # Test: Feature preparation
 # ---------------------------------------------------------------------------
 
+
 class TestFeaturePreparation:
     @pytest.fixture
     def decider(self):
         artifact = _make_mock_artifact()
-        with patch("fitz_ai.core.guardrails.governance_decider.GovernanceDecider.__init__", lambda self, **kw: None):
+        with patch(
+            "fitz_ai.core.guardrails.governance_decider.GovernanceDecider.__init__",
+            lambda self, **kw: None,
+        ):
             d = GovernanceDecider.__new__(GovernanceDecider)
         from fitz_ai.core.governance import AnswerGovernor
+
         d._available = True
         d._governor = AnswerGovernor()
         d._s1_model = artifact["stage1_model"]
@@ -195,6 +214,7 @@ class TestFeaturePreparation:
 # Test: AnswerMode mapping
 # ---------------------------------------------------------------------------
 
+
 class TestAnswerModeMapping:
     def test_abstain_maps_directly(self):
         assert GovernanceDecider._map_to_answer_mode("abstain", []) == AnswerMode.ABSTAIN
@@ -214,13 +234,18 @@ class TestAnswerModeMapping:
 # Test: Error handling
 # ---------------------------------------------------------------------------
 
+
 class TestErrorHandling:
     @pytest.fixture
     def decider(self):
         artifact = _make_mock_artifact()
-        with patch("fitz_ai.core.guardrails.governance_decider.GovernanceDecider.__init__", lambda self, **kw: None):
+        with patch(
+            "fitz_ai.core.guardrails.governance_decider.GovernanceDecider.__init__",
+            lambda self, **kw: None,
+        ):
             d = GovernanceDecider.__new__(GovernanceDecider)
         from fitz_ai.core.governance import AnswerGovernor
+
         d._available = True
         d._governor = AnswerGovernor()
         d._s1_model = artifact["stage1_model"]

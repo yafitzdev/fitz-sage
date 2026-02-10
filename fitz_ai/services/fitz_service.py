@@ -345,12 +345,10 @@ class FitzService:
             logger.error(f"Ingestion failed: {e}")
             raise IngestError(f"Ingestion failed: {e}") from e
 
-    def _build_ingest_components(
-        self, source: Path, artifacts: str | None = None
-    ) -> tuple:
+    def _build_ingest_components(self, source: Path, artifacts: str | None = None) -> tuple:
         """Build all components required for diff ingestion."""
-        from fitz_ai.cli.context import CLIContext
         from fitz_ai.cli.commands.ingest_config import build_chunking_router_config
+        from fitz_ai.cli.context import CLIContext
         from fitz_ai.ingestion.chunking.router import ChunkingRouter
         from fitz_ai.ingestion.parser import ParserRouter
         from fitz_ai.ingestion.state import IngestStateManager

@@ -13,9 +13,9 @@ Aspects represent different facets of an entity:
 - TIMELINE: When something happened, temporal sequence
 """
 
+import re
 from dataclasses import dataclass
 from enum import Enum
-import re
 
 
 class QueryAspect(Enum):

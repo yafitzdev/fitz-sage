@@ -13,10 +13,10 @@ pytestmark = pytest.mark.tier1
 from fitz_ai.vector_db.base import SearchResult
 from fitz_ai.vector_db.custom import CustomVectorDB, _extract_path, _substitute_vars
 
-
 # ---------------------------------------------------------------------------
 # Pure functions
 # ---------------------------------------------------------------------------
+
 
 class TestSubstituteVars:
     def test_simple_substitution(self):
@@ -69,6 +69,7 @@ class TestExtractPath:
 # CustomVectorDB
 # ---------------------------------------------------------------------------
 
+
 def _make_custom_db(**overrides) -> CustomVectorDB:
     """Create CustomVectorDB with mocked HTTP client."""
     kwargs = {
@@ -103,7 +104,9 @@ class TestCustomVectorDBInit:
 
     def test_requires_search(self):
         with pytest.raises(ValueError, match="search"):
-            CustomVectorDB(base_url="http://localhost", upsert={"method": "POST", "endpoint": "/up"})
+            CustomVectorDB(
+                base_url="http://localhost", upsert={"method": "POST", "endpoint": "/up"}
+            )
 
     def test_auth_from_env(self, monkeypatch):
         monkeypatch.setenv("MY_API_KEY", "secret")

@@ -151,9 +151,7 @@ class TestQueryOptions:
         mock_service.query.return_value = mock_answer
 
         with patch("fitz_ai.cli.commands.query.FitzService", return_value=mock_service):
-            runner.invoke(
-                app, ["query", "question", "-c", "custom", "--engine", "fitz_rag"]
-            )
+            runner.invoke(app, ["query", "question", "-c", "custom", "--engine", "fitz_rag"])
 
         # Service should be called with the custom collection
         mock_service.query.assert_called_once()

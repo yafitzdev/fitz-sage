@@ -160,9 +160,7 @@ class AnswerVerificationConstraint:
             return ConstraintResult.allow()
 
         if not self.chat:
-            logger.debug(
-                f"{PIPELINE} AnswerVerificationConstraint: no chat provider, skipping"
-            )
+            logger.debug(f"{PIPELINE} AnswerVerificationConstraint: no chat provider, skipping")
             return ConstraintResult.allow()
 
         # Combine top chunks for verification

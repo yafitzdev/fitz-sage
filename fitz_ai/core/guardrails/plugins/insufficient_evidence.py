@@ -466,7 +466,9 @@ def _extract_specific_entities(query: str) -> tuple[set[str], set[str], set[str]
         # Skip years and numbered qualifiers (already handled by critical)
         if re.match(r"^(19|20)\d{2}$", entity):
             continue
-        if re.match(r"^(type|tier|phase|version|level|class|grade|stage|gen|generation)\s+", entity):
+        if re.match(
+            r"^(type|tier|phase|version|level|class|grade|stage|gen|generation)\s+", entity
+        ):
             continue
         # Skip generic words that aren't proper nouns
         if entity in generic_words:
@@ -504,33 +506,143 @@ Rules:
 
 # Words that should never be accepted as primary entities even if LLM selects them.
 # Mirrors generic_words in _extract_specific_entities plus additional LLM-specific rejections.
-_LLM_PRIMARY_REJECT = frozenset({
-    # Actions / verbs
-    "compare", "explain", "describe", "list", "show", "tell", "find", "get",
-    "make", "use", "help", "work", "affect", "impact", "cause", "caused", "effect",
-    "change", "improve", "reduce", "increase", "fix", "upgrade", "proceed",
-    # Query-aspect words
-    "benefit", "risk", "cost", "price", "pricing", "rate", "rates", "value",
-    "difference", "deadline", "budget", "revenue", "salary", "warranty", "coverage",
-    "eligibility", "requirements", "prerequisites", "ingredients", "calorie", "calories",
-    "mechanism", "dosage", "interest", "capacity", "specifications", "specs",
-    "efficiency", "certification", "population", "headquarters", "address",
-    # Adjectives / modifiers
-    "best", "worst", "main", "key", "important", "current", "latest", "new", "old",
-    "first", "last", "next", "previous", "average", "total", "number", "amount",
-    "percent", "percentage", "exact", "minimum", "maximum", "target", "recommended",
-    "hourly", "annual", "monthly", "weekly", "daily",
-    # Format words
-    "bulleted", "numbered", "formatted", "detailed", "summary",
-    # Abstract nouns
-    "example", "type", "kind", "way", "method", "process", "system", "part", "role",
-    "result", "reason", "factor", "feature", "advantage", "disadvantage",
-    "problem", "solution", "symptom", "treatment", "side", "long", "short",
-    "term", "high", "low", "load",
-    # LLM-specific additional rejections
-    "company", "product", "service", "customer", "user", "team", "project",
-    "data", "information", "question", "answer",
-})
+_LLM_PRIMARY_REJECT = frozenset(
+    {
+        # Actions / verbs
+        "compare",
+        "explain",
+        "describe",
+        "list",
+        "show",
+        "tell",
+        "find",
+        "get",
+        "make",
+        "use",
+        "help",
+        "work",
+        "affect",
+        "impact",
+        "cause",
+        "caused",
+        "effect",
+        "change",
+        "improve",
+        "reduce",
+        "increase",
+        "fix",
+        "upgrade",
+        "proceed",
+        # Query-aspect words
+        "benefit",
+        "risk",
+        "cost",
+        "price",
+        "pricing",
+        "rate",
+        "rates",
+        "value",
+        "difference",
+        "deadline",
+        "budget",
+        "revenue",
+        "salary",
+        "warranty",
+        "coverage",
+        "eligibility",
+        "requirements",
+        "prerequisites",
+        "ingredients",
+        "calorie",
+        "calories",
+        "mechanism",
+        "dosage",
+        "interest",
+        "capacity",
+        "specifications",
+        "specs",
+        "efficiency",
+        "certification",
+        "population",
+        "headquarters",
+        "address",
+        # Adjectives / modifiers
+        "best",
+        "worst",
+        "main",
+        "key",
+        "important",
+        "current",
+        "latest",
+        "new",
+        "old",
+        "first",
+        "last",
+        "next",
+        "previous",
+        "average",
+        "total",
+        "number",
+        "amount",
+        "percent",
+        "percentage",
+        "exact",
+        "minimum",
+        "maximum",
+        "target",
+        "recommended",
+        "hourly",
+        "annual",
+        "monthly",
+        "weekly",
+        "daily",
+        # Format words
+        "bulleted",
+        "numbered",
+        "formatted",
+        "detailed",
+        "summary",
+        # Abstract nouns
+        "example",
+        "type",
+        "kind",
+        "way",
+        "method",
+        "process",
+        "system",
+        "part",
+        "role",
+        "result",
+        "reason",
+        "factor",
+        "feature",
+        "advantage",
+        "disadvantage",
+        "problem",
+        "solution",
+        "symptom",
+        "treatment",
+        "side",
+        "long",
+        "short",
+        "term",
+        "high",
+        "low",
+        "load",
+        # LLM-specific additional rejections
+        "company",
+        "product",
+        "service",
+        "customer",
+        "user",
+        "team",
+        "project",
+        "data",
+        "information",
+        "question",
+        "answer",
+    }
+)
 
 
 def _llm_rank_primary_entity(
@@ -568,7 +680,8 @@ def _llm_rank_primary_entity(
         return all(w in _LLM_PRIMARY_REJECT or w in STOPWORDS for w in words_in_phrase)
 
     candidates = {
-        c for c in candidates
+        c
+        for c in candidates
         if c not in _LLM_PRIMARY_REJECT
         and not _is_generic_phrase(c)
         and not re.match(r"^(19|20)\d{2}$", c)
@@ -798,9 +911,7 @@ class InsufficientEvidenceConstraint:
                 primary_entities = llm_primary
                 # Also ensure these are in specific_entities
                 specific_entities |= llm_primary
-                logger.debug(
-                    f"{PIPELINE} LLM-assisted primary entity: {llm_primary}"
-                )
+                logger.debug(f"{PIPELINE} LLM-assisted primary entity: {llm_primary}")
 
         max_sim = 0.0
         entity_match_found = False
@@ -882,9 +993,8 @@ class InsufficientEvidenceConstraint:
         # 1. Entity match found AND similarity in ambiguous range (0.5-0.78), OR
         # 2. Moderate similarity (0.5-0.78) with no entities to verify (possible related content)
         # Skip aspect check for high similarity (>0.78) - embeddings are reliable there
-        should_check_aspect = (
-            (entity_match_found and 0.5 <= max_sim < 0.78)
-            or (not specific_entities and 0.5 <= max_sim < 0.78)
+        should_check_aspect = (entity_match_found and 0.5 <= max_sim < 0.78) or (
+            not specific_entities and 0.5 <= max_sim < 0.78
         )
 
         logger.debug(
@@ -923,7 +1033,12 @@ class InsufficientEvidenceConstraint:
 
             # Only abstain if we found conflicting aspects but NO matching aspects
             if has_conflicting_aspect and not has_matching_aspect:
-                return False, max_sim, f"aspect_mismatch:query asks {query_aspect.value}, chunks have {list(set(conflicting_aspects))}", diag
+                return (
+                    False,
+                    max_sim,
+                    f"aspect_mismatch:query asks {query_aspect.value}, chunks have {list(set(conflicting_aspects))}",
+                    diag,
+                )
 
         # 7. If we have entity match OR no specific entities OR very high similarity, allow
         return True, max_sim, "relevant", diag

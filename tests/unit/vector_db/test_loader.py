@@ -3,10 +3,8 @@
 
 from __future__ import annotations
 
-import os
 import uuid
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import httpx
 import pytest
@@ -20,7 +18,6 @@ from fitz_ai.vector_db.loader import (
     VectorDBSpec,
     _string_to_uuid,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -113,6 +110,7 @@ def uuid_spec(uuid_spec_path):
 # _string_to_uuid
 # ---------------------------------------------------------------------------
 
+
 class TestStringToUuid:
     def test_deterministic(self):
         assert _string_to_uuid("hello") == _string_to_uuid("hello")
@@ -129,6 +127,7 @@ class TestStringToUuid:
 # VectorDBSpec
 # ---------------------------------------------------------------------------
 
+
 class TestVectorDBSpec:
     def test_name_and_type(self, spec):
         assert spec.name == "test_db"
@@ -138,14 +137,22 @@ class TestVectorDBSpec:
         assert not spec.is_local()
 
     def test_is_local_true(self, tmp_path):
-        local_spec = {**_MINIMAL_SPEC, "connection": {"type": "local"}, "operations": {"python_class": "a.b.C"}}
+        local_spec = {
+            **_MINIMAL_SPEC,
+            "connection": {"type": "local"},
+            "operations": {"python_class": "a.b.C"},
+        }
         p = tmp_path / "local.yaml"
         p.write_text(yaml.dump(local_spec))
         s = VectorDBSpec(p)
         assert s.is_local()
 
     def test_get_local_class_path(self, tmp_path):
-        local_spec = {**_MINIMAL_SPEC, "connection": {"type": "local"}, "operations": {"python_class": "my.module.MyClass"}}
+        local_spec = {
+            **_MINIMAL_SPEC,
+            "connection": {"type": "local"},
+            "operations": {"python_class": "my.module.MyClass"},
+        }
         p = tmp_path / "local.yaml"
         p.write_text(yaml.dump(local_spec))
         s = VectorDBSpec(p)
@@ -271,6 +278,7 @@ class TestVectorDBSpec:
 # ---------------------------------------------------------------------------
 # GenericVectorDBPlugin
 # ---------------------------------------------------------------------------
+
 
 class TestGenericVectorDBPlugin:
     @pytest.fixture

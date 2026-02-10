@@ -39,37 +39,65 @@ from fitz_ai.core.guardrails.plugins.specific_info_type import SpecificInfoTypeC
 from fitz_ai.llm import get_chat_factory
 
 # Default path to fitz-gov tier1 data (sibling repo)
-_DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "fitz-gov" / "data" / "tier1_core"
+_DEFAULT_DATA_DIR = (
+    Path(__file__).resolve().parent.parent.parent.parent / "fitz-gov" / "data" / "tier1_core"
+)
 _OUTPUT_PATH = Path(__file__).resolve().parent / "data" / "features.csv"
 
 # Typed defaults for None feature values
 _BOOL_FEATURES = {
-    "ie_fired", "ie_entity_match_found", "ie_primary_match_found",
-    "ie_critical_match_found", "ie_has_matching_aspect", "ie_has_conflicting_aspect",
-    "ca_fired", "ca_numerical_variance_detected", "ca_is_uncertainty_query",
-    "caa_fired", "caa_has_causal_evidence", "caa_has_predictive_evidence",
-    "sit_fired", "sit_entity_mismatch", "sit_has_specific_info",
+    "ie_fired",
+    "ie_entity_match_found",
+    "ie_primary_match_found",
+    "ie_critical_match_found",
+    "ie_has_matching_aspect",
+    "ie_has_conflicting_aspect",
+    "ca_fired",
+    "ca_numerical_variance_detected",
+    "ca_is_uncertainty_query",
+    "caa_fired",
+    "caa_has_causal_evidence",
+    "caa_has_predictive_evidence",
+    "sit_fired",
+    "sit_entity_mismatch",
+    "sit_has_specific_info",
     "av_fired",
-    "has_abstain_signal", "has_disputed_signal", "has_qualified_signal",
-    "detection_temporal", "detection_aggregation", "detection_comparison",
-    "detection_boost_recency", "detection_boost_authority", "detection_needs_rewriting",
+    "has_abstain_signal",
+    "has_disputed_signal",
+    "has_qualified_signal",
+    "detection_temporal",
+    "detection_aggregation",
+    "detection_comparison",
+    "detection_boost_recency",
+    "detection_boost_authority",
+    "detection_needs_rewriting",
 }
 
 _NUMERIC_FEATURES = {
-    "ie_max_similarity", "ie_summary_overlap",
-    "ca_skipped_hedged_pairs", "ca_pairs_checked",
+    "ie_max_similarity",
+    "ie_summary_overlap",
+    "ca_skipped_hedged_pairs",
+    "ca_pairs_checked",
     "ca_relevance_filtered_count",
     "av_jury_votes_no",
     "num_constraints_fired",
-    "query_word_count", "num_chunks", "num_unique_sources",
-    "mean_vector_score", "std_vector_score", "score_spread",
+    "query_word_count",
+    "num_chunks",
+    "num_unique_sources",
+    "mean_vector_score",
+    "std_vector_score",
+    "score_spread",
     "vocab_overlap_ratio",
 }
 
 _STRING_FEATURES = {
-    "ie_signal", "ie_query_aspect", "ca_signal",
-    "ca_first_evidence_char", "ca_evidence_characters",
-    "caa_query_type", "sit_info_type_requested",
+    "ie_signal",
+    "ie_query_aspect",
+    "ca_signal",
+    "ca_first_evidence_char",
+    "ca_evidence_characters",
+    "caa_query_type",
+    "sit_info_type_requested",
     "dominant_content_type",
 }
 
@@ -196,12 +224,23 @@ def process_case(case: dict[str, Any], chat) -> dict[str, Any] | None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Extract governance classifier features from fitz-gov cases")
-    parser.add_argument("--data-dir", type=Path, default=_DEFAULT_DATA_DIR, help="Path to tier1_core JSON files")
+    parser = argparse.ArgumentParser(
+        description="Extract governance classifier features from fitz-gov cases"
+    )
+    parser.add_argument(
+        "--data-dir", type=Path, default=_DEFAULT_DATA_DIR, help="Path to tier1_core JSON files"
+    )
     parser.add_argument("--output", type=Path, default=_OUTPUT_PATH, help="Output CSV path")
     parser.add_argument("--limit", type=int, default=0, help="Process only first N cases (0 = all)")
-    parser.add_argument("--chat", type=str, default=None, help="Override chat provider (e.g. 'cohere', 'anthropic')")
-    parser.add_argument("--workers", type=int, default=3, help="Concurrent workers (default: 3, each makes ~7 LLM calls)")
+    parser.add_argument(
+        "--chat", type=str, default=None, help="Override chat provider (e.g. 'cohere', 'anthropic')"
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=3,
+        help="Concurrent workers (default: 3, each makes ~7 LLM calls)",
+    )
     args = parser.parse_args()
 
     # Load config and create chat client
@@ -271,7 +310,9 @@ def main():
 
     print(f"\nExpected mode distribution: {dict(expected_dist)}")
     print(f"Governor prediction distribution: {dict(governor_dist)}")
-    print(f"Governor baseline accuracy: {governor_correct}/{len(all_rows)} ({100*governor_correct/len(all_rows):.1f}%)")
+    print(
+        f"Governor baseline accuracy: {governor_correct}/{len(all_rows)} ({100*governor_correct/len(all_rows):.1f}%)"
+    )
 
 
 if __name__ == "__main__":

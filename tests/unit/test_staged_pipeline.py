@@ -1,13 +1,12 @@
 # tests/unit/test_staged_pipeline.py
 """Tests for staged constraint pipeline."""
 
-import pytest
 
 from fitz_ai.core.guardrails.base import ConstraintResult
 from fitz_ai.core.guardrails.staged import (
     ConstraintStage,
-    StagedConstraintPipeline,
     StageContext,
+    StagedConstraintPipeline,
     _build_staged_pipeline,
     run_staged_constraints,
 )
@@ -235,9 +234,7 @@ class TestStagedConstraintPipeline:
         safe = MockConstraint("safe_constraint", allow=True)
 
         pipeline = StagedConstraintPipeline(
-            stages=[
-                ConstraintStage(name="sufficiency", constraints=[crasher, safe])
-            ]
+            stages=[ConstraintStage(name="sufficiency", constraints=[crasher, safe])]
         )
 
         results = pipeline.run("test", [])

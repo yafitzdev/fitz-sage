@@ -55,42 +55,87 @@ _DEFAULT_FITZGOV_DIR = (
 )
 
 # Metadata columns (not features)
-_META_COLS = {"case_id", "expected_mode", "governor_predicted", "classifier_predicted", "difficulty", "subcategory"}
+_META_COLS = {
+    "case_id",
+    "expected_mode",
+    "governor_predicted",
+    "classifier_predicted",
+    "difficulty",
+    "subcategory",
+}
 
 # Categorical features that need label encoding
 _CATEGORICAL_FEATURES = {
-    "ie_signal", "ca_signal",
-    "ca_first_evidence_char", "ca_evidence_characters",
-    "caa_query_type", "sit_info_type_requested",
+    "ie_signal",
+    "ca_signal",
+    "ca_first_evidence_char",
+    "ca_evidence_characters",
+    "caa_query_type",
+    "sit_info_type_requested",
 }
 
 # Boolean features to convert to int
 _BOOL_FEATURES = {
     "ie_fired",
-    "ca_fired", "ca_numerical_variance_detected",
-    "caa_fired", "caa_has_causal_evidence", "caa_has_predictive_evidence",
-    "sit_fired", "sit_entity_mismatch", "sit_has_specific_info",
+    "ca_fired",
+    "ca_numerical_variance_detected",
+    "caa_fired",
+    "caa_has_causal_evidence",
+    "caa_has_predictive_evidence",
+    "sit_fired",
+    "sit_entity_mismatch",
+    "sit_has_specific_info",
     "has_qualified_signal",
-    "detection_temporal", "detection_comparison",
+    "detection_temporal",
+    "detection_comparison",
     "has_distinct_years",
 }
 
 # Markers for context feature extraction
 _CONTRADICTION_MARKERS = [
-    "however", "but", "although", "contrary", "disagree", "whereas",
-    "nevertheless", "conversely", "despite", "in contrast", "on the other hand",
-    "contradicts", "inconsistent", "conflicts with", "differs from",
+    "however",
+    "but",
+    "although",
+    "contrary",
+    "disagree",
+    "whereas",
+    "nevertheless",
+    "conversely",
+    "despite",
+    "in contrast",
+    "on the other hand",
+    "contradicts",
+    "inconsistent",
+    "conflicts with",
+    "differs from",
 ]
 _NEGATION_WORDS = {
-    "not", "no", "never", "neither", "nor", "none", "nothing",
-    "hardly", "barely", "scarcely", "doesn't", "don't", "isn't",
-    "wasn't", "weren't", "won't", "can't", "couldn't", "shouldn't",
+    "not",
+    "no",
+    "never",
+    "neither",
+    "nor",
+    "none",
+    "nothing",
+    "hardly",
+    "barely",
+    "scarcely",
+    "doesn't",
+    "don't",
+    "isn't",
+    "wasn't",
+    "weren't",
+    "won't",
+    "can't",
+    "couldn't",
+    "shouldn't",
 }
 
 
 # ---------------------------------------------------------------------------
 # Context feature computation (text-based, no LLM)
 # ---------------------------------------------------------------------------
+
 
 def load_cases_by_id(data_dir: Path) -> dict[str, dict]:
     """Load fitz-gov cases indexed by case_id."""
@@ -155,8 +200,29 @@ def compute_context_features(query: str, contexts: list[str]) -> dict[str, float
         features["ctx_min_pairwise_sim"] = 0.0
 
     # Query-context word overlap (excluding stopwords)
-    stopwords = {"the", "a", "an", "is", "are", "was", "were", "what", "how", "does",
-                 "do", "did", "in", "of", "to", "for", "and", "or", "this", "that", "with"}
+    stopwords = {
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "what",
+        "how",
+        "does",
+        "do",
+        "did",
+        "in",
+        "of",
+        "to",
+        "for",
+        "and",
+        "or",
+        "this",
+        "that",
+        "with",
+    }
     query_words = set(query.lower().split()) - stopwords
     if query_words and contexts:
         ctx_words = set(all_text_lower.split())
@@ -176,7 +242,9 @@ def enrich_with_context_features(df: pd.DataFrame, data_dir: Path) -> pd.DataFra
     # Check if ctx_* features are already in the CSV (from feature_extractor.py)
     ctx_cols = [c for c in df.columns if c.startswith("ctx_")]
     if ctx_cols:
-        print(f"  Context features already present in CSV ({len(ctx_cols)} cols), skipping enrichment")
+        print(
+            f"  Context features already present in CSV ({len(ctx_cols)} cols), skipping enrichment"
+        )
         return df
 
     print(f"Computing context features from {data_dir}...")
@@ -198,6 +266,7 @@ def enrich_with_context_features(df: pd.DataFrame, data_dir: Path) -> pd.DataFra
 # Feature preparation
 # ---------------------------------------------------------------------------
 
+
 def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEncoder]]:
     """Prepare feature matrix: encode categoricals, convert bools to int."""
     feature_cols = [c for c in df.columns if c not in _META_COLS]
@@ -215,7 +284,9 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
     for col in _BOOL_FEATURES:
         if col not in X.columns:
             continue
-        X[col] = X[col].map({"True": 1, "False": 0, True: 1, False: 0, 1: 1, 0: 0}).fillna(0).astype(int)
+        X[col] = (
+            X[col].map({"True": 1, "False": 0, True: 1, False: 0, 1: 1, 0: 0}).fillna(0).astype(int)
+        )
 
     X = X.fillna(0)
     for col in X.columns:
@@ -228,6 +299,7 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
 # Model training
 # ---------------------------------------------------------------------------
 
+
 def quick_model_comparison(
     X_train: pd.DataFrame, y_train: pd.Series, cv: StratifiedKFold, seed: int
 ) -> dict[str, dict]:
@@ -236,20 +308,33 @@ def quick_model_comparison(
 
     models = {
         "GBT": GradientBoostingClassifier(
-            n_estimators=200, max_depth=4, learning_rate=0.1,
-            min_samples_leaf=5, random_state=seed,
+            n_estimators=200,
+            max_depth=4,
+            learning_rate=0.1,
+            min_samples_leaf=5,
+            random_state=seed,
         ),
         "RF": RandomForestClassifier(
-            n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1,
+            n_estimators=300,
+            class_weight="balanced",
+            random_state=seed,
+            n_jobs=-1,
         ),
         "ET": ExtraTreesClassifier(
-            n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1,
+            n_estimators=300,
+            class_weight="balanced",
+            random_state=seed,
+            n_jobs=-1,
         ),
         "SVM": SVC(
-            class_weight="balanced", probability=True, random_state=seed,
+            class_weight="balanced",
+            probability=True,
+            random_state=seed,
         ),
         "LR": LogisticRegression(
-            class_weight="balanced", max_iter=1000, random_state=seed,
+            class_weight="balanced",
+            max_iter=1000,
+            random_state=seed,
         ),
     }
 
@@ -262,12 +347,20 @@ def quick_model_comparison(
             scores = []
             for train_idx, val_idx in cv.split(X_train, y_train):
                 m = GradientBoostingClassifier(
-                    n_estimators=200, max_depth=4, learning_rate=0.1,
-                    min_samples_leaf=5, random_state=seed,
+                    n_estimators=200,
+                    max_depth=4,
+                    learning_rate=0.1,
+                    min_samples_leaf=5,
+                    random_state=seed,
                 )
-                m.fit(X_train.iloc[train_idx], y_train.iloc[train_idx],
-                      sample_weight=sample_weights[train_idx])
-                scores.append(accuracy_score(y_train.iloc[val_idx], m.predict(X_train.iloc[val_idx])))
+                m.fit(
+                    X_train.iloc[train_idx],
+                    y_train.iloc[train_idx],
+                    sample_weight=sample_weights[train_idx],
+                )
+                scores.append(
+                    accuracy_score(y_train.iloc[val_idx], m.predict(X_train.iloc[val_idx]))
+                )
             cv_scores = np.array(scores)
         else:
             cv_scores = cross_val_score(model, X_train, y_train, cv=cv, scoring="accuracy")
@@ -363,7 +456,9 @@ def hyperparameter_search(
             "params": search.best_params_,
         }
         total_fits = cv.get_n_splits() * n_iter
-        print(f"  {name:6s}: {search.best_score_:.3f} (searched {total_fits} fits in {elapsed:.1f}s)")
+        print(
+            f"  {name:6s}: {search.best_score_:.3f} (searched {total_fits} fits in {elapsed:.1f}s)"
+        )
         # Print key params
         for k, v in search.best_params_.items():
             if isinstance(v, float):
@@ -386,7 +481,9 @@ def build_ensemble(
     stack = StackingClassifier(
         estimators=estimators,
         final_estimator=LogisticRegression(
-            class_weight="balanced", max_iter=1000, random_state=seed,
+            class_weight="balanced",
+            max_iter=1000,
+            random_state=seed,
         ),
         cv=5,
         n_jobs=-1,
@@ -404,6 +501,7 @@ def build_ensemble(
 # ---------------------------------------------------------------------------
 # Evaluation
 # ---------------------------------------------------------------------------
+
 
 def print_confusion_matrix(y_true, y_pred, labels):
     """Print a formatted confusion matrix."""
@@ -478,7 +576,11 @@ def train_twostage(
 
     # Stratified split (stratify on 3-class to preserve disputed proportion)
     X_train, X_test, y3_train, y3_test = train_test_split(
-        X, y_3class, test_size=test_size, random_state=seed, stratify=y_3class,
+        X,
+        y_3class,
+        test_size=test_size,
+        random_state=seed,
+        stratify=y_3class,
     )
     y_s1_train = np.array(
         ["abstain" if l == "abstain" else "answerable" for l in y3_train],
@@ -496,19 +598,32 @@ def train_twostage(
     print(f"\n{'='*60}")
     print("STAGE 1: answerable vs abstain")
     print(f"{'='*60}")
-    print(f"Train: {sum(y_s1_train == 'answerable')} answerable, {sum(y_s1_train == 'abstain')} abstain")
-    print(f"Test:  {sum(y_s1_test == 'answerable')} answerable, {sum(y_s1_test == 'abstain')} abstain")
+    print(
+        f"Train: {sum(y_s1_train == 'answerable')} answerable, {sum(y_s1_train == 'abstain')} abstain"
+    )
+    print(
+        f"Test:  {sum(y_s1_test == 'answerable')} answerable, {sum(y_s1_test == 'abstain')} abstain"
+    )
 
     s1_models = {
         "RF": RandomForestClassifier(
-            n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1,
+            n_estimators=300,
+            class_weight="balanced",
+            random_state=seed,
+            n_jobs=-1,
         ),
         "ET": ExtraTreesClassifier(
-            n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1,
+            n_estimators=300,
+            class_weight="balanced",
+            random_state=seed,
+            n_jobs=-1,
         ),
         "GBT": GradientBoostingClassifier(
-            n_estimators=200, max_depth=4, learning_rate=0.1,
-            min_samples_leaf=5, random_state=seed,
+            n_estimators=200,
+            max_depth=4,
+            learning_rate=0.1,
+            min_samples_leaf=5,
+            random_state=seed,
         ),
     }
 
@@ -522,9 +637,16 @@ def train_twostage(
         cm = confusion_matrix(y_s1_test, pred, labels=["abstain", "answerable"])
         abs_recall = cm[0, 0] / cm[0].sum() if cm[0].sum() > 0 else 0
         ans_recall = cm[1, 1] / cm[1].sum() if cm[1].sum() > 0 else 0
-        s1_results[name] = {"model": model, "acc": acc, "cv": cv_scores.mean(), "cv_std": cv_scores.std()}
-        print(f"  {name:6s}: test={acc:.4f}, CV={cv_scores.mean():.4f} (+/-{cv_scores.std():.4f})"
-              f"  abstain={abs_recall:.3f} answerable={ans_recall:.3f}")
+        s1_results[name] = {
+            "model": model,
+            "acc": acc,
+            "cv": cv_scores.mean(),
+            "cv_std": cv_scores.std(),
+        }
+        print(
+            f"  {name:6s}: test={acc:.4f}, CV={cv_scores.mean():.4f} (+/-{cv_scores.std():.4f})"
+            f"  abstain={abs_recall:.3f} answerable={ans_recall:.3f}"
+        )
 
     # Hyperparameter search on top Stage 1 model
     s1_ranked = sorted(s1_results.items(), key=lambda x: x[1]["acc"], reverse=True)
@@ -582,7 +704,7 @@ def train_twostage(
     if hasattr(s1_model, "feature_importances_"):
         imp = s1_model.feature_importances_
         order = np.argsort(imp)[::-1]
-        print(f"\n  Stage 1 top 10 features:")
+        print("\n  Stage 1 top 10 features:")
         for rank, idx in enumerate(order[:10], 1):
             print(f"    {rank:2d}. {feature_names[idx]:40s} {imp[idx]:.4f}")
 
@@ -594,26 +716,40 @@ def train_twostage(
     answerable_train = y_s1_train == "answerable"
     X_train_s2 = X_train[answerable_train]
     y_train_s2 = y3_train[answerable_train]
-    print(f"Train: {sum(y_train_s2 == 'trustworthy')} trustworthy, {sum(y_train_s2 == 'disputed')} disputed")
+    print(
+        f"Train: {sum(y_train_s2 == 'trustworthy')} trustworthy, {sum(y_train_s2 == 'disputed')} disputed"
+    )
 
     # Full answerable data for CV
-    answerable_all = np.array(
-        ["abstain" if l == "abstain" else "answerable" for l in y_3class],
-        dtype=object,
-    ) == "answerable"
+    answerable_all = (
+        np.array(
+            ["abstain" if l == "abstain" else "answerable" for l in y_3class],
+            dtype=object,
+        )
+        == "answerable"
+    )
     X_answerable = X[answerable_all]
     y_answerable = y_3class[answerable_all]
 
     s2_models = {
         "ET": ExtraTreesClassifier(
-            n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1,
+            n_estimators=300,
+            class_weight="balanced",
+            random_state=seed,
+            n_jobs=-1,
         ),
         "RF": RandomForestClassifier(
-            n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1,
+            n_estimators=300,
+            class_weight="balanced",
+            random_state=seed,
+            n_jobs=-1,
         ),
         "GBT": GradientBoostingClassifier(
-            n_estimators=200, max_depth=4, learning_rate=0.1,
-            min_samples_leaf=5, random_state=seed,
+            n_estimators=200,
+            max_depth=4,
+            learning_rate=0.1,
+            min_samples_leaf=5,
+            random_state=seed,
         ),
     }
 
@@ -647,7 +783,7 @@ def train_twostage(
     if hasattr(s2_model, "feature_importances_"):
         imp = s2_model.feature_importances_
         order = np.argsort(imp)[::-1]
-        print(f"\n  Stage 2 top 10 features:")
+        print("\n  Stage 2 top 10 features:")
         for rank, idx in enumerate(order[:10], 1):
             print(f"    {rank:2d}. {feature_names[idx]:40s} {imp[idx]:.4f}")
 
@@ -673,11 +809,13 @@ def train_twostage(
     print(header)
     print("-" * len(header))
     for i, label in enumerate(_3CLASS_LABELS):
-        row = f"actual {label}".rjust(20) + "".join(f"{cm_combined[i, j]:>15}" for j in range(len(_3CLASS_LABELS)))
+        row = f"actual {label}".rjust(20) + "".join(
+            f"{cm_combined[i, j]:>15}" for j in range(len(_3CLASS_LABELS))
+        )
         print(row)
 
     # Per-class recall
-    print(f"\nPer-class recall:")
+    print("\nPer-class recall:")
     recalls = {}
     for i, label in enumerate(_3CLASS_LABELS):
         total = cm_combined[i].sum()
@@ -722,20 +860,34 @@ def train_twostage(
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(description="Train governance classifier")
     parser.add_argument("--input", type=Path, default=_DEFAULT_INPUT, help="Input features CSV")
     parser.add_argument("--output", type=Path, default=None, help="Output model path")
-    parser.add_argument("--data-dir", type=Path, default=_DEFAULT_FITZGOV_DIR,
-                        help="fitz-gov tier1_core dir for context features")
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=_DEFAULT_FITZGOV_DIR,
+        help="fitz-gov tier1_core dir for context features",
+    )
     parser.add_argument("--test-size", type=float, default=0.2, help="Test set fraction")
-    parser.add_argument("--time-budget", type=int, default=120,
-                        help="Hyperparameter search time budget in seconds (default: 120)")
+    parser.add_argument(
+        "--time-budget",
+        type=int,
+        default=120,
+        help="Hyperparameter search time budget in seconds (default: 120)",
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--no-context-features", action="store_true",
-                        help="Skip context feature enrichment")
-    parser.add_argument("--mode", choices=["4class", "twostage"], default="4class",
-                        help="Training mode: 4class (legacy) or twostage (recommended)")
+    parser.add_argument(
+        "--no-context-features", action="store_true", help="Skip context feature enrichment"
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["4class", "twostage"],
+        default="4class",
+        help="Training mode: 4class (legacy) or twostage (recommended)",
+    )
     args = parser.parse_args()
 
     if args.output is None:
@@ -758,10 +910,19 @@ def main():
         X, encoders = prepare_features(df)
         feature_names = list(X.columns)
         y_4class = df["expected_mode"].values
-        governor_preds = df["governor_predicted"].values if "governor_predicted" in df.columns else None
+        governor_preds = (
+            df["governor_predicted"].values if "governor_predicted" in df.columns else None
+        )
         train_twostage(
-            X, y_4class, feature_names, encoders,
-            args.test_size, args.time_budget, args.seed, args.output, governor_preds,
+            X,
+            y_4class,
+            feature_names,
+            encoders,
+            args.test_size,
+            args.time_budget,
+            args.seed,
+            args.output,
+            governor_preds,
         )
         return
 

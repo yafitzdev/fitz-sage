@@ -510,8 +510,7 @@ class ConflictAwareConstraint:
             try:
                 query_embedding = self.embedder(query)
                 relevant_chunks = [
-                    c for c in chunks_to_check
-                    if self._is_chunk_relevant(query_embedding, c)
+                    c for c in chunks_to_check if self._is_chunk_relevant(query_embedding, c)
                 ]
                 filtered = len(chunks_to_check) - len(relevant_chunks)
                 ca_diag["ca_relevance_filtered_count"] = filtered
@@ -582,8 +581,12 @@ class ConflictAwareConstraint:
 
             # Track numerical variance (checked again inside pairwise methods, but
             # tracked here for classifier feature extraction)
-            text1 = first_chunk.content[:800] if len(first_chunk.content) > 800 else first_chunk.content
-            text2 = other_chunk.content[:800] if len(other_chunk.content) > 800 else other_chunk.content
+            text1 = (
+                first_chunk.content[:800] if len(first_chunk.content) > 800 else first_chunk.content
+            )
+            text2 = (
+                other_chunk.content[:800] if len(other_chunk.content) > 800 else other_chunk.content
+            )
             is_var, _ = self._numerical_detector.check_chunk_pair_variance(text1, text2)
             if is_var:
                 ca_diag["ca_numerical_variance_detected"] = True
@@ -611,7 +614,9 @@ class ConflictAwareConstraint:
                 )
 
         # Expose evidence characters even on allow path for classifier features
-        ca_diag["ca_evidence_characters"] = evidence_chars_seen[0] if evidence_chars_seen else "none"
+        ca_diag["ca_evidence_characters"] = (
+            evidence_chars_seen[0] if evidence_chars_seen else "none"
+        )
 
         logger.debug(f"{PIPELINE} ConflictAwareConstraint: no contradiction detected")
         return ConstraintResult.allow(**ca_diag)

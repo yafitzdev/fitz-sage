@@ -65,9 +65,7 @@ def _extract_constraint_features(
 ) -> None:
     """Extract features from constraint result metadata."""
     # Aggregate constraint signals
-    num_denials = sum(
-        1 for r in constraint_results.values() if not r.allow_decisive_answer
-    )
+    num_denials = sum(1 for r in constraint_results.values() if not r.allow_decisive_answer)
     features["num_constraints_fired"] = num_denials
 
     signals = [r.signal for r in constraint_results.values() if r.signal]
@@ -130,9 +128,7 @@ def _extract_query_features(features: dict[str, Any], query: str) -> None:
     features["query_word_count"] = len(query.split())
 
 
-def _extract_chunk_features(
-    features: dict[str, Any], query: str, chunks: Sequence[Chunk]
-) -> None:
+def _extract_chunk_features(features: dict[str, Any], query: str, chunks: Sequence[Chunk]) -> None:
     """Extract cheap features from chunks and their relationship to query."""
     features["num_chunks"] = len(chunks)
 
@@ -142,11 +138,23 @@ def _extract_chunk_features(
         features["score_spread"] = None
         features["vocab_overlap_ratio"] = 0.0
         # Inter-chunk defaults (including ctx_* features)
-        for k in ("max_pairwise_overlap", "min_pairwise_overlap", "chunk_length_cv",
-                   "assertion_density", "number_density", "ctx_length_mean",
-                   "ctx_length_std", "ctx_total_chars", "ctx_contradiction_count",
-                   "ctx_negation_count", "ctx_number_count", "ctx_number_variance",
-                   "ctx_max_pairwise_sim", "ctx_mean_pairwise_sim", "ctx_min_pairwise_sim"):
+        for k in (
+            "max_pairwise_overlap",
+            "min_pairwise_overlap",
+            "chunk_length_cv",
+            "assertion_density",
+            "number_density",
+            "ctx_length_mean",
+            "ctx_length_std",
+            "ctx_total_chars",
+            "ctx_contradiction_count",
+            "ctx_negation_count",
+            "ctx_number_count",
+            "ctx_number_variance",
+            "ctx_max_pairwise_sim",
+            "ctx_mean_pairwise_sim",
+            "ctx_min_pairwise_sim",
+        ):
             features[k] = 0.0
         features["year_count"] = 0
         features["has_distinct_years"] = False
@@ -155,7 +163,9 @@ def _extract_chunk_features(
     # Source diversity
     doc_ids = set()
     for c in chunks:
-        doc_id = getattr(c, "doc_id", None) or c.metadata.get("doc_id") or c.metadata.get("source_file")
+        doc_id = (
+            getattr(c, "doc_id", None) or c.metadata.get("doc_id") or c.metadata.get("source_file")
+        )
         if doc_id:
             doc_ids.add(doc_id)
     features["num_unique_sources"] = len(doc_ids) if doc_ids else len(chunks)
@@ -192,29 +202,108 @@ def _extract_chunk_features(
     _extract_interchunk_features(features, chunks)
 
 
-
 _STOP_WORDS = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been",
-    "being", "have", "has", "had", "do", "does", "did", "will",
-    "would", "could", "should", "may", "might", "can", "shall",
-    "in", "on", "at", "to", "for", "of", "with", "by", "from",
-    "and", "or", "but", "not", "no", "if", "then", "than",
-    "that", "this", "these", "those", "what", "which", "who",
-    "how", "when", "where", "why", "it", "its",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "can",
+    "shall",
+    "in",
+    "on",
+    "at",
+    "to",
+    "for",
+    "of",
+    "with",
+    "by",
+    "from",
+    "and",
+    "or",
+    "but",
+    "not",
+    "no",
+    "if",
+    "then",
+    "than",
+    "that",
+    "this",
+    "these",
+    "those",
+    "what",
+    "which",
+    "who",
+    "how",
+    "when",
+    "where",
+    "why",
+    "it",
+    "its",
 }
 
 _HEDGE_WORDS = {
-    "may", "might", "could", "possibly", "perhaps", "likely", "unlikely",
-    "sometimes", "often", "typically", "generally", "usually", "probably",
-    "approximately", "roughly", "about", "around", "estimated", "suggests",
-    "appears", "seems", "potentially", "tends",
+    "may",
+    "might",
+    "could",
+    "possibly",
+    "perhaps",
+    "likely",
+    "unlikely",
+    "sometimes",
+    "often",
+    "typically",
+    "generally",
+    "usually",
+    "probably",
+    "approximately",
+    "roughly",
+    "about",
+    "around",
+    "estimated",
+    "suggests",
+    "appears",
+    "seems",
+    "potentially",
+    "tends",
 }
 
 _ASSERTION_WORDS = {
-    "always", "never", "must", "certainly", "definitely", "clearly",
-    "obviously", "undoubtedly", "absolutely", "exactly", "precisely",
-    "proven", "confirmed", "established", "demonstrates", "proves",
-    "invariably", "unquestionably",
+    "always",
+    "never",
+    "must",
+    "certainly",
+    "definitely",
+    "clearly",
+    "obviously",
+    "undoubtedly",
+    "absolutely",
+    "exactly",
+    "precisely",
+    "proven",
+    "confirmed",
+    "established",
+    "demonstrates",
+    "proves",
+    "invariably",
+    "unquestionably",
 }
 
 _NUMBER_RE = re.compile(r"\b\d+(?:\.\d+)?(?:%|st|nd|rd|th)?\b")
@@ -222,20 +311,46 @@ _PLAIN_NUMBER_RE = re.compile(r"\b\d+\.?\d*\b")
 _YEAR_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")
 
 _CONTRADICTION_MARKERS = [
-    "however", "but", "although", "contrary", "disagree", "whereas",
-    "nevertheless", "conversely", "despite", "in contrast", "on the other hand",
-    "contradicts", "inconsistent", "conflicts with", "differs from",
+    "however",
+    "but",
+    "although",
+    "contrary",
+    "disagree",
+    "whereas",
+    "nevertheless",
+    "conversely",
+    "despite",
+    "in contrast",
+    "on the other hand",
+    "contradicts",
+    "inconsistent",
+    "conflicts with",
+    "differs from",
 ]
 _NEGATION_WORDS = {
-    "not", "no", "never", "neither", "nor", "none", "nothing",
-    "hardly", "barely", "scarcely", "doesn't", "don't", "isn't",
-    "wasn't", "weren't", "won't", "can't", "couldn't", "shouldn't",
+    "not",
+    "no",
+    "never",
+    "neither",
+    "nor",
+    "none",
+    "nothing",
+    "hardly",
+    "barely",
+    "scarcely",
+    "doesn't",
+    "don't",
+    "isn't",
+    "wasn't",
+    "weren't",
+    "won't",
+    "can't",
+    "couldn't",
+    "shouldn't",
 }
 
 
-def _extract_interchunk_features(
-    features: dict[str, Any], chunks: Sequence[Chunk]
-) -> None:
+def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Chunk]) -> None:
     """Extract inter-chunk text relationship features (deterministic, no LLM).
 
     Includes features previously only available at training time via
@@ -243,14 +358,23 @@ def _extract_interchunk_features(
     available at both training and inference time.
     """
     _defaults = {
-        "max_pairwise_overlap": 0.0, "min_pairwise_overlap": 0.0,
-        "chunk_length_cv": 0.0, "assertion_density": 0.0, "number_density": 0.0,
-        "ctx_length_mean": 0.0, "ctx_length_std": 0.0, "ctx_total_chars": 0.0,
-        "ctx_contradiction_count": 0.0, "ctx_negation_count": 0.0,
-        "ctx_number_count": 0.0, "ctx_number_variance": 0.0,
-        "ctx_max_pairwise_sim": 0.0, "ctx_mean_pairwise_sim": 0.0,
+        "max_pairwise_overlap": 0.0,
+        "min_pairwise_overlap": 0.0,
+        "chunk_length_cv": 0.0,
+        "assertion_density": 0.0,
+        "number_density": 0.0,
+        "ctx_length_mean": 0.0,
+        "ctx_length_std": 0.0,
+        "ctx_total_chars": 0.0,
+        "ctx_contradiction_count": 0.0,
+        "ctx_negation_count": 0.0,
+        "ctx_number_count": 0.0,
+        "ctx_number_variance": 0.0,
+        "ctx_max_pairwise_sim": 0.0,
+        "ctx_mean_pairwise_sim": 0.0,
         "ctx_min_pairwise_sim": 0.0,
-        "year_count": 0, "has_distinct_years": False,
+        "year_count": 0,
+        "has_distinct_years": False,
     }
     if len(chunks) < 2:
         features.update(_defaults)
@@ -330,9 +454,7 @@ def _extract_interchunk_features(
         sum(1 for m in _CONTRADICTION_MARKERS if m in all_text_lower)
     )
     all_words = all_text_lower.split()
-    features["ctx_negation_count"] = float(
-        sum(1 for w in all_words if w in _NEGATION_WORDS)
-    )
+    features["ctx_negation_count"] = float(sum(1 for w in all_words if w in _NEGATION_WORDS))
 
     # --- Numerical content ---
     features["ctx_number_count"] = float(len(all_numbers))
@@ -353,9 +475,7 @@ def _extract_interchunk_features(
         matrix = tfidf.fit_transform(texts)
         sim_matrix = _cos_sim(matrix)
         n = sim_matrix.shape[0]
-        pairwise_sims = [
-            float(sim_matrix[i, j]) for i in range(n) for j in range(i + 1, n)
-        ]
+        pairwise_sims = [float(sim_matrix[i, j]) for i in range(n) for j in range(i + 1, n)]
         features["ctx_max_pairwise_sim"] = max(pairwise_sims)
         features["ctx_mean_pairwise_sim"] = sum(pairwise_sims) / len(pairwise_sims)
         features["ctx_min_pairwise_sim"] = min(pairwise_sims)
@@ -369,9 +489,7 @@ def _extract_interchunk_features(
     features["has_distinct_years"] = len(all_years) > 1
 
 
-def _extract_detection_features(
-    features: dict[str, Any], detection_summary: Any | None
-) -> None:
+def _extract_detection_features(features: dict[str, Any], detection_summary: Any | None) -> None:
     """Extract features from DetectionSummary (Tier 3)."""
     if detection_summary is None:
         features["detection_temporal"] = None

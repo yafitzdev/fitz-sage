@@ -45,54 +45,86 @@ from fitz_ai.llm import get_chat_factory, get_embedder
 from fitz_ai.retrieval.detection.registry import DetectionOrchestrator
 
 # Paths
-_DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "fitz-gov" / "data" / "tier1_core"
+_DEFAULT_DATA_DIR = (
+    Path(__file__).resolve().parent.parent.parent.parent / "fitz-gov" / "data" / "tier1_core"
+)
 _DEFAULT_MODEL = Path(__file__).resolve().parent / "data" / "model_v1.joblib"
 _DEFAULT_OUTPUT = Path(__file__).resolve().parent / "data" / "eval_results.csv"
 
 # Feature type sets (copied from extract_features.py / train_classifier.py for preprocessing)
 _BOOL_FEATURES = {
     "ie_fired",
-    "ca_fired", "ca_numerical_variance_detected",
-    "caa_fired", "caa_has_causal_evidence", "caa_has_predictive_evidence",
-    "sit_fired", "sit_entity_mismatch", "sit_has_specific_info",
+    "ca_fired",
+    "ca_numerical_variance_detected",
+    "caa_fired",
+    "caa_has_causal_evidence",
+    "caa_has_predictive_evidence",
+    "sit_fired",
+    "sit_entity_mismatch",
+    "sit_has_specific_info",
     "has_qualified_signal",
-    "detection_temporal", "detection_comparison",
+    "detection_temporal",
+    "detection_comparison",
     "has_distinct_years",
 }
 
 _NUMERIC_FEATURES = {
-    "ca_skipped_hedged_pairs", "ca_pairs_checked",
+    "ca_skipped_hedged_pairs",
+    "ca_pairs_checked",
     "av_jury_votes_no",
     "num_constraints_fired",
-    "query_word_count", "num_chunks", "num_unique_sources",
-    "mean_vector_score", "score_spread",
+    "query_word_count",
+    "num_chunks",
+    "num_unique_sources",
+    "mean_vector_score",
+    "score_spread",
     "vocab_overlap_ratio",
-    "max_pairwise_overlap", "min_pairwise_overlap",
-    "chunk_length_cv", "assertion_density", "number_density",
-    "ctx_length_mean", "ctx_length_std", "ctx_total_chars",
-    "ctx_contradiction_count", "ctx_negation_count",
-    "ctx_number_count", "ctx_number_variance",
-    "ctx_max_pairwise_sim", "ctx_mean_pairwise_sim", "ctx_min_pairwise_sim",
+    "max_pairwise_overlap",
+    "min_pairwise_overlap",
+    "chunk_length_cv",
+    "assertion_density",
+    "number_density",
+    "ctx_length_mean",
+    "ctx_length_std",
+    "ctx_total_chars",
+    "ctx_contradiction_count",
+    "ctx_negation_count",
+    "ctx_number_count",
+    "ctx_number_variance",
+    "ctx_max_pairwise_sim",
+    "ctx_mean_pairwise_sim",
+    "ctx_min_pairwise_sim",
     "year_count",
 }
 
 _STRING_FEATURES = {
-    "ie_signal", "ca_signal",
-    "ca_first_evidence_char", "ca_evidence_characters",
-    "caa_query_type", "sit_info_type_requested",
+    "ie_signal",
+    "ca_signal",
+    "ca_first_evidence_char",
+    "ca_evidence_characters",
+    "caa_query_type",
+    "sit_info_type_requested",
 }
 
-_META_COLS = {"case_id", "expected_mode", "governor_predicted", "classifier_predicted",
-              "difficulty", "subcategory"}
+_META_COLS = {
+    "case_id",
+    "expected_mode",
+    "governor_predicted",
+    "classifier_predicted",
+    "difficulty",
+    "subcategory",
+}
 
 
 # ---------------------------------------------------------------------------
 # Data loading (reused from extract_features.py)
 # ---------------------------------------------------------------------------
 
+
 def load_cases(data_dir: Path) -> list[dict[str, Any]]:
     """Load all cases from tier1_core JSON files."""
     import json
+
     cases = []
     json_files = sorted(data_dir.glob("*.json"))
     if not json_files:
@@ -126,6 +158,7 @@ def case_to_chunks(case: dict[str, Any]) -> list[Chunk]:
 # Embedding enrichment
 # ---------------------------------------------------------------------------
 
+
 def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
     """Compute cosine similarity between two vectors."""
     dot = sum(a * b for a, b in zip(vec1, vec2))
@@ -158,6 +191,7 @@ def enrich_chunks_with_embeddings(
 # Constraint running
 # ---------------------------------------------------------------------------
 
+
 def make_constraints(chat) -> list:
     """Create a fresh set of constraints."""
     return [
@@ -170,7 +204,9 @@ def make_constraints(chat) -> list:
 
 
 def run_constraints_individually(
-    query: str, chunks: Sequence[Chunk], constraints: list,
+    query: str,
+    chunks: Sequence[Chunk],
+    constraints: list,
 ) -> dict[str, ConstraintResult]:
     """Run each constraint independently (no staged short-circuit)."""
     results: dict[str, ConstraintResult] = {}
@@ -207,6 +243,7 @@ def fill_defaults(features: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Classifier inference
 # ---------------------------------------------------------------------------
+
 
 class GovernanceClassifier:
     """Wrapper for trained classifier model inference."""
@@ -311,6 +348,7 @@ def process_case(
 # Evaluation metrics
 # ---------------------------------------------------------------------------
 
+
 def print_evaluation(rows: list[dict[str, Any]]) -> None:
     """Print comprehensive evaluation comparing governor vs classifier vs expected."""
     n = len(rows)
@@ -332,7 +370,9 @@ def print_evaluation(rows: list[dict[str, Any]]) -> None:
     print(f"Governor accuracy:    {gov_correct}/{n} ({100 * gov_correct / n:.1f}%)")
     print(f"Classifier accuracy:  {cls_correct}/{n} ({100 * cls_correct / n:.1f}%)")
     print(f"Agreement rate:       {agreement}/{n} ({100 * agreement / n:.1f}%)")
-    print(f"Delta:                {cls_correct - gov_correct:+d} ({100 * (cls_correct - gov_correct) / n:+.1f}pp)")
+    print(
+        f"Delta:                {cls_correct - gov_correct:+d} ({100 * (cls_correct - gov_correct) / n:+.1f}pp)"
+    )
 
     # Per-class breakdown
     print("\n--- Per-class accuracy ---")
@@ -346,25 +386,32 @@ def print_evaluation(rows: list[dict[str, Any]]) -> None:
         gov_ok = sum(1 for e, g, c in mode_rows if e == g)
         cls_ok = sum(1 for e, g, c in mode_rows if e == c)
         delta = cls_ok - gov_ok
-        print(f"{mode:12s} {cnt:6d} {gov_ok:4d} ({100 * gov_ok / cnt:5.1f}%) "
-              f"{cls_ok:4d} ({100 * cls_ok / cnt:5.1f}%) {delta:+4d}")
+        print(
+            f"{mode:12s} {cnt:6d} {gov_ok:4d} ({100 * gov_ok / cnt:5.1f}%) "
+            f"{cls_ok:4d} ({100 * cls_ok / cnt:5.1f}%) {delta:+4d}"
+        )
 
     # Confusion matrices
     for name, preds in [("Governor", governor), ("Classifier", classifier)]:
         print(f"\n--- {name} confusion matrix ---")
-        print(f"{'predicted ->':>20s} {'abstain':>10s} {'confident':>10s} {'disputed':>10s} {'qualified':>10s}")
+        print(
+            f"{'predicted ->':>20s} {'abstain':>10s} {'confident':>10s} {'disputed':>10s} {'qualified':>10s}"
+        )
         print("-" * 62)
         for actual_mode in modes:
-            counts = Counter(
-                p for e, p in zip(expected, preds) if e == actual_mode
-            )
+            counts = Counter(p for e, p in zip(expected, preds) if e == actual_mode)
             row_vals = [counts.get(m, 0) for m in modes]
             label = f"actual {actual_mode}"
-            print(f"{label:>20s} {row_vals[0]:10d} {row_vals[1]:10d} {row_vals[2]:10d} {row_vals[3]:10d}")
+            print(
+                f"{label:>20s} {row_vals[0]:10d} {row_vals[1]:10d} {row_vals[2]:10d} {row_vals[3]:10d}"
+            )
 
     # Disagreement analysis
-    disagree = [(r["case_id"], r["expected_mode"], r["governor_predicted"], r["classifier_predicted"])
-                for r in rows if r["governor_predicted"] != r["classifier_predicted"]]
+    disagree = [
+        (r["case_id"], r["expected_mode"], r["governor_predicted"], r["classifier_predicted"])
+        for r in rows
+        if r["governor_predicted"] != r["classifier_predicted"]
+    ]
     print(f"\n--- Disagreements: {len(disagree)}/{n} ({100 * len(disagree) / n:.1f}%) ---")
 
     # Who's right when they disagree?
@@ -378,9 +425,11 @@ def print_evaluation(rows: list[dict[str, Any]]) -> None:
     det_temporal = sum(1 for r in rows if r.get("detection_temporal"))
     det_aggregation = sum(1 for r in rows if r.get("detection_aggregation"))
     det_comparison = sum(1 for r in rows if r.get("detection_comparison"))
-    print(f"\n--- Feature distribution (Tier 2/3 check) ---")
-    print(f"  mean_vector_score: mean={np.mean(vec_scores):.3f}, std={np.std(vec_scores):.3f}, "
-          f"non-zero={sum(1 for v in vec_scores if v > 0)}/{n}")
+    print("\n--- Feature distribution (Tier 2/3 check) ---")
+    print(
+        f"  mean_vector_score: mean={np.mean(vec_scores):.3f}, std={np.std(vec_scores):.3f}, "
+        f"non-zero={sum(1 for v in vec_scores if v > 0)}/{n}"
+    )
     print(f"  detection_temporal: {det_temporal}/{n}")
     print(f"  detection_aggregation: {det_aggregation}/{n}")
     print(f"  detection_comparison: {det_comparison}/{n}")
@@ -389,6 +438,7 @@ def print_evaluation(rows: list[dict[str, Any]]) -> None:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main():
     parser = argparse.ArgumentParser(description="Full pipeline eval for governance classifier")
@@ -429,7 +479,7 @@ def main():
     print(f"Loading cases from {args.data_dir}...")
     cases = load_cases(args.data_dir)
     if args.limit > 0:
-        cases = cases[:args.limit]
+        cases = cases[: args.limit]
     print(f"Loaded {len(cases)} cases")
 
     # Process cases
@@ -449,9 +499,12 @@ def main():
                 print(f"\n  ERROR on case {case['id']}: {e}", file=sys.stderr)
     else:
         from concurrent.futures import ThreadPoolExecutor, as_completed
+
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
             futures = {
-                executor.submit(process_case, case, chat, embedder, detection_orchestrator, classifier): case["id"]
+                executor.submit(
+                    process_case, case, chat, embedder, detection_orchestrator, classifier
+                ): case["id"]
                 for case in cases
             }
             for future in tqdm(as_completed(futures), total=len(futures), desc="Evaluating"):

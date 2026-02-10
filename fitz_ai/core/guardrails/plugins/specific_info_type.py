@@ -64,7 +64,9 @@ class SpecificInfoTypeConstraint:
         info_type = self._identify_info_type(query)
 
         # Check if chunks contain the requested info type
-        has_specific_info = self._check_for_info_type(chunks, info_type, query) if info_type else None
+        has_specific_info = (
+            self._check_for_info_type(chunks, info_type, query) if info_type else None
+        )
 
         # Build diagnostics for classifier feature extraction
         sit_diag = {
@@ -74,7 +76,7 @@ class SpecificInfoTypeConstraint:
         }
 
         if entity_mismatch:
-            logger.info(f"SpecificInfoTypeConstraint: Entity mismatch detected -> QUALIFIED")
+            logger.info("SpecificInfoTypeConstraint: Entity mismatch detected -> QUALIFIED")
             return ConstraintResult.deny(
                 reason="Context discusses a different entity or version",
                 signal="qualified",
@@ -112,10 +114,10 @@ class SpecificInfoTypeConstraint:
 
         # Look for version mismatches (X1 vs X2, 2024 vs 2023, etc.)
         version_patterns = [
-            (r'x\d+', r'x\d+'),  # X1, X2, etc.
-            (r'v\d+', r'v\d+'),  # v1, v2, etc.
-            (r'20\d{2}', r'20\d{2}'),  # Years
-            (r'q[1-4]', r'q[1-4]'),  # Quarters
+            (r"x\d+", r"x\d+"),  # X1, X2, etc.
+            (r"v\d+", r"v\d+"),  # v1, v2, etc.
+            (r"20\d{2}", r"20\d{2}"),  # Years
+            (r"q[1-4]", r"q[1-4]"),  # Quarters
         ]
 
         for query_pattern, context_pattern in version_patterns:
@@ -130,12 +132,12 @@ class SpecificInfoTypeConstraint:
 
         # Look for specific product/service mismatches
         specific_mismatches = [
-            ('online', 'in-store'),
-            ('in-store', 'online'),
-            ('elderly', 'children'),
-            ('children', 'elderly'),
-            ('before', 'after'),
-            ('after', 'before'),
+            ("online", "in-store"),
+            ("in-store", "online"),
+            ("elderly", "children"),
+            ("children", "elderly"),
+            ("before", "after"),
+            ("after", "before"),
         ]
 
         for query_term, context_term in specific_mismatches:
@@ -160,26 +162,26 @@ class SpecificInfoTypeConstraint:
         # PRICING: Only when explicitly asking about price/cost with clear intent
         # "how much does X cost" or "what is the price of X"
         if re.search(
-            r'\b(price|pricing|cost|fee|charge|tariff)\b.*\b(of|for|to)\b',
+            r"\b(price|pricing|cost|fee|charge|tariff)\b.*\b(of|for|to)\b",
             query_lower,
-        ) or re.search(r'\bhow much\b.*\b(cost|charge|pay)\b', query_lower):
+        ) or re.search(r"\bhow much\b.*\b(cost|charge|pay)\b", query_lower):
             return "pricing"
 
         # QUANTITY: Only "how many X" pattern - very specific
-        if re.search(r'\bhow many\b', query_lower):
+        if re.search(r"\bhow many\b", query_lower):
             return "quantity"
 
         # TEMPORAL: Only when asking for a specific date/deadline/schedule
         # NOT "when" in general - only "when is/was/will the deadline/date/etc."
         if re.search(
-            r'\b(when is|when was|when will|when does|when did)\b.*'
-            r'\b(deadline|due date|release|launch|expire|expiration|completion|delivery)\b',
+            r"\b(when is|when was|when will|when does|when did)\b.*"
+            r"\b(deadline|due date|release|launch|expire|expiration|completion|delivery)\b",
             query_lower,
         ):
             return "temporal"
         # "what is the deadline/date for X"
         if re.search(
-            r'\bwhat\b.*\b(deadline|due date|release date|launch date|expiration date)\b',
+            r"\bwhat\b.*\b(deadline|due date|release date|launch date|expiration date)\b",
             query_lower,
         ):
             return "temporal"
@@ -187,36 +189,36 @@ class SpecificInfoTypeConstraint:
         # SPECIFICATION: Only when asking for specific numeric specs/limits/requirements
         # "what is the maximum/minimum X" or "what are the requirements for X"
         if re.search(
-            r'\bwhat\b.*\b(maximum|minimum|max|min|limit|capacity)\b.*\b(of|for)\b',
+            r"\bwhat\b.*\b(maximum|minimum|max|min|limit|capacity)\b.*\b(of|for)\b",
             query_lower,
         ):
             return "specification"
         if re.search(
-            r'\b(maximum|minimum|max|min)\b.*\b(load|weight|capacity|size|speed)\b',
+            r"\b(maximum|minimum|max|min)\b.*\b(load|weight|capacity|size|speed)\b",
             query_lower,
         ):
             return "specification"
 
         # MEASUREMENT: Only when explicitly asking for a dose/dimension/size with clear intent
         if re.search(
-            r'\bwhat\b.*\b(dosage|dose|dimension|size|weight|height|length|width)\b.*\b(of|for)\b',
+            r"\bwhat\b.*\b(dosage|dose|dimension|size|weight|height|length|width)\b.*\b(of|for)\b",
             query_lower,
         ):
             return "measurement"
         if re.search(
-            r'\b(recommended|maximum|correct|proper)\b.*\b(dosage|dose)\b',
+            r"\b(recommended|maximum|correct|proper)\b.*\b(dosage|dose)\b",
             query_lower,
         ):
             return "measurement"
 
         # WARRANTY: Only when explicitly asking about warranty/coverage terms
         if re.search(
-            r'\b(what|does|is)\b.*\b(warranty|guarantee|coverage)\b.*\b(cover|include|last|length|duration|period)\b',
+            r"\b(what|does|is)\b.*\b(warranty|guarantee|coverage)\b.*\b(cover|include|last|length|duration|period)\b",
             query_lower,
         ):
             return "warranty"
         if re.search(
-            r'\b(warranty|guarantee)\b.*\b(for|on|of)\b',
+            r"\b(warranty|guarantee)\b.*\b(for|on|of)\b",
             query_lower,
         ):
             return "warranty"
@@ -224,19 +226,19 @@ class SpecificInfoTypeConstraint:
         # RATE: Only when explicitly asking for a rate, percentage, salary, or average
         # "what is the X rate" or "what is the rate of/for X"
         if re.search(
-            r'\bwhat\b.*\b(rate|percentage|percent|ratio)\b',
+            r"\bwhat\b.*\b(rate|percentage|percent|ratio)\b",
             query_lower,
         ):
             return "rate"
         if re.search(
-            r'\b(average|median|mean)\b.*\b(salary|wage|income|pay|compensation)\b',
+            r"\b(average|median|mean)\b.*\b(salary|wage|income|pay|compensation)\b",
             query_lower,
         ):
             return "rate"
 
         # DECISION: Only very explicit decision-seeking patterns
         if re.search(
-            r'\b(should we|should i|is it worth|worth the risk|should we proceed)\b',
+            r"\b(should we|should i|is it worth|worth the risk|should we proceed)\b",
             query_lower,
         ):
             return "decision"
@@ -258,16 +260,16 @@ class SpecificInfoTypeConstraint:
 
         if info_type == "pricing":
             # Look for currency symbols, price patterns, or cost mentions with numbers
-            if re.search(r'[$\u20ac\u00a3\u00a5\u20b9][\d,]+', combined_text):
+            if re.search(r"[$\u20ac\u00a3\u00a5\u20b9][\d,]+", combined_text):
                 return True
-            if re.search(r'\d+\s*(dollar|euro|pound|cent|rupee)', combined_text):
+            if re.search(r"\d+\s*(dollar|euro|pound|cent|rupee)", combined_text):
                 return True
-            if re.search(r'(price|cost|fee|charge|rate).*?\d+', combined_text):
+            if re.search(r"(price|cost|fee|charge|rate).*?\d+", combined_text):
                 return True
-            if re.search(r'\d+.*(price|cost|fee|charge|rate)', combined_text):
+            if re.search(r"\d+.*(price|cost|fee|charge|rate)", combined_text):
                 return True
             # Also check for words like "free", "no charge", "included"
-            if re.search(r'\b(free|no charge|no cost|included|complimentary)\b', combined_text):
+            if re.search(r"\b(free|no charge|no cost|included|complimentary)\b", combined_text):
                 return True
 
         elif info_type == "quantity":
@@ -277,28 +279,30 @@ class SpecificInfoTypeConstraint:
             for entity in query_entities:
                 entity_escaped = re.escape(entity.lower())
                 # Number near entity in either direction (within 100 chars)
-                if re.search(rf'\d+.{{0,100}}{entity_escaped}', combined_text):
+                if re.search(rf"\d+.{{0,100}}{entity_escaped}", combined_text):
                     return True
-                if re.search(rf'{entity_escaped}.{{0,100}}\d+', combined_text):
+                if re.search(rf"{entity_escaped}.{{0,100}}\d+", combined_text):
                     return True
             # Fallback: if context contains numbers with quantity words, likely answers it
-            if re.search(r'\d+\s*(employees|users|customers|members|people|items|units)', combined_text):
+            if re.search(
+                r"\d+\s*(employees|users|customers|members|people|items|units)", combined_text
+            ):
                 return True
             # If the context has percentages or counts, likely relevant
-            if re.search(r'\d+%|\d+\s*(thousand|million|billion|hundred)', combined_text):
+            if re.search(r"\d+%|\d+\s*(thousand|million|billion|hundred)", combined_text):
                 return True
 
         elif info_type == "temporal":
             # Look for dates, times, deadlines - be generous
             date_patterns = [
-                r'\d{4}',  # Year
-                r'\d{1,2}/\d{1,2}',  # MM/DD
-                r'(january|february|march|april|may|june|july|august|september|october|november|december)',
-                r'(q1|q2|q3|q4)',  # Quarters
-                r'\d{1,2}:\d{2}',  # Time
-                r'(deadline|due|expire|schedule|target).*?\d',
-                r'(tomorrow|yesterday|today|next week|last month|next month|this year|last year)',
-                r'\d+\s*(day|week|month|year)s?',  # Duration
+                r"\d{4}",  # Year
+                r"\d{1,2}/\d{1,2}",  # MM/DD
+                r"(january|february|march|april|may|june|july|august|september|october|november|december)",
+                r"(q1|q2|q3|q4)",  # Quarters
+                r"\d{1,2}:\d{2}",  # Time
+                r"(deadline|due|expire|schedule|target).*?\d",
+                r"(tomorrow|yesterday|today|next week|last month|next month|this year|last year)",
+                r"\d+\s*(day|week|month|year)s?",  # Duration
             ]
             for pattern in date_patterns:
                 if re.search(pattern, combined_text):
@@ -306,67 +310,69 @@ class SpecificInfoTypeConstraint:
 
         elif info_type == "specification":
             # Look for specific requirements or limits - be generous
-            if re.search(r'(require|minimum|maximum|limit|capacity|threshold).*?\d+', combined_text):
+            if re.search(
+                r"(require|minimum|maximum|limit|capacity|threshold).*?\d+", combined_text
+            ):
                 return True
-            if re.search(r'\d+.*(require|minimum|maximum|limit|capacity|threshold)', combined_text):
+            if re.search(r"\d+.*(require|minimum|maximum|limit|capacity|threshold)", combined_text):
                 return True
-            if re.search(r'(must|should|need|at least|up to|no more than).*?\d+', combined_text):
+            if re.search(r"(must|should|need|at least|up to|no more than).*?\d+", combined_text):
                 return True
-            if re.search(r'(gb|mb|tb|ghz|mhz|kg|lbs?|mph|km)', combined_text):
+            if re.search(r"(gb|mb|tb|ghz|mhz|kg|lbs?|mph|km)", combined_text):
                 return True
 
         elif info_type == "measurement":
             # Look for measurements with units - be generous
-            if re.search(r'\d+\s*(mg|g|kg|ml|l|cm|mm|m|km|inch|inches|foot|feet)', combined_text):
+            if re.search(r"\d+\s*(mg|g|kg|ml|l|cm|mm|m|km|inch|inches|foot|feet)", combined_text):
                 return True
-            if re.search(r'\d+\s*(milligram|gram|kilogram|milliliter|liter)', combined_text):
+            if re.search(r"\d+\s*(milligram|gram|kilogram|milliliter|liter)", combined_text):
                 return True
-            if re.search(r'(dose|dosage|measurement|size|dimension).*?\d+', combined_text):
+            if re.search(r"(dose|dosage|measurement|size|dimension).*?\d+", combined_text):
                 return True
             # Any number with a unit-like suffix
-            if re.search(r'\d+\s*[a-z]{1,4}\b', combined_text):
+            if re.search(r"\d+\s*[a-z]{1,4}\b", combined_text):
                 return True
 
         elif info_type == "decision":
             # Look for pros/cons, recommendations, analysis - be very generous
-            if re.search(r'(recommend|suggest|advise|consider)', combined_text):
+            if re.search(r"(recommend|suggest|advise|consider)", combined_text):
                 return True
-            if re.search(r'(pro|con|advantage|disadvantage|benefit|drawback)', combined_text):
+            if re.search(r"(pro|con|advantage|disadvantage|benefit|drawback)", combined_text):
                 return True
-            if re.search(r'(risk|opportunity|trade.?off|implication)', combined_text):
+            if re.search(r"(risk|opportunity|trade.?off|implication)", combined_text):
                 return True
-            if re.search(r'(should|worth|advisable|prudent)', combined_text):
+            if re.search(r"(should|worth|advisable|prudent)", combined_text):
                 return True
             # If context discusses the topic at all with evaluative language, count it
-            if re.search(r'(good|bad|better|worse|best|worst|effective|efficient)', combined_text):
+            if re.search(r"(good|bad|better|worse|best|worst|effective|efficient)", combined_text):
                 return True
 
         elif info_type == "rate":
             # Look for percentages, rates, ratios, salary figures
-            if re.search(r'\d+(\.\d+)?\s*%', combined_text):
+            if re.search(r"\d+(\.\d+)?\s*%", combined_text):
                 return True
-            if re.search(r'\d+\s*percent', combined_text):
+            if re.search(r"\d+\s*percent", combined_text):
                 return True
-            if re.search(r'(rate|ratio)\s*(of|is|was|:)\s*\d', combined_text):
+            if re.search(r"(rate|ratio)\s*(of|is|was|:)\s*\d", combined_text):
                 return True
-            if re.search(r'\$[\d,]+', combined_text):
+            if re.search(r"\$[\d,]+", combined_text):
                 return True
-            if re.search(r'\d+\s*(per|/)\s*(year|month|hour|annum|capita)', combined_text):
+            if re.search(r"\d+\s*(per|/)\s*(year|month|hour|annum|capita)", combined_text):
                 return True
-            if re.search(r'(salary|wage|income|compensation|pay).*?\d', combined_text):
+            if re.search(r"(salary|wage|income|compensation|pay).*?\d", combined_text):
                 return True
-            if re.search(r'\d+.*(salary|wage|income|compensation|pay)', combined_text):
+            if re.search(r"\d+.*(salary|wage|income|compensation|pay)", combined_text):
                 return True
 
         elif info_type == "warranty":
             # Look for warranty/coverage details - be generous
-            if re.search(r'\d+\s*(year|month|day)', combined_text):
+            if re.search(r"\d+\s*(year|month|day)", combined_text):
                 return True
-            if re.search(r'(warranty|coverage|guarantee|protection)', combined_text):
+            if re.search(r"(warranty|coverage|guarantee|protection)", combined_text):
                 return True
-            if re.search(r'(covers?|protects?|includes?)', combined_text):
+            if re.search(r"(covers?|protects?|includes?)", combined_text):
                 return True
-            if re.search(r'(defects?|damage|repair|replacement)', combined_text):
+            if re.search(r"(defects?|damage|repair|replacement)", combined_text):
                 return True
 
         return False
@@ -377,8 +383,8 @@ class SpecificInfoTypeConstraint:
         query_lower = query.lower()
 
         # Remove common question starters
-        for starter in ['what', 'how many', 'when', 'where', 'why', 'who', 'which']:
-            query_lower = query_lower.replace(starter, '')
+        for starter in ["what", "how many", "when", "where", "why", "who", "which"]:
+            query_lower = query_lower.replace(starter, "")
 
         # Extract capitalized words (likely entities)
         entities = []
@@ -388,16 +394,16 @@ class SpecificInfoTypeConstraint:
                 entities.append(word.lower())
 
         # Also extract nouns after "of" or "for"
-        if ' of ' in query_lower:
-            after_of = query_lower.split(' of ')[-1].split()[0]
+        if " of " in query_lower:
+            after_of = query_lower.split(" of ")[-1].split()[0]
             if after_of:
                 entities.append(after_of)
-        if ' for ' in query_lower:
-            after_for = query_lower.split(' for ')[-1].split()[0]
+        if " for " in query_lower:
+            after_for = query_lower.split(" for ")[-1].split()[0]
             if after_for:
                 entities.append(after_for)
 
-        return entities if entities else ['users', 'platform', 'system', 'product', 'service']
+        return entities if entities else ["users", "platform", "system", "product", "service"]
 
 
 __all__ = ["SpecificInfoTypeConstraint"]

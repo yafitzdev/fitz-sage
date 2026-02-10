@@ -28,7 +28,7 @@ class TestGetVectorDbPlugin:
         mock_create.return_value = mock_plugin
         mock_wrap.return_value = mock_plugin
 
-        result = get_vector_db_plugin("pgvector", mode="local")
+        get_vector_db_plugin("pgvector", mode="local")
 
         mock_create.assert_called_once_with("pgvector", mode="local")
         mock_wrap.assert_called_once_with(
