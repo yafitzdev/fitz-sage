@@ -177,6 +177,8 @@ You can—but you'll hit walls fast.
 
 Most RAG implementations are naive vector search—they fail silently on real-world queries. Fitz has **built-in intelligence** that handles edge cases automatically:
 
+<br>
+
 | Feature | Query | Naive RAG Problem | FitzRAG Solution |
 |---------|-------|-------------------|------------------|
 | [**epistemic-honesty**](docs/features/epistemic-honesty.md) | "What was our Q4 revenue?" | ❌ Hallucinated number — Info doesn't exist, but LLM won't admit it | ✅ "I don't know" |
@@ -250,91 +252,11 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 > [!NOTE]
 > Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. 92% of our test cases are rated "hard."
 
-<br>
-
 >1. [X] **The system fails safe.** The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence ("trustworthy" instead of "disputed") is the rarest error mode: only 3 cases in 1,100+.
 >
 >2. [X] **These scores are a floor, not a ceiling.** All benchmarks were measured using `qwen2.5:3b` — a 3B parameter local model. The governance constraints run on the fast-tier LLM to keep latency low. Stronger models produce better constraint signals, which feed better features into the classifier. Upgrading your chat provider should improve governance accuracy for free.
 >
 >3. [X] **Zero extra latency.** The constraints already run as part of the pipeline. The ML classifier just replaces hand-coded rules with a local sklearn model — inference takes microseconds, no additional API calls.
-
----
-
-<details>
-
-<summary><strong>📦 Fitz vs LangChain vs LlamaIndex</strong></summary>
-
-<br>
-
-#### Fitz opts for a deliberately narrower approach.
->
->LangChain and LlamaIndex are powerful **LLM application frameworks** designed to help developers build complex, end-to-end AI systems. 
->Fitz provides a **minimal, replaceable RAG engine** with strong epistemic guarantees — without locking users into a framework, ecosystem, or long-term architectural commitment.
->
->Fitz is not a competitor in scope.  
->It is an infrastructure primitive.
-
-<br>
-
-#### Core philosophical differences ⚖️
->
->| Dimension | Fitz | LangChain | LlamaIndex |
->|--------|------|-----------|------------|
->| Primary role | **RAG engine** | LLM application framework | LLM data framework |
->| User commitment | **No framework lock-in** | High | High |
->| Engine coupling | **Swappable in one line** | Deep | Deep |
->| Design goal | Correctness & honesty | Flexibility | Data integration |
->| Long-term risk | Low | Migration-heavy | Migration-heavy |
-
-<br>
-
-#### Epistemic behavior (truth over fluency) 🎯
->
->| Aspect | Fitz | LangChain / LlamaIndex |
->|-----|------|------------------------|
->| “I don’t know” | **First-class behavior** | Not guaranteed |
->| Hallucination handling | Designed-in | Usually prompt-level |
->| Confidence signaling | Explicit | Implicit |
->
->Fitz treats uncertainty as a **feature**, not a failure.  
->If the system cannot support an answer with retrieved evidence, it says so.
-
-<br>
-
-#### Transparency & provenance 🔎
->
->| Capability | Fitz | LangChain / LlamaIndex |
->|---------|------|------------------------|
->| Source attribution | **Mandatory** | Optional |
->| Retrieval trace | **Explicit & structured** | Often opaque |
->| Debuggability | Built-in | Tool-dependent |
->
->Every answer in Fitz is fully auditable down to the retrieval step.
-
-<br>
-
-#### Scope & complexity 🪐
->
->| Aspect | Fitz | LangChain / LlamaIndex |
->|-----|------|------------------------|
->| Chains / agents | ❎ | ✔ |
->| Prompt graphs | ❎ | ✔ |
->| UI abstractions | ❎ | Often |
->| Cognitive overhead | **Very low** | High |
->
->Fitz intentionally does less — so it can be trusted more.
-
-<br>
-
-#### Use Fitz if you want:
->
->- A replaceable RAG engine, not a framework marriage
->- Strong epistemic guarantees (“I don’t know” is valid output)
->- Full provenance for every answer
->- A transparent, extensible plugin architecture
->- A future-proof ingestion pipeline that survives engine changes
-
-</details>
 
 ---
 <details>
