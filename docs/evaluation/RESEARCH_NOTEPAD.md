@@ -2646,7 +2646,8 @@ Trade-off: 31% of trustworthy answers get unnecessarily hedged (annoying), but 9
 8. ~~Integrate two-stage model into production pipeline~~ DONE (GovernanceDecider, 1456 tests pass)
 9. ~~Safety-first threshold tuning~~ DONE (disputed 89.7%, s2=0.80)
 10. ~~Sweet-spot threshold tuning~~ DONE (s2=0.785: disputed 89.7%, trustworthy 70.6%, D->T still 3)
-11. Remaining error analysis: trustworthy->disputed errors still dominated by numerical_near_miss and methodology_difference — may need subcategory-specific rules or more training data
+11. ~~Source agreement features exploration~~ BLOCKED — fitz-gov is single-source (1098/1113 cases have num_unique_sources=1). Source agreement features (cross-source consistency, claim alignment) are valid for production multi-document KBs but can't be evaluated or trained on current test set. **Add multi-source test cases in fitz-gov v4.0.**
+12. Remaining error analysis: trustworthy->disputed errors still dominated by numerical_near_miss and methodology_difference — may need subcategory-specific rules or more training data
 
 ---
 
