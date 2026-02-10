@@ -207,34 +207,38 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 
 ### Governance — Know What You Don't Know
 
-Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty using a two-stage ML classifier trained on 1,100+ labeled cases.
+```bash
+fitz eval fitz-gov --model ollama/qwen2.5:3b
+```
+
+Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty using a two-stage ML classifier trained on 1,100+ labeled cases from [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty.
 
 ```
   Query + Retrieved Chunks
-            |
-            v
-  +---------------------+
-  |   5 Constraints      |     Contradiction detection, evidence sufficiency,
-  |   (epistemic sensors)|     causal attribution, answer verification,
-  |                      |     specific info type
-  +----------+----------+
-             |
-             | 51 features extracted
-             v
-  +---------------------+
-  |  Stage 1: RF         |     Can the evidence answer this query?
-  |  Answerability       +---> NO  --> ABSTAIN  (81.2% recall)
-  +----------+----------+
-             | YES
-             v
-  +---------------------+
-  |  Stage 2: ET         |     Do the sources conflict?
-  |  Conflict Detection  +---> YES --> DISPUTED (89.7% recall)
-  +----------+----------+
-             | NO
-             v
-       TRUSTWORTHY              Consistent evidence found
-       (70.6% recall)
+            │
+            ▼
+  ┌─────────────────────┐
+  │ 5 Constraints       │     Contradiction detection, evidence sufficiency,
+  │ (epistemic sensors) │     causal attribution, answer verification,
+  │                     │     specific info type
+  └──────────┬──────────┘
+             │
+             │ 51 features extracted
+             ▼
+  ┌─────────────────────┐
+  │ Stage 1: RF         │     Can the evidence answer this query?
+  │ Answerability       ├───► NO  ──► ABSTAIN  (81.2% recall)
+  └──────────┬──────────┘
+             │ YES
+             ▼
+  ┌─────────────────────┐
+  │ Stage 2: ET         │     Do the sources conflict?
+  │ Conflict Detection  ├───► YES ──► **DISPUTED** (89.7% recall)
+  └──────────┬──────────┘
+             │ NO
+             ▼
+        TRUSTWORTHY           Consistent evidence found
+        (70.6% recall)
 ```
 
 | Decision | What It Means | Recall |
@@ -243,18 +247,15 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 | **DISPUTED** | Sources contradict each other | **89.7%** |
 | **TRUSTWORTHY** | Consistent, sufficient evidence | **70.6%** |
 
-Measured on [fitz-gov](https://github.com/yafitzdev/fitz-gov) — a benchmark for epistemic honesty, not retrieval quality.
-
 > [!NOTE]
 > **What this score means:** Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. 92% of our test cases are rated "hard."
 
-**How it works:** Five epistemic constraints extract 51 features from each query. A two-stage classifier (Random Forest for answerability, Extra Trees for conflict detection) — trained on fitz-gov's 1,100+ labeled boundary cases with calibrated per-stage thresholds — replaces hand-coded priority rules. The constraints stay as sensors; only the decision logic learned from data.
+>1. [X] **The system fails safe.** The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence (the dangerous failure) is the rarest error mode: only 3 cases in 1,100+.
+>
+>2. [X] **These scores are a floor, not a ceiling.** All benchmarks were measured using `qwen2.5:3b` — a 3B parameter local model. The governance constraints run on the fast-tier LLM to keep latency low. Stronger models produce better constraint signals, which feed better features into the classifier. Upgrading your chat provider should improve governance accuracy for free.
+>
+>3. [X] **Zero extra latency.** The constraints already run as part of the pipeline. The ML classifier just replaces hand-coded rules with a local sklearn model — inference takes microseconds, no additional API calls.
 
-**The system fails safe.** The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence (the dangerous failure) is the rarest error mode: only 3 cases in 1,100+.
-
-```bash
-fitz eval fitz-gov --model ollama/qwen2.5:3b
-```
 
 > [Feature docs](docs/features/governance-benchmarking.md) · [Benchmark results](docs/evaluation/fitz-gov-3.0-results.md) · [Classifier experiments](docs/evaluation/classifier/NOTEPAD.md)
 

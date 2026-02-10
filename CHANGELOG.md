@@ -11,6 +11,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.1] - 2026-02-09
+
+### 🎉 Highlights
+
+**ML Governance Classifier** — Replaced the hand-coded `AnswerGovernor` (37% accuracy) with a two-stage ML classifier: Random Forest (answerable vs abstain) → Extra Trees (trustworthy vs disputed). Trained on 1,113 fitz-gov cases with 51 features. Per-class recall: Abstain 81.2%, Disputed 89.7%, Trustworthy 70.6%. Only 3 dangerous (disputed→trustworthy) errors in 1,100+ cases.
+
+**GovernanceDecider Integration** — New `GovernanceDecider` class wraps the ML classifier with fail-open fallback to `AnswerGovernor`. Loads the model artifact once at init and runs two-stage prediction with calibrated per-class thresholds (s1=0.50, s2=0.785).
+
+**Safety-First Threshold Tuning** — Iterative threshold exploration prioritizing dispute detection safety. Sweet-spot at s2=0.785 balances trustworthy recall (70.6%) against disputed recall (89.7%) with minimal dangerous misclassifications.
+
+### 🚀 Added
+
+#### Governance ML Classifier
+- Two-stage classifier pipeline: RF (Stage 1: answerability) → ET (Stage 2: conflict detection)
+- `GovernanceDecider` class with fail-open fallback to `AnswerGovernor` on any error
+- Calibrated per-class thresholds (s1=0.50, s2=0.785) tuned for safety
+- 3-class output (abstain/disputed/trustworthy) mapped to 4-class AnswerMode (ABSTAIN/DISPUTED/CONFIDENT/QUALIFIED)
+- Feature extraction pipeline: 51 features from constraint results, chunk metadata, and inter-chunk text signals
+- Inter-chunk text features (hedging ratio, negation ratio, numeric density) — +10.5pp Stage 2 CV improvement
+- Feature parity fix: `ctx_*` features ported from training to production inference
+
+#### Evaluation & Experiments
+- 10+ classifier experiments documented (Exp 1–10) with full result tracking
+- Per-class calibrated thresholds with governor fallback (Step 1)
+- Two-stage binary classifier formalization with calibration (82.96% accuracy, 76.9% min recall)
+- Expanded dataset evaluation (1,113 cases from fitz-gov 3.0)
+- Dead code audit identifying 18 removable features and 700+ lines of dead code
+
+#### Testing
+- 90 new vector_db unit tests covering types, writer, loader, custom plugin, and registry
+- Property-based tests for vector_db components
+
+### 🔧 Fixed
+
+- Feature parity gap between training and production inference (`ctx_*` features missing at inference time)
+- Governance constraint sensitivity tuning (causal attribution false positives, IE forecast-year relaxation)
+- Evidence character gate for ConflictAware constraint
+- Primary referent abstain rule for InsufficientEvidence constraint
+
+### 📚 Documentation
+
+- Updated README governance section with current classifier results and two-stage pipeline diagram
+- Research notepad with full experiment history and threshold tuning journal
+- Classifier status notepad tracking model iterations
+- Source agreement features analysis (blocked by single-source test set, deferred to fitz-gov v4.0)
+- fitz-gov 3.0 docs, cross-check fixes, governance journey writeup
+- Dead code audit results and calibration analysis
+
+### 🧹 Refactoring
+
+- Removed 18 dead features, 2 unused plugins, 600+ lines of dead code
+- Cleaned up governance constraint plugins (SIT moved to Stage 2, rate info type added)
+- Removed scratch benchmark script from repo
+
+---
+
 ## [0.8.0] - 2026-02-03
 
 ### 🎉 Highlights
@@ -1422,7 +1478,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.2...v0.7.0
