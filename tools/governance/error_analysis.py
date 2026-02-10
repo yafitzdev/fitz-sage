@@ -7,7 +7,10 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, ".")
-from tools.governance.train_classifier import enrich_with_context_features, prepare_features  # noqa: E402
+from tools.governance.train_classifier import (  # noqa: E402
+    enrich_with_context_features,
+    prepare_features,
+)
 
 # Load data
 df = pd.read_csv("tools/governance/data/eval_results_v5_clean.csv")

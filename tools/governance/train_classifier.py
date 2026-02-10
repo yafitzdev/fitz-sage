@@ -284,9 +284,7 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
     for col in _BOOL_FEATURES:
         if col not in X.columns:
             continue
-        X[col] = (
-            X[col].map({"True": 1, "False": 0, True: 1, False: 0}).fillna(0).astype(int)
-        )
+        X[col] = X[col].map({"True": 1, "False": 0, True: 1, False: 0}).fillna(0).astype(int)
 
     X = X.fillna(0)
     for col in X.columns:
