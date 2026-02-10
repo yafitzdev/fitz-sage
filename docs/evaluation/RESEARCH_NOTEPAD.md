@@ -2617,7 +2617,7 @@ Executed cleanup from audit findings:
 5. ~~Proposal 1: CA quality features via scoring prompt~~ FAILED (fast LLM can't score)
 6. ~~Proposal 1b: Deterministic text features~~ DONE (Stage 2 CV +10.5pp, min recall +1.0pp)
 7. ~~Proposal 2: Feature parity fix~~ DONE (12 features ported to production, no regression)
-8. Integrate two-stage model into production pipeline (`GovernanceDecider`)
+8. ~~Integrate two-stage model into production pipeline~~ DONE (GovernanceDecider, 1456 tests pass)
 9. Remaining error analysis: 23 trustworthy->disputed still dominated by numerical_near_miss and methodology_difference — may need subcategory-specific rules or more training data
 
 ---

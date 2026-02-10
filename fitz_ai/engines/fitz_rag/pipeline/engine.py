@@ -11,6 +11,7 @@ from typing import Sequence
 
 from fitz_ai.core.answer_mode import AnswerMode
 from fitz_ai.core.governance import AnswerGovernor
+from fitz_ai.core.guardrails.governance_decider import GovernanceDecider
 from fitz_ai.core.guardrails import (
     ConstraintPlugin,
     create_default_constraints,
@@ -164,6 +165,9 @@ class RAGPipeline:
             f"governance_logging={governance_status}"
         )
 
+        # ML-based governance decider (fail-open to AnswerGovernor if no model)
+        self._governance_decider = GovernanceDecider()
+
         # Last governance feature vector (available after run() completes)
         self._last_governance_features: dict | None = None
 
@@ -297,8 +301,9 @@ class RAGPipeline:
         import time
 
         governance_start = time.perf_counter()
-        governor = AnswerGovernor()
-        governance = governor.decide(constraint_results)
+        governance = self._governance_decider.decide(
+            constraint_results, self._last_governance_features
+        )
         governance_ms = (time.perf_counter() - governance_start) * 1000
 
         logger.info(
