@@ -10,14 +10,13 @@ three tiers:
 - Tier 2: Cheap computation on existing data (no LLM, no I/O)
 - Tier 3: DetectionSummary from retrieval (threaded via StageContext)
 
-The classifier uses these features to predict one of 4 governance modes:
-abstain, disputed, qualified, confident.
+The classifier uses these features to predict one of 3 governance modes:
+abstain, disputed, trustworthy.
 """
 
 from __future__ import annotations
 
 import statistics
-from collections import Counter
 from typing import TYPE_CHECKING, Any, Sequence
 
 from fitz_ai.core.chunk import Chunk
@@ -71,24 +70,13 @@ def _extract_constraint_features(
     features["num_constraints_fired"] = num_denials
 
     signals = [r.signal for r in constraint_results.values() if r.signal]
-    features["has_abstain_signal"] = "abstain" in signals
-    features["has_disputed_signal"] = "disputed" in signals
     features["has_qualified_signal"] = "qualified" in signals
 
     # IE constraint features
     ie = constraint_results.get("insufficient_evidence")
     if ie:
-        m = ie.metadata
         features["ie_fired"] = not ie.allow_decisive_answer
         features["ie_signal"] = ie.signal
-        features["ie_max_similarity"] = m.get("max_similarity")
-        features["ie_entity_match_found"] = m.get("ie_entity_match_found")
-        features["ie_primary_match_found"] = m.get("ie_primary_match_found")
-        features["ie_critical_match_found"] = m.get("ie_critical_match_found")
-        features["ie_query_aspect"] = m.get("ie_query_aspect")
-        features["ie_summary_overlap"] = m.get("ie_summary_overlap")
-        features["ie_has_matching_aspect"] = m.get("ie_has_matching_aspect")
-        features["ie_has_conflicting_aspect"] = m.get("ie_has_conflicting_aspect")
     else:
         features["ie_fired"] = None
 
@@ -99,11 +87,9 @@ def _extract_constraint_features(
         features["ca_fired"] = not ca.allow_decisive_answer
         features["ca_signal"] = ca.signal
         features["ca_numerical_variance_detected"] = m.get("ca_numerical_variance_detected")
-        features["ca_is_uncertainty_query"] = m.get("ca_is_uncertainty_query")
         features["ca_skipped_hedged_pairs"] = m.get("ca_skipped_hedged_pairs")
         features["ca_pairs_checked"] = m.get("ca_pairs_checked")
         features["ca_first_evidence_char"] = m.get("ca_first_evidence_char")
-        features["ca_relevance_filtered_count"] = m.get("ca_relevance_filtered_count")
         features["ca_evidence_characters"] = m.get("ca_evidence_characters")
     else:
         features["ca_fired"] = None
@@ -133,11 +119,9 @@ def _extract_constraint_features(
     # AnswerVerification features
     av = constraint_results.get("answer_verification")
     if av:
-        m = av.metadata
-        features["av_fired"] = not av.allow_decisive_answer
-        features["av_jury_votes_no"] = m.get("jury_votes")
+        features["av_jury_votes_no"] = av.metadata.get("jury_votes")
     else:
-        features["av_fired"] = None
+        features["av_jury_votes_no"] = None
 
 
 def _extract_query_features(features: dict[str, Any], query: str) -> None:
@@ -154,10 +138,8 @@ def _extract_chunk_features(
     if not chunks:
         features["num_unique_sources"] = 0
         features["mean_vector_score"] = None
-        features["std_vector_score"] = None
         features["score_spread"] = None
         features["vocab_overlap_ratio"] = 0.0
-        features["dominant_content_type"] = None
         return
 
     # Source diversity
@@ -180,11 +162,9 @@ def _extract_chunk_features(
 
     if scores:
         features["mean_vector_score"] = statistics.mean(scores)
-        features["std_vector_score"] = statistics.stdev(scores) if len(scores) > 1 else 0.0
         features["score_spread"] = max(scores) - min(scores)
     else:
         features["mean_vector_score"] = None
-        features["std_vector_score"] = None
         features["score_spread"] = None
 
     # Vocabulary overlap between query and chunks
@@ -206,12 +186,6 @@ def _extract_chunk_features(
     else:
         features["vocab_overlap_ratio"] = 0.0
 
-    # Dominant content type from enrichment metadata
-    content_types = [c.metadata.get("content_type") for c in chunks if c.metadata.get("content_type")]
-    if content_types:
-        features["dominant_content_type"] = Counter(content_types).most_common(1)[0][0]
-    else:
-        features["dominant_content_type"] = None
 
 
 def _extract_detection_features(
@@ -220,19 +194,11 @@ def _extract_detection_features(
     """Extract features from DetectionSummary (Tier 3)."""
     if detection_summary is None:
         features["detection_temporal"] = None
-        features["detection_aggregation"] = None
         features["detection_comparison"] = None
-        features["detection_boost_recency"] = None
-        features["detection_boost_authority"] = None
-        features["detection_needs_rewriting"] = None
         return
 
     features["detection_temporal"] = getattr(detection_summary, "has_temporal_intent", None)
-    features["detection_aggregation"] = getattr(detection_summary, "has_aggregation_intent", None)
     features["detection_comparison"] = getattr(detection_summary, "has_comparison_intent", None)
-    features["detection_boost_recency"] = getattr(detection_summary, "boost_recency", None)
-    features["detection_boost_authority"] = getattr(detection_summary, "boost_authority", None)
-    features["detection_needs_rewriting"] = getattr(detection_summary, "needs_rewriting", None)
 
 
 __all__ = ["extract_features"]

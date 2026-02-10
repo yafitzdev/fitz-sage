@@ -74,9 +74,7 @@ from .governance import AnswerGovernor, GovernanceDecision, GovernanceLog, decid
 from .guardrails import ConstraintPlugin as ConstraintPluginProtocol
 from .guardrails import (
     ConstraintResult,
-    SemanticMatcher,
     create_default_constraints,
-    create_semantic_matcher,
     run_constraints,
 )
 from .guardrails.plugins import (
@@ -107,13 +105,11 @@ __all__ = [
     # Epistemic Guardrails
     "ConstraintResult",
     "ConstraintPluginProtocol",
-    "SemanticMatcher",
     "ConflictAwareConstraint",
     "InsufficientEvidenceConstraint",
     "CausalAttributionConstraint",
     "run_constraints",
     "create_default_constraints",
-    "create_semantic_matcher",
     # Governance
     "AnswerGovernor",
     "GovernanceDecision",

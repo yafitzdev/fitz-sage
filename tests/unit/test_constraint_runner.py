@@ -71,8 +71,8 @@ class TestRunConstraints:
         assert len(results) == 1
         assert results[0].metadata["constraint_name"] == "my_constraint"
 
-    def test_allowing_constraints_not_modified(self):
-        """Allowing constraints don't get constraint_name injected."""
+    def test_allowing_constraints_have_metadata(self):
+        """All results (allow and deny) get constraint_name and stage metadata."""
         constraints = [
             MockConstraint("my_constraint", allow=True),
         ]
@@ -81,8 +81,8 @@ class TestRunConstraints:
 
         assert len(results) == 1
         assert results[0].allow_decisive_answer is True
-        # Original metadata should be empty for allow() results
-        assert "constraint_name" not in results[0].metadata
+        assert results[0].metadata["constraint_name"] == "my_constraint"
+        assert "stage" in results[0].metadata
 
     def test_exception_skips_constraint(self):
         """Crashing constraints are skipped (fail-safe)."""

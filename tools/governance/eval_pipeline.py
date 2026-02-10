@@ -51,33 +51,27 @@ _DEFAULT_OUTPUT = Path(__file__).resolve().parent / "data" / "eval_results.csv"
 
 # Feature type sets (copied from extract_features.py / train_classifier.py for preprocessing)
 _BOOL_FEATURES = {
-    "ie_fired", "ie_entity_match_found", "ie_primary_match_found",
-    "ie_critical_match_found", "ie_has_matching_aspect", "ie_has_conflicting_aspect",
-    "ca_fired", "ca_numerical_variance_detected", "ca_is_uncertainty_query",
+    "ie_fired",
+    "ca_fired", "ca_numerical_variance_detected",
     "caa_fired", "caa_has_causal_evidence", "caa_has_predictive_evidence",
     "sit_fired", "sit_entity_mismatch", "sit_has_specific_info",
-    "av_fired",
-    "has_abstain_signal", "has_disputed_signal", "has_qualified_signal",
-    "detection_temporal", "detection_aggregation", "detection_comparison",
-    "detection_boost_recency", "detection_boost_authority", "detection_needs_rewriting",
+    "has_qualified_signal",
+    "detection_temporal", "detection_comparison",
 }
 
 _NUMERIC_FEATURES = {
-    "ie_max_similarity", "ie_summary_overlap",
     "ca_skipped_hedged_pairs", "ca_pairs_checked",
-    "ca_relevance_filtered_count",
     "av_jury_votes_no",
     "num_constraints_fired",
     "query_word_count", "num_chunks", "num_unique_sources",
-    "mean_vector_score", "std_vector_score", "score_spread",
+    "mean_vector_score", "score_spread",
     "vocab_overlap_ratio",
 }
 
 _STRING_FEATURES = {
-    "ie_signal", "ie_query_aspect", "ca_signal",
+    "ie_signal", "ca_signal",
     "ca_first_evidence_char", "ca_evidence_characters",
     "caa_query_type", "sit_info_type_requested",
-    "dominant_content_type",
 }
 
 _META_COLS = {"case_id", "expected_mode", "governor_predicted", "classifier_predicted",

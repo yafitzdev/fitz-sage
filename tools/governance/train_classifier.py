@@ -59,23 +59,19 @@ _META_COLS = {"case_id", "expected_mode", "governor_predicted", "classifier_pred
 
 # Categorical features that need label encoding
 _CATEGORICAL_FEATURES = {
-    "ie_signal", "ie_query_aspect", "ca_signal",
+    "ie_signal", "ca_signal",
     "ca_first_evidence_char", "ca_evidence_characters",
     "caa_query_type", "sit_info_type_requested",
-    "dominant_content_type",
 }
 
 # Boolean features to convert to int
 _BOOL_FEATURES = {
-    "ie_fired", "ie_entity_match_found", "ie_primary_match_found",
-    "ie_critical_match_found", "ie_has_matching_aspect", "ie_has_conflicting_aspect",
-    "ca_fired", "ca_numerical_variance_detected", "ca_is_uncertainty_query",
+    "ie_fired",
+    "ca_fired", "ca_numerical_variance_detected",
     "caa_fired", "caa_has_causal_evidence", "caa_has_predictive_evidence",
     "sit_fired", "sit_entity_mismatch", "sit_has_specific_info",
-    "av_fired",
-    "has_abstain_signal", "has_disputed_signal", "has_qualified_signal",
-    "detection_temporal", "detection_aggregation", "detection_comparison",
-    "detection_boost_recency", "detection_boost_authority", "detection_needs_rewriting",
+    "has_qualified_signal",
+    "detection_temporal", "detection_comparison",
 }
 
 # Markers for context feature extraction

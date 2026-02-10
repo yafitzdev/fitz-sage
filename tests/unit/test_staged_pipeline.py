@@ -215,8 +215,8 @@ class TestStagedConstraintPipeline:
         assert results[0].metadata["stage"] == "consistency"
         assert results[0].metadata["constraint_name"] == "conflict_aware"
 
-    def test_allow_results_no_extra_metadata(self):
-        """Allow results don't get stage metadata injected."""
+    def test_allow_results_have_stage_metadata(self):
+        """All results (allow and deny) get stage metadata for feature extraction."""
         c = MockConstraint("insufficient_evidence", allow=True)
 
         pipeline = StagedConstraintPipeline(
@@ -226,7 +226,8 @@ class TestStagedConstraintPipeline:
         results = pipeline.run("test", [])
 
         assert len(results) == 1
-        assert "stage" not in results[0].metadata
+        assert results[0].metadata["stage"] == "relevance"
+        assert results[0].metadata["constraint_name"] == "insufficient_evidence"
 
     def test_crashing_constraint_skipped(self):
         """Exception in a constraint is caught, other constraints still run."""
@@ -348,19 +349,6 @@ class TestBuildStagedPipeline:
         assert len(pipeline.stages) == 1
         assert pipeline.stages[0].name == "sufficiency"
 
-    def test_governance_analyzer_bypasses_stages(self):
-        """GovernanceAnalyzer runs as single unified stage."""
-        constraints = [
-            MockConstraint("governance_analyzer"),
-            MockConstraint("insufficient_evidence"),
-        ]
-
-        pipeline = _build_staged_pipeline(constraints)
-
-        # Should have a single "unified" stage with just the analyzer
-        assert len(pipeline.stages) == 1
-        assert pipeline.stages[0].name == "unified"
-
     def test_relevance_stage_has_short_circuit(self):
         """Relevance stage is configured with abstain short-circuit."""
         constraints = [
@@ -373,18 +361,6 @@ class TestBuildStagedPipeline:
         relevance_stage = pipeline.stages[0]
         assert relevance_stage.name == "relevance"
         assert "abstain" in relevance_stage.short_circuit_signals
-
-    def test_deterministic_conflict_goes_to_consistency(self):
-        """DeterministicConflictConstraint also classified as consistency."""
-        constraints = [
-            MockConstraint("insufficient_evidence"),
-            MockConstraint("deterministic_conflict"),
-        ]
-
-        pipeline = _build_staged_pipeline(constraints)
-
-        assert len(pipeline.stages) == 2
-        assert pipeline.stages[1].name == "consistency"
 
     def test_empty_constraints_returns_empty_pipeline(self):
         """No constraints produces pipeline with no stages."""

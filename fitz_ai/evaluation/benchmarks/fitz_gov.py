@@ -94,7 +94,6 @@ class FitzGovBenchmark:
         llm_model: str = "qwen2.5:14b",
         llm_base_url: str = "http://localhost:11434",
         enrich_chunks: bool = True,
-        deterministic: bool = False,
         use_fusion: bool = False,
         adaptive: bool = True,
         model_override: str | None = None,
@@ -114,10 +113,8 @@ class FitzGovBenchmark:
             enrich_chunks: If True, enrich chunks with metadata (summary, keywords,
                           entities) before running constraints. This simulates the
                           full ingestion pipeline.
-            deterministic: If True, use deterministic constraints (embeddings + regex)
-                          instead of LLM-based constraints. No model variance.
             use_fusion: If True, use 3-prompt fusion for contradiction detection.
-                       Reduces variance via majority voting. Ignored if deterministic=True.
+                       Reduces variance via majority voting.
             adaptive: If True, auto-select detection method based on query type:
                      - Uncertainty/causal queries → Fusion (conservative)
                      - Factual queries → Standard pairwise (aggressive)
@@ -134,12 +131,10 @@ class FitzGovBenchmark:
         self._llm_model = llm_model
         self._llm_base_url = llm_base_url
         self._enrich_chunks = enrich_chunks
-        self._deterministic = deterministic
         self._use_fusion = use_fusion
         self._adaptive = adaptive
         self._model_override = model_override
         self._enricher = None
-        self._embedder = None
         self._chat_factory_override = None
 
         # Create chat factory override if model specified
@@ -170,10 +165,6 @@ class FitzGovBenchmark:
         if enrich_chunks:
             self._init_enricher()
 
-        # Initialize embedder for deterministic mode
-        if deterministic:
-            self._init_embedder()
-
     def _init_enricher(self) -> None:
         """Initialize the chunk enricher for metadata extraction."""
         from fitz_ai.ingestion.enrichment.bus import ChunkEnricher
@@ -196,19 +187,6 @@ class FitzGovBenchmark:
         except Exception as e:
             logger.warning(f"Failed to initialize enricher: {e}")
             self._enricher = None
-
-    def _init_embedder(self) -> None:
-        """Initialize the embedder for deterministic constraints."""
-        from fitz_ai.llm import get_embedder
-
-        try:
-            # Use ollama for embeddings (runs locally)
-            embedding = get_embedder("ollama")
-            self._embedder = embedding.embed
-            logger.info("Initialized embedder for deterministic constraints")
-        except Exception as e:
-            logger.warning(f"Failed to initialize embedder: {e}")
-            self._embedder = None
 
     def evaluate(
         self,
@@ -254,7 +232,6 @@ class FitzGovBenchmark:
         # Update timing
         result.evaluation_time_seconds = time.time() - start_time
         result.metadata["full_mode"] = self._full_mode
-        result.metadata["deterministic"] = self._deterministic
         result.metadata["use_fusion"] = self._use_fusion
         result.metadata["adaptive"] = self._adaptive
         if self._model_override:
@@ -319,13 +296,7 @@ class FitzGovBenchmark:
         pipeline = engine._pipeline
 
         # Step 1: Run constraints on injected chunks
-        # Use deterministic constraints if enabled, otherwise use pipeline's constraints
-        if self._deterministic and self._embedder:
-            from fitz_ai.core.guardrails import create_deterministic_constraints
-
-            constraints = create_deterministic_constraints(embedder=self._embedder)
-            constraint_results = run_constraints(query.text, chunks, constraints)
-        elif self._use_fusion or self._adaptive or self._model_override:
+        if self._use_fusion or self._adaptive or self._model_override:
             # Create constraints with fusion/adaptive mode for contradiction detection
             from fitz_ai.core.guardrails import (
                 AnswerVerificationConstraint,
@@ -341,7 +312,7 @@ class FitzGovBenchmark:
             else:
                 fast_chat = pipeline.chat_factory("fast")
             # Get embedder from pipeline for semantic relevance checking
-            embedder = self._embedder if self._embedder else pipeline.embedder.embed
+            embedder = pipeline.embedder.embed
             constraints = [
                 InsufficientEvidenceConstraint(embedder=embedder, chat=fast_chat),
                 SpecificInfoTypeConstraint(),  # NEW: Detect missing specific info types

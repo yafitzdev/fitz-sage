@@ -36,7 +36,6 @@ _STAGE_MAP: dict[str, str] = {
     "causal_attribution": STAGE_SUFFICIENCY,
     "answer_verification": STAGE_SUFFICIENCY,
     "conflict_aware": STAGE_CONSISTENCY,
-    "deterministic_conflict": STAGE_CONSISTENCY,
 }
 
 
@@ -225,7 +224,6 @@ def _build_staged_pipeline(
     Group constraints into stages based on their name.
 
     Unknown constraints default to the sufficiency stage (safe).
-    GovernanceAnalyzer bypasses staging entirely (runs as single stage).
     """
     relevance: list[ConstraintPlugin] = []
     sufficiency: list[ConstraintPlugin] = []
@@ -233,12 +231,6 @@ def _build_staged_pipeline(
 
     for c in constraints:
         name = c.name
-
-        if name == "governance_analyzer":
-            return StagedConstraintPipeline(
-                stages=[ConstraintStage(name="unified", constraints=[c])]
-            )
-
         stage_name = _STAGE_MAP.get(name, STAGE_SUFFICIENCY)
         if stage_name == STAGE_RELEVANCE:
             relevance.append(c)
