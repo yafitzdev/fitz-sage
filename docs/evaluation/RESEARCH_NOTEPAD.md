@@ -2461,7 +2461,8 @@ Saved as `model_v5_calibrated.joblib`.
 | Two-stage calibrated | Feb 9 | 80.72% | min recall 76.9%, model_v5_calibrated |
 | Two-stage + inter-chunk (v7) | Feb 10 | 78.92% | +10.5pp Stage 2 CV, model_v7 |
 | Two-stage + parity fix (v8) | Feb 10 | 78.92% | 51 features, production parity, model_v5 overwritten |
-| **Safety-first (s2=0.80)** | **Feb 10** | **75.3%** | **Disputed 89.7%, trustworthy 69.1%. Production model.** |
+| Safety-first (s2=0.80) | Feb 10 | 75.3% | Disputed 89.7%, trustworthy 67.6% |
+| **Sweet-spot (s2=0.785)** | **Feb 10** | **76.5%** | **Disputed 89.7%, trustworthy 70.6%, abstain 81.2%. Production model.** |
 
 ### Dead Code & Feature Audit
 
@@ -2644,7 +2645,8 @@ Trade-off: 31% of trustworthy answers get unnecessarily hedged (annoying), but 9
 7. ~~Proposal 2: Feature parity fix~~ DONE (12 features ported to production, no regression)
 8. ~~Integrate two-stage model into production pipeline~~ DONE (GovernanceDecider, 1456 tests pass)
 9. ~~Safety-first threshold tuning~~ DONE (disputed 89.7%, s2=0.80)
-10. Remaining error analysis: trustworthy->disputed errors still dominated by numerical_near_miss and methodology_difference — may need subcategory-specific rules or more training data
+10. ~~Sweet-spot threshold tuning~~ DONE (s2=0.785: disputed 89.7%, trustworthy 70.6%, D->T still 3)
+11. Remaining error analysis: trustworthy->disputed errors still dominated by numerical_near_miss and methodology_difference — may need subcategory-specific rules or more training data
 
 ---
 

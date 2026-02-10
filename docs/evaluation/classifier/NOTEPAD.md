@@ -1,7 +1,7 @@
 # Governance Classifier — Living Notepad
 
 **Goal**: Replace hand-coded `AnswerGovernor.decide()` priority rules with a trained tabular classifier.
-**Status**: **Production-integrated, safety-first tuned**. GovernanceDecider replaces AnswerGovernor. Abstain 81.2%, Disputed 89.7%, Trustworthy 69.1%. Safety-first threshold (s2=0.80): catches 9/10 conflicts, trades unnecessary hedging over false confidence. 1456 tests pass.
+**Status**: **Production-integrated, sweet-spot tuned**. GovernanceDecider replaces AnswerGovernor. Abstain 81.2%, Disputed 89.7%, Trustworthy 70.6%. Sweet-spot threshold (s2=0.785): crosses 70% trustworthy while keeping disputed at 89.7% and only 3 dangerous errors. 1456 tests pass.
 
 ---
 
