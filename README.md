@@ -9,7 +9,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.8.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.8.1-green.svg)](CHANGELOG.md)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
 
 
@@ -236,7 +236,8 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
   │ Conflict Detection  │     
   └──────────┬──────────┘
              │                Consistent evidence found
-             └──────────────► NO ──► TRUSTWORTHY (70.6% recall)           
+             └──────────────► NO ──► TRUSTWORTHY (70.6% recall)          
+              
 ```
 
 <br>
