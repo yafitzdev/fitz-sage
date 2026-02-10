@@ -2460,7 +2460,8 @@ Saved as `model_v5_calibrated.joblib`.
 | Two-stage (formal) | Feb 9 | 82.96% | model_v5, best accuracy |
 | Two-stage calibrated | Feb 9 | 80.72% | min recall 76.9%, model_v5_calibrated |
 | Two-stage + inter-chunk (v7) | Feb 10 | 78.92% | +10.5pp Stage 2 CV, model_v7 |
-| **Two-stage + parity fix (v8)** | **Feb 10** | **78.92%** | **51 features, production parity, model_v5 overwritten** |
+| Two-stage + parity fix (v8) | Feb 10 | 78.92% | 51 features, production parity, model_v5 overwritten |
+| **Safety-first (s2=0.80)** | **Feb 10** | **75.3%** | **Disputed 89.7%, trustworthy 69.1%. Production model.** |
 
 ### Dead Code & Feature Audit
 
@@ -2608,6 +2609,30 @@ Executed cleanup from audit findings:
 
 **Model artifacts**: model_v5_twostage.joblib (overwritten), model_v5_calibrated.joblib (overwritten)
 
+### Production Integration (Feb 10, 2026)
+
+New `GovernanceDecider` class replaces `AnswerGovernor` in the RAG pipeline:
+- Loads calibrated two-stage model at init (once)
+- Runs feature preparation + prediction at query time (~1ms)
+- Maps 3-class output to 4-class AnswerMode:
+  - abstain -> ABSTAIN, disputed -> DISPUTED
+  - trustworthy + constraints fired -> QUALIFIED
+  - trustworthy + no constraints -> CONFIDENT
+- Fail-open: any error falls back to AnswerGovernor (rule-based)
+- 16 new tests, 1456 total pass
+
+### Safety-First Threshold Tuning (Feb 10, 2026)
+
+Raised Stage 2 confidence threshold from 0.75 to 0.80 to align with core design principle: "hedging is annoying but harmless, false confidence is dangerous."
+
+| Class | Before (0.75) | After (0.80) | Delta |
+|-------|---------------|--------------|-------|
+| Abstain | 81.2% | 81.2% | 0.0pp |
+| Disputed | 79.5% | **89.7%** | **+10.2pp** |
+| Trustworthy | 77.9% | 69.1% | -8.8pp |
+
+Trade-off: 31% of trustworthy answers get unnecessarily hedged (annoying), but 90% of real conflicts get caught (safe). The "cost" in trustworthy recall is weighted by the class being 3.5x larger than disputed in the test set, which makes overall accuracy drop even though the net effect is positive for safety.
+
 ### Next Steps
 
 1. ~~Formalize two-stage training pipeline in `train_classifier.py`~~ DONE (82.96%)
@@ -2618,7 +2643,8 @@ Executed cleanup from audit findings:
 6. ~~Proposal 1b: Deterministic text features~~ DONE (Stage 2 CV +10.5pp, min recall +1.0pp)
 7. ~~Proposal 2: Feature parity fix~~ DONE (12 features ported to production, no regression)
 8. ~~Integrate two-stage model into production pipeline~~ DONE (GovernanceDecider, 1456 tests pass)
-9. Remaining error analysis: 23 trustworthy->disputed still dominated by numerical_near_miss and methodology_difference — may need subcategory-specific rules or more training data
+9. ~~Safety-first threshold tuning~~ DONE (disputed 89.7%, s2=0.80)
+10. Remaining error analysis: trustworthy->disputed errors still dominated by numerical_near_miss and methodology_difference — may need subcategory-specific rules or more training data
 
 ---
 

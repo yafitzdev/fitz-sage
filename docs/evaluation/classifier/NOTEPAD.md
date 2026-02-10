@@ -1,7 +1,7 @@
 # Governance Classifier — Living Notepad
 
 **Goal**: Replace hand-coded `AnswerGovernor.decide()` priority rules with a trained tabular classifier.
-**Status**: **Production-integrated**. GovernanceDecider replaces AnswerGovernor in pipeline. Two-stage ML classifier (82.06% raw, 78.92% calibrated, 77.9% min recall) with fail-open fallback. 1456 tests pass.
+**Status**: **Production-integrated, safety-first tuned**. GovernanceDecider replaces AnswerGovernor. Abstain 81.2%, Disputed 89.7%, Trustworthy 69.1%. Safety-first threshold (s2=0.80): catches 9/10 conflicts, trades unnecessary hedging over false confidence. 1456 tests pass.
 
 ---
 
@@ -1565,3 +1565,4 @@ Removing dead features should NOT hurt accuracy (they contribute zero informatio
 | 2026-02-10 | **Proposal 1b: Deterministic inter-chunk features — SUCCESS**. Added 5 Tier 2b features computed from chunk text (no LLM): max_pairwise_overlap, min_pairwise_overlap, chunk_length_cv, assertion_density, number_density. chunk_length_cv has Cohen's d=0.424 within ca_fired=True (disputed chunks have higher length variance). Stage 2 CV: 74.3%→**84.8%** (+10.5pp). Calibrated: 78.92% accuracy, min recall **77.9%** (+1.0pp). Total errors 65→47 (-28%). model_v7_twostage/calibrated saved. |
 | 2026-02-10 | **Proposal 2: Feature parity fix + targeted engineering — SUCCESS**. Ported 10 ctx_* features + 2 temporal features from train_classifier.py->feature_extractor.py (production parity fix). Added TF-IDF cosine similarity (ctx_max/mean/min_pairwise_sim), contradiction/negation markers, numerical variance, year_count, has_distinct_years. Total features: 38->51. Offline extraction via _extract_v8.py (no 30min re-run). v8 model: 82.06% raw accuracy, Stage 2 CV 84.47%. Calibrated: 78.92% accuracy, min recall 77.9% (s1=0.50, s2=0.75). Production feature gap closed -- all training features now available at inference. model_v5_twostage/calibrated overwritten with v8 features. |
 | 2026-02-10 | **Production integration: GovernanceDecider**. New `GovernanceDecider` class replaces `AnswerGovernor` in pipeline. Loads calibrated two-stage model at init, runs feature preparation + prediction at query time. Maps 3-class (abstain/disputed/trustworthy) to 4-class AnswerMode (trustworthy + constraints fired -> QUALIFIED, trustworthy + no constraints -> CONFIDENT). Fail-open: falls back to AnswerGovernor on any error. 16 new tests + 1456 total pass. |
+| 2026-02-10 | **Safety-first threshold tuning**. Raised Stage 2 threshold from 0.75 to 0.80. Disputed recall 79.5% -> **89.7%** (+10.2pp), trustworthy recall 77.9% -> 69.1% (-8.8pp). Aligns with core principle: hedging is annoying but harmless, false confidence is dangerous. 9/10 real conflicts now caught. |
