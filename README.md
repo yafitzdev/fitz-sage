@@ -217,26 +217,22 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
             ▼
   ┌─────────────────────┐
   │ 5 Constraints       │     Contradiction detection, evidence sufficiency,
-  │ (epistemic sensors) │     causal attribution, answer verification,
-  │                     │     specific info type
+  │ (epistemic sensors) │     causal attribution, answer verification, specific info type
   └──────────┬──────────┘
-             │
              │ 51 features extracted
              ▼
   ┌─────────────────────┐
   │ Stage 1: RF         │     Can the evidence answer this query?
-  │ Answerability       ├───► NO  ──► ABSTAIN  (81.2% recall)
+  │ Answerability       ├───► NO ──► ABSTAIN (81.2% recall)
   └──────────┬──────────┘
              │ YES
              ▼
-  ┌─────────────────────┐
-  │ Stage 2: ET         │     Do the sources conflict?
-  │ Conflict Detection  ├───► YES ──► DISPUTED (89.7% recall)
+  ┌─────────────────────┐     Do the sources conflict?
+  │ Stage 2: ET         ├───► YES ──► DISPUTED (89.7% recall)
+  │ Conflict Detection  │     
   └──────────┬──────────┘
-             │ NO
-             ▼
-        TRUSTWORTHY           Consistent evidence found
-        (70.6% recall)
+             │                Consistent evidence found
+             └──────────────► NO ──► TRUSTWORTHY (70.6% recall)           
 ```
 
 | Decision | Meaning                              | Recall |
@@ -248,7 +244,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 > [!NOTE]
 > Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. 92% of our test cases are rated "hard."
 
->1. [X] **The system fails safe.** The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence (the dangerous failure) is the rarest error mode: only 3 cases in 1,100+.
+>1. [X] **The system fails safe.** The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence ("trustworthy" instead of "disputed") is the rarest error mode: only 3 cases in 1,100+.
 >
 >2. [X] **These scores are a floor, not a ceiling.** All benchmarks were measured using `qwen2.5:3b` — a 3B parameter local model. The governance constraints run on the fast-tier LLM to keep latency low. Stronger models produce better constraint signals, which feed better features into the classifier. Upgrading your chat provider should improve governance accuracy for free.
 >
