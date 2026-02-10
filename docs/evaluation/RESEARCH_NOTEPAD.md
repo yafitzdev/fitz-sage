@@ -2458,7 +2458,9 @@ Saved as `model_v5_calibrated.joblib`.
 | 3-class single GBT | Feb 9 | 72.7% | Class collapse |
 | Two-stage (simulation) | Feb 9 | 78.5% | Quick estimates |
 | Two-stage (formal) | Feb 9 | 82.96% | model_v5, best accuracy |
-| **Two-stage calibrated** | **Feb 9** | **80.72%** | **min recall 76.9%, model_v5_calibrated** |
+| Two-stage calibrated | Feb 9 | 80.72% | min recall 76.9%, model_v5_calibrated |
+| Two-stage + inter-chunk (v7) | Feb 10 | 78.92% | +10.5pp Stage 2 CV, model_v7 |
+| **Two-stage + parity fix (v8)** | **Feb 10** | **78.92%** | **51 features, production parity, model_v5 overwritten** |
 
 ### Dead Code & Feature Audit
 
@@ -2558,6 +2560,54 @@ Executed cleanup from audit findings:
 
 **Model artifacts**: `model_v7_twostage.joblib`, `model_v7_calibrated.joblib`
 
+### Proposal 2: Feature Parity Fix + Targeted Engineering — SUCCESS (Feb 10, 2026)
+
+**Problem**: Critical production gap — the top 3 Stage 2 features by importance (ctx_length_mean, ctx_total_chars, ctx_length_std) only existed at training time in `train_classifier.py:compute_context_features()`. They were NOT in production `feature_extractor.py`. Training-time features that don't exist at inference time mean the model runs on different data in production.
+
+**Implementation**:
+1. Ported all ctx_* features from train_classifier.py to feature_extractor.py's `_extract_interchunk_features()`
+2. Added TF-IDF cosine similarity features (ctx_max/mean/min_pairwise_sim)
+3. Added contradiction markers, negation counts, numerical variance
+4. Added temporal features (year_count, has_distinct_years)
+5. Made train_classifier.py skip enrichment when ctx_* already present in CSV
+6. Created `_extract_v8.py` for offline feature computation from test case JSONs (no 30min pipeline re-run)
+
+**Features added to production** (12 new):
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| ctx_length_mean | train_classifier.py | Mean character length of chunks |
+| ctx_length_std | train_classifier.py | Std dev of chunk character lengths |
+| ctx_total_chars | train_classifier.py | Total characters across all chunks |
+| ctx_contradiction_count | train_classifier.py | Count of contradiction markers in text |
+| ctx_negation_count | train_classifier.py | Count of negation words |
+| ctx_number_count | train_classifier.py | Count of numeric values extracted |
+| ctx_number_variance | train_classifier.py | Population variance of extracted numbers |
+| ctx_max_pairwise_sim | train_classifier.py | Max TF-IDF cosine similarity between chunk pairs |
+| ctx_mean_pairwise_sim | train_classifier.py | Mean TF-IDF cosine similarity |
+| ctx_min_pairwise_sim | train_classifier.py | Min TF-IDF cosine similarity |
+| year_count | new | Count of distinct years mentioned |
+| has_distinct_years | new | Whether multiple different years appear |
+
+**Dataset**: eval_results_v8_full.csv (1113 rows x 51 cols)
+
+**Results**:
+
+| Metric | v7 (Proposal 1b) | v8 (Proposal 2) | Delta |
+|--------|------------------|------------------|-------|
+| Raw accuracy | 80.27% | 82.06% | +1.8pp |
+| Stage 2 CV | 84.8% | 84.47% | -0.3pp |
+| Calibrated accuracy | 78.92% | 78.92% | 0.0pp |
+| Calibrated min recall | 77.9% | 77.9% | 0.0pp |
+| Disputed recall (cal) | 79.5% | 79.5% | 0.0pp |
+| Optimal thresholds | s1=0.50, s2=0.70 | s1=0.50, s2=0.75 | s2 tighter |
+
+**Key insight**: The accuracy results are nearly identical, which is expected — the ctx_* features were already being computed at training time by `compute_context_features()`. The win is architectural: closing the train/inference feature gap ensures the model in production sees the same data it was trained on. Without this fix, the model would silently degrade in production because its top features (ctx_length_mean, ctx_total_chars, ctx_length_std) would all be zero at inference time.
+
+**Files changed**: feature_extractor.py (ported 12 features), eval_pipeline.py (feature lists), train_classifier.py (skip logic), calibrate_thresholds.py (skip logic), _extract_v8.py (new, offline extraction)
+
+**Model artifacts**: model_v5_twostage.joblib (overwritten), model_v5_calibrated.joblib (overwritten)
+
 ### Next Steps
 
 1. ~~Formalize two-stage training pipeline in `train_classifier.py`~~ DONE (82.96%)
@@ -2566,8 +2616,9 @@ Executed cleanup from audit findings:
 4. ~~Execute feature cleanup~~ DONE (826 lines deleted, no regression)
 5. ~~Proposal 1: CA quality features via scoring prompt~~ FAILED (fast LLM can't score)
 6. ~~Proposal 1b: Deterministic text features~~ DONE (Stage 2 CV +10.5pp, min recall +1.0pp)
-7. Integrate two-stage model into production pipeline (`GovernanceDecider`)
-8. Remaining error analysis: 23 trustworthy->disputed still dominated by numerical_near_miss and methodology_difference — may need subcategory-specific rules or more training data
+7. ~~Proposal 2: Feature parity fix~~ DONE (12 features ported to production, no regression)
+8. Integrate two-stage model into production pipeline (`GovernanceDecider`)
+9. Remaining error analysis: 23 trustworthy->disputed still dominated by numerical_near_miss and methodology_difference — may need subcategory-specific rules or more training data
 
 ---
 

@@ -100,7 +100,15 @@ def prepare_features(
 
 
 def enrich_with_context_features(df: pd.DataFrame, data_dir: Path) -> pd.DataFrame:
-    """Add context-based features by loading original fitz-gov cases."""
+    """Add context-based features by loading original fitz-gov cases.
+
+    Skips if ctx_* features are already present (from feature_extractor.py).
+    """
+    ctx_cols = [c for c in df.columns if c.startswith("ctx_")]
+    if ctx_cols:
+        print(f"  Context features already present in CSV ({len(ctx_cols)} cols), skipping enrichment")
+        return df
+
     print(f"Computing context features from {data_dir}...")
     cases = load_cases_by_id(data_dir)
 

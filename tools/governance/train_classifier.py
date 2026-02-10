@@ -72,6 +72,7 @@ _BOOL_FEATURES = {
     "sit_fired", "sit_entity_mismatch", "sit_has_specific_info",
     "has_qualified_signal",
     "detection_temporal", "detection_comparison",
+    "has_distinct_years",
 }
 
 # Markers for context feature extraction
@@ -167,7 +168,17 @@ def compute_context_features(query: str, contexts: list[str]) -> dict[str, float
 
 
 def enrich_with_context_features(df: pd.DataFrame, data_dir: Path) -> pd.DataFrame:
-    """Add context-based features by loading original fitz-gov cases."""
+    """Add context-based features by loading original fitz-gov cases.
+
+    Skips features that are already present in the DataFrame (e.g. when
+    feature_extractor.py already computed them during eval_pipeline extraction).
+    """
+    # Check if ctx_* features are already in the CSV (from feature_extractor.py)
+    ctx_cols = [c for c in df.columns if c.startswith("ctx_")]
+    if ctx_cols:
+        print(f"  Context features already present in CSV ({len(ctx_cols)} cols), skipping enrichment")
+        return df
+
     print(f"Computing context features from {data_dir}...")
     cases = load_cases_by_id(data_dir)
 

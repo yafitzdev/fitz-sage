@@ -141,11 +141,15 @@ def _extract_chunk_features(
         features["mean_vector_score"] = None
         features["score_spread"] = None
         features["vocab_overlap_ratio"] = 0.0
-        features["max_pairwise_overlap"] = 0.0
-        features["min_pairwise_overlap"] = 0.0
-        features["chunk_length_cv"] = 0.0
-        features["assertion_density"] = 0.0
-        features["number_density"] = 0.0
+        # Inter-chunk defaults (including ctx_* features)
+        for k in ("max_pairwise_overlap", "min_pairwise_overlap", "chunk_length_cv",
+                   "assertion_density", "number_density", "ctx_length_mean",
+                   "ctx_length_std", "ctx_total_chars", "ctx_contradiction_count",
+                   "ctx_negation_count", "ctx_number_count", "ctx_number_variance",
+                   "ctx_max_pairwise_sim", "ctx_mean_pairwise_sim", "ctx_min_pairwise_sim"):
+            features[k] = 0.0
+        features["year_count"] = 0
+        features["has_distinct_years"] = False
         return
 
     # Source diversity
@@ -214,71 +218,155 @@ _ASSERTION_WORDS = {
 }
 
 _NUMBER_RE = re.compile(r"\b\d+(?:\.\d+)?(?:%|st|nd|rd|th)?\b")
+_PLAIN_NUMBER_RE = re.compile(r"\b\d+\.?\d*\b")
+_YEAR_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")
+
+_CONTRADICTION_MARKERS = [
+    "however", "but", "although", "contrary", "disagree", "whereas",
+    "nevertheless", "conversely", "despite", "in contrast", "on the other hand",
+    "contradicts", "inconsistent", "conflicts with", "differs from",
+]
+_NEGATION_WORDS = {
+    "not", "no", "never", "neither", "nor", "none", "nothing",
+    "hardly", "barely", "scarcely", "doesn't", "don't", "isn't",
+    "wasn't", "weren't", "won't", "can't", "couldn't", "shouldn't",
+}
 
 
 def _extract_interchunk_features(
     features: dict[str, Any], chunks: Sequence[Chunk]
 ) -> None:
-    """Extract inter-chunk text relationship features (deterministic, no LLM)."""
+    """Extract inter-chunk text relationship features (deterministic, no LLM).
+
+    Includes features previously only available at training time via
+    train_classifier.py compute_context_features(). All features here are
+    available at both training and inference time.
+    """
+    _defaults = {
+        "max_pairwise_overlap": 0.0, "min_pairwise_overlap": 0.0,
+        "chunk_length_cv": 0.0, "assertion_density": 0.0, "number_density": 0.0,
+        "ctx_length_mean": 0.0, "ctx_length_std": 0.0, "ctx_total_chars": 0.0,
+        "ctx_contradiction_count": 0.0, "ctx_negation_count": 0.0,
+        "ctx_number_count": 0.0, "ctx_number_variance": 0.0,
+        "ctx_max_pairwise_sim": 0.0, "ctx_mean_pairwise_sim": 0.0,
+        "ctx_min_pairwise_sim": 0.0,
+        "year_count": 0, "has_distinct_years": False,
+    }
     if len(chunks) < 2:
-        features["max_pairwise_overlap"] = 0.0
-        features["min_pairwise_overlap"] = 0.0
-        features["chunk_length_cv"] = 0.0
-        features["assertion_density"] = 0.0
-        features["number_density"] = 0.0
+        features.update(_defaults)
         return
 
-    # Precompute word sets for each chunk (content words only)
+    # Precompute per-chunk data
+    texts = [c.content for c in chunks]
     chunk_word_sets = []
     chunk_lengths = []
+    char_lengths = []
     total_hedge = 0
     total_assert = 0
     total_numbers = 0
-    total_words = 0
+    all_text_lower = ""
+    all_numbers: list[float] = []
+    all_years: set[str] = set()
 
     for c in chunks:
-        words = c.content.lower().split()
+        text = c.content
+        text_lower = text.lower()
+        all_text_lower += " " + text_lower
+
+        words = text_lower.split()
         content_words = set(words) - _STOP_WORDS
         chunk_word_sets.append(content_words)
         chunk_lengths.append(len(words))
-        total_words += len(words)
+        char_lengths.append(len(text))
 
         word_set = set(words)
         total_hedge += len(word_set & _HEDGE_WORDS)
         total_assert += len(word_set & _ASSERTION_WORDS)
-        total_numbers += len(_NUMBER_RE.findall(c.content))
+        total_numbers += len(_NUMBER_RE.findall(text))
 
-    # Pairwise Jaccard overlap
+        for m in _PLAIN_NUMBER_RE.finditer(text):
+            try:
+                all_numbers.append(float(m.group(0)))
+            except ValueError:
+                pass
+        for ym in _YEAR_RE.finditer(text):
+            all_years.add(ym.group(0))
+
+    # --- Pairwise Jaccard overlap ---
     overlaps = []
     for i in range(len(chunk_word_sets)):
         for j in range(i + 1, len(chunk_word_sets)):
             a, b = chunk_word_sets[i], chunk_word_sets[j]
             union = a | b
-            if union:
-                overlaps.append(len(a & b) / len(union))
-            else:
-                overlaps.append(0.0)
+            overlaps.append(len(a & b) / len(union) if union else 0.0)
 
     features["max_pairwise_overlap"] = max(overlaps) if overlaps else 0.0
     features["min_pairwise_overlap"] = min(overlaps) if overlaps else 0.0
 
-    # Chunk length coefficient of variation
+    # --- Chunk length coefficient of variation ---
     mean_len = statistics.mean(chunk_lengths)
     if mean_len > 0 and len(chunk_lengths) > 1:
-        std_len = statistics.stdev(chunk_lengths)
-        features["chunk_length_cv"] = std_len / mean_len
+        features["chunk_length_cv"] = statistics.stdev(chunk_lengths) / mean_len
     else:
         features["chunk_length_cv"] = 0.0
 
-    # Assertion vs hedge density (assertion_density > 0 = more assertive, < 0 = more hedged)
+    # --- Assertion vs hedge density ---
     epistemic_total = total_assert + total_hedge
     if epistemic_total > 0:
         features["assertion_density"] = (total_assert - total_hedge) / epistemic_total
     else:
         features["assertion_density"] = 0.0
 
-    # Number density (numbers per chunk)
+    # --- Number density (numbers per chunk) ---
     features["number_density"] = total_numbers / len(chunks)
+
+    # --- Context length stats (ported from train_classifier.py) ---
+    features["ctx_length_mean"] = statistics.mean(char_lengths)
+    features["ctx_length_std"] = statistics.pstdev(char_lengths)
+    features["ctx_total_chars"] = sum(char_lengths)
+
+    # --- Contradiction and negation markers ---
+    features["ctx_contradiction_count"] = float(
+        sum(1 for m in _CONTRADICTION_MARKERS if m in all_text_lower)
+    )
+    all_words = all_text_lower.split()
+    features["ctx_negation_count"] = float(
+        sum(1 for w in all_words if w in _NEGATION_WORDS)
+    )
+
+    # --- Numerical content ---
+    features["ctx_number_count"] = float(len(all_numbers))
+    if len(all_numbers) > 1:
+        mean_n = sum(all_numbers) / len(all_numbers)
+        features["ctx_number_variance"] = float(
+            sum((x - mean_n) ** 2 for x in all_numbers) / len(all_numbers)
+        )
+    else:
+        features["ctx_number_variance"] = 0.0
+
+    # --- TF-IDF pairwise similarity ---
+    try:
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.metrics.pairwise import cosine_similarity as _cos_sim
+
+        tfidf = TfidfVectorizer(max_features=500, stop_words="english")
+        matrix = tfidf.fit_transform(texts)
+        sim_matrix = _cos_sim(matrix)
+        n = sim_matrix.shape[0]
+        pairwise_sims = [
+            float(sim_matrix[i, j]) for i in range(n) for j in range(i + 1, n)
+        ]
+        features["ctx_max_pairwise_sim"] = max(pairwise_sims)
+        features["ctx_mean_pairwise_sim"] = sum(pairwise_sims) / len(pairwise_sims)
+        features["ctx_min_pairwise_sim"] = min(pairwise_sims)
+    except Exception:
+        features["ctx_max_pairwise_sim"] = 0.0
+        features["ctx_mean_pairwise_sim"] = 0.0
+        features["ctx_min_pairwise_sim"] = 0.0
+
+    # --- Temporal features ---
+    features["year_count"] = len(all_years)
+    features["has_distinct_years"] = len(all_years) > 1
 
 
 def _extract_detection_features(

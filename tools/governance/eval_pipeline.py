@@ -57,6 +57,7 @@ _BOOL_FEATURES = {
     "sit_fired", "sit_entity_mismatch", "sit_has_specific_info",
     "has_qualified_signal",
     "detection_temporal", "detection_comparison",
+    "has_distinct_years",
 }
 
 _NUMERIC_FEATURES = {
@@ -68,6 +69,11 @@ _NUMERIC_FEATURES = {
     "vocab_overlap_ratio",
     "max_pairwise_overlap", "min_pairwise_overlap",
     "chunk_length_cv", "assertion_density", "number_density",
+    "ctx_length_mean", "ctx_length_std", "ctx_total_chars",
+    "ctx_contradiction_count", "ctx_negation_count",
+    "ctx_number_count", "ctx_number_variance",
+    "ctx_max_pairwise_sim", "ctx_mean_pairwise_sim", "ctx_min_pairwise_sim",
+    "year_count",
 }
 
 _STRING_FEATURES = {
