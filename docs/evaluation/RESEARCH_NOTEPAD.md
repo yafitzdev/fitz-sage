@@ -2474,14 +2474,100 @@ Comprehensive audit of all 47 features in the classifier pipeline:
 
 **Total**: 18 removable features (38% of 47), ~700 lines dead code. Remaining: ~29 clean features.
 
+### Dead Code Cleanup (Feb 9, 2026)
+
+Executed cleanup from audit findings:
+- Removed 18 dead features from feature_extractor.py, eval_pipeline.py, train_classifier.py
+- Deleted 2 unused plugin files: deterministic_conflict.py (359 lines), governance_analyzer.py (241 lines)
+- Removed 3 dead factory functions from guardrails/__init__.py
+- Fixed 4 tests that assumed old behavior
+- **826 lines deleted total**
+- Retrained model_v6 on 29 clean features: **80.72% accuracy** (identical to pre-cleanup)
+- No regression — dead features confirmed dead
+
+### Proposal 1: Contradiction Quality Features — FAILED (Feb 9, 2026)
+
+**Hypothesis**: Replace binary CONTRADICT/AGREE prompt with continuous scoring (SCORE: 0-10) + type classification (numerical/opposing/temporal/framing/compatible). Give the classifier richer signal about HOW contradictory sources are, not just IF they contradict.
+
+**Implementation**:
+- Changed CONTRADICTION_PROMPT to request "SCORE: N TYPE: word" format
+- Added `_parse_score_response()` parser for the new format
+- Changed `_check_pairwise_contradiction()` return from `bool` to `tuple[bool, int, str]`
+- Changed `_check_pairwise_fusion()` similarly (vote count → score mapping: 0→0, 1→3, 2→7, 3→10)
+- Added 4 new features: ca_max_score, ca_mean_score, ca_contradiction_type, ca_score_spread
+- Integrated into feature_extractor.py, eval_pipeline.py, train_classifier.py
+
+**Testing**:
+- Smoke test with 5 cases: ALL scores returned as 10 regardless of content
+- Direct LLM testing confirmed: qwen2.5:3b (fast model) **always returns "SCORE: 10"**
+- Even clearly compatible texts (two paragraphs about Paris being the capital of France) get SCORE: 10 TYPE: framing
+- The 3B model fundamentally cannot handle 0-10 scaling
+
+**Follow-up test (type-only classification)**:
+- Simplified to just type classification: "Pick ONE: numerical, opposing, temporal, framing, compatible"
+- Results: 1/4 correct (only "opposing" detected correctly)
+- numerical→opposing (MISS), opposing→opposing (OK), framing→compatible (MISS), temporal→opposing (MISS)
+- The 3B model also lacks nuance for type classification
+
+**Root cause**: Small language models (3B parameters) lack the calibration to produce meaningful scalar scores or fine-grained classifications. They can handle binary yes/no decisions (CONTRADICT/AGREE) reasonably well but cannot distinguish between "slight tension" (score 3) and "direct contradiction" (score 10).
+
+**Result**: All changes reverted. The "zero additional LLM cost" assumption is invalid.
+
+**Implications for next steps**:
+1. Cannot get richer CA features from the fast LLM — it's limited to binary decisions
+2. Two-tier approach (smart LLM for uncertain cases) is the only path for LLM-based scoring
+3. Alternative: derive features from deterministic text analysis (no LLM) — overlap ratios, sentiment polarity, hedge word density, number extraction
+4. Alternative: more dataset cases in the hardest subcategories (binary_conflict, opposing_conclusions) where the classifier struggles most
+
+### Proposal 1b: Deterministic Inter-Chunk Features — SUCCESS (Feb 10, 2026)
+
+**Hypothesis**: Since the fast LLM can't provide scoring nuance, derive discrimination signal from deterministic text analysis of chunks. No LLM calls needed — purely Tier 2 features.
+
+**Features added** (in `feature_extractor.py`):
+
+| Feature | Description | Cohen's d (Stage 2, within ca_fired=True) |
+|---------|-------------|------|
+| `chunk_length_cv` | Coefficient of variation of chunk word counts | **0.424** |
+| `max_pairwise_overlap` | Max Jaccard overlap between any two chunks | 0.146 |
+| `min_pairwise_overlap` | Min Jaccard overlap between any two chunks | 0.139 |
+| `number_density` | Numbers per chunk | 0.114 |
+| `assertion_density` | (assertions - hedges) / (assertions + hedges) | 0.006 |
+
+**Key insight**: `chunk_length_cv` is the strongest new discriminator. Disputed cases have significantly higher chunk length variance (mean 0.181 vs 0.120 for trustworthy within ca_fired=True). Intuitively: when sources have very different sizes, they're more likely from different contexts, increasing real contradiction risk.
+
+**Results**:
+
+| Metric | Previous (v6) | New (v7) | Delta |
+|--------|--------------|----------|-------|
+| Stage 2 CV | 74.3% | **84.8%** | **+10.5pp** |
+| Raw accuracy | 82.96% | 80.27% | -2.7pp |
+| Calibrated accuracy | 80.72% | 78.92% | -1.8pp |
+| Calibrated min recall | 76.9% | **77.9%** | **+1.0pp** |
+| Disputed recall (cal) | 76.9% | **79.5%** | **+2.6pp** |
+| Total test errors | 65 | **47** | **-28%** |
+
+**Error profile (calibrated, 47 errors)**:
+- trustworthy->disputed: 23 (48.9%) — still dominant, top subs: numerical_near_miss (3), methodology_difference (3)
+- abstain->trustworthy: 8 (17.0%)
+- trustworthy->abstain: 7 (14.9%) — mainly partial_answer (5)
+- disputed->trustworthy: 7 (14.9%) — mainly opposing_conclusions (3), temporal_conflict (2)
+
+**Stage 2 top features**: ctx_length_mean (#1), ctx_total_chars (#2), ctx_length_std (#3), ca_fired (#4), mean_vector_score (#5), ctx_max_pairwise_sim (#6), ctx_min_pairwise_sim (#7), ctx_mean_pairwise_sim (#8), **chunk_length_cv (#9)**, score_spread (#10)
+
+**Files changed**: `feature_extractor.py` (added 5 features), `eval_pipeline.py` (added to _NUMERIC_FEATURES)
+
+**Model artifacts**: `model_v7_twostage.joblib`, `model_v7_calibrated.joblib`
+
 ### Next Steps
 
 1. ~~Formalize two-stage training pipeline in `train_classifier.py`~~ DONE (82.96%)
 2. ~~Calibrate per-stage confidence thresholds~~ DONE (80.72%, min recall 76.9%)
 3. ~~Dead feature audit~~ DONE (18 removable features, 700 lines dead code)
-4. Execute feature cleanup: remove 18 dead features, retrain on 29-feature set
-5. Richer CA features for Stage 2 disputed detection (pair count, severity)
-6. Integrate two-stage model into production pipeline (`GovernanceDecider`)
+4. ~~Execute feature cleanup~~ DONE (826 lines deleted, no regression)
+5. ~~Proposal 1: CA quality features via scoring prompt~~ FAILED (fast LLM can't score)
+6. ~~Proposal 1b: Deterministic text features~~ DONE (Stage 2 CV +10.5pp, min recall +1.0pp)
+7. Integrate two-stage model into production pipeline (`GovernanceDecider`)
+8. Remaining error analysis: 23 trustworthy->disputed still dominated by numerical_near_miss and methodology_difference — may need subcategory-specific rules or more training data
 
 ---
 

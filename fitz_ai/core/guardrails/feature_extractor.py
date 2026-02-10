@@ -16,6 +16,7 @@ abstain, disputed, trustworthy.
 
 from __future__ import annotations
 
+import re
 import statistics
 from typing import TYPE_CHECKING, Any, Sequence
 
@@ -140,6 +141,11 @@ def _extract_chunk_features(
         features["mean_vector_score"] = None
         features["score_spread"] = None
         features["vocab_overlap_ratio"] = 0.0
+        features["max_pairwise_overlap"] = 0.0
+        features["min_pairwise_overlap"] = 0.0
+        features["chunk_length_cv"] = 0.0
+        features["assertion_density"] = 0.0
+        features["number_density"] = 0.0
         return
 
     # Source diversity
@@ -169,15 +175,7 @@ def _extract_chunk_features(
 
     # Vocabulary overlap between query and chunks
     query_words = set(query.lower().split())
-    # Remove common stop words
-    stop_words = {"the", "a", "an", "is", "are", "was", "were", "be", "been",
-                  "being", "have", "has", "had", "do", "does", "did", "will",
-                  "would", "could", "should", "may", "might", "can", "shall",
-                  "in", "on", "at", "to", "for", "of", "with", "by", "from",
-                  "and", "or", "but", "not", "no", "if", "then", "than",
-                  "that", "this", "these", "those", "what", "which", "who",
-                  "how", "when", "where", "why", "it", "its"}
-    query_content_words = query_words - stop_words
+    query_content_words = query_words - _STOP_WORDS
     if query_content_words:
         chunk_text = " ".join(c.content.lower() for c in chunks)
         chunk_words = set(chunk_text.split())
@@ -186,6 +184,101 @@ def _extract_chunk_features(
     else:
         features["vocab_overlap_ratio"] = 0.0
 
+    # Inter-chunk text features (Tier 2b — deterministic, no LLM)
+    _extract_interchunk_features(features, chunks)
+
+
+
+_STOP_WORDS = {
+    "the", "a", "an", "is", "are", "was", "were", "be", "been",
+    "being", "have", "has", "had", "do", "does", "did", "will",
+    "would", "could", "should", "may", "might", "can", "shall",
+    "in", "on", "at", "to", "for", "of", "with", "by", "from",
+    "and", "or", "but", "not", "no", "if", "then", "than",
+    "that", "this", "these", "those", "what", "which", "who",
+    "how", "when", "where", "why", "it", "its",
+}
+
+_HEDGE_WORDS = {
+    "may", "might", "could", "possibly", "perhaps", "likely", "unlikely",
+    "sometimes", "often", "typically", "generally", "usually", "probably",
+    "approximately", "roughly", "about", "around", "estimated", "suggests",
+    "appears", "seems", "potentially", "tends",
+}
+
+_ASSERTION_WORDS = {
+    "always", "never", "must", "certainly", "definitely", "clearly",
+    "obviously", "undoubtedly", "absolutely", "exactly", "precisely",
+    "proven", "confirmed", "established", "demonstrates", "proves",
+    "invariably", "unquestionably",
+}
+
+_NUMBER_RE = re.compile(r"\b\d+(?:\.\d+)?(?:%|st|nd|rd|th)?\b")
+
+
+def _extract_interchunk_features(
+    features: dict[str, Any], chunks: Sequence[Chunk]
+) -> None:
+    """Extract inter-chunk text relationship features (deterministic, no LLM)."""
+    if len(chunks) < 2:
+        features["max_pairwise_overlap"] = 0.0
+        features["min_pairwise_overlap"] = 0.0
+        features["chunk_length_cv"] = 0.0
+        features["assertion_density"] = 0.0
+        features["number_density"] = 0.0
+        return
+
+    # Precompute word sets for each chunk (content words only)
+    chunk_word_sets = []
+    chunk_lengths = []
+    total_hedge = 0
+    total_assert = 0
+    total_numbers = 0
+    total_words = 0
+
+    for c in chunks:
+        words = c.content.lower().split()
+        content_words = set(words) - _STOP_WORDS
+        chunk_word_sets.append(content_words)
+        chunk_lengths.append(len(words))
+        total_words += len(words)
+
+        word_set = set(words)
+        total_hedge += len(word_set & _HEDGE_WORDS)
+        total_assert += len(word_set & _ASSERTION_WORDS)
+        total_numbers += len(_NUMBER_RE.findall(c.content))
+
+    # Pairwise Jaccard overlap
+    overlaps = []
+    for i in range(len(chunk_word_sets)):
+        for j in range(i + 1, len(chunk_word_sets)):
+            a, b = chunk_word_sets[i], chunk_word_sets[j]
+            union = a | b
+            if union:
+                overlaps.append(len(a & b) / len(union))
+            else:
+                overlaps.append(0.0)
+
+    features["max_pairwise_overlap"] = max(overlaps) if overlaps else 0.0
+    features["min_pairwise_overlap"] = min(overlaps) if overlaps else 0.0
+
+    # Chunk length coefficient of variation
+    mean_len = statistics.mean(chunk_lengths)
+    if mean_len > 0 and len(chunk_lengths) > 1:
+        std_len = statistics.stdev(chunk_lengths)
+        features["chunk_length_cv"] = std_len / mean_len
+    else:
+        features["chunk_length_cv"] = 0.0
+
+    # Assertion vs hedge density (assertion_density > 0 = more assertive, < 0 = more hedged)
+    epistemic_total = total_assert + total_hedge
+    if epistemic_total > 0:
+        features["assertion_density"] = (total_assert - total_hedge) / epistemic_total
+    else:
+        features["assertion_density"] = 0.0
+
+    # Number density (numbers per chunk)
+    features["number_density"] = total_numbers / len(chunks)
 
 
 def _extract_detection_features(

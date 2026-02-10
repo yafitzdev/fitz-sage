@@ -66,6 +66,8 @@ _NUMERIC_FEATURES = {
     "query_word_count", "num_chunks", "num_unique_sources",
     "mean_vector_score", "score_spread",
     "vocab_overlap_ratio",
+    "max_pairwise_overlap", "min_pairwise_overlap",
+    "chunk_length_cv", "assertion_density", "number_density",
 }
 
 _STRING_FEATURES = {
