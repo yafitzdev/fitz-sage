@@ -141,9 +141,9 @@ You can—but you'll hit walls fast.
 > Point at a folder. Ask a question. Get an answer with sources. Even for tables! Everything else is handled by Fitz.
 
 **Honest answers ✅** → [Governance Benchmark](#governance-know-what-you-dont-know)
-> Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."*
->
-> **Measured, not claimed:** Fitz detects disputes at **89.7% recall** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 1,100+ case benchmark for epistemic honesty. A two-stage ML classifier trained on labeled boundary cases replaces hand-coded rules.
+> Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."
+> 
+> → Fitz detects disputes at **89.7% recall** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 1,100+ case benchmark for epistemic honesty.
 
 **Queries that actually work 📊**
 > Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, AST-aware chunking for code, and SQL execution for tabular data. No configuration—it just works.
