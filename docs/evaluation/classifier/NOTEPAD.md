@@ -1263,6 +1263,123 @@ The 4-class problem is fundamentally ill-posed given current features. Confident
 
 Steps 2/2b reverted. GovernanceDecider, eval_results_v3/v4.csv, model_v4_ca_continuous.joblib all dropped.
 
+### Experiment 8: Two-Stage Binary Classifier
+
+**Goal**: Decompose the 3-class problem into two binary decisions, each solving a narrower problem with cleaner signal.
+
+**Architecture**:
+```
+Query → Constraints → Features
+  │
+  ├─ Stage 1: Can we answer? (answerable vs abstain)
+  │    └─ RF, class_weight="balanced"
+  │
+  └─ Stage 2: Do sources agree? (trustworthy vs disputed)
+       └─ ET, class_weight="balanced"
+       └─ Only runs on cases Stage 1 predicted "answerable"
+```
+
+**Stage 1 Results** (answerable vs abstain):
+
+| Model | Test Acc | 5-fold CV | Abstain Recall | Answerable Recall |
+|-------|----------|-----------|----------------|-------------------|
+| GBT | 86.1% | 86.5% | 64.6% | 92.0% |
+| **RF** | **91.5%** | 85.1% | **79.2%** | **94.9%** |
+| ET | 90.1% | 85.4% | 75.0% | 94.3% |
+
+Stage 1 top features: `mean_vector_score` (0.104), `ca_fired` (0.096), `query_word_count` (0.095), `has_disputed_signal` (0.089), `vocab_overlap_ratio` (0.088). CA features are useful here — they separate "nothing relevant found" from "found something."
+
+**Stage 2 Results** (trustworthy vs disputed, answerable subset only):
+
+| Model | Test Acc | 5-fold CV | Disputed Recall | Trustworthy Recall |
+|-------|----------|-----------|-----------------|-------------------|
+| GBT | 74.7% | 72.3% | 18.4% | 91.4% |
+| RF | 78.9% | 71.4% | 23.7% | 95.3% |
+| **ET** | **82.5%** | 70.1% | **34.2%** | **96.9%** |
+
+Stage 2 top features: `score_spread` (0.140), `std_vector_score` (0.134), `mean_vector_score` (0.132), `vocab_overlap_ratio` (0.112), `query_word_count` (0.105). Retrieval score distribution dominates — disputed cases have wider score spread.
+
+**Combined Two-Stage Results**:
+
+| Class | Single 3-class | Two-stage | Delta |
+|-------|---------------|-----------|-------|
+| Abstain | 72.9% | **79.2%** | **+6.2pp** |
+| Disputed | 28.2% | **33.3%** | **+5.1pp** |
+| Trustworthy | 85.3% | **91.2%** | **+5.9pp** |
+| **Overall** | **72.7%** | **78.5%** | **+5.8pp** |
+
+**Confusion matrix (two-stage)**:
+```
+        predicted ->        abstain       disputed    trustworthy
+      actual abstain             38              1              9
+     actual disputed              1             13             25
+  actual trustworthy              8              4            124
+```
+
+**Key insight**: Every class improves because each binary model gets cleaner signal — Stage 1 doesn't waste splits on disputed vs trustworthy, Stage 2 doesn't waste splits filtering out abstain.
+
+**Comparison to all previous approaches**:
+
+| Approach | Overall | Abstain | Disputed | Conf/Qual/Trust |
+|----------|---------|---------|----------|-----------------|
+| Governor (rules) | 26.9% | — | — | — |
+| 4-class GBT (Exp 6) | 69.1% | 85% | 67% | 62%/66% |
+| 4-class calibrated (Step 1) | 70.0% | 85% | 69% | 64%/66% |
+| 3-class GBT | 72.7% | 73% | 28% | 85% |
+| **Two-stage binary** | **78.5%** | **79%** | **33%** | **91%** |
+
+The two-stage approach is +9.4pp over the best 4-class model and +5.8pp over the single 3-class model.
+
+#### Stage 2 Weakness Analysis: Why 25/38 Disputed Cases Get Missed
+
+**Stage 1 routing**: Near-perfect. 38/39 disputed cases correctly routed to Stage 2. Only 1 disputed case misclassified as abstain. Stage 1 is not the bottleneck.
+
+**Stage 2 errors**: 25/38 disputed cases predicted as trustworthy (66% miss rate).
+
+**Subcategory breakdown**:
+
+| Subcategory | Correct | Missed | Miss Rate |
+|-------------|---------|--------|-----------|
+| `binary_conflict` | 0 | 5 | **100%** |
+| `opposing_conclusions` | 1 | 8 | **89%** |
+| `implicit_contradiction` | 0 | 2 | **100%** |
+| `contradictory_attribution` | 0 | 1 | **100%** |
+| `competing_theories` | 0 | 1 | **100%** |
+| `numerical_conflict` | 5 | 5 | 50% |
+| `temporal_conflict` | 1 | 2 | 67% |
+| `source_quality_conflict` | 2 | 1 | 33% |
+| `conditional_conflict` | 3 | 0 | **0%** |
+| `methodology_conflict` | 1 | 0 | **0%** |
+
+**Pattern**: Cases where contradictions are *structurally obvious* (binary yes/no, opposing conclusions) get missed the most. Cases with *specific markers* (conditional language, methodology differences) get caught. The classifier relies on surface features (score distribution) instead of semantic conflict detection.
+
+**Feature distributions (correctly classified vs missed disputed)**:
+
+| Feature | Correct | Missed | Delta |
+|---------|---------|--------|-------|
+| `score_spread` | 0.207 | 0.071 | **+0.136** |
+| `std_vector_score` | 0.106 | 0.043 | **+0.063** |
+| `ca_fired` | 1.0 | 1.0 | 0 |
+| `has_disputed_signal` | 1.0 | 1.0 | 0 |
+
+**Root cause**: `ca_fired` is True for both correct AND missed disputed cases (100%). It's also True for 70% of trustworthy cases. The classifier can only distinguish the 30% of cases where retrieval scores happen to have wider spread. The other 70% — where disputed and trustworthy cases look identical on all features — are a coin flip.
+
+**CA firing rates by class (3-class)**:
+
+| Class | CA Fired | Rate |
+|-------|----------|------|
+| abstain | 37/237 | 15.6% |
+| disputed | 192/196 | **98.0%** |
+| trustworthy | 476/680 | **70.1%** |
+
+The 28pp gap between disputed (98%) and trustworthy (70%) is the ONLY discrimination the CA signal provides. For the 70% of trustworthy cases where CA fires, there is no feature that distinguishes them from disputed.
+
+**What Stage 2 needs to improve**:
+1. **Contradiction pair count** — How many pairs contradicted, not just "did any?" Disputed cases likely have more contradicting pairs.
+2. **Contradiction severity** — Strength of the strongest contradiction. The old VERDICT SCORE approach was right in concept but wrong in execution (noisy LLM scores, prompt-induced over-firing).
+3. **Source agreement signal** — Positive evidence that sources agree (not just absence of contradiction). This would help the 70% of trustworthy cases where CA fires.
+4. **Chunk-level conflict features** — Ratio of chunks involved in contradictions, whether the same claim is disputed or different claims.
+
 ---
 
 ## 9. Files Created
@@ -1353,3 +1470,5 @@ Steps 2/2b reverted. GovernanceDecider, eval_results_v3/v4.csv, model_v4_ca_cont
 | 2026-02-09 | Step 2b eval: Re-extracted 1113 cases (55 min, 0 errors). CA fire rate 74.5% (VERDICT SCORE prompts more aggressive than original). Retrained: Stacking Ensemble 65.5% (winner). Calibrated: 64.6%, min recall 61.5%. Regression from Exp 6 (-3.6pp raw, -5.4pp calibrated) due to prompt-induced CA over-firing. |
 | 2026-02-09 | Deep dive: Feature quality analysis. Permutation importance reveals constraint signals (ca_signal, has_disputed_signal) have near-zero actual accuracy impact despite high split importance. 10 dead features, 8 redundant. Confident vs qualified inseparable (max r=0.23). |
 | 2026-02-09 | 3-class pivot decided. Collapse confident+qualified → trustworthy. 3-class GBT: 72.7% test, 64.9% CV. Steps 2/2b fully reverted to Step 1 baseline (commit 60934fc). GovernanceDecider and all Step 2 artifacts dropped. |
+| 2026-02-09 | Experiment 8: Two-stage binary (RF+ET). Overall 78.5% (+5.8pp vs single 3-class). Every class improved. Stage 2 disputed recall still weak at 33% — missed cases are binary_conflict and opposing_conclusions subcategories where CA fires but can't distinguish from trustworthy (70% CA overlap). |
+| 2026-02-09 | Stage 2 weakness analysis: 25/38 disputed missed. Root cause: ca_fired=True for 98% disputed AND 70% trustworthy. Only discriminator is score_spread (correct disputed has 3x wider spread). Need richer CA features: pair count, severity, source agreement. |

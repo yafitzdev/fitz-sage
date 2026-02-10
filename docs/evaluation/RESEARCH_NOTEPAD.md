@@ -2384,12 +2384,44 @@ Collapsed confident + qualified → **trustworthy**. User question becomes "can 
 
 **Remaining weakness**: Disputed recall at 28.2% — constraint signals need to be richer (severity scores, pair counts) rather than binary fired/not-fired.
 
+### Experiment 8: Two-Stage Binary Classifier
+
+Decomposed the 3-class problem into two sequential binary classifiers:
+- **Stage 1**: RF — answerable vs abstain (91.5% test accuracy)
+- **Stage 2**: ET — trustworthy vs disputed (82.5% test accuracy on answerable subset)
+
+| Class | Single 3-class | Two-stage | Delta |
+|-------|---------------|-----------|-------|
+| Abstain | 72.9% | **79.2%** | **+6.2pp** |
+| Disputed | 28.2% | **33.3%** | **+5.1pp** |
+| Trustworthy | 85.3% | **91.2%** | **+5.9pp** |
+| **Overall** | **72.7%** | **78.5%** | **+5.8pp** |
+
+**Stage 1 top features**: `mean_vector_score`, `ca_fired`, `query_word_count`
+**Stage 2 top features**: `score_spread`, `std_vector_score`, `mean_vector_score`
+
+**Stage 2 bottleneck**: 25/38 disputed cases missed. CA fires for 98% of disputed AND 70% of trustworthy — insufficient discrimination. Correctly classified disputed cases have 3x wider `score_spread`. Subcategories with 100% miss rate: `binary_conflict`, `opposing_conclusions`, `implicit_contradiction`.
+
+### Historical Accuracy Progression
+
+| Approach | Date | Accuracy | Notes |
+|----------|------|----------|-------|
+| Governor (rules) | Feb 8 | 26.9% | Baseline |
+| 4-class GBT (Exp 1) | Feb 8 | 57.4% | First classifier |
+| 4-class RF (Exp 2) | Feb 8 | 71.0% | +context features |
+| 4-class GBT (Exp 6) | Feb 8 | 69.1% | +199 cases, shipping model |
+| 4-class calibrated | Feb 8 | 70.0% | Per-class thresholds |
+| 4-class continuous CA | Feb 9 | 67.3% | Regression (reverted) |
+| 4-class two-tier CA | Feb 9 | 65.5% | Regression (reverted) |
+| 3-class single GBT | Feb 9 | 72.7% | Class collapse |
+| **Two-stage binary** | **Feb 9** | **78.5%** | **Current best** |
+
 ### Next Steps
 
-1. Formally retrain 3-class model with proper pipeline
-2. Calibrate 3-class thresholds (3 classes = smaller sweep space)
-3. Richer constraint features for disputed detection (pair counts, contradiction severity)
-4. Consider two-stage binary: (trustworthy+disputed vs abstain) then (trustworthy vs disputed)
+1. Formalize two-stage training pipeline in `train_classifier.py`
+2. Calibrate per-stage confidence thresholds
+3. Richer CA features for Stage 2 disputed detection
+4. Dead feature removal (10 constant, 8 redundant)
 
 ---
 
