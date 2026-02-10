@@ -216,10 +216,11 @@ class TestDoctorConnectionTests:
     def test_test_chat_success(self):
         """Test _test_chat with working plugin."""
         mock_plugin = MagicMock()
+        mock_factory = MagicMock(return_value=mock_plugin)
 
         with patch(
-            "fitz_ai.llm.get_chat",
-            return_value=mock_plugin,
+            "fitz_ai.llm.get_chat_factory",
+            return_value=mock_factory,
         ):
             from fitz_ai.cli.commands.doctor import _test_chat
 

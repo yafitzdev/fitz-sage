@@ -163,6 +163,9 @@ class TestMLPrediction:
 # ---------------------------------------------------------------------------
 
 
+pd = pytest.importorskip("pandas", reason="pandas required for feature preparation tests")
+
+
 class TestFeaturePreparation:
     @pytest.fixture
     def decider(self):

@@ -195,10 +195,7 @@ class GovernanceDecider:
                 X[col] = 0
             else:
                 X[col] = (
-                    X[col]
-                    .map({"True": 1, "False": 0, True: 1, False: 0})
-                    .fillna(0)
-                    .astype(int)
+                    X[col].map({"True": 1, "False": 0, True: 1, False: 0}).fillna(0).astype(int)
                 )
 
         # Fill NaN, convert all to numeric
