@@ -207,9 +207,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 
 ### Governance — Know What You Don't Know
 
-```bash
-fitz eval fitz-gov --model ollama/qwen2.5:3b
-```
+[Feature docs](docs/features/governance-benchmarking.md) • [Benchmark results](docs/evaluation/fitz-gov-3.0-results.md) • [Classifier experiments](docs/evaluation/classifier/NOTEPAD.md)
 
 Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty using a two-stage ML classifier trained on 1,100+ labeled cases from [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty.
 
@@ -233,7 +231,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
              ▼
   ┌─────────────────────┐
   │ Stage 2: ET         │     Do the sources conflict?
-  │ Conflict Detection  ├───► YES ──► **DISPUTED** (89.7% recall)
+  │ Conflict Detection  ├───► YES ──► DISPUTED (89.7% recall)
   └──────────┬──────────┘
              │ NO
              ▼
@@ -241,23 +239,20 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
         (70.6% recall)
 ```
 
-| Decision | What It Means | Recall |
-|----------|---------------|--------|
+| Decision | Meaning                              | Recall |
+|----------|--------------------------------------|--------|
 | **ABSTAIN** | Evidence doesn't answer the question | **81.2%** |
-| **DISPUTED** | Sources contradict each other | **89.7%** |
-| **TRUSTWORTHY** | Consistent, sufficient evidence | **70.6%** |
+| **DISPUTED** | Sources contradict each other        | **89.7%** |
+| **TRUSTWORTHY** | Consistent, sufficient evidence      | **70.6%** |
 
 > [!NOTE]
-> **What this score means:** Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. 92% of our test cases are rated "hard."
+> Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. 92% of our test cases are rated "hard."
 
 >1. [X] **The system fails safe.** The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence (the dangerous failure) is the rarest error mode: only 3 cases in 1,100+.
 >
 >2. [X] **These scores are a floor, not a ceiling.** All benchmarks were measured using `qwen2.5:3b` — a 3B parameter local model. The governance constraints run on the fast-tier LLM to keep latency low. Stronger models produce better constraint signals, which feed better features into the classifier. Upgrading your chat provider should improve governance accuracy for free.
 >
 >3. [X] **Zero extra latency.** The constraints already run as part of the pipeline. The ML classifier just replaces hand-coded rules with a local sklearn model — inference takes microseconds, no additional API calls.
-
-
-> [Feature docs](docs/features/governance-benchmarking.md) · [Benchmark results](docs/evaluation/fitz-gov-3.0-results.md) · [Classifier experiments](docs/evaluation/classifier/NOTEPAD.md)
 
 ---
 
