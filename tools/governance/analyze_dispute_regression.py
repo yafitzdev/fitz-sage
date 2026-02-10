@@ -135,7 +135,6 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(
         X_all, y_all, test_size=0.2, random_state=SEED, stratify=y_all
     )
-    train_idx = X_train.index
     test_idx = X_test.index
     is_new_test = is_new[test_idx]
 

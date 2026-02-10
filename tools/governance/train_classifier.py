@@ -285,7 +285,7 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
         if col not in X.columns:
             continue
         X[col] = (
-            X[col].map({"True": 1, "False": 0, True: 1, False: 0, 1: 1, 0: 0}).fillna(0).astype(int)
+            X[col].map({"True": 1, "False": 0, True: 1, False: 0}).fillna(0).astype(int)
         )
 
     X = X.fillna(0)
@@ -491,7 +491,6 @@ def build_ensemble(
     )
     print(f"\n--- Building stacking ensemble ({len(estimators)} base models) ---")
     start = time.time()
-    sample_weights = compute_sample_weight("balanced", y_train)
     stack.fit(X_train, y_train)
     elapsed = time.time() - start
     print(f"  Ensemble trained in {elapsed:.1f}s")
@@ -506,7 +505,7 @@ def build_ensemble(
 def print_confusion_matrix(y_true, y_pred, labels):
     """Print a formatted confusion matrix."""
     cm = confusion_matrix(y_true, y_pred, labels=labels)
-    header = "predicted ->".rjust(20) + "".join(f"{l:>12}" for l in labels)
+    header = "predicted ->".rjust(20) + "".join(f"{lbl:>12}" for lbl in labels)
     print(header)
     print("-" * len(header))
     for i, label in enumerate(labels):
@@ -548,7 +547,7 @@ _3CLASS_LABELS = ["abstain", "disputed", "trustworthy"]
 def _collapse_to_3class(labels: np.ndarray) -> np.ndarray:
     """Collapse confident+qualified → trustworthy."""
     return np.array(
-        ["trustworthy" if l in ("confident", "qualified") else l for l in labels],
+        ["trustworthy" if lbl in ("confident", "qualified") else lbl for lbl in labels],
         dtype=object,
     )
 
@@ -568,12 +567,6 @@ def train_twostage(
 
     y_3class = _collapse_to_3class(y_4class)
 
-    # Stage 1 labels: answerable vs abstain
-    y_s1 = np.array(
-        ["abstain" if l == "abstain" else "answerable" for l in y_3class],
-        dtype=object,
-    )
-
     # Stratified split (stratify on 3-class to preserve disputed proportion)
     X_train, X_test, y3_train, y3_test = train_test_split(
         X,
@@ -583,11 +576,11 @@ def train_twostage(
         stratify=y_3class,
     )
     y_s1_train = np.array(
-        ["abstain" if l == "abstain" else "answerable" for l in y3_train],
+        ["abstain" if lbl == "abstain" else "answerable" for lbl in y3_train],
         dtype=object,
     )
     y_s1_test = np.array(
-        ["abstain" if l == "abstain" else "answerable" for l in y3_test],
+        ["abstain" if lbl == "abstain" else "answerable" for lbl in y3_test],
         dtype=object,
     )
 
@@ -723,7 +716,7 @@ def train_twostage(
     # Full answerable data for CV
     answerable_all = (
         np.array(
-            ["abstain" if l == "abstain" else "answerable" for l in y_3class],
+            ["abstain" if lbl == "abstain" else "answerable" for lbl in y_3class],
             dtype=object,
         )
         == "answerable"
@@ -805,7 +798,7 @@ def train_twostage(
     print(classification_report(y3_test, final_pred, labels=_3CLASS_LABELS, zero_division=0))
 
     cm_combined = confusion_matrix(y3_test, final_pred, labels=_3CLASS_LABELS)
-    header = "predicted ->".rjust(20) + "".join(f"{l:>15}" for l in _3CLASS_LABELS)
+    header = "predicted ->".rjust(20) + "".join(f"{lbl:>15}" for lbl in _3CLASS_LABELS)
     print(header)
     print("-" * len(header))
     for i, label in enumerate(_3CLASS_LABELS):

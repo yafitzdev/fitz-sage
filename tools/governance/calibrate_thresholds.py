@@ -87,7 +87,7 @@ def prepare_features(df: pd.DataFrame, encoders: dict[str, LabelEncoder]) -> pd.
         if col not in X.columns:
             continue
         X[col] = (
-            X[col].map({"True": 1, "False": 0, True: 1, False: 0, 1: 1, 0: 0}).fillna(0).astype(int)
+            X[col].map({"True": 1, "False": 0, True: 1, False: 0}).fillna(0).astype(int)
         )
 
     X = X.fillna(0)
@@ -144,7 +144,7 @@ def align_features(X: pd.DataFrame, model_feature_names: list[str]) -> pd.DataFr
 def print_confusion_matrix(y_true, y_pred, labels):
     """Print a formatted confusion matrix."""
     cm = confusion_matrix(y_true, y_pred, labels=labels)
-    header = "predicted ->".rjust(20) + "".join(f"{l:>15}" for l in labels)
+    header = "predicted ->".rjust(20) + "".join(f"{lbl:>15}" for lbl in labels)
     print(header)
     print("-" * len(header))
     for i, label in enumerate(labels):
@@ -335,11 +335,9 @@ def calibrate_twostage(model_path: Path, eval_csv: Path, output_path: Path):
 
     s1_classes = list(s1_model.classes_)
     answerable_idx = s1_classes.index("answerable")
-    abstain_idx = s1_classes.index("abstain")
-
     # Stage 1 proba stats
     y_s1_true = np.array(
-        ["abstain" if l == "abstain" else "answerable" for l in y3_test],
+        ["abstain" if lbl == "abstain" else "answerable" for lbl in y3_test],
         dtype=object,
     )
     print("\nStage 1 P(answerable) stats:")
@@ -542,7 +540,7 @@ def calibrate_4class(model_path: Path, eval_csv: Path, output_path: Path):
 
     classifier_preds = model.predict(X_test)
     baseline_acc = accuracy_score(y_test, classifier_preds)
-    baseline_recalls = per_class_recall(y_test, classifier_preds, labels)
+    _ = per_class_recall(y_test, classifier_preds, labels)  # printed below
 
     print(f"\nBaseline accuracy: {baseline_acc:.4f}")
     probas = model.predict_proba(X_test)

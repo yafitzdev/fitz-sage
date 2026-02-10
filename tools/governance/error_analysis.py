@@ -1,9 +1,13 @@
 # tools/governance/error_analysis.py
 import sys
+from pathlib import Path
 
 import joblib
 import numpy as np
 import pandas as pd
+
+sys.path.insert(0, ".")
+from tools.governance.train_classifier import enrich_with_context_features, prepare_features  # noqa: E402
 
 # Load data
 df = pd.read_csv("tools/governance/data/eval_results_v5_clean.csv")
@@ -11,12 +15,6 @@ model_data = joblib.load("tools/governance/data/model_v6_twostage.joblib")
 s1_model = model_data["stage1_model"]
 s2_model = model_data["stage2_model"]
 feature_cols = model_data["feature_names"]
-
-# Also compute context features (same as training)
-sys.path.insert(0, ".")
-from pathlib import Path
-
-from tools.governance.train_classifier import enrich_with_context_features, prepare_features
 
 fitzgov_dir = (
     Path(__file__).resolve().parent.parent.parent.parent / "fitz-gov" / "data" / "tier1_core"
