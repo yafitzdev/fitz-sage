@@ -1,7 +1,7 @@
 # Governance Classifier — Living Notepad
 
 **Goal**: Replace hand-coded `AnswerGovernor.decide()` priority rules with a trained tabular classifier.
-**Status**: Step 2b eval complete. Re-extracted with binary CA → retrained → calibrated. Stacking Ensemble 65.5% raw, 64.6% calibrated (-4.5pp vs Exp 6's 69.1%). Root cause: VERDICT SCORE prompts cause 74.5% CA fire rate even with short-circuit (vs 63.4% with old prompts). GovernanceDecider integrated and functional. Next: restore original prompts OR accept regression as cost of Pass 2 capability.
+**Status**: 3-class pivot decided. Collapsing confident+qualified → trustworthy. Deep feature analysis revealed constraint signals are near-useless (permutation importance ≈ 0), 10 dead features, 8 redundant. 3-class GBT: 72.7% test, 64.9% CV. Steps 2/2b reverted (all regressed). Clean baseline: Step 1 calibrated at 70.0% (4-class). Next: retrain 3-class model, richer constraint features for disputed detection.
 
 ---
 
@@ -1176,6 +1176,93 @@ Saved as `model_v3_calibrated.joblib` (overwrites previous calibrated model).
 2. **Accept regression** — Keep VERDICT SCORE prompts as-is. 65.5% is still +38.6pp over governor. The GovernanceDecider's Pass 2 (smart LLM on uncertain cases) may recover the gap.
 3. **Dual prompts** — Use original prompts in `apply()` (binary decision, Pass 1) and VERDICT SCORE prompts only in `score_all_pairs()` (continuous scoring, Pass 2). Best of both worlds but more code complexity.
 
+### Deep Dive: Why the Classifier is Stuck at ~70%
+
+After Steps 2 and 2b both regressed, conducted a comprehensive analysis of feature quality, constraint signal discrimination, and label consistency. All Step 2/2b code reverted to Step 1 baseline (commit `60934fc`).
+
+#### Finding 1: Permutation Importance Exposes Fake Feature Importance
+
+GBT split-based importance inflates continuous features (many split points) over binary ones (one split). Permutation importance (shuffle feature, measure accuracy drop) reveals the truth:
+
+| Feature | Split Imp (rank) | Perm Imp (rank) | Verdict |
+|---------|-----------------|-----------------|---------|
+| `ctx_length_mean` | 0.129 (#1) | 0.090 (#1) | Genuinely important |
+| `query_word_count` | 0.042 (#6) | 0.050 (#2) | Underrated by splits |
+| `ctx_length_std` | 0.065 (#3) | 0.039 (#3) | Confirmed |
+| `has_disputed_signal` | 0.052 (#5) | **0.001 (#27)** | **Fake importance** |
+| `ca_signal` | top 15 | **not in top 30** | **Fake importance** |
+| `ca_fired` | top 15 | **not in top 30** | **Fake importance** |
+
+The constraint signals that SHOULD drive governance decisions contribute almost nothing to actual accuracy.
+
+#### Finding 2: Massive Feature Redundancy
+
+- **10 dead features** (constant zero, no variance): `ie_max_similarity`, `ie_entity_match_found`, `ie_primary_match_found`, `ie_critical_match_found`, `ie_query_aspect`, `ie_summary_overlap`, `ie_has_matching_aspect`, `ie_has_conflicting_aspect`, `ca_is_uncertainty_query`, `ca_relevance_filtered_count`
+- **8 redundant features** (r > 0.95): `has_disputed_signal` = `ca_fired` = inverse of `ca_signal` (same bit 3x), `has_abstain_signal` = `ie_fired` = inverse of `ie_signal` (same bit 3x), plus 2 more pairs
+- **Effective features**: ~30 independent non-constant out of 50
+
+#### Finding 3: Constraint Signals Don't Discriminate
+
+Information gain analysis:
+
+| Feature | IG (bits) | What it tells us |
+|---------|-----------|------------------|
+| `ca_signal`/`ca_fired`/`has_disputed_signal` | 0.252 | One decent signal, stored 3 times |
+| `query_word_count` | 0.069 | Weak |
+| `mean_vector_score` | 0.049 | Weak |
+| `ie_signal`/`ie_fired` | 0.031 | Near useless |
+
+When `ca_signal=True` (n=706, 63.4%): 41.4% qualified, 27.2% disputed, 26.2% confident, 5.2% abstain. CA fires for EVERYTHING — it only reliably excludes abstain. Confident and qualified are indistinguishable.
+
+Point-biserial correlations with each class:
+
+| Class | Best feature | r | Separability |
+|-------|-------------|---|-------------|
+| Abstain (n=237) | NOT ca_fired | -0.52 | Decent |
+| Disputed (n=196) | ca_fired | +0.33 | Weak |
+| Confident (n=257) | subcategory | -0.23 | Very weak |
+| Qualified (n=423) | classifier_predicted | +0.16 | Nearly noise |
+
+**Root cause**: Confident vs qualified (680 cases combined) have no feature with r > 0.23. The classifier is guessing between them using weak proxies like text length.
+
+#### Finding 4: Labels Are Clean
+
+8 duplicate queries with different labels found. All legitimate — same query with different contexts should get different governance modes. No systematic labeling errors.
+
+#### Finding 5: 3-Class Collapse Dramatically Improves Results
+
+Reframing: trustworthy (confident+qualified) vs disputed vs abstain. User question becomes "can I trust this answer?" not "how confident is the system?"
+
+**Class distribution (3-class)**:
+- trustworthy: 680 (61.1%) — confident + qualified
+- abstain: 237 (21.3%)
+- disputed: 196 (17.6%)
+
+**Results**:
+
+| Metric | 4-class GBT | 3-class GBT |
+|--------|------------|------------|
+| 5-fold CV | ~52% | **64.9%** |
+| Test accuracy | 69.1% | **72.7%** |
+| Abstain recall | 60% | **72.9%** |
+| Disputed recall | ~0%* | **28.2%** |
+| Trustworthy recall | n/a | **85.3%** |
+
+*The 4-class model secretly collapsed to a 2-class model (only predicted abstain + qualified).
+
+Feature importance (3-class): `mean_vector_score`, `score_spread`, `std_vector_score` dominate — retrieval quality signals become primary discriminators.
+
+#### Decision: Pivot to 3-Class
+
+The 4-class problem is fundamentally ill-posed given current features. Confident and qualified are inseparable because:
+1. The constraint signals are binary and don't capture the confident/qualified distinction
+2. Context length (the strongest proxy) barely discriminates (median 581 vs 687 chars)
+3. No existing feature captures "sources agree" as a positive signal
+
+3-class removes the hardest boundary and aligns with user needs: trustworthy (answer the question) vs disputed (flag disagreement) vs abstain (can't answer).
+
+Steps 2/2b reverted. GovernanceDecider, eval_results_v3/v4.csv, model_v4_ca_continuous.joblib all dropped.
+
 ---
 
 ## 9. Files Created
@@ -1264,3 +1351,5 @@ Saved as `model_v3_calibrated.joblib` (overwrites previous calibrated model).
 | 2026-02-09 | Step 2 retrain: **REGRESSION** — 69.1%→67.3% (-1.8pp). New features ranked #15/#17 (low importance). CA over-firing degraded binary signal. model_v4_ca_continuous.joblib saved for reference. model_v3 remains shipping model. |
 | 2026-02-09 | Step 2b (two-tier CA): Short-circuit restored in apply(). New `score_all_pairs()` method for smart LLM scoring on uncertain cases. `GovernanceDecider` class implements two-pass ML decision flow. Integrated into pipeline engine with fail-open fallback to AnswerGovernor. GovernanceDecision extended with `source`/`confidence` fields. 1523 tests pass. Pending: re-extract + retrain + eval. |
 | 2026-02-09 | Step 2b eval: Re-extracted 1113 cases (55 min, 0 errors). CA fire rate 74.5% (VERDICT SCORE prompts more aggressive than original). Retrained: Stacking Ensemble 65.5% (winner). Calibrated: 64.6%, min recall 61.5%. Regression from Exp 6 (-3.6pp raw, -5.4pp calibrated) due to prompt-induced CA over-firing. |
+| 2026-02-09 | Deep dive: Feature quality analysis. Permutation importance reveals constraint signals (ca_signal, has_disputed_signal) have near-zero actual accuracy impact despite high split importance. 10 dead features, 8 redundant. Confident vs qualified inseparable (max r=0.23). |
+| 2026-02-09 | 3-class pivot decided. Collapse confident+qualified → trustworthy. 3-class GBT: 72.7% test, 64.9% CV. Steps 2/2b fully reverted to Step 1 baseline (commit 60934fc). GovernanceDecider and all Step 2 artifacts dropped. |

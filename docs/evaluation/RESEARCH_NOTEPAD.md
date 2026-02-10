@@ -2323,4 +2323,74 @@ Deterministic pre-filters (numerical variance, hedging gating) are more reliable
 
 ---
 
+## ML Governance Classifier (Feb 8-9, 2026)
+
+### Background
+
+Replaced hand-coded `AnswerGovernor.decide()` priority rules with a trained GBT classifier. Uses constraint outputs as features instead of decision-makers. Training data: 1113 labeled cases from fitz-gov.
+
+### 4-Class Results (Experiments 1-7)
+
+| Experiment | Model | Accuracy | Abstain | Confident | Disputed | Qualified | Notes |
+|------------|-------|----------|---------|-----------|----------|-----------|-------|
+| Exp 1 | GBT | 57.4% | 62% | 35% | 28% | 74% | Baseline, 47 features |
+| Exp 2 | RF | 71.0% | 77% | 45% | 45% | 87% | +context features, +class weighting |
+| Exp 3 | RF | 69.4% | — | — | 52% | — | Tighter CA prompts |
+| Exp 4 | RF | 41.0% | 84% | 0% | 0% | 51% | Distribution shift (synthetic→real) |
+| Exp 5 | RF | 68.9% | 79% | 48% | **83%** | 67% | Retrained on real features |
+| Exp 6 | **GBT** | **69.1%** | **85%** | **62%** | **67%** | **66%** | +199 cases (1113 total). **Shipping model** |
+| Exp 7a | GBT | 66.8% | — | — | — | — | +6 text features (noise, reverted) |
+| Exp 7b | GBT | 60.1% | — | — | — | — | Longer hyperparam search (worse) |
+
+**Step 1** (calibrated thresholds): 69.1% → **70.0%** (+0.9pp), per-class governor fallback
+
+**Steps 2/2b** (continuous CA): Both regressed (67.3%, 65.5%). VERDICT SCORE prompts caused CA over-firing (63%→74% fire rate). Fully reverted.
+
+### Feature Quality Deep Dive (Feb 9)
+
+**Critical finding**: Constraint signals have near-zero permutation importance despite appearing important in split-based rankings.
+
+| Feature | Split Importance (rank) | Permutation Importance (rank) |
+|---------|------------------------|------------------------------|
+| `ctx_length_mean` | 0.129 (#1) | 0.090 (#1) |
+| `has_disputed_signal` | 0.052 (#5) | **0.001 (#27)** |
+| `ca_signal` | top 15 | **not in top 30** |
+
+**Feature health**: 10 dead features (constant zero), 8 redundant (r > 0.95), ~30 effective out of 50.
+
+**Class separability**: Confident vs qualified inseparable (max r=0.23). CA fires for 63% of cases regardless of class. IE fires for 1.3% of cases.
+
+### 3-Class Pivot Decision
+
+Collapsed confident + qualified → **trustworthy**. User question becomes "can I trust this answer?"
+
+| Class | Count | Share |
+|-------|-------|-------|
+| trustworthy | 680 | 61.1% |
+| abstain | 237 | 21.3% |
+| disputed | 196 | 17.6% |
+
+### 3-Class Benchmark Results
+
+| Metric | 4-class (Exp 6) | 3-class GBT |
+|--------|-----------------|-------------|
+| 5-fold CV | ~52% | **64.9%** (+/- 2.7%) |
+| Test accuracy | 69.1% | **72.7%** |
+| Abstain recall | 60% | **72.9%** |
+| Disputed recall | ~0% | **28.2%** |
+| Trustworthy recall | n/a | **85.3%** |
+
+**Key insight**: The 4-class model was secretly a 2-class model (only predicted abstain + qualified, 0% recall on confident and disputed). 3-class model actually learns all three classes.
+
+**Remaining weakness**: Disputed recall at 28.2% — constraint signals need to be richer (severity scores, pair counts) rather than binary fired/not-fired.
+
+### Next Steps
+
+1. Formally retrain 3-class model with proper pipeline
+2. Calibrate 3-class thresholds (3 classes = smaller sweep space)
+3. Richer constraint features for disputed detection (pair counts, contradiction severity)
+4. Consider two-stage binary: (trustworthy+disputed vs abstain) then (trustworthy vs disputed)
+
+---
+
 *This is a living document. Update continuously with new findings.*
