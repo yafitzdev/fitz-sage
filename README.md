@@ -71,8 +71,8 @@ fitz serve  # http://localhost:8000/docs for interactive API
 
   Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)).
 
-  - ~40k lines of Python
-  - 1200+ tests, 100% coverage
+  - ~50k lines of Python
+  - 1500+ tests, 99% coverage
   - Zero LangChain/LlamaIndex dependencies — built from scratch
 
 ![fitz-ai honest_rag](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/honest_rag.jpg)
@@ -143,7 +143,7 @@ You can—but you'll hit walls fast.
 **Honest answers ✅** → [Governance Benchmark](#governance-know-what-you-dont-know)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."*
 >
-> **Measured, not claimed:** Fitz scores **69.1%** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 1,100+ case benchmark for epistemic honesty — detecting when to abstain, dispute, or qualify answers. An ML classifier trained on labeled boundary cases replaces hand-coded rules.
+> **Measured, not claimed:** Fitz detects disputes at **89.7% recall** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 1,100+ case benchmark for epistemic honesty. A two-stage ML classifier trained on labeled boundary cases replaces hand-coded rules.
 
 **Queries that actually work 📊**
 > Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, AST-aware chunking for code, and SQL execution for tabular data. No configuration—it just works.
@@ -180,7 +180,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 | Feature | Query | Naive RAG Problem | FitzRAG Solution |
 |---------|-------|-------------------|------------------|
 | [**epistemic-honesty**](docs/features/epistemic-honesty.md) | "What was our Q4 revenue?" | ❌ Hallucinated number — Info doesn't exist, but LLM won't admit it | ✅ "I don't know" |
-| [**governance-benchmarking**](docs/features/governance-benchmarking.md) | *[Benchmark: fitz-gov]* | ❌ No measurement — Retrieval benchmarks don't test epistemic honesty | ✅ 69.1% governance accuracy (ML classifier, 1100+ cases) |
+| [**governance-benchmarking**](docs/features/governance-benchmarking.md) | *[Benchmark: fitz-gov]* | ❌ No measurement — Retrieval benchmarks don't test epistemic honesty | ✅ 89.7% dispute detection, 81.2% abstain (ML classifier, 1100+ cases) |
 | [**keyword-vocabulary**](docs/features/keyword-vocabulary.md) | "Find TC_1000" | ❌ Wrong test case — Embeddings see TC_1000 ≈ TC_2000 (semantically similar) | ✅ Exact keyword matching |
 | [**hybrid-search**](docs/features/hybrid-search.md) | "X100 battery specs" | ❌ Returns Y200 docs — Semantic search misses exact model numbers | ✅ Hybrid search (dense + sparse) |
 | [**sparse-search**](docs/features/sparse-search.md) | "error code E_AUTH_401" | ❌ No exact match — Embeddings miss precise error codes | ✅ PostgreSQL full-text search |
@@ -207,23 +207,50 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 
 ### Governance — Know What You Don't Know
 
-Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty using an ML classifier trained on 1,100+ labeled cases.
+Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty using a two-stage ML classifier trained on 1,100+ labeled cases.
 
-| Mode | What It Tests | Recall |
-|------|---------------|--------|
-| **ABSTAIN** | Context doesn't answer the question | **85%** |
-| **DISPUTED** | Sources contradict each other | **67%** |
-| **QUALIFIED** | Evidence exists but needs caveats | **66%** |
-| **CONFIDENT** | Clear, consistent evidence | **62%** |
+```
+  Query + Retrieved Chunks
+            |
+            v
+  +---------------------+
+  |   5 Constraints      |     Contradiction detection, evidence sufficiency,
+  |   (epistemic sensors)|     causal attribution, answer verification,
+  |                      |     specific info type
+  +----------+----------+
+             |
+             | 51 features extracted
+             v
+  +---------------------+
+  |  Stage 1: RF         |     Can the evidence answer this query?
+  |  Answerability       +---> NO  --> ABSTAIN  (81.2% recall)
+  +----------+----------+
+             | YES
+             v
+  +---------------------+
+  |  Stage 2: ET         |     Do the sources conflict?
+  |  Conflict Detection  +---> YES --> DISPUTED (89.7% recall)
+  +----------+----------+
+             | NO
+             v
+       TRUSTWORTHY              Consistent evidence found
+       (70.6% recall)
+```
 
-**Overall: 69.1%** on [fitz-gov](https://github.com/yafitzdev/fitz-gov) — a benchmark for epistemic honesty, not retrieval quality.
+| Decision | What It Means | Recall |
+|----------|---------------|--------|
+| **ABSTAIN** | Evidence doesn't answer the question | **81.2%** |
+| **DISPUTED** | Sources contradict each other | **89.7%** |
+| **TRUSTWORTHY** | Consistent, sufficient evidence | **70.6%** |
+
+Measured on [fitz-gov](https://github.com/yafitzdev/fitz-gov) — a benchmark for epistemic honesty, not retrieval quality.
 
 > [!NOTE]
-> **What this score means?** Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. 92% of our test cases are rated "hard."
+> **What this score means:** Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. 92% of our test cases are rated "hard."
 
-**How it works:** Five epistemic constraints (contradiction detection, evidence sufficiency, causal attribution, answer verification) extract 58 features from each query. A gradient-boosted tree classifier — trained on fitz-gov's 1,100+ labeled boundary cases with independent blind validation — replaces hand-coded priority rules. The constraints stay; only the decision logic learned from data.
+**How it works:** Five epistemic constraints extract 51 features from each query. A two-stage classifier (Random Forest for answerability, Extra Trees for conflict detection) — trained on fitz-gov's 1,100+ labeled boundary cases with calibrated per-stage thresholds — replaces hand-coded priority rules. The constraints stay as sensors; only the decision logic learned from data.
 
-**The system fails safe.** When the classifier is wrong, it over-hedges (says "qualified" instead of "confident") — annoying but not dangerous. Over-confidence (the dangerous failure) is the rarest error mode.
+**The system fails safe.** The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence (the dangerous failure) is the rarest error mode: only 3 cases in 1,100+.
 
 ```bash
 fitz eval fitz-gov --model ollama/qwen2.5:3b
