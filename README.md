@@ -211,6 +211,8 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 
 Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty using a two-stage ML classifier trained on 1,100+ labeled cases from [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty.
 
+<br>
+
 ```
   Query + Retrieved Chunks
             │
@@ -235,14 +237,20 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
              └──────────────► NO ──► TRUSTWORTHY (70.6% recall)           
 ```
 
+<br>
+
 | Decision | Meaning                              | Recall |
 |----------|--------------------------------------|--------|
 | **ABSTAIN** | Evidence doesn't answer the question | **81.2%** |
 | **DISPUTED** | Sources contradict each other        | **89.7%** |
 | **TRUSTWORTHY** | Consistent, sufficient evidence      | **70.6%** |
 
+<br>
+
 > [!NOTE]
 > Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. 92% of our test cases are rated "hard."
+
+<br>
 
 >1. [X] **The system fails safe.** The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence ("trustworthy" instead of "disputed") is the rarest error mode: only 3 cases in 1,100+.
 >
