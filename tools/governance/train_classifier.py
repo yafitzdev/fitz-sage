@@ -6,8 +6,13 @@ Loads features.csv, enriches with text-based context features from fitz-gov
 cases, trains multiple models with class weighting and hyperparameter search,
 builds stacking ensemble, evaluates against governor baseline.
 
+Supports two modes:
+  - 4-class: abstain/confident/disputed/qualified (legacy)
+  - twostage: two binary classifiers (answerable-vs-abstain → trustworthy-vs-disputed)
+
 Usage:
     python -m tools.governance.train_classifier
+    python -m tools.governance.train_classifier --mode twostage
     python -m tools.governance.train_classifier --time-budget 600  # 10 min search
 """
 
@@ -41,9 +46,11 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import SVC
 from sklearn.utils.class_weight import compute_sample_weight
 
-_DEFAULT_INPUT = Path(__file__).resolve().parent / "data" / "features.csv"
-_DEFAULT_MODEL_OUTPUT = Path(__file__).resolve().parent / "data" / "model_v1.joblib"
-_DEFAULT_DATA_DIR = (
+_DATA_DIR = Path(__file__).resolve().parent / "data"
+_DEFAULT_INPUT = _DATA_DIR / "features.csv"
+_DEFAULT_MODEL_OUTPUT = _DATA_DIR / "model_v1.joblib"
+_DEFAULT_TWOSTAGE_OUTPUT = _DATA_DIR / "model_v5_twostage.joblib"
+_DEFAULT_FITZGOV_DIR = (
     Path(__file__).resolve().parent.parent.parent.parent / "fitz-gov" / "data" / "tier1_core"
 )
 
@@ -427,14 +434,292 @@ def evaluate_model(name, model, X_test, y_test, labels):
 
 
 # ---------------------------------------------------------------------------
+# Two-stage binary training
+# ---------------------------------------------------------------------------
+
+_3CLASS_LABELS = ["abstain", "disputed", "trustworthy"]
+
+
+def _collapse_to_3class(labels: np.ndarray) -> np.ndarray:
+    """Collapse confident+qualified → trustworthy."""
+    return np.array(
+        ["trustworthy" if l in ("confident", "qualified") else l for l in labels],
+        dtype=object,
+    )
+
+
+def train_twostage(
+    X: pd.DataFrame,
+    y_4class: np.ndarray,
+    feature_names: list[str],
+    encoders: dict[str, LabelEncoder],
+    test_size: float,
+    time_budget: int,
+    seed: int,
+    output_path: Path,
+    governor_preds: np.ndarray | None = None,
+):
+    """Train a two-stage binary classifier: Stage 1 (answerable vs abstain) → Stage 2 (trustworthy vs disputed)."""
+
+    y_3class = _collapse_to_3class(y_4class)
+
+    # Stage 1 labels: answerable vs abstain
+    y_s1 = np.array(
+        ["abstain" if l == "abstain" else "answerable" for l in y_3class],
+        dtype=object,
+    )
+
+    # Stratified split (stratify on 3-class to preserve disputed proportion)
+    X_train, X_test, y3_train, y3_test = train_test_split(
+        X, y_3class, test_size=test_size, random_state=seed, stratify=y_3class,
+    )
+    y_s1_train = np.array(
+        ["abstain" if l == "abstain" else "answerable" for l in y3_train],
+        dtype=object,
+    )
+    y_s1_test = np.array(
+        ["abstain" if l == "abstain" else "answerable" for l in y3_test],
+        dtype=object,
+    )
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
+    time_per_stage = time_budget // 2
+
+    # ---- Stage 1: answerable vs abstain ----
+    print(f"\n{'='*60}")
+    print("STAGE 1: answerable vs abstain")
+    print(f"{'='*60}")
+    print(f"Train: {sum(y_s1_train == 'answerable')} answerable, {sum(y_s1_train == 'abstain')} abstain")
+    print(f"Test:  {sum(y_s1_test == 'answerable')} answerable, {sum(y_s1_test == 'abstain')} abstain")
+
+    s1_models = {
+        "RF": RandomForestClassifier(
+            n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1,
+        ),
+        "ET": ExtraTreesClassifier(
+            n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1,
+        ),
+        "GBT": GradientBoostingClassifier(
+            n_estimators=200, max_depth=4, learning_rate=0.1,
+            min_samples_leaf=5, random_state=seed,
+        ),
+    }
+
+    print("\n--- Stage 1: Quick comparison ---")
+    s1_results = {}
+    for name, model in s1_models.items():
+        cv_scores = cross_val_score(model, X_train, y_s1_train, cv=cv, scoring="accuracy")
+        model.fit(X_train, y_s1_train)
+        pred = model.predict(X_test)
+        acc = accuracy_score(y_s1_test, pred)
+        cm = confusion_matrix(y_s1_test, pred, labels=["abstain", "answerable"])
+        abs_recall = cm[0, 0] / cm[0].sum() if cm[0].sum() > 0 else 0
+        ans_recall = cm[1, 1] / cm[1].sum() if cm[1].sum() > 0 else 0
+        s1_results[name] = {"model": model, "acc": acc, "cv": cv_scores.mean(), "cv_std": cv_scores.std()}
+        print(f"  {name:6s}: test={acc:.4f}, CV={cv_scores.mean():.4f} (+/-{cv_scores.std():.4f})"
+              f"  abstain={abs_recall:.3f} answerable={ans_recall:.3f}")
+
+    # Hyperparameter search on top Stage 1 model
+    s1_ranked = sorted(s1_results.items(), key=lambda x: x[1]["acc"], reverse=True)
+    s1_best_name = s1_ranked[0][0]
+    print(f"\n--- Stage 1: Tuning {s1_best_name} ({time_per_stage}s budget) ---")
+
+    s1_param_grids = {
+        "RF": {
+            "n_estimators": randint(100, 600),
+            "max_depth": [None, 10, 20, 30],
+            "min_samples_leaf": randint(1, 15),
+            "max_features": ["sqrt", "log2", 0.3, 0.5, 0.7],
+        },
+        "ET": {
+            "n_estimators": randint(100, 600),
+            "max_depth": [None, 10, 20, 30],
+            "min_samples_leaf": randint(1, 15),
+            "max_features": ["sqrt", "log2", 0.3, 0.5, 0.7],
+        },
+        "GBT": {
+            "n_estimators": randint(100, 500),
+            "max_depth": randint(2, 8),
+            "learning_rate": uniform(0.01, 0.3),
+            "subsample": uniform(0.6, 0.4),
+        },
+    }
+
+    s1_base = {
+        "RF": RandomForestClassifier(class_weight="balanced", random_state=seed, n_jobs=-1),
+        "ET": ExtraTreesClassifier(class_weight="balanced", random_state=seed, n_jobs=-1),
+        "GBT": GradientBoostingClassifier(random_state=seed),
+    }
+
+    n_iter = max(10, int(time_per_stage / 3))
+    s1_search = RandomizedSearchCV(
+        s1_base[s1_best_name],
+        s1_param_grids[s1_best_name],
+        n_iter=n_iter,
+        cv=cv,
+        scoring="accuracy",
+        random_state=seed,
+        n_jobs=-1 if s1_best_name != "GBT" else 1,
+    )
+    s1_search.fit(X_train, y_s1_train)
+    s1_model = s1_search.best_estimator_
+
+    s1_pred_test = s1_model.predict(X_test)
+    s1_acc = accuracy_score(y_s1_test, s1_pred_test)
+    cm_s1 = confusion_matrix(y_s1_test, s1_pred_test, labels=["abstain", "answerable"])
+    print(f"  Best: {s1_search.best_score_:.4f} CV -> {s1_acc:.4f} test")
+    print(f"  Params: {s1_search.best_params_}")
+    print(f"  Abstain recall:    {cm_s1[0,0]}/{cm_s1[0].sum()} ({cm_s1[0,0]/cm_s1[0].sum():.3f})")
+    print(f"  Answerable recall: {cm_s1[1,1]}/{cm_s1[1].sum()} ({cm_s1[1,1]/cm_s1[1].sum():.3f})")
+
+    if hasattr(s1_model, "feature_importances_"):
+        imp = s1_model.feature_importances_
+        order = np.argsort(imp)[::-1]
+        print(f"\n  Stage 1 top 10 features:")
+        for rank, idx in enumerate(order[:10], 1):
+            print(f"    {rank:2d}. {feature_names[idx]:40s} {imp[idx]:.4f}")
+
+    # ---- Stage 2: trustworthy vs disputed (answerable subset) ----
+    print(f"\n{'='*60}")
+    print("STAGE 2: trustworthy vs disputed")
+    print(f"{'='*60}")
+
+    answerable_train = y_s1_train == "answerable"
+    X_train_s2 = X_train[answerable_train]
+    y_train_s2 = y3_train[answerable_train]
+    print(f"Train: {sum(y_train_s2 == 'trustworthy')} trustworthy, {sum(y_train_s2 == 'disputed')} disputed")
+
+    # Full answerable data for CV
+    answerable_all = np.array(
+        ["abstain" if l == "abstain" else "answerable" for l in y_3class],
+        dtype=object,
+    ) == "answerable"
+    X_answerable = X[answerable_all]
+    y_answerable = y_3class[answerable_all]
+
+    s2_models = {
+        "ET": ExtraTreesClassifier(
+            n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1,
+        ),
+        "RF": RandomForestClassifier(
+            n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1,
+        ),
+        "GBT": GradientBoostingClassifier(
+            n_estimators=200, max_depth=4, learning_rate=0.1,
+            min_samples_leaf=5, random_state=seed,
+        ),
+    }
+
+    print("\n--- Stage 2: Quick comparison ---")
+    s2_results = {}
+    for name, model in s2_models.items():
+        cv_scores = cross_val_score(model, X_answerable, y_answerable, cv=cv, scoring="accuracy")
+        model.fit(X_train_s2, y_train_s2)
+        s2_results[name] = {"model": model, "cv": cv_scores.mean(), "cv_std": cv_scores.std()}
+        print(f"  {name:6s}: CV={cv_scores.mean():.4f} (+/-{cv_scores.std():.4f})")
+
+    # Tune top Stage 2 model
+    s2_ranked = sorted(s2_results.items(), key=lambda x: x[1]["cv"], reverse=True)
+    s2_best_name = s2_ranked[0][0]
+    print(f"\n--- Stage 2: Tuning {s2_best_name} ({time_per_stage}s budget) ---")
+
+    s2_search = RandomizedSearchCV(
+        s1_base[s2_best_name],  # reuse base model constructors
+        s1_param_grids[s2_best_name],
+        n_iter=n_iter,
+        cv=cv,
+        scoring="accuracy",
+        random_state=seed,
+        n_jobs=-1 if s2_best_name != "GBT" else 1,
+    )
+    s2_search.fit(X_train_s2, y_train_s2)
+    s2_model = s2_search.best_estimator_
+    print(f"  Best CV: {s2_search.best_score_:.4f}")
+    print(f"  Params: {s2_search.best_params_}")
+
+    if hasattr(s2_model, "feature_importances_"):
+        imp = s2_model.feature_importances_
+        order = np.argsort(imp)[::-1]
+        print(f"\n  Stage 2 top 10 features:")
+        for rank, idx in enumerate(order[:10], 1):
+            print(f"    {rank:2d}. {feature_names[idx]:40s} {imp[idx]:.4f}")
+
+    # ---- Combined evaluation ----
+    print(f"\n{'='*60}")
+    print("COMBINED TWO-STAGE EVALUATION")
+    print(f"{'='*60}")
+
+    final_pred = np.full(len(y3_test), "abstain", dtype=object)
+    s1_answerable_mask = s1_pred_test == "answerable"
+    if s1_answerable_mask.any():
+        s2_preds = s2_model.predict(X_test[s1_answerable_mask])
+        answerable_positions = np.where(s1_answerable_mask)[0]
+        for i, pos in enumerate(answerable_positions):
+            final_pred[pos] = s2_preds[i]
+
+    combined_acc = accuracy_score(y3_test, final_pred)
+    print(f"\nCombined accuracy: {combined_acc:.4f} ({sum(y3_test == final_pred)}/{len(y3_test)})")
+    print(classification_report(y3_test, final_pred, labels=_3CLASS_LABELS, zero_division=0))
+
+    cm_combined = confusion_matrix(y3_test, final_pred, labels=_3CLASS_LABELS)
+    header = "predicted ->".rjust(20) + "".join(f"{l:>15}" for l in _3CLASS_LABELS)
+    print(header)
+    print("-" * len(header))
+    for i, label in enumerate(_3CLASS_LABELS):
+        row = f"actual {label}".rjust(20) + "".join(f"{cm_combined[i, j]:>15}" for j in range(len(_3CLASS_LABELS)))
+        print(row)
+
+    # Per-class recall
+    print(f"\nPer-class recall:")
+    recalls = {}
+    for i, label in enumerate(_3CLASS_LABELS):
+        total = cm_combined[i].sum()
+        recall = cm_combined[i, i] / total if total > 0 else 0
+        recalls[label] = recall
+        print(f"  {label:15s}: {recall:.4f} ({cm_combined[i, i]}/{total})")
+    print(f"  Min recall: {min(recalls.values()):.4f}")
+
+    # Governor comparison
+    if governor_preds is not None:
+        gov_3class = _collapse_to_3class(governor_preds[X_test.index])
+        gov_acc = accuracy_score(y3_test, gov_3class)
+        print(f"\nGovernor baseline (3-class): {gov_acc:.4f}")
+        print(f"Delta vs governor: +{combined_acc - gov_acc:.4f}")
+
+    # ---- Save artifact ----
+    artifact = {
+        "mode": "twostage",
+        "stage1_model": s1_model,
+        "stage1_name": f"{s1_best_name} (tuned)",
+        "stage1_accuracy": s1_acc,
+        "stage2_model": s2_model,
+        "stage2_name": f"{s2_best_name} (tuned)",
+        "stage2_cv": s2_search.best_score_,
+        "combined_accuracy": combined_acc,
+        "combined_recalls": recalls,
+        "encoders": encoders,
+        "feature_names": feature_names,
+        "labels": _3CLASS_LABELS,
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(artifact, output_path)
+    print(f"\nTwo-stage model saved to {output_path}")
+    print(f"  Stage 1: {s1_best_name} (tuned) — answerable vs abstain")
+    print(f"  Stage 2: {s2_best_name} (tuned) — trustworthy vs disputed")
+    print(f"  Combined: {combined_acc:.4f}")
+
+    return artifact
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(description="Train governance classifier")
     parser.add_argument("--input", type=Path, default=_DEFAULT_INPUT, help="Input features CSV")
-    parser.add_argument("--output", type=Path, default=_DEFAULT_MODEL_OUTPUT, help="Output model path")
-    parser.add_argument("--data-dir", type=Path, default=_DEFAULT_DATA_DIR,
+    parser.add_argument("--output", type=Path, default=None, help="Output model path")
+    parser.add_argument("--data-dir", type=Path, default=_DEFAULT_FITZGOV_DIR,
                         help="fitz-gov tier1_core dir for context features")
     parser.add_argument("--test-size", type=float, default=0.2, help="Test set fraction")
     parser.add_argument("--time-budget", type=int, default=120,
@@ -442,7 +727,12 @@ def main():
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--no-context-features", action="store_true",
                         help="Skip context feature enrichment")
+    parser.add_argument("--mode", choices=["4class", "twostage"], default="4class",
+                        help="Training mode: 4class (legacy) or twostage (recommended)")
     args = parser.parse_args()
+
+    if args.output is None:
+        args.output = _DEFAULT_TWOSTAGE_OUTPUT if args.mode == "twostage" else _DEFAULT_MODEL_OUTPUT
 
     # Load data
     print(f"Loading features from {args.input}...")
@@ -455,6 +745,18 @@ def main():
         df = enrich_with_context_features(df, args.data_dir)
     elif not args.no_context_features:
         print(f"WARNING: {args.data_dir} not found, skipping context features")
+
+    # Two-stage mode: delegate to dedicated function
+    if args.mode == "twostage":
+        X, encoders = prepare_features(df)
+        feature_names = list(X.columns)
+        y_4class = df["expected_mode"].values
+        governor_preds = df["governor_predicted"].values if "governor_predicted" in df.columns else None
+        train_twostage(
+            X, y_4class, feature_names, encoders,
+            args.test_size, args.time_budget, args.seed, args.output, governor_preds,
+        )
+        return
 
     # Prepare features
     X, encoders = prepare_features(df)

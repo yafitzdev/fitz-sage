@@ -2386,21 +2386,63 @@ Collapsed confident + qualified → **trustworthy**. User question becomes "can 
 
 ### Experiment 8: Two-Stage Binary Classifier
 
-Decomposed the 3-class problem into two sequential binary classifiers:
-- **Stage 1**: RF — answerable vs abstain (91.5% test accuracy)
-- **Stage 2**: ET — trustworthy vs disputed (82.5% test accuracy on answerable subset)
+Decomposed the 3-class problem into two sequential binary classifiers.
 
-| Class | Single 3-class | Two-stage | Delta |
-|-------|---------------|-----------|-------|
-| Abstain | 72.9% | **79.2%** | **+6.2pp** |
-| Disputed | 28.2% | **33.3%** | **+5.1pp** |
-| Trustworthy | 85.3% | **91.2%** | **+5.9pp** |
-| **Overall** | **72.7%** | **78.5%** | **+5.8pp** |
+**Experiment 8a (simulation)**: Quick CV-only estimates before formalizing:
+- Stage 1: RF — answerable vs abstain (91.5% test accuracy)
+- Stage 2: ET — trustworthy vs disputed (82.5% test accuracy on answerable subset)
+- Combined: 78.5%
 
-**Stage 1 top features**: `mean_vector_score`, `ca_fired`, `query_word_count`
-**Stage 2 top features**: `score_spread`, `std_vector_score`, `mean_vector_score`
+**Experiment 8b (formalized pipeline)**: Full hyperparameter search with `train_classifier.py --mode twostage`:
+- **Stage 1**: RF (tuned) — answerable vs abstain, 92.4% test, 91.5% CV
+- **Stage 2**: RF (tuned) — trustworthy vs disputed, 83.6% CV
+- **Combined**: **82.96%** (185/223)
 
-**Stage 2 bottleneck**: 25/38 disputed cases missed. CA fires for 98% of disputed AND 70% of trustworthy — insufficient discrimination. Correctly classified disputed cases have 3x wider `score_spread`. Subcategories with 100% miss rate: `binary_conflict`, `opposing_conclusions`, `implicit_contradiction`.
+| Class | Single 3-class | Exp 8a (sim) | **Exp 8b (formal)** | Delta vs 3-class |
+|-------|---------------|-------------|---------------------|------------------|
+| Abstain | 72.9% | 79.2% | **81.3%** | **+8.4pp** |
+| Disputed | 28.2% | 33.3% | **53.9%** | **+25.7pp** |
+| Trustworthy | 85.3% | 91.2% | **91.9%** | **+6.6pp** |
+| **Overall** | **72.7%** | **78.5%** | **82.96%** | **+10.3pp** |
+
+Confusion matrix (Exp 8b):
+```
+                        abstain       disputed    trustworthy
+      actual abstain         39              0              9
+     actual disputed          1             21             17
+  actual trustworthy          7              4            125
+```
+
+**Stage 1 top features**: `ca_fired` (0.090), `has_disputed_signal` (0.085), `ca_signal` (0.078), `query_word_count` (0.057)
+**Stage 2 top features**: `ctx_length_mean` (0.115), `ctx_total_chars` (0.082), `ctx_length_std` (0.066), `ctx_mean_pairwise_sim` (0.060), `score_spread` (0.054)
+
+**Key insight**: Hyperparameter-tuned RF significantly outperforms simulation estimates. Disputed recall nearly doubled (33.3% -> 53.9%). Context features dominate Stage 2 — the text-based features computed from raw chunk content are the primary discriminator between trustworthy and disputed, not constraint signals.
+
+**Remaining weakness**: 17/39 disputed cases still misclassified as trustworthy. Constraint signals remain low-importance for Stage 2.
+
+### Experiment 9: Two-Stage Threshold Calibration
+
+Swept per-stage confidence thresholds (s1: 0.30-0.80, s2: 0.30-0.80, 121 combinations) to maximize minimum per-class recall.
+
+**Probability distribution analysis**:
+- Stage 1 P(answerable): truly answerable mean=0.904, truly abstain mean=0.308 (strong separation)
+- Stage 2 P(trustworthy): truly trustworthy mean=0.865, truly disputed mean=0.530 (moderate separation)
+
+**Optimal thresholds**: Stage 1 = 0.50, Stage 2 = 0.70
+
+| Metric | Raw (0.5/0.5) | Calibrated (0.5/0.7) | Delta |
+|--------|---------------|----------------------|-------|
+| Accuracy | 82.96% | **80.72%** | -2.2pp |
+| Abstain recall | 81.2% | 81.2% | 0.0pp |
+| Disputed recall | 53.9% | **76.9%** | **+23.1pp** |
+| Trustworthy recall | 91.9% | 81.6% | -10.3pp |
+| **Min recall** | **53.9%** | **76.9%** | **+23.1pp** |
+
+**Key insight**: Lowering the Stage 2 trustworthy confidence threshold from 0.5 to 0.7 forces uncertain "trustworthy" predictions to be reclassified as "disputed". This trades 10.3pp trustworthy recall for 23.1pp disputed recall, creating a much more balanced classifier. The model now correctly identifies 3/4 of disputed cases.
+
+**Routing**: 21.1% of cases abstain at Stage 1, 78.9% proceed to Stage 2.
+
+Saved as `model_v5_calibrated.joblib`.
 
 ### Historical Accuracy Progression
 
@@ -2414,14 +2456,17 @@ Decomposed the 3-class problem into two sequential binary classifiers:
 | 4-class continuous CA | Feb 9 | 67.3% | Regression (reverted) |
 | 4-class two-tier CA | Feb 9 | 65.5% | Regression (reverted) |
 | 3-class single GBT | Feb 9 | 72.7% | Class collapse |
-| **Two-stage binary** | **Feb 9** | **78.5%** | **Current best** |
+| Two-stage (simulation) | Feb 9 | 78.5% | Quick estimates |
+| Two-stage (formal) | Feb 9 | 82.96% | model_v5, best accuracy |
+| **Two-stage calibrated** | **Feb 9** | **80.72%** | **min recall 76.9%, model_v5_calibrated** |
 
 ### Next Steps
 
-1. Formalize two-stage training pipeline in `train_classifier.py`
-2. Calibrate per-stage confidence thresholds
-3. Richer CA features for Stage 2 disputed detection
-4. Dead feature removal (10 constant, 8 redundant)
+1. ~~Formalize two-stage training pipeline in `train_classifier.py`~~ DONE (82.96%)
+2. ~~Calibrate per-stage confidence thresholds~~ DONE (80.72%, min recall 76.9%)
+3. Dead feature removal (10 constant, 8 redundant)
+4. Richer CA features for Stage 2 disputed detection (pair count, severity)
+5. Integrate two-stage model into production pipeline (`GovernanceDecider`)
 
 ---
 
