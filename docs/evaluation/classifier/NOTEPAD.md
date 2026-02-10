@@ -1441,6 +1441,91 @@ The 28pp gap between disputed (98%) and trustworthy (70%) is the ONLY discrimina
 
 ---
 
+## Dead Code & Feature Audit (Feb 9, 2026)
+
+Analysis of all features extracted by `feature_extractor.py` to identify dead, redundant, and near-constant features.
+
+### Constant Zero Features (11 features)
+
+These are extracted but NEVER have a non-zero value across all 1,113 cases.
+
+**Group A: IE Embedding Diagnostics (8 features)**
+Root cause: `InsufficientEvidenceConstraint` is constructed without `embedder` argument in both eval pipeline (`eval_pipeline.py:162`) and production (`__init__.py:125`). The `_check_embedding_relevance()` method at `insufficient_evidence.py:959` never runs.
+
+- `ie_max_similarity`, `ie_entity_match_found`, `ie_primary_match_found`
+- `ie_critical_match_found`, `ie_query_aspect`, `ie_summary_overlap`
+- `ie_has_matching_aspect`, `ie_has_conflicting_aspect`
+
+**Group B: CA Config-Gated (2 features)**
+- `ca_is_uncertainty_query` — only set inside `if self.adaptive:` block, `adaptive=False` by default
+- `ca_relevance_filtered_count` — only set inside `if self.embedder:` block, `embedder=None` by default
+
+**Group C: Missing Enrichment (1 feature)**
+- `dominant_content_type` — eval pipeline chunks lack `content_type` metadata (would need ingestion enrichment bus to populate)
+
+### Redundant Features (6 pairs, |r| > 0.95)
+
+| Feature A | Feature B | r | Recommendation |
+|-----------|-----------|---|----------------|
+| `has_abstain_signal` | `ie_fired` | 1.0 | Remove `has_abstain_signal` — ie_fired is the only source |
+| `has_disputed_signal` | `ca_fired` | 1.0 | Remove `has_disputed_signal` — ca_fired is the only source |
+| `av_fired` | `av_jury_votes_no` | 1.0 | Remove `av_fired` — av_jury_votes_no is more informative |
+| `std_vector_score` | `score_spread` | 0.97 | Remove `std_vector_score` — score_spread has wider range |
+| `has_abstain_signal` | `num_unique_sources` | -1.0 | Transitive from ie_fired |
+| `ie_fired` | `num_unique_sources` | -1.0 | Transitive, keep `ie_fired` |
+
+Note: `has_qualified_signal` is NOT redundant (multiple constraints can signal "qualified").
+
+### Near-Constant Features (4 features, >99.8% same value)
+
+| Feature | Dominant | Minority | Notes |
+|---------|----------|----------|-------|
+| `detection_boost_authority` | False 99.91% | 1 case | |
+| `detection_aggregation` | False 99.82% | 2 cases | |
+| `detection_needs_rewriting` | False 99.82% | 2 cases | |
+| `detection_boost_recency` | False 99.73% | 3 cases | |
+
+### Dead Code: Unused Constraint Plugins
+
+| File | Lines | Status |
+|------|-------|--------|
+| `plugins/deterministic_conflict.py` | 359 | Entire file unused in production/eval paths |
+| `plugins/governance_analyzer.py` | 241 | Entire file unused in production/eval paths |
+
+Also dead:
+- `create_deterministic_constraints()` in `__init__.py:64-100`
+- `create_semantic_matcher()` in `__init__.py:135-147` (marked deprecated)
+- Legacy `semantic_matcher`/`embedder` params on `create_default_constraints()` (ignored, violates CLAUDE.md rule)
+
+### Summary
+
+| Category | Count | Reduction |
+|----------|-------|-----------|
+| Constant zero features | 11 | Remove from feature extractor |
+| Redundant features | 4 unique | Remove duplicates |
+| Near-constant features | 4 | Consider removing |
+| **Total removable** | **18-19** | **38-40% of 47 features** |
+| Dead code files | 2 | 600 lines |
+| Dead code functions | 3 | ~100 lines |
+| **Remaining features** | **~29** | Clean, meaningful set |
+
+### Impact Assessment
+
+Removing dead features should NOT hurt accuracy (they contribute zero information). May slightly improve:
+- Training speed (fewer dimensions)
+- Model interpretability (less noise in feature importance rankings)
+- Maintenance burden (less code to keep in sync)
+
+### Action Items
+
+1. Remove 11 constant features from `feature_extractor.py` and `train_classifier.py`
+2. Remove 4 redundant features from same files
+3. Retrain two-stage model on clean 29-feature set → verify no regression
+4. Delete `deterministic_conflict.py` and `governance_analyzer.py`
+5. Clean up `__init__.py` (dead factories, deprecated params)
+
+---
+
 ## Changelog
 
 | Date | Change |
@@ -1474,3 +1559,4 @@ The 28pp gap between disputed (98%) and trustworthy (70%) is the ONLY discrimina
 | 2026-02-09 | Stage 2 weakness analysis: 25/38 disputed missed. Root cause: ca_fired=True for 98% disputed AND 70% trustworthy. Only discriminator is score_spread (correct disputed has 3x wider spread). Need richer CA features: pair count, severity, source agreement. |
 | 2026-02-09 | Formalized two-stage pipeline in `train_classifier.py` (`--mode twostage`). Trained with hyperparameter search: **82.96% accuracy** (+4.5pp over simulation, +46.2pp over governor). Both stages use RF (tuned). Disputed recall 53.9% (up from 33.3% simulation). Saved as `model_v5_twostage.joblib`. |
 | 2026-02-09 | Calibrated two-stage thresholds (`calibrate_thresholds.py --mode twostage`). Optimal: s1=0.50, s2=0.70. Calibrated: **80.72% accuracy**, min recall **76.9%** (disputed). Disputed recall +23.1pp (53.9%->76.9%), trade-off: trustworthy -10.3pp (91.9%->81.6%). Saved as `model_v5_calibrated.joblib`. |
+| 2026-02-09 | Dead code audit: 11 constant-zero features (IE embedding diagnostics, CA config-gated, missing enrichment), 4 redundant (r>0.95), 4 near-constant. 2 unused plugin files (600 lines). Total: 18 removable features (38% of 47), leaving ~29 clean features. |

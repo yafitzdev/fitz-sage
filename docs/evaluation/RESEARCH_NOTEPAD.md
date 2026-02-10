@@ -2460,13 +2460,28 @@ Saved as `model_v5_calibrated.joblib`.
 | Two-stage (formal) | Feb 9 | 82.96% | model_v5, best accuracy |
 | **Two-stage calibrated** | **Feb 9** | **80.72%** | **min recall 76.9%, model_v5_calibrated** |
 
+### Dead Code & Feature Audit
+
+Comprehensive audit of all 47 features in the classifier pipeline:
+
+**Constant zero features (11)**: 8 IE embedding diagnostics (embedder never passed), 2 CA config-gated features (adaptive/embedder off), 1 missing enrichment metadata (dominant_content_type).
+
+**Redundant features (4)**: has_abstain_signal == ie_fired (r=1.0), has_disputed_signal == ca_fired (r=1.0), av_fired == av_jury_votes_no (r=1.0), std_vector_score ~= score_spread (r=0.97).
+
+**Near-constant (4)**: detection_boost_authority/aggregation/needs_rewriting/boost_recency (all >99.7% False).
+
+**Dead code**: 2 unused plugin files (deterministic_conflict.py 359 lines, governance_analyzer.py 241 lines), 3 dead factory functions in __init__.py.
+
+**Total**: 18 removable features (38% of 47), ~700 lines dead code. Remaining: ~29 clean features.
+
 ### Next Steps
 
 1. ~~Formalize two-stage training pipeline in `train_classifier.py`~~ DONE (82.96%)
 2. ~~Calibrate per-stage confidence thresholds~~ DONE (80.72%, min recall 76.9%)
-3. Dead feature removal (10 constant, 8 redundant)
-4. Richer CA features for Stage 2 disputed detection (pair count, severity)
-5. Integrate two-stage model into production pipeline (`GovernanceDecider`)
+3. ~~Dead feature audit~~ DONE (18 removable features, 700 lines dead code)
+4. Execute feature cleanup: remove 18 dead features, retrain on 29-feature set
+5. Richer CA features for Stage 2 disputed detection (pair count, severity)
+6. Integrate two-stage model into production pipeline (`GovernanceDecider`)
 
 ---
 
