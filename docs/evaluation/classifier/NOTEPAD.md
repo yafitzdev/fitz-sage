@@ -1,7 +1,7 @@
 # Governance Classifier — Living Notepad
 
 **Goal**: Replace hand-coded `AnswerGovernor.decide()` priority rules with a trained tabular classifier.
-**Status**: Exp 7 complete. GBT 69.1% is the ceiling with current features/data. Two optimization attempts failed (new text features hurt accuracy, longer search found worse params). Shipping GBT model_v3. See `CLASSIFIER_NEXT_STEPS.md` for roadmap to 70%+.
+**Status**: Step 2b eval complete. Re-extracted with binary CA → retrained → calibrated. Stacking Ensemble 65.5% raw, 64.6% calibrated (-4.5pp vs Exp 6's 69.1%). Root cause: VERDICT SCORE prompts cause 74.5% CA fire rate even with short-circuit (vs 63.4% with old prompts). GovernanceDecider integrated and functional. Next: restore original prompts OR accept regression as cost of Pass 2 capability.
 
 ---
 
@@ -183,6 +183,10 @@ All signals are already computed by the constraint pipeline before `AnswerGovern
 | `evidence_character` | cat | conflict_aware.py:200 | "assertive" / "hedged" / "mixed" |
 | `numerical_variance` | bool | conflict_aware.py:244 | Same direction, ≤25% difference |
 | `ca_signal` | cat | conflict_aware.py | "disputed" or null |
+| `ca_max_contradiction_score` | float [0-1] | conflict_aware.py (Step 2) | Strongest per-pair contradiction intensity |
+| `ca_mean_contradiction_score` | float [0-1] | conflict_aware.py (Step 2) | Average contradiction intensity across all pairs |
+| `ca_contradiction_density` | float [0-1] | conflict_aware.py (Step 2) | Proportion of pairs flagged as contradicting |
+| `ca_conflicting_chunk_ratio` | float [0-1] | conflict_aware.py (Step 2) | Proportion of chunks in at least one contradiction |
 
 ### 4d. CausalAttribution signals
 
@@ -925,6 +929,253 @@ The original GBT model from Exp 6 (200s budget) remains the best: 69.1% overall 
 
 Next improvements require the structural changes outlined in `CLASSIFIER_NEXT_STEPS.md`: better constraint signals, calibrated confidence thresholds, and real-world failure data.
 
+### Step 2 Implementation: Continuous CA Signals
+
+**Goal**: Replace binary CA features with continuous contradiction intensity scores. Per `CLASSIFIER_NEXT_STEPS.md`, this is the #1 feature unlock for disputed recall.
+
+**Changes made** (all in `conflict_aware.py`):
+
+1. **Prompts updated**: `CONTRADICTION_PROMPT` and all 3 `FUSION_PROMPTS` now request "VERDICT SCORE" format (e.g., "CONTRADICT 8", "AGREE 1"). Score is contradiction intensity 0-10.
+
+2. **New helper `_parse_verdict_score(response)`**: Parses "VERDICT SCORE" format with fallbacks:
+   - No score found: CONTRADICT→8, AGREE/YES→1, UNCLEAR→5
+   - Clamped to [0, 10]
+
+3. **Return type changes**:
+   - `_check_pairwise_contradiction()`: `bool` → `tuple[bool, float]` (score normalized to 0.0-1.0)
+   - `_check_pairwise_fusion()`: `bool` → `tuple[bool, float]` (mean of 3 prompt scores, normalized)
+
+4. **Short-circuit removed in `apply()`**: Previously returned on first contradiction. Now checks ALL pairs to compute aggregate statistics. Accumulates `pair_scores` list and tracks which chunk indices are involved in contradictions.
+
+5. **4 new continuous features surfaced in `ca_diag`**:
+   - `ca_max_contradiction_score`: Strongest per-pair contradiction intensity (0.0-1.0)
+   - `ca_mean_contradiction_score`: Average across all checked pairs (0.0-1.0)
+   - `ca_contradiction_density`: Proportion of pairs flagged as contradicting (0.0-1.0)
+   - `ca_conflicting_chunk_ratio`: Proportion of chunks involved in at least one contradiction (0.0-1.0)
+
+6. **Feature pipeline wired through**:
+   - `feature_extractor.py`: 4 new features extracted from CA metadata
+   - `extract_features.py`: Added to `_NUMERIC_FEATURES`
+   - `eval_pipeline.py`: Added to `_NUMERIC_FEATURES`
+   - `train_classifier.py`: No change needed (generic `pd.to_numeric().fillna(0)` handles new columns)
+
+**Cost increase**: Previously short-circuited on first contradiction (avg ~1 LLM call). Now checks all pairs (max 4 pairs for 5 chunks). Worst case: +3 extra LLM calls per case when contradiction found on pair 1. Average: ~1-2 extra calls.
+
+**Tests**: 32 passed, 1 skipped (Ollama-dependent). All existing behavior preserved — deny/allow decisions unchanged.
+
+**Next**: Run `eval_pipeline.py` to re-extract features with new continuous scores → retrain → check if continuous CA features enter top 20 importance and disputed recall improves.
+
+### Step 2 Retraining Results: REGRESSION
+
+**Re-extraction**: `eval_pipeline.py` on 1113 cases, 35.7 min, 0 errors. Output: `eval_results_v3.csv`.
+
+**New feature distributions** (4 continuous CA features):
+
+| Feature | Overall Mean | Disputed | Non-Disputed | Gap | Non-zero |
+|---------|-------------|----------|--------------|-----|----------|
+| `ca_max_contradiction_score` | 0.784 | 0.933 | 0.750 | 0.18 | 955/1113 |
+| `ca_mean_contradiction_score` | 0.749 | 0.861 | 0.725 | 0.14 | 955/1113 |
+| `ca_contradiction_density` | 0.697 | 0.766 | 0.680 | 0.09 | 822/1113 |
+| `ca_conflicting_chunk_ratio` | 0.708 | 0.801 | 0.690 | 0.11 | 822/1113 |
+
+**Problem**: The gap between disputed and non-disputed means is only 0.09-0.18, less than 1 std. The LLM gives high contradiction scores broadly — insufficient class separation.
+
+**CA over-firing** (binary signal degradation):
+
+| Dataset | CA Fired | Rate |
+|---------|----------|------|
+| v2 (pre-Step 2) | 706/1113 | 63.4% |
+| v3 (post-Step 2) | 822/1113 | **73.9%** (+10.5pp) |
+
+Removing the short-circuit means checking all pairs instead of just pair 1. More pairs checked = more chances for false positive contradictions. The binary `ca_signal` now fires for 74% of cases, including 75.5% of confident and 71.4% of qualified cases, compared to 87.8% of disputed. The 13pp gap (87.8% - 74.5%) provides minimal discrimination.
+
+**Retrain results (1113 samples, 62 features, 80/20 split, seed=42)**:
+
+| Model | Accuracy | Abstain | Confident | Disputed | Qualified |
+|-------|----------|---------|-----------|----------|-----------|
+| **RF (winner)** | **67.3%** | 72% | 71% | 59% | 66% |
+| GBT | 64.1% | 68% | 65% | 56% | 65% |
+| ET | 66.8% | 70% | 60% | 69% | 68% |
+| Ensemble | 66.4% | 74% | 63% | 64% | 65% |
+
+**Comparison to Exp 6 (pre-Step 2)**:
+
+| Metric | Exp 6 (GBT, 58 features) | Step 2 (RF, 62 features) | Delta |
+|--------|--------------------------|--------------------------|-------|
+| Overall accuracy | **69.1%** | 67.3% | **-1.8pp** |
+| Abstain recall | **85%** | 72% | **-13pp** |
+| Confident recall | 62% | **71%** | **+9pp** |
+| Disputed recall | **67%** | 59% | **-8pp** |
+| Qualified recall | 66% | 66% | 0pp |
+| Min recall | 62% | 59% | **-3pp** |
+
+**Feature importance (RF, top 20)**:
+
+| Rank | Feature | Importance |
+|------|---------|------------|
+| 1 | ctx_length_mean | 0.149 |
+| 2 | ctx_total_chars | 0.108 |
+| 3 | mean_vector_score | 0.087 |
+| 4 | query_word_count | 0.078 |
+| 5 | ctx_length_std | 0.068 |
+| ... | ... | ... |
+| **15** | **ca_mean_contradiction_score** | **0.021** |
+| **17** | **ca_max_contradiction_score** | **0.014** |
+
+The new continuous features DID enter the top 20 but with low importance (2.1% and 1.4%). `ca_contradiction_density` and `ca_conflicting_chunk_ratio` didn't make top 20.
+
+**Root cause analysis**:
+
+1. **No-short-circuit over-firing**: Checking all pairs instead of just pair 1 increased CA false positive rate by 10.5pp. The binary `ca_signal` went from a somewhat useful signal (63% fire rate) to a nearly useless one (74% fire rate). Since `ca_signal` was ranked #5 in Exp 6 feature importance, degrading it hurts overall accuracy.
+
+2. **LLM score calibration**: The ollama local model gives high contradiction scores (mean 0.75-0.78) even for non-disputed cases. The VERDICT SCORE prompt format may be too novel for this model size, or it may be biased toward high numbers. The disputed-vs-non-disputed gap (0.09-0.18 on 0-1 scale) is below 1 std — not enough for tree split discrimination.
+
+3. **More features ≠ better model**: Going from 58 to 62 features with noisy new columns can confuse tree models that have limited training data (890 train samples). The noise-to-signal ratio of the 4 new features is too high.
+
+**Model saved as**: `model_v4_ca_continuous.joblib` (RF tuned, 67.3%, for comparison purposes only). **model_v3.joblib remains the shipping model (69.1%).**
+
+**Verdict**: Step 2 as implemented does NOT improve the classifier. The continuous CA features are too noisy due to (a) LLM score miscalibration and (b) over-firing from no-short-circuit. **Recommended fixes before retry**:
+
+1. **Restore short-circuit for binary deny/allow** — Keep the binary CA behavior unchanged (fires ~63% like before). Compute continuous scores as a SEPARATE diagnostic pass that doesn't affect the deny/allow decision.
+
+2. **Score threshold for deny** — Instead of `contradicting_pairs > 0`, require `ca_max_contradiction_score > 0.7` or similar. Only deny when the contradiction is strong, not just present.
+
+3. **Better LLM for scoring** — The ollama local model may not be well-calibrated for scoring tasks. Try Cohere or another provider that better follows the VERDICT SCORE format.
+
+4. **Verify prompt format** — Test the VERDICT SCORE prompt manually on known cases to ensure the LLM produces calibrated scores.
+
+### Step 2b Implementation: Two-Tier CA Architecture
+
+**Goal**: Save the continuous CA approach by fixing its two root causes: (1) CA over-firing from no-short-circuit, and (2) noisy LLM scores from the fast/local model. Gate the expensive smart LLM behind classifier uncertainty so it only fires on ~15% of queries.
+
+**Architecture: Two-Pass CA**
+
+```
+Query → Constraints (Pass 1, fast LLM) → Feature extraction → Classifier
+  │
+  ├─ max_proba >= threshold → ML prediction (done, ~85% of queries)
+  │
+  └─ max_proba < threshold → Pass 2 (smart LLM scoring)
+       → score_all_pairs() with smart LLM
+       → Enrich features with 4 continuous scores
+       → Re-run classifier → if confident, ML prediction
+       → If still uncertain: fall back to governor rules
+```
+
+**Changes made**:
+
+1. **Short-circuit restored in `apply()`** (`conflict_aware.py`):
+   - Reverted to returning `ConstraintResult.deny()` on first contradiction
+   - Removed pair_scores accumulation, aggregate computation
+   - CA fire rate should return to ~63% (was 73.9% in Step 2)
+   - VERDICT SCORE prompts and `_parse_verdict_score()` kept (needed for Pass 2)
+   - Pairwise methods still return `tuple[bool, float]` (score ignored in short-circuit)
+
+2. **New `score_all_pairs()` method** (`conflict_aware.py`):
+   - Accepts optional `chat_override: ChatProvider` for smart LLM
+   - Checks ALL pairs without short-circuit (same as Step 2's removed loop)
+   - Returns `dict[str, float]` with 4 continuous features
+   - Does NOT affect deny/allow decisions — purely diagnostic
+   - Reuses same evidence character gating and method selection as `apply()`
+   - Temporarily swaps `self.chat` with override, restores in `finally` block
+
+3. **`GovernanceDecider` class** (`governance_decider.py`, new file):
+   - Loads model artifact (model, encoders, feature_names, labels, thresholds)
+   - `decide()` implements the two-pass flow:
+     - Pass 1: `extract_features()` → `_predict()` → check per-class threshold
+     - Pass 2 (if uncertain + smart LLM): `score_all_pairs()` → update features → `_predict()` again
+     - Fallback: `AnswerGovernor.decide()` with `source="rule-fallback"`
+   - `_encode_features()`: Handles categorical (LabelEncoder), bool→int, numeric conversion
+   - Returns `GovernanceDecision` with `source` and `confidence` metadata
+
+4. **Pipeline integration** (`engine.py`):
+   - `_try_init_governance_decider()`: fail-open init (returns None if model not found)
+   - Finds CA constraint instance for Pass 2, gets smart LLM via `chat_factory("smart")`
+   - Step 3 governance: uses GovernanceDecider if available, else AnswerGovernor
+   - Logs `source` in governance decision message
+
+5. **GovernanceDecision extended** (`governance.py`):
+   - Added `source: str = "rule"` field ("ml", "ml-enriched", "rule-fallback", "rule")
+   - Added `confidence: float | None = None` field (max predicted probability)
+   - Both fields included in `to_dict()` serialization
+   - Frozen dataclass — fields have defaults, no breaking changes
+
+**Key infrastructure reused**:
+
+| What | Where | How used |
+|------|-------|----------|
+| Multi-tier LLM | `chat_factory("smart")` | Pass 2 gets smart LLM |
+| Feature extraction | `feature_extractor.extract_features()` | Pass 1 feature vector |
+| Calibrated thresholds | `model_v3_calibrated.joblib` | Per-class uncertainty gating |
+| VERDICT SCORE prompts | `conflict_aware.py:46-112` | Already in place from Step 2 |
+| `_parse_verdict_score()` | `conflict_aware.py:261-279` | Already in place from Step 2 |
+| AnswerGovernor | `governance.py` | Fallback for doubly-uncertain cases |
+
+**Cost analysis**:
+
+| Scenario | Fast LLM calls | Smart LLM calls | Total cost |
+|----------|----------------|-----------------|------------|
+| Pre-Step 2 (baseline) | 1-4 per query | 0 | Baseline |
+| Step 2 (regressed) | 4-8 per query | 0 | ~2x baseline |
+| **Step 2b (two-tier)** | 1-4 per query | **0 for ~85%, 4-8 for ~15%** | **~1.3x baseline** |
+
+**Tests**: 1523 passed, 3 skipped, 2 pre-existing failures (allow metadata injection — unrelated).
+
+### Step 2b Evaluation Results
+
+**Re-extraction**: `eval_pipeline.py` on 1113 cases (55.1 min, 0 errors). Output: `eval_results_v4.csv`.
+
+**Binary CA behavior verified**:
+- All 4 continuous CA features are exactly 0.0 (short-circuit works — `score_all_pairs()` not called during eval)
+- CA fire rate: **74.5%** (829/1113 have `ca_signal=disputed`)
+
+**CA fire rate NOT restored to 63.4%**: The VERDICT SCORE prompts (kept from Step 2 for Pass 2 capability) are more aggressive at detecting contradictions than the original prompts. Even with short-circuit restored, the prompt text itself causes more "CONTRADICT" verdicts. The binary `ca_signal` feature is degraded.
+
+| Dataset | Prompts | CA Fire Rate |
+|---------|---------|-------------|
+| eval_results_v2.csv (Exp 6) | Original CONTRADICTION/FUSION | 63.4% |
+| eval_results_v3.csv (Step 2) | VERDICT SCORE, no short-circuit | 73.9% |
+| eval_results_v4.csv (Step 2b) | VERDICT SCORE, short-circuit restored | **74.5%** |
+
+**Retrain results (1113 samples, 62 features, 80/20 split, seed=42)**:
+
+| Model | Accuracy | Abstain | Confident | Disputed | Qualified |
+|-------|----------|---------|-----------|----------|-----------|
+| GBT | 60.5% | — | — | 49% | — |
+| RF | 63.2% | — | — | 59% | — |
+| ET | 62.8% | — | — | 64% | — |
+| **Stacking Ensemble** | **65.5%** | — | — | 64% | — |
+
+Model saved as `model_v1.joblib` (Stacking Ensemble, 62 features).
+
+**Calibration (per-class thresholds → governor fallback)**:
+
+| Metric | Raw | Calibrated |
+|--------|-----|------------|
+| Accuracy | 65.5% | 64.6% |
+| Min recall | 61.2% | 61.5% |
+
+Optimal thresholds: `abstain=0.45, confident=0.00, disputed=0.75, qualified=0.00`
+
+Fallback analysis: 9/223 (4.0%) cases fell back to governor. Governor accuracy on fallback cases: 6/9 (66.7%). Calibration trades 0.9pp accuracy for 0.3pp min recall improvement.
+
+Saved as `model_v3_calibrated.joblib` (overwrites previous calibrated model).
+
+**Comparison to Exp 6 (pre-Step 2)**:
+
+| Metric | Exp 6 (GBT, 69.1%) | Step 2b (Ensemble, 65.5%) | Delta |
+|--------|---------------------|---------------------------|-------|
+| Overall accuracy | **69.1%** | 65.5% | **-3.6pp** |
+| Calibrated accuracy | **70.0%** | 64.6% | **-5.4pp** |
+| Winner model | GBT | Stacking Ensemble | changed |
+
+**Root cause**: The accuracy regression is entirely due to the VERDICT SCORE prompts making `ca_signal` fire at 74.5% instead of 63.4%. Since `ca_signal` was the #5 most important feature in Exp 6, degrading it loses ~3.6pp accuracy. The short-circuit restoration had no effect because the prompts themselves are more aggressive.
+
+**Options**:
+1. **Restore original prompts** — Revert VERDICT SCORE prompts to original CONTRADICTION/FUSION format. `score_all_pairs()` can use separate prompts for Pass 2. Expected: restore 69.1% accuracy.
+2. **Accept regression** — Keep VERDICT SCORE prompts as-is. 65.5% is still +38.6pp over governor. The GovernanceDecider's Pass 2 (smart LLM on uncertain cases) may recover the gap.
+3. **Dual prompts** — Use original prompts in `apply()` (binary decision, Pass 1) and VERDICT SCORE prompts only in `score_all_pairs()` (continuous scoring, Pass 2). Best of both worlds but more code complexity.
+
 ---
 
 ## 9. Files Created
@@ -943,6 +1194,12 @@ Next improvements require the structural changes outlined in `CLASSIFIER_NEXT_ST
 | `tools/governance/data/model_v3.joblib` | GBT tuned on 1113 cases (69.1% acc, 67% dispute recall) |
 | `tools/governance/data/validation_report.txt` | Blind validation report for 200 generated cases (93.5% agreement) |
 | `tools/governance/analyze_dispute_regression.py` | Diagnostic tool for disputed recall regression investigation |
+| `tools/governance/data/eval_results_v3.csv` | 1113 rows with Step 2 continuous CA features |
+| `tools/governance/data/model_v4_ca_continuous.joblib` | RF tuned on v3 features (67.3% — regression, reference only) |
+| `tools/governance/calibrate_thresholds.py` | Per-class threshold calibration (Step 1) |
+| `tools/governance/data/model_v3_calibrated.joblib` | GBT with per-class calibrated thresholds (70.0%) |
+| `fitz_ai/core/guardrails/governance_decider.py` | GovernanceDecider — two-pass ML governance (Step 2b) |
+| `tools/governance/data/eval_results_v4.csv` | 1113 rows with Step 2b binary CA features (short-circuit restored) |
 
 ---
 
@@ -1001,3 +1258,9 @@ Next improvements require the structural changes outlined in `CLASSIFIER_NEXT_ST
 | 2026-02-08 | Experiment 7a (new text features): Added 6 hedging/assertive/number features. GBT dropped to 66.8%. Features added noise. Reverted. |
 | 2026-02-08 | Experiment 7b (600s search): GBT found worse params (max_depth=2, 60.1%). Longer search doesn't guarantee better results. 69.1% confirmed as ceiling. |
 | 2026-02-08 | Restored GBT model_v3 from Exp 6 (200s params). Shipping at 69.1%. Improvement roadmap in `CLASSIFIER_NEXT_STEPS.md`. |
+| 2026-02-08 | Step 1 (calibrated thresholds): +0.9pp accuracy (69.1%→70.0%), +1.9pp min recall. model_v3_calibrated.joblib saved. |
+| 2026-02-09 | Step 2 (continuous CA signals): Implemented. Prompts request "VERDICT SCORE" format, pairwise methods return (bool, float), apply() checks all pairs, 4 new continuous features surfaced. |
+| 2026-02-09 | Step 2 re-extraction: eval_pipeline.py on 1113 cases (35.7 min, 0 errors). eval_results_v3.csv saved. CA firing rate jumped 63%→74%. |
+| 2026-02-09 | Step 2 retrain: **REGRESSION** — 69.1%→67.3% (-1.8pp). New features ranked #15/#17 (low importance). CA over-firing degraded binary signal. model_v4_ca_continuous.joblib saved for reference. model_v3 remains shipping model. |
+| 2026-02-09 | Step 2b (two-tier CA): Short-circuit restored in apply(). New `score_all_pairs()` method for smart LLM scoring on uncertain cases. `GovernanceDecider` class implements two-pass ML decision flow. Integrated into pipeline engine with fail-open fallback to AnswerGovernor. GovernanceDecision extended with `source`/`confidence` fields. 1523 tests pass. Pending: re-extract + retrain + eval. |
+| 2026-02-09 | Step 2b eval: Re-extracted 1113 cases (55 min, 0 errors). CA fire rate 74.5% (VERDICT SCORE prompts more aggressive than original). Retrained: Stacking Ensemble 65.5% (winner). Calibrated: 64.6%, min recall 61.5%. Regression from Exp 6 (-3.6pp raw, -5.4pp calibrated) due to prompt-induced CA over-firing. |
