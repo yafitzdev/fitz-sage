@@ -19,18 +19,39 @@ from fitz_ai.runtime import get_default_engine, get_engine_registry
 
 from .init_config import (
     copy_engine_default_config,
+    generate_fitz_krag_config,
     generate_fitz_rag_config,
     generate_global_config,
 )
 from .init_detector import detect_system, filter_available_plugins, load_default_config
 from .init_models import get_default_model, get_default_or_first
 
+# Preferred plugin order: first available = default (selected on Enter).
+# Ollama first because it's local, private, and free.
+_PLUGIN_PREFERENCE: dict[str, list[str]] = {
+    "chat": ["ollama", "cohere", "openai", "anthropic"],
+    "embedding": ["ollama", "cohere", "openai"],
+    "rerank": ["ollama", "cohere"],
+    "vision": ["ollama", "cohere", "openai", "anthropic"],
+    "vector_db": ["pgvector"],
+}
 
-def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
-    """Run FitzRAG-specific configuration wizard.
+
+def _order_by_preference(available: list[str], plugin_type: str) -> list[str]:
+    """Reorder available plugins by preference. First item = default."""
+    preference = _PLUGIN_PREFERENCE.get(plugin_type, [])
+    ordered = [p for p in preference if p in available]
+    remaining = [p for p in available if p not in ordered]
+    return ordered + remaining
+
+
+def _select_plugins(system, non_interactive: bool) -> dict:
+    """Run shared plugin selection (chat, embedding, rerank, vision, vector_db).
 
     Returns:
-        Generated FitzRAG config YAML string.
+        Dict with keys: chat, chat_model_smart, chat_model_fast, chat_model_balanced,
+        embedding, embedding_model, rerank, rerank_model, vector_db,
+        vision, vision_model.
     """
     # Discover plugins
     all_chat = available_llm_plugins("chat")
@@ -38,17 +59,23 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
     all_rerank = available_llm_plugins("rerank")
     all_vision = available_llm_plugins("vision")
     all_vector_db = available_vector_db_plugins()
-    all_retrieval = available_retrieval_plugins()
-    all_chunkers = available_chunking_plugins()
 
-    # Filter to available only
-    avail_chat = filter_available_plugins(all_chat, "chat", system)
-    avail_embedding = filter_available_plugins(all_embedding, "embedding", system)
-    avail_rerank = filter_available_plugins(all_rerank, "rerank", system)
-    avail_vision = filter_available_plugins(all_vision, "vision", system)
-    avail_vector_db = filter_available_plugins(all_vector_db, "vector_db", system)
-    avail_retrieval = all_retrieval
-    avail_chunkers = all_chunkers if all_chunkers else ["simple"]
+    # Filter to available, then order by preference (first = default)
+    avail_chat = _order_by_preference(
+        filter_available_plugins(all_chat, "chat", system), "chat"
+    )
+    avail_embedding = _order_by_preference(
+        filter_available_plugins(all_embedding, "embedding", system), "embedding"
+    )
+    avail_rerank = _order_by_preference(
+        filter_available_plugins(all_rerank, "rerank", system), "rerank"
+    )
+    avail_vision = _order_by_preference(
+        filter_available_plugins(all_vision, "vision", system), "vision"
+    )
+    avail_vector_db = _order_by_preference(
+        filter_available_plugins(all_vector_db, "vector_db", system), "vector_db"
+    )
 
     # Validate minimum requirements
     if not avail_chat:
@@ -66,86 +93,46 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
         ui.info("Ensure pgvector packages are installed: pip install psycopg pgvector pgserver")
         raise typer.Exit(1)
 
-    # Load defaults from default.yaml (flat format)
-    default_config = load_default_config()
-
-    # Helper to extract plugin name from flat format (string) or old nested format (dict)
-    def _get_plugin(key: str, fallback: str) -> str:
-        val = default_config.get(key)
-        if isinstance(val, dict):
-            # Old nested format: {"plugin_name": "cohere", "kwargs": {...}}
-            return val.get("plugin_name", fallback)
-        elif isinstance(val, str):
-            # New flat format: "cohere" or "cohere/model-name"
-            return val.split("/")[0] if val else fallback
-        return fallback
-
-    # Plugin defaults (new flat format)
-    default_chat = _get_plugin("chat", "cohere")
-    default_embedding = _get_plugin("embedding", "cohere")
-    default_vector_db = _get_plugin("vector_db", "pgvector")
-    default_retrieval = _get_plugin("retrieval_plugin", "dense")
-
-    # Chunking defaults (new flat format)
-    default_chunker = "recursive"
-    default_chunk_size = default_config.get("chunk_size", 512)
-    default_chunk_overlap = default_config.get("chunk_overlap", 0)
-
     if non_interactive:
-        # Use defaults if available
-        chat_choice = get_default_or_first(avail_chat, default_chat)
+        chat_choice = avail_chat[0]
         chat_model_smart = get_default_model("chat", chat_choice, "smart")
         chat_model_fast = get_default_model("chat", chat_choice, "fast")
         chat_model_balanced = get_default_model("chat", chat_choice, "balanced")
-        embedding_choice = get_default_or_first(avail_embedding, default_embedding)
+        embedding_choice = avail_embedding[0]
         embedding_model = get_default_model("embedding", embedding_choice)
-        rerank_choice = None  # Default to no reranking (user can enable via config)
+        rerank_choice = None
         rerank_model = ""
-        vector_db_choice = get_default_or_first(avail_vector_db, default_vector_db)
-        retrieval_choice = get_default_or_first(avail_retrieval, default_retrieval)
-        chunker_choice = default_chunker
-        chunk_size = default_chunk_size
-        chunk_overlap = default_chunk_overlap
+        vector_db_choice = avail_vector_db[0]
         vision_choice = avail_vision[0] if avail_vision else None
         vision_model = get_default_model("vision", vision_choice) if vision_choice else ""
-        parser_choice = "docling_vision" if vision_choice else "docling"
     else:
-        # Interactive selection
+        # Interactive selection (first item in each list is the default)
         ui.section("Configuration")
 
-        # Chat plugin (use default models - user can edit config later)
-        chat_choice = ui.prompt_numbered_choice(
-            "Chat plugin", avail_chat, get_default_or_first(avail_chat, default_chat)
-        )
+        chat_choice = ui.prompt_numbered_choice("Chat plugin", avail_chat, avail_chat[0])
         chat_model_smart = get_default_model("chat", chat_choice, "smart")
         chat_model_fast = get_default_model("chat", chat_choice, "fast")
         chat_model_balanced = get_default_model("chat", chat_choice, "balanced")
 
-        # Embedding (use default model)
         print()
         embedding_choice = ui.prompt_numbered_choice(
-            "Embedding plugin",
-            avail_embedding,
-            get_default_or_first(avail_embedding, default_embedding),
+            "Embedding plugin", avail_embedding, avail_embedding[0]
         )
         embedding_model = get_default_model("embedding", embedding_choice)
 
-        # Rerank provider (optional - None means no reranking)
         rerank_choice = None
         rerank_model = ""
         print()
-        # Add "None" option to allow skipping reranking
         rerank_options = ["None (no reranking)"] + avail_rerank
         selected = ui.prompt_numbered_choice(
             "Rerank plugin (optional, improves retrieval accuracy)",
             rerank_options,
-            rerank_options[0],  # Default to None
+            rerank_options[0],
         )
         if selected != "None (no reranking)":
             rerank_choice = selected
             rerank_model = get_default_model("rerank", rerank_choice)
 
-        # Vision provider (use default model)
         vision_choice = None
         vision_model = ""
         if avail_vision:
@@ -160,15 +147,64 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
             print()
             ui.info("Vision: not available (no vision plugins detected)")
 
-        # Vector DB - always pgvector (no selection needed)
-        vector_db_choice = "pgvector"
+        vector_db_choice = avail_vector_db[0]
 
+    return {
+        "chat": chat_choice,
+        "chat_model_smart": chat_model_smart,
+        "chat_model_fast": chat_model_fast,
+        "chat_model_balanced": chat_model_balanced,
+        "embedding": embedding_choice,
+        "embedding_model": embedding_model,
+        "rerank": rerank_choice,
+        "rerank_model": rerank_model,
+        "vector_db": vector_db_choice,
+        "vision": vision_choice,
+        "vision_model": vision_model,
+    }
+
+
+def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
+    """Run FitzRAG-specific configuration wizard.
+
+    Returns:
+        Generated FitzRAG config YAML string.
+    """
+    plugins = _select_plugins(system, non_interactive)
+
+    # RAG-specific: retrieval, chunking, parser
+    all_retrieval = available_retrieval_plugins()
+    all_chunkers = available_chunking_plugins()
+    avail_chunkers = all_chunkers if all_chunkers else ["simple"]
+
+    default_config = load_default_config()
+
+    def _get_plugin(key: str, fallback: str) -> str:
+        val = default_config.get(key)
+        if isinstance(val, dict):
+            return val.get("plugin_name", fallback)
+        elif isinstance(val, str):
+            return val.split("/")[0] if val else fallback
+        return fallback
+
+    default_retrieval = _get_plugin("retrieval_plugin", "dense")
+    default_chunker = "recursive"
+    default_chunk_size = default_config.get("chunk_size", 512)
+    default_chunk_overlap = default_config.get("chunk_overlap", 0)
+
+    if non_interactive:
+        retrieval_choice = get_default_or_first(all_retrieval, default_retrieval)
+        chunker_choice = default_chunker
+        chunk_size = default_chunk_size
+        chunk_overlap = default_chunk_overlap
+        parser_choice = "docling_vision" if plugins["vision"] else "docling"
+    else:
         # Retrieval
         print()
         retrieval_choice = ui.prompt_numbered_choice(
             "Retrieval strategy",
-            avail_retrieval,
-            get_default_or_first(avail_retrieval, default_retrieval),
+            all_retrieval,
+            get_default_or_first(all_retrieval, default_retrieval),
         )
 
         # Chunking
@@ -181,6 +217,9 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
 
         # Parser selection
         print()
+        avail_vision = filter_available_plugins(
+            available_llm_plugins("vision"), "vision", system
+        )
         if avail_vision:
             parser_descs = [
                 "docling_vision - VLM-powered figure description",
@@ -192,24 +231,46 @@ def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
             ui.info("Parser: docling (VLM not available)")
             parser_choice = "docling"
 
-    # Generate config
     return generate_fitz_rag_config(
-        chat=chat_choice,
-        chat_model_smart=chat_model_smart,
-        chat_model_fast=chat_model_fast,
-        chat_model_balanced=chat_model_balanced,
-        embedding=embedding_choice,
-        embedding_model=embedding_model,
-        rerank=rerank_choice,
-        rerank_model=rerank_model,
-        vector_db=vector_db_choice,
+        chat=plugins["chat"],
+        chat_model_smart=plugins["chat_model_smart"],
+        chat_model_fast=plugins["chat_model_fast"],
+        chat_model_balanced=plugins["chat_model_balanced"],
+        embedding=plugins["embedding"],
+        embedding_model=plugins["embedding_model"],
+        rerank=plugins["rerank"],
+        rerank_model=plugins["rerank_model"],
+        vector_db=plugins["vector_db"],
         retrieval=retrieval_choice,
         chunker=chunker_choice,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         parser=parser_choice,
-        vision=vision_choice,
-        vision_model=vision_model,
+        vision=plugins["vision"],
+        vision_model=plugins["vision_model"],
+    )
+
+
+def _run_fitz_krag_wizard(system, non_interactive: bool) -> str:
+    """Run FitzKRAG-specific configuration wizard.
+
+    Returns:
+        Generated FitzKRAG config YAML string.
+    """
+    plugins = _select_plugins(system, non_interactive)
+
+    return generate_fitz_krag_config(
+        chat=plugins["chat"],
+        chat_model_smart=plugins["chat_model_smart"],
+        chat_model_fast=plugins["chat_model_fast"],
+        chat_model_balanced=plugins["chat_model_balanced"],
+        embedding=plugins["embedding"],
+        embedding_model=plugins["embedding_model"],
+        rerank=plugins["rerank"],
+        rerank_model=plugins["rerank_model"],
+        vector_db=plugins["vector_db"],
+        vision=plugins["vision"],
+        vision_model=plugins["vision_model"],
     )
 
 
@@ -363,6 +424,8 @@ def command(
 
     if default_engine == "fitz_rag":
         engine_config_yaml = _run_fitz_rag_wizard(system, non_interactive)
+    elif default_engine == "fitz_krag":
+        engine_config_yaml = _run_fitz_krag_wizard(system, non_interactive)
     else:
         # For any other engine, use auto-discovery
         engine_config_yaml = copy_engine_default_config(default_engine, registry)

@@ -201,8 +201,8 @@ class TestCreateProviderConfig:
 
         config = yaml.safe_load(config_path.read_text())
 
-        assert config["chat"]["plugin_name"] == "local_ollama"
-        assert config["embedding"]["plugin_name"] == "local_ollama"
+        assert config["chat"]["plugin_name"] == "ollama"
+        assert config["embedding"]["plugin_name"] == "ollama"
 
     def test_config_uses_pgvector(self, tmp_path):
         """Test that config uses local FAISS."""

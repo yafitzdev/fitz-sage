@@ -18,6 +18,84 @@ default_engine: {default_engine}
 """
 
 
+def _build_chat_kwargs_section(
+    chat_model_smart: str,
+    chat_model_fast: str,
+    chat_model_balanced: str,
+) -> str:
+    """Build the chat_kwargs YAML section."""
+    lines = []
+    if chat_model_smart or chat_model_fast or chat_model_balanced:
+        lines.append("  models:")
+        if chat_model_smart:
+            lines.append(f"    smart: {chat_model_smart}")
+        if chat_model_fast:
+            lines.append(f"    fast: {chat_model_fast}")
+        if chat_model_balanced:
+            lines.append(f"    balanced: {chat_model_balanced}")
+    lines.append("  temperature: 0.2")
+    return "\n".join(lines)
+
+
+def _build_embedding_kwargs_section(embedding_model: str) -> str:
+    """Build the embedding_kwargs YAML section."""
+    if embedding_model:
+        return f"  model: {embedding_model}"
+    return ""
+
+
+def _build_rerank_sections(rerank: str | None, rerank_model: str) -> tuple[str, str]:
+    """Build rerank line and kwargs section.
+
+    Returns:
+        Tuple of (rerank_line, rerank_kwargs_section).
+    """
+    if rerank:
+        rerank_line = f"rerank: {rerank}"
+        if rerank_model:
+            rerank_kwargs_section = f"""
+# Reranker kwargs
+rerank_kwargs:
+  model: {rerank_model}"""
+        else:
+            rerank_kwargs_section = ""
+    else:
+        rerank_line = "rerank: null  # No reranker configured"
+        rerank_kwargs_section = ""
+    return rerank_line, rerank_kwargs_section
+
+
+def _build_vision_sections(vision: str | None, vision_model: str) -> tuple[str, str]:
+    """Build vision line and kwargs section.
+
+    Returns:
+        Tuple of (vision_line, vision_kwargs_section).
+    """
+    if vision:
+        vision_line = f"vision: {vision}"
+        if vision_model:
+            vision_kwargs_section = f"""
+# Vision kwargs
+vision_kwargs:
+  model: {vision_model}"""
+        else:
+            vision_kwargs_section = ""
+    else:
+        vision_line = "vision: null  # Enable with: vision: openai or vision: anthropic"
+        vision_kwargs_section = ""
+    return vision_line, vision_kwargs_section
+
+
+def _build_vdb_kwargs_section(vector_db: str) -> str:
+    """Build vector_db_kwargs YAML section."""
+    if vector_db == "pgvector":
+        return """
+# Vector DB kwargs (pgvector settings)
+vector_db_kwargs:
+  mode: local  # "local" (embedded) or "external" (connection_string)"""
+    return ""
+
+
 def generate_fitz_rag_config(
     *,
     chat: str,
@@ -45,59 +123,13 @@ def generate_fitz_rag_config(
     - Plugin kwargs use separate _kwargs fields
     - None = disabled (no enabled flags)
     """
-    # Build chat_kwargs section
-    chat_kwargs_lines = []
-    if chat_model_smart or chat_model_fast or chat_model_balanced:
-        chat_kwargs_lines.append("  models:")
-        if chat_model_smart:
-            chat_kwargs_lines.append(f"    smart: {chat_model_smart}")
-        if chat_model_fast:
-            chat_kwargs_lines.append(f"    fast: {chat_model_fast}")
-        if chat_model_balanced:
-            chat_kwargs_lines.append(f"    balanced: {chat_model_balanced}")
-    chat_kwargs_lines.append("  temperature: 0.2")
-    chat_kwargs_section = "\n".join(chat_kwargs_lines)
-
-    # Build embedding_kwargs section
-    embedding_kwargs_section = ""
-    if embedding_model:
-        embedding_kwargs_section = f"  model: {embedding_model}"
-
-    # Build rerank section
-    if rerank:
-        rerank_line = f"rerank: {rerank}"
-        if rerank_model:
-            rerank_kwargs_section = f"""
-# Reranker kwargs
-rerank_kwargs:
-  model: {rerank_model}"""
-        else:
-            rerank_kwargs_section = ""
-    else:
-        rerank_line = "rerank: null  # No reranker configured"
-        rerank_kwargs_section = ""
-
-    # Build vision section
-    if vision:
-        vision_line = f"vision: {vision}"
-        if vision_model:
-            vision_kwargs_section = f"""
-# Vision kwargs
-vision_kwargs:
-  model: {vision_model}"""
-        else:
-            vision_kwargs_section = ""
-    else:
-        vision_line = "vision: null  # Enable with: vision: openai or vision: anthropic"
-        vision_kwargs_section = ""
-
-    # Build vector_db_kwargs section
-    vdb_kwargs_section = ""
-    if vector_db == "pgvector":
-        vdb_kwargs_section = """
-# Vector DB kwargs (pgvector settings)
-vector_db_kwargs:
-  mode: local  # "local" (embedded) or "external" (connection_string)"""
+    chat_kwargs_section = _build_chat_kwargs_section(
+        chat_model_smart, chat_model_fast, chat_model_balanced
+    )
+    embedding_kwargs_section = _build_embedding_kwargs_section(embedding_model)
+    rerank_line, rerank_kwargs_section = _build_rerank_sections(rerank, rerank_model)
+    vision_line, vision_kwargs_section = _build_vision_sections(vision, vision_model)
+    vdb_kwargs_section = _build_vdb_kwargs_section(vector_db)
 
     return f"""# Fitz RAG Engine Configuration
 # Generated by: fitz init
@@ -151,6 +183,125 @@ max_chunks: 8
 chunk_size: {chunk_size}
 chunk_overlap: {chunk_overlap}
 parser: {parser}
+
+# ===========================================================================
+# Logging
+# ===========================================================================
+
+log_level: INFO
+
+# ===========================================================================
+# Plugin Kwargs (Advanced)
+# ===========================================================================
+
+# Chat model tiers (smart for queries, fast for background tasks)
+chat_kwargs:
+{chat_kwargs_section}
+
+# Embedding model override
+embedding_kwargs:
+{embedding_kwargs_section if embedding_kwargs_section else "  {}"}
+{rerank_kwargs_section}{vision_kwargs_section}{vdb_kwargs_section}
+"""
+
+
+def generate_fitz_krag_config(
+    *,
+    chat: str,
+    chat_model_smart: str,
+    chat_model_fast: str,
+    chat_model_balanced: str = "",
+    embedding: str,
+    embedding_model: str,
+    rerank: str | None,
+    rerank_model: str,
+    vector_db: str,
+    vision: str | None = None,
+    vision_model: str = "",
+) -> str:
+    """
+    Generate the Fitz KRAG config YAML string.
+
+    Produces flat YAML (no fitz_krag: wrapper - loader handles unwrapping).
+    Includes user-selected plugins plus KRAG-specific defaults matching default.yaml.
+    """
+    chat_kwargs_section = _build_chat_kwargs_section(
+        chat_model_smart, chat_model_fast, chat_model_balanced
+    )
+    embedding_kwargs_section = _build_embedding_kwargs_section(embedding_model)
+    rerank_line, rerank_kwargs_section = _build_rerank_sections(rerank, rerank_model)
+    vision_line, vision_kwargs_section = _build_vision_sections(vision, vision_model)
+    vdb_kwargs_section = _build_vdb_kwargs_section(vector_db)
+
+    return f"""# Fitz KRAG Engine Configuration
+# Generated by: fitz init
+#
+# KRAG = Knowledge Routing Augmented Generation
+# Uses knowledge-type-aware strategies instead of uniform chunk retrieval.
+
+# ===========================================================================
+# Core Plugins
+# ===========================================================================
+
+# Chat LLM for answering questions
+chat: {chat}
+
+# Embedding model for vectors
+embedding: {embedding}
+
+# Vector database
+vector_db: {vector_db}
+
+# ===========================================================================
+# Optional Features (null = disabled)
+# ===========================================================================
+
+# Reranker for improved retrieval quality
+{rerank_line}
+
+# Vision/VLM for image parsing
+{vision_line}
+
+# ===========================================================================
+# Collection
+# ===========================================================================
+
+collection: default
+
+# ===========================================================================
+# Code Strategy
+# ===========================================================================
+
+code_languages: [python, typescript, java, go]
+summary_batch_size: 15
+max_expansion_depth: 1
+include_class_context: true
+
+# ===========================================================================
+# Retrieval
+# ===========================================================================
+
+top_addresses: 10
+top_read: 5
+keyword_weight: 0.4
+semantic_weight: 0.6
+fallback_to_chunks: true
+section_bm25_weight: 0.6
+section_semantic_weight: 0.4
+
+# ===========================================================================
+# Context Assembly
+# ===========================================================================
+
+max_context_tokens: 8000
+include_file_header: true
+
+# ===========================================================================
+# Generation
+# ===========================================================================
+
+enable_citations: true
+strict_grounding: true
 
 # ===========================================================================
 # Logging

@@ -15,34 +15,34 @@ MODEL_DEFAULTS = {
         "cohere": "command-a-03-2025",
         "openai": "gpt-4o",
         "anthropic": "claude-sonnet-4-20250514",
-        "local_ollama": "llama3.2",
+        "ollama": "llama3.2",
     },
     "chat_fast": {
         "cohere": "command-r7b-12-2024",
         "openai": "gpt-4o-mini",
         "anthropic": "claude-haiku-3-5-20241022",
-        "local_ollama": "llama3.2:1b",
+        "ollama": "llama3.2:1b",
     },
     "chat_balanced": {
         "cohere": "command-r-08-2024",
         "openai": "gpt-4o-mini",
         "anthropic": "claude-sonnet-4-20250514",
-        "local_ollama": "llama3.2",
+        "ollama": "llama3.2",
     },
     "embedding": {
         "cohere": "embed-english-v3.0",
         "openai": "text-embedding-3-small",
-        "local_ollama": "nomic-embed-text",
+        "ollama": "nomic-embed-text",
     },
     "rerank": {
         "cohere": "rerank-v3.5",
-        "local_ollama": "qllama/bge-reranker-v2-m3",
+        "ollama": "qllama/bge-reranker-v2-m3",
     },
     "vision": {
         "cohere": "command-a-vision-07-2025",
         "openai": "gpt-4o",
         "anthropic": "claude-sonnet-4-20250514",
-        "local_ollama": "llama3.2-vision",
+        "ollama": "llama3.2-vision",
     },
 }
 

@@ -240,10 +240,10 @@ PROVIDER_CONFIGS = {
     },
     "ollama": {
         "chat": {
-            "plugin_name": "local_ollama",
+            "plugin_name": "ollama",
             "kwargs": {"models": {"smart": "llama3.2", "fast": "llama3.2"}},
         },
-        "embedding": {"plugin_name": "local_ollama", "kwargs": {"model": "nomic-embed-text"}},
+        "embedding": {"plugin_name": "ollama", "kwargs": {"model": "nomic-embed-text"}},
         "rerank": {"enabled": False},
     },
 }
@@ -516,7 +516,7 @@ def _create_provider_config(config_path: Path, provider: str, extra: Optional[di
     if provider == "ollama" and extra:
         provider_cfg = {
             "chat": {
-                "plugin_name": "local_ollama",
+                "plugin_name": "ollama",
                 "kwargs": {
                     "models": {
                         "smart": extra.get("chat_model", "llama3.2"),
@@ -525,7 +525,7 @@ def _create_provider_config(config_path: Path, provider: str, extra: Optional[di
                 },
             },
             "embedding": {
-                "plugin_name": "local_ollama",
+                "plugin_name": "ollama",
                 "kwargs": {"model": extra.get("embedding_model", "nomic-embed-text")},
             },
             "rerank": {"enabled": False},

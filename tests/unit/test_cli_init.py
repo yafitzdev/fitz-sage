@@ -138,12 +138,12 @@ class TestInitHelpers:
         # Smart tier (default)
         assert get_default_model("chat", "cohere", "smart") == "command-a-03-2025"
         assert get_default_model("chat", "openai", "smart") == "gpt-4o"
-        assert "llama" in get_default_model("chat", "local_ollama", "smart")
+        assert "llama" in get_default_model("chat", "ollama", "smart")
 
         # Fast tier
         assert get_default_model("chat", "cohere", "fast") == "command-r7b-12-2024"
         assert get_default_model("chat", "openai", "fast") == "gpt-4o-mini"
-        assert "llama" in get_default_model("chat", "local_ollama", "fast")
+        assert "llama" in get_default_model("chat", "ollama", "fast")
 
     def test_get_default_model_embedding(self):
         """Test get_default_model returns correct embedding model."""

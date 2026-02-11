@@ -19,7 +19,7 @@ Usage:
     Requires vision provider to be configured:
 
         vision:
-          plugin_name: cohere  # or openai, anthropic, local_ollama
+          plugin_name: cohere  # or openai, anthropic, ollama
           kwargs: {}
 """
 

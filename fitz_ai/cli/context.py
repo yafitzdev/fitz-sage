@@ -37,7 +37,10 @@ from fitz_ai.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
-DEFAULT_ENGINE = "fitz_rag"
+def _default_engine() -> str:
+    from fitz_ai.runtime import get_default_engine
+
+    return get_default_engine()
 
 
 # =============================================================================
@@ -89,7 +92,7 @@ def _get_rerank_model_default(provider: str) -> str:
         from fitz_ai.llm.providers.cohere import RERANK_MODEL
 
         return RERANK_MODEL
-    elif provider in ("ollama", "local_ollama"):
+    elif provider == "ollama":
         from fitz_ai.llm.providers.ollama import RERANK_MODEL
 
         return RERANK_MODEL
@@ -218,7 +221,7 @@ class CLIContext:
     # -------------------------------------------------------------------------
 
     @classmethod
-    def load(cls, engine: str = DEFAULT_ENGINE) -> "CLIContext":
+    def load(cls, engine: str | None = None) -> "CLIContext":
         """
         Load CLI context with merged config (defaults + user overrides).
 
@@ -226,11 +229,14 @@ class CLIContext:
         Values are guaranteed to be present - no fallback logic needed.
 
         Args:
-            engine: Engine name (default: "fitz_rag")
+            engine: Engine name (default: from user config or runtime default)
 
         Returns:
             CLIContext with all values populated from merged config.
         """
+        if engine is None:
+            engine = _default_engine()
+
         # Load merged config (defaults + user overrides) - returns Pydantic model
         typed_config = load_engine_config(engine)
 
@@ -726,4 +732,4 @@ class CLIContext:
         return " | ".join(parts)
 
 
-__all__ = ["CLIContext", "DEFAULT_ENGINE"]
+__all__ = ["CLIContext"]

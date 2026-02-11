@@ -163,7 +163,9 @@ def _get_config_path() -> Path:
         return ctx.config_path
 
     # Fall back to expected path for error messages (when no user config exists)
-    engine_config = FitzPaths.engine_config("fitz_rag")
+    from fitz_ai.runtime import get_default_engine
+
+    engine_config = FitzPaths.engine_config(get_default_engine())
     if engine_config.exists():
         return engine_config
     return FitzPaths.config()

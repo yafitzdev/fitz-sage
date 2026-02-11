@@ -17,7 +17,7 @@ VLM Integration:
     Configure vision in fitz.yaml:
         vision:
           enabled: true
-          plugin_name: openai  # or "anthropic", "local_ollama"
+          plugin_name: openai  # or "anthropic", "ollama"
 
 Requires: pip install docling
 """

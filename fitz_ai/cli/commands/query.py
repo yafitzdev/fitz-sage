@@ -73,7 +73,7 @@ def command(
         None,
         "--collection",
         "-c",
-        help="Collection to query (fitz_rag only).",
+        help="Collection to query (engines with collection support).",
     ),
     engine: Optional[str] = typer.Option(
         None,

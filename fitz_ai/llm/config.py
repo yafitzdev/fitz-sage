@@ -401,7 +401,7 @@ def create_rerank_provider(
 
         return CohereRerank(auth, **kwargs)  # type: ignore[arg-type]
 
-    elif provider in ("ollama", "local_ollama"):
+    elif provider == "ollama":
         from fitz_ai.llm.providers.ollama import OllamaRerank
 
         return OllamaRerank(**kwargs)
