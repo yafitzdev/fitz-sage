@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from fitz_ai.core import Answer, Provenance
+from fitz_ai.core import Answer, GenerationError, Provenance
 from fitz_ai.engines.fitz_krag.types import ReadResult
 
 if TYPE_CHECKING:
@@ -78,7 +78,7 @@ class CodeSynthesizer:
             )
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
-            raise
+            raise GenerationError(f"LLM generation failed: {e}") from e
 
         provenance = self._build_provenance(results)
 

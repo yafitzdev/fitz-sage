@@ -255,6 +255,7 @@ class KragIngestPipeline:
                         "metadata": sec.metadata,
                     }
                 )
+            _resolve_section_parents(section_dicts, all_section_file_ids)
             self._section_store.upsert_batch(section_dicts)
             stats["sections_embedded"] = len(section_vectors)
 
@@ -537,6 +538,36 @@ class KragIngestPipeline:
         except Exception as e:
             logger.warning(f"Embedding failed: {e}")
             return []
+
+
+def _resolve_section_parents(section_dicts: list[dict[str, Any]], file_ids: list[str]) -> None:
+    """Resolve placeholder parent IDs (_parent_N) to actual UUIDs.
+
+    Parent indices are local to each file's section batch, so we group
+    sections by file_id and resolve within each group.
+    """
+    # Group indices by file_id (preserving order)
+    file_groups: dict[str, list[int]] = {}
+    for i, fid in enumerate(file_ids):
+        file_groups.setdefault(fid, []).append(i)
+
+    for indices in file_groups.values():
+        for global_idx in indices:
+            parent_id = section_dicts[global_idx].get("parent_section_id")
+            if not parent_id or not parent_id.startswith("_parent_"):
+                continue
+            try:
+                local_idx = int(parent_id.removeprefix("_parent_"))
+            except (ValueError, TypeError):
+                section_dicts[global_idx]["parent_section_id"] = None
+                continue
+            # Map local index to the global index within this file group
+            if 0 <= local_idx < len(indices):
+                section_dicts[global_idx]["parent_section_id"] = section_dicts[indices[local_idx]][
+                    "id"
+                ]
+            else:
+                section_dicts[global_idx]["parent_section_id"] = None
 
 
 def _hash_file(path: Path) -> str:

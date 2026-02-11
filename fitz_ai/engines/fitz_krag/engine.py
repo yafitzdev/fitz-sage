@@ -10,7 +10,6 @@ content is read on demand after ranking.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from fitz_ai.core import (
     Answer,
@@ -23,9 +22,6 @@ from fitz_ai.core import (
 )
 from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 from fitz_ai.logging.logger import get_logger
-
-if TYPE_CHECKING:
-    pass
 
 logger = get_logger(__name__)
 
