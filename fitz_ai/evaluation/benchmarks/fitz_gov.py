@@ -152,11 +152,11 @@ class FitzGovBenchmark:
             llm_base_url=llm_base_url,
         )
 
-        # Build mode mapping (fitz-gov external package uses its own mode names)
+        # fitz-gov uses the same 3-mode system (TRUSTWORTHY/DISPUTED/ABSTAIN)
         self._mode_to_fitz_gov = {
             AnswerMode.ABSTAIN: fitz_gov.AnswerMode.ABSTAIN,
             AnswerMode.DISPUTED: fitz_gov.AnswerMode.DISPUTED,
-            AnswerMode.TRUSTWORTHY: fitz_gov.AnswerMode.CONFIDENT,
+            AnswerMode.TRUSTWORTHY: fitz_gov.AnswerMode.TRUSTWORTHY,
         }
 
         # Initialize enricher if enabled
