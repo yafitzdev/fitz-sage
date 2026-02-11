@@ -90,3 +90,56 @@ class ImportGraphStore:
         with self._cm.connection(self._collection) as conn:
             conn.execute(sql, (file_id,))
             conn.commit()
+
+    def resolve_targets(self, path_to_id: dict[str, str]) -> int:
+        """Resolve ``target_file_id`` for all unresolved import edges.
+
+        Builds a module→file_id mapping from *path_to_id* (as returned by
+        ``RawFileStore.list_ids_by_path()``), then UPDATEs every edge whose
+        ``target_file_id IS NULL`` when the ``target_module`` matches a
+        known file.
+
+        Returns the number of edges resolved.
+        """
+        module_to_id: dict[str, str] = {}
+        for path, file_id in path_to_id.items():
+            module = _path_to_module(path)
+            module_to_id[module] = file_id
+
+        select_sql = f"""
+            SELECT source_file_id, target_module
+            FROM {TABLE}
+            WHERE target_file_id IS NULL
+        """
+        update_sql = f"""
+            UPDATE {TABLE}
+            SET target_file_id = %s
+            WHERE source_file_id = %s AND target_module = %s
+        """
+        resolved = 0
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(select_sql).fetchall()
+            for source_file_id, target_module in rows:
+                target_id = module_to_id.get(target_module)
+                if target_id:
+                    conn.execute(update_sql, (target_id, source_file_id, target_module))
+                    resolved += 1
+            if resolved:
+                conn.commit()
+        return resolved
+
+
+def _path_to_module(file_path: str) -> str:
+    """Convert a file path to a Python-style module name.
+
+    Intentionally duplicates the 6-line helper in each language strategy
+    to avoid coupling import_graph_store to any specific strategy.
+    """
+    path = file_path.replace("\\", "/")
+    if path.startswith("./"):
+        path = path[2:]
+    if path.endswith(".py"):
+        path = path[:-3]
+    if path.endswith("/__init__"):
+        path = path[: -len("/__init__")]
+    return path.replace("/", ".")

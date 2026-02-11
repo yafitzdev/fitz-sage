@@ -85,6 +85,23 @@ class FitzKragConfig(BasePluginConfig):
         description="Include class signature + __init__ when expanding methods",
     )
 
+    max_reference_expansions: int = Field(
+        default=3,
+        ge=0,
+        description="Max same-file referenced symbols to include as context (0 = disabled)",
+    )
+
+    include_import_summaries: bool = Field(
+        default=True,
+        description="Include summaries of imported symbols as context",
+    )
+
+    max_import_expansions: int = Field(
+        default=5,
+        ge=0,
+        description="Max imported symbol summaries to include as context",
+    )
+
     # ==========================================================================
     # Retrieval
     # ==========================================================================
@@ -132,6 +149,11 @@ class FitzKragConfig(BasePluginConfig):
         ge=0.0,
         le=1.0,
         description="Weight for semantic search in section hybrid merge",
+    )
+
+    include_section_context: bool = Field(
+        default=True,
+        description="Include parent breadcrumb and child TOC for section addresses",
     )
 
     # ==========================================================================

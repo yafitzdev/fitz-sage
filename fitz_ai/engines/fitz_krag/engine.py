@@ -104,7 +104,9 @@ class FitzKragEngine:
             config=self._config,
             section_strategy=section_strategy,
         )
-        self._reader = ContentReader(self._raw_store, section_store=self._section_store)
+        self._reader = ContentReader(
+            self._raw_store, section_store=self._section_store, config=self._config
+        )
         self._expander = CodeExpander(
             self._raw_store,
             self._symbol_store,

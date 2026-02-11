@@ -128,6 +128,53 @@ class TestSymbolStore:
         conn.execute.assert_called_once()
         conn.commit.assert_called_once()
 
+    def test_get_by_file(self, mock_cm):
+        """Returns symbols with references, ordered by start_line."""
+        cm, conn = mock_cm
+        conn.execute.return_value.fetchall.return_value = [
+            (
+                "s1",
+                "helper",
+                "mod.helper",
+                "function",
+                "f1",
+                1,
+                3,
+                "def helper()",
+                "A helper",
+                {},
+                ["os", "sys"],
+            ),
+            (
+                "s2",
+                "main_fn",
+                "mod.main_fn",
+                "function",
+                "f1",
+                5,
+                10,
+                "def main_fn()",
+                "Main function",
+                {},
+                ["helper"],
+            ),
+        ]
+        store = SymbolStore(cm, "test_col")
+        results = store.get_by_file("f1")
+        assert len(results) == 2
+        assert results[0]["name"] == "helper"
+        assert results[0]["references"] == ["os", "sys"]
+        assert results[1]["name"] == "main_fn"
+        assert results[1]["references"] == ["helper"]
+
+    def test_get_by_file_empty(self, mock_cm):
+        """Returns empty list for nonexistent file."""
+        cm, conn = mock_cm
+        conn.execute.return_value.fetchall.return_value = []
+        store = SymbolStore(cm, "test_col")
+        results = store.get_by_file("nonexistent")
+        assert results == []
+
 
 class TestImportGraphStore:
     def test_upsert_batch(self, mock_cm):
@@ -171,3 +218,30 @@ class TestImportGraphStore:
         store = ImportGraphStore(cm, "test_col")
         store.delete_by_file("f1")
         conn.execute.assert_called_once()
+
+    def test_resolve_targets(self, mock_cm):
+        """Resolves 2/3 edges (one unresolvable stdlib import)."""
+        cm, conn = mock_cm
+        # SELECT returns 3 unresolved edges
+        conn.execute.return_value.fetchall.return_value = [
+            ("f1", "mypackage.utils"),
+            ("f1", "mypackage.models"),
+            ("f1", "os"),  # stdlib — won't resolve
+        ]
+        store = ImportGraphStore(cm, "test_col")
+        path_to_id = {
+            "mypackage/utils.py": "f2",
+            "mypackage/models.py": "f3",
+        }
+        resolved = store.resolve_targets(path_to_id)
+        assert resolved == 2
+        # SELECT (1) + UPDATE (2) = 3 execute calls
+        assert conn.execute.call_count == 3
+
+    def test_resolve_targets_no_unresolved(self, mock_cm):
+        """Returns 0 when no unresolved edges exist."""
+        cm, conn = mock_cm
+        conn.execute.return_value.fetchall.return_value = []
+        store = ImportGraphStore(cm, "test_col")
+        resolved = store.resolve_targets({"foo.py": "f1"})
+        assert resolved == 0

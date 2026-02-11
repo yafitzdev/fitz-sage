@@ -132,6 +132,30 @@ class SymbolStore:
             return None
         return _row_to_dict(row)
 
+    def get_by_file(self, raw_file_id: str) -> list[dict[str, Any]]:
+        """Get all symbols for a raw file, ordered by start_line.
+
+        Includes the ``references`` column (index 10) as a separate field
+        so that callers can see AST-extracted references without breaking
+        existing ``_row_to_dict`` consumers.
+        """
+        sql = f"""
+            SELECT id, name, qualified_name, kind, raw_file_id,
+                   start_line, end_line, signature, summary, metadata,
+                   references
+            FROM {TABLE}
+            WHERE raw_file_id = %s
+            ORDER BY start_line
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, (raw_file_id,)).fetchall()
+        results = []
+        for row in rows:
+            d = _row_to_dict(row[:10])
+            d["references"] = list(row[10]) if row[10] else []
+            results.append(d)
+        return results
+
 
 def _vector_to_pg(vector: list[float] | None) -> str | None:
     """Convert a float list to pgvector string format."""

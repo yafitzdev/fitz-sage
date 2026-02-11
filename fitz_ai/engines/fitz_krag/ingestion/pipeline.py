@@ -259,6 +259,11 @@ class KragIngestPipeline:
             self._section_store.upsert_batch(section_dicts)
             stats["sections_embedded"] = len(section_vectors)
 
+        # 4c. Resolve import target_file_ids now that all files are stored
+        all_path_to_id = self._raw_store.list_ids_by_path()
+        resolved = self._import_store.resolve_targets(all_path_to_id)
+        stats["imports_resolved"] = resolved
+
         # 5. Delete removed files
         deleted_paths = set(existing_hashes.keys()) - current_paths
         for del_path in deleted_paths:

@@ -8,11 +8,12 @@ Addresses are lightweight pointers; reading fetches the actual content.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
 
 if TYPE_CHECKING:
+    from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
     from fitz_ai.engines.fitz_krag.ingestion.raw_file_store import RawFileStore
     from fitz_ai.engines.fitz_krag.ingestion.section_store import SectionStore
 
@@ -26,9 +27,11 @@ class ContentReader:
         self,
         raw_store: "RawFileStore",
         section_store: "SectionStore | None" = None,
+        config: "FitzKragConfig | None" = None,
     ):
         self._raw_store = raw_store
         self._section_store = section_store
+        self._config = config
 
     def read(self, addresses: list[Address], limit: int) -> list[ReadResult]:
         """Read content for top addresses."""
@@ -110,14 +113,56 @@ class ContentReader:
         raw_file = self._raw_store.get(addr.source_id)
         file_path = raw_file["path"] if raw_file else "unknown"
 
+        content = section["content"]
+        metadata: dict[str, Any] = {
+            "page_start": section.get("page_start"),
+            "page_end": section.get("page_end"),
+            "section_title": section["title"],
+            "section_level": section["level"],
+        }
+
+        # Add breadcrumb and child TOC when section context is enabled
+        if self._config and self._config.include_section_context:
+            breadcrumb = self._build_breadcrumb(section)
+            if breadcrumb:
+                content = f"[{breadcrumb}]\n{content}"
+                metadata["breadcrumb"] = breadcrumb
+
+            children = self._section_store.get_children(section_id)
+            if children:
+                child_titles = "\n".join(f"  - {c['title']}" for c in children)
+                content = f"{content}\n\nSubsections:\n{child_titles}"
+                metadata["child_count"] = len(children)
+
         return ReadResult(
             address=addr,
-            content=section["content"],
+            content=content,
             file_path=file_path,
-            metadata={
-                "page_start": section.get("page_start"),
-                "page_end": section.get("page_end"),
-                "section_title": section["title"],
-                "section_level": section["level"],
-            },
+            metadata=metadata,
         )
+
+    def _build_breadcrumb(self, section: dict[str, Any]) -> str:
+        """Walk up parent_section_id chain to build a breadcrumb path.
+
+        Caps at 5 levels to prevent runaway chains.
+        """
+        if not self._section_store:
+            return ""
+
+        titles: list[str] = []
+        parent_id = section.get("parent_section_id")
+        depth = 0
+
+        while parent_id and depth < 5:
+            parent = self._section_store.get(parent_id)
+            if not parent:
+                break
+            titles.append(parent["title"])
+            parent_id = parent.get("parent_section_id")
+            depth += 1
+
+        if not titles:
+            return ""
+
+        titles.reverse()
+        return " > ".join(titles)

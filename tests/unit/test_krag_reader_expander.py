@@ -27,19 +27,23 @@ def _make_symbol_address(
     kind: str = "function",
     qualified_name: str = "mod.func",
     score: float = 0.9,
+    symbol_id: str | None = None,
 ) -> Address:
+    metadata: dict = {
+        "start_line": start_line,
+        "end_line": end_line,
+        "kind": kind,
+        "qualified_name": qualified_name,
+    }
+    if symbol_id is not None:
+        metadata["symbol_id"] = symbol_id
     return Address(
         kind=AddressKind.SYMBOL,
         source_id=source_id,
         location=location,
         summary=f"Symbol {location}",
         score=score,
-        metadata={
-            "start_line": start_line,
-            "end_line": end_line,
-            "kind": kind,
-            "qualified_name": qualified_name,
-        },
+        metadata=metadata,
     )
 
 
@@ -121,10 +125,18 @@ def _make_section_store(sections: dict[str, dict] | None = None) -> MagicMock:
 def _make_config(
     max_expansion_depth: int = 1,
     include_class_context: bool = True,
+    max_reference_expansions: int = 3,
+    include_import_summaries: bool = True,
+    max_import_expansions: int = 5,
+    include_section_context: bool = True,
 ) -> MagicMock:
     config = MagicMock()
     config.max_expansion_depth = max_expansion_depth
     config.include_class_context = include_class_context
+    config.max_reference_expansions = max_reference_expansions
+    config.include_import_summaries = include_import_summaries
+    config.max_import_expansions = max_import_expansions
+    config.include_section_context = include_section_context
     return config
 
 
@@ -307,8 +319,13 @@ class TestCodeExpander:
         self,
         raw_files: dict[str, dict] | None = None,
         symbol_results: list[dict] | None = None,
+        file_symbols: list[dict] | None = None,
+        import_edges: list[dict] | None = None,
         max_expansion_depth: int = 1,
         include_class_context: bool = True,
+        max_reference_expansions: int = 3,
+        include_import_summaries: bool = True,
+        max_import_expansions: int = 5,
     ) -> CodeExpander:
         if raw_files is None:
             raw_files = {
@@ -320,10 +337,16 @@ class TestCodeExpander:
         raw_store = _make_raw_store(raw_files)
         symbol_store = MagicMock()
         symbol_store.search_by_name.return_value = symbol_results or []
+        symbol_store.get_by_file.return_value = file_symbols or []
+        symbol_store.get.return_value = None
         import_store = MagicMock()
+        import_store.get_imports.return_value = import_edges or []
         config = _make_config(
             max_expansion_depth=max_expansion_depth,
             include_class_context=include_class_context,
+            max_reference_expansions=max_reference_expansions,
+            include_import_summaries=include_import_summaries,
+            max_import_expansions=max_import_expansions,
         )
         return CodeExpander(raw_store, symbol_store, import_store, config)
 
@@ -336,6 +359,7 @@ class TestCodeExpander:
         end_line: int = 6,
         kind: str = "function",
         qualified_name: str = "mod.func",
+        symbol_id: str | None = None,
     ) -> ReadResult:
         addr = _make_symbol_address(
             source_id=source_id,
@@ -343,6 +367,7 @@ class TestCodeExpander:
             end_line=end_line,
             kind=kind,
             qualified_name=qualified_name,
+            symbol_id=symbol_id,
         )
         return ReadResult(
             address=addr,
@@ -517,3 +542,411 @@ class TestCodeExpander:
 
         class_headers = [r for r in expanded if r.metadata.get("context_type") == "class_header"]
         assert class_headers == []
+
+    # ------------------------------------------------------------------
+    # Same-file reference expansion tests
+    # ------------------------------------------------------------------
+
+    def test_expand_same_file_references(self):
+        """Referenced helper function from same file is added with context_type='reference'."""
+        file_symbols = [
+            {
+                "id": "s1",
+                "name": "main_fn",
+                "qualified_name": "mod.main_fn",
+                "kind": "function",
+                "start_line": 4,
+                "end_line": 6,
+                "references": ["helper"],
+                "raw_file_id": "file1",
+                "signature": "def main_fn()",
+                "summary": "Main function",
+                "metadata": {},
+            },
+            {
+                "id": "s2",
+                "name": "helper",
+                "qualified_name": "mod.helper",
+                "kind": "function",
+                "start_line": 7,
+                "end_line": 8,
+                "references": [],
+                "raw_file_id": "file1",
+                "signature": "def helper()",
+                "summary": "Helper function",
+                "metadata": {},
+            },
+        ]
+        expander = self._make_expander(file_symbols=file_symbols)
+        result = self._symbol_read_result(symbol_id="s1", qualified_name="mod.main_fn")
+
+        expanded = expander.expand([result])
+
+        refs = [r for r in expanded if r.metadata.get("context_type") == "reference"]
+        assert len(refs) == 1
+        assert "def other():" in refs[0].content or "helper" in refs[0].address.location
+        assert refs[0].address.metadata["qualified_name"] == "mod.helper"
+
+    def test_expand_same_file_refs_capped(self):
+        """5 referenced symbols but cap=2, only 2 added."""
+        file_symbols = [
+            {
+                "id": "s1",
+                "name": "main_fn",
+                "qualified_name": "mod.main_fn",
+                "kind": "function",
+                "start_line": 4,
+                "end_line": 6,
+                "references": ["a", "b", "c", "d", "e"],
+                "raw_file_id": "file1",
+                "signature": "def main_fn()",
+                "summary": "Main",
+                "metadata": {},
+            },
+        ]
+        # Add 5 symbols that match the references
+        for i, name in enumerate(["a", "b", "c", "d", "e"]):
+            file_symbols.append(
+                {
+                    "id": f"s{i + 2}",
+                    "name": name,
+                    "qualified_name": f"mod.{name}",
+                    "kind": "function",
+                    "start_line": 7 + i * 2,
+                    "end_line": 8 + i * 2,
+                    "references": [],
+                    "raw_file_id": "file1",
+                    "signature": f"def {name}()",
+                    "summary": f"Function {name}",
+                    "metadata": {},
+                }
+            )
+        expander = self._make_expander(file_symbols=file_symbols, max_reference_expansions=2)
+        result = self._symbol_read_result(symbol_id="s1", qualified_name="mod.main_fn")
+
+        expanded = expander.expand([result])
+
+        refs = [r for r in expanded if r.metadata.get("context_type") == "reference"]
+        assert len(refs) == 2
+
+    def test_expand_same_file_refs_skip_self(self):
+        """Symbol doesn't reference itself even if its name appears in references."""
+        file_symbols = [
+            {
+                "id": "s1",
+                "name": "recursive",
+                "qualified_name": "mod.recursive",
+                "kind": "function",
+                "start_line": 4,
+                "end_line": 6,
+                "references": ["recursive"],
+                "raw_file_id": "file1",
+                "signature": "def recursive()",
+                "summary": "Recursive fn",
+                "metadata": {},
+            },
+        ]
+        expander = self._make_expander(file_symbols=file_symbols)
+        result = self._symbol_read_result(symbol_id="s1", qualified_name="mod.recursive")
+
+        expanded = expander.expand([result])
+
+        refs = [r for r in expanded if r.metadata.get("context_type") == "reference"]
+        assert len(refs) == 0
+
+    def test_expand_same_file_refs_disabled(self):
+        """max_reference_expansions=0 skips reference expansion entirely."""
+        file_symbols = [
+            {
+                "id": "s1",
+                "name": "main_fn",
+                "qualified_name": "mod.main_fn",
+                "kind": "function",
+                "start_line": 4,
+                "end_line": 6,
+                "references": ["helper"],
+                "raw_file_id": "file1",
+                "signature": "def main_fn()",
+                "summary": "Main",
+                "metadata": {},
+            },
+            {
+                "id": "s2",
+                "name": "helper",
+                "qualified_name": "mod.helper",
+                "kind": "function",
+                "start_line": 7,
+                "end_line": 8,
+                "references": [],
+                "raw_file_id": "file1",
+                "signature": "def helper()",
+                "summary": "Helper",
+                "metadata": {},
+            },
+        ]
+        expander = self._make_expander(file_symbols=file_symbols, max_reference_expansions=0)
+        result = self._symbol_read_result(symbol_id="s1", qualified_name="mod.main_fn")
+
+        expanded = expander.expand([result])
+
+        refs = [r for r in expanded if r.metadata.get("context_type") == "reference"]
+        assert len(refs) == 0
+
+    # ------------------------------------------------------------------
+    # Import summary expansion tests
+    # ------------------------------------------------------------------
+
+    def test_expand_import_summaries(self):
+        """Resolved import edge produces summary context block."""
+        target_file_symbols = [
+            {
+                "id": "ts1",
+                "name": "helper_fn",
+                "qualified_name": "utils.helper_fn",
+                "kind": "function",
+                "start_line": 1,
+                "end_line": 5,
+                "references": [],
+                "raw_file_id": "f2",
+                "signature": "def helper_fn()",
+                "summary": "A useful helper function",
+                "metadata": {},
+            },
+        ]
+        import_edges = [
+            {
+                "source_file_id": "file1",
+                "target_module": "utils",
+                "target_file_id": "f2",
+                "import_names": ["helper_fn"],
+            },
+        ]
+        expander = self._make_expander(import_edges=import_edges)
+        # Override get_by_file to return target symbols for f2
+        expander._symbol_store.get_by_file.side_effect = lambda fid: (
+            target_file_symbols if fid == "f2" else []
+        )
+        result = self._symbol_read_result(symbol_id="s1")
+
+        expanded = expander.expand([result])
+
+        summaries = [r for r in expanded if r.metadata.get("context_type") == "import_summaries"]
+        assert len(summaries) == 1
+        assert "utils.helper_fn" in summaries[0].content
+        assert "A useful helper function" in summaries[0].content
+
+    def test_expand_import_summaries_unresolved_skipped(self):
+        """target_file_id=None edges are skipped (stdlib/third-party)."""
+        import_edges = [
+            {
+                "source_file_id": "file1",
+                "target_module": "os",
+                "target_file_id": None,
+                "import_names": ["path"],
+            },
+        ]
+        expander = self._make_expander(import_edges=import_edges)
+        result = self._symbol_read_result(symbol_id="s1")
+
+        expanded = expander.expand([result])
+
+        summaries = [r for r in expanded if r.metadata.get("context_type") == "import_summaries"]
+        assert len(summaries) == 0
+
+    def test_expand_import_summaries_disabled(self):
+        """include_import_summaries=False skips import summary expansion."""
+        import_edges = [
+            {
+                "source_file_id": "file1",
+                "target_module": "utils",
+                "target_file_id": "f2",
+                "import_names": ["helper_fn"],
+            },
+        ]
+        expander = self._make_expander(import_edges=import_edges, include_import_summaries=False)
+        result = self._symbol_read_result(symbol_id="s1")
+
+        expanded = expander.expand([result])
+
+        summaries = [r for r in expanded if r.metadata.get("context_type") == "import_summaries"]
+        assert len(summaries) == 0
+
+    def test_expand_import_summaries_capped(self):
+        """Respects max_import_expansions limit."""
+        target_file_symbols = [
+            {
+                "id": f"ts{i}",
+                "name": f"fn{i}",
+                "qualified_name": f"utils.fn{i}",
+                "kind": "function",
+                "start_line": i,
+                "end_line": i + 2,
+                "references": [],
+                "raw_file_id": "f2",
+                "signature": f"def fn{i}()",
+                "summary": f"Function {i}",
+                "metadata": {},
+            }
+            for i in range(10)
+        ]
+        import_edges = [
+            {
+                "source_file_id": "file1",
+                "target_module": "utils",
+                "target_file_id": "f2",
+                "import_names": [],  # empty = all
+            },
+        ]
+        expander = self._make_expander(import_edges=import_edges, max_import_expansions=2)
+        expander._symbol_store.get_by_file.side_effect = lambda fid: (
+            target_file_symbols if fid == "f2" else []
+        )
+        result = self._symbol_read_result(symbol_id="s1")
+
+        expanded = expander.expand([result])
+
+        summaries = [r for r in expanded if r.metadata.get("context_type") == "import_summaries"]
+        assert len(summaries) == 1
+        # Only 2 lines despite 10 available symbols
+        lines = [l for l in summaries[0].content.splitlines() if l.startswith("- ")]
+        assert len(lines) == 2
+
+
+# ===========================================================================
+# TestContentReader — Section context tests
+# ===========================================================================
+
+
+class TestContentReaderSectionContext:
+    """Tests for section breadcrumb and child TOC in ContentReader."""
+
+    def test_read_section_with_breadcrumb(self):
+        """Parent chain rendered as breadcrumb prefix."""
+        section_data = {
+            "sec-root": {
+                "id": "sec-root",
+                "content": "Root content",
+                "title": "Introduction",
+                "level": 1,
+                "page_start": 1,
+                "page_end": 5,
+                "parent_section_id": None,
+            },
+            "sec-child": {
+                "id": "sec-child",
+                "content": "Child content",
+                "title": "Background",
+                "level": 2,
+                "page_start": 2,
+                "page_end": 4,
+                "parent_section_id": "sec-root",
+            },
+            "sec-leaf": {
+                "id": "sec-leaf",
+                "content": "Leaf body text.",
+                "title": "Details",
+                "level": 3,
+                "page_start": 3,
+                "page_end": 4,
+                "parent_section_id": "sec-child",
+            },
+        }
+        raw_store = _make_raw_store()
+        section_store = _make_section_store(section_data)
+        section_store.get_children.return_value = []
+        config = _make_config(include_section_context=True)
+        reader = ContentReader(raw_store, section_store=section_store, config=config)
+
+        addr = _make_section_address(section_id="sec-leaf", source_id="file1")
+        results = reader.read([addr], limit=10)
+
+        assert len(results) == 1
+        r = results[0]
+        assert r.content.startswith("[Introduction > Background]")
+        assert "Leaf body text." in r.content
+        assert r.metadata["breadcrumb"] == "Introduction > Background"
+
+    def test_read_section_with_child_toc(self):
+        """Children titles appended as subsection list."""
+        section_data = {
+            "sec-parent": {
+                "id": "sec-parent",
+                "content": "Parent body.",
+                "title": "Chapter 1",
+                "level": 1,
+                "page_start": 1,
+                "page_end": 10,
+                "parent_section_id": None,
+            },
+        }
+        child_sections = [
+            {"title": "Section 1.1"},
+            {"title": "Section 1.2"},
+            {"title": "Section 1.3"},
+        ]
+        raw_store = _make_raw_store()
+        section_store = _make_section_store(section_data)
+        section_store.get_children.return_value = child_sections
+        config = _make_config(include_section_context=True)
+        reader = ContentReader(raw_store, section_store=section_store, config=config)
+
+        addr = _make_section_address(section_id="sec-parent", source_id="file1")
+        results = reader.read([addr], limit=10)
+
+        assert len(results) == 1
+        r = results[0]
+        assert "Subsections:" in r.content
+        assert "  - Section 1.1" in r.content
+        assert "  - Section 1.2" in r.content
+        assert "  - Section 1.3" in r.content
+        assert r.metadata["child_count"] == 3
+
+    def test_read_section_context_disabled(self):
+        """include_section_context=False returns plain content."""
+        section_data = {
+            "sec-001": {
+                "content": "Plain content.",
+                "title": "Section A",
+                "level": 1,
+                "page_start": 1,
+                "page_end": 5,
+                "parent_section_id": None,
+            },
+        }
+        raw_store = _make_raw_store()
+        section_store = _make_section_store(section_data)
+        config = _make_config(include_section_context=False)
+        reader = ContentReader(raw_store, section_store=section_store, config=config)
+
+        addr = _make_section_address(section_id="sec-001", source_id="file1")
+        results = reader.read([addr], limit=10)
+
+        assert len(results) == 1
+        r = results[0]
+        assert r.content == "Plain content."
+        assert "breadcrumb" not in r.metadata
+        assert "child_count" not in r.metadata
+
+    def test_read_section_backward_compat_no_config(self):
+        """ContentReader without config works as before (no breadcrumb/TOC)."""
+        section_data = {
+            "sec-001": {
+                "content": "Section body text.",
+                "title": "Introduction",
+                "level": 2,
+                "page_start": 1,
+                "page_end": 3,
+                "parent_section_id": "sec-root",
+            },
+        }
+        raw_store = _make_raw_store()
+        section_store = _make_section_store(section_data)
+        reader = ContentReader(raw_store, section_store=section_store)
+
+        addr = _make_section_address(section_id="sec-001", source_id="file1")
+        results = reader.read([addr], limit=10)
+
+        assert len(results) == 1
+        r = results[0]
+        assert r.content == "Section body text."
+        assert "breadcrumb" not in r.metadata
