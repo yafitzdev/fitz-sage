@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from fitz_ai.engines.fitz_rag.config.schema import BasePluginConfig, PluginKwargs
+from fitz_ai.core.config import BasePluginConfig, PluginKwargs
 
 
 class FitzKragConfig(BasePluginConfig):

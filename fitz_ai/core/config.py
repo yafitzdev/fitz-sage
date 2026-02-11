@@ -12,11 +12,11 @@ Usage:
     data = load_yaml("config.yaml")
 
     # Load and validate with a schema
-    from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
-    config = load_config("config.yaml", FitzRagConfig)
+    from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
+    config = load_config("config.yaml", FitzKragConfig)
 
     # For engine-specific loading, use the engine's loader:
-    from fitz_ai.engines.fitz_rag.config.loader import load_config as load_rag_config
+    from fitz_ai.config.loader import load_engine_config
 
 Design principles:
     - Generic utilities only - no engine imports
@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Type, TypeVar, Union
 
 import yaml
+from pydantic import BaseModel, ConfigDict, Field
 
 from fitz_ai.core.paths import FitzPaths
 
@@ -39,6 +40,77 @@ logger = logging.getLogger(__name__)
 
 # Type variable for config classes
 T = TypeVar("T")
+
+
+# =============================================================================
+# Shared Plugin Config Base Classes
+# =============================================================================
+
+
+class BasePluginConfig(BaseModel):
+    """Base class to avoid repeating model_config."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class PluginKwargs(BaseModel):
+    """
+    Additional kwargs for plugin initialization.
+
+    Common parameters used by LLM plugins. Plugins ignore fields they don't need.
+    Allows extra fields for plugin-specific configuration.
+    """
+
+    model: str | None = Field(
+        default=None,
+        description="Model override (e.g., 'gpt-4', 'claude-sonnet-4')",
+    )
+
+    temperature: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description="Temperature for generation (0.0-2.0)",
+    )
+
+    max_tokens: int | None = Field(
+        default=None,
+        ge=1,
+        description="Maximum tokens to generate",
+    )
+
+    timeout: int | None = Field(
+        default=None,
+        ge=1,
+        description="Request timeout in seconds",
+    )
+
+    top_p: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Top-p sampling parameter",
+    )
+
+    host: str | None = Field(
+        default=None,
+        description="Host for self-hosted services (e.g., Ollama)",
+    )
+
+    port: int | None = Field(
+        default=None,
+        ge=1,
+        le=65535,
+        description="Port for self-hosted services (e.g., Ollama)",
+    )
+
+    api_key: str | None = Field(
+        default=None,
+        description="API key override (use environment variables instead)",
+    )
+
+    # Allow plugins to add their own fields
+    model_config = ConfigDict(extra="allow")
 
 
 # =============================================================================
@@ -139,13 +211,9 @@ def load_config(
         ConfigValidationError: If config doesn't match schema
 
     Examples:
-        # Load RAG config with explicit schema
-        from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
-        config = load_config("config.yaml", FitzRagConfig)
-
-        # For engine-specific defaults, use the engine's loader:
-        from fitz_ai.engines.fitz_rag.config.loader import load_config as load_rag_config
-        config = load_rag_config()  # Loads default.yaml
+        # Load KRAG config with explicit schema
+        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
+        config = load_config("config.yaml", FitzKragConfig)
     """
     resolved_path = Path(path)
 

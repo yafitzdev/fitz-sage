@@ -34,86 +34,12 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from fitz_ai.core.config import BasePluginConfig, PluginKwargs
+
 try:
     from fitz_ai.cloud.config import CloudConfig
 except ImportError:
     CloudConfig = None  # Cloud is optional
-
-
-# =============================================================================
-# Base Config with Common Settings
-# =============================================================================
-
-
-class BasePluginConfig(BaseModel):
-    """Base class to avoid repeating model_config."""
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# =============================================================================
-# Plugin Configuration
-# =============================================================================
-
-
-class PluginKwargs(BaseModel):
-    """
-    Additional kwargs for plugin initialization.
-
-    Common parameters used by LLM plugins. Plugins ignore fields they don't need.
-    Allows extra fields for plugin-specific configuration.
-    """
-
-    model: str | None = Field(
-        default=None,
-        description="Model override (e.g., 'gpt-4', 'claude-sonnet-4')",
-    )
-
-    temperature: float | None = Field(
-        default=None,
-        ge=0.0,
-        le=2.0,
-        description="Temperature for generation (0.0-2.0)",
-    )
-
-    max_tokens: int | None = Field(
-        default=None,
-        ge=1,
-        description="Maximum tokens to generate",
-    )
-
-    timeout: int | None = Field(
-        default=None,
-        ge=1,
-        description="Request timeout in seconds",
-    )
-
-    top_p: float | None = Field(
-        default=None,
-        ge=0.0,
-        le=1.0,
-        description="Top-p sampling parameter",
-    )
-
-    host: str | None = Field(
-        default=None,
-        description="Host for self-hosted services (e.g., Ollama)",
-    )
-
-    port: int | None = Field(
-        default=None,
-        ge=1,
-        le=65535,
-        description="Port for self-hosted services (e.g., Ollama)",
-    )
-
-    api_key: str | None = Field(
-        default=None,
-        description="API key override (use environment variables instead)",
-    )
-
-    # Allow plugins to add their own fields
-    model_config = ConfigDict(extra="allow")
 
 
 # =============================================================================
