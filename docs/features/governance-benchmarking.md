@@ -58,7 +58,7 @@ Blind validation means an independent LLM labels each case without seeing the ex
 
 ## How Fitz Classifies Governance
 
-Fitz uses a **two-layer approach**: epistemic constraints extract features, then a trained ML classifier makes the final decision.
+Fitz uses a **two-stage approach**: epistemic constraints extract features, then a trained two-stage ML classifier makes the final decision.
 
 ### Layer 1: Constraint Pipeline (Feature Extraction)
 
@@ -72,57 +72,78 @@ Five constraints run on every query, each contributing diagnostic signals:
 | **SpecificInfoType** | Missing specific information | Info type requested, entity mismatch |
 | **AnswerVerification** | LLM jury assessment (3-prompt vote) | Jury votes |
 
-Additionally, embedding-based features (vector scores, score distributions) and query classification features (temporal, comparison, aggregation detection) feed into the classifier.
+Additionally, embedding-based features (vector scores, score distributions), inter-chunk text features (pairwise overlap, assertion density, TF-IDF similarity), and query classification features (temporal, comparison, aggregation detection) feed into the classifier.
 
-**Total: 58 features** across 3 tiers — constraint metadata, retrieval scores, and query classification.
+**Total: 51 features** across constraint metadata, retrieval scores, text analysis, and query classification.
 
-### Layer 2: ML Classifier (Decision)
+### Layer 2: Two-Stage ML Classifier (Decision)
 
-A gradient-boosted tree (GBT) trained on the full fitz-gov dataset replaces the hand-coded priority rules that previously made governance decisions.
+A two-stage binary classifier replaces the hand-coded priority rules that previously made governance decisions.
 
-Why ML over rules:
-- **Rules can't handle interactions.** A dispute signal + high relevance score + hedging language might mean "qualified" — rules pick "disputed" because it has higher priority.
-- **Rules have a qualified bias.** The most common governance mode is "qualified" (hedging). A priority-based system defaults to hedging on anything ambiguous.
-- **ML learns from 1,100+ labeled examples.** The decision boundary is empirical, not hand-tuned.
+```
+Stage 1: Random Forest — Answerability
+    "Can the evidence answer this query?"
+    → NO  → ABSTAIN
+    → YES → pass to Stage 2
 
-The classifier is tiny (~5MB), runs in microseconds, and adds zero latency to the pipeline.
+Stage 2: Extra Trees — Conflict Detection
+    "Do the sources conflict?"
+    → YES → DISPUTED
+    → NO  → TRUSTWORTHY
+```
+
+The trustworthy output maps back to 4 modes at runtime: if constraints fired during processing, it becomes QUALIFIED (hedged); if no constraints fired, it becomes CONFIDENT (direct answer).
+
+Why two-stage over 4-class:
+- **Confident vs qualified is inseparable** from features alone (max correlation r=0.23). Collapsing them into "trustworthy" and using constraint signals for the split is more reliable.
+- **Binary classifiers are easier to calibrate.** Each stage has one threshold to tune, with clear safety trade-offs.
+- **Staged approach improved accuracy by +9.4pp** over the best 4-class model.
+
+The classifier is tiny (~5MB), runs in microseconds, and adds zero latency to the pipeline. It fails open — if anything goes wrong, it falls back to the rule-based governor.
 
 ## Current Results
 
-**Classifier: 69.1% overall accuracy** on held-out test data (223 cases, stratified split).
+**Production model: Two-stage classifier, safety-first thresholds.**
 
-| Mode | Precision | Recall | F1 | Support |
-|------|-----------|--------|-----|---------|
-| **Abstain** | 77% | **85%** | 81% | 47 |
-| **Confident** | 60% | 62% | 61% | 52 |
-| **Disputed** | 59% | 67% | 63% | 39 |
-| **Qualified** | 77% | 66% | 71% | 85 |
+| Decision | Meaning | Recall |
+|----------|---------|--------|
+| **ABSTAIN** | Evidence doesn't answer the question | **81.2%** |
+| **DISPUTED** | Sources contradict each other | **89.7%** |
+| **TRUSTWORTHY** | Consistent, sufficient evidence | **70.6%** |
 
-For comparison, the rule-based governor achieves 27% accuracy on the same test set (it over-predicts "disputed" after conflict detection tuning). A naive baseline that always predicts "qualified" would score 38%.
+For comparison, the rule-based governor achieves 27% accuracy on the same test set (it over-predicts "disputed" after conflict detection tuning). A naive baseline that always predicts "qualified" would score 34%.
+
+### Safety-First Threshold Tuning
+
+The Stage 2 threshold is tuned for safety, not balanced accuracy. At s2=0.785:
+- **89.7% disputed recall** — 9 out of 10 real conflicts are caught
+- **70.6% trustworthy recall** — crosses the 70% usability threshold
+- **Only 3 dangerous errors** in 1,100+ cases — over-confidence (trustworthy when should be disputed) is the rarest failure mode
+
+The most common error is over-hedging: predicting "disputed" when the answer is actually "trustworthy." This is annoying but harmless. The opposite (missing a real conflict) is dangerous but rare.
+
+### Training History
+
+| Experiment | Dataset | Accuracy | Key Finding |
+|------------|---------|----------|-------------|
+| 1 (baseline) | 914, synthetic features | 57.4% | Constraint features alone insufficient |
+| 2 (+context features) | 914, synthetic | 71.0% | Context features dominate importance |
+| 3 (CA tuning) | 914, synthetic | 69.4% | Tighter CA prompts: +7pp disputed, -1.6pp overall |
+| 4 (real features) | 914, real | 41.0% | Distribution shift — synthetic≠real features |
+| 5 (retrained on real) | 914, real | 68.9% | 83% disputed recall, vector features now important |
+| 6 (expanded data) | 1113, real | 69.1% | +199 cases, confident +14pp, disputed -16pp (harder cases) |
+| 7 (dead code cleanup) | 1113, 29 features | 80.7% | Removed 18 dead features, no regression |
+| 8 (inter-chunk features) | 1113, 51 features | **82.1%** | TF-IDF similarity, assertion density, length CV |
+| **Production** | 1113, calibrated | **81.2 / 89.7 / 70.6** | Safety-first thresholds, two-stage RF+ET |
 
 ### Why These Numbers Are Honest
 
-We could report higher numbers. Training on easier cases, using a smaller test set, or optimizing for overall accuracy at the expense of minority classes would all inflate the headline metric. We don't.
+We could report higher numbers. Training on easier cases, using a smaller test set, or optimizing for overall accuracy at the expense of safety would all inflate the headline metric. We don't.
 
 - **92% of test cases are hard** — boundary cases, not softballs
 - **The test set is stratified** — each class is represented proportionally, not cherry-picked
-- **We report per-class recall** — a system that gets 90% overall by ignoring the disputed class is worse than one that gets 69% with balanced performance
-
-### What the Numbers Mean in Practice
-
-| Recall | What It Means |
-|--------|--------------|
-| **Abstain 85%** | When Fitz doesn't have the answer, it says so 85% of the time instead of hallucinating |
-| **Disputed 67%** | When sources contradict, Fitz flags the conflict 67% of the time instead of picking a side |
-| **Qualified 66%** | When evidence needs caveats, Fitz hedges 66% of the time instead of stating it as fact |
-| **Confident 62%** | When the answer is clear, Fitz gives it directly 62% of the time instead of over-hedging |
-
-The failure modes are instructive. When Fitz misclassifies:
-- Disputed cases mostly get classified as qualified (hedging when it should flag a conflict — safe failure)
-- Confident cases get classified as qualified (hedging when it should be direct — annoying but safe)
-- Qualified cases get classified as confident (over-confidence — the most dangerous failure, but rare)
-
-**The system fails safe.** Over-hedging is annoying but not dangerous. Over-confidence is dangerous but rare.
+- **We report per-class recall** — a system that gets 90% overall by ignoring the disputed class is worse than one that gets 81% with balanced performance
+- **Safety-first calibration** — we deliberately sacrifice trustworthy recall to maximize dispute detection
 
 ## Key Techniques
 
@@ -143,8 +164,8 @@ Query: "type 2 diabetes" + Context: "type 1 diabetes" -> ABSTAIN
 ### 3. Evidence Character Analysis
 Classify the rhetorical stance of each source: "assertive" (states facts), "hedged" (uses qualifiers), or "mixed." Two assertive sources that disagree = dispute. One hedged source + one assertive = qualified.
 
-### 4. Numerical Variance Detection
-Numbers within 25% of each other (e.g., "23%" vs "27%") likely describe the same phenomenon with measurement noise — not a contradiction. Numbers >25% apart might be a real dispute.
+### 4. Inter-Chunk Text Features
+Deterministic features computed from chunk text without LLM calls: pairwise TF-IDF cosine similarity, assertion density, numerical variance, chunk length coefficient of variation. These features alone improved Stage 2 accuracy by +10.5pp.
 
 ### 5. LLM Jury Verification
 Three independent prompts assess evidence sufficiency. Unanimous agreement that context doesn't answer the query triggers qualification — a safety net against false confidence.
@@ -153,49 +174,50 @@ Three independent prompts assess evidence sufficiency. Unanimous agreement that 
 
 The top features the classifier relies on:
 
-| Rank | Feature | Importance | What It Captures |
-|------|---------|------------|-----------------|
-| 1 | Context length (mean) | 12.9% | Proxy for evidence depth |
-| 2 | Context length (total) | 9.0% | Total evidence available |
-| 3 | Context length (std) | 6.5% | Asymmetry between sources |
-| 4 | Vector score (mean) | 6.3% | Retrieval confidence |
-| 5 | Disputed signal | 5.2% | CA constraint fired |
-| 6 | CA signal | 5.1% | Contradiction detection result |
-| 7 | CA fired | 4.9% | Whether conflict check triggered |
-| 8 | Query word count | 4.2% | Query complexity |
-| 9 | Number variance | 4.2% | Numerical disagreement between sources |
-| 10 | Pairwise similarity (mean) | 3.7% | How similar sources are to each other |
+| Rank | Feature | Category | What It Captures |
+|------|---------|----------|-----------------|
+| 1 | Context length (mean) | Context | Proxy for evidence depth |
+| 2 | Context length (total) | Context | Total evidence available |
+| 3 | Context length (std) | Context | Asymmetry between sources |
+| 4 | Vector score (mean) | Retrieval | Retrieval confidence |
+| 5 | Disputed signal | Constraint | CA constraint fired |
+| 6 | Chunk length CV | Inter-chunk | Length variation (disputed chunks have higher variance) |
+| 7 | Max pairwise overlap | Inter-chunk | Text similarity between sources |
+| 8 | Query word count | Query | Query complexity |
+| 9 | Number variance | Context | Numerical disagreement between sources |
+| 10 | Pairwise similarity (mean) | Inter-chunk | TF-IDF cosine between sources |
 
-Context features dominate because they're available for every case, while constraint signals only fire on specific patterns. This is an area for improvement — stronger constraint signals should eventually outrank length proxies.
+Context and inter-chunk features dominate because they're available for every case, while constraint signals only fire on specific patterns. Improving constraint signal quality is the path to better accuracy.
 
 ## Running the Benchmark
 
 ```bash
-# Run governance evaluation
-fitz eval fitz-gov --model ollama/qwen2.5:3b
+# Feature extraction (requires LLM provider)
+python -m tools.governance.eval_pipeline --chat cohere --embedding ollama --workers 1
 
-# Run with specific collection
-fitz eval fitz-gov --collection test
+# Train classifier on extracted features
+python -m tools.governance.train_classifier --mode twostage --time-budget 200
+
+# Output: tools/governance/data/model_v5_twostage.joblib
 ```
 
 ## Files
 
-- **Test cases**: [fitz-gov](https://github.com/yafitzdev/fitz-gov) (1,100+ cases)
-- **Constraints**: `fitz_ai/core/guardrails/plugins/` (IE, CA, CAA, SIT, AV)
-- **Feature extraction**: `fitz_ai/core/guardrails/feature_extractor.py`
-- **Training pipeline**: `tools/governance/train_classifier.py`
-- **Evaluation pipeline**: `tools/governance/eval_pipeline.py`
-- **Model artifact**: `tools/governance/data/model_v3.joblib`
+| File | Purpose |
+|------|---------|
+| **Test cases** | [fitz-gov](https://github.com/yafitzdev/fitz-gov) (1,100+ cases) |
+| **Constraints** | `fitz_ai/core/guardrails/plugins/` (IE, CA, CAA, SIT, AV) |
+| **Feature extraction** | `fitz_ai/core/guardrails/feature_extractor.py` (51 features) |
+| **GovernanceDecider** | `fitz_ai/core/guardrails/governance_decider.py` (two-stage ML) |
+| **Training pipeline** | `tools/governance/train_classifier.py` |
+| **Evaluation pipeline** | `tools/governance/eval_pipeline.py` |
+| **Model artifact** | `tools/governance/data/model_v5_calibrated.joblib` |
 
 ## Technical Specification
 
-For the full experimental record with ablation results, confusion matrices, and training history:
+For the full experimental record with all training history, ablation results, and confusion matrices:
 
-**[Classifier NOTEPAD](../evaluation/classifier/NOTEPAD.md)** — Living document with all 7 experiments
-
-For future improvement plans:
-
-**[Classifier Next Steps](../evaluation/later/CLASSIFIER_NEXT_STEPS.md)** — Roadmap to 70%+ per-class recall
+**[Classifier NOTEPAD](../evaluation/classifier/NOTEPAD.md)** — Living document with complete experiment log
 
 ## Why This Matters
 

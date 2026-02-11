@@ -140,7 +140,7 @@ You can—but you'll hit walls fast.
 **Super fast setup 🐆**
 > Point at a folder. Ask a question. Get an answer with sources. Even for tables! Everything else is handled by Fitz.
 
-**Honest answers ✅** → [Governance Benchmark](#governance-know-what-you-dont-know)
+**Honest answers ✅** → [Governance Benchmark](docs/features/governance-benchmarking.md)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."
 > 
 > → Fitz detects disputes at **89.7% recall** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 1,100+ case benchmark for epistemic honesty.
@@ -154,7 +154,7 @@ You can—but you'll hit walls fast.
 **Other Features at a Glance 🃏**
 >1. [x] **Fully local execution possible.** Embedded PostgreSQL + Ollama, no API keys required to start.
 >2. [x] **Plugin-based architecture.** Swap LLMs, rerankers, and retrieval pipelines via YAML config.
->3. [x] **KRAG (Knowledge Routing Augmented Generation).** Address-based retrieval.
+>3. [x] **[KRAG (Knowledge Routing Augmented Generation)](docs/features/krag.md).** Address-based retrieval.
 >4. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
 >5. [x] **Full provenance.** Every answer traces back to the exact source symbol, section, or document.
 >6. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
@@ -686,6 +686,6 @@ MIT
 - [Governance Benchmarking (fitz-gov)](docs/features/governance-benchmarking.md)
 - [Plugin Development](docs/PLUGINS.md)
 - [Feature Control](docs/FEATURE_CONTROL.md)
-- [FitzKRAG Engine](docs/ENGINES.md)
+- [KRAG — Knowledge Routing Augmented Generation](docs/features/krag.md)
 - [Custom Engines](docs/CUSTOM_ENGINES.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
