@@ -12,7 +12,9 @@ import logging
 from typing import TYPE_CHECKING
 
 from fitz_ai.core import Answer, GenerationError, Provenance
+from fitz_ai.core.answer_mode import AnswerMode
 from fitz_ai.engines.fitz_krag.types import ReadResult
+from fitz_ai.governance.instructions import get_mode_instruction
 
 if TYPE_CHECKING:
     from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
@@ -51,6 +53,7 @@ class CodeSynthesizer:
         query: str,
         context: str,
         results: list[ReadResult],
+        answer_mode: AnswerMode = AnswerMode.TRUSTWORTHY,
     ) -> Answer:
         """
         Generate an answer grounded in the provided code context.
@@ -59,13 +62,33 @@ class CodeSynthesizer:
             query: User's question
             context: Assembled context string from ContextAssembler
             results: ReadResults used to build provenance
+            answer_mode: Epistemic posture controlling answer framing
 
         Returns:
             Answer with text, provenance, and metadata
         """
+        # ABSTAIN: skip LLM call entirely
+        if answer_mode == AnswerMode.ABSTAIN:
+            provenance = self._build_provenance(results)
+            return Answer(
+                text="The available information does not allow a definitive answer.",
+                provenance=provenance,
+                mode=answer_mode,
+                metadata={
+                    "engine": "fitz_krag",
+                    "query": query,
+                    "sources_count": len(results),
+                    "answer_mode": answer_mode.value,
+                },
+            )
+
         system_prompt = (
             SYSTEM_PROMPT_GROUNDED if self._config.strict_grounding else SYSTEM_PROMPT_OPEN
         )
+
+        # Prepend mode instruction
+        mode_instruction = get_mode_instruction(answer_mode)
+        system_prompt = f"{mode_instruction}\n\n{system_prompt}"
 
         user_prompt = f"Context:\n{context}\n\nQuestion: {query}"
 
@@ -85,10 +108,12 @@ class CodeSynthesizer:
         return Answer(
             text=raw_answer,
             provenance=provenance,
+            mode=answer_mode,
             metadata={
                 "engine": "fitz_krag",
                 "query": query,
                 "sources_count": len(results),
+                "answer_mode": answer_mode.value,
             },
         )
 

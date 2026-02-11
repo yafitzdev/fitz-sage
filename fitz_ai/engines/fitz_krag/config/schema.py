@@ -150,6 +150,15 @@ class FitzKragConfig(BasePluginConfig):
     )
 
     # ==========================================================================
+    # Guardrails
+    # ==========================================================================
+
+    enable_guardrails: bool = Field(
+        default=True,
+        description="Enable epistemic guardrails (constraint checking before generation)",
+    )
+
+    # ==========================================================================
     # Generation
     # ==========================================================================
 
@@ -161,6 +170,24 @@ class FitzKragConfig(BasePluginConfig):
     strict_grounding: bool = Field(
         default=True,
         description="Only generate answers from provided context",
+    )
+
+    # ==========================================================================
+    # Cloud
+    # ==========================================================================
+
+    cloud: dict = Field(
+        default_factory=dict,
+        description="Fitz Cloud config (enabled, api_key, org_key, etc.)",
+    )
+
+    # ==========================================================================
+    # Detection
+    # ==========================================================================
+
+    enable_detection: bool = Field(
+        default=True,
+        description="Enable shared detection (temporal, comparison, expansion awareness)",
     )
 
     # ==========================================================================

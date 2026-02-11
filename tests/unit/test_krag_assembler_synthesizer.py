@@ -282,7 +282,7 @@ class TestCodeSynthesizer:
         messages = chat.chat.call_args[0][0]
         system_msg = messages[0]
         assert system_msg["role"] == "system"
-        assert system_msg["content"] == SYSTEM_PROMPT_GROUNDED
+        assert SYSTEM_PROMPT_GROUNDED in system_msg["content"]
 
     # -- test_generate_open_grounding ---------------------------------------
 
@@ -298,7 +298,7 @@ class TestCodeSynthesizer:
         messages = chat.chat.call_args[0][0]
         system_msg = messages[0]
         assert system_msg["role"] == "system"
-        assert system_msg["content"] == SYSTEM_PROMPT_OPEN
+        assert SYSTEM_PROMPT_OPEN in system_msg["content"]
 
     # -- test_generate_llm_error_raises_generation_error --------------------
 

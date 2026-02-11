@@ -6,7 +6,7 @@ Retrieval router — dispatches queries to available strategies and merges resul
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.engines.fitz_krag.types import Address
 
@@ -41,38 +41,63 @@ class RetrievalRouter:
         self._section_strategy = section_strategy
         self._config = config
 
-    def retrieve(self, query: str, analysis: "QueryAnalysis | None" = None) -> list[Address]:
+    def retrieve(
+        self,
+        query: str,
+        analysis: "QueryAnalysis | None" = None,
+        detection: "Any | None" = None,
+    ) -> list[Address]:
         """
         Retrieve addresses using strategy weights from query analysis.
 
         When analysis is provided, strategies with near-zero weight are skipped
         and results are ranked using CrossStrategyRanker. Without analysis,
         all strategies run equally (backward compatible).
+
+        When detection is provided (DetectionSummary), it enhances retrieval:
+        - Query expansion: additional retrievals with detection.query_variations
+        - Comparison: search both detection.comparison_entities
+        - Fetch multiplier: increase limit by detection.fetch_multiplier
         """
         from fitz_ai.engines.fitz_krag.retrieval.ranker import CrossStrategyRanker
 
         limit = self._config.top_addresses
+
+        # Apply fetch multiplier from detection
+        if detection and hasattr(detection, "fetch_multiplier"):
+            limit = limit * detection.fetch_multiplier
+
         weights = analysis.strategy_weights if analysis else None
         all_addresses: list[Address] = []
 
-        # Run code strategy (skip if weight below threshold)
-        if not weights or weights.get("code", 1.0) > 0.05:
-            code_addresses = self._code_strategy.retrieve(query, limit)
-            all_addresses.extend(code_addresses)
+        # Collect queries to run (original + detection expansions)
+        queries = [query]
+        if detection:
+            if hasattr(detection, "query_variations") and detection.query_variations:
+                queries.extend(detection.query_variations)
+            if hasattr(detection, "comparison_entities") and detection.comparison_entities:
+                for entity in detection.comparison_entities:
+                    queries.append(f"{query} {entity}")
 
-        # Run section strategy if available and weighted
-        if self._section_strategy and (not weights or weights.get("section", 1.0) > 0.05):
-            section_addresses = self._section_strategy.retrieve(query, limit)
-            all_addresses.extend(section_addresses)
+        for q in queries:
+            # Run code strategy (skip if weight below threshold)
+            if not weights or weights.get("code", 1.0) > 0.05:
+                code_addresses = self._code_strategy.retrieve(q, limit)
+                all_addresses.extend(code_addresses)
+
+            # Run section strategy if available and weighted
+            if self._section_strategy and (not weights or weights.get("section", 1.0) > 0.05):
+                section_addresses = self._section_strategy.retrieve(q, limit)
+                all_addresses.extend(section_addresses)
 
         # Chunk fallback when other results are insufficient
         if (
             self._chunk_strategy
             and self._config.fallback_to_chunks
             and (not weights or weights.get("chunk", 1.0) > 0.05)
-            and len(all_addresses) < limit // 2
+            and len(all_addresses) < self._config.top_addresses // 2
         ):
-            chunk_limit = limit - len(all_addresses)
+            chunk_limit = self._config.top_addresses - len(all_addresses)
             chunk_addresses = self._chunk_strategy.retrieve(query, chunk_limit)
             all_addresses.extend(chunk_addresses)
 
@@ -83,11 +108,11 @@ class RetrievalRouter:
         if analysis:
             ranker = CrossStrategyRanker()
             ranked = ranker.rank(deduped, analysis)
-            return ranked[:limit]
+            return ranked[: self._config.top_addresses]
 
         # Fallback: sort by score
         deduped.sort(key=lambda a: a.score, reverse=True)
-        return deduped[:limit]
+        return deduped[: self._config.top_addresses]
 
     def _deduplicate(self, addresses: list[Address]) -> list[Address]:
         """Deduplicate addresses by source_id+location."""

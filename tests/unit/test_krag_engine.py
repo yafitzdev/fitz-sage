@@ -58,6 +58,10 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._expander = MagicMock(name="expander")
     engine._assembler = MagicMock(name="assembler")
     engine._synthesizer = MagicMock(name="synthesizer")
+    engine._constraints = []
+    engine._governor = None
+    engine._cloud_client = None
+    engine._detection_orchestrator = None
     return engine
 
 
@@ -228,6 +232,7 @@ class TestAnswer:
         engine._retrieval_router.retrieve.assert_called_once_with(
             query.text,
             analysis,
+            detection=None,
         )
         engine._reader.read.assert_called_once_with(
             [address_1, address_2],
@@ -238,10 +243,13 @@ class TestAnswer:
             query.text,
             expanded,
         )
+        from fitz_ai.core.answer_mode import AnswerMode
+
         engine._synthesizer.generate.assert_called_once_with(
             query.text,
             context,
             expanded,
+            answer_mode=AnswerMode.TRUSTWORTHY,
         )
 
         assert result is expected_answer
