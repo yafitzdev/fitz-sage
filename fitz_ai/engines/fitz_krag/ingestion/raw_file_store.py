@@ -37,16 +37,17 @@ class RawFileStore:
         """Insert or update a raw file."""
         meta_json = json.dumps(metadata or {})
         sql = f"""
-            INSERT INTO {TABLE} (id, path, content, content_hash, file_type, size_bytes, metadata)
+            INSERT INTO {TABLE}
+                ("id", "path", "content", "content_hash", "file_type", "size_bytes", "metadata")
             VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)
-            ON CONFLICT (id) DO UPDATE SET
-                path = EXCLUDED.path,
-                content = EXCLUDED.content,
-                content_hash = EXCLUDED.content_hash,
-                file_type = EXCLUDED.file_type,
-                size_bytes = EXCLUDED.size_bytes,
-                metadata = EXCLUDED.metadata,
-                updated_at = NOW()
+            ON CONFLICT ("id") DO UPDATE SET
+                "path" = EXCLUDED."path",
+                "content" = EXCLUDED."content",
+                "content_hash" = EXCLUDED."content_hash",
+                "file_type" = EXCLUDED."file_type",
+                "size_bytes" = EXCLUDED."size_bytes",
+                "metadata" = EXCLUDED."metadata",
+                "updated_at" = NOW()
         """
         with self._cm.connection(self._collection) as conn:
             conn.execute(
@@ -56,7 +57,10 @@ class RawFileStore:
 
     def get(self, file_id: str) -> dict[str, Any] | None:
         """Get a raw file by ID."""
-        sql = f"SELECT id, path, content, content_hash, file_type, size_bytes, metadata FROM {TABLE} WHERE id = %s"
+        sql = f"""
+            SELECT "id", "path", "content", "content_hash", "file_type", "size_bytes", "metadata"
+            FROM {TABLE} WHERE "id" = %s
+        """
         with self._cm.connection(self._collection) as conn:
             row = conn.execute(sql, (file_id,)).fetchone()
         if not row:
@@ -73,7 +77,10 @@ class RawFileStore:
 
     def get_by_path(self, path: str) -> dict[str, Any] | None:
         """Get a raw file by path."""
-        sql = f"SELECT id, path, content, content_hash, file_type, size_bytes, metadata FROM {TABLE} WHERE path = %s"
+        sql = f"""
+            SELECT "id", "path", "content", "content_hash", "file_type", "size_bytes", "metadata"
+            FROM {TABLE} WHERE "path" = %s
+        """
         with self._cm.connection(self._collection) as conn:
             row = conn.execute(sql, (path,)).fetchone()
         if not row:
@@ -90,21 +97,21 @@ class RawFileStore:
 
     def delete(self, file_id: str) -> None:
         """Delete a raw file (cascades to symbols + imports)."""
-        sql = f"DELETE FROM {TABLE} WHERE id = %s"
+        sql = f'DELETE FROM {TABLE} WHERE "id" = %s'
         with self._cm.connection(self._collection) as conn:
             conn.execute(sql, (file_id,))
             conn.commit()
 
     def list_hashes(self) -> dict[str, str]:
         """Return {path: content_hash} for all stored files."""
-        sql = f"SELECT path, content_hash FROM {TABLE}"
+        sql = f'SELECT "path", "content_hash" FROM {TABLE}'
         with self._cm.connection(self._collection) as conn:
             rows = conn.execute(sql).fetchall()
         return {row[0]: row[1] for row in rows}
 
     def list_ids_by_path(self) -> dict[str, str]:
         """Return {path: file_id} for all stored files."""
-        sql = f"SELECT path, id FROM {TABLE}"
+        sql = f'SELECT "path", "id" FROM {TABLE}'
         with self._cm.connection(self._collection) as conn:
             rows = conn.execute(sql).fetchall()
         return {row[0]: row[1] for row in rows}

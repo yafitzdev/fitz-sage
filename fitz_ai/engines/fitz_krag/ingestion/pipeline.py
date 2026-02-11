@@ -465,6 +465,9 @@ class KragIngestPipeline:
         """Process a document file: store raw + parse + extract sections."""
         try:
             content = abs_path.read_text(encoding="utf-8", errors="replace")
+            # Strip NUL bytes — binary formats (DOCX, PDF) produce them via
+            # errors="replace" and PostgreSQL TEXT fields reject 0x00.
+            content = content.replace("\x00", "")
         except Exception as e:
             logger.warning(f"Cannot read {abs_path}: {e}")
             return None

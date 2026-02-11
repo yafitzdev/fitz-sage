@@ -2,6 +2,9 @@
 """
 End-to-end tests for retrieval intelligence features.
 
+FROZEN: fitz_rag e2e retrieval tests. Marked for deletion when fitz_krag fully replaces fitz_rag.
+See tests/e2e_krag/test_retrieval_e2e.py for the KRAG equivalent.
+
 These tests validate that all retrieval intelligence features work correctly
 with real document ingestion and RAG pipeline execution.
 

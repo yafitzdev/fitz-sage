@@ -1,12 +1,9 @@
-# tests/e2e/conftest.py
+# tests/e2e_krag/conftest.py
 """
-Pytest fixtures for E2E tests.
+Pytest fixtures for KRAG E2E tests.
 
-FROZEN: fitz_rag e2e fixtures. Marked for deletion when fitz_krag fully replaces fitz_rag.
-See tests/e2e_krag/conftest.py for the KRAG equivalent.
-
-Provides the E2E runner as a session-scoped fixture that handles
-setup (ingestion) and teardown (collection cleanup) automatically.
+Equivalent to tests/e2e/conftest.py but uses KragE2ERunner
+instead of E2ERunner.
 
 Configuration:
 - All tests use tests/test_config.yaml (same as unit, load, etc.)
@@ -26,21 +23,20 @@ from typing import Callable
 
 import pytest
 
+from tests.e2e.scenarios import SCENARIOS, TestScenario
+
+from .runner import FIXTURES_DIR, KragE2ERunner
+
 
 def pytest_collection_modifyitems(items):
-    """Add tier3 and e2e markers to all tests in this directory."""
+    """Add tier3 and e2e_krag markers to all tests in this directory."""
     for item in items:
-        if "/e2e/" in str(item.fspath) or "\\e2e\\" in str(item.fspath):
+        if "/e2e_krag/" in str(item.fspath) or "\\e2e_krag\\" in str(item.fspath):
             item.add_marker(pytest.mark.tier3)
-            item.add_marker(pytest.mark.e2e)
+            item.add_marker(pytest.mark.e2e_krag)
 
-
-from .runner import FIXTURES_DIR, E2ERunner
-from .scenarios import SCENARIOS, TestScenario
 
 # Set workspace to project root so FitzPaths finds storage paths
-# (vocabulary, entity graph, table cache, etc.)
-# Note: LLM config is loaded from tests/test_config.yaml, not .fitz/config/
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 
@@ -54,16 +50,13 @@ def set_workspace():
     FitzPaths.reset()
 
 
-def create_tiered_runner(
+def create_tiered_krag_runner(
     fixtures_dir: Path,
     scenarios: list[TestScenario],
-    suite_name: str = "E2E",
-) -> Callable[[], E2ERunner]:
+    suite_name: str = "KRAG E2E",
+) -> Callable[[], KragE2ERunner]:
     """
-    Factory to create tiered E2E runner setup logic.
-
-    This is a helper that returns a generator function for use in fixtures.
-    The actual fixture must be created in the test module with the appropriate scope.
+    Factory to create tiered KRAG E2E runner setup logic.
 
     Args:
         fixtures_dir: Path to test fixtures
@@ -72,18 +65,12 @@ def create_tiered_runner(
 
     Returns:
         Generator function that yields the configured runner
-
-    Usage in test modules:
-        @pytest.fixture(scope="module")
-        def my_runner(set_workspace):
-            yield from create_tiered_runner(MY_FIXTURES_DIR, MY_SCENARIOS, "My Suite")()
     """
 
     def runner_generator():
-        runner = E2ERunner(fixtures_dir=fixtures_dir, use_cache=True)
+        runner = KragE2ERunner(fixtures_dir=fixtures_dir, use_cache=True)
         runner.setup()
 
-        # Run tiered execution unless disabled
         use_tiered = os.environ.get("E2E_SINGLE_TIER", "0") != "1"
 
         if use_tiered:
@@ -104,9 +91,9 @@ def create_tiered_runner(
 
 
 @pytest.fixture(scope="session")
-def e2e_runner(set_workspace):
+def krag_e2e_runner(set_workspace):
     """
-    Session-scoped E2E runner fixture for main retrieval tests.
+    Session-scoped KRAG E2E runner fixture for main retrieval tests.
 
     By default, runs ALL scenarios through tiered execution (local -> cloud)
     during setup. Individual tests then just look up their pre-computed result
@@ -114,7 +101,7 @@ def e2e_runner(set_workspace):
 
     Set E2E_SINGLE_TIER=1 to disable tiered mode.
     """
-    yield from create_tiered_runner(FIXTURES_DIR, SCENARIOS, "MAIN E2E")()
+    yield from create_tiered_krag_runner(FIXTURES_DIR, SCENARIOS, "MAIN KRAG E2E")()
 
 
 @pytest.fixture(scope="module")

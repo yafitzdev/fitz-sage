@@ -31,27 +31,27 @@ class SymbolStore:
 
         sql = f"""
             INSERT INTO {TABLE}
-                (id, name, qualified_name, kind, raw_file_id,
-                 start_line, end_line, signature, summary, summary_vector,
-                 imports, references, keywords, entities, metadata)
+                ("id", "name", "qualified_name", "kind", "raw_file_id",
+                 "start_line", "end_line", "signature", "summary", "summary_vector",
+                 "imports", "references", "keywords", "entities", "metadata")
             VALUES
                 (%s, %s, %s, %s, %s,
                  %s, %s, %s, %s, %s::vector,
                  %s, %s, %s, %s::jsonb, %s::jsonb)
-            ON CONFLICT (id) DO UPDATE SET
-                name = EXCLUDED.name,
-                qualified_name = EXCLUDED.qualified_name,
-                kind = EXCLUDED.kind,
-                start_line = EXCLUDED.start_line,
-                end_line = EXCLUDED.end_line,
-                signature = EXCLUDED.signature,
-                summary = EXCLUDED.summary,
-                summary_vector = EXCLUDED.summary_vector,
-                imports = EXCLUDED.imports,
-                references = EXCLUDED.references,
-                keywords = EXCLUDED.keywords,
-                entities = EXCLUDED.entities,
-                metadata = EXCLUDED.metadata
+            ON CONFLICT ("id") DO UPDATE SET
+                "name" = EXCLUDED."name",
+                "qualified_name" = EXCLUDED."qualified_name",
+                "kind" = EXCLUDED."kind",
+                "start_line" = EXCLUDED."start_line",
+                "end_line" = EXCLUDED."end_line",
+                "signature" = EXCLUDED."signature",
+                "summary" = EXCLUDED."summary",
+                "summary_vector" = EXCLUDED."summary_vector",
+                "imports" = EXCLUDED."imports",
+                "references" = EXCLUDED."references",
+                "keywords" = EXCLUDED."keywords",
+                "entities" = EXCLUDED."entities",
+                "metadata" = EXCLUDED."metadata"
         """
         with self._cm.connection(self._collection) as conn:
             for sym in symbols:
@@ -81,12 +81,12 @@ class SymbolStore:
     def search_bm25(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
         """Full-text search on symbol name + summary using tsvector."""
         sql = f"""
-            SELECT id, name, qualified_name, kind, raw_file_id,
-                   start_line, end_line, signature, summary, metadata,
-                   ts_rank_cd(content_tsv, plainto_tsquery('english', %s)) AS rank
+            SELECT "id", "name", "qualified_name", "kind", "raw_file_id",
+                   "start_line", "end_line", "signature", "summary", "metadata",
+                   ts_rank_cd("content_tsv", plainto_tsquery('english', %s)) AS "rank"
             FROM {TABLE}
-            WHERE content_tsv @@ plainto_tsquery('english', %s)
-            ORDER BY rank DESC
+            WHERE "content_tsv" @@ plainto_tsquery('english', %s)
+            ORDER BY "rank" DESC
             LIMIT %s
         """
         with self._cm.connection(self._collection) as conn:
@@ -102,10 +102,10 @@ class SymbolStore:
         """Keyword search against symbol name and qualified_name using ILIKE."""
         pattern = f"%{query}%"
         sql = f"""
-            SELECT id, name, qualified_name, kind, raw_file_id,
-                   start_line, end_line, signature, summary, metadata
+            SELECT "id", "name", "qualified_name", "kind", "raw_file_id",
+                   "start_line", "end_line", "signature", "summary", "metadata"
             FROM {TABLE}
-            WHERE name ILIKE %s OR qualified_name ILIKE %s
+            WHERE "name" ILIKE %s OR "qualified_name" ILIKE %s
             LIMIT %s
         """
         with self._cm.connection(self._collection) as conn:
@@ -119,12 +119,12 @@ class SymbolStore:
             return []
 
         sql = f"""
-            SELECT id, name, qualified_name, kind, raw_file_id,
-                   start_line, end_line, signature, summary, metadata,
-                   1 - (summary_vector <=> %s::vector) AS score
+            SELECT "id", "name", "qualified_name", "kind", "raw_file_id",
+                   "start_line", "end_line", "signature", "summary", "metadata",
+                   1 - ("summary_vector" <=> %s::vector) AS "score"
             FROM {TABLE}
-            WHERE summary_vector IS NOT NULL
-            ORDER BY summary_vector <=> %s::vector
+            WHERE "summary_vector" IS NOT NULL
+            ORDER BY "summary_vector" <=> %s::vector
             LIMIT %s
         """
         with self._cm.connection(self._collection) as conn:
@@ -138,7 +138,7 @@ class SymbolStore:
 
     def delete_by_file(self, raw_file_id: str) -> None:
         """Delete all symbols for a raw file."""
-        sql = f"DELETE FROM {TABLE} WHERE raw_file_id = %s"
+        sql = f'DELETE FROM {TABLE} WHERE "raw_file_id" = %s'
         with self._cm.connection(self._collection) as conn:
             conn.execute(sql, (raw_file_id,))
             conn.commit()
@@ -146,9 +146,9 @@ class SymbolStore:
     def get(self, symbol_id: str) -> dict[str, Any] | None:
         """Get a symbol by ID."""
         sql = f"""
-            SELECT id, name, qualified_name, kind, raw_file_id,
-                   start_line, end_line, signature, summary, metadata
-            FROM {TABLE} WHERE id = %s
+            SELECT "id", "name", "qualified_name", "kind", "raw_file_id",
+                   "start_line", "end_line", "signature", "summary", "metadata"
+            FROM {TABLE} WHERE "id" = %s
         """
         with self._cm.connection(self._collection) as conn:
             row = conn.execute(sql, (symbol_id,)).fetchone()
@@ -164,12 +164,12 @@ class SymbolStore:
         existing ``_row_to_dict`` consumers.
         """
         sql = f"""
-            SELECT id, name, qualified_name, kind, raw_file_id,
-                   start_line, end_line, signature, summary, metadata,
-                   references
+            SELECT "id", "name", "qualified_name", "kind", "raw_file_id",
+                   "start_line", "end_line", "signature", "summary", "metadata",
+                   "references"
             FROM {TABLE}
-            WHERE raw_file_id = %s
-            ORDER BY start_line
+            WHERE "raw_file_id" = %s
+            ORDER BY "start_line"
         """
         with self._cm.connection(self._collection) as conn:
             rows = conn.execute(sql, (raw_file_id,)).fetchall()

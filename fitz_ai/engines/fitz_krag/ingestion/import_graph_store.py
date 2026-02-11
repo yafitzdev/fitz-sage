@@ -29,11 +29,12 @@ class ImportGraphStore:
             return
 
         sql = f"""
-            INSERT INTO {TABLE} (source_file_id, target_module, target_file_id, import_names)
+            INSERT INTO {TABLE}
+                ("source_file_id", "target_module", "target_file_id", "import_names")
             VALUES (%s, %s, %s, %s)
-            ON CONFLICT (source_file_id, target_module) DO UPDATE SET
-                target_file_id = EXCLUDED.target_file_id,
-                import_names = EXCLUDED.import_names
+            ON CONFLICT ("source_file_id", "target_module") DO UPDATE SET
+                "target_file_id" = EXCLUDED."target_file_id",
+                "import_names" = EXCLUDED."import_names"
         """
         with self._cm.connection(self._collection) as conn:
             for edge in edges:
@@ -51,8 +52,8 @@ class ImportGraphStore:
     def get_imports(self, file_id: str) -> list[dict[str, Any]]:
         """Get all imports from a file."""
         sql = f"""
-            SELECT source_file_id, target_module, target_file_id, import_names
-            FROM {TABLE} WHERE source_file_id = %s
+            SELECT "source_file_id", "target_module", "target_file_id", "import_names"
+            FROM {TABLE} WHERE "source_file_id" = %s
         """
         with self._cm.connection(self._collection) as conn:
             rows = conn.execute(sql, (file_id,)).fetchall()
@@ -69,8 +70,8 @@ class ImportGraphStore:
     def get_importers(self, file_id: str) -> list[dict[str, Any]]:
         """Get all files that import this file."""
         sql = f"""
-            SELECT source_file_id, target_module, target_file_id, import_names
-            FROM {TABLE} WHERE target_file_id = %s
+            SELECT "source_file_id", "target_module", "target_file_id", "import_names"
+            FROM {TABLE} WHERE "target_file_id" = %s
         """
         with self._cm.connection(self._collection) as conn:
             rows = conn.execute(sql, (file_id,)).fetchall()
@@ -86,7 +87,7 @@ class ImportGraphStore:
 
     def delete_by_file(self, file_id: str) -> None:
         """Delete all import edges for a file (as source)."""
-        sql = f"DELETE FROM {TABLE} WHERE source_file_id = %s"
+        sql = f'DELETE FROM {TABLE} WHERE "source_file_id" = %s'
         with self._cm.connection(self._collection) as conn:
             conn.execute(sql, (file_id,))
             conn.commit()
@@ -94,7 +95,7 @@ class ImportGraphStore:
     def resolve_targets(self, path_to_id: dict[str, str]) -> int:
         """Resolve ``target_file_id`` for all unresolved import edges.
 
-        Builds a module→file_id mapping from *path_to_id* (as returned by
+        Builds a module->file_id mapping from *path_to_id* (as returned by
         ``RawFileStore.list_ids_by_path()``), then UPDATEs every edge whose
         ``target_file_id IS NULL`` when the ``target_module`` matches a
         known file.
@@ -107,14 +108,14 @@ class ImportGraphStore:
             module_to_id[module] = file_id
 
         select_sql = f"""
-            SELECT source_file_id, target_module
+            SELECT "source_file_id", "target_module"
             FROM {TABLE}
-            WHERE target_file_id IS NULL
+            WHERE "target_file_id" IS NULL
         """
         update_sql = f"""
             UPDATE {TABLE}
-            SET target_file_id = %s
-            WHERE source_file_id = %s AND target_module = %s
+            SET "target_file_id" = %s
+            WHERE "source_file_id" = %s AND "target_module" = %s
         """
         resolved = 0
         with self._cm.connection(self._collection) as conn:

@@ -1,0 +1,573 @@
+# tests/e2e_krag/runner.py
+"""
+KRAG E2E test runner with ingestion and cleanup.
+
+Equivalent to tests/e2e/runner.py but uses FitzKragEngine instead of RAGPipeline.
+
+Handles the full lifecycle:
+1. Create a unique test collection
+2. Create FitzKragEngine with collection
+3. Ingest test fixtures via engine.ingest()
+4. Run test scenarios via engine.answer()
+5. Clean up PostgreSQL tables for collection
+"""
+
+from __future__ import annotations
+
+import time
+import uuid
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+from fitz_ai.logging.logger import get_logger
+
+from tests.e2e.cache import ResponseCache
+from tests.e2e.config import get_cache_config, get_tier_config, get_tier_names, load_e2e_config
+from tests.e2e.scenarios import SCENARIOS, TestScenario
+
+from .validators import ValidationResult, validate_answer
+
+logger = get_logger(__name__)
+
+# Path to test fixtures (shared with RAG e2e)
+FIXTURES_DIR = Path(__file__).parent.parent / "e2e" / "fixtures_rag"
+
+
+@dataclass
+class ScenarioResult:
+    """Result of running a single scenario."""
+
+    scenario: TestScenario
+    validation: ValidationResult
+    answer_text: str
+    duration_ms: float
+    error: Optional[str] = None
+    source_ids: list[str] = field(default_factory=list)
+
+
+@dataclass
+class E2ERunResult:
+    """Result of running all E2E tests."""
+
+    collection: str
+    scenario_results: list[ScenarioResult] = field(default_factory=list)
+    ingestion_duration_s: float = 0.0
+    total_duration_s: float = 0.0
+
+    @property
+    def passed(self) -> int:
+        return sum(1 for r in self.scenario_results if r.validation.passed)
+
+    @property
+    def failed(self) -> int:
+        return sum(1 for r in self.scenario_results if not r.validation.passed)
+
+    @property
+    def total(self) -> int:
+        return len(self.scenario_results)
+
+    @property
+    def pass_rate(self) -> float:
+        return (self.passed / self.total * 100) if self.total > 0 else 0.0
+
+
+@dataclass
+class TieredRunResult:
+    """Result of tiered test execution."""
+
+    results: dict[str, tuple[ScenarioResult, str]] = field(default_factory=dict)
+    tier_names: list[str] = field(default_factory=list)
+    cache_stats: dict = field(default_factory=dict)
+    total_duration_s: float = 0.0
+
+    def tier_summary(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for _result, tier in self.results.values():
+            counts[tier] = counts.get(tier, 0) + 1
+        return counts
+
+    @property
+    def total_passed(self) -> int:
+        return sum(1 for r, _t in self.results.values() if r.validation.passed)
+
+    @property
+    def total_failed(self) -> int:
+        return sum(1 for r, _t in self.results.values() if not r.validation.passed)
+
+    @property
+    def total(self) -> int:
+        return len(self.results)
+
+    @property
+    def pass_rate(self) -> float:
+        return (self.total_passed / self.total * 100) if self.total > 0 else 0.0
+
+    def print_summary(self) -> None:
+        print("\n" + "=" * 60)
+        print("TIERED KRAG E2E TEST RESULTS")
+        print("=" * 60)
+
+        tier_counts = self.tier_summary()
+        cached_count = tier_counts.get("cached", 0)
+        failed_all_count = tier_counts.get("failed_all", 0)
+
+        if cached_count > 0:
+            print(f"  Cached (skipped LLM):  {cached_count}")
+
+        for tier in self.tier_names:
+            count = tier_counts.get(tier, 0)
+            print(f"  {tier.capitalize()} tier passed:   {count}")
+
+        if failed_all_count > 0:
+            tiers_tried = " -> ".join(self.tier_names) if self.tier_names else "none"
+            print(f"  Failed ALL tiers:      {failed_all_count}  (tried: {tiers_tried})")
+
+        print("-" * 60)
+        print(f"  Total: {self.total_passed}/{self.total} passed ({self.pass_rate:.1f}%)")
+        print(f"  Duration: {self.total_duration_s:.1f}s")
+
+        if self.cache_stats:
+            print(
+                f"  Cache: {self.cache_stats.get('hits', 0)} hits, "
+                f"{self.cache_stats.get('misses', 0)} misses"
+            )
+        print("=" * 60)
+
+
+class KragE2ERunner:
+    """
+    End-to-end test runner for FitzKragEngine.
+
+    Uses FitzKragEngine.ingest() for document ingestion and
+    FitzKragEngine.answer() for query execution.
+
+    Usage:
+        runner = KragE2ERunner()
+        runner.setup()  # Creates engine and ingests fixtures
+        results = runner.run_all()  # Runs all scenarios
+        runner.teardown()  # Cleans up collection
+    """
+
+    def __init__(
+        self,
+        fixtures_dir: Path | None = None,
+        collection_prefix: str = "e2e_krag",
+        use_cache: bool = True,
+    ):
+        self.fixtures_dir = fixtures_dir or FIXTURES_DIR
+        self.collection = f"{collection_prefix}_{uuid.uuid4().hex[:8]}"
+        self.engine = None
+        self._setup_complete = False
+        self._current_tier: str | None = None
+        self._tiered_results: TieredRunResult | None = None
+
+        cache_config = get_cache_config()
+        self.cache = ResponseCache(
+            max_entries=cache_config.get("max_entries", 1000),
+            ttl_days=cache_config.get("ttl_days", 30),
+            enabled=use_cache and cache_config.get("enabled", True),
+        )
+
+    def get_tiered_result(self, scenario_id: str) -> tuple[ScenarioResult, str] | None:
+        if self._tiered_results is None:
+            return None
+        return self._tiered_results.results.get(scenario_id)
+
+    def setup(self, tier_name: str | None = None) -> float:
+        """
+        Set up the test environment.
+
+        Creates FitzKragEngine, ingests fixtures.
+
+        Args:
+            tier_name: Which tier to initialize with (default: first tier)
+
+        Returns:
+            Duration of ingestion in seconds
+        """
+        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
+        from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
+
+        logger.info(f"KRAG E2E Setup: Creating collection '{self.collection}'")
+
+        start_time = time.time()
+
+        # Load test config
+        e2e_config = load_e2e_config()
+        tier_names = get_tier_names(e2e_config)
+        tier_name = tier_name or tier_names[0]
+
+        logger.info(f"KRAG E2E Setup: Using test_config.yaml (tier: {tier_name})")
+
+        tier_config = get_tier_config(tier_name, e2e_config)
+
+        chat_plugin = tier_config["chat"]["plugin_name"]
+        chat_kwargs = tier_config["chat"].get("kwargs", {})
+        embedding_plugin = tier_config["embedding"]["plugin_name"]
+        embedding_kwargs = tier_config["embedding"].get("kwargs", {})
+        vector_db_plugin = tier_config["vector_db"]["plugin_name"]
+        vector_db_kwargs = tier_config["vector_db"].get("kwargs", {})
+
+        logger.info(
+            f"KRAG E2E Setup: chat={chat_plugin}, embedding={embedding_plugin}, "
+            f"vector_db={vector_db_plugin}"
+        )
+
+        # Build KRAG config
+        config_dict = {
+            "chat": chat_plugin,
+            "embedding": embedding_plugin,
+            "vector_db": vector_db_plugin,
+            "collection": self.collection,
+            # Disable guardrails for E2E tests to isolate retrieval testing
+            "enable_guardrails": False,
+            # Relax strict grounding for test flexibility
+            "strict_grounding": False,
+            # Higher retrieval for better recall
+            "top_addresses": 20,
+            "top_read": 10,
+            # Plugin kwargs
+            "chat_kwargs": chat_kwargs,
+            "embedding_kwargs": embedding_kwargs,
+            "vector_db_kwargs": vector_db_kwargs,
+        }
+
+        cfg = FitzKragConfig(**config_dict)
+        self.engine = FitzKragEngine(cfg)
+
+        # Ingest fixtures
+        logger.info(f"KRAG E2E Setup: Ingesting fixtures from '{self.fixtures_dir}'")
+
+        stats = self.engine.ingest(self.fixtures_dir, force=True)
+
+        ingestion_duration = time.time() - start_time
+        logger.info(
+            f"KRAG E2E Setup: Ingested {stats.get('files', 0)} files, "
+            f"{stats.get('symbols', 0)} symbols, "
+            f"{stats.get('sections', 0)} sections in {ingestion_duration:.1f}s"
+        )
+
+        self._setup_complete = True
+        self._current_tier = tier_name
+        logger.info(f"KRAG E2E Setup: Complete (tier: {tier_name})")
+
+        return ingestion_duration
+
+    def _rebuild_engine(self, tier_name: str) -> None:
+        """
+        Rebuild engine with a different tier's configuration.
+
+        If the embedding changes, re-ingests with the new embedding.
+
+        Args:
+            tier_name: Name of the tier to switch to
+        """
+        if tier_name == self._current_tier:
+            logger.debug(f"Already on tier '{tier_name}', skipping rebuild")
+            return
+
+        logger.info(f"KRAG E2E: Switching to tier '{tier_name}'")
+
+        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
+        from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
+
+        e2e_config = load_e2e_config()
+        tier_config = get_tier_config(tier_name, e2e_config)
+
+        # Check if embedding changed
+        current_tier_config = (
+            get_tier_config(self._current_tier, e2e_config) if self._current_tier else None
+        )
+        current_embedding = (
+            current_tier_config["embedding"]["plugin_name"] if current_tier_config else None
+        )
+        new_embedding = tier_config["embedding"]["plugin_name"]
+        needs_reingest = current_embedding != new_embedding
+
+        chat_plugin = tier_config["chat"]["plugin_name"]
+        chat_kwargs = tier_config["chat"].get("kwargs", {})
+        embedding_plugin = tier_config["embedding"]["plugin_name"]
+        embedding_kwargs = tier_config["embedding"].get("kwargs", {})
+        vector_db_plugin = tier_config["vector_db"]["plugin_name"]
+        vector_db_kwargs = tier_config["vector_db"].get("kwargs", {})
+
+        # Rebuild engine with new tier config
+        config_dict = {
+            "chat": chat_plugin,
+            "embedding": embedding_plugin,
+            "vector_db": vector_db_plugin,
+            "collection": self.collection,
+            "enable_guardrails": False,
+            "strict_grounding": False,
+            "top_addresses": 20,
+            "top_read": 10,
+            "chat_kwargs": chat_kwargs,
+            "embedding_kwargs": embedding_kwargs,
+            "vector_db_kwargs": vector_db_kwargs,
+        }
+
+        cfg = FitzKragConfig(**config_dict)
+        self.engine = FitzKragEngine(cfg)
+
+        if needs_reingest:
+            logger.info(
+                f"KRAG E2E: Embedding changed ({current_embedding} -> {new_embedding}), "
+                "re-ingesting..."
+            )
+            self.engine.ingest(self.fixtures_dir, force=True)
+
+        self._current_tier = tier_name
+        logger.info(f"KRAG E2E: Switched to tier '{tier_name}' (chat={chat_plugin})")
+
+    def teardown(self) -> None:
+        """Clean up the test environment."""
+        if not self.engine:
+            return
+
+        logger.info(f"KRAG E2E Teardown: Cleaning collection '{self.collection}'")
+
+        try:
+            self._cleanup_collection()
+        except Exception as e:
+            logger.warning(f"KRAG E2E Teardown: Cleanup error: {e}")
+
+        self.engine = None
+        self._setup_complete = False
+        logger.info("KRAG E2E Teardown: Complete")
+
+    def _cleanup_collection(self) -> None:
+        """Drop PostgreSQL tables and vector data for the test collection."""
+        from fitz_ai.storage.postgres import PostgresConnectionManager
+
+        try:
+            conn_mgr = PostgresConnectionManager.get_instance()
+            # KRAG tables use "krag_" prefix within the collection's database
+            table_names = [
+                "krag_raw_files",
+                "krag_symbol_index",
+                "krag_import_graph",
+                "krag_section_index",
+                "krag_table_index",
+            ]
+            for table_name in table_names:
+                try:
+                    conn_mgr.execute(
+                        self.collection, f'DROP TABLE IF EXISTS "{table_name}" CASCADE'
+                    )
+                except Exception:
+                    pass
+            logger.debug(f"Dropped KRAG tables for collection '{self.collection}'")
+        except Exception as e:
+            logger.debug(f"PostgreSQL cleanup failed (non-fatal): {e}")
+
+        # Also clean up vocabulary, entity graph, table store files
+        from fitz_ai.core.paths import FitzPaths
+
+        for path_fn in [FitzPaths.vocabulary, FitzPaths.entity_graph]:
+            try:
+                path = path_fn(self.collection)
+                if path.exists():
+                    path.unlink()
+            except Exception:
+                pass
+
+    def run_scenario(self, scenario: TestScenario, use_cache: bool = True) -> ScenarioResult:
+        """Run a single test scenario."""
+        if not self._setup_complete:
+            raise RuntimeError("KRAG E2E runner not set up. Call setup() first.")
+
+        from fitz_ai.core import Query
+
+        logger.debug(f"Running scenario {scenario.id}: {scenario.name}")
+
+        start_time = time.time()
+
+        # Check cache first
+        if use_cache and self.cache.enabled:
+            cached = self.cache.get(scenario.query, [], scenario_id=scenario.id)
+            if cached and cached.get("passed"):
+                logger.debug(f"Cache hit for scenario {scenario.id}")
+                duration_ms = (time.time() - start_time) * 1000
+                return ScenarioResult(
+                    scenario=scenario,
+                    validation=ValidationResult(
+                        passed=True,
+                        reason="Cached result",
+                        details={"cached": True, "original_tier": cached.get("tier")},
+                    ),
+                    answer_text=cached.get("answer_text", "")[:500],
+                    duration_ms=duration_ms,
+                    error=None,
+                )
+
+        # Run query through KRAG engine
+        error = None
+        answer_text = ""
+        source_ids: list[str] = []
+
+        try:
+            answer = self.engine.answer(Query(text=scenario.query))
+            answer_text = answer.text
+            source_ids = [p.source_id for p in answer.provenance] if answer.provenance else []
+            validation = validate_answer(answer, scenario)
+        except Exception as e:
+            logger.error(f"Scenario {scenario.id} failed with error: {e}")
+            error = str(e)
+            validation = ValidationResult(
+                passed=False,
+                reason=f"Engine error: {e}",
+                details={"error": str(e)},
+            )
+
+        duration_ms = (time.time() - start_time) * 1000
+
+        # Cache successful results
+        if use_cache and self.cache.enabled and validation.passed:
+            self.cache.set(
+                query=scenario.query,
+                chunk_ids=source_ids,
+                scenario_id=scenario.id,
+                answer_text=answer_text[:500] if answer_text else "",
+                passed=True,
+                tier=self._current_tier or "unknown",
+            )
+
+        return ScenarioResult(
+            scenario=scenario,
+            validation=validation,
+            answer_text=answer_text[:500] if answer_text else "",
+            duration_ms=duration_ms,
+            error=error,
+            source_ids=source_ids,
+        )
+
+    def run_all(self, scenarios: list[TestScenario] | None = None) -> E2ERunResult:
+        """Run all test scenarios."""
+        scenarios = scenarios or SCENARIOS
+        results: list[ScenarioResult] = []
+
+        logger.info(f"KRAG E2E Run: Starting {len(scenarios)} scenarios")
+        start_time = time.time()
+
+        for scenario in scenarios:
+            result = self.run_scenario(scenario)
+            results.append(result)
+
+            status = "PASS" if result.validation.passed else "FAIL"
+            logger.info(
+                f"  [{status}] {scenario.id}: {scenario.name} ({result.duration_ms:.0f}ms)"
+            )
+
+        total_duration = time.time() - start_time
+
+        run_result = E2ERunResult(
+            collection=self.collection,
+            scenario_results=results,
+            total_duration_s=total_duration,
+        )
+
+        logger.info(
+            f"KRAG E2E Run: Complete - {run_result.passed}/{run_result.total} passed "
+            f"({run_result.pass_rate:.1f}%) in {total_duration:.1f}s"
+        )
+
+        return run_result
+
+    def run_tiered(self, scenarios: list[TestScenario] | None = None) -> TieredRunResult:
+        """Run tests with tiered fallback (local -> cloud)."""
+        if not self._setup_complete:
+            raise RuntimeError("KRAG E2E runner not set up. Call setup() first.")
+
+        scenarios = scenarios or SCENARIOS
+        e2e_config = load_e2e_config()
+        tier_names = get_tier_names(e2e_config)
+
+        all_results: dict[str, tuple[ScenarioResult, str]] = {}
+        remaining = list(scenarios)
+
+        logger.info(f"KRAG E2E Tiered Run: Starting {len(scenarios)} scenarios")
+        logger.info(f"KRAG E2E Tiered Run: Tiers = {tier_names}")
+        start_time = time.time()
+
+        # Phase 0: Check cache
+        if self.cache.enabled:
+            logger.info("\n--- Checking cache ---")
+            still_need_run = []
+            for scenario in remaining:
+                cached = self.cache.get(scenario.query, [], scenario_id=scenario.id)
+                if cached and cached.get("passed"):
+                    result = ScenarioResult(
+                        scenario=scenario,
+                        validation=ValidationResult(
+                            passed=True,
+                            reason="Cached result",
+                            details={"cached": True, "original_tier": cached.get("tier")},
+                        ),
+                        answer_text=cached.get("answer_text", "")[:500],
+                        duration_ms=0.0,
+                        error=None,
+                    )
+                    all_results[scenario.id] = (result, "cached")
+                    logger.info(f"  [CACHE] {scenario.id}: {scenario.name}")
+                else:
+                    still_need_run.append(scenario)
+
+            cached_count = len(remaining) - len(still_need_run)
+            logger.info(f"Cache: {cached_count} hits, {len(still_need_run)} need to run")
+            remaining = still_need_run
+
+        last_results: dict[str, ScenarioResult] = {}
+
+        for tier_name in tier_names:
+            if not remaining:
+                break
+
+            logger.info(f"\n--- Tier '{tier_name}': {len(remaining)} scenarios ---")
+            self._rebuild_engine(tier_name)
+
+            still_failing = []
+            for scenario in remaining:
+                result = self.run_scenario(scenario, use_cache=False)
+                last_results[scenario.id] = result
+
+                if result.validation.passed:
+                    all_results[scenario.id] = (result, tier_name)
+                    status = "PASS"
+                    if self.cache.enabled:
+                        self.cache.set(
+                            query=scenario.query,
+                            chunk_ids=result.source_ids,
+                            scenario_id=scenario.id,
+                            answer_text=result.answer_text,
+                            passed=True,
+                            tier=tier_name,
+                        )
+                else:
+                    still_failing.append(scenario)
+                    status = "FAIL"
+
+                logger.info(
+                    f"  [{status}] {scenario.id}: {scenario.name} ({result.duration_ms:.0f}ms)"
+                )
+
+            passed_this_tier = len(remaining) - len(still_failing)
+            logger.info(f"Tier '{tier_name}': {passed_this_tier}/{len(remaining)} passed")
+            remaining = still_failing
+
+        for scenario in remaining:
+            result = last_results[scenario.id]
+            all_results[scenario.id] = (result, "failed_all")
+
+        total_duration = time.time() - start_time
+
+        tiered_result = TieredRunResult(
+            results=all_results,
+            tier_names=tier_names,
+            cache_stats=self.cache.stats(),
+            total_duration_s=total_duration,
+        )
+
+        tiered_result.print_summary()
+
+        return tiered_result

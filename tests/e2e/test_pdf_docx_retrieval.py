@@ -2,6 +2,9 @@
 """
 E2E retrieval tests for PDF and DOCX documents.
 
+FROZEN: fitz_rag e2e PDF/DOCX tests. Marked for deletion when fitz_krag fully replaces fitz_rag.
+See tests/e2e_krag/test_pdf_docx_retrieval.py for the KRAG equivalent.
+
 These tests verify that PDF/DOCX content can be queried through the RAG pipeline.
 Requires the PDF/DOCX fixtures in fixtures_parser/ directory.
 

@@ -2,6 +2,9 @@
 """
 E2E test runner with ingestion and cleanup.
 
+FROZEN: fitz_rag e2e runner. Marked for deletion when fitz_krag fully replaces fitz_rag.
+See tests/e2e_krag/runner.py for the KRAG equivalent.
+
 Handles the full lifecycle:
 1. Create a unique test collection
 2. Ingest test fixtures

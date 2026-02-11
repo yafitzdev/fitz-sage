@@ -31,26 +31,26 @@ class SectionStore:
 
         sql = f"""
             INSERT INTO {TABLE}
-                (id, raw_file_id, title, level, page_start, page_end,
-                 content, summary, summary_vector, parent_section_id,
-                 position, keywords, entities, metadata)
+                ("id", "raw_file_id", "title", "level", "page_start", "page_end",
+                 "content", "summary", "summary_vector", "parent_section_id",
+                 "position", "keywords", "entities", "metadata")
             VALUES
                 (%s, %s, %s, %s, %s, %s,
                  %s, %s, %s::vector, %s,
                  %s, %s, %s::jsonb, %s::jsonb)
-            ON CONFLICT (id) DO UPDATE SET
-                title = EXCLUDED.title,
-                level = EXCLUDED.level,
-                page_start = EXCLUDED.page_start,
-                page_end = EXCLUDED.page_end,
-                content = EXCLUDED.content,
-                summary = EXCLUDED.summary,
-                summary_vector = EXCLUDED.summary_vector,
-                parent_section_id = EXCLUDED.parent_section_id,
-                position = EXCLUDED.position,
-                keywords = EXCLUDED.keywords,
-                entities = EXCLUDED.entities,
-                metadata = EXCLUDED.metadata
+            ON CONFLICT ("id") DO UPDATE SET
+                "title" = EXCLUDED."title",
+                "level" = EXCLUDED."level",
+                "page_start" = EXCLUDED."page_start",
+                "page_end" = EXCLUDED."page_end",
+                "content" = EXCLUDED."content",
+                "summary" = EXCLUDED."summary",
+                "summary_vector" = EXCLUDED."summary_vector",
+                "parent_section_id" = EXCLUDED."parent_section_id",
+                "position" = EXCLUDED."position",
+                "keywords" = EXCLUDED."keywords",
+                "entities" = EXCLUDED."entities",
+                "metadata" = EXCLUDED."metadata"
         """
         with self._cm.connection(self._collection) as conn:
             for sec in sections:
@@ -79,12 +79,12 @@ class SectionStore:
     def search_bm25(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
         """Full-text search using ts_rank on content_tsv."""
         sql = f"""
-            SELECT id, raw_file_id, title, level, page_start, page_end,
-                   content, summary, parent_section_id, position, metadata,
-                   ts_rank(content_tsv, plainto_tsquery('english', %s)) AS rank
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata",
+                   ts_rank("content_tsv", plainto_tsquery('english', %s)) AS "rank"
             FROM {TABLE}
-            WHERE content_tsv @@ plainto_tsquery('english', %s)
-            ORDER BY rank DESC
+            WHERE "content_tsv" @@ plainto_tsquery('english', %s)
+            ORDER BY "rank" DESC
             LIMIT %s
         """
         with self._cm.connection(self._collection) as conn:
@@ -103,12 +103,12 @@ class SectionStore:
             return []
 
         sql = f"""
-            SELECT id, raw_file_id, title, level, page_start, page_end,
-                   content, summary, parent_section_id, position, metadata,
-                   1 - (summary_vector <=> %s::vector) AS score
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata",
+                   1 - ("summary_vector" <=> %s::vector) AS "score"
             FROM {TABLE}
-            WHERE summary_vector IS NOT NULL
-            ORDER BY summary_vector <=> %s::vector
+            WHERE "summary_vector" IS NOT NULL
+            ORDER BY "summary_vector" <=> %s::vector
             LIMIT %s
         """
         with self._cm.connection(self._collection) as conn:
@@ -123,9 +123,9 @@ class SectionStore:
     def get(self, section_id: str) -> dict[str, Any] | None:
         """Get a section by ID."""
         sql = f"""
-            SELECT id, raw_file_id, title, level, page_start, page_end,
-                   content, summary, parent_section_id, position, metadata
-            FROM {TABLE} WHERE id = %s
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata"
+            FROM {TABLE} WHERE "id" = %s
         """
         with self._cm.connection(self._collection) as conn:
             row = conn.execute(sql, (section_id,)).fetchone()
@@ -136,11 +136,11 @@ class SectionStore:
     def get_by_file(self, raw_file_id: str) -> list[dict[str, Any]]:
         """Get all sections for a file, ordered by position."""
         sql = f"""
-            SELECT id, raw_file_id, title, level, page_start, page_end,
-                   content, summary, parent_section_id, position, metadata
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata"
             FROM {TABLE}
-            WHERE raw_file_id = %s
-            ORDER BY position
+            WHERE "raw_file_id" = %s
+            ORDER BY "position"
         """
         with self._cm.connection(self._collection) as conn:
             rows = conn.execute(sql, (raw_file_id,)).fetchall()
@@ -149,11 +149,11 @@ class SectionStore:
     def get_children(self, section_id: str) -> list[dict[str, Any]]:
         """Get child sections of a parent."""
         sql = f"""
-            SELECT id, raw_file_id, title, level, page_start, page_end,
-                   content, summary, parent_section_id, position, metadata
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata"
             FROM {TABLE}
-            WHERE parent_section_id = %s
-            ORDER BY position
+            WHERE "parent_section_id" = %s
+            ORDER BY "position"
         """
         with self._cm.connection(self._collection) as conn:
             rows = conn.execute(sql, (section_id,)).fetchall()
@@ -169,11 +169,11 @@ class SectionStore:
             return self.get_children(parent_id)
         # Top-level sections: get all level-1 sections for same file
         sql = f"""
-            SELECT id, raw_file_id, title, level, page_start, page_end,
-                   content, summary, parent_section_id, position, metadata
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata"
             FROM {TABLE}
-            WHERE raw_file_id = %s AND parent_section_id IS NULL
-            ORDER BY position
+            WHERE "raw_file_id" = %s AND "parent_section_id" IS NULL
+            ORDER BY "position"
         """
         with self._cm.connection(self._collection) as conn:
             rows = conn.execute(sql, (section["raw_file_id"],)).fetchall()
@@ -181,7 +181,7 @@ class SectionStore:
 
     def delete_by_file(self, raw_file_id: str) -> None:
         """Delete all sections for a file."""
-        sql = f"DELETE FROM {TABLE} WHERE raw_file_id = %s"
+        sql = f'DELETE FROM {TABLE} WHERE "raw_file_id" = %s'
         with self._cm.connection(self._collection) as conn:
             conn.execute(sql, (raw_file_id,))
             conn.commit()

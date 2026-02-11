@@ -31,20 +31,20 @@ class TableStore:
 
         sql = f"""
             INSERT INTO {TABLE}
-                (id, raw_file_id, table_id, name, columns, row_count,
-                 summary, summary_vector, metadata)
+                ("id", "raw_file_id", "table_id", "name", "columns", "row_count",
+                 "summary", "summary_vector", "metadata")
             VALUES
                 (%s, %s, %s, %s, %s, %s,
                  %s, %s::vector, %s::jsonb)
-            ON CONFLICT (id) DO UPDATE SET
-                raw_file_id = EXCLUDED.raw_file_id,
-                table_id = EXCLUDED.table_id,
-                name = EXCLUDED.name,
-                columns = EXCLUDED.columns,
-                row_count = EXCLUDED.row_count,
-                summary = EXCLUDED.summary,
-                summary_vector = EXCLUDED.summary_vector,
-                metadata = EXCLUDED.metadata
+            ON CONFLICT ("id") DO UPDATE SET
+                "raw_file_id" = EXCLUDED."raw_file_id",
+                "table_id" = EXCLUDED."table_id",
+                "name" = EXCLUDED."name",
+                "columns" = EXCLUDED."columns",
+                "row_count" = EXCLUDED."row_count",
+                "summary" = EXCLUDED."summary",
+                "summary_vector" = EXCLUDED."summary_vector",
+                "metadata" = EXCLUDED."metadata"
         """
         with self._cm.connection(self._collection) as conn:
             for tbl in tables:
@@ -69,11 +69,11 @@ class TableStore:
         """ILIKE search on name and column names."""
         pattern = f"%{query}%"
         sql = f"""
-            SELECT id, raw_file_id, table_id, name, columns, row_count,
-                   summary, metadata
+            SELECT "id", "raw_file_id", "table_id", "name", "columns", "row_count",
+                   "summary", "metadata"
             FROM {TABLE}
-            WHERE name ILIKE %s OR EXISTS (
-                SELECT 1 FROM unnest(columns) AS col WHERE col ILIKE %s
+            WHERE "name" ILIKE %s OR EXISTS (
+                SELECT 1 FROM unnest("columns") AS col WHERE col ILIKE %s
             )
             LIMIT %s
         """
@@ -88,12 +88,12 @@ class TableStore:
             return []
 
         sql = f"""
-            SELECT id, raw_file_id, table_id, name, columns, row_count,
-                   summary, metadata,
-                   1 - (summary_vector <=> %s::vector) AS score
+            SELECT "id", "raw_file_id", "table_id", "name", "columns", "row_count",
+                   "summary", "metadata",
+                   1 - ("summary_vector" <=> %s::vector) AS "score"
             FROM {TABLE}
-            WHERE summary_vector IS NOT NULL
-            ORDER BY summary_vector <=> %s::vector
+            WHERE "summary_vector" IS NOT NULL
+            ORDER BY "summary_vector" <=> %s::vector
             LIMIT %s
         """
         with self._cm.connection(self._collection) as conn:
@@ -108,9 +108,9 @@ class TableStore:
     def get(self, table_index_id: str) -> dict[str, Any] | None:
         """Get a single table record by ID."""
         sql = f"""
-            SELECT id, raw_file_id, table_id, name, columns, row_count,
-                   summary, metadata
-            FROM {TABLE} WHERE id = %s
+            SELECT "id", "raw_file_id", "table_id", "name", "columns", "row_count",
+                   "summary", "metadata"
+            FROM {TABLE} WHERE "id" = %s
         """
         with self._cm.connection(self._collection) as conn:
             row = conn.execute(sql, (table_index_id,)).fetchone()
@@ -121,10 +121,10 @@ class TableStore:
     def get_by_file(self, raw_file_id: str) -> list[dict[str, Any]]:
         """Get all table records for a raw file."""
         sql = f"""
-            SELECT id, raw_file_id, table_id, name, columns, row_count,
-                   summary, metadata
+            SELECT "id", "raw_file_id", "table_id", "name", "columns", "row_count",
+                   "summary", "metadata"
             FROM {TABLE}
-            WHERE raw_file_id = %s
+            WHERE "raw_file_id" = %s
         """
         with self._cm.connection(self._collection) as conn:
             rows = conn.execute(sql, (raw_file_id,)).fetchall()
@@ -132,7 +132,7 @@ class TableStore:
 
     def delete_by_file(self, raw_file_id: str) -> None:
         """Delete table metadata when source file is removed."""
-        sql = f"DELETE FROM {TABLE} WHERE raw_file_id = %s"
+        sql = f'DELETE FROM {TABLE} WHERE "raw_file_id" = %s'
         with self._cm.connection(self._collection) as conn:
             conn.execute(sql, (raw_file_id,))
             conn.commit()

@@ -1,11 +1,10 @@
-# tests/e2e/validators.py
+# tests/e2e_krag/validators.py
 """
-Answer validation for E2E tests.
+Answer validation for KRAG E2E tests.
 
-FROZEN: fitz_rag e2e validators. Marked for deletion when fitz_krag fully replaces fitz_rag.
-See tests/e2e_krag/validators.py for the KRAG equivalent.
-
-Validates RAG pipeline answers against expected outcomes defined in scenarios.
+Validates FitzKragEngine answers (core.Answer) against expected outcomes
+defined in scenarios. Equivalent to tests/e2e/validators.py but for core.Answer
+instead of RGSAnswer.
 """
 
 from __future__ import annotations
@@ -14,9 +13,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import RGSAnswer
+    from fitz_ai.core import Answer
 
-    from .scenarios import TestScenario
+    from tests.e2e.scenarios import TestScenario
 
 
 @dataclass
@@ -28,26 +27,26 @@ class ValidationResult:
     details: dict
 
 
-def validate_answer(answer: "RGSAnswer", scenario: "TestScenario") -> ValidationResult:
+def validate_answer(answer: "Answer", scenario: "TestScenario") -> ValidationResult:
     """
-    Validate an answer against a test scenario.
+    Validate a KRAG answer against a test scenario.
 
     Checks:
     1. must_contain: All substrings must be present (case-insensitive)
     2. must_contain_any: At least one substring must be present (case-insensitive)
     3. must_not_contain: No substrings should be present (case-insensitive)
     4. expected_mode: Answer mode matches if specified
-    5. min_sources: Minimum number of source citations
+    5. min_sources: Minimum number of provenance citations
     6. custom_validator: Custom validation function if provided
 
     Args:
-        answer: The RGSAnswer from the pipeline
+        answer: The core.Answer from the KRAG engine
         scenario: The test scenario with expected outcomes
 
     Returns:
         ValidationResult with pass/fail status and reason
     """
-    answer_text = answer.answer.lower()
+    answer_text = answer.text.lower()
     details: dict = {}
 
     # 1. Check must_contain (all required)
@@ -60,7 +59,7 @@ def validate_answer(answer: "RGSAnswer", scenario: "TestScenario") -> Validation
             return ValidationResult(
                 passed=False,
                 reason=f"Missing required content: {missing}",
-                details={"missing": missing, "answer_preview": answer.answer[:200]},
+                details={"missing": missing, "answer_preview": answer.text[:200]},
             )
         details["must_contain"] = "all present"
 
@@ -78,7 +77,7 @@ def validate_answer(answer: "RGSAnswer", scenario: "TestScenario") -> Validation
                 reason=f"Missing at least one of: {scenario.must_contain_any}",
                 details={
                     "expected_any_of": scenario.must_contain_any,
-                    "answer_preview": answer.answer[:200],
+                    "answer_preview": answer.text[:200],
                 },
             )
         details["must_contain_any"] = f"found: {found_items}"
@@ -108,9 +107,11 @@ def validate_answer(answer: "RGSAnswer", scenario: "TestScenario") -> Validation
             )
         details["mode"] = actual_mode
 
-    # 5. Check min_sources
+    # 5. Check min_sources (uses provenance instead of sources)
     if scenario.min_sources > 0:
-        source_count = len(answer.sources) if hasattr(answer, "sources") and answer.sources else 0
+        source_count = (
+            len(answer.provenance) if hasattr(answer, "provenance") and answer.provenance else 0
+        )
         if source_count < scenario.min_sources:
             return ValidationResult(
                 passed=False,
