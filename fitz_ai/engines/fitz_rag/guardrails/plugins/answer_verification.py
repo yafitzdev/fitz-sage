@@ -1,4 +1,4 @@
-# fitz_ai/core/guardrails/plugins/answer_verification.py
+# fitz_ai/engines/fitz_rag/guardrails/plugins/answer_verification.py
 """
 Answer Verification Constraint - LLM jury for positive confidence confirmation.
 

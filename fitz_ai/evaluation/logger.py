@@ -19,7 +19,7 @@ import threading
 from typing import TYPE_CHECKING, Sequence
 
 import fitz_ai
-from fitz_ai.core.governance import GovernanceDecision, GovernanceLog
+from fitz_ai.engines.fitz_rag.governance import GovernanceDecision, GovernanceLog
 from fitz_ai.evaluation.schema import ensure_schema
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import GOVERNANCE

@@ -2,8 +2,8 @@
 """Tests for constraint runner."""
 
 
-from fitz_ai.core.guardrails.base import ConstraintResult
-from fitz_ai.core.guardrails.runner import run_constraints
+from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
+from fitz_ai.engines.fitz_rag.guardrails.runner import run_constraints
 
 
 class MockConstraint:

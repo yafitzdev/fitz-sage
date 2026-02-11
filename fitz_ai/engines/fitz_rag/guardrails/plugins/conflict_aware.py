@@ -1,4 +1,4 @@
-# fitz_ai/core/guardrails/plugins/conflict_aware.py
+# fitz_ai/engines/fitz_rag/guardrails/plugins/conflict_aware.py
 """
 Conflict-Aware Constraint - Default guardrail for contradiction detection.
 

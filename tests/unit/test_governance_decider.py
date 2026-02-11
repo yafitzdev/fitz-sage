@@ -11,9 +11,9 @@ import pytest
 pytestmark = pytest.mark.tier1
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.core.governance import GovernanceDecision
-from fitz_ai.core.guardrails.base import ConstraintResult
-from fitz_ai.core.guardrails.governance_decider import GovernanceDecider
+from fitz_ai.engines.fitz_rag.governance import GovernanceDecision
+from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
+from fitz_ai.engines.fitz_rag.guardrails.governance_decider import GovernanceDecider
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -99,11 +99,11 @@ class TestMLPrediction:
     def decider(self):
         artifact = _make_mock_artifact()
         with patch(
-            "fitz_ai.core.guardrails.governance_decider.GovernanceDecider.__init__",
+            "fitz_ai.engines.fitz_rag.guardrails.governance_decider.GovernanceDecider.__init__",
             lambda self, **kw: None,
         ):
             d = GovernanceDecider.__new__(GovernanceDecider)
-        from fitz_ai.core.governance import AnswerGovernor
+        from fitz_ai.engines.fitz_rag.governance import AnswerGovernor
 
         d._available = True
         d._governor = AnswerGovernor()
@@ -171,11 +171,11 @@ class TestFeaturePreparation:
     def decider(self):
         artifact = _make_mock_artifact()
         with patch(
-            "fitz_ai.core.guardrails.governance_decider.GovernanceDecider.__init__",
+            "fitz_ai.engines.fitz_rag.guardrails.governance_decider.GovernanceDecider.__init__",
             lambda self, **kw: None,
         ):
             d = GovernanceDecider.__new__(GovernanceDecider)
-        from fitz_ai.core.governance import AnswerGovernor
+        from fitz_ai.engines.fitz_rag.governance import AnswerGovernor
 
         d._available = True
         d._governor = AnswerGovernor()
@@ -243,11 +243,11 @@ class TestErrorHandling:
     def decider(self):
         artifact = _make_mock_artifact()
         with patch(
-            "fitz_ai.core.guardrails.governance_decider.GovernanceDecider.__init__",
+            "fitz_ai.engines.fitz_rag.guardrails.governance_decider.GovernanceDecider.__init__",
             lambda self, **kw: None,
         ):
             d = GovernanceDecider.__new__(GovernanceDecider)
-        from fitz_ai.core.governance import AnswerGovernor
+        from fitz_ai.engines.fitz_rag.governance import AnswerGovernor
 
         d._available = True
         d._governor = AnswerGovernor()

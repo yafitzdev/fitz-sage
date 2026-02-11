@@ -29,7 +29,6 @@ from typing import TYPE_CHECKING, List
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.core.conflicts import find_conflicts
-from fitz_ai.core.guardrails.semantic import SemanticMatcher
 from fitz_ai.ingestion.enrichment.config import (
     HierarchyConfig,
     HierarchyRule,
@@ -45,7 +44,7 @@ from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.prompts import hierarchy as hierarchy_prompts
 
 if TYPE_CHECKING:
-    pass
+    from fitz_ai.engines.fitz_rag.guardrails.semantic import SemanticMatcher
 
 logger = logging.getLogger(__name__)
 

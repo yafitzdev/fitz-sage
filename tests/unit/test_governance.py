@@ -4,8 +4,8 @@
 import pytest
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.core.governance import AnswerGovernor, GovernanceDecision
-from fitz_ai.core.guardrails.base import ConstraintResult
+from fitz_ai.engines.fitz_rag.governance import AnswerGovernor, GovernanceDecision
+from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
 
 
 class TestGovernanceDecision:
@@ -82,6 +82,7 @@ class TestGovernanceDecision:
         )
 
         assert "conflicting information" in decision.user_explanation.lower()
+
 
 class TestAnswerGovernor:
     """Tests for AnswerGovernor decision logic."""

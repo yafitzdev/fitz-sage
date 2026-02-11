@@ -18,13 +18,13 @@ import pytest
 
 from fitz_ai.core.answer_mode import AnswerMode
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.core.governance import AnswerGovernor
-from fitz_ai.core.guardrails import run_constraints
-from fitz_ai.core.guardrails.plugins.conflict_aware import ConflictAwareConstraint
-from fitz_ai.core.guardrails.plugins.insufficient_evidence import (
+from fitz_ai.engines.fitz_rag.governance import AnswerGovernor
+from fitz_ai.engines.fitz_rag.guardrails import run_constraints
+from fitz_ai.engines.fitz_rag.guardrails.plugins.conflict_aware import ConflictAwareConstraint
+from fitz_ai.engines.fitz_rag.guardrails.plugins.insufficient_evidence import (
     InsufficientEvidenceConstraint,
 )
-from fitz_ai.core.guardrails.semantic import SemanticMatcher
+from fitz_ai.engines.fitz_rag.guardrails.semantic import SemanticMatcher
 from tests.unit.mock_embedder import create_deterministic_embedder
 
 # =============================================================================
@@ -406,7 +406,7 @@ class TestSignalPriority:
         even check for conflicts.)
         """
         # This tests the governor priority, not constraint interaction
-        from fitz_ai.core.guardrails.base import ConstraintResult
+        from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
 
         results = [
             ConstraintResult(

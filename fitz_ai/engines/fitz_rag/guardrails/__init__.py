@@ -1,19 +1,17 @@
-# fitz_ai/core/guardrails/__init__.py
+# fitz_ai/engines/fitz_rag/guardrails/__init__.py
 """
 Epistemic Guardrails - Constraint system for epistemic correctness.
 
 Guardrails inspect retrieved context and determine what conclusions are allowed.
 They are orthogonal to retrieval (what's relevant) and generation (how to answer).
 
-This is a core platform capability supporting epistemic honesty across all engines.
-
 Usage:
-    from fitz_ai.core.guardrails import (
+    from fitz_ai.engines.fitz_rag.guardrails import (
         ConstraintResult,
         create_default_constraints,
         run_constraints,
     )
-    from fitz_ai.core.governance import AnswerGovernor
+    from fitz_ai.engines.fitz_rag.governance import AnswerGovernor
 
     constraints = create_default_constraints(chat=chat_provider)
     results = run_constraints(query, chunks, constraints)

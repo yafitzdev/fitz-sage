@@ -1,4 +1,4 @@
-# fitz_ai/core/guardrails/runner.py
+# fitz_ai/engines/fitz_rag/guardrails/runner.py
 """
 Constraint Runner - Applies constraint plugins to retrieved context.
 

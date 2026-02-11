@@ -1,4 +1,4 @@
-# fitz_ai/core/guardrails/base.py
+# fitz_ai/engines/fitz_rag/guardrails/base.py
 """
 Constraint Plugin Base - Protocol and result types for epistemic guardrails.
 

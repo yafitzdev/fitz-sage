@@ -18,7 +18,7 @@ import pytest
 pytestmark = pytest.mark.tier1
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.core.guardrails import CausalAttributionConstraint
+from fitz_ai.engines.fitz_rag.guardrails import CausalAttributionConstraint
 
 # =============================================================================
 # Test Data

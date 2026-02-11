@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable
 
-from fitz_ai.core.guardrails.semantic import cosine_similarity
+from fitz_ai.core.math import cosine_similarity
 from fitz_ai.logging.logger import get_logger
 
 logger = get_logger(__name__)

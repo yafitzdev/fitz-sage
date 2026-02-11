@@ -1,4 +1,4 @@
-# fitz_ai/core/governance.py
+# fitz_ai/engines/fitz_rag/governance/governor.py
 """
 Answer Governance - Determines epistemic posture for answers.
 
@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any, Sequence
 from fitz_ai.core.answer_mode import AnswerMode
 
 if TYPE_CHECKING:
-    from fitz_ai.core.guardrails.base import ConstraintResult
+    from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
 
 
 @dataclass(frozen=True)

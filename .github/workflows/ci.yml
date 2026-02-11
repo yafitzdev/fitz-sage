@@ -134,7 +134,7 @@ jobs:
         run: |
           # Only check imports that don't require heavy ML dependencies
           python -c "from fitz_ai.core import Answer, Provenance, Query; print('Core imports OK')"
-          python -c "from fitz_ai.core.guardrails import ConflictAwareConstraint; print('Guardrails OK')"
+          python -c "from fitz_ai.engines.fitz_rag.guardrails import ConflictAwareConstraint; print('Guardrails OK')"
           python -c "import fitz_ai; print('Package imports OK')"
 
       - name: Check CLI entry point exists

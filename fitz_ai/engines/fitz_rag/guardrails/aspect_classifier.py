@@ -1,4 +1,4 @@
-# fitz_ai/core/guardrails/aspect_classifier.py
+# fitz_ai/engines/fitz_rag/guardrails/aspect_classifier.py
 """
 Query and chunk aspect classification for intent alignment.
 

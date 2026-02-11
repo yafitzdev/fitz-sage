@@ -1,4 +1,4 @@
-# fitz_ai/core/guardrails/staged.py
+# fitz_ai/engines/fitz_rag/guardrails/staged.py
 """
 Staged Constraint Pipeline - Hierarchical constraint evaluation.
 

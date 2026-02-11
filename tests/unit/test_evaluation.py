@@ -17,7 +17,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.core.governance import GovernanceDecision, GovernanceLog
+from fitz_ai.engines.fitz_rag.governance import GovernanceDecision, GovernanceLog
 from fitz_ai.evaluation.models import (
     AbstainTrend,
     ConstraintFrequency,
@@ -688,8 +688,8 @@ class TestGovernanceLogIntegration:
 
     def test_full_round_trip(self):
         """Test creating decision -> log -> dict -> verify."""
-        from fitz_ai.core.governance import AnswerGovernor
-        from fitz_ai.core.guardrails.base import ConstraintResult
+        from fitz_ai.engines.fitz_rag.governance import AnswerGovernor
+        from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
 
         # Create constraint results
         results = [

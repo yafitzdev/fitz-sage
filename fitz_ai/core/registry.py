@@ -313,7 +313,7 @@ PIPELINE_REGISTRY = PluginRegistry(
 # Constraint plugins registry (for guardrails)
 CONSTRAINT_REGISTRY = PluginRegistry(
     name="constraint",
-    scan_packages=["fitz_ai.core.guardrails.plugins"],
+    scan_packages=["fitz_ai.engines.fitz_rag.guardrails.plugins"],
     required_method="apply",
     plugin_name_attr="name",
     user_plugin_paths=_get_plugin_paths("constraint"),

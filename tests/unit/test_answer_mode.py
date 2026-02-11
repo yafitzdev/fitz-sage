@@ -11,8 +11,8 @@ These tests verify:
 from __future__ import annotations
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.core.governance import AnswerGovernor
-from fitz_ai.core.guardrails import ConstraintResult
+from fitz_ai.engines.fitz_rag.governance import AnswerGovernor
+from fitz_ai.engines.fitz_rag.guardrails import ConstraintResult
 from fitz_ai.engines.fitz_rag.generation.answer_mode.instructions import (
     MODE_INSTRUCTIONS,
     get_mode_instruction,

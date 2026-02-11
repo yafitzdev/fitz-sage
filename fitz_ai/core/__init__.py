@@ -69,20 +69,6 @@ from .exceptions import (
     UnsupportedOperationError,
 )
 
-# Epistemic guardrails (constraint plugins)
-from .governance import AnswerGovernor, GovernanceDecision, GovernanceLog, decide_answer_mode
-from .guardrails import ConstraintPlugin as ConstraintPluginProtocol
-from .guardrails import (
-    ConstraintResult,
-    create_default_constraints,
-    run_constraints,
-)
-from .guardrails.plugins import (
-    CausalAttributionConstraint,
-    ConflictAwareConstraint,
-    InsufficientEvidenceConstraint,
-)
-
 # Path management
 from .paths import FitzPaths, get_config_path, get_vector_db_path, get_workspace
 from .provenance import Provenance
@@ -102,19 +88,6 @@ __all__ = [
     "Provenance",
     "Constraints",
     "Chunk",
-    # Epistemic Guardrails
-    "ConstraintResult",
-    "ConstraintPluginProtocol",
-    "ConflictAwareConstraint",
-    "InsufficientEvidenceConstraint",
-    "CausalAttributionConstraint",
-    "run_constraints",
-    "create_default_constraints",
-    # Governance
-    "AnswerGovernor",
-    "GovernanceDecision",
-    "GovernanceLog",
-    "decide_answer_mode",
     # Path Management
     "FitzPaths",
     "get_workspace",

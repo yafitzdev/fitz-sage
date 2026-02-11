@@ -1,4 +1,4 @@
-# fitz_ai/core/guardrails/plugins/causal_attribution.py
+# fitz_ai/engines/fitz_rag/guardrails/plugins/causal_attribution.py
 """
 Causal Attribution Constraint - Prevents implicit causality and speculation.
 

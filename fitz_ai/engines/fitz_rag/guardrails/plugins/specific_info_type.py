@@ -1,4 +1,4 @@
-# fitz_ai/core/guardrails/plugins/specific_info_type.py
+# fitz_ai/engines/fitz_rag/guardrails/plugins/specific_info_type.py
 """
 Specific Info Type Constraint - Detects when specific information types are missing.
 

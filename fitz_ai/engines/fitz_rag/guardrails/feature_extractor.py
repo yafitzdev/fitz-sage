@@ -1,4 +1,4 @@
-# fitz_ai/core/guardrails/feature_extractor.py
+# fitz_ai/engines/fitz_rag/guardrails/feature_extractor.py
 """
 Feature Extractor for Governance Classifier.
 
@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, Sequence
 from fitz_ai.core.chunk import Chunk
 
 if TYPE_CHECKING:
-    from fitz_ai.core.guardrails.base import ConstraintResult
+    from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
 
 
 def extract_features(

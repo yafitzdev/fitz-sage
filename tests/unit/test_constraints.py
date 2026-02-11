@@ -22,8 +22,8 @@ import pytest
 pytestmark = pytest.mark.tier1
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.core.governance import AnswerGovernor
-from fitz_ai.core.guardrails import (
+from fitz_ai.engines.fitz_rag.governance import AnswerGovernor
+from fitz_ai.engines.fitz_rag.guardrails import (
     ConflictAwareConstraint,
     ConstraintResult,
     run_constraints,
@@ -442,7 +442,7 @@ class TestAnswerVerificationConstraint:
 
     def test_no_chat_allows_answer(self):
         """Should allow when no chat provider available."""
-        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+        from fitz_ai.engines.fitz_rag.guardrails import AnswerVerificationConstraint
 
         constraint = AnswerVerificationConstraint(chat=None)
 
@@ -453,7 +453,7 @@ class TestAnswerVerificationConstraint:
 
     def test_empty_chunks_allows_answer(self):
         """Should allow when no chunks (handled by InsufficientEvidence)."""
-        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+        from fitz_ai.engines.fitz_rag.guardrails import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         constraint = AnswerVerificationConstraint(chat=mock_chat)
@@ -465,7 +465,7 @@ class TestAnswerVerificationConstraint:
 
     def test_disabled_constraint_allows_answer(self):
         """Should allow when constraint is disabled."""
-        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+        from fitz_ai.engines.fitz_rag.guardrails import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         constraint = AnswerVerificationConstraint(chat=mock_chat, enabled=False)
@@ -478,7 +478,7 @@ class TestAnswerVerificationConstraint:
 
     def test_jury_unanimous_yes_allows_answer(self):
         """Should allow when all 3 jury prompts say context answers."""
-        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+        from fitz_ai.engines.fitz_rag.guardrails import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         # Prompt 1: YES (answers), Prompt 2: NO (not insufficient), Prompt 3: YES (complete)
@@ -493,7 +493,7 @@ class TestAnswerVerificationConstraint:
 
     def test_jury_unanimous_no_qualifies_answer(self):
         """Should qualify when all 3 jury prompts say context doesn't answer."""
-        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+        from fitz_ai.engines.fitz_rag.guardrails import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         # Prompt 1: NO (doesn't answer), Prompt 2: YES (insufficient), Prompt 3: NO (incomplete)
@@ -508,7 +508,7 @@ class TestAnswerVerificationConstraint:
 
     def test_jury_2_no_votes_allows(self):
         """Should allow when only 2 out of 3 jury prompts say doesn't answer (need 3/3)."""
-        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+        from fitz_ai.engines.fitz_rag.guardrails import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         # Prompt 1: NO, Prompt 2: YES (insufficient), Prompt 3: YES (answers)
@@ -524,7 +524,7 @@ class TestAnswerVerificationConstraint:
 
     def test_jury_1_no_vote_allows(self):
         """Should allow when only 1 out of 3 jury prompts says doesn't answer."""
-        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+        from fitz_ai.engines.fitz_rag.guardrails import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         # Prompt 1: YES, Prompt 2: NO (not insufficient), Prompt 3: NO (one says incomplete)
@@ -539,7 +539,7 @@ class TestAnswerVerificationConstraint:
 
     def test_jury_error_counted_as_abstain(self):
         """Should handle LLM errors gracefully."""
-        from fitz_ai.core.guardrails import AnswerVerificationConstraint
+        from fitz_ai.engines.fitz_rag.guardrails import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         # First two succeed, third errors

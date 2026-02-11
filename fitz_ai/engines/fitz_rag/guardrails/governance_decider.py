@@ -1,4 +1,4 @@
-# fitz_ai/core/guardrails/governance_decider.py
+# fitz_ai/engines/fitz_rag/guardrails/governance_decider.py
 """
 ML-based governance decider using a two-stage calibrated classifier.
 
@@ -23,10 +23,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.core.governance import AnswerGovernor, GovernanceDecision
+from fitz_ai.engines.fitz_rag.governance import AnswerGovernor, GovernanceDecision
 
 if TYPE_CHECKING:
-    from fitz_ai.core.guardrails.base import ConstraintResult
+    from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
 
 logger = logging.getLogger(__name__)
 
