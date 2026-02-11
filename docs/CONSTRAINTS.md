@@ -216,7 +216,7 @@ This means constraints work across:
 Constraints implement the `ConstraintPlugin` protocol:
 
 ```python
-from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintPlugin, ConstraintResult
+from fitz_ai.governance.constraints.base import ConstraintPlugin, ConstraintResult
 
 class MyConstraint:
     @property
@@ -244,7 +244,7 @@ Constraints must be:
 
 ```python
 from datetime import datetime, timedelta
-from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
+from fitz_ai.governance.constraints.base import ConstraintResult
 
 class RecencyConstraint:
     """Warn when sources are outdated."""
@@ -281,7 +281,7 @@ class RecencyConstraint:
 
 Place custom constraints in:
 ```
-fitz_ai/engines/fitz_rag/guardrails/plugins/my_constraint.py
+fitz_ai/governance/constraints/plugins/my_constraint.py
 ```
 
 They are auto-discovered.
@@ -305,9 +305,9 @@ Fitz treats uncertainty as a **feature**, not a failure.
 
 | File | Purpose |
 |------|---------|
-| `fitz_ai/engines/fitz_rag/guardrails/base.py` | Protocol and result types |
-| `fitz_ai/engines/fitz_rag/guardrails/semantic.py` | Semantic matching utilities |
-| `fitz_ai/engines/fitz_rag/guardrails/plugins/` | Built-in constraints |
+| `fitz_ai/governance/constraints/base.py` | Protocol and result types |
+| `fitz_ai/governance/constraints/semantic.py` | Semantic matching utilities |
+| `fitz_ai/governance/constraints/plugins/` | Built-in constraints |
 
 ---
 

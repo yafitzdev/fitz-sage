@@ -1,4 +1,4 @@
-# fitz_ai/engines/fitz_rag/guardrails/plugins/specific_info_type.py
+# fitz_ai/governance/constraints/plugins/specific_info_type.py
 """
 Specific Info Type Constraint - Detects when specific information types are missing.
 
@@ -19,7 +19,7 @@ specific info is genuinely absent from the context.
 import re
 from typing import Sequence
 
-from fitz_ai.core.chunk import Chunk
+from fitz_ai.governance.protocol import EvidenceItem
 from fitz_ai.logging.logger import get_logger
 
 from ..base import ConstraintResult
@@ -43,7 +43,7 @@ class SpecificInfoTypeConstraint:
         self.enabled = enabled
         self.name = "specific_info_type"
 
-    def apply(self, query: str, chunks: Sequence[Chunk]) -> ConstraintResult:
+    def apply(self, query: str, chunks: Sequence[EvidenceItem]) -> ConstraintResult:
         """
         Check if chunks contain the specific type of information requested.
 
@@ -100,7 +100,7 @@ class SpecificInfoTypeConstraint:
             **sit_diag,
         )
 
-    def _has_entity_mismatch(self, query: str, chunks: Sequence[Chunk]) -> bool:
+    def _has_entity_mismatch(self, query: str, chunks: Sequence[EvidenceItem]) -> bool:
         """
         Check if query asks about a specific entity but context has a different one.
 
@@ -249,7 +249,9 @@ class SpecificInfoTypeConstraint:
         # all generic factual questions that should NOT trigger this constraint.
         return None
 
-    def _check_for_info_type(self, chunks: Sequence[Chunk], info_type: str, query: str) -> bool:
+    def _check_for_info_type(
+        self, chunks: Sequence[EvidenceItem], info_type: str, query: str
+    ) -> bool:
         """
         Check if chunks contain the specific type of information.
 

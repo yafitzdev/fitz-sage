@@ -1,4 +1,4 @@
-# fitz_ai/engines/fitz_rag/guardrails/staged.py
+# fitz_ai/governance/constraints/staged.py
 """
 Staged Constraint Pipeline - Hierarchical constraint evaluation.
 
@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Sequence
 
-from fitz_ai.core.chunk import Chunk
+from fitz_ai.governance.protocol import EvidenceItem
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
@@ -92,7 +92,7 @@ class StagedConstraintPipeline:
     def __init__(self, stages: list[ConstraintStage]) -> None:
         self.stages = stages
 
-    def run(self, query: str, chunks: Sequence[Chunk]) -> list[ConstraintResult]:
+    def run(self, query: str, chunks: Sequence[EvidenceItem]) -> list[ConstraintResult]:
         """Execute staged pipeline, return all constraint results."""
         all_results: list[ConstraintResult] = []
         context = StageContext()
@@ -133,7 +133,7 @@ class StagedConstraintPipeline:
     def _run_stage(
         self,
         query: str,
-        chunks: Sequence[Chunk],
+        chunks: Sequence[EvidenceItem],
         stage: ConstraintStage,
     ) -> list[ConstraintResult]:
         """Run all constraints in a stage with error handling."""
@@ -267,7 +267,7 @@ def _build_staged_pipeline(
 
 def run_staged_constraints(
     query: str,
-    chunks: Sequence[Chunk],
+    chunks: Sequence[EvidenceItem],
     constraints: Sequence[ConstraintPlugin],
 ) -> list[ConstraintResult]:
     """

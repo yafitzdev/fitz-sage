@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from fitz_ai.engines.fitz_rag.guardrails import SemanticMatcher
+from fitz_ai.governance import SemanticMatcher
 
 from .mock_embedder import create_deterministic_embedder
 

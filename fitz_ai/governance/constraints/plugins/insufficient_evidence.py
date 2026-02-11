@@ -1,4 +1,4 @@
-# fitz_ai/engines/fitz_rag/guardrails/plugins/insufficient_evidence.py
+# fitz_ai/governance/constraints/plugins/insufficient_evidence.py
 """
 Insufficient Evidence Constraint - Default guardrail for evidence coverage.
 
@@ -20,7 +20,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence
 
-from fitz_ai.core.chunk import Chunk
+from fitz_ai.governance.protocol import EvidenceItem
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
@@ -749,7 +749,7 @@ def _context_mentions_all_critical(critical: set[str], context: str) -> bool:
     return True
 
 
-def _get_max_score(chunks: Sequence[Chunk]) -> float | None:
+def _get_max_score(chunks: Sequence[EvidenceItem]) -> float | None:
     """Get the highest vector_score from chunks, or None if no scores."""
     scores = []
     for chunk in chunks:
@@ -759,7 +759,7 @@ def _get_max_score(chunks: Sequence[Chunk]) -> float | None:
     return max(scores) if scores else None
 
 
-def _has_entity_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
+def _has_entity_overlap(query: str, chunks: Sequence[EvidenceItem]) -> bool:
     """Check if query entities appear in chunk entities (enriched metadata)."""
     query_entities = _extract_query_entities(query)
     if not query_entities:
@@ -780,7 +780,7 @@ def _has_entity_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
     return False
 
 
-def _has_summary_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
+def _has_summary_overlap(query: str, chunks: Sequence[EvidenceItem]) -> bool:
     """Check if query topics appear in chunk summaries (less noise than raw content)."""
     query_words = _extract_words(query)
     if not query_words:
@@ -798,7 +798,7 @@ def _has_summary_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
     return False
 
 
-def _has_lexical_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
+def _has_lexical_overlap(query: str, chunks: Sequence[EvidenceItem]) -> bool:
     """Check if query shares any meaningful words with chunks (fallback)."""
     query_words = _extract_words(query)
     if not query_words:
@@ -812,7 +812,7 @@ def _has_lexical_overlap(query: str, chunks: Sequence[Chunk]) -> bool:
     return False
 
 
-def _check_enriched_relevance(query: str, chunks: Sequence[Chunk]) -> tuple[bool, str]:
+def _check_enriched_relevance(query: str, chunks: Sequence[EvidenceItem]) -> tuple[bool, str]:
     """
     Check relevance using enriched metadata.
 
@@ -890,7 +890,7 @@ class InsufficientEvidenceConstraint:
             return None
 
     def _check_embedding_relevance(
-        self, query: str, chunks: Sequence[Chunk]
+        self, query: str, chunks: Sequence[EvidenceItem]
     ) -> tuple[bool, float, str, dict]:
         """
         Check relevance using embedding similarity + entity matching.
@@ -1046,7 +1046,7 @@ class InsufficientEvidenceConstraint:
     def apply(
         self,
         query: str,
-        chunks: Sequence[Chunk],
+        chunks: Sequence[EvidenceItem],
     ) -> ConstraintResult:
         """
         Check if there is relevant evidence to answer the query.

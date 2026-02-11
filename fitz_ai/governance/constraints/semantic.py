@@ -1,4 +1,4 @@
-# fitz_ai/engines/fitz_rag/guardrails/semantic.py
+# fitz_ai/governance/constraints/semantic.py
 """
 Semantic Matcher - Language-agnostic concept detection using embeddings.
 
@@ -10,7 +10,7 @@ concepts to nearby vectors regardless of language. "because" (English),
 "parce que" (French), "因为" (Chinese) all cluster together.
 
 Usage:
-    from fitz_ai.engines.fitz_rag.guardrails.semantic import SemanticMatcher
+    from fitz_ai.governance.constraints.semantic import SemanticMatcher
 
     matcher = SemanticMatcher(embedder)
     if matcher.has_causal_language(chunk.content):
@@ -22,8 +22,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Sequence
 
-from fitz_ai.core.chunk import Chunk
 from fitz_ai.core.math import cosine_similarity, mean_vector
+from fitz_ai.governance.protocol import EvidenceItem
 
 # Type alias for embedder function
 EmbedderFunc = Callable[[str], list[float]]
@@ -247,11 +247,11 @@ class SemanticMatcher:
         similarity = self.max_similarity_to_concepts(text, "assertion", ASSERTION_CONCEPTS)
         return similarity >= self.assertion_threshold
 
-    def count_causal_chunks(self, chunks: Sequence[Chunk]) -> int:
+    def count_causal_chunks(self, chunks: Sequence[EvidenceItem]) -> int:
         """Count chunks containing causal language."""
         return sum(1 for chunk in chunks if self.has_causal_language(chunk.content))
 
-    def count_assertion_chunks(self, chunks: Sequence[Chunk]) -> int:
+    def count_assertion_chunks(self, chunks: Sequence[EvidenceItem]) -> int:
         """Count chunks containing assertions."""
         return sum(1 for chunk in chunks if self.has_assertion(chunk.content))
 
@@ -276,7 +276,7 @@ class SemanticMatcher:
         similarity = cosine_similarity(query_vec, text_vec)
         return similarity >= self.relevance_threshold
 
-    def chunk_relevance_score(self, query: str, chunk: Chunk) -> float:
+    def chunk_relevance_score(self, query: str, chunk: EvidenceItem) -> float:
         """
         Get the relevance score between query and chunk.
 
@@ -286,11 +286,11 @@ class SemanticMatcher:
         chunk_vec = self._embed_text(chunk.content)
         return cosine_similarity(query_vec, chunk_vec)
 
-    def count_relevant_chunks(self, query: str, chunks: Sequence[Chunk]) -> int:
+    def count_relevant_chunks(self, query: str, chunks: Sequence[EvidenceItem]) -> int:
         """Count chunks that are semantically relevant to the query."""
         return sum(1 for chunk in chunks if self.is_relevant_to_query(query, chunk.content))
 
-    def get_relevant_chunks(self, query: str, chunks: Sequence[Chunk]) -> list[Chunk]:
+    def get_relevant_chunks(self, query: str, chunks: Sequence[EvidenceItem]) -> list[EvidenceItem]:
         """Filter chunks to only those relevant to the query."""
         return [chunk for chunk in chunks if self.is_relevant_to_query(query, chunk.content)]
 

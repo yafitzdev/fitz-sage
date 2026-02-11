@@ -4,8 +4,8 @@
 import pytest
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.engines.fitz_rag.governance import AnswerGovernor, GovernanceDecision
-from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
+from fitz_ai.governance import AnswerGovernor, GovernanceDecision
+from fitz_ai.governance.constraints.base import ConstraintResult
 
 
 class TestGovernanceDecision:

@@ -15,7 +15,7 @@ The LLM-based approach was chosen because embedding-based conflict detection
 - Complementary information (should NOT be flagged)
 - Contradictory claims (SHOULD be flagged)
 
-See fitz_ai.engines.fitz_rag.guardrails.plugins.conflict_aware for the LLM implementation.
+See fitz_ai.governance.constraints.plugins.conflict_aware for the LLM implementation.
 """
 
 from __future__ import annotations

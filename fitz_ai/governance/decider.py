@@ -1,4 +1,4 @@
-# fitz_ai/engines/fitz_rag/guardrails/governance_decider.py
+# fitz_ai/governance/decider.py
 """
 ML-based governance decider using a two-stage calibrated classifier.
 
@@ -23,10 +23,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.engines.fitz_rag.governance import AnswerGovernor, GovernanceDecision
+from fitz_ai.governance.governor import AnswerGovernor, GovernanceDecision
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
+    from fitz_ai.governance.constraints.base import ConstraintResult
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def _find_model_path() -> Path | None:
     """Search for the model artifact in known locations."""
     candidates = [
         # Development: tools/governance/data/
-        Path(__file__).resolve().parent.parent.parent.parent
+        Path(__file__).resolve().parent.parent
         / "tools"
         / "governance"
         / "data"

@@ -1,17 +1,17 @@
-# fitz_ai/engines/fitz_rag/guardrails/__init__.py
+# fitz_ai/governance/__init__.py
 """
-Epistemic Guardrails - Constraint system for epistemic correctness.
+Epistemic Governance - Shared constraint system for epistemic correctness.
 
 Guardrails inspect retrieved context and determine what conclusions are allowed.
 They are orthogonal to retrieval (what's relevant) and generation (how to answer).
 
 Usage:
-    from fitz_ai.engines.fitz_rag.guardrails import (
+    from fitz_ai.governance import (
         ConstraintResult,
         create_default_constraints,
         run_constraints,
+        AnswerGovernor,
     )
-    from fitz_ai.engines.fitz_rag.governance import AnswerGovernor
 
     constraints = create_default_constraints(chat=chat_provider)
     results = run_constraints(query, chunks, constraints)
@@ -22,15 +22,22 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .base import ConstraintPlugin, ConstraintResult
-from .plugins.answer_verification import AnswerVerificationConstraint
-from .plugins.causal_attribution import CausalAttributionConstraint
-from .plugins.conflict_aware import ConflictAwareConstraint
-from .plugins.insufficient_evidence import InsufficientEvidenceConstraint
-from .plugins.specific_info_type import SpecificInfoTypeConstraint
-from .runner import run_constraints
-from .semantic import SemanticMatcher
-from .staged import ConstraintStage, StageContext, StagedConstraintPipeline, run_staged_constraints
+from .constraints.base import ConstraintPlugin, ConstraintResult
+from .constraints.plugins.answer_verification import AnswerVerificationConstraint
+from .constraints.plugins.causal_attribution import CausalAttributionConstraint
+from .constraints.plugins.conflict_aware import ConflictAwareConstraint
+from .constraints.plugins.insufficient_evidence import InsufficientEvidenceConstraint
+from .constraints.plugins.specific_info_type import SpecificInfoTypeConstraint
+from .constraints.runner import run_constraints
+from .constraints.semantic import SemanticMatcher
+from .constraints.staged import (
+    ConstraintStage,
+    StageContext,
+    StagedConstraintPipeline,
+    run_staged_constraints,
+)
+from .governor import AnswerGovernor, GovernanceDecision, GovernanceLog, decide_answer_mode
+from .protocol import EvidenceItem
 
 if TYPE_CHECKING:
     from fitz_ai.llm.providers.base import ChatProvider
@@ -61,6 +68,8 @@ def create_default_constraints(
 
 
 __all__ = [
+    # Protocol
+    "EvidenceItem",
     # Core types
     "ConstraintResult",
     "ConstraintPlugin",
@@ -80,4 +89,9 @@ __all__ = [
     "StageContext",
     "ConstraintStage",
     "run_staged_constraints",
+    # Governance
+    "AnswerGovernor",
+    "GovernanceDecision",
+    "GovernanceLog",
+    "decide_answer_mode",
 ]

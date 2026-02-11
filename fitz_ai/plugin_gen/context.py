@@ -263,7 +263,7 @@ Required class structure:
 from dataclasses import dataclass
 from typing import Sequence
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
+from fitz_ai.governance.constraints.base import ConstraintResult
 
 @dataclass
 class MyConstraint:

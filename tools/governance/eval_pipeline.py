@@ -33,20 +33,20 @@ from tqdm import tqdm
 
 from fitz_ai.config import load_engine_config
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.engines.fitz_rag.governance import AnswerGovernor
-from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
-from fitz_ai.engines.fitz_rag.guardrails.feature_extractor import extract_features
-from fitz_ai.engines.fitz_rag.guardrails.plugins.answer_verification import (
+from fitz_ai.governance import AnswerGovernor
+from fitz_ai.governance.constraints.base import ConstraintResult
+from fitz_ai.governance.constraints.feature_extractor import extract_features
+from fitz_ai.governance.constraints.plugins.answer_verification import (
     AnswerVerificationConstraint,
 )
-from fitz_ai.engines.fitz_rag.guardrails.plugins.causal_attribution import (
+from fitz_ai.governance.constraints.plugins.causal_attribution import (
     CausalAttributionConstraint,
 )
-from fitz_ai.engines.fitz_rag.guardrails.plugins.conflict_aware import ConflictAwareConstraint
-from fitz_ai.engines.fitz_rag.guardrails.plugins.insufficient_evidence import (
+from fitz_ai.governance.constraints.plugins.conflict_aware import ConflictAwareConstraint
+from fitz_ai.governance.constraints.plugins.insufficient_evidence import (
     InsufficientEvidenceConstraint,
 )
-from fitz_ai.engines.fitz_rag.guardrails.plugins.specific_info_type import (
+from fitz_ai.governance.constraints.plugins.specific_info_type import (
     SpecificInfoTypeConstraint,
 )
 from fitz_ai.llm import get_chat_factory, get_embedder

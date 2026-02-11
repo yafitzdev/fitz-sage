@@ -13,8 +13,7 @@ mapping:
 
   fitz_ai.ingestion: domain
   fitz_ai.engines.fitz_rag.retrieval: domain
-  fitz_ai.engines.fitz_rag.guardrails: domain
-  fitz_ai.engines.fitz_rag.governance: domain
+  fitz_ai.governance: domain
   fitz_ai.generation: domain
 
   fitz_ai.engines.fitz_rag.pipeline: orchestration

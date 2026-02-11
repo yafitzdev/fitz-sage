@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Sequence
 
-from fitz_ai.engines.fitz_rag.guardrails import ConstraintPlugin, SemanticMatcher
+from fitz_ai.governance import ConstraintPlugin, SemanticMatcher
 from fitz_ai.engines.fitz_rag.protocols import Embedder
 from fitz_ai.llm.factory import ChatFactory
 

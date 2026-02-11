@@ -44,7 +44,7 @@ from fitz_ai.llm.factory import ChatFactory, ModelTier
 from fitz_ai.prompts import hierarchy as hierarchy_prompts
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_rag.guardrails.semantic import SemanticMatcher
+    from fitz_ai.governance.constraints.semantic import SemanticMatcher
 
 logger = logging.getLogger(__name__)
 

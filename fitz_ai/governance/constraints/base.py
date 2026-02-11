@@ -1,4 +1,4 @@
-# fitz_ai/engines/fitz_rag/guardrails/base.py
+# fitz_ai/governance/constraints/base.py
 """
 Constraint Plugin Base - Protocol and result types for epistemic guardrails.
 
@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Protocol, Sequence, runtime_checkable
 
-from fitz_ai.core.chunk import Chunk
+from fitz_ai.governance.protocol import EvidenceItem
 
 
 @dataclass(frozen=True)
@@ -70,14 +70,14 @@ class ConstraintPlugin(Protocol):
     def apply(
         self,
         query: str,
-        chunks: Sequence[Chunk],
+        chunks: Sequence[EvidenceItem],
     ) -> ConstraintResult:
         """
         Apply the constraint to retrieved context.
 
         Args:
             query: The user's question
-            chunks: Retrieved chunks (post-retrieval, pre-generation)
+            chunks: Retrieved evidence items (post-retrieval, pre-generation)
 
         Returns:
             ConstraintResult indicating whether decisive answers are allowed

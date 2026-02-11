@@ -1,4 +1,4 @@
-# fitz_ai/engines/fitz_rag/guardrails/plugins/answer_verification.py
+# fitz_ai/governance/constraints/plugins/answer_verification.py
 """
 Answer Verification Constraint - LLM jury for positive confidence confirmation.
 
@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Sequence
 
-from fitz_ai.core.chunk import Chunk
+from fitz_ai.governance.protocol import EvidenceItem
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
@@ -142,7 +142,7 @@ class AnswerVerificationConstraint:
 
         return no_votes, responses
 
-    def apply(self, query: str, chunks: Sequence[Chunk]) -> ConstraintResult:
+    def apply(self, query: str, chunks: Sequence[EvidenceItem]) -> ConstraintResult:
         """
         Check if chunks actually answer the query using LLM jury.
 

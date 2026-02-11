@@ -10,19 +10,19 @@ from __future__ import annotations
 from typing import Sequence
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.engines.fitz_rag.guardrails import (
+from fitz_ai.governance import (
     ConstraintPlugin,
     create_default_constraints,
     run_constraints,
 )
-from fitz_ai.engines.fitz_rag.guardrails.governance_decider import GovernanceDecider
+from fitz_ai.governance.decider import GovernanceDecider
 from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 from fitz_ai.engines.fitz_rag.exceptions import (
     LLMError,
     PipelineError,
     RGSGenerationError,
 )
-from fitz_ai.engines.fitz_rag.generation.answer_mode.instructions import (
+from fitz_ai.governance.instructions import (
     get_mode_instruction,
 )
 from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
@@ -183,7 +183,7 @@ class RAGPipeline:
         Returns a flat dict of feature_name -> value.
         """
         try:
-            from fitz_ai.engines.fitz_rag.guardrails.feature_extractor import extract_features
+            from fitz_ai.governance.constraints.feature_extractor import extract_features
 
             # Build constraint_name -> result mapping
             result_map = {}

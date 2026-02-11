@@ -66,7 +66,7 @@ class TestEpistemicAssessment:
         detection was unreliable. Conflicts are now detected at query time using
         LLM-based analysis in ConflictAwareConstraint.
         """
-        from fitz_ai.engines.fitz_rag.guardrails import SemanticMatcher
+        from fitz_ai.governance import SemanticMatcher
 
         from .mock_embedder import create_deterministic_embedder
 
@@ -284,7 +284,7 @@ class TestHierarchyEnricherEpistemic:
         still adds epistemic metadata (evidence density, chunk count, etc.)
         but does not detect conflicts at ingest time.
         """
-        from fitz_ai.engines.fitz_rag.guardrails import SemanticMatcher
+        from fitz_ai.governance import SemanticMatcher
 
         from .mock_embedder import create_deterministic_embedder
 
@@ -383,7 +383,7 @@ class TestSingleSourceOfTruth:
         This test verifies the constraint returns expected behavior without LLM,
         and the epistemic assessment handles conflict detection independently.
         """
-        from fitz_ai.engines.fitz_rag.guardrails import ConflictAwareConstraint, SemanticMatcher
+        from fitz_ai.governance import ConflictAwareConstraint, SemanticMatcher
 
         from .mock_embedder import create_deterministic_embedder
 

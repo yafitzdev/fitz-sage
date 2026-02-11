@@ -1,4 +1,4 @@
-# fitz_ai/engines/fitz_rag/guardrails/plugins/causal_attribution.py
+# fitz_ai/governance/constraints/plugins/causal_attribution.py
 """
 Causal Attribution Constraint - Prevents implicit causality and speculation.
 
@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Sequence
 
-from fitz_ai.core.chunk import Chunk
+from fitz_ai.governance.protocol import EvidenceItem
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
@@ -216,7 +216,7 @@ def _is_uncertainty_query(query: str) -> tuple[bool, str]:
     return False, "none"
 
 
-def _has_causal_evidence(chunks: Sequence[Chunk]) -> bool:
+def _has_causal_evidence(chunks: Sequence[EvidenceItem]) -> bool:
     """Check if any chunk contains causal language using keywords.
 
     Only checks raw content - NOT summaries. LLM-generated summaries often
@@ -231,7 +231,7 @@ def _has_causal_evidence(chunks: Sequence[Chunk]) -> bool:
     return False
 
 
-def _has_predictive_evidence(chunks: Sequence[Chunk]) -> bool:
+def _has_predictive_evidence(chunks: Sequence[EvidenceItem]) -> bool:
     """Check if any chunk contains forward-looking/predictive language.
 
     Only checks raw content - NOT summaries (same rationale as causal evidence).
@@ -244,7 +244,7 @@ def _has_predictive_evidence(chunks: Sequence[Chunk]) -> bool:
     return False
 
 
-def _has_appropriate_evidence(query_type: str, chunks: Sequence[Chunk]) -> bool:
+def _has_appropriate_evidence(query_type: str, chunks: Sequence[EvidenceItem]) -> bool:
     """Check if chunks have evidence appropriate to the query type."""
     if query_type == "causal":
         return _has_causal_evidence(chunks)
@@ -288,7 +288,7 @@ class CausalAttributionConstraint:
     def apply(
         self,
         query: str,
-        chunks: Sequence[Chunk],
+        chunks: Sequence[EvidenceItem],
     ) -> ConstraintResult:
         """
         Check if uncertainty queries have sufficient evidence.

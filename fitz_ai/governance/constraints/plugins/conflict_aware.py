@@ -1,4 +1,4 @@
-# fitz_ai/engines/fitz_rag/guardrails/plugins/conflict_aware.py
+# fitz_ai/governance/constraints/plugins/conflict_aware.py
 """
 Conflict-Aware Constraint - Default guardrail for contradiction detection.
 
@@ -21,7 +21,7 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Sequence
 
-from fitz_ai.core.chunk import Chunk
+from fitz_ai.governance.protocol import EvidenceItem
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
@@ -302,7 +302,7 @@ class ConflictAwareConstraint:
             return 0.0
         return dot / (norm1 * norm2)
 
-    def _is_chunk_relevant(self, query_embedding: list[float], chunk: Chunk) -> bool:
+    def _is_chunk_relevant(self, query_embedding: list[float], chunk: EvidenceItem) -> bool:
         """Check if a chunk is relevant to the query via embedding similarity."""
         if not self.embedder:
             return True  # No embedder = assume relevant
@@ -315,7 +315,7 @@ class ConflictAwareConstraint:
             logger.warning(f"{PIPELINE} ConflictAwareConstraint: relevance check failed: {e}")
             return True  # Fail open
 
-    def _get_chunk_stance(self, query: str, chunk: Chunk) -> str:
+    def _get_chunk_stance(self, query: str, chunk: EvidenceItem) -> str:
         """
         Get chunk's stance on the query: YES, NO, or UNCLEAR.
 
@@ -351,7 +351,9 @@ class ConflictAwareConstraint:
             logger.warning(f"{PIPELINE} ConflictAwareConstraint: stance check failed: {e}")
             return "UNCLEAR"
 
-    def _check_pairwise_contradiction(self, query: str, chunk1: Chunk, chunk2: Chunk) -> bool:
+    def _check_pairwise_contradiction(
+        self, query: str, chunk1: EvidenceItem, chunk2: EvidenceItem
+    ) -> bool:
         """
         Check if two chunks contradict each other about the query.
 
@@ -389,7 +391,9 @@ class ConflictAwareConstraint:
             logger.warning(f"{PIPELINE} ConflictAwareConstraint: contradiction check failed: {e}")
             return False
 
-    def _check_pairwise_fusion(self, query: str, chunk1: Chunk, chunk2: Chunk) -> bool:
+    def _check_pairwise_fusion(
+        self, query: str, chunk1: EvidenceItem, chunk2: EvidenceItem
+    ) -> bool:
         """
         Check for contradiction using 3-prompt fusion with majority voting.
 
@@ -456,7 +460,7 @@ class ConflictAwareConstraint:
     def apply(
         self,
         query: str,
-        chunks: Sequence[Chunk],
+        chunks: Sequence[EvidenceItem],
     ) -> ConstraintResult:
         """
         Check for conflicting claims in retrieved chunks.

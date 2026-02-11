@@ -1,4 +1,4 @@
-# fitz_ai/engines/fitz_rag/guardrails/runner.py
+# fitz_ai/governance/constraints/runner.py
 """
 Constraint Runner - Applies constraint plugins to retrieved context.
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from fitz_ai.core.chunk import Chunk
+from fitz_ai.governance.protocol import EvidenceItem
 
 from .base import ConstraintPlugin, ConstraintResult
 from .staged import run_staged_constraints
@@ -21,7 +21,7 @@ from .staged import run_staged_constraints
 
 def run_constraints(
     query: str,
-    chunks: Sequence[Chunk],
+    chunks: Sequence[EvidenceItem],
     constraints: Sequence[ConstraintPlugin],
 ) -> list[ConstraintResult]:
     """
@@ -36,7 +36,7 @@ def run_constraints(
 
     Args:
         query: The user's question
-        chunks: Retrieved chunks (post-retrieval, pre-generation)
+        chunks: Retrieved evidence items (post-retrieval, pre-generation)
         constraints: List of constraint plugins to apply
 
     Returns:

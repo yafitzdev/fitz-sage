@@ -1,4 +1,4 @@
-# fitz_ai/engines/fitz_rag/guardrails/aspect_classifier.py
+# fitz_ai/governance/constraints/aspect_classifier.py
 """
 Query and chunk aspect classification for intent alignment.
 
@@ -124,8 +124,6 @@ class AspectClassifier:
         r"\b(the cause|a cause|causes include|root cause)\b",
         r"\bwhy .* (happened|occurred|failed)\b",
         r"\b(reasons for|primary reasons?|main reasons?|cited .* as the reason)\b",
-        # Note: "due to" is too common in non-causal contexts - removed
-        # Note: "led to" is EFFECT, not CAUSE
     ]
 
     EFFECT_CONTENT = [
@@ -173,21 +171,18 @@ class AspectClassifier:
         r"\b(costs? \$|prices? (of|at|is)|pricing (is|at|for)|\$\d+|USD|EUR)\b",
         r"\b(monthly (fee|cost|price)|annual (fee|cost|price)|subscription (fee|cost))\b",
         r"\b(pay|payment|billing|invoice|charge)\b.*(per|each|every)\b",
-        # Note: "per year" alone is too broad - "downtime per year" is not pricing
     ]
 
     TIMELINE_CONTENT = [
         r"\b(in \d{4}|founded in|established in|launched in|released in)\b",
         r"\b(history of|timeline of|chronology|dates back to)\b",
         r"\b(year|decade|century|era) (of|when)\b",
-        # Note: "First, Second" without dates = PROCESS steps, not timeline
     ]
 
     PROOF_CONTENT = [
         r"\b(proof of|proved|proven|derivation of)\b",
         r"\b(QED|therefore it follows|it can be shown)\b",
         r"\b(by induction|by contradiction|lemma)\b",
-        # Note: "states that" is DEFINITION, not PROOF
     ]
 
     FEATURE_CONTENT = [

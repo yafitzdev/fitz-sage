@@ -1,4 +1,4 @@
-# fitz_ai/engines/fitz_rag/guardrails/feature_extractor.py
+# fitz_ai/governance/constraints/feature_extractor.py
 """
 Feature Extractor for Governance Classifier.
 
@@ -20,15 +20,15 @@ import re
 import statistics
 from typing import TYPE_CHECKING, Any, Sequence
 
-from fitz_ai.core.chunk import Chunk
+from fitz_ai.governance.protocol import EvidenceItem
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_rag.guardrails.base import ConstraintResult
+    from fitz_ai.governance.constraints.base import ConstraintResult
 
 
 def extract_features(
     query: str,
-    chunks: Sequence[Chunk],
+    chunks: Sequence[EvidenceItem],
     constraint_results: dict[str, "ConstraintResult"],
     detection_summary: Any | None = None,
 ) -> dict[str, Any]:
@@ -128,7 +128,9 @@ def _extract_query_features(features: dict[str, Any], query: str) -> None:
     features["query_word_count"] = len(query.split())
 
 
-def _extract_chunk_features(features: dict[str, Any], query: str, chunks: Sequence[Chunk]) -> None:
+def _extract_chunk_features(
+    features: dict[str, Any], query: str, chunks: Sequence[EvidenceItem]
+) -> None:
     """Extract cheap features from chunks and their relationship to query."""
     features["num_chunks"] = len(chunks)
 
@@ -350,7 +352,7 @@ _NEGATION_WORDS = {
 }
 
 
-def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Chunk]) -> None:
+def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[EvidenceItem]) -> None:
     """Extract inter-chunk text relationship features (deterministic, no LLM).
 
     Includes features previously only available at training time via

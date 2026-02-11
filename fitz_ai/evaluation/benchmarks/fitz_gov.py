@@ -267,8 +267,8 @@ class FitzGovBenchmark:
         from dataclasses import dataclass
 
         from fitz_ai.core import Chunk
-        from fitz_ai.engines.fitz_rag.governance import AnswerGovernor
-        from fitz_ai.engines.fitz_rag.guardrails.runner import run_constraints
+        from fitz_ai.governance import AnswerGovernor
+        from fitz_ai.governance.constraints.runner import run_constraints
 
         # Create chunks from injected contexts
         chunks = [
@@ -296,7 +296,7 @@ class FitzGovBenchmark:
         # Step 1: Run constraints on injected chunks
         if self._use_fusion or self._adaptive or self._model_override:
             # Create constraints with fusion/adaptive mode for contradiction detection
-            from fitz_ai.engines.fitz_rag.guardrails import (
+            from fitz_ai.governance import (
                 AnswerVerificationConstraint,
                 CausalAttributionConstraint,
                 ConflictAwareConstraint,
