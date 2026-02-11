@@ -75,41 +75,46 @@ Strict import rules enforce separation of concerns:
 │  - Provenance       Source tracking                             │
 │  - Protocols        Engine/plugin interfaces                    │
 └─────────────────────────────────────────────────────────────────┘
-          ▲                    ▲                    ▲
-          │                    │                    │
-┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐
-│  llm/           │  │  storage/       │  │  ingest/            │
-│  Chat, Embed,   │  │  PostgreSQL +   │  │  Parse, Chunk,      │
-│  Rerank, Vision │  │  pgvector       │  │  Enrich             │
-└─────────────────┘  └─────────────────┘  └─────────────────────┘
-          ▲                    ▲                    ▲
-          └────────────────────┼────────────────────┘
-                               │
-                    ┌─────────────────────┐
-                    │  engines/           │
-                    │  FitzRAG + custom   │
-                    │  Orchestrate layers │
-                    └─────────────────────┘
+     ▲              ▲              ▲              ▲              ▲
+     │              │              │              │              │
+┌──────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌────────────┐
+│ llm/     │ │ storage/  │ │ vector_db/│ │retrieval/ │ │ ingestion/ │
+│ Chat,    │ │ PostgreSQL│ │ pgvector  │ │ Detection,│ │ Parse,     │
+│ Embed,   │ │ connection│ │ abstrac-  │ │ Sparse,   │ │ Chunk,     │
+│ Rerank   │ │ manager   │ │ tion      │ │ Entities  │ │ Enrich     │
+└──────────┘ └───────────┘ └───────────┘ └───────────┘ └────────────┘
+     ▲              ▲              ▲              ▲
+     └──────────────┼──────────────┼──────────────┘
+                    │              │
+                    ┌──────────────────────┐
+                    │  engines/            │
+                    │  FitzRAG + custom    │
+                    │  Orchestrate layers  │
+                    └──────────────────────┘
                                ▲
-                    ┌─────────────────────┐
-                    │  runtime/           │
-                    │  Multi-engine       │
-                    │  orchestration      │
-                    └─────────────────────┘
+                    ┌──────────────────────┐
+                    │  runtime/            │
+                    │  Multi-engine        │
+                    │  orchestration       │
+                    └──────────────────────┘
                                ▲
-                    ┌─────────────────────┐
-                    │  cli/, api/         │
-                    │  User-facing layer  │
-                    └─────────────────────┘
+                    ┌──────────────────────┐
+                    │  cli/, api/, sdk/    │
+                    │  User-facing layer   │
+                    └──────────────────────┘
 ```
 
 **Import rules:**
 
 | Layer | Can Import From |
 |-------|-----------------|
-| `core/` | Standard library only |
-| `llm/`, `vector_db/`, `ingest/` | `core/` |
-| `engines/` | `core/`, `llm/`, `vector_db/` |
+| `core/` | No imports from engines/, ingestion/ |
+| `retrieval/` | `core/` |
+| `llm/` | `core/` |
+| `storage/` | `core/` |
+| `vector_db/` | `core/`, `storage/` |
+| `ingestion/` | `core/` |
+| `engines/` | `core/`, `llm/`, `vector_db/`, `storage/`, `retrieval/` |
 | `runtime/` | All layers |
 | `cli/`, `api/` | All layers |
 
@@ -247,7 +252,7 @@ Features are controlled by plugin selection, not boolean flags:
 |---------|------------|-------------|
 | Reranking | `rerank: cohere` | `rerank: null` (or omit) |
 | Vision/VLM | `parser.plugin_name: docling_vision` | `parser.plugin_name: docling` |
-| Enrichment | Chat client available (automatic) | `enrichment.enabled: false` |
+| Enrichment | Chat client available (automatic) | No chat client configured |
 
 ---
 
@@ -259,9 +264,8 @@ Features are controlled by plugin selection, not boolean flags:
 @dataclass
 class Query:
     text: str                      # The question
-    collection: str = "default"    # Target collection
-    top_k: int = 5                 # Chunks to retrieve
-    metadata_filter: dict = None   # Optional filters
+    constraints: Constraints = None  # Query-time constraints
+    metadata: dict = None          # Additional query metadata
 ```
 
 ### Answer
@@ -271,7 +275,7 @@ class Query:
 class Answer:
     text: str                      # The response
     mode: AnswerMode               # CONFIDENT, QUALIFIED, DISPUTED, ABSTAIN
-    sources: list[Source]          # Provenance chain
+    provenance: list[Provenance]   # Source attribution chain
     metadata: dict                 # Additional info
 ```
 
@@ -281,8 +285,7 @@ class Answer:
 @dataclass
 class Chunk:
     id: str                        # Unique identifier
-    text: str                      # Content
-    embedding: list[float]         # Vector representation
+    content: str                   # Chunk content
     metadata: dict                 # Source file, page, etc.
 ```
 
@@ -313,6 +316,7 @@ embedding:
   plugin_name: cohere
   kwargs: { model: embed-v4.0 }
 
+# Provider presence enables reranking (no enabled flag)
 rerank:
   plugin_name: cohere
   kwargs: { model: rerank-v3.5 }
@@ -330,14 +334,15 @@ chunking:
   default:
     plugin_name: semantic        # Python plugin
 
-# Features
-rerank: cohere                   # Provider presence enables reranking
+# Retrieval pipeline
 retrieval:
   plugin_name: dense             # YAML plugin
 
+# Enrichment (always on when chat client available)
 enrichment:
   hierarchy:
-    enabled: true                # Direct config (not plugin)
+    grouping_strategy: metadata  # or "semantic"
+    group_by: source_file
 ```
 
 ---
@@ -349,13 +354,23 @@ fitz_ai/
 ├── core/                        # Foundation layer
 │   ├── types.py                 # Query, Answer, Chunk
 │   ├── protocols.py             # KnowledgeEngine protocol
-│   ├── paths.py                 # Config path management
-│   └── guardrails/plugins/      # Epistemic guardrails (Python)
+│   └── paths.py                 # Config path management
 │
 ├── engines/                     # Engine implementations
 │   └── fitz_rag/
 │       ├── engine.py            # Main RAG engine
-│       └── retrieval/plugins/   # Retrieval plugins (YAML)
+│       ├── retrieval/           # Retrieval steps + strategies
+│       ├── generation/          # Answer generation + RGS
+│       ├── pipeline/            # RAGPipeline orchestration
+│       └── guardrails/plugins/  # Epistemic guardrails (Python)
+│
+├── retrieval/                   # SHARED retrieval intelligence
+│   ├── detection/               # Unified query classification (LLM-based)
+│   ├── sparse/                  # BM25 hybrid search
+│   ├── entity_graph/            # Entity-based linking
+│   ├── vocabulary/              # Keyword storage + matching
+│   ├── hyde/                    # Hypothetical document generation
+│   └── rewriter/                # LLM-based query rewriting
 │
 ├── llm/                         # LLM service layer
 │   ├── chat/                    # Chat plugins (YAML)
@@ -363,7 +378,9 @@ fitz_ai/
 │   ├── rerank/                  # Rerank plugins (YAML)
 │   └── vision/                  # Vision plugins (YAML)
 │
-├── vector_db/                   # Vector storage
+├── storage/                     # PostgreSQL connection manager
+│
+├── vector_db/                   # Vector DB abstraction
 │   └── plugins/                 # DB plugins (YAML)
 │
 ├── ingestion/                   # Document processing
@@ -371,11 +388,18 @@ fitz_ai/
 │   ├── chunking/plugins/        # Chunking plugins (Python)
 │   └── enrichment/              # Enrichment pipeline
 │
+├── cloud/                       # Encrypted cache API
+│
+├── tabular/                     # CSV/table query with SQL generation
+│
+├── runtime/                     # Multi-engine orchestration
+│
 ├── cli/                         # CLI commands
 │   └── commands/                # Typer commands
 │
-└── api/                         # REST API
-    └── routes/                  # FastAPI routes
+├── api/                         # REST API (FastAPI)
+│
+└── sdk/                         # Stateful Python interface
 ```
 
 ---

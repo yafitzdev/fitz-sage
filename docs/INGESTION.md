@@ -229,15 +229,15 @@ The enrichment pipeline adds LLM-generated enhancements. **All chunk-level enric
 │  Enrichment Pipeline (always on, runs after chunking)           │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │           ChunkEnricher (Enrichment Bus)                │    │
-│  │        One LLM call per batch (~15 chunks)              │    │
-│  ├─────────────────────────────────────────────────────────┤    │
-│  │  Summary     │  Keywords      │  Entities               │    │
-│  │  Module      │  Module        │  Module                 │    │
-│  │  (per-chunk  │  (exact-match  │  (classes, people,      │    │
-│  │   summaries) │   identifiers) │   technologies)         │    │
-│  └─────────────────────────────────────────────────────────┘    │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │            ChunkEnricher (Enrichment Bus)                │   │
+│  │         One LLM call per batch (~15 chunks)              │   │
+│  ├──────────────────────────────────────────────────────────┤   │
+│  │  Summary    │  Keywords     │  Entities   │ ContentType  │   │
+│  │  Module     │  Module       │  Module     │ Module       │   │
+│  │  (per-chunk │  (exact-match │  (classes,  │ (narrative/  │   │
+│  │  summaries) │  identifiers) │  people)    │ structured)  │   │
+│  └──────────────────────────────────────────────────────────┘   │
 │                              │                                  │
 │  ┌───────────────────────────┴───────────────────────────┐      │
 │  │                Hierarchy Enricher                      │      │
@@ -251,17 +251,19 @@ The enrichment pipeline adds LLM-generated enhancements. **All chunk-level enric
 
 ### ChunkEnricher (Baked In)
 
-The `ChunkEnricher` bus extracts **summary + keywords + entities** in a single LLM call per batch of ~15 chunks. This makes enrichment nearly free (~$0.13-0.74 for 1000 chunks).
+The `ChunkEnricher` bus extracts **summary + keywords + entities + content type** in a single LLM call per batch of ~15 chunks. This makes enrichment nearly free (~$0.13-0.74 for 1000 chunks).
 
 **What it extracts:**
 - **Summaries** - Natural language descriptions for each chunk
 - **Keywords** - Exact-match identifiers (TC-1001, JIRA-123, `AuthService`)
 - **Entities** - Named entities (classes, people, technologies)
+- **Content Type** - Classification (`narrative`/`structured`/`technical`/`mixed`)
 
 **Results:**
 - Summaries stored in `chunk.metadata["summary"]`
 - Keywords saved to `VocabularyStore` for exact-match retrieval
 - Entities stored in `chunk.metadata["entities"]`
+- Content type stored in `chunk.metadata["content_type"]`
 
 ### Hierarchy
 

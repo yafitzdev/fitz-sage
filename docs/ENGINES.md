@@ -134,7 +134,7 @@ rerank:
 Fitz supports a pluggable engine architecture. You can swap engines via configuration:
 
 ```python
-from fitz import run
+from fitz_ai import run
 
 # Default: Fitz RAG
 answer = run("What is X?", engine="fitz_rag")

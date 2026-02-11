@@ -23,14 +23,14 @@ The enrichment pipeline adds AI-generated metadata to chunks during ingestion. A
 │  │              ChunkEnricher (Enrichment Bus)             │    │
 │  │         One LLM call per batch (~15 chunks)             │    │
 │  ├─────────────────────────────────────────────────────────┤    │
-│  │  ┌───────────┐  ┌───────────┐  ┌───────────────────┐    │    │
-│  │  │  Summary  │  │ Keywords  │  │     Entities      │    │    │
-│  │  │  Module   │  │  Module   │  │      Module       │    │    │
-│  │  │           │  │           │  │                   │    │    │
-│  │  │ Per-chunk │  │ Exact-    │  │ Named entities    │    │    │
-│  │  │ search    │  │ match IDs │  │ (class, person,   │    │    │
-│  │  │ summaries │  │ for vocab │  │  technology...)   │    │    │
-│  │  └───────────┘  └───────────┘  └───────────────────┘    │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────┐  │    │
+│  │  │ Summary  │ │ Keywords │ │ Entities │ │ContentType  │  │    │
+│  │  │ Module   │ │  Module  │ │  Module  │ │  Module     │  │    │
+│  │  │          │ │          │ │          │ │             │  │    │
+│  │  │Per-chunk │ │ Exact-   │ │ Named    │ │ narrative/  │  │    │
+│  │  │ search   │ │ match IDs│ │ entities │ │ structured/ │  │    │
+│  │  │summaries │ │ for vocab│ │          │ │ technical   │  │    │
+│  │  └──────────┘ └──────────┘ └──────────┘ └─────────────┘  │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                              │                                  │
 │  ┌───────────────────────────┴───────────────────────────┐      │
@@ -48,6 +48,7 @@ The enrichment pipeline adds AI-generated metadata to chunks during ingestion. A
 - **Summaries** - Natural language descriptions for better semantic search
 - **Keywords** - Exact-match identifiers (TC-1001, JIRA-123, `AuthService`)
 - **Entities** - Named entity extraction (classes, people, technologies)
+- **Content Type** - Classification (`narrative`/`structured`/`technical`/`mixed`)
 - **Hierarchy** - Multi-level summaries for analytical queries
 
 All features run automatically when a chat client is available.
@@ -164,6 +165,22 @@ Extracts named entities and domain concepts.
 
 ---
 
+### Content Type Module
+
+Classifies each chunk's content type for retrieval boosting.
+
+**Content types:**
+- `narrative` - Prose, documentation, explanations
+- `structured` - Lists, tables, structured data
+- `technical` - Code, configurations, specifications
+- `mixed` - Combination of types
+
+**Stored in:** `chunk.metadata["content_type"]`
+
+**Used by:** VectorSearchStep for document type boosting at query time (narrative vs structured queries).
+
+---
+
 ## Hierarchy
 
 Multi-level summaries for analytical queries. **Always on by default.**
@@ -219,11 +236,10 @@ No special query syntax needed - summaries match analytical queries via vector s
 
 ### Configuration
 
-Hierarchy configuration is the only enrichment setting available:
+Hierarchy configuration is the only enrichment setting available. Enrichment runs automatically when a chat client is available -- no `enabled` flag needed (provider presence is the toggle).
 
 ```yaml
 enrichment:
-  enabled: true  # Master switch (default: true)
   hierarchy:
     grouping_strategy: metadata   # or "semantic"
     group_by: source_file         # metadata key for grouping

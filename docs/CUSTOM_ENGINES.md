@@ -78,7 +78,7 @@ registry.register(
 ### Using Your Engine
 
 ```python
-from fitz import run
+from fitz_ai import run
 
 # Use via universal runtime
 answer = run("What is Python?", engine="my_simple")
@@ -557,7 +557,7 @@ class TestMyEngine:
 
 ```python
 def test_my_engine_via_universal_runtime():
-    from fitz import run
+    from fitz_ai import run
     from fitz_ai.runtime import list_engines
     
     # Verify registration
@@ -674,7 +674,7 @@ pip install fitz_ai-my-engine
 ```
 
 ```python
-from fitz import run
+from fitz_ai import run
 answer = run("Question?", engine="my_engine")
 ```
 

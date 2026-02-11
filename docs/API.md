@@ -85,7 +85,7 @@ Query the knowledge base with a single question.
 {
   "text": "The refund policy allows returns within 30 days...",
   "mode": "confident",
-  "sources": [
+  "provenance": [
     {
       "source_id": "policies/refund.md",
       "excerpt": "Returns are accepted within 30 days of purchase...",
@@ -102,7 +102,7 @@ Query the knowledge base with a single question.
 |-------|------|-------------|
 | `text` | string | The answer text |
 | `mode` | string | `confident`, `qualified`, `disputed`, or `abstain` |
-| `sources` | array | Sources used in the answer |
+| `provenance` | array | Source attribution for the answer |
 
 ### Example
 
@@ -155,7 +155,7 @@ Same as `/query`:
 {
   "text": "For returns, you need to...",
   "mode": "confident",
-  "sources": [...]
+  "provenance": [...]
 }
 ```
 
@@ -298,7 +298,7 @@ Health check endpoint.
 ```json
 {
   "status": "healthy",
-  "version": "0.4.0",
+  "version": "0.8.1",
   "config_exists": true
 }
 ```

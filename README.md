@@ -10,7 +10,7 @@
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.8.1-green.svg)](CHANGELOG.md)
-[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
+[![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
 
 
 [Quick Start](#quick-start) • [Installation](#installation) • [Documentation](docs/) • [GitHub](https://github.com/yafitzdev/fitz-ai)
@@ -296,8 +296,8 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >
 >```bash
 >fitz plugin
->? Plugin type: chunker
->? Description: sentence-based chunker that splits on periods
+>? Plugin type: constraint
+>? Description: flags answers that cite a single source when multiple exist
 >
 >Generating...
 >✓ Syntax valid
@@ -305,7 +305,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >✓ Plugin loads correctly
 >✓ Functional test passed
 >
->Created: ~/.fitz/plugins/chunking/sentence_chunker.py
+>Created: ~/.fitz/plugins/constraints/single_source_warning.py
 >```
 >
 >The generated plugin is immediately usable—no manual editing required.
@@ -320,9 +320,9 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >| `llm-embedding` | YAML | Connect to an embedding provider |
 >| `llm-rerank` | YAML | Connect to a reranking provider |
 >| `retrieval` | YAML | Define a retrieval strategy |
->| `chunker` | Python | Custom document chunking logic |
->| `reader` | Python | Custom file format reader |
 >| `constraint` | Python | Epistemic safety guardrail |
+>| `reader` | Python | Custom file format reader |
+>| `chunker` | Python | Custom chunking logic (fallback strategy) |
 
 <br>
 
@@ -338,20 +338,17 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 
 <br>
 
-#### Example: Custom chunker
+#### Example: Custom constraint
 
 >```bash
 >fitz plugin
->? Plugin type: chunker
->? Description: splits text by paragraphs, keeping code blocks intact
+>? Plugin type: constraint
+>? Description: detects when sources use different time frames
 >
-># Creates ~/.fitz/plugins/chunking/paragraph_chunker.py
+># Creates ~/.fitz/plugins/constraints/temporal_mismatch.py
 >```
 >
->```python
-># Generated plugin is immediately usable
->fitz ingest ./docs --chunker paragraph_chunker
->```
+>Generated plugins are auto-discovered — no registration needed.
 
 </details>
 
@@ -631,30 +628,12 @@ fitz serve --host 0.0.0.0     # all interfaces
 
 <br>
 
-**Example requests:**
+**Example request:**
 
 ```bash
-# Query
 curl -X POST http://localhost:8000/query \
   -H "Content-Type: application/json" \
   -d '{"question": "What is the refund policy?", "collection": "default"}'
-
-# Ingest
-curl -X POST http://localhost:8000/ingest \
-  -H "Content-Type: application/json" \
-  -d '{"source": "./docs", "collection": "mydata"}'
-
-# Chat (stateless - client manages history)
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "What about returns?",
-    "history": [
-      {"role": "user", "content": "What is the refund policy?"},
-      {"role": "assistant", "content": "The refund policy allows..."}
-    ],
-    "collection": "default"
-  }'
 ```
 
 </details>

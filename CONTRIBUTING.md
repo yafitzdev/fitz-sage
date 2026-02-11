@@ -40,7 +40,7 @@ Be respectful, inclusive, and constructive. We're all here to build something us
 ```bash
 # Clone your fork
 git clone https://github.com/yafitzdev/fitz-ai.git
-cd fitz
+cd fitz-ai
 
 # Create virtual environment
 python -m venv .venv
@@ -60,32 +60,38 @@ python -m tools.contract_map --layout-depth 2
 
 Fitz follows strict architectural principles. Please respect these when contributing.
 
-### Project Structure (v0.3.0+)
+### Project Structure
 
 ```
 fitz_ai/
 ├── core/              # Paradigm-agnostic contracts (Query, Answer, Provenance)
 ├── engines/           # Engine implementations
-│   └── fitz_rag/      # Traditional RAG engine
-├── runtime/           # Engine orchestration
-├── llm/               # Shared LLM service (chat, embedding, rerank)
-├── vector_db/         # Shared vector DB service
-├── ingest/            # Document ingestion
+│   └── fitz_rag/      # RAG with retrieval intelligence
+├── retrieval/         # SHARED retrieval intelligence (detection, sparse, entities, etc.)
+├── llm/               # LLM service layer (chat, embedding, rerank, vision)
+├── storage/           # PostgreSQL connection manager
+├── vector_db/         # Vector DB abstraction + pgvector plugin
+├── ingestion/         # Document ingestion (parser, chunking, enrichment)
+├── cloud/             # Encrypted cache API
+├── tabular/           # CSV/table query with SQL generation
+├── runtime/           # Multi-engine orchestration
 ├── cli/               # Command-line interface
-└── backends/          # Local backends (Ollama, FAISS)
+├── api/               # REST API (FastAPI)
+└── sdk/               # Stateful Python interface
 ```
 
 ### Layer Dependencies
 
 ```
-core/        ← NO imports from engines/, ingest/, or backends/
-engines/     ← May import from core/, llm/, vector_db/
+core/        ← NO imports from engines/, ingestion/
+retrieval/   ← May import from core/
 llm/         ← May import from core/
-vector_db/   ← May import from core/
-ingest/      ← May import from core/
+storage/     ← May import from core/
+vector_db/   ← May import from core/, storage/
+ingestion/   ← May import from core/
+engines/     ← May import from core/, llm/, vector_db/, storage/, retrieval/
 runtime/     ← May import from all (orchestration layer)
 cli/         ← May import from all (user-facing layer)
-backends/    ← May import from core/
 tools/       ← May import from all (development tools)
 ```
 
@@ -167,11 +173,11 @@ Open an issue with:
    isort .
    
    # Type check
-   mypy fitz
-   
+   mypy fitz_ai
+
    # Run tests
    pytest
-   
+
    # Check architecture
    python -m tools.contract_map --fail-on-errors
    ```
@@ -279,7 +285,7 @@ Plugins extend functionality within engines (LLM providers, vector DBs, etc.).
 
 ### Creating a New Plugin
 
-1. **Identify the plugin type**: `chat`, `embedding`, `rerank`, `vector_db`, `retrieval`, `chunking`, `ingestion`
+1. **Identify the plugin type**: `llm-chat`, `llm-embedding`, `llm-rerank`, `retrieval`, `constraint`, `reader`, `chunker`
 
 2. **Create the plugin file**:
    ```python
@@ -332,7 +338,7 @@ Plugins extend functionality within engines (LLM providers, vector DBs, etc.).
 pytest
 
 # With coverage
-pytest --cov=fitz
+pytest --cov=fitz_ai
 
 # Specific module
 pytest tests/engines/test_fitz_rag.py
@@ -422,8 +428,7 @@ class MyClass:
 Before submitting a PR, verify:
 
 - [ ] No imports from `engines/` in `core/`
-- [ ] No imports from `ingest/` in `core/`
-- [ ] No imports from `backends/` in `core/`
+- [ ] No imports from `ingestion/` in `core/`
 - [ ] New engines implement `KnowledgeEngine` protocol
 - [ ] New plugins follow the Protocol pattern
 - [ ] Config-driven design (no hardcoded provider selection)

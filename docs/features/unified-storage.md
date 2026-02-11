@@ -101,7 +101,7 @@ No Docker. No cloud accounts. No configuration.
 
 ### Local Mode (Default)
 
-Fitz uses [pgserver](https://github.com/orm011/pgserver)—a pip-installable embedded PostgreSQL with pgvector included.
+Fitz uses [fitz-pgserver](https://github.com/yafitzdev/fitz-pgserver)—a pip-installable embedded PostgreSQL with pgvector included (fork of pgserver with Windows crash recovery fixes).
 
 ```
 ~/.fitz/

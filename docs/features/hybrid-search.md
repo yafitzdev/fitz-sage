@@ -78,7 +78,7 @@ PostgreSQL tsvector configuration:
 
 ## Files
 
-- **pgvector backend:** `fitz_ai/backends/local_vector_db/pgvector.py`
+- **pgvector plugin:** `fitz_ai/vector_db/plugins/pgvector.py`
 - **Schema:** `chunks` table with `content_tsv tsvector GENERATED ALWAYS AS ...`
 - **Query integration:** `fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py` (`_hybrid_search`)
 
