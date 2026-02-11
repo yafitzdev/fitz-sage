@@ -59,6 +59,14 @@ def _symbol_index_ddl(embedding_dim: int) -> str:
         summary_vector vector({embedding_dim}),
         imports TEXT[],
         references TEXT[],
+        keywords TEXT[] DEFAULT '{{}}',
+        entities JSONB DEFAULT '[]'::jsonb,
+        content_tsv tsvector GENERATED ALWAYS AS (
+            to_tsvector('english',
+                coalesce(name, '') || ' ' ||
+                coalesce(qualified_name, '') || ' ' ||
+                coalesce(summary, ''))
+        ) STORED,
         metadata JSONB NOT NULL DEFAULT '{{}}'::jsonb,
         created_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -70,6 +78,8 @@ def _symbol_index_ddl(embedding_dim: int) -> str:
         ON {TABLE_PREFIX}symbol_index (kind);
     CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}symbol_file
         ON {TABLE_PREFIX}symbol_index (raw_file_id);
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}symbol_tsv
+        ON {TABLE_PREFIX}symbol_index USING gin (content_tsv);
     """
 
 
@@ -114,6 +124,8 @@ def _section_index_ddl(embedding_dim: int) -> str:
         summary_vector vector({embedding_dim}),
         parent_section_id TEXT,
         position INTEGER NOT NULL,
+        keywords TEXT[] DEFAULT '{{}}',
+        entities JSONB DEFAULT '[]'::jsonb,
         metadata JSONB NOT NULL DEFAULT '{{}}'::jsonb,
         created_at TIMESTAMPTZ DEFAULT NOW()
     );

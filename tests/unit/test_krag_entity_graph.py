@@ -1,0 +1,349 @@
+# tests/unit/test_krag_entity_graph.py
+"""
+Unit tests for entity graph integration in KRAG.
+
+Tests that:
+- Pipeline calls entity_graph_store.add_chunk_entities during ingestion
+- CodeExpander._add_entity_related finds related symbols
+- Entity expansion skipped when no entity_graph_store
+- Graceful failure on entity graph errors
+"""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from fitz_ai.engines.fitz_krag.retrieval.expander import CodeExpander
+from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+RAW_FILE_CONTENT = (
+    "import os\n"
+    "import sys\n"
+    "\n"
+    "def func():\n"
+    "    return 42\n"
+    "\n"
+    "def other():\n"
+    "    pass\n"
+)
+
+
+def _make_raw_store(files: dict[str, dict] | None = None) -> MagicMock:
+    store = MagicMock()
+    if files is None:
+        files = {
+            "file1": {"path": "module.py", "content": RAW_FILE_CONTENT},
+        }
+    store.get.side_effect = lambda sid: files.get(sid)
+    return store
+
+
+def _make_config(
+    max_expansion_depth: int = 1,
+    include_class_context: bool = False,
+    max_reference_expansions: int = 0,
+    include_import_summaries: bool = False,
+    max_import_expansions: int = 0,
+) -> MagicMock:
+    config = MagicMock()
+    config.max_expansion_depth = max_expansion_depth
+    config.include_class_context = include_class_context
+    config.max_reference_expansions = max_reference_expansions
+    config.include_import_summaries = include_import_summaries
+    config.max_import_expansions = max_import_expansions
+    return config
+
+
+def _make_symbol_address(
+    source_id: str = "file1",
+    location: str = "mod.func",
+    symbol_id: str = "sym-1",
+    kind: str = "function",
+    qualified_name: str = "mod.func",
+    start_line: int = 4,
+    end_line: int = 6,
+    score: float = 0.9,
+) -> Address:
+    return Address(
+        kind=AddressKind.SYMBOL,
+        source_id=source_id,
+        location=location,
+        summary=f"Symbol {location}",
+        score=score,
+        metadata={
+            "start_line": start_line,
+            "end_line": end_line,
+            "kind": kind,
+            "qualified_name": qualified_name,
+            "symbol_id": symbol_id,
+        },
+    )
+
+
+def _make_read_result(
+    symbol_id: str = "sym-1",
+    source_id: str = "file1",
+    file_path: str = "module.py",
+    content: str = "def func():\n    return 42",
+) -> ReadResult:
+    addr = _make_symbol_address(source_id=source_id, symbol_id=symbol_id)
+    return ReadResult(
+        address=addr,
+        content=content,
+        file_path=file_path,
+        line_range=(4, 6),
+    )
+
+
+def _make_entity_graph_store(
+    related_ids: list[str] | None = None,
+    side_effect=None,
+) -> MagicMock:
+    store = MagicMock()
+    if side_effect:
+        store.get_related_chunks.side_effect = side_effect
+    else:
+        store.get_related_chunks.return_value = related_ids or []
+    return store
+
+
+def _make_expander(
+    entity_graph_store: MagicMock | None = None,
+    raw_files: dict[str, dict] | None = None,
+    symbol_get_return: dict | None = None,
+) -> CodeExpander:
+    """Create a CodeExpander with entity graph support."""
+    raw_store = _make_raw_store(raw_files)
+    symbol_store = MagicMock()
+    symbol_store.search_by_name.return_value = []
+    symbol_store.get_by_file.return_value = []
+    symbol_store.get.return_value = symbol_get_return
+    import_store = MagicMock()
+    import_store.get_imports.return_value = []
+    config = _make_config()
+
+    expander = CodeExpander(raw_store, symbol_store, import_store, config)
+    if entity_graph_store is not None:
+        expander._entity_graph_store = entity_graph_store
+    return expander
+
+
+# ---------------------------------------------------------------------------
+# TestPipelineEntityGraphIntegration
+# ---------------------------------------------------------------------------
+
+
+class TestPipelineEntityGraphIntegration:
+    """Tests that the pipeline populates entity graph during ingestion."""
+
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ensure_schema")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.RawFileStore")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SymbolStore")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ImportGraphStore")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SectionStore")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TableStore")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy")
+    def test_calls_add_chunk_entities_during_ingestion(
+        self,
+        mock_doc_strat,
+        mock_py_strat,
+        mock_table_store,
+        mock_section_store,
+        mock_import_store,
+        mock_symbol_store,
+        mock_raw_store,
+        mock_ensure_schema,
+    ):
+        """Pipeline calls entity_graph_store.add_chunk_entities for enriched items."""
+        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
+        from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+
+        config = FitzKragConfig(collection="test_col", enable_enrichment=False)
+        chat = MagicMock()
+        embedder = MagicMock()
+        embedder.dimensions = 1024
+        cm = MagicMock()
+        entity_store = MagicMock()
+
+        pipeline = KragIngestPipeline(
+            config=config,
+            chat=chat,
+            embedder=embedder,
+            connection_manager=cm,
+            collection="test_col",
+            entity_graph_store=entity_store,
+        )
+
+        # Call _populate_entity_graph directly
+        item_dicts = [
+            {
+                "id": "sym-001",
+                "entities": [
+                    {"name": "PostgreSQL", "type": "technology"},
+                    {"name": "auth_handler", "type": "function"},
+                ],
+            },
+            {
+                "id": "sym-002",
+                "entities": [
+                    {"name": "Redis", "type": "technology"},
+                ],
+            },
+            {
+                "id": "sym-003",
+                "entities": [],  # No entities — should be skipped
+            },
+        ]
+        pipeline._populate_entity_graph(item_dicts, "symbol_id")
+
+        # Called for sym-001 and sym-002, NOT sym-003
+        assert entity_store.add_chunk_entities.call_count == 2
+
+        # Verify first call
+        first_call = entity_store.add_chunk_entities.call_args_list[0]
+        assert first_call[0][0] == "sym-001"
+        assert first_call[0][1] == [
+            ("PostgreSQL", "technology"),
+            ("auth_handler", "function"),
+        ]
+
+        # Verify second call
+        second_call = entity_store.add_chunk_entities.call_args_list[1]
+        assert second_call[0][0] == "sym-002"
+        assert second_call[0][1] == [("Redis", "technology")]
+
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ensure_schema")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.RawFileStore")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SymbolStore")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ImportGraphStore")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SectionStore")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TableStore")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy")
+    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy")
+    def test_graceful_failure_on_entity_graph_errors(
+        self,
+        mock_doc_strat,
+        mock_py_strat,
+        mock_table_store,
+        mock_section_store,
+        mock_import_store,
+        mock_symbol_store,
+        mock_raw_store,
+        mock_ensure_schema,
+    ):
+        """Pipeline catches entity graph errors without crashing."""
+        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
+        from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+
+        config = FitzKragConfig(collection="test_col", enable_enrichment=False)
+        chat = MagicMock()
+        embedder = MagicMock()
+        embedder.dimensions = 1024
+        cm = MagicMock()
+        entity_store = MagicMock()
+        entity_store.add_chunk_entities.side_effect = RuntimeError("DB connection lost")
+
+        pipeline = KragIngestPipeline(
+            config=config,
+            chat=chat,
+            embedder=embedder,
+            connection_manager=cm,
+            collection="test_col",
+            entity_graph_store=entity_store,
+        )
+
+        item_dicts = [
+            {
+                "id": "sym-001",
+                "entities": [{"name": "PostgreSQL", "type": "technology"}],
+            },
+        ]
+
+        # Should not raise
+        pipeline._populate_entity_graph(item_dicts, "symbol_id")
+
+
+# ---------------------------------------------------------------------------
+# TestExpanderEntityRelated
+# ---------------------------------------------------------------------------
+
+
+class TestExpanderEntityRelated:
+    """Tests for CodeExpander._add_entity_related."""
+
+    def test_finds_related_symbols(self):
+        """Entity graph returns related symbol IDs; expander fetches and appends them."""
+        entity_store = _make_entity_graph_store(related_ids=["sym-related"])
+        related_symbol = {
+            "id": "sym-related",
+            "name": "related_func",
+            "qualified_name": "mod.related_func",
+            "kind": "function",
+            "raw_file_id": "file1",
+            "start_line": 7,
+            "end_line": 8,
+        }
+        expander = _make_expander(
+            entity_graph_store=entity_store,
+            symbol_get_return=related_symbol,
+        )
+
+        original = _make_read_result(symbol_id="sym-1")
+        expanded = expander.expand([original])
+
+        # Original + imports + entity-related
+        entity_results = [r for r in expanded if r.metadata.get("context_type") == "entity_related"]
+        assert len(entity_results) == 1
+        assert entity_results[0].address.location == "mod.related_func"
+        assert entity_results[0].address.metadata["symbol_id"] == "sym-related"
+
+    def test_skips_already_present_ids(self):
+        """Entity-related IDs that are already in expanded results are not added again."""
+        entity_store = _make_entity_graph_store(related_ids=["sym-1"])
+        expander = _make_expander(entity_graph_store=entity_store)
+
+        original = _make_read_result(symbol_id="sym-1")
+        expanded = expander.expand([original])
+
+        entity_results = [r for r in expanded if r.metadata.get("context_type") == "entity_related"]
+        assert len(entity_results) == 0
+
+    def test_skipped_when_no_entity_graph_store(self):
+        """No entity_graph_store -> entity expansion step is skipped entirely."""
+        expander = _make_expander(entity_graph_store=None)
+
+        original = _make_read_result()
+        expanded = expander.expand([original])
+
+        entity_results = [r for r in expanded if r.metadata.get("context_type") == "entity_related"]
+        assert len(entity_results) == 0
+
+    def test_graceful_failure_on_entity_graph_error(self):
+        """Exception in entity graph store does not crash the expander."""
+        entity_store = _make_entity_graph_store(side_effect=RuntimeError("connection timeout"))
+        expander = _make_expander(entity_graph_store=entity_store)
+
+        original = _make_read_result()
+
+        # Should not raise; returns at least the original results
+        expanded = expander.expand([original])
+        assert len(expanded) >= 1
+        assert expanded[0].content == original.content
+
+    def test_no_related_ids_returns_unchanged(self):
+        """Entity graph returning empty list does not add any results."""
+        entity_store = _make_entity_graph_store(related_ids=[])
+        expander = _make_expander(entity_graph_store=entity_store)
+
+        original = _make_read_result()
+        expanded = expander.expand([original])
+
+        entity_results = [r for r in expanded if r.metadata.get("context_type") == "entity_related"]
+        assert len(entity_results) == 0

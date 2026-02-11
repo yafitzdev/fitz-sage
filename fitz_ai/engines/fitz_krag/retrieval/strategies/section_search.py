@@ -33,6 +33,7 @@ class SectionSearchStrategy:
         self._section_store = section_store
         self._embedder = embedder
         self._config = config
+        self._hyde_generator: Any = None  # Set by engine if HyDE enabled
 
     def retrieve(self, query: str, limit: int) -> list[Address]:
         """
@@ -40,7 +41,8 @@ class SectionSearchStrategy:
 
         1. BM25 full-text search (PostgreSQL ts_rank)
         2. Semantic search on section summaries
-        3. Hybrid merge — BM25 weighted higher
+        3. HyDE search (when enabled)
+        4. Hybrid merge — BM25 weighted higher
         """
         fetch_limit = limit * 2
 
@@ -55,13 +57,48 @@ class SectionSearchStrategy:
             logger.warning(f"Semantic section search failed, using BM25 only: {e}")
             semantic_results = []
 
-        # 3. Hybrid merge
+        # 3. HyDE search
+        if self._hyde_generator:
+            hyde_results = self._run_hyde(query, fetch_limit)
+            semantic_results = self._merge_hyde(semantic_results, hyde_results)
+
+        # 4. Hybrid merge
         bm25_weight = self._config.section_bm25_weight
         semantic_weight = self._config.section_semantic_weight
         merged = self._merge_results(bm25_results, semantic_results, bm25_weight, semantic_weight)
 
-        # 4. Convert to Address objects
+        # 5. Convert to Address objects
         return [self._to_address(r) for r in merged[:limit]]
+
+    def _run_hyde(self, query: str, limit: int) -> list[dict[str, Any]]:
+        """Generate hypothetical docs via HyDE and search with their embeddings."""
+        try:
+            hypotheses = self._hyde_generator.generate(query)
+            all_results: list[dict[str, Any]] = []
+            for hyp in hypotheses:
+                hyp_vector = self._embedder.embed(hyp)
+                results = self._section_store.search_by_vector(hyp_vector, limit=limit)
+                all_results.extend(results)
+            return all_results
+        except Exception as e:
+            logger.warning(f"HyDE section search failed: {e}")
+            return []
+
+    def _merge_hyde(
+        self,
+        semantic_results: list[dict[str, Any]],
+        hyde_results: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Merge HyDE results into semantic results with lower weight."""
+        for r in hyde_results:
+            r["score"] = r.get("score", 0.0) * 0.5
+        combined = list(semantic_results)
+        seen_ids = {r["id"] for r in combined}
+        for r in hyde_results:
+            if r["id"] not in seen_ids:
+                combined.append(r)
+                seen_ids.add(r["id"])
+        return combined
 
     def _merge_results(
         self,

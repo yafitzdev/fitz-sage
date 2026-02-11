@@ -62,6 +62,13 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._governor = None
     engine._cloud_client = None
     engine._detection_orchestrator = None
+    engine._query_rewriter = None
+    engine._address_reranker = None
+    engine._hop_controller = None
+    engine._chat_factory = None
+    engine._vocabulary_store = None
+    engine._keyword_matcher = None
+    engine._entity_graph_store = None
     return engine
 
 

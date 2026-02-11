@@ -62,6 +62,13 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._governor = None
     engine._table_store = MagicMock(name="table_store")
     engine._pg_table_store = MagicMock(name="pg_table_store")
+    engine._query_rewriter = None
+    engine._address_reranker = None
+    engine._hop_controller = None
+    engine._chat_factory = None
+    engine._vocabulary_store = None
+    engine._keyword_matcher = None
+    engine._entity_graph_store = None
     return engine
 
 
@@ -241,14 +248,47 @@ class TestRouterDetection:
         # Both addresses returned
         assert len(results) == 2
 
-    def test_retrieve_with_comparison_entities_creates_augmented_queries(self):
-        """Router.retrieve with comparison_entities creates entity-augmented queries."""
+    def test_retrieve_with_comparison_entities_uses_llm_queries(self):
+        """Router.retrieve with comparison_entities generates LLM-focused queries."""
         addr1 = _make_address("a.py", "mod.alpha", 0.9)
         addr2 = _make_address("b.py", "mod.beta", 0.8)
-        addr3 = _make_address("c.py", "mod.gamma", 0.7)
 
         code_strategy = MagicMock(name="code_strategy")
-        code_strategy.retrieve.side_effect = [[addr1], [addr2], [addr3]]
+        code_strategy.retrieve.return_value = [addr1]
+
+        section_strategy = MagicMock(name="section_strategy")
+        section_strategy.retrieve.return_value = []
+
+        mock_chat = MagicMock(name="chat")
+        mock_chat.chat.return_value = '["React hooks state", "Vue composition API", "React vs Vue"]'
+        mock_factory = MagicMock(return_value=mock_chat)
+
+        config = _make_config(top_addresses=10, fallback_to_chunks=False)
+        router = RetrievalRouter(
+            code_strategy=code_strategy,
+            chunk_strategy=None,
+            config=config,
+            section_strategy=section_strategy,
+            chat_factory=mock_factory,
+        )
+
+        detection = _make_detection_summary(
+            comparison_entities=["React", "Vue"],
+        )
+        router.retrieve("compare frameworks", detection=detection)
+
+        # Code strategy called 4 times: original + 3 LLM-generated entity queries
+        assert code_strategy.retrieve.call_count == 4
+        calls = code_strategy.retrieve.call_args_list
+        assert calls[0].args[0] == "compare frameworks"
+        assert calls[1].args[0] == "React hooks state"
+        assert calls[2].args[0] == "Vue composition API"
+        assert calls[3].args[0] == "React vs Vue"
+
+    def test_retrieve_comparison_fallback_without_chat_factory(self):
+        """Without chat_factory, comparison falls back to naive entity append."""
+        code_strategy = MagicMock(name="code_strategy")
+        code_strategy.retrieve.return_value = [_make_address()]
 
         section_strategy = MagicMock(name="section_strategy")
         section_strategy.retrieve.return_value = []
@@ -259,19 +299,17 @@ class TestRouterDetection:
             chunk_strategy=None,
             config=config,
             section_strategy=section_strategy,
+            chat_factory=None,  # No LLM
         )
 
-        detection = _make_detection_summary(
-            comparison_entities=["React", "Vue"],
-        )
-        results = router.retrieve("compare frameworks", detection=detection)
+        detection = _make_detection_summary(comparison_entities=["A", "B"])
+        router.retrieve("compare A and B", detection=detection)
 
-        # Code strategy called 3 times: original + 2 entity-augmented queries
+        # Falls back to naive: original + "compare A and B A" + "compare A and B B"
         assert code_strategy.retrieve.call_count == 3
         calls = code_strategy.retrieve.call_args_list
-        assert calls[0].args[0] == "compare frameworks"
-        assert calls[1].args[0] == "compare frameworks React"
-        assert calls[2].args[0] == "compare frameworks Vue"
+        assert calls[1].args[0] == "compare A and B A"
+        assert calls[2].args[0] == "compare A and B B"
 
     def test_retrieve_with_fetch_multiplier_increases_limit(self):
         """Router.retrieve with fetch_multiplier increases the retrieval limit."""
@@ -362,3 +400,166 @@ class TestEngineAnswerDetectionFlow:
         engine._retrieval_router.retrieve.assert_called_once_with(
             query.text, analysis, detection=None
         )
+
+
+# ---------------------------------------------------------------------------
+# TestTemporalTagging
+# ---------------------------------------------------------------------------
+
+
+class TestTemporalTagging:
+    """Tests for temporal reference tagging on addresses."""
+
+    def _make_router(
+        self,
+        code_results: list[Address] | None = None,
+        top_addresses: int = 10,
+    ) -> RetrievalRouter:
+        code_strategy = MagicMock(name="code_strategy")
+        code_strategy.retrieve.return_value = code_results or []
+        section_strategy = MagicMock(name="section_strategy")
+        section_strategy.retrieve.return_value = []
+        config = _make_config(top_addresses=top_addresses, fallback_to_chunks=False)
+        return RetrievalRouter(
+            code_strategy=code_strategy,
+            chunk_strategy=None,
+            config=config,
+            section_strategy=section_strategy,
+        )
+
+    def test_temporal_variations_tag_addresses(self):
+        """Addresses from temporal query variations get tagged with temporal_refs."""
+        addr = _make_address("a.py", "report.revenue", 0.8)
+        router = self._make_router(code_results=[addr])
+
+        # Detection with temporal data
+        detection = MagicMock(name="detection")
+        detection.query_variations = ["Q1 2024 revenue", "Q2 2024 revenue"]
+        detection.comparison_entities = []
+        detection.fetch_multiplier = 1
+        # Temporal result with references
+        temporal = MagicMock(name="temporal_result")
+        temporal.metadata = {
+            "references": [
+                {"text": "Q1 2024", "type": "quarter"},
+                {"text": "Q2 2024", "type": "quarter"},
+            ]
+        }
+        detection.temporal = temporal
+
+        results = router.retrieve("compare Q1 vs Q2 revenue", detection=detection)
+
+        # Addresses from temporal queries should have temporal_refs in metadata
+        tagged = [r for r in results if r.metadata.get("temporal_refs")]
+        assert len(tagged) > 0
+        # The deduplicated address should have both refs merged
+        all_refs = tagged[0].metadata["temporal_refs"]
+        assert "Q1 2024" in all_refs
+        assert "Q2 2024" in all_refs
+
+    def test_original_query_has_no_temporal_tag(self):
+        """Addresses from the original query should NOT get temporal tags."""
+        addr = _make_address("a.py", "unique.symbol", 0.9)
+        code_strategy = MagicMock(name="code_strategy")
+        # First call (original) returns addr, subsequent calls return different addr
+        code_strategy.retrieve.side_effect = [
+            [addr],
+            [_make_address("b.py", "other.symbol", 0.7)],
+        ]
+        section_strategy = MagicMock(name="section_strategy")
+        section_strategy.retrieve.return_value = []
+        config = _make_config(top_addresses=10, fallback_to_chunks=False)
+        router = RetrievalRouter(
+            code_strategy=code_strategy,
+            chunk_strategy=None,
+            config=config,
+            section_strategy=section_strategy,
+        )
+
+        detection = MagicMock(name="detection")
+        detection.query_variations = ["Q1 revenue"]
+        detection.comparison_entities = []
+        detection.fetch_multiplier = 1
+        temporal = MagicMock()
+        temporal.metadata = {"references": [{"text": "Q1 2024", "type": "quarter"}]}
+        detection.temporal = temporal
+
+        results = router.retrieve("revenue trends", detection=detection)
+
+        # Find the original query's address (unique.symbol)
+        original = [r for r in results if r.location == "unique.symbol"]
+        assert len(original) == 1
+        assert "temporal_refs" not in original[0].metadata
+
+    def test_no_temporal_refs_when_detection_has_no_temporal(self):
+        """Without temporal in detection, no temporal_refs are added."""
+        addr = _make_address("a.py", "mod.func", 0.9)
+        router = self._make_router(code_results=[addr])
+
+        detection = MagicMock(name="detection")
+        detection.query_variations = ["synonym query"]
+        detection.comparison_entities = []
+        detection.fetch_multiplier = 1
+        detection.temporal = None  # No temporal data
+
+        results = router.retrieve("original query", detection=detection)
+
+        for r in results:
+            assert "temporal_refs" not in r.metadata
+
+
+# ---------------------------------------------------------------------------
+# TestDeduplicateTemporalMerge
+# ---------------------------------------------------------------------------
+
+
+class TestDeduplicateTemporalMerge:
+    """Tests for _deduplicate merging temporal_refs from duplicates."""
+
+    def test_merges_temporal_refs_on_dedup(self):
+        """When same address appears with different temporal tags, tags are merged."""
+        router = RetrievalRouter(
+            code_strategy=MagicMock(),
+            chunk_strategy=None,
+            config=_make_config(top_addresses=10),
+        )
+
+        addr_q1 = Address(
+            kind=AddressKind.SYMBOL,
+            source_id="f.py",
+            location="report.revenue",
+            summary="Revenue report",
+            score=0.8,
+            metadata={"temporal_refs": ["Q1 2024"]},
+        )
+        addr_q2 = Address(
+            kind=AddressKind.SYMBOL,
+            source_id="f.py",
+            location="report.revenue",
+            summary="Revenue report",
+            score=0.9,
+            metadata={"temporal_refs": ["Q2 2024"]},
+        )
+
+        deduped = router._deduplicate([addr_q1, addr_q2])
+
+        assert len(deduped) == 1
+        assert set(deduped[0].metadata["temporal_refs"]) == {"Q1 2024", "Q2 2024"}
+        # Takes the higher score
+        assert deduped[0].score == 0.9
+
+    def test_dedup_without_temporal_refs_unchanged(self):
+        """Deduplication without temporal refs works as before."""
+        router = RetrievalRouter(
+            code_strategy=MagicMock(),
+            chunk_strategy=None,
+            config=_make_config(top_addresses=10),
+        )
+
+        addr1 = _make_address("a.py", "mod.func", 0.8)
+        addr2 = _make_address("a.py", "mod.func", 0.6)
+
+        deduped = router._deduplicate([addr1, addr2])
+
+        assert len(deduped) == 1
+        assert deduped[0].score == 0.8  # First one kept

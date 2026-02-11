@@ -39,12 +39,15 @@ class RetrievalRouter:
         config: "FitzKragConfig",
         section_strategy: "SectionSearchStrategy | None" = None,
         table_strategy: "TableSearchStrategy | None" = None,
+        chat_factory: Any = None,
     ):
         self._code_strategy = code_strategy
         self._chunk_strategy = chunk_strategy
         self._section_strategy = section_strategy
         self._table_strategy = table_strategy
         self._config = config
+        self._chat_factory = chat_factory
+        self._keyword_matcher: Any = None  # Set by engine for vocabulary filtering
 
     def retrieve(
         self,
@@ -75,30 +78,57 @@ class RetrievalRouter:
         weights = analysis.strategy_weights if analysis else None
         all_addresses: list[Address] = []
 
-        # Collect queries to run (original + detection expansions)
-        queries = [query]
+        # Collect queries to run (original + detection expansions + multi-query)
+        # Each entry is (query_text, tag) where tag is used for temporal metadata
+        tagged_queries: list[tuple[str, str | None]] = [(query, None)]
         if detection:
             if hasattr(detection, "query_variations") and detection.query_variations:
-                queries.extend(detection.query_variations)
+                # Tag temporal variations with their reference text
+                temporal_refs = self._extract_temporal_refs(detection)
+                for i, variation in enumerate(detection.query_variations):
+                    tag = temporal_refs[i] if i < len(temporal_refs) else None
+                    tagged_queries.append((variation, tag))
             if hasattr(detection, "comparison_entities") and detection.comparison_entities:
-                for entity in detection.comparison_entities:
-                    queries.append(f"{query} {entity}")
+                # Generate entity-focused queries via LLM instead of naive append
+                comparison_queries = self._generate_comparison_queries(
+                    query, detection.comparison_entities
+                )
+                for cq in comparison_queries:
+                    tagged_queries.append((cq, None))
 
-        for q in queries:
+        # Multi-query expansion for long queries
+        if (
+            self._config.enable_multi_query
+            and self._chat_factory
+            and len(query) >= self._config.multi_query_min_length
+        ):
+            expanded = self._expand_query(query)
+            for eq in expanded:
+                tagged_queries.append((eq, None))
+
+        for q, temporal_tag in tagged_queries:
+            batch: list[Address] = []
+
             # Run code strategy (skip if weight below threshold)
             if not weights or weights.get("code", 1.0) > 0.05:
                 code_addresses = self._code_strategy.retrieve(q, limit)
-                all_addresses.extend(code_addresses)
+                batch.extend(code_addresses)
 
             # Run section strategy if available and weighted
             if self._section_strategy and (not weights or weights.get("section", 1.0) > 0.05):
                 section_addresses = self._section_strategy.retrieve(q, limit)
-                all_addresses.extend(section_addresses)
+                batch.extend(section_addresses)
 
             # Run table strategy if available and weighted
             if self._table_strategy and (not weights or weights.get("table", 1.0) > 0.05):
                 table_addresses = self._table_strategy.retrieve(q, limit)
-                all_addresses.extend(table_addresses)
+                batch.extend(table_addresses)
+
+            # Tag addresses with temporal reference if this query is temporal
+            if temporal_tag:
+                batch = self._tag_temporal(batch, temporal_tag)
+
+            all_addresses.extend(batch)
 
         # Chunk fallback when other results are insufficient
         if (
@@ -114,6 +144,10 @@ class RetrievalRouter:
         # Deduplicate
         deduped = self._deduplicate(all_addresses)
 
+        # Keyword vocabulary boost
+        if self._keyword_matcher:
+            deduped = self._apply_keyword_boost(query, deduped)
+
         # Rank using analysis if available
         if analysis:
             ranker = CrossStrategyRanker()
@@ -124,15 +158,174 @@ class RetrievalRouter:
         deduped.sort(key=lambda a: a.score, reverse=True)
         return deduped[: self._config.top_addresses]
 
+    def _extract_temporal_refs(self, detection: Any) -> list[str]:
+        """Extract temporal reference texts from detection metadata."""
+        try:
+            temporal = getattr(detection, "temporal", None)
+            if not temporal:
+                return []
+            refs = temporal.metadata.get("references", [])
+            result = []
+            for r in refs:
+                if isinstance(r, dict):
+                    result.append(r.get("text", ""))
+                elif isinstance(r, str):
+                    result.append(r)
+            return result
+        except Exception:
+            return []
+
+    def _tag_temporal(self, addresses: list[Address], ref_text: str) -> list[Address]:
+        """Tag addresses with the temporal reference that produced them."""
+        tagged: list[Address] = []
+        for addr in addresses:
+            meta = dict(addr.metadata)
+            existing = meta.get("temporal_refs", [])
+            if ref_text not in existing:
+                meta["temporal_refs"] = existing + [ref_text]
+            tagged.append(
+                Address(
+                    kind=addr.kind,
+                    source_id=addr.source_id,
+                    location=addr.location,
+                    summary=addr.summary,
+                    score=addr.score,
+                    metadata=meta,
+                )
+            )
+        return tagged
+
+    def _generate_comparison_queries(self, query: str, entities: list[str]) -> list[str]:
+        """Generate entity-focused search queries for comparison via LLM."""
+        if not self._chat_factory:
+            # Fallback to naive approach when no LLM available
+            return [f"{query} {entity}" for entity in entities]
+
+        try:
+            import json
+
+            chat = self._chat_factory("fast")
+            entities_str = ", ".join(entities)
+            prompt = (
+                "This is a comparison query. Generate focused search queries for "
+                "each entity being compared.\n\n"
+                f"Query: {query}\n"
+                f"Entities: {entities_str}\n\n"
+                "Instructions:\n"
+                "1. Generate 2-3 search queries for EACH entity\n"
+                "2. Generate 1 query that includes both entities together\n\n"
+                'Return ONLY a JSON array of strings: ["query1", "query2", ...]'
+            )
+            response = chat.chat([{"role": "user", "content": prompt}])
+            text = response.strip()
+            start = text.find("[")
+            end = text.rfind("]") + 1
+            if start >= 0 and end > start:
+                parsed = json.loads(text[start:end])
+                if isinstance(parsed, list):
+                    return [
+                        str(q)
+                        for q in parsed[: len(entities) * 3 + 1]
+                        if isinstance(q, str) and q.strip()
+                    ]
+        except Exception as e:
+            logger.warning(f"Comparison query expansion failed: {e}")
+
+        # Fallback to naive approach
+        return [f"{query} {entity}" for entity in entities]
+
+    def _expand_query(self, query: str) -> list[str]:
+        """Decompose a long query into focused sub-queries via LLM."""
+        try:
+            chat = self._chat_factory("fast")
+            prompt = (
+                "Break this complex query into 2-3 simpler, focused search queries.\n"
+                "Return ONLY a JSON array of strings.\n\n"
+                f"Query: {query}\n\n"
+                'Output: ["query1", "query2", ...]'
+            )
+            import json
+
+            response = chat.chat([{"role": "user", "content": prompt}])
+            text = response.strip()
+            start = text.find("[")
+            end = text.rfind("]") + 1
+            if start >= 0 and end > start:
+                parsed = json.loads(text[start:end])
+                if isinstance(parsed, list):
+                    return [str(q) for q in parsed[:3] if isinstance(q, str) and q.strip()]
+        except Exception as e:
+            logger.warning(f"Multi-query expansion failed: {e}")
+        return []
+
+    def _apply_keyword_boost(self, query: str, addresses: list[Address]) -> list[Address]:
+        """Boost addresses matching vocabulary keywords found in the query."""
+        try:
+            matched_keywords = self._keyword_matcher.find_in_query(query)
+            if not matched_keywords:
+                return addresses
+
+            # Collect all variations from matched keywords for text matching
+            match_terms = set()
+            for kw in matched_keywords:
+                match_terms.add(kw.id.lower())
+                for variation in getattr(kw, "match", []):
+                    match_terms.add(variation.lower())
+
+            boosted: list[Address] = []
+            for addr in addresses:
+                text = (addr.summary or "") + " " + (addr.location or "")
+                text_lower = text.lower()
+                boost = sum(1 for term in match_terms if term in text_lower)
+                if boost > 0:
+                    boosted.append(
+                        Address(
+                            kind=addr.kind,
+                            source_id=addr.source_id,
+                            location=addr.location,
+                            summary=addr.summary,
+                            score=addr.score + 0.1 * boost,
+                            metadata=addr.metadata,
+                        )
+                    )
+                else:
+                    boosted.append(addr)
+            return boosted
+        except Exception as e:
+            logger.warning(f"Keyword boost failed: {e}")
+            return addresses
+
     def _deduplicate(self, addresses: list[Address]) -> list[Address]:
-        """Deduplicate addresses by source_id+location."""
-        seen: set[tuple[str, str]] = set()
+        """Deduplicate addresses by source_id+location, merging temporal tags."""
+        seen: dict[tuple[str, str], int] = {}
         result: list[Address] = []
 
         for addr in addresses:
             key = (addr.source_id, addr.location)
             if key not in seen:
-                seen.add(key)
+                seen[key] = len(result)
                 result.append(addr)
+            else:
+                # Merge temporal_refs from duplicate into existing address
+                new_refs = addr.metadata.get("temporal_refs", [])
+                if new_refs:
+                    idx = seen[key]
+                    existing = result[idx]
+                    existing_refs = existing.metadata.get("temporal_refs", [])
+                    merged_refs = list(existing_refs)
+                    for ref in new_refs:
+                        if ref not in merged_refs:
+                            merged_refs.append(ref)
+                    if merged_refs != existing_refs:
+                        meta = dict(existing.metadata)
+                        meta["temporal_refs"] = merged_refs
+                        result[idx] = Address(
+                            kind=existing.kind,
+                            source_id=existing.source_id,
+                            location=existing.location,
+                            summary=existing.summary,
+                            score=max(existing.score, addr.score),
+                            metadata=meta,
+                        )
 
         return result

@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class CodeSearchStrategy:
-    """Hybrid keyword + semantic search on symbol_index."""
+    """Hybrid keyword + BM25 + semantic search on symbol_index."""
 
     def __init__(
         self,
@@ -33,21 +33,31 @@ class CodeSearchStrategy:
         self._symbol_store = symbol_store
         self._embedder = embedder
         self._config = config
+        self._hyde_generator: Any = None  # Set by engine if HyDE enabled
 
     def retrieve(self, query: str, limit: int) -> list[Address]:
         """
         Retrieve code symbol addresses matching the query.
 
         1. Keyword search: query words against symbol names
-        2. Semantic search: embed query, search summary_vector
-        3. Hybrid merge with configurable weights
+        2. BM25 full-text search (when content_tsv exists)
+        3. Semantic search: embed query, search summary_vector
+        4. HyDE search: embed hypothetical docs, search (when enabled)
+        5. Hybrid merge with configurable weights
         """
         fetch_limit = limit * 2
 
         # 1. Keyword search
         keyword_results = self._symbol_store.search_by_name(query, limit=fetch_limit)
 
-        # 2. Semantic search
+        # 2. BM25 search
+        bm25_results: list[dict[str, Any]] = []
+        try:
+            bm25_results = self._symbol_store.search_bm25(query, limit=fetch_limit)
+        except Exception as e:
+            logger.debug(f"BM25 search not available: {e}")
+
+        # 3. Semantic search
         try:
             query_vector = self._embedder.embed(query)
             semantic_results = self._symbol_store.search_by_vector(query_vector, limit=fetch_limit)
@@ -55,22 +65,65 @@ class CodeSearchStrategy:
             logger.warning(f"Semantic search failed, using keyword only: {e}")
             semantic_results = []
 
-        # 3. Hybrid merge
-        merged = self._merge_results(keyword_results, semantic_results)
+        # 4. HyDE search
+        if self._hyde_generator:
+            hyde_results = self._run_hyde(query, fetch_limit)
+            semantic_results = self._merge_hyde(semantic_results, hyde_results)
 
-        # 4. Convert to Address objects
+        # 5. Hybrid merge
+        merged = self._merge_results(keyword_results, semantic_results, bm25_results)
+
+        # 6. Convert to Address objects
         return [self._to_address(r) for r in merged[:limit]]
+
+    def _run_hyde(self, query: str, limit: int) -> list[dict[str, Any]]:
+        """Generate hypothetical docs via HyDE and search with their embeddings."""
+        try:
+            hypotheses = self._hyde_generator.generate(query)
+            all_results: list[dict[str, Any]] = []
+            for hyp in hypotheses:
+                hyp_vector = self._embedder.embed(hyp)
+                results = self._symbol_store.search_by_vector(hyp_vector, limit=limit)
+                all_results.extend(results)
+            return all_results
+        except Exception as e:
+            logger.warning(f"HyDE search failed: {e}")
+            return []
+
+    def _merge_hyde(
+        self,
+        semantic_results: list[dict[str, Any]],
+        hyde_results: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Merge HyDE results into semantic results with lower weight."""
+        # Discount HyDE scores by 0.5
+        for r in hyde_results:
+            r["score"] = r.get("score", 0.0) * 0.5
+        combined = list(semantic_results)
+        seen_ids = {r["id"] for r in combined}
+        for r in hyde_results:
+            if r["id"] not in seen_ids:
+                combined.append(r)
+                seen_ids.add(r["id"])
+        return combined
 
     def _merge_results(
         self,
         keyword_results: list[dict[str, Any]],
         semantic_results: list[dict[str, Any]],
+        bm25_results: list[dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
-        """Merge keyword and semantic results with weighted scoring."""
+        """Merge keyword, BM25, and semantic results with weighted scoring."""
         scores: dict[str, float] = {}
         by_id: dict[str, dict[str, Any]] = {}
         kw = self._config.keyword_weight
         sw = self._config.semantic_weight
+        bw = self._config.code_bm25_weight
+
+        # Normalize weights when BM25 results present
+        if bm25_results:
+            total = kw + sw + bw
+            kw, sw, bw = kw / total, sw / total, bw / total
 
         # Score keyword results by rank position
         for rank, r in enumerate(keyword_results):
@@ -78,6 +131,14 @@ class CodeSearchStrategy:
             rank_score = 1.0 / (rank + 1)
             scores[sid] = scores.get(sid, 0) + kw * rank_score
             by_id[sid] = r
+
+        # Score BM25 results
+        if bm25_results:
+            for rank, r in enumerate(bm25_results):
+                sid = r["id"]
+                bm25_score = r.get("bm25_score", 1.0 / (rank + 1))
+                scores[sid] = scores.get(sid, 0) + bw * bm25_score
+                by_id[sid] = r
 
         # Score semantic results by their cosine score
         for rank, r in enumerate(semantic_results):

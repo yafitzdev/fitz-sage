@@ -9,7 +9,7 @@ to provide the LLM with enough context to understand the code.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
 
@@ -36,6 +36,7 @@ class CodeExpander:
         self._symbol_store = symbol_store
         self._import_store = import_store
         self._config = config
+        self._entity_graph_store: Any = None  # Set by engine if enrichment enabled
 
     def expand(self, read_results: list[ReadResult]) -> list[ReadResult]:
         """
@@ -70,6 +71,10 @@ class CodeExpander:
             # 4. Import-followed summaries
             if self._config.include_import_summaries:
                 expanded = self._add_import_summaries(expanded, result)
+
+        # 5. Entity graph expansion (for all result types)
+        if self._entity_graph_store:
+            expanded = self._add_entity_related(expanded, read_results)
 
         return self._deduplicate(expanded)
 
@@ -322,6 +327,70 @@ class CodeExpander:
                 metadata={"context_type": "import_summaries"},
             )
         )
+        return expanded
+
+    def _add_entity_related(
+        self, expanded: list[ReadResult], original_results: list[ReadResult]
+    ) -> list[ReadResult]:
+        """Find other symbols/sections sharing entities with current results."""
+        try:
+            # Collect IDs from original results
+            chunk_ids = []
+            for r in original_results:
+                sid = r.address.metadata.get("symbol_id") or r.address.metadata.get("section_id")
+                if sid:
+                    chunk_ids.append(sid)
+
+            if not chunk_ids:
+                return expanded
+
+            related_ids = self._entity_graph_store.get_related_chunks(chunk_ids, max_total=3)
+            if not related_ids:
+                return expanded
+
+            # Existing IDs to avoid duplicates
+            existing_ids = {
+                r.address.metadata.get("symbol_id") or r.address.metadata.get("section_id")
+                for r in expanded
+            }
+
+            for related_id in related_ids:
+                if related_id in existing_ids:
+                    continue
+
+                # Try to fetch as symbol first, then section
+                sym = self._symbol_store.get(related_id)
+                if sym:
+                    raw_file = self._raw_store.get(sym["raw_file_id"])
+                    if raw_file:
+                        lines = raw_file["content"].splitlines()
+                        start = sym["start_line"] - 1
+                        end = sym["end_line"]
+                        code = "\n".join(lines[max(0, start) : end])
+                        addr = Address(
+                            kind=AddressKind.SYMBOL,
+                            source_id=sym["raw_file_id"],
+                            location=sym["qualified_name"],
+                            summary=f"Entity-related: {sym['name']}",
+                            metadata={
+                                "context_type": "entity_related",
+                                "symbol_id": sym["id"],
+                                "qualified_name": sym["qualified_name"],
+                            },
+                        )
+                        expanded.append(
+                            ReadResult(
+                                address=addr,
+                                content=code,
+                                file_path=raw_file["path"],
+                                line_range=(sym["start_line"], sym["end_line"]),
+                                metadata={"context_type": "entity_related"},
+                            )
+                        )
+                        existing_ids.add(related_id)
+        except Exception as e:
+            logger.warning(f"Entity graph expansion failed: {e}")
+
         return expanded
 
     def _deduplicate(self, results: list[ReadResult]) -> list[ReadResult]:

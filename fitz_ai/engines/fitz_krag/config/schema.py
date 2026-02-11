@@ -242,6 +242,92 @@ class FitzKragConfig(BasePluginConfig):
     )
 
     # ==========================================================================
+    # Query Intelligence
+    # ==========================================================================
+
+    enable_query_rewriting: bool = Field(
+        default=True,
+        description="Enable LLM-based query rewriting for retrieval optimization",
+    )
+
+    enable_hyde: bool = Field(
+        default=True,
+        description="Enable HyDE (Hypothetical Document Embeddings) for improved recall",
+    )
+
+    enable_multi_query: bool = Field(
+        default=True,
+        description="Enable multi-query expansion for long/complex queries",
+    )
+
+    multi_query_min_length: int = Field(
+        default=300,
+        ge=50,
+        description="Minimum query character length to trigger multi-query expansion",
+    )
+
+    # ==========================================================================
+    # Reranking
+    # ==========================================================================
+
+    rerank_k: int = Field(
+        default=10,
+        ge=1,
+        description="Number of addresses to keep after reranking",
+    )
+
+    rerank_min_addresses: int = Field(
+        default=20,
+        ge=1,
+        description="Minimum addresses before reranking is applied (skip if fewer)",
+    )
+
+    # ==========================================================================
+    # BM25 Code Search
+    # ==========================================================================
+
+    code_bm25_weight: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Weight for BM25 search in code hybrid merge",
+    )
+
+    # ==========================================================================
+    # Enrichment
+    # ==========================================================================
+
+    enable_enrichment: bool = Field(
+        default=True,
+        description="Enable keyword/entity extraction during ingestion",
+    )
+
+    # ==========================================================================
+    # Multi-Hop
+    # ==========================================================================
+
+    enable_multi_hop: bool = Field(
+        default=False,
+        description="Enable multi-hop iterative retrieval for complex queries",
+    )
+
+    max_hops: int = Field(
+        default=2,
+        ge=1,
+        le=5,
+        description="Maximum retrieval hops for multi-hop reasoning",
+    )
+
+    # ==========================================================================
+    # Hierarchy
+    # ==========================================================================
+
+    enable_hierarchy: bool = Field(
+        default=True,
+        description="Enable L1/L2 hierarchical summaries during ingestion",
+    )
+
+    # ==========================================================================
     # Plugin kwargs
     # ==========================================================================
 

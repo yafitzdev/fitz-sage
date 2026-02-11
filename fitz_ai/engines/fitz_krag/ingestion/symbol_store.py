@@ -33,11 +33,11 @@ class SymbolStore:
             INSERT INTO {TABLE}
                 (id, name, qualified_name, kind, raw_file_id,
                  start_line, end_line, signature, summary, summary_vector,
-                 imports, references, metadata)
+                 imports, references, keywords, entities, metadata)
             VALUES
                 (%s, %s, %s, %s, %s,
                  %s, %s, %s, %s, %s::vector,
-                 %s, %s, %s::jsonb)
+                 %s, %s, %s, %s::jsonb, %s::jsonb)
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 qualified_name = EXCLUDED.qualified_name,
@@ -49,6 +49,8 @@ class SymbolStore:
                 summary_vector = EXCLUDED.summary_vector,
                 imports = EXCLUDED.imports,
                 references = EXCLUDED.references,
+                keywords = EXCLUDED.keywords,
+                entities = EXCLUDED.entities,
                 metadata = EXCLUDED.metadata
         """
         with self._cm.connection(self._collection) as conn:
@@ -69,10 +71,32 @@ class SymbolStore:
                         vector_str,
                         sym.get("imports", []),
                         sym.get("references", []),
+                        sym.get("keywords", []),
+                        json.dumps(sym.get("entities", [])),
                         json.dumps(sym.get("metadata", {})),
                     ),
                 )
             conn.commit()
+
+    def search_bm25(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Full-text search on symbol name + summary using tsvector."""
+        sql = f"""
+            SELECT id, name, qualified_name, kind, raw_file_id,
+                   start_line, end_line, signature, summary, metadata,
+                   ts_rank_cd(content_tsv, plainto_tsquery('english', %s)) AS rank
+            FROM {TABLE}
+            WHERE content_tsv @@ plainto_tsquery('english', %s)
+            ORDER BY rank DESC
+            LIMIT %s
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, (query, query, limit)).fetchall()
+        results = []
+        for row in rows:
+            d = _row_to_dict(row[:10])
+            d["bm25_score"] = float(row[10]) if row[10] is not None else 0.0
+            results.append(d)
+        return results
 
     def search_by_name(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
         """Keyword search against symbol name and qualified_name using ILIKE."""

@@ -33,11 +33,11 @@ class SectionStore:
             INSERT INTO {TABLE}
                 (id, raw_file_id, title, level, page_start, page_end,
                  content, summary, summary_vector, parent_section_id,
-                 position, metadata)
+                 position, keywords, entities, metadata)
             VALUES
                 (%s, %s, %s, %s, %s, %s,
                  %s, %s, %s::vector, %s,
-                 %s, %s::jsonb)
+                 %s, %s, %s::jsonb, %s::jsonb)
             ON CONFLICT (id) DO UPDATE SET
                 title = EXCLUDED.title,
                 level = EXCLUDED.level,
@@ -48,6 +48,8 @@ class SectionStore:
                 summary_vector = EXCLUDED.summary_vector,
                 parent_section_id = EXCLUDED.parent_section_id,
                 position = EXCLUDED.position,
+                keywords = EXCLUDED.keywords,
+                entities = EXCLUDED.entities,
                 metadata = EXCLUDED.metadata
         """
         with self._cm.connection(self._collection) as conn:
@@ -67,6 +69,8 @@ class SectionStore:
                         vector_str,
                         sec.get("parent_section_id"),
                         sec["position"],
+                        sec.get("keywords", []),
+                        json.dumps(sec.get("entities", [])),
                         json.dumps(sec.get("metadata", {})),
                     ),
                 )

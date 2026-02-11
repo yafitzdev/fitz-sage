@@ -66,6 +66,13 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._detection_orchestrator = None
     engine._table_store = MagicMock(name="table_store")
     engine._pg_table_store = MagicMock(name="pg_table_store")
+    engine._query_rewriter = None
+    engine._address_reranker = None
+    engine._hop_controller = None
+    engine._chat_factory = None
+    engine._vocabulary_store = None
+    engine._keyword_matcher = None
+    engine._entity_graph_store = None
     return engine
 
 
@@ -161,7 +168,7 @@ class TestEngineInit:
         # Core clients called
         _patches["get_chat"].assert_called_once()
         _patches["get_embedder"].assert_called_once()
-        _patches["PostgresConnectionManager"].get_instance.assert_called_once()
+        _patches["PostgresConnectionManager"].get_instance.assert_called()
 
         # Schema ensured
         _patches["ensure_schema"].assert_called_once()
@@ -461,6 +468,8 @@ class TestIngest:
             collection=engine._config.collection,
             table_store=engine._table_store,
             pg_table_store=engine._pg_table_store,
+            vocabulary_store=engine._vocabulary_store,
+            entity_graph_store=engine._entity_graph_store,
         )
         mock_pipeline_cls.return_value.ingest.assert_called_once_with(
             source,

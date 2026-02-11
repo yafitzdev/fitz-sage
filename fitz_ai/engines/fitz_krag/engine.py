@@ -115,6 +115,7 @@ class FitzKragEngine:
             config=self._config,
             section_strategy=section_strategy,
             table_strategy=table_strategy,
+            chat_factory=None,  # Set after chat_factory is created
         )
         self._reader = ContentReader(
             self._raw_store,
@@ -166,14 +167,92 @@ class FitzKragEngine:
 
         self._table_handler = TableQueryHandler(self._chat, self._pg_table_store, self._config)
 
+        # Chat factory (shared by detection, rewriter, HyDE, multi-hop, enrichment)
+        from fitz_ai.llm.factory import get_chat_factory
+
+        self._chat_factory = get_chat_factory(self._config.chat)
+
         # Shared detection
         self._detection_orchestrator: Any = None
         if self._config.enable_detection:
-            from fitz_ai.llm.factory import get_chat_factory
             from fitz_ai.retrieval.detection.registry import DetectionOrchestrator
 
-            chat_factory = get_chat_factory(self._config.chat)
-            self._detection_orchestrator = DetectionOrchestrator(chat_factory=chat_factory)
+            self._detection_orchestrator = DetectionOrchestrator(chat_factory=self._chat_factory)
+
+        # Query rewriting
+        self._query_rewriter: Any = None
+        if self._config.enable_query_rewriting:
+            from fitz_ai.retrieval.rewriter.rewriter import QueryRewriter
+
+            self._query_rewriter = QueryRewriter(chat_factory=self._chat_factory)
+
+        # HyDE generator (passed to strategies)
+        self._hyde_generator: Any = None
+        if self._config.enable_hyde:
+            from fitz_ai.retrieval.hyde.generator import HydeGenerator
+
+            self._hyde_generator = HydeGenerator(chat_factory=self._chat_factory)
+
+        # Reranker (activated by config.rerank provider presence)
+        self._address_reranker: Any = None
+        if self._config.rerank:
+            from fitz_ai.llm.client import get_reranker
+
+            reranker = get_reranker(self._config.rerank)
+            if reranker:
+                from fitz_ai.engines.fitz_krag.retrieval.reranker import AddressReranker
+
+                self._address_reranker = AddressReranker(
+                    reranker=reranker,
+                    k=self._config.rerank_k,
+                    min_addresses=self._config.rerank_min_addresses,
+                )
+
+        # Wire chat_factory + HyDE into router and strategies
+        if self._config.enable_multi_query:
+            self._retrieval_router._chat_factory = self._chat_factory
+        if self._hyde_generator:
+            code_strategy._hyde_generator = self._hyde_generator
+            section_strategy._hyde_generator = self._hyde_generator
+
+        # Vocabulary store + keyword matcher
+        self._vocabulary_store: Any = None
+        self._keyword_matcher: Any = None
+        if self._config.enable_enrichment:
+            try:
+                from fitz_ai.retrieval.vocabulary.matcher import KeywordMatcher
+                from fitz_ai.retrieval.vocabulary.store import VocabularyStore
+
+                self._vocabulary_store = VocabularyStore(collection=self._config.collection)
+                keywords = self._vocabulary_store.load()
+                if keywords:
+                    self._keyword_matcher = KeywordMatcher(keywords)
+                    self._retrieval_router._keyword_matcher = self._keyword_matcher
+            except Exception as e:
+                logger.debug(f"Vocabulary store init: {e}")
+
+        # Entity graph store
+        self._entity_graph_store: Any = None
+        if self._config.enable_enrichment:
+            try:
+                from fitz_ai.retrieval.entity_graph.store import EntityGraphStore
+
+                self._entity_graph_store = EntityGraphStore(collection=self._config.collection)
+                self._expander._entity_graph_store = self._entity_graph_store
+            except Exception as e:
+                logger.debug(f"Entity graph store init: {e}")
+
+        # Multi-hop controller
+        self._hop_controller: Any = None
+        if self._config.enable_multi_hop:
+            from fitz_ai.engines.fitz_krag.retrieval.multihop import KragHopController
+
+            self._hop_controller = KragHopController(
+                router=self._retrieval_router,
+                reader=self._reader,
+                chat_factory=self._chat_factory,
+                max_hops=self._config.max_hops,
+            )
 
     def answer(self, query: Query) -> Answer:
         """
@@ -192,16 +271,36 @@ class FitzKragEngine:
             raise QueryError("Query text cannot be empty")
 
         try:
+            # 0.5. Rewrite query for retrieval optimization
+            retrieval_query = query.text
+            if self._query_rewriter:
+                try:
+                    result = self._query_rewriter.rewrite(query.text)
+                    if result.rewritten_query != query.text:
+                        retrieval_query = result.rewritten_query
+                        logger.debug(
+                            f"Query rewritten: '{query.text[:50]}' -> '{retrieval_query[:50]}'"
+                        )
+                except Exception as e:
+                    logger.warning(f"Query rewriting failed, using original: {e}")
+
             # 1. Analyze query intent
-            analysis = self._query_analyzer.analyze(query.text)
+            analysis = self._query_analyzer.analyze(retrieval_query)
 
             # 1.5. Run shared detection (temporal, comparison, expansion)
             detection = None
             if self._detection_orchestrator:
-                detection = self._detection_orchestrator.detect_for_retrieval(query.text)
+                detection = self._detection_orchestrator.detect_for_retrieval(retrieval_query)
 
-            # 2. Retrieve addresses with analysis-informed routing
-            addresses = self._retrieval_router.retrieve(query.text, analysis, detection=detection)
+            # 2. Retrieve addresses (or multi-hop)
+            if self._hop_controller:
+                # Multi-hop: iterative retrieve → read → evaluate → bridge
+                read_results = self._hop_controller.execute(retrieval_query, analysis, detection)
+                addresses = [r.address for r in read_results] if read_results else []
+            else:
+                addresses = self._retrieval_router.retrieve(
+                    retrieval_query, analysis, detection=detection
+                )
 
             if not addresses:
                 return Answer(
@@ -210,14 +309,21 @@ class FitzKragEngine:
                     metadata={"engine": "fitz_krag", "query": query.text},
                 )
 
-            # 2.5. Check cloud cache (early return on hit)
+            # 2.5. Rerank addresses (when reranker configured)
+            if self._address_reranker and not self._hop_controller:
+                addresses = self._address_reranker.rerank(retrieval_query, addresses)
+
+            # 2.6. Check cloud cache (early return on hit)
             if self._cloud_client:
                 cached = self._check_cloud_cache(query.text, addresses)
                 if cached:
                     return cached
 
-            # 3. Read content for top addresses
-            read_results = self._reader.read(addresses, self._config.top_read)
+            # 3. Read content for top addresses (skip if multi-hop already read)
+            if self._hop_controller:
+                pass  # read_results already populated by hop controller
+            else:
+                read_results = self._reader.read(addresses, self._config.top_read)
 
             if not read_results:
                 return Answer(
@@ -348,6 +454,8 @@ class FitzKragEngine:
             collection=col,
             table_store=self._table_store,
             pg_table_store=self._pg_table_store,
+            vocabulary_store=self._vocabulary_store,
+            entity_graph_store=self._entity_graph_store,
         )
         return pipeline.ingest(source)
 

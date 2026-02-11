@@ -60,7 +60,7 @@ class KragIngestPipeline:
     Steps:
     1. Scan source for files
     2. Compute content hashes, diff against stored hashes
-    3. For new/changed files: extract -> summarize -> embed -> store
+    3. For new/changed files: extract -> summarize -> enrich -> embed -> store
     4. For deleted files: cascade delete
     """
 
@@ -73,6 +73,8 @@ class KragIngestPipeline:
         collection: str,
         table_store: "TableStore | None" = None,
         pg_table_store: "PostgresTableStore | None" = None,
+        vocabulary_store: Any = None,
+        entity_graph_store: Any = None,
     ):
         self._config = config
         self._chat = chat
@@ -87,6 +89,15 @@ class KragIngestPipeline:
         self._section_store = SectionStore(connection_manager, collection)
         self._table_store = table_store or TableStore(connection_manager, collection)
         self._pg_table_store = pg_table_store
+        self._vocabulary_store = vocabulary_store
+        self._entity_graph_store = entity_graph_store
+
+        # Enricher
+        self._enricher: Any = None
+        if config.enable_enrichment:
+            from fitz_ai.engines.fitz_krag.ingestion.enricher import KragEnricher
+
+            self._enricher = KragEnricher(chat, batch_size=config.summary_batch_size)
 
         # Code strategies
         self._strategies: dict[str, Any] = {}
@@ -233,11 +244,26 @@ class KragIngestPipeline:
                         "summary_vector": vectors[i] if i < len(vectors) else None,
                         "imports": sym.imports,
                         "references": sym.references,
+                        "keywords": [],
+                        "entities": [],
                         "metadata": {},
                     }
                 )
+
+            # Enrich symbols with keywords + entities
+            if self._enricher:
+                self._enricher.enrich_symbols(symbol_dicts)
+
             self._symbol_store.upsert_batch(symbol_dicts)
             stats["symbols_embedded"] = len(vectors)
+
+            # Save keywords to VocabularyStore
+            if self._vocabulary_store:
+                self._save_keywords_to_vocabulary(symbol_dicts, [])
+
+            # Populate entity graph
+            if self._entity_graph_store:
+                self._populate_entity_graph(symbol_dicts, "symbol_id")
 
         # Store import edges
         if all_import_edges:
@@ -265,12 +291,34 @@ class KragIngestPipeline:
                         ),
                         "parent_section_id": sec.parent_id,
                         "position": sec.position,
+                        "keywords": [],
+                        "entities": [],
                         "metadata": sec.metadata,
                     }
                 )
             _resolve_section_parents(section_dicts, all_section_file_ids)
+
+            # Enrich sections with keywords + entities
+            if self._enricher:
+                self._enricher.enrich_sections(section_dicts)
+
             self._section_store.upsert_batch(section_dicts)
             stats["sections_embedded"] = len(section_vectors)
+
+            # Save section keywords to VocabularyStore
+            if self._vocabulary_store:
+                self._save_keywords_to_vocabulary([], section_dicts)
+
+            # Populate entity graph for sections
+            if self._entity_graph_store:
+                self._populate_entity_graph(section_dicts, "section_id")
+
+        # 4b-2. Hierarchical summaries (L1 groups + L2 corpus)
+        if self._config.enable_hierarchy:
+            if all_symbols:
+                self._generate_hierarchy_symbols(symbol_dicts, all_symbol_file_ids)
+            if all_sections:
+                self._generate_hierarchy_sections(section_dicts, all_section_file_ids)
 
         # 4c. Batch summarize + embed tables
         if all_table_metas:
@@ -701,6 +749,177 @@ class KragIngestPipeline:
         except Exception as e:
             logger.warning(f"Embedding failed: {e}")
             return []
+
+    # ------------------------------------------------------------------
+    # Vocabulary integration
+    # ------------------------------------------------------------------
+
+    def _save_keywords_to_vocabulary(
+        self,
+        symbol_dicts: list[dict[str, Any]],
+        section_dicts: list[dict[str, Any]],
+    ) -> None:
+        """Collect keywords from enriched dicts and save to VocabularyStore."""
+        try:
+            from fitz_ai.retrieval.vocabulary.models import Keyword
+
+            keywords: list[Keyword] = []
+            seen: set[str] = set()
+
+            for item_list in [symbol_dicts, section_dicts]:
+                for item in item_list:
+                    for kw_str in item.get("keywords", []):
+                        kw_lower = kw_str.lower()
+                        if kw_lower not in seen:
+                            seen.add(kw_lower)
+                            keywords.append(
+                                Keyword(
+                                    id=kw_str,
+                                    category="auto",
+                                    match=[kw_str],
+                                    occurrences=1,
+                                    auto_generated=[kw_str],
+                                )
+                            )
+
+            if keywords:
+                self._vocabulary_store.merge_and_save(keywords, source_docs=len(symbol_dicts))
+                logger.debug(f"Saved {len(keywords)} keywords to vocabulary store")
+        except Exception as e:
+            logger.warning(f"Failed to save keywords to vocabulary: {e}")
+
+    # ------------------------------------------------------------------
+    # Entity graph integration
+    # ------------------------------------------------------------------
+
+    def _populate_entity_graph(self, item_dicts: list[dict[str, Any]], id_field: str) -> None:
+        """Add entities from enriched items to the entity graph store."""
+        try:
+            for item in item_dicts:
+                entities = item.get("entities", [])
+                if not entities:
+                    continue
+                entity_tuples = []
+                for e in entities:
+                    if isinstance(e, dict):
+                        entity_tuples.append((e.get("name", ""), e.get("type", "unknown")))
+                if entity_tuples:
+                    self._entity_graph_store.add_chunk_entities(item["id"], entity_tuples)
+        except Exception as e:
+            logger.warning(f"Failed to populate entity graph: {e}")
+
+    # ------------------------------------------------------------------
+    # Hierarchical summaries
+    # ------------------------------------------------------------------
+
+    def _generate_hierarchy_symbols(
+        self, symbol_dicts: list[dict[str, Any]], file_ids: list[str]
+    ) -> None:
+        """Generate L1 file-level summaries for symbols."""
+        try:
+            groups: dict[str, list[dict]] = {}
+            for i, sym in enumerate(symbol_dicts):
+                fid = file_ids[i] if i < len(file_ids) else sym.get("raw_file_id", "")
+                groups.setdefault(fid, []).append(sym)
+
+            l1_summaries: list[str] = []
+            for file_id, symbols in groups.items():
+                names = [s.get("name", "") for s in symbols[:10]]
+                summaries = [s.get("summary", "") for s in symbols[:10] if s.get("summary")]
+                content = "\n".join(f"- {n}: {s}" for n, s in zip(names, summaries) if s)
+                if not content:
+                    continue
+
+                try:
+                    group_summary = self._chat.chat(
+                        [
+                            {
+                                "role": "system",
+                                "content": (
+                                    "Summarize this group of code symbols in 2-3 sentences. "
+                                    "Focus on what this file/module does overall."
+                                ),
+                            },
+                            {"role": "user", "content": content},
+                        ]
+                    )
+                    l1_summaries.append(group_summary)
+                    for sym in symbols:
+                        meta = sym.get("metadata", {})
+                        meta["hierarchy_summary"] = group_summary
+                        sym["metadata"] = meta
+                except Exception as e:
+                    logger.debug(f"L1 summary failed for file group: {e}")
+
+            # L2 corpus summary
+            if l1_summaries:
+                self._generate_corpus_summary(l1_summaries, "code")
+        except Exception as e:
+            logger.warning(f"Hierarchy generation for symbols failed: {e}")
+
+    def _generate_hierarchy_sections(
+        self, section_dicts: list[dict[str, Any]], file_ids: list[str]
+    ) -> None:
+        """Generate L1 file-level summaries for sections."""
+        try:
+            groups: dict[str, list[dict]] = {}
+            for i, sec in enumerate(section_dicts):
+                fid = file_ids[i] if i < len(file_ids) else sec.get("raw_file_id", "")
+                groups.setdefault(fid, []).append(sec)
+
+            l1_summaries: list[str] = []
+            for file_id, sections in groups.items():
+                titles = [s.get("title", "") for s in sections[:10]]
+                summaries = [s.get("summary", "") for s in sections[:10] if s.get("summary")]
+                content = "\n".join(f"- {t}: {s}" for t, s in zip(titles, summaries) if s)
+                if not content:
+                    continue
+
+                try:
+                    group_summary = self._chat.chat(
+                        [
+                            {
+                                "role": "system",
+                                "content": (
+                                    "Summarize this group of document sections in 2-3 sentences. "
+                                    "Focus on what this document covers overall."
+                                ),
+                            },
+                            {"role": "user", "content": content},
+                        ]
+                    )
+                    l1_summaries.append(group_summary)
+                    for sec in sections:
+                        meta = sec.get("metadata", {})
+                        meta["hierarchy_summary"] = group_summary
+                        sec["metadata"] = meta
+                except Exception as e:
+                    logger.debug(f"L1 summary failed for section group: {e}")
+
+            if l1_summaries:
+                self._generate_corpus_summary(l1_summaries, "document")
+        except Exception as e:
+            logger.warning(f"Hierarchy generation for sections failed: {e}")
+
+    def _generate_corpus_summary(self, l1_summaries: list[str], kind: str) -> None:
+        """Generate L2 corpus-level summary from L1 summaries."""
+        try:
+            content = "\n".join(f"- {s}" for s in l1_summaries[:20])
+            corpus_summary = self._chat.chat(
+                [
+                    {
+                        "role": "system",
+                        "content": (
+                            f"Summarize this collection of {kind} modules in 3-5 sentences. "
+                            "Describe the overall system architecture and purpose."
+                        ),
+                    },
+                    {"role": "user", "content": content},
+                ]
+            )
+            logger.debug(f"L2 corpus summary ({kind}): {corpus_summary[:100]}...")
+        except Exception as e:
+            logger.warning(f"L2 corpus summary failed: {e}")
 
 
 def _resolve_section_parents(section_dicts: list[dict[str, Any]], file_ids: list[str]) -> None:
