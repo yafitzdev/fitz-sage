@@ -4,7 +4,7 @@
 
 # fitz-ai
 
-### Intelligent, honest RAG in 5 minutes. No infrastructure. No boilerplate.
+### Intelligent, honest knowledge retrieval in 5 minutes. No infrastructure. No boilerplate.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
@@ -146,7 +146,7 @@ You can—but you'll hit walls fast.
 > → Fitz detects disputes at **89.7% recall** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 1,100+ case benchmark for epistemic honesty.
 
 **Queries that actually work 📊**
-> Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, AST-aware chunking for code, and SQL execution for tabular data. No configuration—it just works.
+> Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, address-based code retrieval with import graph traversal, and SQL execution for tabular data. No configuration—it just works.
 
 **Tabular data that is actually searchable 📈** → [Unified Storage](docs/features/unified-storage.md)
 > CSV and table data is a nightmare in most RAG systems—chunked arbitrarily, structure lost, queries fail. Fitz stores tables natively in PostgreSQL alongside your vectors—same database, no sync issues. Auto-detects schema and runs real SQL. Ask "What's the average price by region?" and get an actual computed answer, not fragmented rows.
@@ -154,9 +154,9 @@ You can—but you'll hit walls fast.
 **Other Features at a Glance 🃏**
 >1. [x] **Fully local execution possible.** Embedded PostgreSQL + Ollama, no API keys required to start.
 >2. [x] **Plugin-based architecture.** Swap LLMs, rerankers, and retrieval pipelines via YAML config.
->3. [x] **Extensible engine system.** FitzRAG built-in, with a clean registry for adding custom engines.
+>3. [x] **KRAG (Knowledge Routing Augmented Generation).** Address-based retrieval.
 >4. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
->5. [x] **Full provenance.** Every answer traces back to the exact chunk and document.
+>5. [x] **Full provenance.** Every answer traces back to the exact source symbol, section, or document.
 >6. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
 >7. [x] **[Enterprise gateway support](docs/features/enterprise-gateway.md).** OAuth2 M2M, custom CA certs, mTLS, and corporate proxy/gateway integration.
 
@@ -166,10 +166,31 @@ You can—but you'll hit walls fast.
 > Any questions left? Try fitz on itself:
 > 
 > ```bash
-> fitz quickstart ./fitz_ai "How does the chunking pipeline work?"
+> fitz quickstart ./fitz_ai "How does the ingestion pipeline work?"
 > ```
 >
 > The codebase speaks for itself.
+
+---
+
+### What You Can Search
+
+You feed Fitz documents — code files, PDFs, markdown, CSVs. FitzKRAG extracts structured retrieval units from them, each with its own storage and search strategy.
+
+<br>
+
+| Retrieval Unit  | Extracted From | Query Example | How It Works |
+|-----------------|----------------|---------------|-------------|
+| **Symbols 🖌️** | Code files | "How does the auth module work?" | Tree-sitter parses functions, classes, and methods into addressable units with qualified names, references, and import graphs. Cross-file dependencies are graph traversals, not text searches. |
+| **Sections 📑** | Documents (PDF, markdown, text) | "What are the design principles?" | Headings and paragraphs are extracted with parent/child hierarchy. Deeply nested sections include parent context; top-level headings include child summaries. |
+| **Tables 📅**   | CSV files or tables within documents | "What's the average price by region?" | Native PostgreSQL storage with auto-detected schema. Real SQL execution from natural language — not chunked text. |
+| **Images 🖼️**  | Figures and diagrams within documents | "What does the architecture diagram show?" | VLM-powered figure extraction and visual understanding. *(Coming soon)* |
+| **Chunks 🧩**     | Any content as fallback | "Find mentions of the refund policy" | Traditional chunk-based retrieval when structured extraction doesn't apply. Automatic fallback — no configuration needed. |
+
+<br>
+
+> [!NOTE]
+> All retrieval units share the same retrieval intelligence (temporal handling, comparison queries, multi-hop reasoning, etc.) and the same enrichment pipeline (summaries, keywords, entities, hierarchical summaries).
 
 ---
 
@@ -179,28 +200,27 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 
 <br>
 
-| Feature | Query | Naive RAG Problem | FitzRAG Solution |
+| Feature | Query | Naive RAG Problem | Fitz Solution |
 |---------|-------|-------------------|------------------|
 | [**epistemic-honesty**](docs/features/epistemic-honesty.md) | "What was our Q4 revenue?" | ❌ Hallucinated number — Info doesn't exist, but LLM won't admit it | ✅ "I don't know" |
-| [**governance-benchmarking**](docs/features/governance-benchmarking.md) | *[Benchmark: fitz-gov]* | ❌ No measurement — Retrieval benchmarks don't test epistemic honesty | ✅ 89.7% dispute detection, 81.2% abstain (ML classifier, 1100+ cases) |
 | [**keyword-vocabulary**](docs/features/keyword-vocabulary.md) | "Find TC_1000" | ❌ Wrong test case — Embeddings see TC_1000 ≈ TC_2000 (semantically similar) | ✅ Exact keyword matching |
 | [**hybrid-search**](docs/features/hybrid-search.md) | "X100 battery specs" | ❌ Returns Y200 docs — Semantic search misses exact model numbers | ✅ Hybrid search (dense + sparse) |
 | [**sparse-search**](docs/features/sparse-search.md) | "error code E_AUTH_401" | ❌ No exact match — Embeddings miss precise error codes | ✅ PostgreSQL full-text search |
 | [**multi-hop**](docs/features/multi-hop-reasoning.md) | "Who wrote the paper cited by the 2023 review?" | ❌ Returns the review only — Single-step search can't traverse references | ✅ Iterative retrieval |
 | [**hierarchical-rag**](docs/features/hierarchical-rag.md) | "What are the design principles?" | ❌ Random fragments — Answer is spread across docs; no single chunk contains it | ✅ Hierarchical summaries |
-| [**tabular-data-routing**](docs/features/tabular-data-routing.md) | "What's the timeout for CAN?" *(table)* | ❌ Fragmented rows — Tables chunked arbitrarily, structure lost | ✅ SQL on structured data |
 | [**multi-query**](docs/features/multi-query-rag.md) | *[User pastes 500-char test report]* "What failed and why?" | ❌ Vaguely related chunks — Long input → averaged embedding → matches nothing specifically | ✅ Multi-query decomposition |
 | [**comparison-queries**](docs/features/comparison-queries.md) | "Compare React vs Vue performance" | ❌ Incomplete comparison — Only retrieves one entity, missing the other | ✅ Multi-entity retrieval |
-| [**entity-graph**](docs/features/entity-graph.md) | "What else mentions AuthService?" | ❌ Isolated chunks — No awareness of shared entities across docs | ✅ Entity-based chunk linking |
+| [**entity-graph**](docs/features/entity-graph.md) | "What else mentions AuthService?" | ❌ Isolated chunks — No awareness of shared entities across docs | ✅ Entity-based linking across sources |
 | [**temporal-queries**](docs/features/temporal-queries.md) | "What changed between Q1 and Q2?" | ❌ Random chunks — No awareness of time periods in query | ✅ Temporal query handling |
 | [**aggregation-queries**](docs/features/aggregation-queries.md) | "List all the test cases that failed" | ❌ Partial list — No mechanism for comprehensive retrieval | ✅ Aggregation query handling |
 | [**freshness-authority**](docs/features/freshness-authority.md) | "What does the official spec say?" | ❌ Returns notes — Can't distinguish authoritative vs informal sources | ✅ Freshness/authority boosting |
 | [**query-expansion**](docs/features/query-expansion.md) | "How do I fetch the db config?" | ❌ No matches — User says "fetch", docs say "retrieve"; "db" vs "database" | ✅ Query expansion |
 | [**query-rewriting**](docs/features/query-rewriting.md) | "Tell me more about it" *(after discussing TechCorp)* | ❌ Lost context — Pronouns like "it" reference nothing, retrieval fails | ✅ Conversational context resolution |
 | [**hyde**](docs/features/hyde.md) | "What's TechCorp's approach to sustainability?" | ❌ Poor recall — Abstract queries don't embed close to concrete documents | ✅ Hypothetical document generation |
-| [**code-aware-chunking**](docs/features/code-aware-chunking.md) | "How does the auth module work?" *(code)* | ❌ Broken code fragments — Naive chunking splits functions mid-body | ✅ Complete functions |
-| [**contextual-embeddings**](docs/features/contextual-embeddings.md) | "When does it expire?" | ❌ Ambiguous chunk — "It expires in 24h" embedded without context; "it" = ? | ✅ Summary-prefixed embeddings |
+| [**contextual-embeddings**](docs/features/contextual-embeddings.md) | "When does it expire?" | ❌ Ambiguous chunk — "It expires in 24h" embedded without context; "it" = ? | ✅ Summary-prefixed symbol/section embeddings |
 | [**reranking**](docs/features/reranking.md) | "What's the battery warranty?" | ❌ Imprecise ranking — Vector similarity ≠ true relevance; best answer buried | ✅ Cross-encoder precision |
+
+<br>
 
 > [!IMPORTANT]
 > These features are **always on**—no configuration needed. Fitz automatically detects when to use each capability.
@@ -216,7 +236,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 <br>
 
 ```
-  Query + Retrieved Chunks
+  Query + Retrieved Context
             │
             ▼
   ┌─────────────────────┐
@@ -377,7 +397,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >- Module-level functions matching CLI (`ingest`, `query`)
 >- Auto-config creation (no setup required)
 >- Full provenance tracking
->- Same honest RAG as the CLI
+>- Same honest retrieval as the CLI
 >
 >For advanced use (multiple collections), use the `fitz` class directly:
 >```python
@@ -451,9 +471,9 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 
 <strong>Codebase Search 🐍</strong>
 
-> Fitz includes built-in AST-aware chunking for code bases. Functions, classes, and modules become individual searchable units with docstrings and imports preserved. Ask questions in natural language; get answers pointing to specific code.
+> FitzKRAG uses address-based retrieval for code: tree-sitter parses your codebase into symbols (functions, classes, methods) with qualified names, references, and import graphs. No chunking—each symbol is a precise, addressable unit. Cross-file dependencies are tracked, so "what calls this function?" is a graph traversal, not a text search.
 >
-> *Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They ingest the codebase and ask "Where is user authentication handled?" or "What API endpoints modify the billing table?" New developers onboard in days instead of weeks.
+> *Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They ingest the codebase and ask "Where is user authentication handled?" or "What depends on the billing module?" FitzKRAG returns specific functions with their callers and dependencies. New developers onboard in days instead of weeks.
 
 </details>
 
@@ -475,9 +495,9 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 │  API: /query | /chat | /ingest | /collections | /health       │
 ├───────────────────────────────────────────────────────────────┤
 │  Engines                                                      │
-│  ┌───────────┐  ┌────────────┐                                │
-│  │  FitzRAG  │  │  Custom... │  (extensible registry)         │
-│  └───────────┘  └────────────┘                                │
+│  ┌────────────┐  ┌────────────┐                               │
+│  │  FitzKRAG  │  │  Custom... │  (extensible registry)        │
+│  └────────────┘  └────────────┘                               │
 ├───────────────────────────────────────────────────────────────┤
 │  LLM Plugins (YAML-defined)                                   │
 │  ┌────────┐ ┌───────────┐ ┌────────┐                          │
@@ -488,10 +508,10 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 │  Storage (PostgreSQL + pgvector)                              │
 │  vectors | metadata | tables | keywords | full-text search    │
 ├───────────────────────────────────────────────────────────────┤
-│  Retrieval Pipelines (plugin choice controls features)        │
-│  dense (no rerank) | dense_rerank (with rerank)               │
+│  Retrieval (address-based, baked-in intelligence)             │
+│  symbols | sections | tables | import graphs | reranking      │
 ├───────────────────────────────────────────────────────────────┤
-│  Enrichment (baked in via ChunkEnricher)                      │
+│  Enrichment (baked in)                                        │
 │  summaries | keywords | entities | hierarchical summaries     │
 ├───────────────────────────────────────────────────────────────┤
 │  Constraints (epistemic safety)                               │
@@ -666,6 +686,6 @@ MIT
 - [Governance Benchmarking (fitz-gov)](docs/features/governance-benchmarking.md)
 - [Plugin Development](docs/PLUGINS.md)
 - [Feature Control](docs/FEATURE_CONTROL.md)
+- [FitzKRAG Engine](docs/ENGINES.md)
 - [Custom Engines](docs/CUSTOM_ENGINES.md)
-- [Engine Comparison](docs/ENGINES.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
