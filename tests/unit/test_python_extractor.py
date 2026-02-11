@@ -131,6 +131,51 @@ class TestImportExtraction:
         assert "Dict" in imp.import_names
         assert "List" in imp.import_names
 
+    def test_relative_import_single_dot(self, strategy):
+        """``from .models import User`` in ``src/utils/helpers.py`` resolves to ``src.utils.models``."""
+        source = "from .models import User\n"
+        result = strategy.extract(source, "src/utils/helpers.py")
+        assert len(result.imports) == 1
+        assert result.imports[0].target_module == "src.utils.models"
+        assert "User" in result.imports[0].import_names
+
+    def test_relative_import_double_dot(self, strategy):
+        """``from ..core import Base`` in ``src/utils/helpers.py`` resolves to ``src.core``."""
+        source = "from ..core import Base\n"
+        result = strategy.extract(source, "src/utils/helpers.py")
+        assert len(result.imports) == 1
+        assert result.imports[0].target_module == "src.core"
+        assert "Base" in result.imports[0].import_names
+
+    def test_relative_import_in_init(self, strategy):
+        """``from .helpers import foo`` in ``src/utils/__init__.py`` resolves to ``src.utils.helpers``."""
+        source = "from .helpers import foo\n"
+        result = strategy.extract(source, "src/utils/__init__.py")
+        assert len(result.imports) == 1
+        assert result.imports[0].target_module == "src.utils.helpers"
+        assert "foo" in result.imports[0].import_names
+
+    def test_relative_import_no_module(self, strategy):
+        """``from . import models`` (module=None) resolves using import names."""
+        source = "from . import models\n"
+        result = strategy.extract(source, "src/utils/helpers.py")
+        assert len(result.imports) == 1
+        assert result.imports[0].target_module == "src.utils"
+        assert "models" in result.imports[0].import_names
+
+    def test_relative_import_beyond_root(self, strategy):
+        """Relative import that goes above root is skipped."""
+        source = "from ....way.too.high import X\n"
+        result = strategy.extract(source, "pkg/mod.py")
+        assert len(result.imports) == 0
+
+    def test_absolute_import_unchanged(self, strategy):
+        """Absolute imports still work as before."""
+        source = "from fitz_ai.core import Query\n"
+        result = strategy.extract(source, "src/engine.py")
+        assert len(result.imports) == 1
+        assert result.imports[0].target_module == "fitz_ai.core"
+
 
 class TestSyntaxError:
     def test_invalid_syntax_returns_empty(self, strategy):

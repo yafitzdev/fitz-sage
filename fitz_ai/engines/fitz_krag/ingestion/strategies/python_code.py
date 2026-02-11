@@ -67,7 +67,15 @@ class PythonCodeIngestStrategy:
                     )
 
             elif isinstance(node, ast.ImportFrom):
-                if node.module:
+                if node.level and node.level > 0:
+                    # Relative import: resolve to absolute module name
+                    resolved = _resolve_relative_import(
+                        module_name, node.module, node.level, file_path
+                    )
+                    if resolved:
+                        names = [alias.name for alias in node.names]
+                        imports.append(ImportEdge(target_module=resolved, import_names=names))
+                elif node.module:
                     names = [alias.name for alias in node.names]
                     imports.append(ImportEdge(target_module=node.module, import_names=names))
 
@@ -237,6 +245,38 @@ def _extract_references(node: ast.AST) -> list[str]:
             if isinstance(child.value, ast.Name):
                 refs.add(f"{child.value.id}.{child.attr}")
     return sorted(refs)
+
+
+def _resolve_relative_import(
+    module_name: str, import_module: str | None, level: int, file_path: str
+) -> str | None:
+    """Resolve a relative import to an absolute module name.
+
+    ``from .models import User`` in file ``src/utils/helpers.py`` (module
+    ``src.utils.helpers``) with level=1 resolves to ``src.utils.models``.
+
+    For ``__init__.py`` files the module name already IS the package, so
+    level=1 stays at the same package rather than going up one extra level.
+    """
+    parts = module_name.split(".")
+
+    # For non-__init__ files, the package is the parent (drop last component).
+    # For __init__.py the module name is already the package.
+    is_init = file_path.replace("\\", "/").endswith("/__init__.py") or file_path == "__init__.py"
+    if not is_init and parts:
+        parts = parts[:-1]
+
+    # level=1 means "current package", each extra level goes up one more
+    up = level - 1
+    if up > len(parts):
+        return None  # can't go above root
+    if up > 0:
+        parts = parts[:-up]
+
+    if import_module:
+        parts.append(import_module)
+
+    return ".".join(parts) if parts else None
 
 
 def _path_to_module(file_path: str) -> str:
