@@ -179,13 +179,13 @@ You feed Fitz documents — code files, PDFs, markdown, CSVs. FitzKRAG extracts 
 
 <br>
 
-| Retrieval Unit  | Extracted From | Query Example | How It Works |
-|-----------------|----------------|---------------|-------------|
-| **Symbols 🖌️** | Code files | "How does the auth module work?" | Tree-sitter parses functions, classes, and methods into addressable units with qualified names, references, and import graphs. Cross-file dependencies are graph traversals, not text searches. |
-| **Sections 📑** | Documents (PDF, markdown, text) | "What are the design principles?" | Headings and paragraphs are extracted with parent/child hierarchy. Deeply nested sections include parent context; top-level headings include child summaries. |
-| **Tables 📅**   | CSV files or tables within documents | "What's the average price by region?" | Native PostgreSQL storage with auto-detected schema. Real SQL execution from natural language — not chunked text. |
-| **Images 🖼️**  | Figures and diagrams within documents | "What does the architecture diagram show?" | VLM-powered figure extraction and visual understanding. *(Coming soon)* |
-| **Chunks 🧩**     | Any content as fallback | "Find mentions of the refund policy" | Traditional chunk-based retrieval when structured extraction doesn't apply. Automatic fallback — no configuration needed. |
+| Retrieval Unit              | Extracted From | How It Works |
+|-----------------------------|----------------|-------------|
+| **Symbols 🖌️**             | Code files | Tree-sitter parses functions, classes, and methods into addressable units with qualified names, references, and import graphs. Cross-file dependencies are graph traversals, not text searches. |
+| **Sections 📑**             | Documents (PDF, markdown, text) | Headings and paragraphs are extracted with parent/child hierarchy. Deeply nested sections include parent context; top-level headings include child summaries. |
+| **Tables 📅**               | CSV files or tables within documents | Native PostgreSQL storage with auto-detected schema. Real SQL execution from natural language — not chunked text. |
+| **Images 🖼️**              | Figures and diagrams within documents | VLM-powered figure extraction and visual understanding. *(Coming soon)* |
+| **Chunks 🧩**               | Any content as fallback | Traditional chunk-based retrieval when structured extraction doesn't apply. Automatic fallback — no configuration needed. |
 
 <br>
 
