@@ -108,7 +108,12 @@ class TestEngineRegistry:
 
     def setup_method(self):
         """Reset registry before each test."""
+        self._saved_registry = EngineRegistry._global_registry
         EngineRegistry.reset_global()
+
+    def teardown_method(self):
+        """Restore global registry after each test."""
+        EngineRegistry._global_registry = self._saved_registry
 
     def test_singleton_registry(self):
         """Test that global registry is a singleton."""
@@ -213,6 +218,7 @@ class TestUniversalRunner:
 
     def setup_method(self):
         """Reset registry and set up mock engine."""
+        self._saved_registry = EngineRegistry._global_registry
         EngineRegistry.reset_global()
 
         # Register a mock engine
@@ -232,6 +238,10 @@ class TestUniversalRunner:
             factory=mock_factory,
             description="Mock engine for testing",
         )
+
+    def teardown_method(self):
+        """Restore global registry after each test."""
+        EngineRegistry._global_registry = self._saved_registry
 
     def test_list_engines_function(self):
         """Test list_engines convenience function."""
