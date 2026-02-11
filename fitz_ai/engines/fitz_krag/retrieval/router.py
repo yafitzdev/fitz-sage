@@ -12,6 +12,7 @@ from fitz_ai.engines.fitz_krag.types import Address
 
 if TYPE_CHECKING:
     from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
+    from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis
     from fitz_ai.engines.fitz_krag.retrieval.strategies.chunk_fallback import (
         ChunkFallbackStrategy,
     )
@@ -40,53 +41,63 @@ class RetrievalRouter:
         self._section_strategy = section_strategy
         self._config = config
 
-    def retrieve(self, query: str) -> list[Address]:
+    def retrieve(self, query: str, analysis: "QueryAnalysis | None" = None) -> list[Address]:
         """
-        Retrieve addresses from all enabled strategies.
+        Retrieve addresses using strategy weights from query analysis.
 
-        Runs code + section strategies, merges results by score.
-        Chunk fallback supplements when other results are insufficient.
+        When analysis is provided, strategies with near-zero weight are skipped
+        and results are ranked using CrossStrategyRanker. Without analysis,
+        all strategies run equally (backward compatible).
         """
+        from fitz_ai.engines.fitz_krag.retrieval.ranker import CrossStrategyRanker
+
         limit = self._config.top_addresses
+        weights = analysis.strategy_weights if analysis else None
         all_addresses: list[Address] = []
 
-        # Run code strategy
-        code_addresses = self._code_strategy.retrieve(query, limit)
-        all_addresses.extend(code_addresses)
+        # Run code strategy (skip if weight below threshold)
+        if not weights or weights.get("code", 1.0) > 0.05:
+            code_addresses = self._code_strategy.retrieve(query, limit)
+            all_addresses.extend(code_addresses)
 
-        # Run section strategy if available
-        if self._section_strategy:
+        # Run section strategy if available and weighted
+        if self._section_strategy and (not weights or weights.get("section", 1.0) > 0.05):
             section_addresses = self._section_strategy.retrieve(query, limit)
             all_addresses.extend(section_addresses)
 
-        # Optionally run chunk fallback when other results are insufficient
+        # Chunk fallback when other results are insufficient
         if (
             self._chunk_strategy
             and self._config.fallback_to_chunks
+            and (not weights or weights.get("chunk", 1.0) > 0.05)
             and len(all_addresses) < limit // 2
         ):
             chunk_limit = limit - len(all_addresses)
             chunk_addresses = self._chunk_strategy.retrieve(query, chunk_limit)
             all_addresses.extend(chunk_addresses)
 
-        # Merge, deduplicate, and rank by score
-        return self._merge_and_rank(all_addresses, limit)
+        # Deduplicate
+        deduped = self._deduplicate(all_addresses)
 
-    def _merge_and_rank(
-        self,
-        addresses: list[Address],
-        limit: int,
-    ) -> list[Address]:
-        """Deduplicate by source_id+location, then rank by score."""
+        # Rank using analysis if available
+        if analysis:
+            ranker = CrossStrategyRanker()
+            ranked = ranker.rank(deduped, analysis)
+            return ranked[:limit]
+
+        # Fallback: sort by score
+        deduped.sort(key=lambda a: a.score, reverse=True)
+        return deduped[:limit]
+
+    def _deduplicate(self, addresses: list[Address]) -> list[Address]:
+        """Deduplicate addresses by source_id+location."""
         seen: set[tuple[str, str]] = set()
-        merged: list[Address] = []
+        result: list[Address] = []
 
         for addr in addresses:
             key = (addr.source_id, addr.location)
             if key not in seen:
                 seen.add(key)
-                merged.append(addr)
+                result.append(addr)
 
-        # Sort by score descending
-        merged.sort(key=lambda a: a.score, reverse=True)
-        return merged[:limit]
+        return result

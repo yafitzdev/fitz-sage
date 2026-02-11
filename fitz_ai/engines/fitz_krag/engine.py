@@ -107,6 +107,11 @@ class FitzKragEngine:
             self._config,
         )
 
+        # Query Analysis
+        from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalyzer
+
+        self._query_analyzer = QueryAnalyzer(self._chat)
+
         # Context + Generation
         from fitz_ai.engines.fitz_krag.context.assembler import ContextAssembler
         from fitz_ai.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
@@ -130,8 +135,11 @@ class FitzKragEngine:
             raise QueryError("Query text cannot be empty")
 
         try:
-            # 1. Retrieve addresses
-            addresses = self._retrieval_router.retrieve(query.text)
+            # 1. Analyze query intent
+            analysis = self._query_analyzer.analyze(query.text)
+
+            # 2. Retrieve addresses with analysis-informed routing
+            addresses = self._retrieval_router.retrieve(query.text, analysis)
 
             if not addresses:
                 return Answer(
@@ -140,7 +148,7 @@ class FitzKragEngine:
                     metadata={"engine": "fitz_krag", "query": query.text},
                 )
 
-            # 2. Read content for top addresses
+            # 3. Read content for top addresses
             read_results = self._reader.read(addresses, self._config.top_read)
 
             if not read_results:
@@ -150,13 +158,13 @@ class FitzKragEngine:
                     metadata={"engine": "fitz_krag", "query": query.text},
                 )
 
-            # 3. Expand with context
+            # 4. Expand with context
             expanded = self._expander.expand(read_results)
 
-            # 4. Assemble context
+            # 5. Assemble context
             context = self._assembler.assemble(query.text, expanded)
 
-            # 5. Generate answer
+            # 6. Generate answer
             return self._synthesizer.generate(query.text, context, expanded)
 
         except Exception as e:

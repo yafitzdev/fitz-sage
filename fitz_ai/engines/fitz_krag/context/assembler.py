@@ -42,22 +42,36 @@ class ContextAssembler:
         """
         Format read results as numbered source blocks.
 
-        Groups results by file, adds [S1], [S2] markers for citation.
+        When results contain mixed types (code + documentation), groups them
+        with type headers. Adds [S1], [S2] markers for citation.
         Respects max_context_tokens budget.
         """
         if not results:
             return ""
 
+        # Check if results are mixed-type (code + documentation)
+        has_mixed = self._is_mixed_type(results)
+
         blocks: list[str] = []
         budget = self._config.max_context_tokens * CHARS_PER_TOKEN
         used = 0
+        current_group: str | None = None
 
         for i, result in enumerate(results):
+            # Add type group header for mixed-type results
+            if has_mixed:
+                group = self._type_group(result)
+                if group != current_group:
+                    header = f"--- {group} ---"
+                    if used + len(header) + 2 < budget:
+                        blocks.append(header)
+                        used += len(header) + 2
+                    current_group = group
+
             block = self._format_block(i + 1, result)
             block_len = len(block)
 
             if used + block_len > budget:
-                # Truncate this block to fit remaining budget
                 remaining = budget - used
                 if remaining > 100:
                     block = block[:remaining] + "\n```\n(truncated)"
@@ -68,6 +82,21 @@ class ContextAssembler:
             used += block_len
 
         return "\n\n".join(blocks)
+
+    def _is_mixed_type(self, results: list[ReadResult]) -> bool:
+        """Check if results contain both code and document types."""
+        kinds = {r.address.kind for r in results}
+        code_kinds = {AddressKind.SYMBOL, AddressKind.FILE}
+        doc_kinds = {AddressKind.SECTION}
+        return bool(kinds & code_kinds) and bool(kinds & doc_kinds)
+
+    def _type_group(self, result: ReadResult) -> str:
+        """Get the type group label for a result."""
+        if result.address.kind in (AddressKind.SYMBOL, AddressKind.FILE):
+            return "Code"
+        elif result.address.kind == AddressKind.SECTION:
+            return "Documentation"
+        return "Other"
 
     def _format_block(self, index: int, result: ReadResult) -> str:
         """Format a single source block."""
