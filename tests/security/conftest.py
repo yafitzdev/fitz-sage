@@ -15,7 +15,7 @@ from typing import Callable
 import pytest
 
 # Import e2e fixtures for security tests (these run serially, not in parallel)
-from tests.e2e.conftest import *  # noqa: F401, F403
+from tests.e2e_krag.conftest import *  # noqa: F401, F403
 
 
 # Mark all tests in this directory as tier4 and security
@@ -32,7 +32,7 @@ def pytest_collection_modifyitems(items):
             item.add_marker(pytest.mark.security)
 
 
-from tests.e2e.config import get_tier_names, load_test_config
+from tests.e2e_krag.config import get_tier_names, load_test_config
 
 
 def with_tiered_fallback(test_fn: Callable) -> Callable:

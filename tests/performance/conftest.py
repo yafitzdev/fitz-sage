@@ -19,7 +19,7 @@ import psutil
 import pytest
 
 # Import e2e fixtures for performance tests (these run serially, not in parallel)
-from tests.e2e.conftest import *  # noqa: F401, F403
+from tests.e2e_krag.conftest import *  # noqa: F401, F403
 
 
 def pytest_collection_modifyitems(items):
