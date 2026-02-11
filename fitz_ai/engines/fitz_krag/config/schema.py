@@ -50,6 +50,11 @@ class FitzKragConfig(BasePluginConfig):
         description="Reranker plugin. None = disabled.",
     )
 
+    vision: str | None = Field(
+        default=None,
+        description="Vision/VLM plugin for image description. None = disabled.",
+    )
+
     # ==========================================================================
     # Collection
     # ==========================================================================
@@ -339,6 +344,16 @@ class FitzKragConfig(BasePluginConfig):
     embedding_kwargs: PluginKwargs = Field(
         default_factory=PluginKwargs,
         description="Additional kwargs for embedding plugin",
+    )
+
+    rerank_kwargs: PluginKwargs = Field(
+        default_factory=PluginKwargs,
+        description="Additional kwargs for rerank plugin",
+    )
+
+    vision_kwargs: PluginKwargs = Field(
+        default_factory=PluginKwargs,
+        description="Additional kwargs for vision plugin",
     )
 
     vector_db_kwargs: PluginKwargs = Field(

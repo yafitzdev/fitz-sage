@@ -445,22 +445,14 @@ def get_default_engine() -> str:
     except Exception as e:
         logger.debug(f"Failed to load default engine from user config: {e}")
 
-    # Fall back to package default (single source of truth)
+    # Fall back to first registered engine
     try:
-        from pathlib import Path
-
-        import yaml
-
-        defaults_path = (
-            Path(__file__).parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
-        )
-        with defaults_path.open("r", encoding="utf-8") as f:
-            default_config = yaml.safe_load(f) or {}
-
-        if "default_engine" in default_config:
-            return default_config["default_engine"]
+        registry = EngineRegistry.get_global()
+        engines = registry.list()
+        if engines:
+            return engines[0]
     except Exception as e:
-        logger.debug(f"Failed to load default engine from package config: {e}")
+        logger.debug(f"Failed to get engine from registry: {e}")
 
-    # Last resort fallback (should never reach here if default.yaml is valid)
+    # Last resort fallback (should never reach here if engines are registered)
     return "fitz_rag"

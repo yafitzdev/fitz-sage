@@ -66,6 +66,10 @@ class TestInitCommand:
                 return_value=["simple"],
             ),
             patch("fitz_ai.cli.commands.init_wizard.load_default_config", return_value={}),
+            patch(
+                "fitz_ai.cli.commands.init_wizard.get_default_engine",
+                return_value="fitz_rag",
+            ),
         ):
             result = runner.invoke(app, ["init", "-y", "--show"])
 

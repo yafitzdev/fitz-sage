@@ -42,9 +42,11 @@ class TestQueryCommand:
 class TestQueryHelpers:
     """Tests for query helper functions."""
 
-    def test_load_fitz_rag_config_returns_config(self, tmp_path):
-        """Test load_fitz_rag_config loads valid config."""
+    def test_cli_context_loads_config(self, tmp_path):
+        """Test CLIContext.load() returns raw and typed config."""
         import yaml
+
+        from fitz_ai.cli.context import CLIContext
 
         # Create engine-specific config file
         config_dir = tmp_path / "config"
@@ -63,12 +65,10 @@ class TestQueryHelpers:
             "fitz_ai.cli.context.FitzPaths.engine_config",
             return_value=config_path,
         ):
-            from fitz_ai.cli.utils import load_fitz_rag_config
+            ctx = CLIContext.load(engine="fitz_rag")
 
-            raw, typed = load_fitz_rag_config()
-
-        assert raw["chat"] == "cohere"
-        assert typed.collection == "test"
+        assert ctx.raw_config["chat"] == "cohere"
+        assert ctx.typed_config.collection == "test"
 
     def test_get_collections_returns_list(self):
         """Test get_collections returns collection list."""

@@ -14,6 +14,7 @@ import json
 import logging
 import uuid
 from pathlib import Path
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from fitz_ai.engines.fitz_krag.ingestion.import_graph_store import ImportGraphStore
@@ -140,12 +141,19 @@ class KragIngestPipeline:
         # Ensure schema
         ensure_schema(connection_manager, collection, embedder.dimensions)
 
-    def ingest(self, source: Path) -> dict[str, Any]:
+    def ingest(
+        self,
+        source: Path,
+        force: bool = False,
+        on_progress: Callable[[int, int, str], None] | None = None,
+    ) -> dict[str, Any]:
         """
         Run the full ingestion pipeline.
 
         Args:
             source: Path to source directory or single file
+            force: If True, re-ingest all files regardless of hash state
+            on_progress: Optional callback(current, total, file_path) for progress
 
         Returns:
             Stats dict: files_scanned, files_new, files_changed, files_deleted,
@@ -179,6 +187,11 @@ class KragIngestPipeline:
         for abs_path in file_paths:
             rel_path = self._relative_path(abs_path, source)
             current_paths.add(rel_path)
+
+            if force:
+                new_files.append((rel_path, abs_path))
+                continue
+
             content_hash = _hash_file(abs_path)
 
             if rel_path not in existing_hashes:
@@ -196,7 +209,13 @@ class KragIngestPipeline:
         all_section_file_ids: list[str] = []
         all_table_metas: list[dict[str, Any]] = []
 
-        for rel_path, abs_path in new_files + changed_files:
+        files_to_process = new_files + changed_files
+        total_files = len(files_to_process)
+
+        for i, (rel_path, abs_path) in enumerate(files_to_process):
+            if on_progress:
+                on_progress(i + 1, total_files, rel_path)
+
             file_id = existing_ids.get(rel_path, str(uuid.uuid4()))
             ext = abs_path.suffix.lower()
 

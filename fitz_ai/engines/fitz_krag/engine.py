@@ -9,6 +9,7 @@ content is read on demand after ranking.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -432,13 +433,21 @@ class FitzKragEngine:
             prompt_template="default",
         )
 
-    def ingest(self, source: Path, collection: str | None = None) -> dict:
+    def ingest(
+        self,
+        source: Path,
+        collection: str | None = None,
+        force: bool = False,
+        on_progress: Callable[[int, int, str], None] | None = None,
+    ) -> dict:
         """
         Ingest source files into the KRAG knowledge store.
 
         Args:
             source: Path to source directory or file
             collection: Collection name override (uses config default if None)
+            force: If True, re-ingest all files regardless of hash state
+            on_progress: Optional callback(current, total, file_path) for progress
 
         Returns:
             Stats dict with files, symbols, imports counts
@@ -457,7 +466,7 @@ class FitzKragEngine:
             vocabulary_store=self._vocabulary_store,
             entity_graph_store=self._entity_graph_store,
         )
-        return pipeline.ingest(source)
+        return pipeline.ingest(source, force=force, on_progress=on_progress)
 
     @property
     def config(self) -> FitzKragConfig:

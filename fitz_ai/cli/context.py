@@ -110,8 +110,11 @@ class CLIContext:
     The context is ALWAYS valid - package defaults guarantee all values exist.
     """
 
+    # Engine
+    engine_name: str = ""
+
     # Raw and typed config
-    raw_config: dict = field(repr=False)
+    raw_config: dict = field(default_factory=dict, repr=False)
     typed_config: Any = field(default=None, repr=False)
     config_path: Path = field(default=None)
     config_source: str = field(default="")
@@ -250,6 +253,7 @@ class CLIContext:
 
         # Extract all values from config dict
         return cls._from_config(
+            engine=engine,
             config=config_dict,
             typed=typed_config,
             path=user_config_path if has_user else None,
@@ -260,19 +264,18 @@ class CLIContext:
     @classmethod
     def _load_typed_config(cls, config: dict, engine: str) -> Any:
         """Load typed config from raw config dict."""
-        if engine == "fitz_rag":
-            try:
-                from fitz_ai.engines.fitz_rag.config import FitzRagConfig
+        try:
+            from fitz_ai.config.loader import load_engine_config
 
-                return FitzRagConfig(**config)
-            except Exception as e:
-                logger.debug(f"Could not load typed config: {e}")
-                return None
-        return None
+            return load_engine_config(engine)
+        except Exception as e:
+            logger.debug(f"Could not load typed config for {engine}: {e}")
+            return None
 
     @classmethod
     def _from_config(
         cls,
+        engine: str,
         config: dict,
         typed: Any,
         path: Optional[Path],
@@ -306,6 +309,7 @@ class CLIContext:
         vector_db_kwargs = cls._to_dict(config.get("vector_db_kwargs", {}))
 
         return cls(
+            engine_name=engine,
             raw_config=config,
             typed_config=typed,
             config_path=path,
@@ -548,12 +552,19 @@ class CLIContext:
             raise typer.Exit(1)
 
     def get_pipeline(self):
-        """Get RAGPipeline instance from typed config."""
-        from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
-
+        """Get pipeline instance for the current engine."""
         if self.typed_config is None:
             raise ValueError("No typed config available")
-        return RAGPipeline.from_config(self.typed_config)
+
+        if self.engine_name == "fitz_rag":
+            from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
+
+            return RAGPipeline.from_config(self.typed_config)
+
+        # For other engines, create the engine instance directly
+        from fitz_ai.runtime import create_engine
+
+        return create_engine(self.engine_name, config=self.typed_config)
 
     def require_pipeline(self):
         """Get RAGPipeline or exit with error."""
@@ -602,7 +613,7 @@ class CLIContext:
         """
         Get typed config or exit with error if invalid.
 
-        Use this in commands that require a valid typed config (e.g., fitz_rag pipeline).
+        Use this in commands that require a valid typed config.
         """
         import typer
 

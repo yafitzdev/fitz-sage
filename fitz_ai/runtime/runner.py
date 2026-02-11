@@ -20,7 +20,7 @@ from fitz_ai.runtime.registry import get_engine_registry
 
 def run(
     query: Union[str, Query],
-    engine: str = "fitz_rag",
+    engine: str | None = None,
     config: Optional[Any] = None,
     config_path: Optional[Union[str, Path]] = None,
     constraints: Optional[Constraints] = None,
@@ -38,7 +38,7 @@ def run(
 
     Args:
         query: Question text or Query object
-        engine: Engine name to use (default: "fitz_rag")
+        engine: Engine name to use (None = user's default engine)
         config: Pre-loaded config object (engine-specific type)
         config_path: Path to config file (ignored if config provided)
         constraints: Optional query-time constraints
@@ -71,6 +71,12 @@ def run(
         >>> config = load_config("my_config.yaml")
         >>> answer = run("Question?", config=config)
     """
+    # Resolve engine name
+    if engine is None:
+        from fitz_ai.runtime.registry import get_default_engine
+
+        engine = get_default_engine()
+
     # Get the registry
     registry = get_engine_registry()
 
@@ -104,7 +110,7 @@ def run(
 
 
 def create_engine(
-    engine: str = "fitz_rag",
+    engine: str | None = None,
     config: Optional[Any] = None,
     config_path: Optional[Union[str, Path]] = None,
 ):
@@ -119,7 +125,7 @@ def create_engine(
     For simple one-off queries, use run() instead.
 
     Args:
-        engine: Engine name to create
+        engine: Engine name to create (None = user's default engine)
         config: Pre-loaded config object
         config_path: Path to config file
 
@@ -143,6 +149,12 @@ def create_engine(
         >>> custom_engine = create_engine("custom")
         >>> answer = custom_engine.answer(query)
     """
+    # Resolve engine name
+    if engine is None:
+        from fitz_ai.runtime.registry import get_default_engine
+
+        engine = get_default_engine()
+
     # Get the registry
     registry = get_engine_registry()
 

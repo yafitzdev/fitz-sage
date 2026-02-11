@@ -103,7 +103,8 @@ def command(
 
 
 def _run_quickstart(source: Path, question: str, collection: str, verbose: bool) -> None:
-    """Run quickstart with fitz_rag engine and pgvector."""
+    """Run quickstart with auto-detected provider and pgvector."""
+    from fitz_ai.runtime import get_default_engine
     from fitz_ai.tabular import is_table_file
 
     # =========================================================================
@@ -118,7 +119,7 @@ def _run_quickstart(source: Path, question: str, collection: str, verbose: bool)
     # Standard document path
     # =========================================================================
 
-    engine_config_path = FitzPaths.engine_config("fitz_rag")
+    engine_config_path = FitzPaths.engine_config(get_default_engine())
 
     # =========================================================================
     # Step 1: Auto-detect Provider
@@ -746,9 +747,10 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
     6. Execute and display answer
     7. Cleanup
     """
+    from fitz_ai.runtime import get_default_engine
     from fitz_ai.tabular import DirectTableQuery
 
-    engine_config_path = FitzPaths.engine_config("fitz_rag")
+    engine_config_path = FitzPaths.engine_config(get_default_engine())
 
     # =========================================================================
     # Step 1: Auto-detect Provider (same as document path)

@@ -117,9 +117,13 @@ def command(
 
     ui.info(f"Engine: {engine}")
 
-    # Route to engine-specific ingest if not fitz_rag
-    if engine != "fitz_rag":
-        run_engine_specific_ingest(source, collection, engine, non_interactive)
+    # Route to engine-specific ingest for engines with self-contained pipelines
+    from fitz_ai.runtime import get_engine_registry
+
+    registry = get_engine_registry()
+    caps = registry.get_capabilities(engine)
+    if caps.supports_persistent_ingest:
+        run_engine_specific_ingest(source, collection, engine, non_interactive, force=force)
         return
 
     # =========================================================================

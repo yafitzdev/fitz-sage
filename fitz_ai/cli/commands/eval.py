@@ -353,15 +353,20 @@ def _display_plain(distribution, constraints, flips, verbose: bool) -> None:
 # =============================================================================
 
 
-def _get_engine(collection: str):
-    """Get a Fitz RAG engine for the given collection."""
-    from fitz_ai.config import load_engine_config
-    from fitz_ai.engines.fitz_rag.engine import FitzRagEngine
+def _get_engine(collection: str, engine_name: str | None = None):
+    """Get an engine instance for the given collection.
 
-    config = load_engine_config("fitz_rag")
-    # Override collection in config (collection is a top-level field now)
+    Uses the default engine unless overridden.
+    """
+    from fitz_ai.config import load_engine_config
+    from fitz_ai.runtime import create_engine, get_default_engine
+
+    if engine_name is None:
+        engine_name = get_default_engine()
+
+    config = load_engine_config(engine_name)
     config.collection = collection
-    return FitzRagEngine(config)
+    return create_engine(engine_name, config=config)
 
 
 @app.command("beir")

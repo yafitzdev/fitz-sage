@@ -43,9 +43,10 @@ class TestChatCommand:
 class TestChatHelpers:
     """Tests for chat helper functions."""
 
-    def test_load_fitz_rag_config_returns_tuple(self):
-        """Test load_fitz_rag_config returns raw and typed config."""
-        # Create a mock CLIContext with the config values (new flat format)
+    def test_cli_context_loads_config(self):
+        """Test CLIContext.load() returns raw and typed config."""
+        from fitz_ai.cli.context import CLIContext
+
         mock_ctx = MagicMock()
         mock_ctx.raw_config = {
             "chat": "cohere",
@@ -57,13 +58,11 @@ class TestChatHelpers:
         mock_ctx.typed_config = MagicMock()
         mock_ctx.typed_config.collection = "test"
 
-        with patch("fitz_ai.cli.utils.CLIContext.load", return_value=mock_ctx):
-            from fitz_ai.cli.utils import load_fitz_rag_config
+        with patch("fitz_ai.cli.context.CLIContext.load", return_value=mock_ctx):
+            ctx = CLIContext.load(engine="fitz_rag")
 
-            raw, typed = load_fitz_rag_config()
-
-        assert raw["chat"] == "cohere"
-        assert typed.collection == "test"
+        assert ctx.raw_config["chat"] == "cohere"
+        assert ctx.typed_config.collection == "test"
 
     def test_get_collections_returns_sorted_list(self):
         """Test get_collections returns sorted collection list."""

@@ -179,7 +179,7 @@ def command(
 
 
 def _run_collection_chat(collection: Optional[str]) -> None:
-    """Run chat using fitz_rag engine."""
+    """Run chat using the default engine."""
     # Load config via CLIContext (always succeeds with defaults)
     ctx = CLIContext.load()
 

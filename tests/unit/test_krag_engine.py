@@ -472,7 +472,7 @@ class TestIngest:
             entity_graph_store=engine._entity_graph_store,
         )
         mock_pipeline_cls.return_value.ingest.assert_called_once_with(
-            source,
+            source, force=False, on_progress=None,
         )
         assert result == expected_stats
 

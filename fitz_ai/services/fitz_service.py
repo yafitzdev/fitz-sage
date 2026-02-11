@@ -184,7 +184,7 @@ class FitzService:
         *,
         top_k: int | None = None,
         conversation_context: "ConversationContext | None" = None,
-        engine: str = "fitz_rag",
+        engine: str | None = None,
     ) -> Answer:
         """
         Query the knowledge base.
@@ -194,7 +194,7 @@ class FitzService:
             collection: Collection to query
             top_k: Number of chunks to retrieve (uses config default if None)
             conversation_context: For query rewriting (pronoun resolution)
-            engine: Engine to use (default: fitz_rag)
+            engine: Engine to use (None = user's default engine)
 
         Returns:
             Answer with text, provenance, and mode
@@ -258,7 +258,7 @@ class FitzService:
             raise CollectionNotFoundError(collection)
 
         try:
-            engine = create_engine("fitz_rag", collection=collection, top_k=top_k)
+            engine = create_engine(collection=collection, top_k=top_k)
 
             # Access retrieval directly if available
             if hasattr(engine, "retrieve"):
@@ -624,7 +624,9 @@ class FitzService:
         # Check config exists
         from fitz_ai.core.paths import FitzPaths
 
-        config_path = FitzPaths.engine_config("fitz_rag")
+        from fitz_ai.runtime import get_default_engine
+
+        config_path = FitzPaths.engine_config(get_default_engine())
         if not config_path.exists():
             issues.append(f"Config not found: {config_path}")
             return ConfigValidationResult(valid=False, issues=issues)

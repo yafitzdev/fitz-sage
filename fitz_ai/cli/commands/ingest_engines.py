@@ -25,6 +25,7 @@ def run_engine_specific_ingest(
     collection: Optional[str],
     engine_name: str,
     non_interactive: bool,
+    force: bool = False,
 ) -> None:
     """Run ingest for engines with supports_persistent_ingest capability."""
     from fitz_ai.runtime import create_engine, get_engine_registry
@@ -40,7 +41,7 @@ def run_engine_specific_ingest(
     caps = registry.get_capabilities(engine_name)
     if not caps.supports_persistent_ingest:
         ui.error(f"Engine '{engine_name}' does not support persistent ingestion.")
-        ui.info("Use 'fitz ingest' without --engine for fitz_rag ingestion.")
+        ui.info("This engine does not have a built-in ingest pipeline.")
         raise typer.Exit(1)
 
     # Get source path
@@ -64,6 +65,8 @@ def run_engine_specific_ingest(
     ui.info(f"Source: {source_path}")
     ui.info(f"Collection: {collection}")
     ui.info(f"Engine: {engine_name}")
+    if force:
+        ui.info("Mode: Force re-ingest (ignoring file hashes)")
     print()
 
     # Create engine and run ingest
@@ -80,7 +83,15 @@ def run_engine_specific_ingest(
     ui.step(2, 2, "Ingesting documents...")
 
     try:
-        result = engine.ingest(source_path, collection)
+        # Build progress callback
+        on_progress = _make_progress_callback()
+
+        result = engine.ingest(
+            source_path,
+            collection,
+            force=force,
+            on_progress=on_progress,
+        )
         ui.success("Ingestion complete")
         print()
 
@@ -111,3 +122,34 @@ def run_engine_specific_ingest(
         ui.error(f"Ingestion failed: {e}")
         logger.debug("Ingestion error", exc_info=True)
         raise typer.Exit(1)
+
+
+def _make_progress_callback():
+    """Create a progress callback that uses Rich if available, else plain text."""
+    if RICH:
+        from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
+
+        progress = Progress(
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            console=console,
+        )
+        task_id = None
+
+        def on_progress(current: int, total: int, file_path: str) -> None:
+            nonlocal task_id
+            if task_id is None:
+                progress.start()
+                task_id = progress.add_task("Processing files", total=total)
+            progress.update(task_id, completed=current, description=f"Processing {file_path}")
+            if current >= total:
+                progress.stop()
+
+        return on_progress
+    else:
+
+        def on_progress(current: int, total: int, file_path: str) -> None:
+            print(f"  [{current}/{total}] {file_path}")
+
+        return on_progress
