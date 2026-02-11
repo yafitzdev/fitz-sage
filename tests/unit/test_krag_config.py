@@ -18,7 +18,7 @@ class TestFitzKragConfig:
 
     def test_defaults(self):
         config = FitzKragConfig(collection="test")
-        assert config.code_languages == ["python"]
+        assert config.code_languages == ["python", "typescript", "java", "go"]
         assert config.summary_batch_size == 15
         assert config.top_addresses == 10
         assert config.top_read == 5

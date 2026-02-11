@@ -152,6 +152,17 @@ benchmarks = [
     "fitz-gov>=2.0.0",  # RAG governance benchmark (epistemic honesty)
 ]
 
+# KRAG additional language support (tree-sitter extractors)
+krag-typescript = ["tree-sitter>=0.22", "tree-sitter-typescript>=0.22"]
+krag-java = ["tree-sitter>=0.22", "tree-sitter-java>=0.22"]
+krag-go = ["tree-sitter>=0.22", "tree-sitter-go>=0.22"]
+krag-all = [
+    "tree-sitter>=0.22",
+    "tree-sitter-typescript>=0.22",
+    "tree-sitter-java>=0.22",
+    "tree-sitter-go>=0.22",
+]
+
 # Install everything at once (core deps include pgvector now)
 all = [
     "ollama>=0.1.0",

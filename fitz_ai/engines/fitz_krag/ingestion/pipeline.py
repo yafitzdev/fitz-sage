@@ -42,6 +42,12 @@ logger = logging.getLogger(__name__)
 # Extensions handled by code strategies
 EXTENSION_MAP: dict[str, str] = {
     ".py": "python",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".js": "typescript",
+    ".jsx": "typescript",
+    ".java": "java",
+    ".go": "go",
 }
 
 
@@ -80,6 +86,36 @@ class KragIngestPipeline:
         self._strategies: dict[str, Any] = {}
         if "python" in config.code_languages:
             self._strategies["python"] = PythonCodeIngestStrategy()
+
+        if "typescript" in config.code_languages:
+            try:
+                from fitz_ai.engines.fitz_krag.ingestion.strategies.typescript import (
+                    TypeScriptIngestStrategy,
+                )
+
+                self._strategies["typescript"] = TypeScriptIngestStrategy()
+            except ImportError:
+                logger.debug("tree-sitter-typescript not installed, skipping TypeScript support")
+
+        if "java" in config.code_languages:
+            try:
+                from fitz_ai.engines.fitz_krag.ingestion.strategies.java import (
+                    JavaIngestStrategy,
+                )
+
+                self._strategies["java"] = JavaIngestStrategy()
+            except ImportError:
+                logger.debug("tree-sitter-java not installed, skipping Java support")
+
+        if "go" in config.code_languages:
+            try:
+                from fitz_ai.engines.fitz_krag.ingestion.strategies.go import (
+                    GoIngestStrategy,
+                )
+
+                self._strategies["go"] = GoIngestStrategy()
+            except ImportError:
+                logger.debug("tree-sitter-go not installed, skipping Go support")
 
         # Document strategy
         self._doc_strategy = TechnicalDocIngestStrategy()

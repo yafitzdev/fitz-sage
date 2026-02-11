@@ -64,7 +64,7 @@ class FitzKragConfig(BasePluginConfig):
     # ==========================================================================
 
     code_languages: list[str] = Field(
-        default=["python"],
+        default=["python", "typescript", "java", "go"],
         description="Enabled code languages for ingestion",
     )
 

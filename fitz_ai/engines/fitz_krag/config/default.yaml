@@ -26,7 +26,7 @@ fitz_krag:
   # Code Strategy
   # ===========================================================================
 
-  code_languages: [python]
+  code_languages: [python, typescript, java, go]
   summary_batch_size: 15
   max_expansion_depth: 1
   include_class_context: true
