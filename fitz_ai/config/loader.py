@@ -152,6 +152,10 @@ def load_engine_config(engine: str):
         from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
 
         ConfigModel = FitzRagConfig
+    elif engine == "fitz_krag":
+        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
+
+        ConfigModel = FitzKragConfig
     else:
         raise ImportError(f"Config schema not available for engine '{engine}'")
 

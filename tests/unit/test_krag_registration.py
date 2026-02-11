@@ -1,0 +1,50 @@
+# tests/unit/test_krag_registration.py
+"""Tests for fitz_krag engine registration."""
+
+import pytest
+
+
+class TestKragRegistration:
+    def test_engine_registers_in_global_registry(self):
+        # Importing runtime triggers auto-registration
+        import fitz_ai.engines.fitz_krag.runtime  # noqa: F401
+        from fitz_ai.runtime.registry import EngineRegistry
+
+        registry = EngineRegistry.get_global()
+        assert "fitz_krag" in registry.list()
+
+    def test_engine_capabilities(self):
+        import fitz_ai.engines.fitz_krag.runtime  # noqa: F401
+        from fitz_ai.runtime.registry import EngineRegistry
+
+        registry = EngineRegistry.get_global()
+        caps = registry.get_capabilities("fitz_krag")
+        assert caps.supports_collections is True
+        assert caps.supports_persistent_ingest is True
+        assert caps.supports_chat is True
+        assert caps.requires_config is True
+
+    def test_config_loader_registered(self):
+        import fitz_ai.engines.fitz_krag.runtime  # noqa: F401
+        from fitz_ai.runtime.registry import EngineRegistry
+
+        registry = EngineRegistry.get_global()
+        info = registry.get_info("fitz_krag")
+        assert info.config_loader is not None
+        assert info.config_type is not None
+
+    def test_default_config_path_registered(self):
+        import fitz_ai.engines.fitz_krag.runtime  # noqa: F401
+        from fitz_ai.runtime.registry import EngineRegistry
+
+        registry = EngineRegistry.get_global()
+        path = registry.get_default_config_path("fitz_krag")
+        assert path is not None
+        assert path.exists()
+
+    def test_config_loader_loads_defaults(self):
+        from fitz_ai.config.loader import load_engine_config
+
+        config = load_engine_config("fitz_krag")
+        assert config.collection == "default"
+        assert config.chat == "cohere"

@@ -1,0 +1,73 @@
+# fitz_ai/engines/fitz_krag/config/default.yaml
+#
+# Default configuration for Fitz KRAG engine.
+#
+# KRAG = Knowledge Routing Augmented Generation
+# Uses knowledge-type-aware strategies instead of uniform chunk retrieval.
+
+fitz_krag:
+
+  # ===========================================================================
+  # Core Plugins (shared infrastructure)
+  # ===========================================================================
+
+  chat: cohere
+  embedding: cohere
+  vector_db: pgvector
+  rerank: null
+
+  # ===========================================================================
+  # Collection
+  # ===========================================================================
+
+  collection: default
+
+  # ===========================================================================
+  # Code Strategy
+  # ===========================================================================
+
+  code_languages: [python]
+  summary_batch_size: 15
+  max_expansion_depth: 1
+  include_class_context: true
+
+  # ===========================================================================
+  # Retrieval
+  # ===========================================================================
+
+  top_addresses: 10
+  top_read: 5
+  keyword_weight: 0.4
+  semantic_weight: 0.6
+  fallback_to_chunks: true
+  section_bm25_weight: 0.6
+  section_semantic_weight: 0.4
+
+  # ===========================================================================
+  # Context Assembly
+  # ===========================================================================
+
+  max_context_tokens: 8000
+  include_file_header: true
+
+  # ===========================================================================
+  # Generation
+  # ===========================================================================
+
+  enable_citations: true
+  strict_grounding: true
+
+  # ===========================================================================
+  # Plugin kwargs
+  # ===========================================================================
+
+  chat_kwargs: {}
+  embedding_kwargs: {}
+  vector_db_kwargs:
+    mode: local
+
+  # ===========================================================================
+  # Logging
+  # ===========================================================================
+
+  log_level: INFO
