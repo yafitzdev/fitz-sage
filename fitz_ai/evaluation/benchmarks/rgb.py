@@ -487,8 +487,8 @@ class RGBEvaluator:
             return answer.mode
         if hasattr(answer, "governance") and hasattr(answer.governance, "mode"):
             return answer.governance.mode
-        # Default to confident if mode not available
-        return AnswerMode.CONFIDENT
+        # Default to trustworthy if mode not available
+        return AnswerMode.TRUSTWORTHY
 
     def _judge_answer(self, query: str, answer: str, ground_truth: str) -> bool:
         """Use LLM to judge if answer is correct."""
@@ -529,13 +529,13 @@ Is the answer correct? Respond with only 'yes' or 'no'."""
             if answer_correct is not None:
                 return answer_correct
             # Fall back to mode check
-            return actual_mode in (AnswerMode.CONFIDENT, AnswerMode.QUALIFIED)
+            return actual_mode == AnswerMode.TRUSTWORTHY
 
         if case.test_type == RGBTestType.INFORMATION_INTEGRATION:
             # Should synthesize from multiple sources
             if answer_correct is not None:
                 return answer_correct
-            return actual_mode == AnswerMode.CONFIDENT
+            return actual_mode == AnswerMode.TRUSTWORTHY
 
         # Default: check mode if expected
         if case.expected_mode:

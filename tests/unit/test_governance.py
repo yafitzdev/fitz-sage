@@ -11,12 +11,12 @@ from fitz_ai.core.guardrails.base import ConstraintResult
 class TestGovernanceDecision:
     """Tests for GovernanceDecision dataclass."""
 
-    def test_confident_decision(self):
-        """Confident decisions have no explanations."""
-        decision = GovernanceDecision.confident()
+    def test_trustworthy_decision(self):
+        """Trustworthy decisions have no explanations."""
+        decision = GovernanceDecision.trustworthy()
 
-        assert decision.mode == AnswerMode.CONFIDENT
-        assert decision.is_confident is True
+        assert decision.mode == AnswerMode.TRUSTWORTHY
+        assert decision.is_trustworthy is True
         assert decision.should_include_caveats is False
         assert decision.user_explanation is None
         assert decision.triggered_constraints == ()
@@ -31,7 +31,7 @@ class TestGovernanceDecision:
         )
 
         assert decision.mode == AnswerMode.ABSTAIN
-        assert decision.is_confident is False
+        assert decision.is_trustworthy is False
         # ABSTAIN doesn't caveat, it refuses
         assert decision.should_include_caveats is False
         assert decision.user_explanation == "No evidence retrieved"
@@ -48,19 +48,6 @@ class TestGovernanceDecision:
         assert decision.mode == AnswerMode.DISPUTED
         assert decision.should_include_caveats is True
         assert "conflicting" in decision.user_explanation.lower()
-
-    def test_qualified_decision(self):
-        """Qualified decisions include caveats."""
-        decision = GovernanceDecision(
-            mode=AnswerMode.QUALIFIED,
-            triggered_constraints=("causal_attribution",),
-            reasons=("No causal evidence found",),
-            signals=frozenset({"qualified"}),
-        )
-
-        assert decision.mode == AnswerMode.QUALIFIED
-        assert decision.should_include_caveats is True
-        assert decision.user_explanation == "No causal evidence found"
 
     def test_to_dict_serialization(self):
         """Decisions serialize to dict for logging."""
@@ -96,27 +83,18 @@ class TestGovernanceDecision:
 
         assert "conflicting information" in decision.user_explanation.lower()
 
-    def test_qualified_without_reasons_has_default_explanation(self):
-        """Qualified mode provides default explanation when no reasons."""
-        decision = GovernanceDecision(
-            mode=AnswerMode.QUALIFIED,
-        )
-
-        assert "limitations" in decision.user_explanation.lower()
-
-
 class TestAnswerGovernor:
     """Tests for AnswerGovernor decision logic."""
 
-    def test_empty_results_returns_confident(self):
-        """No constraints means confident."""
+    def test_empty_results_returns_trustworthy(self):
+        """No constraints means trustworthy."""
         governor = AnswerGovernor()
         decision = governor.decide([])
 
-        assert decision.mode == AnswerMode.CONFIDENT
+        assert decision.mode == AnswerMode.TRUSTWORTHY
 
-    def test_all_allow_returns_confident(self):
-        """All constraints passing means confident."""
+    def test_all_allow_returns_trustworthy(self):
+        """All constraints passing means trustworthy."""
         governor = AnswerGovernor()
         results = [
             ConstraintResult.allow(),
@@ -125,7 +103,7 @@ class TestAnswerGovernor:
 
         decision = governor.decide(results)
 
-        assert decision.mode == AnswerMode.CONFIDENT
+        assert decision.mode == AnswerMode.TRUSTWORTHY
         assert decision.triggered_constraints == ()
 
     def test_abstain_signal_takes_priority(self):
@@ -153,7 +131,7 @@ class TestAnswerGovernor:
         assert "disputed" in decision.signals
         assert len(decision.triggered_constraints) == 2
 
-    def test_disputed_beats_qualified(self):
+    def test_disputed_wins_over_plain_denial(self):
         """Disputed signal wins over plain denial."""
         governor = AnswerGovernor()
         results = [
@@ -175,8 +153,8 @@ class TestAnswerGovernor:
 
         assert decision.mode == AnswerMode.DISPUTED
 
-    def test_denial_without_signal_becomes_qualified(self):
-        """Denial without specific signal resolves to QUALIFIED."""
+    def test_denial_without_signal_becomes_trustworthy(self):
+        """Denial without recognized signal resolves to TRUSTWORTHY."""
         governor = AnswerGovernor()
         results = [
             ConstraintResult(
@@ -189,7 +167,7 @@ class TestAnswerGovernor:
 
         decision = governor.decide(results)
 
-        assert decision.mode == AnswerMode.QUALIFIED
+        assert decision.mode == AnswerMode.TRUSTWORTHY
         assert "my_constraint" in decision.triggered_constraints
 
     def test_constraint_names_tracked(self):
@@ -266,7 +244,7 @@ class TestSignalPriority:
         [
             (["abstain"], AnswerMode.ABSTAIN),
             (["disputed"], AnswerMode.DISPUTED),
-            (["qualified"], AnswerMode.QUALIFIED),
+            (["qualified"], AnswerMode.TRUSTWORTHY),
             (["abstain", "disputed"], AnswerMode.ABSTAIN),
             (["abstain", "qualified"], AnswerMode.ABSTAIN),
             (["disputed", "qualified"], AnswerMode.DISPUTED),
@@ -274,7 +252,7 @@ class TestSignalPriority:
         ],
     )
     def test_signal_priority(self, signals, expected_mode):
-        """Signal priority: abstain > disputed > qualified."""
+        """Signal priority: abstain > disputed > everything else → trustworthy."""
         governor = AnswerGovernor()
         results = [
             ConstraintResult(

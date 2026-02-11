@@ -72,8 +72,7 @@ class FitzGovBenchmark:
     Tests Fitz's ability to correctly classify when to:
     - Abstain (insufficient evidence)
     - Dispute (conflicting sources)
-    - Qualify (uncertain claims)
-    - Be confident (clear evidence)
+    - Answer trustworthily (clear evidence)
 
     Example:
         benchmark = FitzGovBenchmark()
@@ -153,12 +152,11 @@ class FitzGovBenchmark:
             llm_base_url=llm_base_url,
         )
 
-        # Build mode mapping
+        # Build mode mapping (fitz-gov external package uses its own mode names)
         self._mode_to_fitz_gov = {
             AnswerMode.ABSTAIN: fitz_gov.AnswerMode.ABSTAIN,
             AnswerMode.DISPUTED: fitz_gov.AnswerMode.DISPUTED,
-            AnswerMode.QUALIFIED: fitz_gov.AnswerMode.QUALIFIED,
-            AnswerMode.CONFIDENT: fitz_gov.AnswerMode.CONFIDENT,
+            AnswerMode.TRUSTWORTHY: fitz_gov.AnswerMode.CONFIDENT,
         }
 
         # Initialize enricher if enabled
@@ -375,7 +373,7 @@ class FitzGovBenchmark:
             return answer.mode
         if hasattr(answer, "governance") and hasattr(answer.governance, "mode"):
             return answer.governance.mode
-        return AnswerMode.CONFIDENT
+        return AnswerMode.TRUSTWORTHY
 
     def get_available_categories(self) -> list[str]:
         """Get list of available categories."""

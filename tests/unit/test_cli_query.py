@@ -101,7 +101,7 @@ class TestQueryExecution:
         mock_answer = Answer(
             text="This is the answer",
             provenance=[],
-            mode="confident",
+            mode="trustworthy",
         )
 
         mock_service = MagicMock()
@@ -141,7 +141,7 @@ class TestQueryOptions:
         mock_answer = Answer(
             text="Answer",
             provenance=[],
-            mode="confident",
+            mode="trustworthy",
         )
 
         mock_service = MagicMock()

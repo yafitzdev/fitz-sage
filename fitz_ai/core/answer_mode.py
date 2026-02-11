@@ -7,8 +7,7 @@ not what it says. It is determined by constraint signals
 after retrieval, before synthesis.
 
 Modes:
-- CONFIDENT: Answer clearly and directly
-- QUALIFIED: Note uncertainty or limitations
+- TRUSTWORTHY: Answer clearly and directly based on the evidence
 - DISPUTED: Explicitly state sources disagree
 - ABSTAIN: State that evidence is insufficient
 """
@@ -23,11 +22,8 @@ class AnswerMode(str, Enum):
     Selected based on constraint signals, not LLM reasoning.
     """
 
-    CONFIDENT = "confident"
-    """Evidence supports a clear, direct answer."""
-
-    QUALIFIED = "qualified"
-    """Answer with noted uncertainty or limitations."""
+    TRUSTWORTHY = "trustworthy"
+    """Evidence supports answering. Answer clearly and directly."""
 
     DISPUTED = "disputed"
     """Sources explicitly disagree; summarize the disagreement."""

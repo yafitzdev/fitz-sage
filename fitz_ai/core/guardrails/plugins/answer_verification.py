@@ -3,11 +3,11 @@
 Answer Verification Constraint - LLM jury for positive confidence confirmation.
 
 Uses 3-prompt fusion with majority voting to verify chunks actually answer
-the query. Prevents false confidence when context is semantically relevant
-but doesn't contain the requested information.
+the query. Prevents false trustworthy answers when context is semantically
+relevant but doesn't contain the requested information.
 
-The jury approach reduces LLM variance by requiring 2+ NO votes to qualify.
-This is conservative - benefit of doubt goes to allowing confident answers.
+The jury approach reduces LLM variance by requiring 2+ NO votes to trigger.
+This is conservative - benefit of doubt goes to allowing trustworthy answers.
 """
 
 from __future__ import annotations
@@ -68,21 +68,21 @@ class AnswerVerificationConstraint:
     """
     Verifies chunks actually answer the query using 3-prompt LLM jury.
 
-    Prevents false confidence when context is semantically relevant
+    Prevents false trustworthy answers when context is semantically relevant
     but doesn't contain the requested information.
 
     Example failure mode this solves:
     - Query: "What is the capital of France?"
     - Context: "France has 67 million people and is famous for wine."
-    - Without verification: CONFIDENT (no constraint triggered)
-    - With verification: QUALIFIED (jury agrees context doesn't answer)
+    - Without verification: TRUSTWORTHY (no constraint triggered)
+    - With verification: fires "qualified" signal (jury agrees context doesn't answer)
 
     Jury voting:
     - 3 prompts ask "does this answer?" in different ways
-    - Require 2+ NO votes to signal "qualified"
-    - 0-1 NO votes = allow confident (benefit of doubt)
+    - Require 3/3 NO votes to fire (very conservative - unanimous jury)
+    - 0-2 NO votes = allow trustworthy (benefit of doubt)
 
-    This is conservative - we only block confident when the jury agrees
+    This is conservative - we only fire when the jury unanimously agrees
     the context clearly doesn't answer.
 
     Attributes:

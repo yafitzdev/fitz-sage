@@ -33,7 +33,7 @@ class QueryResponse(BaseModel):
 
     text: str = Field(..., description="The answer text")
     mode: Optional[str] = Field(
-        None, description="Answer mode: confident, qualified, disputed, or abstain"
+        None, description="Answer mode: trustworthy, disputed, or abstain"
     )
     sources: List[SourceInfo] = Field(
         default_factory=list, description="Sources used in the answer"
@@ -63,7 +63,7 @@ class ChatResponse(BaseModel):
 
     text: str = Field(..., description="The assistant's response")
     mode: Optional[str] = Field(
-        None, description="Answer mode: confident, qualified, disputed, or abstain"
+        None, description="Answer mode: trustworthy, disputed, or abstain"
     )
     sources: List[SourceInfo] = Field(
         default_factory=list, description="Sources used in the response"

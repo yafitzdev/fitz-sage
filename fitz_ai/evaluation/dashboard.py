@@ -250,7 +250,7 @@ class BenchmarkDashboard:
 
     def _print_confusion_matrix_rich(self, matrix: dict[str, dict[str, int]]) -> None:
         """Print confusion matrix with Rich."""
-        modes = ["confident", "qualified", "disputed", "abstain"]
+        modes = ["trustworthy", "disputed", "abstain"]
 
         table = Table(title="Mode Confusion Matrix", show_header=True, header_style="bold")
         table.add_column("Expected \\ Actual", style="dim")

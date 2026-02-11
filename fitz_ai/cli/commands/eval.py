@@ -183,14 +183,9 @@ def _display_rich(distribution, constraints, flips, verbose: bool) -> None:
 
     # Add rows with color coding based on mode
     table.add_row(
-        "CONFIDENT",
-        str(distribution.confident_count),
-        f"{distribution.confident_rate:.1%}",
-    )
-    table.add_row(
-        "QUALIFIED",
-        str(distribution.qualified_count),
-        f"{distribution.qualified_rate:.1%}",
+        "TRUSTWORTHY",
+        str(distribution.trustworthy_count),
+        f"{distribution.trustworthy_rate:.1%}",
     )
     table.add_row(
         "DISPUTED",
@@ -311,10 +306,9 @@ def _display_plain(distribution, constraints, flips, verbose: bool) -> None:
     """Plain text output without Rich."""
     print("Answer Modes:")
     print("-" * 40)
-    print(f"  CONFIDENT: {distribution.confident_count} ({distribution.confident_rate:.1%})")
-    print(f"  QUALIFIED: {distribution.qualified_count} ({distribution.qualified_rate:.1%})")
-    print(f"  DISPUTED:  {distribution.disputed_count} ({distribution.disputed_rate:.1%})")
-    print(f"  ABSTAIN:   {distribution.abstain_count} ({distribution.abstain_rate:.1%})")
+    print(f"  TRUSTWORTHY: {distribution.trustworthy_count} ({distribution.trustworthy_rate:.1%})")
+    print(f"  DISPUTED:    {distribution.disputed_count} ({distribution.disputed_rate:.1%})")
+    print(f"  ABSTAIN:     {distribution.abstain_count} ({distribution.abstain_rate:.1%})")
 
     if verbose and constraints:
         print()

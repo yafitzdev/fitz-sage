@@ -72,8 +72,8 @@ class TestGovernanceIntegration:
         assert decision.mode == AnswerMode.DISPUTED
         assert "conflict_aware" in decision.triggered_constraints
 
-    def test_single_good_chunk_is_confident(self):
-        """Single chunk, no conflicts → CONFIDENT."""
+    def test_single_good_chunk_is_trustworthy(self):
+        """Single chunk, no conflicts → TRUSTWORTHY."""
         mock_chunks = [{"id": "1"}]
 
         constraints = [MockInsufficientEvidence(), MockConflictAware()]
@@ -82,7 +82,7 @@ class TestGovernanceIntegration:
         results = run_constraints("What is X?", mock_chunks, constraints)
         decision = governor.decide(results)
 
-        assert decision.mode == AnswerMode.CONFIDENT
+        assert decision.mode == AnswerMode.TRUSTWORTHY
         assert decision.triggered_constraints == ()
         assert decision.user_explanation is None
 
@@ -123,15 +123,15 @@ class TestGovernanceIntegration:
 class TestGovernanceDecisionProperties:
     """Test GovernanceDecision helper properties."""
 
-    def test_is_confident_true_for_confident_mode(self):
-        """is_confident returns True for CONFIDENT mode."""
+    def test_is_trustworthy_true_for_trustworthy_mode(self):
+        """is_trustworthy returns True for TRUSTWORTHY mode."""
         governor = AnswerGovernor()
         decision = governor.decide([])
 
-        assert decision.is_confident is True
+        assert decision.is_trustworthy is True
 
-    def test_is_confident_false_for_other_modes(self):
-        """is_confident returns False for non-CONFIDENT modes."""
+    def test_is_trustworthy_false_for_other_modes(self):
+        """is_trustworthy returns False for non-TRUSTWORTHY modes."""
         governor = AnswerGovernor()
 
         result = ConstraintResult.deny(
@@ -148,21 +148,11 @@ class TestGovernanceDecisionProperties:
 
         decision = governor.decide([result])
 
-        assert decision.is_confident is False
+        assert decision.is_trustworthy is False
 
-    def test_should_include_caveats_for_qualified_and_disputed(self):
-        """should_include_caveats is True for QUALIFIED and DISPUTED."""
+    def test_should_include_caveats_for_disputed(self):
+        """should_include_caveats is True for DISPUTED."""
         governor = AnswerGovernor()
-
-        # QUALIFIED
-        result = ConstraintResult(
-            allow_decisive_answer=False,
-            reason="test",
-            signal=None,
-            metadata={"constraint_name": "test"},
-        )
-        decision = governor.decide([result])
-        assert decision.should_include_caveats is True
 
         # DISPUTED
         result = ConstraintResult(
@@ -173,6 +163,20 @@ class TestGovernanceDecisionProperties:
         )
         decision = governor.decide([result])
         assert decision.should_include_caveats is True
+
+    def test_should_not_include_caveats_for_trustworthy(self):
+        """should_include_caveats is False for TRUSTWORTHY."""
+        governor = AnswerGovernor()
+
+        # Denial without signal → TRUSTWORTHY (no caveats)
+        result = ConstraintResult(
+            allow_decisive_answer=False,
+            reason="test",
+            signal=None,
+            metadata={"constraint_name": "test"},
+        )
+        decision = governor.decide([result])
+        assert decision.should_include_caveats is False
 
     def test_should_include_caveats_false_for_abstain(self):
         """ABSTAIN doesn't caveat, it refuses entirely."""

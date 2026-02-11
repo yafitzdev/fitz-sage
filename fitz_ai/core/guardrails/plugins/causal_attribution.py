@@ -268,7 +268,9 @@ class CausalAttributionConstraint:
     - Opinion queries: "should we", "is it better" → almost always qualified
     - Speculative queries: "will succeed" → need explicit predictions
 
-    If query asks for extrapolation but chunks only have facts → QUALIFIED.
+    If query asks for extrapolation but chunks only have facts, the constraint
+    fires a "qualified" signal which governance resolves to TRUSTWORTHY
+    (with caveats tracked via triggered_constraints).
 
     No embeddings, no thresholds - just keyword matching.
 

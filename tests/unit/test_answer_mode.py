@@ -28,15 +28,14 @@ class TestAnswerModeEnum:
 
     def test_all_modes_defined(self):
         """Should have all expected modes."""
-        assert AnswerMode.CONFIDENT == "confident"
-        assert AnswerMode.QUALIFIED == "qualified"
+        assert AnswerMode.TRUSTWORTHY == "trustworthy"
         assert AnswerMode.DISPUTED == "disputed"
         assert AnswerMode.ABSTAIN == "abstain"
 
     def test_mode_is_string(self):
         """Modes should be string-compatible."""
-        assert isinstance(AnswerMode.CONFIDENT, str)
-        assert AnswerMode.CONFIDENT.value == "confident"
+        assert isinstance(AnswerMode.TRUSTWORTHY, str)
+        assert AnswerMode.TRUSTWORTHY.value == "trustworthy"
 
 
 # =============================================================================
@@ -47,21 +46,21 @@ class TestAnswerModeEnum:
 class TestAnswerGovernor:
     """Test the answer mode resolution logic via AnswerGovernor."""
 
-    def test_empty_results_returns_confident(self):
-        """Should return CONFIDENT when no constraint results."""
+    def test_empty_results_returns_trustworthy(self):
+        """Should return TRUSTWORTHY when no constraint results."""
         governor = AnswerGovernor()
         decision = governor.decide([])
-        assert decision.mode == AnswerMode.CONFIDENT
+        assert decision.mode == AnswerMode.TRUSTWORTHY
 
-    def test_all_allowed_returns_confident(self):
-        """Should return CONFIDENT when all constraints allow."""
+    def test_all_allowed_returns_trustworthy(self):
+        """Should return TRUSTWORTHY when all constraints allow."""
         governor = AnswerGovernor()
         results = [
             ConstraintResult.allow(),
             ConstraintResult.allow(),
         ]
         decision = governor.decide(results)
-        assert decision.mode == AnswerMode.CONFIDENT
+        assert decision.mode == AnswerMode.TRUSTWORTHY
 
     def test_abstain_signal_returns_abstain(self):
         """Should return ABSTAIN when abstain signal present."""
@@ -113,8 +112,8 @@ class TestAnswerGovernor:
         decision = governor.decide(results)
         assert decision.mode == AnswerMode.ABSTAIN
 
-    def test_denial_without_signal_returns_qualified(self):
-        """Should return QUALIFIED when denied without signal."""
+    def test_denial_without_signal_returns_trustworthy(self):
+        """Should return TRUSTWORTHY when denied without recognized signal."""
         governor = AnswerGovernor()
         results = [
             ConstraintResult(
@@ -125,7 +124,7 @@ class TestAnswerGovernor:
             ),
         ]
         decision = governor.decide(results)
-        assert decision.mode == AnswerMode.QUALIFIED
+        assert decision.mode == AnswerMode.TRUSTWORTHY
 
 
 # =============================================================================
@@ -150,9 +149,9 @@ class TestModeInstructions:
         instruction = get_mode_instruction(AnswerMode.ABSTAIN)
         assert "definitive" in instruction.lower()
 
-    def test_confident_instruction_is_direct(self):
-        """CONFIDENT instruction should be direct."""
-        instruction = get_mode_instruction(AnswerMode.CONFIDENT)
+    def test_trustworthy_instruction_is_direct(self):
+        """TRUSTWORTHY instruction should be direct."""
+        instruction = get_mode_instruction(AnswerMode.TRUSTWORTHY)
         assert "clearly" in instruction.lower() or "directly" in instruction.lower()
 
 

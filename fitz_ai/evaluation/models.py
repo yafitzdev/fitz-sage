@@ -24,8 +24,7 @@ class ModeDistribution:
         period_start: Start of the aggregation period (UTC)
         period_end: End of the aggregation period (UTC)
         total_queries: Total number of governance decisions in period
-        confident_count: Queries that resulted in CONFIDENT mode
-        qualified_count: Queries that resulted in QUALIFIED mode
+        trustworthy_count: Queries that resulted in TRUSTWORTHY mode
         disputed_count: Queries that resulted in DISPUTED mode
         abstain_count: Queries that resulted in ABSTAIN mode
     """
@@ -33,8 +32,7 @@ class ModeDistribution:
     period_start: datetime
     period_end: datetime
     total_queries: int
-    confident_count: int
-    qualified_count: int
+    trustworthy_count: int
     disputed_count: int
     abstain_count: int
 
@@ -53,23 +51,16 @@ class ModeDistribution:
         return self.abstain_count / self.total_queries
 
     @property
-    def confident_rate(self) -> float:
+    def trustworthy_rate(self) -> float:
         """
-        Rate of queries that resulted in CONFIDENT.
+        Rate of queries that resulted in TRUSTWORTHY.
 
-        Healthy systems should have high confident rate for
+        Healthy systems should have high trustworthy rate for
         in-domain queries with sufficient evidence.
         """
         if self.total_queries == 0:
             return 0.0
-        return self.confident_count / self.total_queries
-
-    @property
-    def qualified_rate(self) -> float:
-        """Rate of queries that resulted in QUALIFIED."""
-        if self.total_queries == 0:
-            return 0.0
-        return self.qualified_count / self.total_queries
+        return self.trustworthy_count / self.total_queries
 
     @property
     def disputed_rate(self) -> float:
@@ -84,12 +75,10 @@ class ModeDistribution:
             "period_start": self.period_start.isoformat(),
             "period_end": self.period_end.isoformat(),
             "total_queries": self.total_queries,
-            "confident_count": self.confident_count,
-            "qualified_count": self.qualified_count,
+            "trustworthy_count": self.trustworthy_count,
             "disputed_count": self.disputed_count,
             "abstain_count": self.abstain_count,
-            "confident_rate": round(self.confident_rate, 4),
-            "qualified_rate": round(self.qualified_rate, 4),
+            "trustworthy_rate": round(self.trustworthy_rate, 4),
             "disputed_rate": round(self.disputed_rate, 4),
             "abstain_rate": round(self.abstain_rate, 4),
         }
@@ -129,18 +118,16 @@ class GovernanceFlip:
         True if the flip is likely a regression.
 
         Regressions:
-        - CONFIDENT → ABSTAIN (was answering, now refusing)
-        - CONFIDENT → DISPUTED (was clear, now conflicting)
-        - QUALIFIED → ABSTAIN (was answering with caveats, now refusing)
+        - TRUSTWORTHY → ABSTAIN (was answering, now refusing)
+        - TRUSTWORTHY → DISPUTED (was clear, now conflicting)
 
         Improvements:
-        - ABSTAIN → CONFIDENT (corpus coverage improved)
-        - DISPUTED → CONFIDENT (conflict resolved)
+        - ABSTAIN → TRUSTWORTHY (corpus coverage improved)
+        - DISPUTED → TRUSTWORTHY (conflict resolved)
         """
         regressions = {
-            ("confident", "abstain"),
-            ("confident", "disputed"),
-            ("qualified", "abstain"),
+            ("trustworthy", "abstain"),
+            ("trustworthy", "disputed"),
         }
         return (self.old_mode, self.new_mode) in regressions
 
@@ -148,10 +135,8 @@ class GovernanceFlip:
     def is_improvement(self) -> bool:
         """True if the flip is likely an improvement."""
         improvements = {
-            ("abstain", "confident"),
-            ("abstain", "qualified"),
-            ("disputed", "confident"),
-            ("disputed", "qualified"),
+            ("abstain", "trustworthy"),
+            ("disputed", "trustworthy"),
         }
         return (self.old_mode, self.new_mode) in improvements
 

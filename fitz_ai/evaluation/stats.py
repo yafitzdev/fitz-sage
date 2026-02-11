@@ -114,7 +114,7 @@ class GovernanceStats:
             rows = result.fetchall()
 
         # Aggregate
-        counts = {"confident": 0, "qualified": 0, "disputed": 0, "abstain": 0}
+        counts = {"trustworthy": 0, "disputed": 0, "abstain": 0}
         for mode, count in rows:
             if mode in counts:
                 counts[mode] = count
@@ -125,8 +125,7 @@ class GovernanceStats:
             period_start=start,
             period_end=end,
             total_queries=total,
-            confident_count=counts["confident"],
-            qualified_count=counts["qualified"],
+            trustworthy_count=counts["trustworthy"],
             disputed_count=counts["disputed"],
             abstain_count=counts["abstain"],
         )

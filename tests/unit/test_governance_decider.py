@@ -73,7 +73,7 @@ class TestFallbackBehavior:
         results = [_make_constraint_result(allow=True)]
         decision = decider.decide(results, {"num_chunks": 3})
         assert isinstance(decision, GovernanceDecision)
-        assert decision.mode == AnswerMode.CONFIDENT
+        assert decision.mode == AnswerMode.TRUSTWORTHY
 
     def test_falls_back_when_features_none(self):
         decider = GovernanceDecider(model_path=Path("nonexistent_model.joblib"))
@@ -115,16 +115,16 @@ class TestMLPrediction:
         d._feature_names = artifact["feature_names"]
         return d
 
-    def test_trustworthy_no_constraints_returns_confident(self, decider):
+    def test_trustworthy_no_constraints_returns_trustworthy(self, decider):
         import numpy as np
 
         decider._s2_model.predict_proba.return_value = np.array([[0.1, 0.9]])
         results = [_make_constraint_result(allow=True)]
         features = {"num_constraints_fired": 0, "query_word_count": 5, "num_chunks": 3}
         decision = decider.decide(results, features)
-        assert decision.mode == AnswerMode.CONFIDENT
+        assert decision.mode == AnswerMode.TRUSTWORTHY
 
-    def test_trustworthy_with_constraints_returns_qualified(self, decider):
+    def test_trustworthy_with_constraints_returns_trustworthy(self, decider):
         import numpy as np
 
         decider._s2_model.predict_proba.return_value = np.array([[0.1, 0.9]])
@@ -133,7 +133,7 @@ class TestMLPrediction:
         ]
         features = {"num_constraints_fired": 1, "query_word_count": 5, "num_chunks": 3}
         decision = decider.decide(results, features)
-        assert decision.mode == AnswerMode.QUALIFIED
+        assert decision.mode == AnswerMode.TRUSTWORTHY
         assert "ie" in decision.triggered_constraints
         assert "hedged" in decision.reasons
 
@@ -225,12 +225,12 @@ class TestAnswerModeMapping:
     def test_disputed_maps_directly(self):
         assert GovernanceDecider._map_to_answer_mode("disputed", []) == AnswerMode.DISPUTED
 
-    def test_trustworthy_no_triggers_is_confident(self):
-        assert GovernanceDecider._map_to_answer_mode("trustworthy", []) == AnswerMode.CONFIDENT
+    def test_trustworthy_no_triggers_is_trustworthy(self):
+        assert GovernanceDecider._map_to_answer_mode("trustworthy", []) == AnswerMode.TRUSTWORTHY
 
-    def test_trustworthy_with_triggers_is_qualified(self):
+    def test_trustworthy_with_triggers_is_trustworthy(self):
         result = GovernanceDecider._map_to_answer_mode("trustworthy", ["conflict_aware"])
-        assert result == AnswerMode.QUALIFIED
+        assert result == AnswerMode.TRUSTWORTHY
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +264,6 @@ class TestErrorHandling:
         results = [_make_constraint_result(allow=True)]
         features = {"num_constraints_fired": 0, "query_word_count": 5, "num_chunks": 3}
         decision = decider.decide(results, features)
-        # Should fall back to AnswerGovernor (all constraints allow → CONFIDENT)
+        # Should fall back to AnswerGovernor (all constraints allow → TRUSTWORTHY)
         assert isinstance(decision, GovernanceDecision)
-        assert decision.mode == AnswerMode.CONFIDENT
+        assert decision.mode == AnswerMode.TRUSTWORTHY

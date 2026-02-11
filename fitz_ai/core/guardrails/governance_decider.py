@@ -10,11 +10,10 @@ Two-stage prediction:
   Stage 1: answerable vs abstain (RF)
   Stage 2: trustworthy vs disputed (ET), only for answerable cases
 
-3-class output mapped to 4-class AnswerMode:
+3-class output mapped to AnswerMode:
   abstain → ABSTAIN
   disputed → DISPUTED
-  trustworthy + no constraints fired → CONFIDENT
-  trustworthy + constraints fired → QUALIFIED
+  trustworthy → TRUSTWORTHY
 """
 
 from __future__ import annotations
@@ -134,7 +133,7 @@ class GovernanceDecider:
         # Collect constraint metadata for GovernanceDecision fields
         triggered, reasons, signals = self._collect_constraint_info(constraint_results)
 
-        # Map 3-class label to 4-class AnswerMode
+        # Map 3-class label to AnswerMode
         mode = self._map_to_answer_mode(label, triggered)
 
         return GovernanceDecision(
@@ -233,15 +232,12 @@ class GovernanceDecider:
 
     @staticmethod
     def _map_to_answer_mode(label: str, triggered: list[str]) -> AnswerMode:
-        """Map 3-class prediction to 4-class AnswerMode."""
+        """Map 3-class prediction to AnswerMode."""
         if label == "abstain":
             return AnswerMode.ABSTAIN
         if label == "disputed":
             return AnswerMode.DISPUTED
-        # trustworthy: split into CONFIDENT vs QUALIFIED based on constraint signals
-        if triggered:
-            return AnswerMode.QUALIFIED
-        return AnswerMode.CONFIDENT
+        return AnswerMode.TRUSTWORTHY
 
 
 __all__ = ["GovernanceDecider"]

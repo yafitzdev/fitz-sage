@@ -2,18 +2,18 @@
 """
 Specific Info Type Constraint - Detects when specific information types are missing.
 
-This constraint prevents confident answers when the query asks for specific
+This constraint prevents trustworthy answers when the query asks for specific
 information (price, date, count, etc.) that isn't present in the context.
 
 It complements InsufficientEvidenceConstraint by catching cases where:
 - Context is topically related (high similarity)
 - But lacks the SPECIFIC type of information requested
-- Should return 'qualified' instead of 'confident'
+- Fires a 'qualified' signal to indicate missing specifics
 
 DESIGN PRINCIPLE: This constraint must be CONSERVATIVE. It is far better to
-allow a confident answer through (false negative) than to wrongly downgrade
-a good answer to qualified (false positive). Only fire when we are VERY
-confident the specific info is genuinely absent from the context.
+allow a trustworthy answer through (false negative) than to wrongly
+flag it (false positive). Only fire when we are VERY confident the
+specific info is genuinely absent from the context.
 """
 
 import re
@@ -33,7 +33,7 @@ class SpecificInfoTypeConstraint:
 
     When a query asks for specific information (price, date, quantity, etc.)
     and the context discusses the topic but lacks that specific info,
-    this constraint triggers 'qualified' mode.
+    this constraint fires a 'qualified' signal.
 
     Conservative by design: only fires on high-confidence detections.
     """
@@ -76,7 +76,7 @@ class SpecificInfoTypeConstraint:
         }
 
         if entity_mismatch:
-            logger.info("SpecificInfoTypeConstraint: Entity mismatch detected -> QUALIFIED")
+            logger.info("SpecificInfoTypeConstraint: Entity mismatch detected")
             return ConstraintResult.deny(
                 reason="Context discusses a different entity or version",
                 signal="qualified",
@@ -91,8 +91,8 @@ class SpecificInfoTypeConstraint:
             # Found the specific info, allow confident answer
             return ConstraintResult.allow(**sit_diag)
 
-        # Context is related but missing specific info -> qualified
-        logger.info(f"SpecificInfoTypeConstraint: Missing {info_type} information -> QUALIFIED")
+        # Context is related but missing specific info
+        logger.info(f"SpecificInfoTypeConstraint: Missing {info_type} information")
 
         return ConstraintResult.deny(
             reason=f"Context discusses the topic but lacks specific {info_type} information",

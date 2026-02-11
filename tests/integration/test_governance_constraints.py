@@ -146,9 +146,9 @@ class TestRelevanceFiltering:
 
         assert decision.mode == AnswerMode.ABSTAIN
 
-    def test_relevant_context_allows_confident(self, insufficient_evidence_constraint):
+    def test_relevant_context_allows_trustworthy(self, insufficient_evidence_constraint):
         """
-        Query + matching context = CONFIDENT.
+        Query + matching context = TRUSTWORTHY.
 
         Uses real embedder to test actual relevance matching.
         Marked as integration test that requires Ollama.
@@ -173,8 +173,8 @@ class TestRelevanceFiltering:
             results = run_constraints(query, chunks, [constraint])
             decision = governor.decide(results)
 
-            assert decision.mode == AnswerMode.CONFIDENT, (
-                f"Expected CONFIDENT for relevant context, "
+            assert decision.mode == AnswerMode.TRUSTWORTHY, (
+                f"Expected TRUSTWORTHY for relevant context, "
                 f"got {decision.mode}. Reasons: {decision.reasons}"
             )
         except Exception as e:
@@ -188,15 +188,15 @@ class TestRelevanceFiltering:
 
 class TestCausalQueryDetection:
     """
-    Tests that causal queries without causal evidence trigger QUALIFIED.
+    Tests that causal queries without causal evidence trigger constraints.
 
     A "why" question with only correlational data should not get a
-    confident answer - it should be qualified.
+    trustworthy answer without caveats being tracked.
     """
 
-    def test_why_query_without_because_triggers_qualified(self, all_constraints, mock_embedder):
+    def test_why_query_without_because_triggers_constraints(self, all_constraints, mock_embedder):
         """
-        "Why did X happen?" + context without causal language = QUALIFIED.
+        "Why did X happen?" + context without causal language = TRUSTWORTHY or ABSTAIN.
         """
         query = "Why do users prefer feature X?"
         chunks = [
@@ -214,16 +214,15 @@ class TestCausalQueryDetection:
         results = run_constraints(query, chunks, all_constraints)
         decision = governor.decide(results)
 
-        # Should be QUALIFIED because we have relevant context but no causal evidence
-        # Note: Current implementation may route to ABSTAIN if relevance is low
-        assert decision.mode in (AnswerMode.QUALIFIED, AnswerMode.ABSTAIN), (
-            f"Expected QUALIFIED or ABSTAIN for causal query without evidence, "
+        # Should be TRUSTWORTHY (with constraint tracked) or ABSTAIN if relevance is low
+        assert decision.mode in (AnswerMode.TRUSTWORTHY, AnswerMode.ABSTAIN), (
+            f"Expected TRUSTWORTHY or ABSTAIN for causal query without evidence, "
             f"got {decision.mode}"
         )
 
-    def test_why_query_with_because_is_confident(self, insufficient_evidence_constraint):
+    def test_why_query_with_because_is_trustworthy(self, insufficient_evidence_constraint):
         """
-        "Why did X happen?" + context with "because" = CONFIDENT.
+        "Why did X happen?" + context with "because" = TRUSTWORTHY.
 
         Uses real embedder since mock embedder can't properly test relevance.
         """
@@ -247,8 +246,8 @@ class TestCausalQueryDetection:
             results = run_constraints(query, chunks, [constraint])
             decision = governor.decide(results)
 
-            assert decision.mode == AnswerMode.CONFIDENT, (
-                f"Expected CONFIDENT for causal query with causal evidence, "
+            assert decision.mode == AnswerMode.TRUSTWORTHY, (
+                f"Expected TRUSTWORTHY for causal query with causal evidence, "
                 f"got {decision.mode}. Reasons: {decision.reasons}"
             )
         except Exception as e:
@@ -270,8 +269,8 @@ class TestCausalQueryDetection:
         results = run_constraints(query, chunks, all_constraints)
         decision = governor.decide(results)
 
-        # Stats don't explain cause - should be qualified or abstain
-        assert decision.mode in (AnswerMode.QUALIFIED, AnswerMode.ABSTAIN)
+        # Stats don't explain cause - should be trustworthy (with constraint) or abstain
+        assert decision.mode in (AnswerMode.TRUSTWORTHY, AnswerMode.ABSTAIN)
 
 
 # =============================================================================
@@ -355,11 +354,11 @@ class TestConflictDetection:
 
         # These give different answers - might trigger divergent claims or pass
         # Also accept ABSTAIN if relevance filtering is strict with mock embedder
-        assert decision.mode in (AnswerMode.DISPUTED, AnswerMode.CONFIDENT, AnswerMode.ABSTAIN)
+        assert decision.mode in (AnswerMode.DISPUTED, AnswerMode.TRUSTWORTHY, AnswerMode.ABSTAIN)
 
-    def test_consistent_claims_remain_confident(self, all_constraints, mock_embedder):
+    def test_consistent_claims_remain_trustworthy(self, all_constraints, mock_embedder):
         """
-        Multiple chunks saying the same thing = CONFIDENT.
+        Multiple chunks saying the same thing = TRUSTWORTHY.
 
         Note: Chunks share "deployment" + "successful" for both relevance and consistency.
         """
@@ -380,12 +379,12 @@ class TestConflictDetection:
         results = run_constraints(query, chunks, all_constraints)
         decision = governor.decide(results)
 
-        # Both say successful → no conflict → CONFIDENT
+        # Both say successful → no conflict → TRUSTWORTHY
         # May also get ABSTAIN if mock embedder relevance is strict
         assert decision.mode in (
-            AnswerMode.CONFIDENT,
+            AnswerMode.TRUSTWORTHY,
             AnswerMode.ABSTAIN,
-        ), f"Expected CONFIDENT or ABSTAIN, got {decision.mode}"
+        ), f"Expected TRUSTWORTHY or ABSTAIN, got {decision.mode}"
 
 
 # =============================================================================
@@ -396,7 +395,7 @@ class TestConflictDetection:
 class TestSignalPriority:
     """
     Tests that signal priority is correctly enforced:
-    ABSTAIN > DISPUTED > QUALIFIED > CONFIDENT
+    ABSTAIN > DISPUTED > TRUSTWORTHY
     """
 
     def test_abstain_beats_disputed(self, all_constraints, mock_embedder):

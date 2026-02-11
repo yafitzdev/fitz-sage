@@ -144,7 +144,7 @@ class GovernanceDecision:
     This object is passed to generation and can be logged for observability.
 
     Attributes:
-        mode: The resolved epistemic posture (CONFIDENT/QUALIFIED/DISPUTED/ABSTAIN)
+        mode: The resolved epistemic posture (TRUSTWORTHY/DISPUTED/ABSTAIN)
         triggered_constraints: Names of constraints that denied decisive answers
         reasons: Human-readable explanations from each triggered constraint
         signals: Raw signal strings from constraints (for debugging/logging)
@@ -156,24 +156,24 @@ class GovernanceDecision:
     signals: frozenset[str] = field(default_factory=frozenset)
 
     @property
-    def is_confident(self) -> bool:
-        """True if no constraints restricted the answer."""
-        return self.mode == AnswerMode.CONFIDENT
+    def is_trustworthy(self) -> bool:
+        """True if evidence supports answering."""
+        return self.mode == AnswerMode.TRUSTWORTHY
 
     @property
     def should_include_caveats(self) -> bool:
         """True if the answer should include uncertainty language."""
-        return self.mode in (AnswerMode.QUALIFIED, AnswerMode.DISPUTED)
+        return self.mode == AnswerMode.DISPUTED
 
     @property
     def user_explanation(self) -> str | None:
         """
         Explanation suitable for showing to the user.
 
-        Returns None for CONFIDENT mode (no explanation needed).
+        Returns None for TRUSTWORTHY mode (no explanation needed).
         For other modes, returns a human-readable reason.
         """
-        if self.mode == AnswerMode.CONFIDENT:
+        if self.mode == AnswerMode.TRUSTWORTHY:
             return None
 
         if self.mode == AnswerMode.ABSTAIN:
@@ -186,10 +186,7 @@ class GovernanceDecision:
                 return f"Sources contain conflicting information: {'; '.join(self.reasons)}"
             return "Sources contain conflicting information."
 
-        # QUALIFIED
-        if self.reasons:
-            return "; ".join(self.reasons)
-        return "Answer provided with noted limitations."
+        return None
 
     def to_dict(self) -> dict:
         """Serialize for logging/storage."""
@@ -201,9 +198,9 @@ class GovernanceDecision:
         }
 
     @classmethod
-    def confident(cls) -> "GovernanceDecision":
-        """Factory for confident decisions (no constraints triggered)."""
-        return cls(mode=AnswerMode.CONFIDENT)
+    def trustworthy(cls) -> "GovernanceDecision":
+        """Factory for trustworthy decisions (no constraints triggered)."""
+        return cls(mode=AnswerMode.TRUSTWORTHY)
 
 
 class AnswerGovernor:
@@ -219,8 +216,7 @@ class AnswerGovernor:
     Signal priority (highest to lowest):
     1. "abstain" → ABSTAIN (insufficient evidence)
     2. "disputed" → DISPUTED (conflicting sources)
-    3. any denial → QUALIFIED (some limitation)
-    4. all pass → CONFIDENT (no restrictions)
+    3. all else → TRUSTWORTHY (evidence supports answering)
 
     Context-aware resolution:
     When InsufficientEvidenceConstraint fires, dispute signals are
@@ -239,7 +235,7 @@ class AnswerGovernor:
             GovernanceDecision with resolved mode and explanations
         """
         if not results:
-            return GovernanceDecision.confident()
+            return GovernanceDecision.trustworthy()
 
         # Collect data from all constraint results
         triggered: list[str] = []
@@ -293,8 +289,7 @@ class AnswerGovernor:
         Priority:
         1. "abstain" present → ABSTAIN (includes dispute subordination)
         2. "disputed" present → DISPUTED (unless subordinated)
-        3. Any denials (even without signal) → QUALIFIED
-        4. Otherwise → CONFIDENT
+        3. All else → TRUSTWORTHY
 
         Dispute subordination:
         When insufficient_evidence fires abstain, disputes are always
@@ -324,25 +319,14 @@ class AnswerGovernor:
                 if ie_similarity < self._IE_LOW_RELEVANCE_THRESHOLD:
                     # Low similarity + IE qualified = content loosely related.
                     # Disputes in loosely-related content are noise.
-                    return AnswerMode.QUALIFIED
+                    return AnswerMode.TRUSTWORTHY
                 # High similarity + IE qualified = content genuinely related
                 # but missing specific info. Disputes may be meaningful.
                 # Fall through to normal dispute resolution below.
 
-            # When multiple constraints fire qualified and only conflict_aware
-            # fires disputed, the qualified consensus is more trustworthy.
-            # This handles cases where complementary perspectives are
-            # misidentified as contradictions.
-            if "qualified" in signals:
-                qualified_count = sum(1 for s in constraint_signals.values() if s == "qualified")
-                disputed_count = sum(1 for s in constraint_signals.values() if s == "disputed")
-                if qualified_count >= 2 and disputed_count <= 1:
-                    return AnswerMode.QUALIFIED
             return AnswerMode.DISPUTED
 
-        if has_denials:
-            return AnswerMode.QUALIFIED
-        return AnswerMode.CONFIDENT
+        return AnswerMode.TRUSTWORTHY
 
 
 # Module-level instance for convenience

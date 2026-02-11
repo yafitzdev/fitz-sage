@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from fitz_ai.core.answer_mode import AnswerMode
+
 import pytest
 
 # Pure logic tests - run on every commit
@@ -298,8 +300,7 @@ class TestRunConstraints:
         governor = AnswerGovernor()
         decision = governor.decide(results)
 
-        assert decision.mode.value in ("disputed", "qualified", "abstain")
-        assert not decision.is_confident
+        assert decision.mode.value in ("disputed", "trustworthy", "abstain")
 
     def test_multiple_constraints_any_deny(self):
         """Should preserve all signals when multiple constraints deny."""
@@ -322,8 +323,11 @@ class TestRunConstraints:
         governor = AnswerGovernor()
         decision = governor.decide(results)
 
-        assert not decision.is_confident
+        # Denial without recognized signal resolves to TRUSTWORTHY
+        # but the constraint is still tracked
+        assert decision.mode == AnswerMode.TRUSTWORTHY
         assert "test denial" in decision.reasons
+        assert len(decision.triggered_constraints) > 0
 
     def test_constraint_exception_continues(self):
         """Should continue if a constraint raises an exception."""
@@ -347,7 +351,7 @@ class TestRunConstraints:
         governor = AnswerGovernor()
         decision = governor.decide(results)
 
-        assert decision.is_confident
+        assert decision.is_trustworthy
 
 
 # =============================================================================

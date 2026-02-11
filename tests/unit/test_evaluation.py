@@ -96,7 +96,7 @@ class TestGovernanceLog:
 
     def test_from_decision_timestamp_is_utc(self):
         """Timestamp should be UTC."""
-        decision = GovernanceDecision.confident()
+        decision = GovernanceDecision.trustworthy()
 
         log = GovernanceLog.from_decision(
             decision,
@@ -116,7 +116,7 @@ class TestGovernanceLog:
             timestamp=now,
             query_hash="hash123",
             query_text="What is the answer?",
-            mode="confident",
+            mode="trustworthy",
             triggered_constraints=("c1", "c2"),
             signals=("sig1",),
             reasons=("reason1",),
@@ -131,7 +131,7 @@ class TestGovernanceLog:
         assert d["timestamp"] == now.isoformat()
         assert d["query_hash"] == "hash123"
         assert d["query_text"] == "What is the answer?"
-        assert d["mode"] == "confident"
+        assert d["mode"] == "trustworthy"
         assert d["triggered_constraints"] == ["c1", "c2"]
         assert d["signals"] == ["sig1"]
         assert d["reasons"] == ["reason1"]
@@ -146,7 +146,7 @@ class TestGovernanceLog:
             timestamp=datetime.now(timezone.utc),
             query_hash="hash",
             query_text=None,
-            mode="confident",
+            mode="trustworthy",
             triggered_constraints=(),
             signals=(),
             reasons=(),
@@ -168,7 +168,7 @@ class TestGovernanceLog:
             timestamp=datetime.now(timezone.utc),
             query_hash="hash",
             query_text="test",
-            mode="confident",
+            mode="trustworthy",
             triggered_constraints=(),
             signals=(),
             reasons=(),
@@ -194,14 +194,12 @@ class TestModeDistribution:
             period_start=datetime.now(timezone.utc),
             period_end=datetime.now(timezone.utc),
             total_queries=100,
-            confident_count=70,
-            qualified_count=15,
+            trustworthy_count=85,
             disputed_count=5,
             abstain_count=10,
         )
 
-        assert dist.confident_rate == 0.70
-        assert dist.qualified_rate == 0.15
+        assert dist.trustworthy_rate == 0.85
         assert dist.disputed_rate == 0.05
         assert dist.abstain_rate == 0.10
 
@@ -211,14 +209,12 @@ class TestModeDistribution:
             period_start=datetime.now(timezone.utc),
             period_end=datetime.now(timezone.utc),
             total_queries=0,
-            confident_count=0,
-            qualified_count=0,
+            trustworthy_count=0,
             disputed_count=0,
             abstain_count=0,
         )
 
-        assert dist.confident_rate == 0.0
-        assert dist.qualified_rate == 0.0
+        assert dist.trustworthy_rate == 0.0
         assert dist.disputed_rate == 0.0
         assert dist.abstain_rate == 0.0
 
@@ -228,13 +224,12 @@ class TestModeDistribution:
             period_start=datetime.now(timezone.utc),
             period_end=datetime.now(timezone.utc),
             total_queries=50,
-            confident_count=50,
-            qualified_count=0,
+            trustworthy_count=50,
             disputed_count=0,
             abstain_count=0,
         )
 
-        assert dist.confident_rate == 1.0
+        assert dist.trustworthy_rate == 1.0
         assert dist.abstain_rate == 0.0
 
     def test_to_dict_serialization(self):
@@ -246,8 +241,7 @@ class TestModeDistribution:
             period_start=start,
             period_end=end,
             total_queries=100,
-            confident_count=80,
-            qualified_count=10,
+            trustworthy_count=90,
             disputed_count=5,
             abstain_count=5,
         )
@@ -257,12 +251,10 @@ class TestModeDistribution:
         assert d["period_start"] == start.isoformat()
         assert d["period_end"] == end.isoformat()
         assert d["total_queries"] == 100
-        assert d["confident_count"] == 80
-        assert d["qualified_count"] == 10
+        assert d["trustworthy_count"] == 90
         assert d["disputed_count"] == 5
         assert d["abstain_count"] == 5
-        assert d["confident_rate"] == 0.8
-        assert d["qualified_rate"] == 0.1
+        assert d["trustworthy_rate"] == 0.9
         assert d["disputed_rate"] == 0.05
         assert d["abstain_rate"] == 0.05
 
@@ -275,12 +267,12 @@ class TestModeDistribution:
 class TestGovernanceFlip:
     """Tests for GovernanceFlip dataclass."""
 
-    def test_is_regression_confident_to_abstain(self):
-        """CONFIDENT -> ABSTAIN is a regression."""
+    def test_is_regression_trustworthy_to_abstain(self):
+        """TRUSTWORTHY -> ABSTAIN is a regression."""
         flip = GovernanceFlip(
             query_hash="abc",
             query_text="test",
-            old_mode="confident",
+            old_mode="trustworthy",
             new_mode="abstain",
             old_timestamp=datetime.now(timezone.utc),
             new_timestamp=datetime.now(timezone.utc),
@@ -289,12 +281,12 @@ class TestGovernanceFlip:
         assert flip.is_regression is True
         assert flip.is_improvement is False
 
-    def test_is_regression_confident_to_disputed(self):
-        """CONFIDENT -> DISPUTED is a regression."""
+    def test_is_regression_trustworthy_to_disputed(self):
+        """TRUSTWORTHY -> DISPUTED is a regression."""
         flip = GovernanceFlip(
             query_hash="abc",
             query_text="test",
-            old_mode="confident",
+            old_mode="trustworthy",
             new_mode="disputed",
             old_timestamp=datetime.now(timezone.utc),
             new_timestamp=datetime.now(timezone.utc),
@@ -303,26 +295,13 @@ class TestGovernanceFlip:
         assert flip.is_regression is True
         assert flip.is_improvement is False
 
-    def test_is_regression_qualified_to_abstain(self):
-        """QUALIFIED -> ABSTAIN is a regression."""
-        flip = GovernanceFlip(
-            query_hash="abc",
-            query_text="test",
-            old_mode="qualified",
-            new_mode="abstain",
-            old_timestamp=datetime.now(timezone.utc),
-            new_timestamp=datetime.now(timezone.utc),
-        )
-
-        assert flip.is_regression is True
-
-    def test_is_improvement_abstain_to_confident(self):
-        """ABSTAIN -> CONFIDENT is an improvement."""
+    def test_is_improvement_abstain_to_trustworthy(self):
+        """ABSTAIN -> TRUSTWORTHY is an improvement."""
         flip = GovernanceFlip(
             query_hash="abc",
             query_text="test",
             old_mode="abstain",
-            new_mode="confident",
+            new_mode="trustworthy",
             old_timestamp=datetime.now(timezone.utc),
             new_timestamp=datetime.now(timezone.utc),
         )
@@ -330,26 +309,13 @@ class TestGovernanceFlip:
         assert flip.is_improvement is True
         assert flip.is_regression is False
 
-    def test_is_improvement_abstain_to_qualified(self):
-        """ABSTAIN -> QUALIFIED is an improvement."""
-        flip = GovernanceFlip(
-            query_hash="abc",
-            query_text="test",
-            old_mode="abstain",
-            new_mode="qualified",
-            old_timestamp=datetime.now(timezone.utc),
-            new_timestamp=datetime.now(timezone.utc),
-        )
-
-        assert flip.is_improvement is True
-
-    def test_is_improvement_disputed_to_confident(self):
-        """DISPUTED -> CONFIDENT is an improvement."""
+    def test_is_improvement_disputed_to_trustworthy(self):
+        """DISPUTED -> TRUSTWORTHY is an improvement."""
         flip = GovernanceFlip(
             query_hash="abc",
             query_text="test",
             old_mode="disputed",
-            new_mode="confident",
+            new_mode="trustworthy",
             old_timestamp=datetime.now(timezone.utc),
             new_timestamp=datetime.now(timezone.utc),
         )
@@ -358,11 +324,11 @@ class TestGovernanceFlip:
 
     def test_neither_regression_nor_improvement(self):
         """Some flips are neither regression nor improvement."""
-        # QUALIFIED -> DISPUTED - unclear if better or worse
+        # ABSTAIN -> DISPUTED - unclear if better or worse
         flip = GovernanceFlip(
             query_hash="abc",
             query_text="test",
-            old_mode="qualified",
+            old_mode="abstain",
             new_mode="disputed",
             old_timestamp=datetime.now(timezone.utc),
             new_timestamp=datetime.now(timezone.utc),
@@ -376,7 +342,7 @@ class TestGovernanceFlip:
         flip = GovernanceFlip(
             query_hash="abc",
             query_text="test",
-            old_mode="confident",
+            old_mode="trustworthy",
             new_mode="abstain",
             old_timestamp=datetime.now(timezone.utc),
             new_timestamp=datetime.now(timezone.utc),
@@ -390,7 +356,7 @@ class TestGovernanceFlip:
         flip = GovernanceFlip(
             query_hash="abc",
             query_text="test",
-            old_mode="confident",
+            old_mode="trustworthy",
             new_mode="abstain",
             old_timestamp=datetime.now(timezone.utc),
             new_timestamp=datetime.now(timezone.utc),
@@ -409,7 +375,7 @@ class TestGovernanceFlip:
         flip = GovernanceFlip(
             query_hash="abc123",
             query_text="What is X?",
-            old_mode="confident",
+            old_mode="trustworthy",
             new_mode="abstain",
             old_timestamp=old_ts,
             new_timestamp=new_ts,
@@ -421,7 +387,7 @@ class TestGovernanceFlip:
 
         assert d["query_hash"] == "abc123"
         assert d["query_text"] == "What is X?"
-        assert d["old_mode"] == "confident"
+        assert d["old_mode"] == "trustworthy"
         assert d["new_mode"] == "abstain"
         assert d["old_timestamp"] == old_ts.isoformat()
         assert d["new_timestamp"] == new_ts.isoformat()
@@ -435,7 +401,7 @@ class TestGovernanceFlip:
         flip = GovernanceFlip(
             query_hash="abc",
             query_text=None,
-            old_mode="confident",
+            old_mode="trustworthy",
             new_mode="abstain",
             old_timestamp=datetime.now(timezone.utc),
             new_timestamp=datetime.now(timezone.utc),
@@ -560,7 +526,7 @@ class TestGovernanceLogger:
         )
 
         # Log fewer than batch_size entries
-        decision = GovernanceDecision.confident()
+        decision = GovernanceDecision.trustworthy()
         for i in range(5):
             logger.log(decision, f"query {i}", [])
 
@@ -589,7 +555,7 @@ class TestGovernanceLogger:
         )
         logger._schema_ensured = True  # Skip schema check
 
-        decision = GovernanceDecision.confident()
+        decision = GovernanceDecision.trustworthy()
 
         # Log exactly batch_size entries
         for i in range(5):
@@ -620,7 +586,7 @@ class TestGovernanceLogger:
         )
         logger._schema_ensured = True
 
-        decision = GovernanceDecision.confident()
+        decision = GovernanceDecision.trustworthy()
 
         # Log some entries
         for i in range(3):
@@ -701,8 +667,7 @@ class TestGovernanceLogIntegration:
     @pytest.mark.parametrize(
         "mode,expected_mode_str",
         [
-            (AnswerMode.CONFIDENT, "confident"),
-            (AnswerMode.QUALIFIED, "qualified"),
+            (AnswerMode.TRUSTWORTHY, "trustworthy"),
             (AnswerMode.DISPUTED, "disputed"),
             (AnswerMode.ABSTAIN, "abstain"),
         ],
