@@ -47,10 +47,10 @@ class InitService:
             pgvector=system.pgvector,
         )
 
-    def load_default_config(self) -> dict:
+    def load_default_config(self, engine: str = "fitz_krag") -> dict:
         """Load the default configuration from package."""
         defaults_path = (
-            Path(__file__).parent.parent.parent / "engines" / "fitz_rag" / "config" / "default.yaml"
+            Path(__file__).parent.parent.parent / "engines" / engine / "config" / "default.yaml"
         )
         with defaults_path.open("r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
@@ -121,77 +121,6 @@ class InitService:
     def generate_global_config(self, default_engine: str) -> str:
         """Generate global config YAML."""
         config = {"runtime": {"default_engine": default_engine}}
-        return yaml.dump(config, sort_keys=False, default_flow_style=False)
-
-    def generate_fitz_rag_config(
-        self,
-        chat_plugin: str,
-        chat_model: str,
-        embedding_plugin: str,
-        embedding_model: str,
-        rerank_plugin: str | None,
-        rerank_model: str | None,
-        vector_db_plugin: str,
-        retrieval_plugin: str,
-        chunking_plugin: str,
-        collection: str = "default",
-    ) -> str:
-        """Generate fitz_rag engine config."""
-        config: dict[str, Any] = {
-            "chat": {
-                "plugin_name": chat_plugin,
-                "kwargs": {},
-            },
-            "embedding": {
-                "plugin_name": embedding_plugin,
-                "kwargs": {},
-            },
-            "rerank": {
-                "enabled": False,
-                "plugin_name": None,
-                "kwargs": {},
-            },
-            "vector_db": {
-                "plugin_name": vector_db_plugin,
-                "kwargs": {},
-            },
-            "retrieval": {
-                "collection": collection,
-                "plugin_name": retrieval_plugin,
-                "top_k": 25,
-                "fetch_artifacts": True,
-            },
-            "chunking": {
-                "router": {
-                    "default": {
-                        "plugin_name": chunking_plugin,
-                        "kwargs": {
-                            "chunk_size": 1500,
-                            "chunk_overlap": 200,
-                        },
-                    },
-                },
-            },
-            "rgs": {
-                "enable_citations": True,
-                "strict_grounding": True,
-                "answer_style": "concise",
-                "max_chunks": 10,
-            },
-        }
-
-        # Add model overrides if provided
-        if chat_model:
-            config["chat"]["kwargs"]["model"] = chat_model
-        if embedding_model:
-            config["embedding"]["kwargs"]["model"] = embedding_model
-
-        # Add rerank if provided
-        if rerank_plugin and rerank_model:
-            config["rerank"]["enabled"] = True
-            config["rerank"]["plugin_name"] = rerank_plugin
-            config["rerank"]["kwargs"]["model"] = rerank_model
-
         return yaml.dump(config, sort_keys=False, default_flow_style=False)
 
     def copy_engine_default_config(self, engine_name: str, registry: Any) -> str | None:

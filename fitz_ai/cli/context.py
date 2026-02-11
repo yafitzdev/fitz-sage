@@ -552,22 +552,16 @@ class CLIContext:
             raise typer.Exit(1)
 
     def get_pipeline(self):
-        """Get pipeline instance for the current engine."""
+        """Get engine instance for the current engine."""
         if self.typed_config is None:
             raise ValueError("No typed config available")
 
-        if self.engine_name == "fitz_rag":
-            from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
-
-            return RAGPipeline.from_config(self.typed_config)
-
-        # For other engines, create the engine instance directly
         from fitz_ai.runtime import create_engine
 
         return create_engine(self.engine_name, config=self.typed_config)
 
     def require_pipeline(self):
-        """Get RAGPipeline or exit with error."""
+        """Get engine instance or exit with error."""
         import typer
 
         from fitz_ai.cli.ui import ui

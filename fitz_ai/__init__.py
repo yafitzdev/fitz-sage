@@ -3,7 +3,7 @@
 Fitz - Local-First RAG Framework & Engine Platform
 
 Fitz is a paradigm-agnostic knowledge engine platform that supports multiple
-approaches to knowledge retrieval and synthesis (Fitz RAG, custom engines).
+approaches to knowledge retrieval and synthesis.
 
 Quick Start:
     >>> from fitz import run
@@ -22,15 +22,11 @@ Public API:
         - create_engine: Factory for creating engines
         - list_engines: List available engines
 
-    Fitz RAG:
-        - run_fitz_rag: RAG-specific entry point
-        - create_fitz_rag_engine: RAG engine factory
-
 Architecture:
     fitz_ai/
     ├── core/              # Paradigm-agnostic contracts
     ├── engines/           # Engine implementations
-    │   └── fitz_rag/   # Retrieval-augmented generation
+    │   └── fitz_krag/     # Knowledge Routing Augmented Generation
     ├── runtime/           # Multi-engine orchestration
     ├── llm/               # LLM service (chat, embedding, rerank)
     ├── vector_db/         # Vector database service
@@ -53,11 +49,11 @@ Examples:
     >>> answer = run("Explain entanglement", constraints=constraints)
 
     Specific engine:
-    >>> answer = run("What is X?", engine="fitz_rag")
+    >>> answer = run("What is X?", engine="fitz_krag")
 
     Reusable engine:
     >>> from fitz import create_engine, Query
-    >>> engine = create_engine("fitz_rag")
+    >>> engine = create_engine("fitz_krag")
     >>> query = Query(text="What is Y?")
     >>> answer = engine.answer(query)
 """
@@ -91,12 +87,6 @@ def __getattr__(name: str):
         from fitz_ai import core
 
         return getattr(core, name)
-
-    # Fitz RAG engine (heavy - loads config, plugins)
-    if name in ("FitzRagEngine", "create_fitz_rag_engine", "run_fitz_rag"):
-        from fitz_ai.engines import fitz_rag
-
-        return getattr(fitz_rag, name)
 
     # Runtime (heavy - discovers all engines)
     if name in (
@@ -215,10 +205,6 @@ __all__ = [
     "list_engines",
     "list_engines_with_info",
     "get_engine_registry",
-    # Fitz RAG
-    "run_fitz_rag",
-    "create_fitz_rag_engine",
-    "FitzRagEngine",
     # SDK
     "fitz",
     "IngestStats",

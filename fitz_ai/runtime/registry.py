@@ -455,4 +455,4 @@ def get_default_engine() -> str:
         logger.debug(f"Failed to get engine from registry: {e}")
 
     # Last resort fallback (should never reach here if engines are registered)
-    return "fitz_rag"
+    return "fitz_krag"

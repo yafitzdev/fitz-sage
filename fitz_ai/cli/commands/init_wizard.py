@@ -10,9 +10,7 @@ import typer
 from fitz_ai.cli.context import CLIContext
 from fitz_ai.cli.ui import RICH, console, ui
 from fitz_ai.core.registry import (
-    available_chunking_plugins,
     available_llm_plugins,
-    available_retrieval_plugins,
     available_vector_db_plugins,
 )
 from fitz_ai.runtime import get_default_engine, get_engine_registry
@@ -20,11 +18,10 @@ from fitz_ai.runtime import get_default_engine, get_engine_registry
 from .init_config import (
     copy_engine_default_config,
     generate_fitz_krag_config,
-    generate_fitz_rag_config,
     generate_global_config,
 )
-from .init_detector import detect_system, filter_available_plugins, load_default_config
-from .init_models import get_default_model, get_default_or_first
+from .init_detector import detect_system, filter_available_plugins
+from .init_models import get_default_model
 
 # Preferred plugin order: first available = default (selected on Enter).
 # Ollama first because it's local, private, and free.
@@ -162,93 +159,6 @@ def _select_plugins(system, non_interactive: bool) -> dict:
         "vision": vision_choice,
         "vision_model": vision_model,
     }
-
-
-def _run_fitz_rag_wizard(system, non_interactive: bool) -> str:
-    """Run FitzRAG-specific configuration wizard.
-
-    Returns:
-        Generated FitzRAG config YAML string.
-    """
-    plugins = _select_plugins(system, non_interactive)
-
-    # RAG-specific: retrieval, chunking, parser
-    all_retrieval = available_retrieval_plugins()
-    all_chunkers = available_chunking_plugins()
-    avail_chunkers = all_chunkers if all_chunkers else ["simple"]
-
-    default_config = load_default_config()
-
-    def _get_plugin(key: str, fallback: str) -> str:
-        val = default_config.get(key)
-        if isinstance(val, dict):
-            return val.get("plugin_name", fallback)
-        elif isinstance(val, str):
-            return val.split("/")[0] if val else fallback
-        return fallback
-
-    default_retrieval = _get_plugin("retrieval_plugin", "dense")
-    default_chunker = "recursive"
-    default_chunk_size = default_config.get("chunk_size", 512)
-    default_chunk_overlap = default_config.get("chunk_overlap", 0)
-
-    if non_interactive:
-        retrieval_choice = get_default_or_first(all_retrieval, default_retrieval)
-        chunker_choice = default_chunker
-        chunk_size = default_chunk_size
-        chunk_overlap = default_chunk_overlap
-        parser_choice = "docling_vision" if plugins["vision"] else "docling"
-    else:
-        # Retrieval
-        print()
-        retrieval_choice = ui.prompt_numbered_choice(
-            "Retrieval strategy",
-            all_retrieval,
-            get_default_or_first(all_retrieval, default_retrieval),
-        )
-
-        # Chunking
-        print()
-        chunker_choice = ui.prompt_numbered_choice(
-            "Chunking strategy", avail_chunkers, default_chunker
-        )
-        chunk_size = ui.prompt_int("  Chunk size", default_chunk_size)
-        chunk_overlap = ui.prompt_int("  Chunk overlap", default_chunk_overlap)
-
-        # Parser selection
-        print()
-        avail_vision = filter_available_plugins(
-            available_llm_plugins("vision"), "vision", system
-        )
-        if avail_vision:
-            parser_descs = [
-                "docling_vision - VLM-powered figure description",
-                "docling - Standard document parsing",
-            ]
-            selected = ui.prompt_numbered_choice("Parser", parser_descs, parser_descs[0])
-            parser_choice = selected.split(" - ")[0]
-        else:
-            ui.info("Parser: docling (VLM not available)")
-            parser_choice = "docling"
-
-    return generate_fitz_rag_config(
-        chat=plugins["chat"],
-        chat_model_smart=plugins["chat_model_smart"],
-        chat_model_fast=plugins["chat_model_fast"],
-        chat_model_balanced=plugins["chat_model_balanced"],
-        embedding=plugins["embedding"],
-        embedding_model=plugins["embedding_model"],
-        rerank=plugins["rerank"],
-        rerank_model=plugins["rerank_model"],
-        vector_db=plugins["vector_db"],
-        retrieval=retrieval_choice,
-        chunker=chunker_choice,
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        parser=parser_choice,
-        vision=plugins["vision"],
-        vision_model=plugins["vision_model"],
-    )
 
 
 def _run_fitz_krag_wizard(system, non_interactive: bool) -> str:
@@ -422,9 +332,7 @@ def command(
     # Generate configs
     global_config_yaml = generate_global_config(default_engine)
 
-    if default_engine == "fitz_rag":
-        engine_config_yaml = _run_fitz_rag_wizard(system, non_interactive)
-    elif default_engine == "fitz_krag":
+    if default_engine == "fitz_krag":
         engine_config_yaml = _run_fitz_krag_wizard(system, non_interactive)
     else:
         # For any other engine, use auto-discovery

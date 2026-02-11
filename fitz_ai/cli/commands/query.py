@@ -91,7 +91,7 @@ def command(
         fitz query                         # Interactive mode
         fitz query "What is RAG?"          # Direct query
         fitz query "question" -e custom    # Use a custom engine
-        fitz query "question" -c my_coll   # Specify collection (fitz_rag)
+        fitz query "question" -c my_coll   # Specify collection
     """
     # =========================================================================
     # Header

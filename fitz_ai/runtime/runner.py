@@ -67,8 +67,8 @@ def run(
         >>> answer = run("What is Y?", constraints=constraints)
 
         With config:
-        >>> from fitz_ai.engines.fitz_rag.config.loader import load_config
-        >>> config = load_config("my_config.yaml")
+        >>> from fitz_ai.config.loader import load_engine_config
+        >>> config = load_engine_config("fitz_krag")
         >>> answer = run("Question?", config=config)
     """
     # Resolve engine name

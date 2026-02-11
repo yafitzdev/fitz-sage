@@ -14,19 +14,11 @@ from typing import Any, Dict, List, Optional
 
 import typer
 
-from fitz_ai.cli.context import CLIContext
 from fitz_ai.cli.ui import RICH, console, display_sources, ui
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.logging.logger import get_logger
-from fitz_ai.retrieval.rewriter.types import ConversationContext, ConversationMessage
 
 logger = get_logger(__name__)
-
-
-def _history_to_context(history: List[Dict[str, str]]) -> ConversationContext:
-    """Convert chat history to ConversationContext for query rewriting."""
-    messages = [ConversationMessage(role=msg["role"], content=msg["content"]) for msg in history]
-    return ConversationContext(history=messages)
 
 
 # =============================================================================
@@ -180,20 +172,38 @@ def command(
 
 def _run_collection_chat(collection: Optional[str]) -> None:
     """Run chat using the default engine."""
-    # Load config via CLIContext (always succeeds with defaults)
-    ctx = CLIContext.load()
+    from fitz_ai.core import Query
+    from fitz_ai.runtime import create_engine, get_default_engine, get_engine_registry
 
-    # Ensure valid typed config before proceeding
-    ctx.require_typed_config()
+    engine_name = get_default_engine()
+    registry = get_engine_registry()
 
-    # Collection selection (keeps ctx and typed_config in sync)
-    selected_collection = ctx.select_collection(collection)
+    # Collection selection
+    collections = registry.get_list_collections(engine_name)
+    if not collections:
+        ui.error(f"No collections found for engine '{engine_name}'.")
+        ui.info("Run 'fitz ingest ./docs' first to ingest documents.")
+        raise typer.Exit(1)
 
-    # Create pipeline
-    pipeline = ctx.require_pipeline()
+    if collection and collection not in collections:
+        ui.error(f"Collection '{collection}' not found. Available: {', '.join(collections)}")
+        raise typer.Exit(1)
+    elif collection is None:
+        if len(collections) == 1:
+            collection = collections[0]
+        else:
+            collection = ui.prompt_numbered_choice("Collection", collections, collections[0])
+
+    # Create engine and load collection
+    try:
+        engine = create_engine(engine_name)
+        engine.load(collection)
+    except Exception as e:
+        ui.error(f"Failed to initialize engine: {e}")
+        raise typer.Exit(1)
 
     # Chat loop
-    _display_welcome(selected_collection)
+    _display_welcome(collection)
 
     history: List[Dict[str, str]] = []
 
@@ -218,34 +228,31 @@ def _run_collection_chat(collection: Optional[str]) -> None:
             if not user_input.strip():
                 continue
 
-            # Retrieve chunks for current question (with conversation context for rewriting)
+            # Query the engine
             try:
-                context = _history_to_context(history) if history else None
-                chunks = pipeline.retrieval.retrieve(user_input, conversation_context=context)
+                answer = engine.answer(Query(text=user_input))
             except Exception as e:
-                ui.error(f"Retrieval failed: {e}")
-                logger.debug("Retrieval error", exc_info=True)
-                continue
-
-            # Build messages with history and context
-            messages = _build_messages(history, chunks, user_input)
-
-            # Get LLM response (use "smart" tier for user-facing responses)
-            try:
-                chat = pipeline.chat_factory("smart")
-                response = chat.chat(messages)
-            except Exception as e:
-                ui.error(f"LLM request failed: {e}")
-                logger.debug("LLM error", exc_info=True)
+                ui.error(f"Query failed: {e}")
+                logger.debug("Query error", exc_info=True)
                 continue
 
             # Display response and sources
-            _display_assistant_message(response)
-            display_sources(chunks, indent=12)
+            _display_assistant_message(answer.text)
+            if answer.provenance:
+                chunks = [
+                    Chunk(
+                        content=p.excerpt or "",
+                        metadata={"source": p.source_id},
+                    )
+                    for p in answer.provenance
+                    if p.excerpt
+                ]
+                if chunks:
+                    display_sources(chunks, indent=12)
 
             # Update history
             history.append({"role": "user", "content": user_input})
-            history.append({"role": "assistant", "content": response})
+            history.append({"role": "assistant", "content": answer.text})
 
     except KeyboardInterrupt:
         pass  # Graceful exit on Ctrl+C

@@ -9,7 +9,7 @@ Provides:
 
 Usage:
     from fitz_ai.ingestion.chunking import ChunkingRouter, Chunker
-    from fitz_ai.engines.fitz_rag.config import ChunkingRouterConfig
+    from fitz_ai.ingestion.chunking.config import ChunkingRouterConfig
 
     config = ChunkingRouterConfig(...)
     router = ChunkingRouter.from_config(config)

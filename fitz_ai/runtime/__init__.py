@@ -23,16 +23,16 @@ Examples:
     List engines:
     >>> from fitz_ai.runtime import list_engines
     >>> print(list_engines())
-    ['fitz_rag']
+    ['fitz_krag']
 
     Create reusable engine:
     >>> from fitz_ai.runtime import create_engine
-    >>> engine = create_engine("fitz_rag")
+    >>> engine = create_engine("fitz_krag")
     >>> answer = engine.answer(query)
 
     Check capabilities:
     >>> from fitz_ai.runtime import get_engine_registry
-    >>> caps = get_engine_registry().get_capabilities("fitz_rag")
+    >>> caps = get_engine_registry().get_capabilities("fitz_krag")
     >>> if caps.requires_documents_at_query:
     ...     print("This engine needs documents loaded first")
 """

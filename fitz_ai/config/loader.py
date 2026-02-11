@@ -6,11 +6,10 @@ Usage:
     from fitz_ai.config.loader import load_engine_config
 
     # Returns Pydantic config model - defaults + user overrides
-    config = load_engine_config("fitz_rag")
+    config = load_engine_config("fitz_krag")
 
     # Values are typed and validated
     chat_plugin = config.chat  # "cohere" or "anthropic/claude-sonnet-4"
-    top_k = config.top_k  # int, validated >= 1
 """
 
 from __future__ import annotations
@@ -132,10 +131,10 @@ def load_engine_config(engine: str):
     Returns a validated Pydantic model with defaults + user overrides.
 
     Args:
-        engine: Engine name (e.g., "fitz_rag")
+        engine: Engine name (e.g., "fitz_krag")
 
     Returns:
-        Pydantic config model (e.g., FitzRagConfig)
+        Pydantic config model (e.g., FitzKragConfig)
 
     Raises:
         FileNotFoundError: If no defaults exist
@@ -143,16 +142,11 @@ def load_engine_config(engine: str):
         ValidationError: If config is invalid
 
     Examples:
-        >>> config = load_engine_config("fitz_rag")
+        >>> config = load_engine_config("fitz_krag")
         >>> config.chat  # str: "cohere" or "anthropic/claude-sonnet-4"
-        >>> config.top_k  # int: validated >= 1
     """
     # Import engine-specific schema
-    if engine == "fitz_rag":
-        from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
-
-        ConfigModel = FitzRagConfig
-    elif engine == "fitz_krag":
+    if engine == "fitz_krag":
         from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 
         ConfigModel = FitzKragConfig

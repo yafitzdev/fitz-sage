@@ -20,7 +20,7 @@ def build_chunking_router_config(ctx):
     Returns:
         ChunkingRouterConfig with recursive chunker using ctx values.
     """
-    from fitz_ai.engines.fitz_rag.config import (
+    from fitz_ai.ingestion.chunking.config import (
         ChunkingRouterConfig,
         ExtensionChunkerConfig,
     )
