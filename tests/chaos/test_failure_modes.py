@@ -43,7 +43,7 @@ class TestLLMFailures:
         """LLM timeout should be handled gracefully."""
         import asyncio
 
-        from fitz_ai.engines.fitz_rag.exceptions import LLMError
+        from fitz_ai.core.exceptions import GenerationError as LLMError
 
         # Replace the chat factory with one that returns a timeout-failing client
         original_factory = self.runner.pipeline.chat_factory
@@ -67,7 +67,7 @@ class TestLLMFailures:
 
     def test_llm_rate_limit_handling(self):
         """Rate limit errors should be handled."""
-        from fitz_ai.engines.fitz_rag.exceptions import LLMError
+        from fitz_ai.core.exceptions import GenerationError as LLMError
 
         def rate_limited(*args, **kwargs):
             raise Exception("Rate limit exceeded. Retry after 60 seconds.")

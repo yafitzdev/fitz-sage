@@ -12,7 +12,7 @@ def test_load_config_from_defaults():
     """Test loading config from default.yaml (isolated from user config)."""
     # Mock _load_user_config to return None, ensuring we only test defaults
     with patch("fitz_ai.config.loader._load_user_config", return_value=None):
-        config = load_engine_config("fitz_rag")
+        config = load_engine_config("fitz_krag")
 
     # Verify it's a Pydantic model
     assert hasattr(config, "chat")
@@ -27,43 +27,43 @@ def test_load_config_from_defaults():
     # Verify None for disabled features
     assert config.vision is None or isinstance(config.vision, str)
 
-    # Verify flattened generation settings
+    # Verify generation settings
     assert hasattr(config, "enable_citations")
     assert hasattr(config, "strict_grounding")
-    assert hasattr(config, "max_chunks")
+    assert hasattr(config, "top_addresses")
 
 
 def test_config_required_field():
     """Test that collection field is required."""
     from pydantic import ValidationError
 
-    from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
+    from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 
     # Missing required 'collection' field
     with pytest.raises(ValidationError):
-        FitzRagConfig(chat="cohere", embedding="cohere")
+        FitzKragConfig(chat="cohere", embedding="cohere")
 
 
 def test_config_validation():
     """Test config validation (Pydantic)."""
     from pydantic import ValidationError
 
-    from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
+    from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 
-    # Invalid top_k (must be >= 1)
+    # Invalid top_addresses (must be >= 1)
     with pytest.raises(ValidationError):
-        FitzRagConfig(chat="cohere", embedding="cohere", collection="test", top_k=0)
+        FitzKragConfig(chat="cohere", embedding="cohere", collection="test", top_addresses=0)
 
-    # Invalid chunk_size (must be >= 50)
+    # Invalid max_context_tokens (must be >= 100)
     with pytest.raises(ValidationError):
-        FitzRagConfig(chat="cohere", embedding="cohere", collection="test", chunk_size=10)
+        FitzKragConfig(chat="cohere", embedding="cohere", collection="test", max_context_tokens=10)
 
 
 def test_config_none_for_disabled():
     """Test that None properly disables optional features."""
-    from fitz_ai.engines.fitz_rag.config.schema import FitzRagConfig
+    from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 
-    config = FitzRagConfig(
+    config = FitzKragConfig(
         chat="cohere",
         embedding="cohere",
         collection="test",

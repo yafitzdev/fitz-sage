@@ -99,7 +99,7 @@ def main():
     # Create versions
     versions = CacheVersions(
         optimizer="1.0.0",
-        engine="fitz_rag",
+        engine="fitz_krag",
         collection="test_collection_v1",
         llm_model="gpt-4o-mini",
         prompt_template="default_v1",

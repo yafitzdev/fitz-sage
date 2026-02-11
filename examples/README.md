@@ -145,7 +145,7 @@ fitz doctor                  # System diagnostics
 
 ## Configuration
 
-Fitz works out of the box, but you can customize via `~/.fitz/config/fitz_rag.yaml`:
+Fitz works out of the box, but you can customize via `~/.fitz/config/fitz_krag.yaml`:
 
 ```yaml
 # LLM provider

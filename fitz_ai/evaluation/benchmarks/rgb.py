@@ -33,7 +33,7 @@ from fitz_ai.core.answer_mode import AnswerMode
 from fitz_ai.logging.logger import get_logger
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_rag.engine import FitzRagEngine
+    from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
 
 logger = get_logger(__name__)
 
@@ -337,7 +337,7 @@ class RGBEvaluator:
 
     def evaluate(
         self,
-        engine: FitzRagEngine,
+        engine: FitzKragEngine,
         cases: list[RGBCase],
         test_type: RGBTestType | None = None,
     ) -> RGBResult:
@@ -392,7 +392,7 @@ class RGBEvaluator:
 
     def _evaluate_type(
         self,
-        engine: FitzRagEngine,
+        engine: FitzKragEngine,
         cases: list[RGBCase],
         test_type: RGBTestType,
     ) -> RGBTypeResult:
@@ -413,7 +413,7 @@ class RGBEvaluator:
             case_results=case_results,
         )
 
-    def _evaluate_case(self, engine: FitzRagEngine, case: RGBCase) -> RGBCaseResult:
+    def _evaluate_case(self, engine: FitzKragEngine, case: RGBCase) -> RGBCaseResult:
         """Evaluate a single test case."""
         from fitz_ai.core import Query
 
@@ -454,7 +454,7 @@ class RGBEvaluator:
             failure_reason=failure_reason,
         )
 
-    def _run_with_contexts(self, engine: FitzRagEngine, query, contexts: list[str]):
+    def _run_with_contexts(self, engine: FitzKragEngine, query, contexts: list[str]):
         """Run engine with injected contexts (bypass retrieval)."""
         # Create mock chunks from contexts
         from fitz_ai.core import Chunk
@@ -560,7 +560,7 @@ Is the answer correct? Respond with only 'yes' or 'no'."""
 
     def evaluate_from_file(
         self,
-        engine: FitzRagEngine,
+        engine: FitzKragEngine,
         path: Path | str,
         test_type: RGBTestType | None = None,
     ) -> RGBResult:

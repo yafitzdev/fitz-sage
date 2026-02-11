@@ -110,12 +110,12 @@ The following are intentionally not linked from README:
 Removed `dense_rerank` plugin - reranking is now baked into `dense` plugin and auto-enabled when rerank provider is configured.
 
 ### Code Changes
-- [x] **fitz_ai/engines/fitz_rag/retrieval/plugins/dense.yaml** - Added rerank/threshold steps with `enabled_if: reranker`
-- [x] **fitz_ai/engines/fitz_rag/retrieval/plugins/dense_rerank.yaml** - Deleted
-- [x] **fitz_ai/engines/fitz_rag/config/schema.py** - Updated retrieval_plugin description
-- [x] **fitz_ai/engines/fitz_rag/config/default.yaml** - Updated comment
-- [x] **fitz_ai/engines/fitz_rag/retrieval/loader.py** - Updated docstring
-- [x] **fitz_ai/engines/fitz_rag/retrieval/registry.py** - Updated docstring
+- [x] **fitz_ai/engines/fitz_krag/retrieval/plugins/dense.yaml** - Added rerank/threshold steps with `enabled_if: reranker`
+- [x] **fitz_ai/engines/fitz_krag/retrieval/plugins/dense_rerank.yaml** - Deleted
+- [x] **fitz_ai/engines/fitz_krag/config/schema.py** - Updated retrieval_plugin description
+- [x] **fitz_ai/engines/fitz_krag/config/default.yaml** - Updated comment
+- [x] **fitz_ai/engines/fitz_krag/retrieval/loader.py** - Updated docstring
+- [x] **fitz_ai/engines/fitz_krag/retrieval/registry.py** - Updated docstring
 - [x] **tests/unit/test_retrieval_yaml_plugins.py** - Updated tests to use `dense` with reranker
 
 ### Documentation Updates

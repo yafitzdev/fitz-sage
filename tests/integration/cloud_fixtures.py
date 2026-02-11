@@ -2,7 +2,7 @@
 """
 Cloud-specific pytest fixtures for E2E integration tests.
 
-These fixtures provide properly configured CloudClient and RAGPipeline
+These fixtures provide properly configured CloudClient and FitzKragEngine
 instances for testing the full cache flow against a real Fitz Cloud backend.
 
 Required Environment Variables:
@@ -150,12 +150,12 @@ def cloud_pipeline(
     unique_collection_name: str,
 ):
     """
-    Create RAGPipeline with cloud_client attached.
+    Create FitzKragEngine with cloud_client attached.
 
     This fixture:
     1. Creates a unique test collection
     2. Ingests test fixtures using real embeddings
-    3. Builds RAGPipeline with CloudClient attached
+    3. Builds FitzKragEngine with CloudClient attached
     4. Cleans up collection after test
 
     Requires Ollama running with:
@@ -164,12 +164,12 @@ def cloud_pipeline(
 
     Also requires PostgreSQL with pgvector (fitz-ai uses pgvector exclusively).
     """
-    from fitz_ai.engines.fitz_rag.config import FitzRagConfig
-    from fitz_ai.engines.fitz_rag.config.schema import (
+    from fitz_ai.engines.fitz_krag.config import FitzKragConfig
+    from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
+    from fitz_ai.ingestion.chunking.config import (
         ChunkingRouterConfig,
         ExtensionChunkerConfig,
     )
-    from fitz_ai.engines.fitz_rag.pipeline.engine import RAGPipeline
     from fitz_ai.ingestion.chunking.router import ChunkingRouter
     from fitz_ai.ingestion.diff import run_diff_ingest
     from fitz_ai.ingestion.parser import ParserRouter
@@ -250,25 +250,23 @@ def cloud_pipeline(
     # Create CloudClient
     cloud_client = CloudClient(config=cloud_config, org_id=cloud_org_id)
 
-    # Build RAG pipeline with cloud client
+    # Build KRAG engine with cloud client
     config_dict = {
         "chat": "local_ollama",
         "embedding": "local_ollama",
         "vector_db": "pgvector",
         "collection": collection,
-        "retrieval_plugin": "dense",
-        "top_k": 10,
+        "top_addresses": 10,
         "strict_grounding": False,
-        "max_chunks": 20,
         "chat_kwargs": {"model": "qwen2.5:1.5b"},
         "embedding_kwargs": {"model": "nomic-embed-text"},
     }
 
-    cfg = FitzRagConfig(**config_dict)
-    pipeline = RAGPipeline.from_config(cfg, cloud_client=cloud_client, constraints=[])
+    cfg = FitzKragConfig(**config_dict)
+    engine = FitzKragEngine(cfg)
 
     try:
-        yield pipeline
+        yield engine
     finally:
         # Cleanup
         cloud_client.close()

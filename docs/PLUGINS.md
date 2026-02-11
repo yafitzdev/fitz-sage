@@ -58,7 +58,7 @@ Fitz uses two types of plugins:
 | Embedding | YAML | `fitz_ai/llm/embedding/` | Text embeddings |
 | Rerank | YAML | `fitz_ai/llm/rerank/` | Document reranking |
 | Vision | YAML | `fitz_ai/llm/vision/` | VLM for image description |
-| Retrieval | YAML | `fitz_ai/engines/fitz_rag/retrieval/plugins/` | Retrieval strategies |
+| Retrieval | YAML | `fitz_ai/engines/fitz_krag/retrieval/plugins/` | Retrieval strategies |
 | Chunking | Python | `fitz_ai/ingestion/chunking/plugins/` | Document chunking |
 | Parser | Python | `fitz_ai/ingestion/parser/plugins/` | Document parsing |
 | Guardrail | Python | `fitz_ai/core/guardrails/plugins/` | Epistemic safety |
@@ -332,7 +332,7 @@ vector = embedder.embed("Some text")
 In configuration:
 
 ```yaml
-# .fitz/config/fitz_rag.yaml
+# .fitz/config/fitz_krag.yaml
 chat:
   plugin_name: my_provider
   kwargs:

@@ -80,8 +80,8 @@ Cross-encoders are more accurate because they see query and document together, b
 ### Enable Reranking
 
 ```yaml
-# ~/.fitz/config/fitz_rag.yaml
-fitz_rag:
+# ~/.fitz/config/fitz_krag.yaml
+fitz_krag:
   rerank: cohere                    # Provider - this alone enables reranking
   # retrieval_plugin: dense         # No need to change - reranking auto-injected
 ```
@@ -89,7 +89,7 @@ fitz_rag:
 ### Disable Reranking (default)
 
 ```yaml
-fitz_rag:
+fitz_krag:
   rerank: null                      # No provider = no reranking
   # Or simply omit the rerank line
 ```
@@ -117,11 +117,11 @@ When reranking is enabled, the `dense` plugin automatically includes:
 
 ## Files
 
-- **RerankStep:** `fitz_ai/engines/fitz_rag/retrieval/steps/rerank.py`
+- **RerankStep:** `fitz_ai/engines/fitz_krag/retrieval/steps/rerank.py`
 - **RerankProvider protocol:** `fitz_ai/llm/providers/base.py`
 - **Cohere implementation:** `fitz_ai/llm/providers/cohere.py`
-- **Plugin definition:** `fitz_ai/engines/fitz_rag/retrieval/plugins/dense.yaml` (uses `enabled_if: reranker`)
-- **Plugin loader:** `fitz_ai/engines/fitz_rag/retrieval/loader.py`
+- **Plugin definition:** `fitz_ai/engines/fitz_krag/retrieval/plugins/dense.yaml` (uses `enabled_if: reranker`)
+- **Plugin loader:** `fitz_ai/engines/fitz_krag/retrieval/loader.py`
 
 ## Benefits
 

@@ -7,7 +7,7 @@ Run this manually to verify cache behavior.
 
 Prerequisites:
 1. Set FITZ_ORG_ID environment variable
-2. Configure cloud section in .fitz/config/fitz_rag.yaml
+2. Configure cloud section in .fitz/config/fitz_krag.yaml
 3. Have documents ingested in a collection
 
 Usage:
@@ -31,8 +31,8 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from fitz_ai.core import Query  # noqa: E402
-from fitz_ai.engines.fitz_rag import FitzRagEngine  # noqa: E402
-from fitz_ai.engines.fitz_rag.config import FitzRagConfig  # noqa: E402
+from fitz_ai.engines.fitz_krag.engine import FitzKragEngine  # noqa: E402
+from fitz_ai.engines.fitz_krag.config import FitzKragConfig  # noqa: E402
 
 
 def test_cache_flow():
@@ -51,7 +51,7 @@ def test_cache_flow():
     print(f"✓ FITZ_ORG_ID: {org_id[:8]}...")
 
     # Load config
-    config_path = ".fitz/config/fitz_rag.yaml"
+    config_path = ".fitz/config/fitz_krag.yaml"
     if not Path(config_path).exists():
         print(f"❌ ERROR: Config file not found: {config_path}")
         return False
@@ -64,12 +64,12 @@ def test_cache_flow():
         with Path(config_path).open("r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
 
-        if "fitz_rag" in raw:
-            config_dict = raw["fitz_rag"]
+        if "fitz_krag" in raw:
+            config_dict = raw["fitz_krag"]
         else:
             config_dict = raw
 
-        config = FitzRagConfig(**config_dict)
+        config = FitzKragConfig(**config_dict)
     except Exception as e:
         print(f"❌ ERROR: Failed to load config: {e}")
         return False
@@ -93,8 +93,8 @@ def test_cache_flow():
 
     # Create engine
     try:
-        engine = FitzRagEngine(config)
-        print("✓ FitzRagEngine initialized")
+        engine = FitzKragEngine(config)
+        print("✓ FitzKragEngine initialized")
     except Exception as e:
         print(f"❌ ERROR: Failed to initialize engine: {e}")
         return False

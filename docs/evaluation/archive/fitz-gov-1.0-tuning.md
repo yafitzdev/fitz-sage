@@ -565,11 +565,11 @@ fitz eval fitz-gov --model ollama/qwen2.5:14b
 
 ```python
 from fitz_ai.config.loader import load_engine_config
-from fitz_ai.engines.fitz_rag import FitzRagEngine
+from fitz_ai.engines.fitz_krag import FitzKragEngine
 from fitz_ai.evaluation.benchmarks import FitzGovBenchmark
 
-config = load_engine_config('fitz_rag')
-engine = FitzRagEngine(config)
+config = load_engine_config('fitz_krag')
+engine = FitzKragEngine(config)
 benchmark = FitzGovBenchmark(model_override="ollama/qwen2.5:3b")
 results = benchmark.evaluate(engine)
 print(results)

@@ -96,7 +96,7 @@ def _load_defaults(engine: str) -> dict[str, Any]:
     with defaults_path.open("r", encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
 
-    # Unwrap engine key if present (e.g., fitz_rag: {...})
+    # Unwrap engine key if present (e.g., fitz_krag: {...})
     if engine in raw:
         defaults = raw[engine]
     else:

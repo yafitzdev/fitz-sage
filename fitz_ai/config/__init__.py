@@ -11,7 +11,7 @@ Usage:
     from fitz_ai.config import load_engine_config
 
     # Load merged config (defaults + user overrides)
-    config = load_engine_config("fitz_rag")
+    config = load_engine_config("fitz_krag")
 
     # Access typed and validated config
     chat_plugin = config.chat  # "cohere" or "provider/model"

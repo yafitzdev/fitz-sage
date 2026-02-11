@@ -11,7 +11,7 @@ Fitz uses a two-file configuration structure:
 | File | Purpose |
 |------|---------|
 | `.fitz/config.yaml` | Global config (default engine) |
-| `.fitz/config/fitz_rag.yaml` | Engine-specific config |
+| `.fitz/config/fitz_krag.yaml` | Engine-specific config |
 
 The `.fitz/` directory is created in your project root when you run `fitz init`.
 
@@ -23,18 +23,18 @@ The `.fitz/` directory is created in your project root when you run `fitz init`.
 
 ```yaml
 # Default engine for CLI commands
-default_engine: fitz_rag  # Default engine (custom engines can be registered)
+default_engine: fitz_krag  # Default engine (custom engines can be registered)
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `default_engine` | string | `fitz_rag` | Engine used by CLI commands |
+| `default_engine` | string | `fitz_krag` | Engine used by CLI commands |
 
 ---
 
-## Fitz RAG Config
+## Fitz KRAG Config
 
-**File:** `.fitz/config/fitz_rag.yaml`
+**File:** `.fitz/config/fitz_krag.yaml`
 
 ### Complete Example
 

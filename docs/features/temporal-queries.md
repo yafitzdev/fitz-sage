@@ -93,7 +93,7 @@ Results from all sub-queries are merged using RRF:
 
 - **Detection module:** `fitz_ai/retrieval/detection/modules/temporal.py`
 - **Orchestrator:** `fitz_ai/retrieval/detection/registry.py`
-- **Integration:** `fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py`
+- **Integration:** `fitz_ai/engines/fitz_krag/retrieval/steps/vector_search.py`
 
 Detection is now LLM-based via the unified `DetectionOrchestrator`. The `TemporalModule` contributes its prompt fragment and parses `TemporalIntent` (COMPARISON, TREND, POINT_IN_TIME, RANGE, SEQUENCE) from the combined LLM response.
 

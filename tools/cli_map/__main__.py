@@ -383,7 +383,7 @@ def render_live_output(minimal: bool = False) -> str:
         lines.append("No CLI flags are used - only interactive prompts.")
         lines.append("")
         lines.append("Test Plan:")
-        lines.append("  1) fitz engine - select fitz_rag")
+        lines.append("  1) fitz engine - select fitz_krag")
         lines.append("  2) fitz init - set cohere, pgvector as defaults")
         lines.append("  3) fitz doctor, fitz config")
         lines.append("  4) fitz quickstart - test one query")
@@ -398,20 +398,20 @@ def render_live_output(minimal: bool = False) -> str:
         lines.append("")
 
         # =====================================================================
-        # STEP 1: fitz engine - select fitz_rag
+        # STEP 1: fitz engine - select fitz_krag
         # =====================================================================
-        # Interactive: Enter confirms current default (fitz_rag)
+        # Interactive: Enter confirms current default (fitz_krag)
         section(
             "1",
-            "fitz engine - select fitz_rag",
+            "fitz engine - select fitz_krag",
             run_cmd("engine", stdin_input="\n"),
         )
 
         # =====================================================================
         # STEP 2: fitz init - set cohere, pgvector as defaults
         # =====================================================================
-        # Interactive init wizard flow for fitz_rag:
-        # 1. Engine selection: Enter (confirm fitz_rag)
+        # Interactive init wizard flow for fitz_krag:
+        # 1. Engine selection: Enter (confirm fitz_krag)
         # 2. Chat plugin: Enter (cohere default)
         # 3. Smart model: Enter (accept default)
         # 4. Fast model: Enter (accept default)

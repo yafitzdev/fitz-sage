@@ -22,7 +22,7 @@ fitz doctor --test    # Test actual connections
 
 **Error:**
 ```
-ConfigNotFoundError: Config file not found: .fitz/config/fitz_rag.yaml
+ConfigNotFoundError: Config file not found: .fitz/config/fitz_krag.yaml
 ```
 
 **Solution:**
@@ -328,7 +328,7 @@ TimeoutError: Request timed out after 120 seconds
 ### Enable Debug Logging
 
 ```yaml
-# In .fitz/config/fitz_rag.yaml
+# In .fitz/config/fitz_krag.yaml
 logging:
   level: DEBUG
 ```

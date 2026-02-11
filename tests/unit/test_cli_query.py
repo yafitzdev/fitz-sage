@@ -11,7 +11,6 @@ from typer.testing import CliRunner
 
 from fitz_ai.cli.cli import app
 from fitz_ai.core import Answer
-from fitz_ai.services.fitz_service import CollectionInfo, QueryError
 
 runner = CliRunner()
 
@@ -26,17 +25,24 @@ class TestQueryCommand:
         assert result.exit_code == 0
         assert "Query your knowledge base" in result.output or "query" in result.output.lower()
 
-    def test_query_requires_valid_collection(self):
-        """Test that query requires a valid collection for collection-based queries."""
-        # Mock FitzService to raise CollectionNotFoundError
-        mock_service = MagicMock()
-        mock_service.list_collections.return_value = []
+    def test_query_no_collections_exits(self):
+        """Test that query exits when no collections found."""
+        mock_registry = MagicMock()
+        mock_registry.list.return_value = ["fitz_krag"]
+        mock_caps = MagicMock()
+        mock_caps.requires_documents_at_query = False
+        mock_caps.supports_persistent_ingest = True
+        mock_caps.supports_collections = True
+        mock_registry.get_capabilities.return_value = mock_caps
+        mock_registry.get_list_collections.return_value = []
 
-        with patch("fitz_ai.cli.commands.query.FitzService", return_value=mock_service):
-            result = runner.invoke(app, ["query", "test question", "--engine", "fitz_rag"])
+        with (
+            patch("fitz_ai.cli.commands.query.get_engine_registry", return_value=mock_registry),
+            patch("fitz_ai.cli.commands.query.get_default_engine", return_value="fitz_krag"),
+        ):
+            result = runner.invoke(app, ["query", "test question"])
 
-        # When no collections exist, command should show message and exit
-        assert "no collection" in result.output.lower() or "ingest" in result.output.lower()
+        assert "no" in result.output.lower() or "ingest" in result.output.lower()
 
 
 class TestQueryHelpers:
@@ -51,12 +57,11 @@ class TestQueryHelpers:
         # Create engine-specific config file
         config_dir = tmp_path / "config"
         config_dir.mkdir()
-        config_path = config_dir / "fitz_rag.yaml"
+        config_path = config_dir / "fitz_krag.yaml"
         config = {
             "chat": "cohere",
             "embedding": "cohere",
             "vector_db": "pgvector",
-            "retrieval_plugin": "dense",
             "collection": "test",
         }
         config_path.write_text(yaml.dump(config))
@@ -65,7 +70,7 @@ class TestQueryHelpers:
             "fitz_ai.cli.context.FitzPaths.engine_config",
             return_value=config_path,
         ):
-            ctx = CLIContext.load(engine="fitz_rag")
+            ctx = CLIContext.load(engine="fitz_krag")
 
         assert ctx.raw_config["chat"] == "cohere"
         assert ctx.typed_config.collection == "test"
@@ -94,41 +99,57 @@ class TestQueryHelpers:
 
 
 class TestQueryExecution:
-    """Tests for query execution with mocked service."""
+    """Tests for query execution with mocked engine (persistent ingest path)."""
 
     def test_query_direct_mode(self):
-        """Test query with direct question argument."""
+        """Test query with direct question argument via persistent ingest path."""
         mock_answer = Answer(
             text="This is the answer",
             provenance=[],
             mode="trustworthy",
         )
 
-        mock_service = MagicMock()
-        mock_service.list_collections.return_value = [
-            CollectionInfo(name="test", chunk_count=10),
-        ]
-        mock_service.query.return_value = mock_answer
+        mock_engine = MagicMock()
+        mock_engine.answer.return_value = mock_answer
 
-        with patch("fitz_ai.cli.commands.query.FitzService", return_value=mock_service):
-            result = runner.invoke(app, ["query", "What is RAG?", "--engine", "fitz_rag"])
+        mock_registry = MagicMock()
+        mock_registry.list.return_value = ["fitz_krag"]
+        mock_caps = MagicMock()
+        mock_caps.requires_documents_at_query = False
+        mock_caps.supports_persistent_ingest = True
+        mock_registry.get_capabilities.return_value = mock_caps
+        mock_registry.get_list_collections.return_value = ["test"]
 
-        # Should call service.query with the question
-        mock_service.query.assert_called_once()
+        with (
+            patch("fitz_ai.cli.commands.query.get_engine_registry", return_value=mock_registry),
+            patch("fitz_ai.cli.commands.query.get_default_engine", return_value="fitz_krag"),
+            patch("fitz_ai.cli.commands.query.create_engine", return_value=mock_engine),
+        ):
+            result = runner.invoke(app, ["query", "What is RAG?"])
+
+        mock_engine.answer.assert_called_once()
         assert result.exit_code == 0
 
     def test_query_handles_error(self):
-        """Test query handles QueryError gracefully."""
-        mock_service = MagicMock()
-        mock_service.list_collections.return_value = [
-            CollectionInfo(name="test", chunk_count=10),
-        ]
-        mock_service.query.side_effect = QueryError("Test error")
+        """Test query handles errors gracefully."""
+        mock_engine = MagicMock()
+        mock_engine.answer.side_effect = Exception("Test error")
 
-        with patch("fitz_ai.cli.commands.query.FitzService", return_value=mock_service):
-            result = runner.invoke(app, ["query", "What is RAG?", "--engine", "fitz_rag"])
+        mock_registry = MagicMock()
+        mock_registry.list.return_value = ["fitz_krag"]
+        mock_caps = MagicMock()
+        mock_caps.requires_documents_at_query = False
+        mock_caps.supports_persistent_ingest = True
+        mock_registry.get_capabilities.return_value = mock_caps
+        mock_registry.get_list_collections.return_value = ["test"]
 
-        # Should show error and exit with code 1
+        with (
+            patch("fitz_ai.cli.commands.query.get_engine_registry", return_value=mock_registry),
+            patch("fitz_ai.cli.commands.query.get_default_engine", return_value="fitz_krag"),
+            patch("fitz_ai.cli.commands.query.create_engine", return_value=mock_engine),
+        ):
+            result = runner.invoke(app, ["query", "What is RAG?"])
+
         assert result.exit_code == 1
         assert "failed" in result.output.lower() or "error" in result.output.lower()
 
@@ -144,31 +165,41 @@ class TestQueryOptions:
             mode="trustworthy",
         )
 
-        mock_service = MagicMock()
-        mock_service.list_collections.return_value = [
-            CollectionInfo(name="custom", chunk_count=10),
-        ]
-        mock_service.query.return_value = mock_answer
+        mock_engine = MagicMock()
+        mock_engine.answer.return_value = mock_answer
 
-        with patch("fitz_ai.cli.commands.query.FitzService", return_value=mock_service):
-            runner.invoke(app, ["query", "question", "-c", "custom", "--engine", "fitz_rag"])
+        mock_registry = MagicMock()
+        mock_registry.list.return_value = ["fitz_krag"]
+        mock_caps = MagicMock()
+        mock_caps.requires_documents_at_query = False
+        mock_caps.supports_persistent_ingest = True
+        mock_registry.get_capabilities.return_value = mock_caps
+        mock_registry.get_list_collections.return_value = ["custom"]
 
-        # Service should be called with the custom collection
-        mock_service.query.assert_called_once()
-        call_kwargs = mock_service.query.call_args
-        assert call_kwargs.kwargs["collection"] == "custom"
+        with (
+            patch("fitz_ai.cli.commands.query.get_engine_registry", return_value=mock_registry),
+            patch("fitz_ai.cli.commands.query.get_default_engine", return_value="fitz_krag"),
+            patch("fitz_ai.cli.commands.query.create_engine", return_value=mock_engine),
+        ):
+            runner.invoke(app, ["query", "question", "-c", "custom"])
+
+        mock_engine.load.assert_called_once_with("custom")
+        mock_engine.answer.assert_called_once()
 
     def test_query_collection_not_found(self):
         """Test query shows error when collection not found."""
-        mock_service = MagicMock()
-        mock_service.list_collections.return_value = [
-            CollectionInfo(name="other", chunk_count=10),
-        ]
+        mock_registry = MagicMock()
+        mock_registry.list.return_value = ["fitz_krag"]
+        mock_caps = MagicMock()
+        mock_caps.requires_documents_at_query = False
+        mock_caps.supports_persistent_ingest = True
+        mock_registry.get_capabilities.return_value = mock_caps
+        mock_registry.get_list_collections.return_value = ["other"]
 
-        with patch("fitz_ai.cli.commands.query.FitzService", return_value=mock_service):
-            result = runner.invoke(
-                app, ["query", "question", "-c", "nonexistent", "--engine", "fitz_rag"]
-            )
+        with (
+            patch("fitz_ai.cli.commands.query.get_engine_registry", return_value=mock_registry),
+            patch("fitz_ai.cli.commands.query.get_default_engine", return_value="fitz_krag"),
+        ):
+            result = runner.invoke(app, ["query", "question", "-c", "nonexistent"])
 
-        # Should show collection not found message
         assert "not found" in result.output.lower() or "available" in result.output.lower()

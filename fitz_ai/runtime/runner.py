@@ -137,7 +137,7 @@ def create_engine(
 
     Examples:
         Create and reuse engine:
-        >>> engine = create_engine("fitz_rag", config_path="config.yaml")
+        >>> engine = create_engine("fitz_krag", config_path="config.yaml")
         >>>
         >>> q1 = Query(text="What is quantum computing?")
         >>> answer1 = engine.answer(q1)
@@ -179,7 +179,7 @@ def list_engines() -> list[str]:
     Examples:
         >>> engines = list_engines()
         >>> print(f"Available: {', '.join(engines)}")
-        ['fitz_rag']
+        ['fitz_krag']
     """
     registry = get_engine_registry()
     return registry.list()
@@ -195,7 +195,7 @@ def list_engines_with_info() -> Dict[str, str]:
     Examples:
         >>> for name, desc in list_engines_with_info().items():
         ...     print(f"{name}: {desc}")
-        fitz_rag: Retrieval-augmented generation
+        fitz_krag: Knowledge routing augmented generation
     """
     registry = get_engine_registry()
     return registry.list_with_descriptions()

@@ -2,7 +2,7 @@
 """
 Unified logging setup for the entire Fitz project.
 
-All modules in fitz_ingest and fitz_rag use:
+All modules in fitz_ai use:
     from fitz_stack.logging import get_logger
     logger = get_logger(__name__)
 

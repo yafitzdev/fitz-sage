@@ -28,7 +28,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from fitz_ai.core.chunk import Chunk
-from fitz_ai.engines.fitz_rag.retrieval.steps.base import RetrievalStep
 from fitz_ai.llm.factory import ChatFactory, ModelTier
 
 from .store.postgres import PostgresTableStore
@@ -40,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class TableQueryStep(RetrievalStep):
+class TableQueryStep:
     """
     Retrieval step that handles table schema chunks.
 

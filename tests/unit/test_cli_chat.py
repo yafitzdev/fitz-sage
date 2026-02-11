@@ -25,17 +25,17 @@ class TestChatCommand:
         assert "chat" in result.output.lower()
         assert "collection" in result.output.lower()
 
-    def test_chat_requires_valid_typed_config(self):
-        """Test that chat requires a valid typed_config."""
-        import typer
+    def test_chat_exits_when_no_collections(self):
+        """Test that chat exits with error when no collections found."""
+        mock_registry = MagicMock()
+        mock_registry.get_list_collections.return_value = []
 
-        # CLIContext.load() always succeeds, but require_typed_config can raise
-        mock_ctx = MagicMock()
-        mock_ctx.typed_config = None
-        mock_ctx.require_typed_config.side_effect = typer.Exit(1)
-
-        with patch("fitz_ai.cli.commands.chat.CLIContext.load", return_value=mock_ctx):
-            result = runner.invoke(app, ["chat"], input="exit\n")
+        with (
+            patch("fitz_ai.cli.commands.chat.RICH", False),
+            patch("fitz_ai.runtime.get_default_engine", return_value="fitz_krag"),
+            patch("fitz_ai.runtime.get_engine_registry", return_value=mock_registry),
+        ):
+            result = runner.invoke(app, ["chat"])
 
         assert result.exit_code != 0
 
@@ -59,7 +59,7 @@ class TestChatHelpers:
         mock_ctx.typed_config.collection = "test"
 
         with patch("fitz_ai.cli.context.CLIContext.load", return_value=mock_ctx):
-            ctx = CLIContext.load(engine="fitz_rag")
+            ctx = CLIContext.load(engine="fitz_krag")
 
         assert ctx.raw_config["chat"] == "cohere"
         assert ctx.typed_config.collection == "test"
@@ -221,22 +221,15 @@ class TestChatExitCommands:
 
     def test_chat_exits_on_exit_command(self):
         """Test that chat exits when user types 'exit'."""
-        mock_ctx = MagicMock()
-        mock_ctx.typed_config = MagicMock()
-        mock_ctx.typed_config.retrieval.collection = "test"
-        mock_ctx.require_typed_config.return_value = mock_ctx.typed_config
-        mock_ctx.require_collections.return_value = ["test"]
-        mock_ctx.retrieval_collection = "test"
-
-        mock_pipeline = MagicMock()
+        mock_engine = MagicMock()
+        mock_registry = MagicMock()
+        mock_registry.get_list_collections.return_value = ["test"]
 
         with (
-            patch("fitz_ai.cli.commands.chat.CLIContext.load", return_value=mock_ctx),
-            patch(
-                "fitz_ai.engines.fitz_rag.pipeline.engine.RAGPipeline.from_config",
-                return_value=mock_pipeline,
-            ),
             patch("fitz_ai.cli.commands.chat.RICH", False),
+            patch("fitz_ai.runtime.get_default_engine", return_value="fitz_krag"),
+            patch("fitz_ai.runtime.get_engine_registry", return_value=mock_registry),
+            patch("fitz_ai.runtime.create_engine", return_value=mock_engine),
         ):
             result = runner.invoke(app, ["chat"], input="exit\n")
 
@@ -244,22 +237,15 @@ class TestChatExitCommands:
 
     def test_chat_exits_on_quit_command(self):
         """Test that chat exits when user types 'quit'."""
-        mock_ctx = MagicMock()
-        mock_ctx.typed_config = MagicMock()
-        mock_ctx.typed_config.retrieval.collection = "test"
-        mock_ctx.require_typed_config.return_value = mock_ctx.typed_config
-        mock_ctx.require_collections.return_value = ["test"]
-        mock_ctx.retrieval_collection = "test"
-
-        mock_pipeline = MagicMock()
+        mock_engine = MagicMock()
+        mock_registry = MagicMock()
+        mock_registry.get_list_collections.return_value = ["test"]
 
         with (
-            patch("fitz_ai.cli.commands.chat.CLIContext.load", return_value=mock_ctx),
-            patch(
-                "fitz_ai.engines.fitz_rag.pipeline.engine.RAGPipeline.from_config",
-                return_value=mock_pipeline,
-            ),
             patch("fitz_ai.cli.commands.chat.RICH", False),
+            patch("fitz_ai.runtime.get_default_engine", return_value="fitz_krag"),
+            patch("fitz_ai.runtime.get_engine_registry", return_value=mock_registry),
+            patch("fitz_ai.runtime.create_engine", return_value=mock_engine),
         ):
             result = runner.invoke(app, ["chat"], input="quit\n")
 

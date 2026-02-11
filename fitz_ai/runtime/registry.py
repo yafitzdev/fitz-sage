@@ -77,7 +77,7 @@ class EngineRegistration:
     """
 
     name: str
-    """Unique name for this engine (e.g., 'fitz_rag')."""
+    """Unique name for this engine (e.g., 'fitz_krag')."""
 
     factory: Callable[[Any], KnowledgeEngine]
     """
@@ -428,7 +428,7 @@ def get_default_engine() -> str:
     The single source of truth is default.yaml.
 
     Returns:
-        Engine name (e.g., 'fitz_rag')
+        Engine name (e.g., 'fitz_krag')
     """
     # Check user config first
     try:

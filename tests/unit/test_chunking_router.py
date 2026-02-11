@@ -1,4 +1,4 @@
-# tests/test_chunking_router.py
+# tests/unit/test_chunking_router.py
 """
 Tests for ChunkingRouter.
 
@@ -16,7 +16,7 @@ import pytest
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.core.document import ParsedDocument
-from fitz_ai.engines.fitz_rag.config import (
+from fitz_ai.ingestion.chunking.config import (
     ChunkingRouterConfig,
     ExtensionChunkerConfig,
 )

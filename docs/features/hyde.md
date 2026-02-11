@@ -67,8 +67,8 @@ Hypothetical documents are written in document style, not question style:
 
 - **Generator module:** `fitz_ai/retrieval/hyde/`
 - **Prompt template:** `fitz_ai/retrieval/hyde/prompts/hypothesis.txt`
-- **Integration:** `fitz_ai/engines/fitz_rag/retrieval/steps/strategies/semantic.py`
-- **Wiring:** `fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py`
+- **Integration:** `fitz_ai/engines/fitz_krag/retrieval/steps/strategies/semantic.py`
+- **Wiring:** `fitz_ai/engines/fitz_krag/retrieval/steps/vector_search.py`
 
 ## Benefits
 

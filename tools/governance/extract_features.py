@@ -253,7 +253,7 @@ def main():
 
     # Load config and create chat client
     print("Loading fitz-ai config...")
-    cfg = load_engine_config("fitz_rag")
+    cfg = load_engine_config("fitz_krag")
 
     chat_spec = args.chat or cfg.chat
     chat_config = {k: v for k, v in cfg.chat_kwargs.model_dump().items() if v is not None}

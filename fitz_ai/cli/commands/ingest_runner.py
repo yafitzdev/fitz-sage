@@ -2,7 +2,7 @@
 """
 Main ingestion orchestration for ingest command.
 
-Contains the fitz_rag ingestion flow with progress tracking and summary display.
+Contains the fitz_krag ingestion flow with progress tracking and summary display.
 """
 
 from __future__ import annotations

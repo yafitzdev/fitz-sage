@@ -1,4 +1,4 @@
-# tests/test_cli_init.py
+# tests/unit/test_cli_init.py
 """
 Tests for the init command.
 """
@@ -58,17 +58,8 @@ class TestInitCommand:
                 return_value=["pgvector"],
             ),
             patch(
-                "fitz_ai.cli.commands.init_wizard.available_retrieval_plugins",
-                return_value=["dense"],
-            ),
-            patch(
-                "fitz_ai.cli.commands.init_wizard.available_chunking_plugins",
-                return_value=["simple"],
-            ),
-            patch("fitz_ai.cli.commands.init_wizard.load_default_config", return_value={}),
-            patch(
                 "fitz_ai.cli.commands.init_wizard.get_default_engine",
-                return_value="fitz_rag",
+                return_value="fitz_krag",
             ),
         ):
             result = runner.invoke(app, ["init", "-y", "--show"])
@@ -172,18 +163,18 @@ class TestGenerateConfig:
 
         from fitz_ai.cli.commands.init_config import generate_global_config
 
-        config_str = generate_global_config("fitz_rag")
+        config_str = generate_global_config("fitz_krag")
         config = yaml.safe_load(config_str)
 
-        assert config["default_engine"] == "fitz_rag"
+        assert config["default_engine"] == "fitz_krag"
 
-    def test_generate_fitz_rag_config_basic(self):
-        """Test generate_fitz_rag_config produces valid YAML with flat format."""
+    def test_generate_fitz_krag_config_basic(self):
+        """Test generate_fitz_krag_config produces valid YAML with flat format."""
         import yaml
 
-        from fitz_ai.cli.commands.init_config import generate_fitz_rag_config
+        from fitz_ai.cli.commands.init_config import generate_fitz_krag_config
 
-        config_str = generate_fitz_rag_config(
+        config_str = generate_fitz_krag_config(
             chat="cohere",
             chat_model_smart="command-a-03-2025",
             chat_model_fast="command-r7b-12-2024",
@@ -192,10 +183,6 @@ class TestGenerateConfig:
             rerank=None,
             rerank_model="",
             vector_db="pgvector",
-            retrieval="dense",
-            chunker="simple",
-            chunk_size=1000,
-            chunk_overlap=200,
         )
 
         # Should be valid YAML with flat format
@@ -205,17 +192,14 @@ class TestGenerateConfig:
         assert config["chat"] == "cohere"
         assert config["embedding"] == "cohere"
         assert config["vector_db"] == "pgvector"
-        assert config["retrieval_plugin"] == "dense"
-        assert config["chunk_size"] == 1000
-        assert config["chunk_overlap"] == 200
 
-    def test_generate_fitz_rag_config_with_rerank(self):
-        """Test generate_fitz_rag_config includes rerank when provided."""
+    def test_generate_fitz_krag_config_with_rerank(self):
+        """Test generate_fitz_krag_config includes rerank when provided."""
         import yaml
 
-        from fitz_ai.cli.commands.init_config import generate_fitz_rag_config
+        from fitz_ai.cli.commands.init_config import generate_fitz_krag_config
 
-        config_str = generate_fitz_rag_config(
+        config_str = generate_fitz_krag_config(
             chat="cohere",
             chat_model_smart="command-a-03-2025",
             chat_model_fast="command-r7b-12-2024",
@@ -224,10 +208,6 @@ class TestGenerateConfig:
             rerank="cohere",
             rerank_model="rerank-v3.5",
             vector_db="pgvector",
-            retrieval="dense",
-            chunker="simple",
-            chunk_size=1000,
-            chunk_overlap=200,
         )
 
         config = yaml.safe_load(config_str)
@@ -235,13 +215,13 @@ class TestGenerateConfig:
         # Rerank is a string in flat format
         assert config["rerank"] == "cohere"
 
-    def test_generate_fitz_rag_config_without_rerank(self):
-        """Test generate_fitz_rag_config sets rerank to null when not provided."""
+    def test_generate_fitz_krag_config_without_rerank(self):
+        """Test generate_fitz_krag_config sets rerank to null when not provided."""
         import yaml
 
-        from fitz_ai.cli.commands.init_config import generate_fitz_rag_config
+        from fitz_ai.cli.commands.init_config import generate_fitz_krag_config
 
-        config_str = generate_fitz_rag_config(
+        config_str = generate_fitz_krag_config(
             chat="cohere",
             chat_model_smart="",
             chat_model_fast="",
@@ -250,43 +230,12 @@ class TestGenerateConfig:
             rerank=None,
             rerank_model="",
             vector_db="pgvector",
-            retrieval="dense",
-            chunker="simple",
-            chunk_size=1000,
-            chunk_overlap=0,
         )
 
         config = yaml.safe_load(config_str)
 
         # Rerank is null in flat format
         assert config["rerank"] is None
-
-    def test_generate_fitz_rag_config_chunking(self):
-        """Test generate_fitz_rag_config includes chunking settings in flat format."""
-        import yaml
-
-        from fitz_ai.cli.commands.init_config import generate_fitz_rag_config
-
-        config_str = generate_fitz_rag_config(
-            chat="cohere",
-            chat_model_smart="",
-            chat_model_fast="",
-            embedding="cohere",
-            embedding_model="",
-            rerank=None,
-            rerank_model="",
-            vector_db="pgvector",
-            retrieval="dense",
-            chunker="recursive",
-            chunk_size=500,
-            chunk_overlap=100,
-        )
-
-        config = yaml.safe_load(config_str)
-
-        # Flat format: chunk_size and chunk_overlap are top-level
-        assert config["chunk_size"] == 500
-        assert config["chunk_overlap"] == 100
 
 
 class TestInitValidation:
@@ -305,7 +254,7 @@ class TestInitValidation:
         return mock_ctx
 
     def test_init_fails_without_chat_plugins(self):
-        """Test init fails when no chat plugins available (fitz_rag)."""
+        """Test init fails when no chat plugins available (fitz_krag)."""
         mock_system = MagicMock()
         mock_system.ollama.available = False
         mock_system.pgvector.available = True
@@ -319,22 +268,13 @@ class TestInitValidation:
             ),
             patch(
                 "fitz_ai.cli.commands.init_wizard.get_default_engine",
-                return_value="fitz_rag",
+                return_value="fitz_krag",
             ),
             patch("fitz_ai.cli.commands.init_wizard.available_llm_plugins", return_value=[]),
             patch(
                 "fitz_ai.cli.commands.init_wizard.available_vector_db_plugins",
                 return_value=["pgvector"],
             ),
-            patch(
-                "fitz_ai.cli.commands.init_wizard.available_retrieval_plugins",
-                return_value=["dense"],
-            ),
-            patch(
-                "fitz_ai.cli.commands.init_wizard.available_chunking_plugins",
-                return_value=["simple"],
-            ),
-            patch("fitz_ai.cli.commands.init_wizard.load_default_config", return_value={}),
         ):
             result = runner.invoke(app, ["init", "-y"])
 
@@ -342,7 +282,7 @@ class TestInitValidation:
         assert "chat" in result.output.lower() or "api key" in result.output.lower()
 
     def test_init_fails_without_vector_db(self):
-        """Test init fails when no vector DB available (fitz_rag)."""
+        """Test init fails when no vector DB available (fitz_krag)."""
         mock_system = MagicMock()
         mock_system.ollama.available = False
         mock_system.pgvector.available = False
@@ -356,7 +296,7 @@ class TestInitValidation:
             ),
             patch(
                 "fitz_ai.cli.commands.init_wizard.get_default_engine",
-                return_value="fitz_rag",
+                return_value="fitz_krag",
             ),
             patch(
                 "fitz_ai.cli.commands.init_wizard.available_llm_plugins",
@@ -365,19 +305,6 @@ class TestInitValidation:
             patch(
                 "fitz_ai.cli.commands.init_wizard.available_vector_db_plugins",
                 return_value=[],
-            ),
-            patch(
-                "fitz_ai.cli.commands.init_wizard.available_retrieval_plugins",
-                return_value=["dense"],
-            ),
-            patch(
-                "fitz_ai.cli.commands.init_wizard.available_chunking_plugins",
-                return_value=["simple"],
-            ),
-            patch("fitz_ai.cli.commands.init_wizard.load_default_config", return_value={}),
-            patch(
-                "fitz_ai.cli.commands.init_wizard.CLIContext.load",
-                return_value=self._create_mock_ctx(),
             ),
         ):
             result = runner.invoke(app, ["init", "-y"])

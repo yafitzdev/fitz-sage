@@ -22,16 +22,16 @@ from typing import Optional
 
 from fitz_ai.logging.logger import get_logger
 
-from tests.e2e.cache import ResponseCache
-from tests.e2e.config import get_cache_config, get_tier_config, get_tier_names, load_e2e_config
-from tests.e2e.scenarios import SCENARIOS, TestScenario
+from tests.e2e_krag.cache import ResponseCache
+from tests.e2e_krag.config import get_cache_config, get_tier_config, get_tier_names, load_e2e_config
+from tests.e2e_krag.scenarios import SCENARIOS, TestScenario
 
 from .validators import ValidationResult, validate_answer
 
 logger = get_logger(__name__)
 
 # Path to test fixtures (shared with RAG e2e)
-FIXTURES_DIR = Path(__file__).parent.parent / "e2e" / "fixtures_rag"
+FIXTURES_DIR = Path(__file__).parent / "fixtures_rag"
 
 
 @dataclass

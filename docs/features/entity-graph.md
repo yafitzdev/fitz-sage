@@ -101,7 +101,7 @@ Internal parameters:
 
 - **Graph store:** `fitz_ai/retrieval/entity_graph/store.py`
 - **Entity extraction:** `fitz_ai/ingestion/enrichment/modules/chunk/entities.py`
-- **Integration:** `fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py`
+- **Integration:** `fitz_ai/engines/fitz_krag/retrieval/steps/vector_search.py`
 
 ## Benefits
 

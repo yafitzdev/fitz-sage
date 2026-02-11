@@ -2,7 +2,7 @@
 """
 Central place for defining logging subsystem tags.
 
-These tags are used across fitz_ingest and fitz_rag modules to ensure
+These tags are used across fitz_ai modules to ensure
 consistent, searchable log output.
 
 Changing a tag here updates it project-wide.

@@ -124,7 +124,7 @@ Answer with engine metadata:
 answer = Answer(
     text="The answer is 42",
     metadata={
-        "engine": "fitz_rag",
+        "engine": "fitz_krag",
         "tokens_used": 1523,
         "confidence": 0.95
     }
@@ -181,7 +181,7 @@ class KnowledgeEngine(Protocol):
 
 **Usage:**
 ```python
-engine = FitzRagEngine(config)
+engine = FitzKragEngine(config)
 query = Query(text="What is quantum computing?")
 answer = engine.answer(query)
 print(answer.text)
@@ -190,7 +190,7 @@ print(answer.text)
 **Implementation Notes:**
 
 How the engine generates the answer is entirely up to the implementation:
-- **Fitz RAG**: Uses retrieval + generation
+- **Fitz KRAG**: Uses retrieval + generation
 - Custom engines might use completely different approaches
 
 **Error Handling:**

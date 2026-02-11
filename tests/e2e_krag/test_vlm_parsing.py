@@ -26,13 +26,13 @@ from pathlib import Path
 import httpx
 import pytest
 
-from tests.e2e.scenarios import Feature, TestScenario
+from tests.e2e_krag.scenarios import Feature, TestScenario
 
 # Mark all tests in this module
 pytestmark = [pytest.mark.e2e_krag_parser, pytest.mark.llm]
 
 # Fixtures directory with figure_test.pdf
-FIXTURES_PARSER_DIR = Path(__file__).parent.parent / "e2e" / "fixtures_parser"
+FIXTURES_PARSER_DIR = Path(__file__).parent / "fixtures_parser"
 
 OLLAMA_BASE_URL = "http://localhost:11434"
 OLLAMA_VISION_MODEL = "llava:7b"
@@ -121,7 +121,7 @@ def vlm_krag_engine(set_workspace):
     from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
     from fitz_ai.storage.postgres import PostgresConnectionManager
 
-    from tests.e2e.config import get_tier_config, get_tier_names, load_e2e_config
+    from tests.e2e_krag.config import get_tier_config, get_tier_names, load_e2e_config
 
     collection = f"e2e_vlm_{uuid.uuid4().hex[:8]}"
 

@@ -243,7 +243,7 @@ constraints = Constraints(
 from fitz_ai import create_engine, Query
 
 # Create engine instance
-engine = create_engine("fitz_rag")
+engine = create_engine("fitz_krag")
 
 # Build query
 query = Query(text="What is X?")
@@ -259,22 +259,22 @@ from fitz_ai import run, list_engines
 
 # List available engines
 engines = list_engines()
-print(engines)  # ['fitz_rag']
+print(engines)  # ['fitz_krag']
 
 # Run with specific engine
-answer = run("What is X?", engine="fitz_rag")
+answer = run("What is X?", engine="fitz_krag")
 ```
 
-### Fitz RAG Specific
+### Fitz KRAG Specific
 
 ```python
-from fitz_ai import run_fitz_rag, create_fitz_rag_engine
+from fitz_ai import run_fitz_krag, create_fitz_krag_engine
 
-# RAG-specific entry point
-answer = run_fitz_rag("What is X?")
+# KRAG-specific entry point
+answer = run_fitz_krag("What is X?")
 
-# Create reusable RAG engine
-engine = create_fitz_rag_engine()
+# Create reusable KRAG engine
+engine = create_fitz_krag_engine()
 ```
 
 ---
@@ -316,7 +316,7 @@ The SDK uses the same config as CLI. See [CONFIG.md](CONFIG.md) for details.
 
 **Config search order:**
 1. `config_path` parameter (if provided)
-2. `.fitz/config/fitz_rag.yaml` (project config)
+2. `.fitz/config/fitz_krag.yaml` (project config)
 3. Auto-created default config (if `auto_init=True`)
 
 ---

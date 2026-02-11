@@ -247,7 +247,7 @@ View or set the default engine for all commands.
 ```bash
 fitz engine              # Interactive engine selection
 fitz engine --list       # List available engines
-fitz engine fitz_rag     # Set default to fitz_rag
+fitz engine fitz_krag    # Set default to fitz_krag
 ```
 
 **Options:**
@@ -265,7 +265,7 @@ fitz query "question" -e my_engine   # Use custom engine for this query
 
 ## Configuration
 
-The `fitz init` command creates `.fitz/config/fitz_rag.yaml` in your project root:
+The `fitz init` command creates `.fitz/config/fitz_krag.yaml` in your project root:
 
 ```yaml
 chat:

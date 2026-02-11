@@ -71,7 +71,7 @@ Expanded queries:   ["How do I fetch employee data?",
 ## Files
 
 - **Expansion detector:** `fitz_ai/retrieval/detection/detectors/expansion.py`
-- **Integration:** `fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py`
+- **Integration:** `fitz_ai/engines/fitz_krag/retrieval/steps/vector_search.py`
 
 Note: Query expansion uses dictionary-based matching (not LLM) for fast, deterministic results. Synonyms and acronyms are defined in the `SYNONYMS` and `ACRONYMS` dicts in `expansion.py`.
 

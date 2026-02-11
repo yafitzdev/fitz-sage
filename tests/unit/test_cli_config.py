@@ -83,7 +83,7 @@ class TestConfigPathOption:
 
     def test_config_path_shows_path(self, tmp_path):
         """Test --path shows config file path."""
-        config_path = tmp_path / "fitz_rag.yaml"
+        config_path = tmp_path / "fitz_krag.yaml"
         config_path.write_text("chat:\n  plugin_name: cohere\n")
 
         mock_ctx = _make_mock_context(
@@ -99,7 +99,7 @@ class TestConfigPathOption:
 
     def test_config_path_missing_file(self, tmp_path):
         """Test --path with missing config shows error."""
-        nonexistent = tmp_path / "nonexistent" / "fitz_rag.yaml"
+        nonexistent = tmp_path / "nonexistent" / "fitz_krag.yaml"
 
         mock_ctx = _make_mock_context(
             has_user_config=False,
@@ -128,7 +128,7 @@ class TestConfigJsonOption:
 
     def test_config_json_output(self, tmp_path):
         """Test --json outputs valid JSON."""
-        config_path = tmp_path / "fitz_rag.yaml"
+        config_path = tmp_path / "fitz_krag.yaml"
         config_path.write_text("chat:\n  plugin_name: cohere\n")
 
         mock_ctx = _make_mock_context(
@@ -157,7 +157,7 @@ class TestConfigRawOption:
 chat:
   plugin_name: cohere
 """
-        config_path = tmp_path / "fitz_rag.yaml"
+        config_path = tmp_path / "fitz_krag.yaml"
         config_path.write_text(config_content)
 
         mock_ctx = _make_mock_context(
@@ -177,7 +177,7 @@ class TestConfigEditOption:
 
     def test_config_edit_missing_file(self, tmp_path):
         """Test --edit with missing config shows error."""
-        nonexistent = tmp_path / "nonexistent" / "fitz_rag.yaml"
+        nonexistent = tmp_path / "nonexistent" / "fitz_krag.yaml"
 
         mock_ctx = _make_mock_context(
             has_user_config=False,
@@ -202,7 +202,7 @@ class TestConfigEditOption:
 
     def test_config_edit_no_editor(self, tmp_path):
         """Test --edit with no editor available."""
-        config_path = tmp_path / "fitz_rag.yaml"
+        config_path = tmp_path / "fitz_krag.yaml"
         config_path.write_text("chat:\n  plugin_name: cohere\n")
 
         mock_ctx = _make_mock_context(
@@ -226,7 +226,7 @@ class TestConfigSummaryView:
 
     def test_config_summary_shows_components(self, tmp_path):
         """Test default view shows all components."""
-        config_path = tmp_path / "fitz_rag.yaml"
+        config_path = tmp_path / "fitz_krag.yaml"
         config_path.write_text("chat:\n  plugin_name: cohere\n")
 
         mock_ctx = _make_mock_context(
@@ -250,7 +250,7 @@ class TestConfigSummaryView:
 
     def test_config_summary_shows_rerank_when_enabled(self, tmp_path):
         """Test summary shows rerank when enabled."""
-        config_path = tmp_path / "fitz_rag.yaml"
+        config_path = tmp_path / "fitz_krag.yaml"
         config_path.write_text("chat:\n  plugin_name: cohere\n")
 
         mock_ctx = _make_mock_context(

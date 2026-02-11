@@ -1,5 +1,5 @@
 # Example configuration with Fitz Cloud cache enabled
-# Copy to .fitz/config/fitz_rag.yaml and fill in your credentials
+# Copy to .fitz/config/fitz_krag.yaml and fill in your credentials
 
 # Chat LLM (required)
 chat:

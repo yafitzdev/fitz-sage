@@ -23,7 +23,7 @@ from typing import Callable
 
 import pytest
 
-from tests.e2e.scenarios import SCENARIOS, TestScenario
+from tests.e2e_krag.scenarios import SCENARIOS, TestScenario
 
 from .runner import FIXTURES_DIR, KragE2ERunner
 

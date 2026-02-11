@@ -46,7 +46,7 @@ Fitz includes a lightweight, SDK-free enterprise provider that supports:
 ### Basic M2M Authentication
 
 ```yaml
-# .fitz/config/fitz_rag.yaml
+# .fitz/config/fitz_krag.yaml
 
 chat:
   plugin_name: enterprise
@@ -236,7 +236,7 @@ Model strings are passed verbatim to the gateway. Common formats:
 ## Example: Full Enterprise Setup
 
 ```yaml
-# .fitz/config/fitz_rag.yaml
+# .fitz/config/fitz_krag.yaml
 
 chat:
   plugin_name: enterprise

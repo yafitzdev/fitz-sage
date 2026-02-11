@@ -84,7 +84,7 @@ Internal settings in `KeywordExtractor`:
 
 - **Keyword vocabulary:** `fitz_ai/retrieval/vocabulary/`
 - **Vocabulary storage:** PostgreSQL `keywords` table (per-collection database)
-- **Query filtering:** `fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py` (`_filter_by_keywords`)
+- **Query filtering:** `fitz_ai/engines/fitz_krag/retrieval/steps/vector_search.py` (`_filter_by_keywords`)
 - **Ingestion hook:** `fitz_ai/ingestion/diff/executor.py` (`_build_keyword_vocabulary`)
 
 ## Benefits

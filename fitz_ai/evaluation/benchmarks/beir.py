@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any
 from fitz_ai.logging.logger import get_logger
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_rag.engine import FitzRagEngine
+    from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
 
 logger = get_logger(__name__)
 
@@ -167,7 +167,7 @@ class FitzBEIRRetriever:
     returns ranked document IDs with scores.
     """
 
-    def __init__(self, engine: FitzRagEngine, k: int = 100):
+    def __init__(self, engine: FitzKragEngine, k: int = 100):
         """
         Initialize the adapter.
 
@@ -288,7 +288,7 @@ class BEIRBenchmark:
 
     def evaluate(
         self,
-        engine: FitzRagEngine,
+        engine: FitzKragEngine,
         dataset: str,
         split: str = "test",
         k_values: list[int] | None = None,
@@ -377,7 +377,7 @@ class BEIRBenchmark:
 
     def evaluate_suite(
         self,
-        engine: FitzRagEngine,
+        engine: FitzKragEngine,
         datasets: list[str] | None = None,
         split: str = "test",
     ) -> BEIRSuiteResult:

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fitz_ai.engines.fitz_rag.exceptions import LLMError
+from fitz_ai.core.exceptions import GenerationError as LLMError
 
 
 class TestLocalLLMRuntimeConfig:

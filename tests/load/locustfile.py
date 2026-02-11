@@ -22,6 +22,8 @@ from pathlib import Path
 
 from locust import User, between, task
 
+from fitz_ai.core import Query
+
 # Sample queries for load testing
 QUERIES = [
     # Simple queries
@@ -53,7 +55,8 @@ class DirectRAGUser(User):
         """Initialize pipeline once per user."""
         if DirectRAGUser._pipeline is None:
             from fitz_ai.core.paths import FitzPaths
-            from fitz_ai.engines.fitz_rag import FitzRagConfig, RAGPipeline
+            from fitz_ai.engines.fitz_krag.config import FitzKragConfig
+            from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
 
             # Set workspace
             project_root = Path(__file__).parent.parent.parent
@@ -75,13 +78,12 @@ class DirectRAGUser(User):
                     "embedding_kwargs", test_config.get("embedding_kwargs", {})
                 ),
                 "vector_db_kwargs": test_config.get("vector_db_kwargs", {}),
-                "retrieval_plugin": "dense",
                 "collection": "e2e_test_collection",
-                "top_k": 20,
+                "top_addresses": 20,
             }
 
-            cfg = FitzRagConfig(**config_dict)
-            DirectRAGUser._pipeline = RAGPipeline.from_config(cfg)
+            cfg = FitzKragConfig(**config_dict)
+            DirectRAGUser._pipeline = FitzKragEngine(cfg)
 
         self.pipeline = DirectRAGUser._pipeline
 
@@ -92,7 +94,7 @@ class DirectRAGUser(User):
         start = time.perf_counter()
 
         try:
-            result = self.pipeline.query(query)
+            result = self.pipeline.answer(Query(text=query))
             elapsed_ms = (time.perf_counter() - start) * 1000
 
             self.environment.events.request.fire(
@@ -119,7 +121,7 @@ class DirectRAGUser(User):
         start = time.perf_counter()
 
         try:
-            result = self.pipeline.query(query)
+            result = self.pipeline.answer(Query(text=query))
             elapsed_ms = (time.perf_counter() - start) * 1000
 
             self.environment.events.request.fire(
@@ -146,7 +148,7 @@ class DirectRAGUser(User):
         start = time.perf_counter()
 
         try:
-            result = self.pipeline.query(query)
+            result = self.pipeline.answer(Query(text=query))
             elapsed_ms = (time.perf_counter() - start) * 1000
 
             self.environment.events.request.fire(

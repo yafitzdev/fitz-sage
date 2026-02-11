@@ -91,7 +91,7 @@ def command(
         raise typer.Exit(1)
 
     # =========================================================================
-    # Run quickstart with fitz_rag + pgvector
+    # Run quickstart with fitz_krag + pgvector
     # =========================================================================
 
     _run_quickstart(source, question, collection, verbose)

@@ -461,7 +461,7 @@ def main():
 
     # Load config
     print("Loading fitz-ai config...")
-    cfg = load_engine_config("fitz_rag")
+    cfg = load_engine_config("fitz_krag")
 
     # Chat client
     chat_spec = args.chat or cfg.chat

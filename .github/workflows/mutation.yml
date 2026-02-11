@@ -73,7 +73,7 @@ jobs:
           TARGET="${{ steps.target.outputs.target }}"
 
           case $TARGET in
-            guardrails) PATHS="fitz_ai/engines/fitz_rag/guardrails/" ;;
+            guardrails) PATHS="fitz_ai/engines/fitz_krag/guardrails/" ;;
             paths) PATHS="fitz_ai/core/paths/" ;;
             core-files) PATHS="fitz_ai/core/answer.py,fitz_ai/core/answer_mode.py,fitz_ai/core/chunk.py,fitz_ai/core/config.py,fitz_ai/core/constants.py,fitz_ai/core/constraints.py,fitz_ai/core/detect.py,fitz_ai/core/document.py,fitz_ai/core/engine.py,fitz_ai/core/http.py,fitz_ai/core/registry.py,fitz_ai/core/utils.py" ;;
           esac

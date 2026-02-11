@@ -66,7 +66,7 @@ Fitz follows strict architectural principles. Please respect these when contribu
 fitz_ai/
 ├── core/              # Paradigm-agnostic contracts (Query, Answer, Provenance)
 ├── engines/           # Engine implementations
-│   └── fitz_rag/      # RAG with retrieval intelligence
+│   └── fitz_krag/     # KRAG with retrieval intelligence
 ├── retrieval/         # SHARED retrieval intelligence (detection, sparse, entities, etc.)
 ├── llm/               # LLM service layer (chat, embedding, rerank, vision)
 ├── storage/           # PostgreSQL connection manager
@@ -184,7 +184,7 @@ Open an issue with:
 
 4. **Commit with clear messages**
    ```bash
-   git commit -m "feat(engines): add hybrid retrieval to fitz_rag"
+   git commit -m "feat(engines): add hybrid retrieval to fitz_krag"
    git commit -m "fix(core): handle empty embedding response"
    git commit -m "docs: update engine development guide"
    ```
@@ -341,7 +341,7 @@ pytest
 pytest --cov=fitz_ai
 
 # Specific module
-pytest tests/engines/test_fitz_rag.py
+pytest tests/engines/test_fitz_krag.py
 
 # Verbose output
 pytest -v
@@ -360,9 +360,9 @@ pytest -x
 
 ```python
 # Good test example
-def test_fitz_rag_preserves_metadata():
-    """Fitz RAG should preserve document metadata in provenance."""
-    engine = create_fitz_rag_engine(config)
+def test_fitz_krag_preserves_metadata():
+    """Fitz KRAG should preserve document metadata in provenance."""
+    engine = create_fitz_krag_engine(config)
     answer = engine.answer(Query(text="test query"))
     
     assert answer.provenance
@@ -384,12 +384,12 @@ def test_fitz_rag_preserves_metadata():
 
 | Item | Convention | Example |
 |------|------------|---------|
-| Modules | `snake_case` | `fitz_rag.py` |
-| Classes | `PascalCase` | `FitzRagEngine` |
-| Functions | `snake_case` | `run_fitz_rag()` |
+| Modules | `snake_case` | `fitz_krag.py` |
+| Classes | `PascalCase` | `FitzKragEngine` |
+| Functions | `snake_case` | `run_fitz_krag()` |
 | Constants | `UPPER_SNAKE` | `DEFAULT_TOP_K` |
 | Plugin names | `snake_case` | `plugin_name = "my_provider"` |
-| Engine names | `snake_case` | `engine="fitz_rag"` |
+| Engine names | `snake_case` | `engine="fitz_krag"` |
 
 ### Code Organization
 

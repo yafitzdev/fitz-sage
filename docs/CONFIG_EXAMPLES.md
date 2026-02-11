@@ -182,10 +182,10 @@ rerank_kwargs:
 Just use defaults from `default.yaml`:
 
 ```python
-from fitz_ai.engines.fitz_rag import FitzRagEngine
+from fitz_ai.engines.fitz_krag import FitzKragEngine
 
 # Uses all defaults from default_v2.yaml
-engine = FitzRagEngine()
+engine = FitzKragEngine()
 
 # Query immediately
 answer = engine.answer(Query("What is quantum computing?"))

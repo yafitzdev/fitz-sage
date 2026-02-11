@@ -92,8 +92,8 @@ Internal parameters:
 
 - **Table store:** `fitz_ai/ingestion/tables/table_store.py`
 - **Table detection:** `fitz_ai/ingestion/parser/` (CSV, Markdown, Docling parsers)
-- **SQL generation:** `fitz_ai/engines/fitz_rag/answering/table_query.py`
-- **Table routing step:** `fitz_ai/engines/fitz_rag/retrieval/steps/table_query.py`
+- **SQL generation:** `fitz_ai/engines/fitz_krag/answering/table_query.py`
+- **Table routing step:** `fitz_ai/engines/fitz_krag/retrieval/steps/table_query.py`
 
 ## Benefits
 

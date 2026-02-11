@@ -6,7 +6,7 @@ Most RAG systems confidently answer questions even when the answer isn't in the 
 
 - **Q:** "What was our Q4 revenue?" (docs only cover Q1-Q3)
 - **Typical RAG:** "Q4 revenue was $2.5M" (hallucinated)
-- **FitzRAG:** "I cannot find Q4 revenue figures in the provided documents. The available financial data covers Q1-Q3 only."
+- **FitzKRAG:** "I cannot find Q4 revenue figures in the provided documents. The available financial data covers Q1-Q3 only."
 
 The system cannot distinguish between "I have evidence" and "I'm making an educated guess."
 
@@ -72,7 +72,7 @@ constraints:
   - `conflict_aware.py` - Detects contradictions across sources
   - `insufficient_evidence.py` - Blocks confident answers without evidence
   - `causal_attribution.py` - Prevents hallucinated causality
-- **Constraint runner:** `fitz_ai/engines/fitz_rag/answering/constraints.py`
+- **Constraint runner:** `fitz_ai/engines/fitz_krag/answering/constraints.py`
 - **Answer modes:** `fitz_ai/core/answer.py` (AnswerMode enum)
 
 ## Benefits

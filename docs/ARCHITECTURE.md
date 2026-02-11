@@ -33,8 +33,8 @@ High-level system design of Fitz.
 │  Engine Layer                                                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────────────────────┐  ┌─────────────────────────────────┐   │
-│  │  FitzRAG Engine                 │  │  Custom Engines                 │   │
-│  │  Traditional RAG pipeline       │  │  (extensible via registry)      │   │
+│  │  FitzKRAG Engine                │  │  Custom Engines                 │   │
+│  │  KRAG pipeline                  │  │  (extensible via registry)      │   │
 │  │  - Retrieval                    │  │                                 │   │
 │  │  - Constraints (guardrails)     │  │                                 │   │
 │  │  - Generation                   │  │                                 │   │
@@ -88,7 +88,7 @@ Strict import rules enforce separation of concerns:
                     │              │
                     ┌──────────────────────┐
                     │  engines/            │
-                    │  FitzRAG + custom    │
+                    │  FitzKRAG + custom   │
                     │  Orchestrate layers  │
                     └──────────────────────┘
                                ▲
@@ -178,7 +178,7 @@ Verify with: `python -m tools.contract_map --fail-on-errors`
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  Configuration (.fitz/config/fitz_rag.yaml)                                 │
+│  Configuration (.fitz/config/fitz_krag.yaml)                                │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  chat:                                                                      │
 │    plugin_name: cohere    ◀─── Selects which plugin to use                  │
@@ -296,7 +296,7 @@ class Chunk:
 ```
 .fitz/
 ├── config/
-│   └── fitz_rag.yaml     # Main engine config
+│   └── fitz_krag.yaml    # Main engine config
 ├── pgdata/               # PostgreSQL data (local mode)
 └── ingest_state.json     # Incremental ingestion state
 ```
@@ -305,7 +305,7 @@ class Chunk:
 
 ```yaml
 # Engine selection
-engine: fitz_rag
+engine: fitz_krag
 
 # LLM services (YAML plugins)
 chat:
@@ -357,11 +357,11 @@ fitz_ai/
 │   └── paths.py                 # Config path management
 │
 ├── engines/                     # Engine implementations
-│   └── fitz_rag/
-│       ├── engine.py            # Main RAG engine
+│   └── fitz_krag/
+│       ├── engine.py            # Main KRAG engine
 │       ├── retrieval/           # Retrieval steps + strategies
 │       ├── generation/          # Answer generation + RGS
-│       ├── pipeline/            # RAGPipeline orchestration
+│       ├── pipeline/            # KRAGPipeline orchestration
 │       └── guardrails/plugins/  # Epistemic guardrails (Python)
 │
 ├── retrieval/                   # SHARED retrieval intelligence

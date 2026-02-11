@@ -245,7 +245,7 @@ def _run_persistent_ingest_query(
 def _run_collection_query(
     question: Optional[str], collection: Optional[str], engine_name: str
 ) -> None:
-    """Run query using FitzService for fitz_rag engine."""
+    """Run query using FitzService for fitz_krag engine."""
     service = FitzService()
 
     # Collection selection

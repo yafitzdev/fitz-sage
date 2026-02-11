@@ -24,7 +24,7 @@ from fitz_ai.core.answer_mode import AnswerMode
 from fitz_ai.logging.logger import get_logger
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_rag.engine import FitzRagEngine
+    from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
 
 logger = get_logger(__name__)
 
@@ -188,7 +188,7 @@ class FitzGovBenchmark:
 
     def evaluate(
         self,
-        engine: FitzRagEngine,
+        engine: FitzKragEngine,
         categories: list | None = None,
         test_cases: list | None = None,
     ) -> Any:
@@ -237,7 +237,7 @@ class FitzGovBenchmark:
 
         return result
 
-    def _run_case(self, engine: FitzRagEngine, case: Any) -> tuple[str, AnswerMode | None]:
+    def _run_case(self, engine: FitzKragEngine, case: Any) -> tuple[str, AnswerMode | None]:
         """
         Run engine on a single test case.
 
@@ -257,7 +257,7 @@ class FitzGovBenchmark:
 
         return answer_text, actual_mode
 
-    def _run_with_contexts(self, engine: FitzRagEngine, query, contexts: list[str]):
+    def _run_with_contexts(self, engine: FitzKragEngine, query, contexts: list[str]):
         """
         Run governance classification on injected contexts.
 

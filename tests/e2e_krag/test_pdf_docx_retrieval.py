@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.e2e.scenarios import PDF_DOCX_SCENARIOS
+from tests.e2e_krag.scenarios import PDF_DOCX_SCENARIOS
 
 from .conftest import create_tiered_krag_runner
 
@@ -26,7 +26,7 @@ from .conftest import create_tiered_krag_runner
 pytestmark = pytest.mark.e2e_krag_parser
 
 # Fixtures directory with PDF/DOCX files (shared with RAG e2e)
-FIXTURES_PARSER_DIR = Path(__file__).parent.parent / "e2e" / "fixtures_parser"
+FIXTURES_PARSER_DIR = Path(__file__).parent / "fixtures_parser"
 
 
 @pytest.fixture(scope="module")

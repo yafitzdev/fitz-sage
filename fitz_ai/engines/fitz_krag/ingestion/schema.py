@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Prefix tables to avoid collision with fitz_rag tables
+# Prefix tables to avoid collision with other engine tables
 TABLE_PREFIX = "krag_"
 
 

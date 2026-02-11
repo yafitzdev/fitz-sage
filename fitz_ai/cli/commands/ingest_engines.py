@@ -2,7 +2,7 @@
 """
 Engine-specific ingestion for ingest command.
 
-Handles ingestion for non-fitz_rag engines.
+Handles ingestion for non-fitz_krag engines.
 """
 
 from __future__ import annotations

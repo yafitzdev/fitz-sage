@@ -26,7 +26,7 @@ This keeps the config declarative and avoids boolean flags that can get out of s
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  CONFIG (.fitz/config/fitz_rag.yaml)                            │
+│  CONFIG (.fitz/config/fitz_krag.yaml)                           │
 │  Declares WHICH provider/model to use                           │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
@@ -139,8 +139,8 @@ retrieval:
 
 | File | Purpose |
 |------|---------|
-| `fitz_ai/engines/fitz_rag/retrieval/plugins/dense.yaml` | Retrieval pipeline (rerank steps have `enabled_if: reranker`) |
-| `fitz_ai/engines/fitz_rag/retrieval/loader.py` | Skips rerank steps when no reranker provided |
+| `fitz_ai/engines/fitz_krag/retrieval/plugins/dense.yaml` | Retrieval pipeline (rerank steps have `enabled_if: reranker`) |
+| `fitz_ai/engines/fitz_krag/retrieval/loader.py` | Skips rerank steps when no reranker provided |
 | `fitz_ai/llm/providers/cohere.py` | Cohere rerank implementation |
 
 ---

@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.e2e.scenarios import SCENARIOS
+from tests.e2e_krag.scenarios import SCENARIOS
 
 # Mark all tests in this module as e2e_krag tests
 pytestmark = pytest.mark.e2e_krag

@@ -243,7 +243,7 @@ markers = [
     # Feature markers
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests (real services)",
-    "e2e: marks tests as end-to-end tests requiring real LLM and ingestion (fitz_rag)",
+    "e2e: marks tests as end-to-end tests requiring real LLM and ingestion (fitz_krag)",
     "e2e_parser: marks tests as parser e2e tests (PDF/DOCX parsing)",
     "e2e_krag: marks tests as KRAG end-to-end tests requiring real LLM and ingestion",
     "e2e_krag_parser: marks tests as KRAG parser e2e tests (PDF/DOCX parsing)",

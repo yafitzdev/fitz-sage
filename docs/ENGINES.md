@@ -71,16 +71,16 @@ class Provenance:
 
 ---
 
-## Fitz RAG Engine
+## Fitz KRAG Engine
 
-**Location**: `fitz_ai/engines/fitz_rag/`
+**Location**: `fitz_ai/engines/fitz_krag/`
 
 ### Usage
 
 ```python
-from fitz_ai.engines.fitz_rag import run_fitz_rag
+from fitz_ai.engines.fitz_krag import run_fitz_krag
 
-answer = run_fitz_rag("What is quantum computing?")
+answer = run_fitz_krag("What is quantum computing?")
 print(answer.text)
 print(answer.provenance)
 ```
@@ -88,7 +88,7 @@ print(answer.provenance)
 ### Configuration
 
 ```yaml
-# .fitz/config/fitz_rag.yaml
+# .fitz/config/fitz_krag.yaml
 chat:
   plugin_name: cohere
   kwargs:
@@ -136,8 +136,8 @@ Fitz supports a pluggable engine architecture. You can swap engines via configur
 ```python
 from fitz_ai import run
 
-# Default: Fitz RAG
-answer = run("What is X?", engine="fitz_rag")
+# Default: Fitz KRAG
+answer = run("What is X?", engine="fitz_krag")
 
 # Custom engine (see CUSTOM_ENGINES.md)
 answer = run("What is X?", engine="my_custom_engine")
@@ -147,7 +147,7 @@ answer = run("What is X?", engine="my_custom_engine")
 
 | Engine | Description | Status |
 |--------|-------------|--------|
-| `fitz_rag` | Traditional RAG with epistemic guardrails | Production |
+| `fitz_krag` | KRAG with epistemic guardrails | Production |
 
 Custom engines can be registered via the engine registry. See [CUSTOM_ENGINES.md](CUSTOM_ENGINES.md).
 
