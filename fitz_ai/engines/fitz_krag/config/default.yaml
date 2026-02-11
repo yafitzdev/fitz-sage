@@ -15,6 +15,7 @@ fitz_krag:
   embedding: cohere
   vector_db: pgvector
   rerank: null
+  parser: docling
 
   # ===========================================================================
   # Collection

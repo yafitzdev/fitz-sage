@@ -444,8 +444,15 @@ def create_vision_provider(
 
         return AnthropicVision(auth, **kwargs)  # type: ignore[arg-type]
 
+    elif provider == "ollama":
+        from fitz_ai.llm.providers.ollama import OllamaVision
+
+        return OllamaVision(**kwargs)
+
     else:
-        raise ValueError(f"Unknown vision provider: {provider}. Supported: 'openai', 'anthropic'")
+        raise ValueError(
+            f"Unknown vision provider: {provider}. Supported: 'openai', 'anthropic', 'ollama'"
+        )
 
 
 __all__ = [

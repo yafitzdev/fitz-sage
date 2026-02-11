@@ -309,12 +309,82 @@ class OllamaRerank:
             self._client.close()
 
 
+VISION_MODEL = "llava:7b"
+
+
+class OllamaVision:
+    """
+    Ollama vision provider using multimodal models (e.g., LLaVA).
+
+    Uses the /api/chat endpoint with images in messages for VLM inference.
+
+    Args:
+        model: Model name (e.g., "llava:7b").
+        base_url: Ollama server URL.
+        **kwargs: Additional default kwargs.
+    """
+
+    def __init__(
+        self,
+        model: str | None = None,
+        base_url: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self._base_url = base_url or DEFAULT_BASE_URL
+        self._model = model or VISION_MODEL
+        self._client = httpx.Client(base_url=self._base_url, timeout=120.0)
+        self._defaults = kwargs
+
+    def describe_image(self, image_base64: str, prompt: str | None = None) -> str:
+        """
+        Describe an image using a vision model.
+
+        Args:
+            image_base64: Base64-encoded image data (raw, no data URI prefix).
+            prompt: Custom prompt for description.
+
+        Returns:
+            Text description of the image.
+        """
+        actual_prompt = prompt or (
+            "Describe this figure, chart, or diagram in detail. "
+            "Include all data values, labels, trends, and key insights visible in the image."
+        )
+
+        # Ollama multimodal API: images go in messages[].images as raw base64 array
+        payload = {
+            "model": self._model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": actual_prompt,
+                    "images": [image_base64],
+                }
+            ],
+            "stream": False,
+        }
+
+        response = self._client.post("/api/chat", json=payload)
+        response.raise_for_status()
+        data = response.json()
+
+        if "message" in data and "content" in data["message"]:
+            return data["message"]["content"]
+        return ""
+
+    def __del__(self) -> None:
+        if hasattr(self, "_client"):
+            self._client.close()
+
+
 __all__ = [
     "OllamaChat",
     "OllamaEmbedding",
     "OllamaRerank",
+    "OllamaVision",
     "CHAT_MODELS",
     "EMBEDDING_MODEL",
     "RERANK_MODEL",
+    "VISION_MODEL",
     "DEFAULT_BASE_URL",
 ]

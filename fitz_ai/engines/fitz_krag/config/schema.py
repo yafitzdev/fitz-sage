@@ -55,6 +55,11 @@ class FitzKragConfig(BasePluginConfig):
         description="Vision/VLM plugin for image description. None = disabled.",
     )
 
+    parser: str = Field(
+        default="docling",
+        description="Document parser plugin: 'docling' or 'docling_vision' (VLM)",
+    )
+
     # ==========================================================================
     # Collection
     # ==========================================================================

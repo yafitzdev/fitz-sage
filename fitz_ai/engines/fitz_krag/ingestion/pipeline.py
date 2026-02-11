@@ -506,7 +506,12 @@ class KragIngestPipeline:
             from fitz_ai.ingestion.parser.router import ParserRouter
             from fitz_ai.ingestion.source.base import SourceFile
 
-            router = ParserRouter()
+            router = ParserRouter(docling_parser=self._config.parser)
+
+            # Inject vision client when using docling_vision parser
+            if self._config.parser == "docling_vision" and self._config.vision:
+                self._inject_vision_client(router)
+
             source_file = SourceFile(
                 uri=f"file://{abs_path}",
                 local_path=abs_path,
@@ -515,6 +520,27 @@ class KragIngestPipeline:
         except Exception as e:
             logger.warning(f"Document parsing failed for {abs_path}: {e}")
             return None
+
+    def _inject_vision_client(self, router: Any) -> None:
+        """Inject vision provider into the docling_vision parser."""
+        try:
+            from fitz_ai.llm.client import get_vision
+
+            vision_client = get_vision(
+                self._config.vision,
+                config=(
+                    self._config.vision_kwargs.model_dump(exclude_none=True) or None
+                ),
+            )
+            if vision_client:
+                for parser in router._parsers.values():
+                    if hasattr(parser, "vision_client"):
+                        parser.vision_client = vision_client
+                        if hasattr(parser, "_vision_client_loaded"):
+                            parser._vision_client_loaded = True
+                        break
+        except Exception as e:
+            logger.warning(f"Failed to inject vision client: {e}")
 
     def _summarize_symbols(self, symbols: list[SymbolEntry]) -> list[str]:
         """Generate 1-2 sentence summaries for symbols, batched."""

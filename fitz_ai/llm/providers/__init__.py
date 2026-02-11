@@ -42,9 +42,13 @@ except ImportError:
 
 # Optional: Ollama (requires ollama package)
 try:
-    from fitz_ai.llm.providers.ollama import OllamaChat, OllamaEmbedding  # noqa: F401
+    from fitz_ai.llm.providers.ollama import (  # noqa: F401
+        OllamaChat,
+        OllamaEmbedding,
+        OllamaVision,
+    )
 
-    __all__.extend(["OllamaChat", "OllamaEmbedding"])
+    __all__.extend(["OllamaChat", "OllamaEmbedding", "OllamaVision"])
 except ImportError:
     pass
 
