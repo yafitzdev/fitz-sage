@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from fitz_ai.core.exceptions import GenerationError as LLMError
+from fitz_ai.core.exceptions import GenerationError
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
@@ -65,7 +65,7 @@ class _OllamaAdapter:
         try:
             import ollama  # type: ignore
         except Exception:
-            raise LLMError(_LOCAL_FALLBACK_HELP) from None
+            raise GenerationError(_LOCAL_FALLBACK_HELP) from None
 
         self._ollama = ollama
         self._model = model
@@ -80,7 +80,7 @@ class _OllamaAdapter:
             )
             return resp["message"]["content"]
         except Exception:
-            raise LLMError(_LOCAL_FALLBACK_HELP) from None
+            raise GenerationError(_LOCAL_FALLBACK_HELP) from None
 
     def embed(self, text: str) -> list[float]:
         try:
@@ -90,7 +90,7 @@ class _OllamaAdapter:
             )
             return resp["embedding"]
         except Exception:
-            raise LLMError(_LOCAL_FALLBACK_HELP) from None
+            raise GenerationError(_LOCAL_FALLBACK_HELP) from None
 
 
 class LocalLLMRuntime:
@@ -121,7 +121,7 @@ class LocalLLMRuntime:
                     verbose=self._cfg.verbose,
                 )
             return self._adapter
-        except LLMError:
+        except GenerationError:
             raise
         except Exception:
-            raise LLMError(_LOCAL_FALLBACK_HELP) from None
+            raise GenerationError(_LOCAL_FALLBACK_HELP) from None

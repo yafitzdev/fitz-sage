@@ -43,7 +43,7 @@ class TestLLMFailures:
         """LLM timeout should be handled gracefully."""
         import asyncio
 
-        from fitz_ai.core.exceptions import GenerationError as LLMError
+        from fitz_ai.core.exceptions import GenerationError
 
         # Replace the chat factory with one that returns a timeout-failing client
         original_factory = self.runner.pipeline.chat_factory
@@ -55,8 +55,8 @@ class TestLLMFailures:
             result = self.runner.pipeline.run("What is TechCorp?")
             # Should either return a graceful error or raise a handled exception
             assert result is None or "error" in result.answer.lower()
-        except LLMError:
-            # LLMError is the expected exception - system handled it properly
+        except GenerationError:
+            # GenerationError is the expected exception - system handled it properly
             pass
         except Exception as e:
             # Other exceptions are acceptable as long as they're handled
@@ -67,7 +67,7 @@ class TestLLMFailures:
 
     def test_llm_rate_limit_handling(self):
         """Rate limit errors should be handled."""
-        from fitz_ai.core.exceptions import GenerationError as LLMError
+        from fitz_ai.core.exceptions import GenerationError
 
         def rate_limited(*args, **kwargs):
             raise Exception("Rate limit exceeded. Retry after 60 seconds.")
@@ -80,8 +80,8 @@ class TestLLMFailures:
             result = self.runner.pipeline.run("What is TechCorp?")
             # Should handle gracefully
             assert result is None or "error" in str(result).lower()
-        except LLMError:
-            # LLMError is the expected exception - system handled it properly
+        except GenerationError:
+            # GenerationError is the expected exception - system handled it properly
             pass
         except Exception as e:
             # Other handled exceptions are acceptable

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fitz_ai.core.exceptions import GenerationError as LLMError
+from fitz_ai.core.exceptions import GenerationError
 
 
 class TestLocalLLMRuntimeConfig:
@@ -51,7 +51,7 @@ class TestOllamaAdapter:
         with patch.dict("sys.modules", {"ollama": None}):
             from fitz_ai.backends.local_llm.runtime import _OllamaAdapter
 
-            with pytest.raises(LLMError) as exc_info:
+            with pytest.raises(GenerationError) as exc_info:
                 _OllamaAdapter("model", verbose=False)
 
             assert "ollama" in str(exc_info.value).lower()
@@ -83,7 +83,7 @@ class TestOllamaAdapter:
             mock_ollama.chat.assert_called_once()
 
     def test_adapter_chat_failure_raises_llm_error(self):
-        """Test adapter chat raises LLMError on failure."""
+        """Test adapter chat raises GenerationError on failure."""
         mock_ollama = MagicMock()
         mock_ollama.chat.side_effect = Exception("Connection failed")
 
@@ -92,7 +92,7 @@ class TestOllamaAdapter:
 
             adapter = _OllamaAdapter("model", verbose=False)
 
-            with pytest.raises(LLMError):
+            with pytest.raises(GenerationError):
                 adapter.chat([{"role": "user", "content": "Hi"}])
 
     def test_adapter_embed_success(self):
@@ -110,7 +110,7 @@ class TestOllamaAdapter:
             mock_ollama.embeddings.assert_called_once()
 
     def test_adapter_embed_failure_raises_llm_error(self):
-        """Test adapter embed raises LLMError on failure."""
+        """Test adapter embed raises GenerationError on failure."""
         mock_ollama = MagicMock()
         mock_ollama.embeddings.side_effect = Exception("Embedding failed")
 
@@ -119,7 +119,7 @@ class TestOllamaAdapter:
 
             adapter = _OllamaAdapter("model", verbose=False)
 
-            with pytest.raises(LLMError):
+            with pytest.raises(GenerationError):
                 adapter.embed("test")
 
 
@@ -163,13 +163,13 @@ class TestLocalLLMRuntime:
             assert adapter1 is adapter2
 
     def test_runtime_llama_raises_llm_error_on_failure(self):
-        """Test llama() raises LLMError on adapter failure."""
+        """Test llama() raises GenerationError on adapter failure."""
         with patch.dict("sys.modules", {"ollama": None}):
             from fitz_ai.backends.local_llm.runtime import LocalLLMRuntime
 
             runtime = LocalLLMRuntime()
 
-            with pytest.raises(LLMError):
+            with pytest.raises(GenerationError):
                 runtime.llama()
 
 
