@@ -84,11 +84,19 @@ class ContextAssembler:
         return "\n\n".join(blocks)
 
     def _is_mixed_type(self, results: list[ReadResult]) -> bool:
-        """Check if results contain both code and document types."""
+        """Check if results contain multiple knowledge types."""
         kinds = {r.address.kind for r in results}
         code_kinds = {AddressKind.SYMBOL, AddressKind.FILE}
         doc_kinds = {AddressKind.SECTION}
-        return bool(kinds & code_kinds) and bool(kinds & doc_kinds)
+        data_kinds = {AddressKind.TABLE}
+        type_groups = sum(
+            [
+                bool(kinds & code_kinds),
+                bool(kinds & doc_kinds),
+                bool(kinds & data_kinds),
+            ]
+        )
+        return type_groups >= 2
 
     def _type_group(self, result: ReadResult) -> str:
         """Get the type group label for a result."""
@@ -96,6 +104,8 @@ class ContextAssembler:
             return "Code"
         elif result.address.kind == AddressKind.SECTION:
             return "Documentation"
+        elif result.address.kind == AddressKind.TABLE:
+            return "Data"
         return "Other"
 
     def _format_block(self, index: int, result: ReadResult) -> str:
@@ -140,7 +150,7 @@ class ContextAssembler:
 
     def _detect_language(self, result: ReadResult) -> str:
         """Detect language for syntax highlighting."""
-        if result.address.kind in (AddressKind.CHUNK, AddressKind.SECTION):
+        if result.address.kind in (AddressKind.CHUNK, AddressKind.SECTION, AddressKind.TABLE):
             return ""
 
         path = result.file_path.lower()

@@ -950,3 +950,87 @@ class TestContentReaderSectionContext:
         r = results[0]
         assert r.content == "Section body text."
         assert "breadcrumb" not in r.metadata
+
+
+# ===========================================================================
+# TestContentReader — Table tests
+# ===========================================================================
+
+
+class TestContentReaderTable:
+    """Tests for table address reading in ContentReader."""
+
+    def _make_table_address(
+        self,
+        table_index_id: str = "rec-001",
+        table_id: str = "tbl_abc",
+        source_id: str = "file1",
+        name: str = "Sales Data",
+    ) -> Address:
+        return Address(
+            kind=AddressKind.TABLE,
+            source_id=source_id,
+            location=name,
+            summary=f"Table {name}",
+            metadata={
+                "table_index_id": table_index_id,
+                "table_id": table_id,
+                "name": name,
+                "columns": ["product", "revenue"],
+                "row_count": 100,
+            },
+        )
+
+    def test_read_table_address(self):
+        """Reader returns schema + sample for TABLE address."""
+        raw_store = _make_raw_store()
+        table_store = MagicMock()
+        table_store.get.return_value = {
+            "id": "rec-001",
+            "raw_file_id": "file1",
+            "table_id": "tbl_abc",
+            "name": "Sales Data",
+            "columns": ["product", "revenue"],
+            "row_count": 100,
+            "summary": "Sales records",
+            "metadata": {},
+        }
+        reader = ContentReader(raw_store, table_store=table_store)
+
+        addr = self._make_table_address()
+        results = reader.read([addr], limit=10)
+
+        assert len(results) == 1
+        r = results[0]
+        assert "Table: Sales Data" in r.content
+        assert "product, revenue" in r.content
+        assert "Row count: 100" in r.content
+        assert r.file_path == "module.py"
+        assert r.metadata["table_id"] == "tbl_abc"
+
+    def test_read_table_no_store(self):
+        """Graceful fallback when table store unavailable."""
+        raw_store = _make_raw_store()
+        reader = ContentReader(raw_store, table_store=None)
+
+        addr = self._make_table_address()
+        results = reader.read([addr], limit=10)
+
+        assert results == []
+
+    def test_read_table_missing_index_id(self):
+        """Missing table_index_id in metadata returns None."""
+        raw_store = _make_raw_store()
+        table_store = MagicMock()
+        reader = ContentReader(raw_store, table_store=table_store)
+
+        addr = Address(
+            kind=AddressKind.TABLE,
+            source_id="file1",
+            location="Some Table",
+            summary="A table",
+            metadata={},  # no table_index_id
+        )
+        results = reader.read([addr], limit=10)
+
+        assert results == []

@@ -30,6 +30,7 @@ class TestQueryType:
         assert QueryType.DOCUMENTATION.value == "documentation"
         assert QueryType.GENERAL.value == "general"
         assert QueryType.CROSS.value == "cross"
+        assert QueryType.DATA.value == "data"
 
     @pytest.mark.parametrize(
         "value,expected",
@@ -69,8 +70,9 @@ class TestQueryAnalysis:
         """CODE type produces code-heavy weights."""
         analysis = QueryAnalysis(primary_type=QueryType.CODE)
         assert analysis.strategy_weights == {
-            "code": 0.8,
+            "code": 0.75,
             "section": 0.1,
+            "table": 0.05,
             "chunk": 0.1,
         }
 
@@ -79,7 +81,8 @@ class TestQueryAnalysis:
         analysis = QueryAnalysis(primary_type=QueryType.DOCUMENTATION)
         assert analysis.strategy_weights == {
             "code": 0.1,
-            "section": 0.8,
+            "section": 0.75,
+            "table": 0.05,
             "chunk": 0.1,
         }
 
@@ -87,18 +90,30 @@ class TestQueryAnalysis:
         """GENERAL type produces balanced weights."""
         analysis = QueryAnalysis(primary_type=QueryType.GENERAL)
         assert analysis.strategy_weights == {
-            "code": 0.3,
-            "section": 0.3,
-            "chunk": 0.4,
+            "code": 0.25,
+            "section": 0.25,
+            "table": 0.15,
+            "chunk": 0.35,
         }
 
     def test_strategy_weights_cross(self) -> None:
-        """CROSS type produces 0.4/0.4/0.2 weights."""
+        """CROSS type produces code/section balanced weights with table."""
         analysis = QueryAnalysis(primary_type=QueryType.CROSS)
         assert analysis.strategy_weights == {
-            "code": 0.4,
-            "section": 0.4,
+            "code": 0.35,
+            "section": 0.35,
+            "table": 0.1,
             "chunk": 0.2,
+        }
+
+    def test_strategy_weights_data(self) -> None:
+        """DATA type produces table-heavy weights."""
+        analysis = QueryAnalysis(primary_type=QueryType.DATA)
+        assert analysis.strategy_weights == {
+            "code": 0.05,
+            "section": 0.05,
+            "table": 0.85,
+            "chunk": 0.05,
         }
 
     def test_strategy_weights_returns_copy(self) -> None:

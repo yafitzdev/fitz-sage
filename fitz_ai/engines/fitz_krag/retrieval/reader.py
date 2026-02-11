@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
     from fitz_ai.engines.fitz_krag.ingestion.raw_file_store import RawFileStore
     from fitz_ai.engines.fitz_krag.ingestion.section_store import SectionStore
+    from fitz_ai.engines.fitz_krag.ingestion.table_store import TableStore
+    from fitz_ai.tabular.store.postgres import PostgresTableStore
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +30,14 @@ class ContentReader:
         raw_store: "RawFileStore",
         section_store: "SectionStore | None" = None,
         config: "FitzKragConfig | None" = None,
+        table_store: "TableStore | None" = None,
+        pg_table_store: "PostgresTableStore | None" = None,
     ):
         self._raw_store = raw_store
         self._section_store = section_store
         self._config = config
+        self._table_store = table_store
+        self._pg_table_store = pg_table_store
 
     def read(self, addresses: list[Address], limit: int) -> list[ReadResult]:
         """Read content for top addresses."""
@@ -52,6 +58,8 @@ class ContentReader:
             return self._read_chunk(addr)
         elif addr.kind == AddressKind.SECTION:
             return self._read_section(addr)
+        elif addr.kind == AddressKind.TABLE:
+            return self._read_table(addr)
         return None
 
     def _read_symbol(self, addr: Address) -> ReadResult | None:
@@ -139,6 +147,65 @@ class ContentReader:
             content=content,
             file_path=file_path,
             metadata=metadata,
+        )
+
+    def _read_table(self, addr: Address) -> ReadResult | None:
+        """Read table schema and sample data."""
+        if not self._table_store:
+            return None
+
+        table_index_id = addr.metadata.get("table_index_id")
+        if not table_index_id:
+            return None
+
+        record = self._table_store.get(table_index_id)
+        if not record:
+            return None
+
+        table_id = record["table_id"]
+        name = record["name"]
+        columns = record["columns"]
+        row_count = record["row_count"]
+
+        # Get raw file for file path
+        raw_file = self._raw_store.get(addr.source_id)
+        file_path = raw_file["path"] if raw_file else "unknown"
+
+        # Build schema content
+        col_list = ", ".join(columns)
+        content = f"Table: {name}\nColumns: {col_list}\nRow count: {row_count}"
+
+        # Fetch sample rows if pg_table_store is available
+        if self._pg_table_store:
+            try:
+                pg_table_name = self._pg_table_store.get_table_name(table_id)
+                if pg_table_name:
+                    col_info = self._pg_table_store.get_columns(table_id)
+                    if col_info:
+                        sanitized_cols, _ = col_info
+                        cols_str = ", ".join(f'"{c}"' for c in sanitized_cols[:20])
+                        sql = f'SELECT {cols_str} FROM "{pg_table_name}" LIMIT 3'
+                        result = self._pg_table_store.execute_query(table_id, sql)
+                        if result:
+                            col_names, rows = result
+                            if rows:
+                                # Format as markdown table
+                                header = "| " + " | ".join(str(c) for c in col_names) + " |"
+                                sep = "| " + " | ".join("---" for _ in col_names) + " |"
+                                data_rows = []
+                                for row in rows:
+                                    cells = [str(v)[:50] if v is not None else "" for v in row]
+                                    data_rows.append("| " + " | ".join(cells) + " |")
+                                sample_table = "\n".join([header, sep] + data_rows)
+                                content += f"\nSample data:\n{sample_table}"
+            except Exception as e:
+                logger.debug(f"Failed to fetch sample rows for table {table_id}: {e}")
+
+        return ReadResult(
+            address=addr,
+            content=content,
+            file_path=file_path,
+            metadata={"table_id": table_id},
         )
 
     def _build_breadcrumb(self, section: dict[str, Any]) -> str:

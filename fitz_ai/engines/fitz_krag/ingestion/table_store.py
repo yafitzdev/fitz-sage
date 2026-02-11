@@ -1,0 +1,165 @@
+# fitz_ai/engines/fitz_krag/ingestion/table_store.py
+"""CRUD operations for krag_table_index table."""
+
+from __future__ import annotations
+
+import json
+import logging
+from typing import TYPE_CHECKING, Any
+
+from fitz_ai.engines.fitz_krag.ingestion.schema import TABLE_PREFIX
+
+if TYPE_CHECKING:
+    from fitz_ai.storage.postgres import PostgresConnectionManager
+
+logger = logging.getLogger(__name__)
+
+TABLE = f"{TABLE_PREFIX}table_index"
+
+
+class TableStore:
+    """CRUD for the table metadata index."""
+
+    def __init__(self, connection_manager: "PostgresConnectionManager", collection: str):
+        self._cm = connection_manager
+        self._collection = collection
+
+    def upsert_batch(self, tables: list[dict[str, Any]]) -> None:
+        """Insert or update a batch of table metadata records."""
+        if not tables:
+            return
+
+        sql = f"""
+            INSERT INTO {TABLE}
+                (id, raw_file_id, table_id, name, columns, row_count,
+                 summary, summary_vector, metadata)
+            VALUES
+                (%s, %s, %s, %s, %s, %s,
+                 %s, %s::vector, %s::jsonb)
+            ON CONFLICT (id) DO UPDATE SET
+                raw_file_id = EXCLUDED.raw_file_id,
+                table_id = EXCLUDED.table_id,
+                name = EXCLUDED.name,
+                columns = EXCLUDED.columns,
+                row_count = EXCLUDED.row_count,
+                summary = EXCLUDED.summary,
+                summary_vector = EXCLUDED.summary_vector,
+                metadata = EXCLUDED.metadata
+        """
+        with self._cm.connection(self._collection) as conn:
+            for tbl in tables:
+                vector_str = _vector_to_pg(tbl.get("summary_vector"))
+                conn.execute(
+                    sql,
+                    (
+                        tbl["id"],
+                        tbl["raw_file_id"],
+                        tbl["table_id"],
+                        tbl["name"],
+                        tbl["columns"],
+                        tbl["row_count"],
+                        tbl.get("summary"),
+                        vector_str,
+                        json.dumps(tbl.get("metadata", {})),
+                    ),
+                )
+            conn.commit()
+
+    def search_by_name(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        """ILIKE search on name and column names."""
+        pattern = f"%{query}%"
+        sql = f"""
+            SELECT id, raw_file_id, table_id, name, columns, row_count,
+                   summary, metadata
+            FROM {TABLE}
+            WHERE name ILIKE %s OR EXISTS (
+                SELECT 1 FROM unnest(columns) AS col WHERE col ILIKE %s
+            )
+            LIMIT %s
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, (pattern, pattern, limit)).fetchall()
+        return [_row_to_dict(row) for row in rows]
+
+    def search_by_vector(self, vector: list[float], limit: int = 10) -> list[dict[str, Any]]:
+        """Cosine similarity search on summary_vector."""
+        vector_str = _vector_to_pg(vector)
+        if not vector_str:
+            return []
+
+        sql = f"""
+            SELECT id, raw_file_id, table_id, name, columns, row_count,
+                   summary, metadata,
+                   1 - (summary_vector <=> %s::vector) AS score
+            FROM {TABLE}
+            WHERE summary_vector IS NOT NULL
+            ORDER BY summary_vector <=> %s::vector
+            LIMIT %s
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, (vector_str, vector_str, limit)).fetchall()
+        results = []
+        for row in rows:
+            d = _row_to_dict(row[:8])
+            d["score"] = float(row[8]) if row[8] is not None else 0.0
+            results.append(d)
+        return results
+
+    def get(self, table_index_id: str) -> dict[str, Any] | None:
+        """Get a single table record by ID."""
+        sql = f"""
+            SELECT id, raw_file_id, table_id, name, columns, row_count,
+                   summary, metadata
+            FROM {TABLE} WHERE id = %s
+        """
+        with self._cm.connection(self._collection) as conn:
+            row = conn.execute(sql, (table_index_id,)).fetchone()
+        if not row:
+            return None
+        return _row_to_dict(row)
+
+    def get_by_file(self, raw_file_id: str) -> list[dict[str, Any]]:
+        """Get all table records for a raw file."""
+        sql = f"""
+            SELECT id, raw_file_id, table_id, name, columns, row_count,
+                   summary, metadata
+            FROM {TABLE}
+            WHERE raw_file_id = %s
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, (raw_file_id,)).fetchall()
+        return [_row_to_dict(row) for row in rows]
+
+    def delete_by_file(self, raw_file_id: str) -> None:
+        """Delete table metadata when source file is removed."""
+        sql = f"DELETE FROM {TABLE} WHERE raw_file_id = %s"
+        with self._cm.connection(self._collection) as conn:
+            conn.execute(sql, (raw_file_id,))
+            conn.commit()
+
+
+def _vector_to_pg(vector: list[float] | None) -> str | None:
+    """Convert a float list to pgvector string format."""
+    if not vector:
+        return None
+    return "[" + ",".join(str(v) for v in vector) + "]"
+
+
+def _row_to_dict(row: tuple) -> dict[str, Any]:
+    """Convert a query row to dict."""
+    meta = row[7]
+    if isinstance(meta, str):
+        meta = json.loads(meta)
+    elif meta is None:
+        meta = {}
+    columns = list(row[4]) if row[4] else []
+    return {
+        "id": row[0],
+        "raw_file_id": row[1],
+        "table_id": row[2],
+        "name": row[3],
+        "columns": columns,
+        "row_count": row[5],
+        "summary": row[6],
+        "metadata": meta,
+    }

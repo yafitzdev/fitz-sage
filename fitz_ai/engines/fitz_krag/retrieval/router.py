@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from fitz_ai.engines.fitz_krag.retrieval.strategies.section_search import (
         SectionSearchStrategy,
     )
+    from fitz_ai.engines.fitz_krag.retrieval.strategies.table_search import (
+        TableSearchStrategy,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +38,12 @@ class RetrievalRouter:
         chunk_strategy: "ChunkFallbackStrategy | None",
         config: "FitzKragConfig",
         section_strategy: "SectionSearchStrategy | None" = None,
+        table_strategy: "TableSearchStrategy | None" = None,
     ):
         self._code_strategy = code_strategy
         self._chunk_strategy = chunk_strategy
         self._section_strategy = section_strategy
+        self._table_strategy = table_strategy
         self._config = config
 
     def retrieve(
@@ -89,6 +94,11 @@ class RetrievalRouter:
             if self._section_strategy and (not weights or weights.get("section", 1.0) > 0.05):
                 section_addresses = self._section_strategy.retrieve(q, limit)
                 all_addresses.extend(section_addresses)
+
+            # Run table strategy if available and weighted
+            if self._table_strategy and (not weights or weights.get("table", 1.0) > 0.05):
+                table_addresses = self._table_strategy.retrieve(q, limit)
+                all_addresses.extend(table_addresses)
 
         # Chunk fallback when other results are insufficient
         if (

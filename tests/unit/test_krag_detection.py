@@ -52,12 +52,16 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._retrieval_router = MagicMock(name="retrieval_router")
     engine._reader = MagicMock(name="reader")
     engine._expander = MagicMock(name="expander")
+    engine._table_handler = MagicMock(name="table_handler")
+    engine._table_handler.process.side_effect = lambda q, results: results
     engine._assembler = MagicMock(name="assembler")
     engine._synthesizer = MagicMock(name="synthesizer")
     engine._detection_orchestrator = None
     engine._cloud_client = None
     engine._constraints = []
     engine._governor = None
+    engine._table_store = MagicMock(name="table_store")
+    engine._pg_table_store = MagicMock(name="pg_table_store")
     return engine
 
 

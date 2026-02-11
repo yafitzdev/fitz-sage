@@ -157,6 +157,35 @@ class FitzKragConfig(BasePluginConfig):
     )
 
     # ==========================================================================
+    # Table Strategy
+    # ==========================================================================
+
+    table_extensions: list[str] = Field(
+        default=[".csv", ".tsv"],
+        description="File extensions to ingest as tables",
+    )
+
+    table_keyword_weight: float = Field(
+        default=0.4,
+        ge=0.0,
+        le=1.0,
+        description="Weight for keyword search in table hybrid merge",
+    )
+
+    table_semantic_weight: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        description="Weight for semantic search in table hybrid merge",
+    )
+
+    max_table_results: int = Field(
+        default=100,
+        ge=1,
+        description="Max SQL result rows to include in context",
+    )
+
+    # ==========================================================================
     # Context Assembly
     # ==========================================================================
 

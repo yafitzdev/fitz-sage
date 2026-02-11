@@ -7,6 +7,7 @@ Tables:
 - krag_symbol_index: code symbol registry with embeddings
 - krag_import_graph: file-level dependency links
 - krag_section_index: document section registry with BM25 + embeddings
+- krag_table_index: table metadata registry with schema summaries + embeddings
 """
 
 from __future__ import annotations
@@ -136,6 +137,38 @@ def _section_hnsw_index_ddl() -> str:
     """
 
 
+def _table_index_ddl(embedding_dim: int) -> str:
+    return f"""
+    CREATE TABLE IF NOT EXISTS {TABLE_PREFIX}table_index (
+        id TEXT PRIMARY KEY,
+        raw_file_id TEXT NOT NULL REFERENCES {TABLE_PREFIX}raw_files(id) ON DELETE CASCADE,
+        table_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        columns TEXT[] NOT NULL,
+        row_count INTEGER NOT NULL,
+        summary TEXT,
+        summary_vector vector({embedding_dim}),
+        metadata JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}table_name
+        ON {TABLE_PREFIX}table_index USING gin (to_tsvector('english', name));
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}table_table_id
+        ON {TABLE_PREFIX}table_index (table_id);
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}table_file
+        ON {TABLE_PREFIX}table_index (raw_file_id);
+    """
+
+
+def _table_hnsw_index_ddl() -> str:
+    return f"""
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}table_vector
+        ON {TABLE_PREFIX}table_index
+        USING hnsw (summary_vector vector_cosine_ops)
+        WITH (m = 16, ef_construction = 64);
+    """
+
+
 def ensure_schema(
     connection_manager: "PostgresConnectionManager",
     collection: str,
@@ -151,10 +184,11 @@ def ensure_schema(
         conn.execute(_symbol_index_ddl(embedding_dim))
         conn.execute(_import_graph_ddl())
         conn.execute(_section_index_ddl(embedding_dim))
+        conn.execute(_table_index_ddl(embedding_dim))
         conn.commit()
 
     # HNSW index creation can be slow; run separately
-    for index_fn in [_symbol_hnsw_index_ddl, _section_hnsw_index_ddl]:
+    for index_fn in [_symbol_hnsw_index_ddl, _section_hnsw_index_ddl, _table_hnsw_index_ddl]:
         try:
             with connection_manager.connection(collection) as conn:
                 conn.execute(index_fn())

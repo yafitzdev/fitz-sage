@@ -27,6 +27,7 @@ class QueryType(str, Enum):
     DOCUMENTATION = "documentation"
     GENERAL = "general"
     CROSS = "cross"
+    DATA = "data"
 
 
 @dataclass(frozen=True)
@@ -48,10 +49,11 @@ class QueryAnalysis:
 
 # Default strategy weights per query type
 _TYPE_WEIGHTS: dict[QueryType, dict[str, float]] = {
-    QueryType.CODE: {"code": 0.8, "section": 0.1, "chunk": 0.1},
-    QueryType.DOCUMENTATION: {"code": 0.1, "section": 0.8, "chunk": 0.1},
-    QueryType.GENERAL: {"code": 0.3, "section": 0.3, "chunk": 0.4},
-    QueryType.CROSS: {"code": 0.4, "section": 0.4, "chunk": 0.2},
+    QueryType.CODE: {"code": 0.75, "section": 0.1, "table": 0.05, "chunk": 0.1},
+    QueryType.DOCUMENTATION: {"code": 0.1, "section": 0.75, "table": 0.05, "chunk": 0.1},
+    QueryType.GENERAL: {"code": 0.25, "section": 0.25, "table": 0.15, "chunk": 0.35},
+    QueryType.CROSS: {"code": 0.35, "section": 0.35, "table": 0.1, "chunk": 0.2},
+    QueryType.DATA: {"code": 0.05, "section": 0.05, "table": 0.85, "chunk": 0.05},
 }
 
 ANALYSIS_PROMPT = """Classify this search query by knowledge type. Return JSON only.
@@ -60,8 +62,8 @@ Query: "{query}"
 
 Return this exact structure:
 {{
-  "primary_type": "code" | "documentation" | "general" | "cross",
-  "secondary_type": null or "code" | "documentation",
+  "primary_type": "code" | "documentation" | "general" | "cross" | "data",
+  "secondary_type": null or "code" | "documentation" | "data",
   "confidence": 0.0-1.0,
   "entities": ["entity1", "entity2"],
   "refined_query": "cleaned query text"
@@ -70,6 +72,7 @@ Return this exact structure:
 Categories:
 - "code": References functions, classes, methods, implementations, code behavior
 - "documentation": References document sections, specs, procedures, policies
+- "data": References tables, datasets, CSV data, statistics, aggregations, filtering records
 - "general": Overview questions, summaries, "what does this project do"
 - "cross": Explicitly asks about both code and documentation together
 

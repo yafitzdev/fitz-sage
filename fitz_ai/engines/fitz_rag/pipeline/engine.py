@@ -10,20 +10,11 @@ from __future__ import annotations
 from typing import Sequence
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.governance import (
-    ConstraintPlugin,
-    create_default_constraints,
-    run_constraints,
-)
-from fitz_ai.governance.decider import GovernanceDecider
 from fitz_ai.engines.fitz_rag.config import FitzRagConfig
 from fitz_ai.engines.fitz_rag.exceptions import (
     LLMError,
     PipelineError,
     RGSGenerationError,
-)
-from fitz_ai.governance.instructions import (
-    get_mode_instruction,
 )
 from fitz_ai.engines.fitz_rag.generation.retrieval_guided.synthesis import (
     RGS,
@@ -48,6 +39,15 @@ from fitz_ai.engines.fitz_rag.retrieval.multihop import (
 )
 from fitz_ai.engines.fitz_rag.retrieval.registry import get_retrieval_plugin
 from fitz_ai.engines.fitz_rag.routing import QueryIntent, QueryRouter
+from fitz_ai.governance import (
+    ConstraintPlugin,
+    create_default_constraints,
+    run_constraints,
+)
+from fitz_ai.governance.decider import GovernanceDecider
+from fitz_ai.governance.instructions import (
+    get_mode_instruction,
+)
 from fitz_ai.llm import ModelTier, get_chat_factory, get_embedder, get_reranker
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE, VECTOR_DB

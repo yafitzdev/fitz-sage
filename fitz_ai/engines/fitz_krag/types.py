@@ -20,6 +20,7 @@ class AddressKind(str, Enum):
     FILE = "file"
     SECTION = "section"
     CHUNK = "chunk"
+    TABLE = "table"
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ class Address:
     - FILE: file_type, size_bytes
     - SECTION: heading, level, parent_section
     - CHUNK: chunk_id, score
+    - TABLE: table_index_id, table_id, name, columns, row_count
     """
 
     kind: AddressKind

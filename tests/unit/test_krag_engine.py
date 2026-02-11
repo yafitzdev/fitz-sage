@@ -56,12 +56,16 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._retrieval_router = MagicMock(name="retrieval_router")
     engine._reader = MagicMock(name="reader")
     engine._expander = MagicMock(name="expander")
+    engine._table_handler = MagicMock(name="table_handler")
+    engine._table_handler.process.side_effect = lambda q, results: results
     engine._assembler = MagicMock(name="assembler")
     engine._synthesizer = MagicMock(name="synthesizer")
     engine._constraints = []
     engine._governor = None
     engine._cloud_client = None
     engine._detection_orchestrator = None
+    engine._table_store = MagicMock(name="table_store")
+    engine._pg_table_store = MagicMock(name="pg_table_store")
     return engine
 
 
@@ -103,6 +107,7 @@ class TestEngineInit:
                 "fitz_ai.engines.fitz_krag.ingestion" ".import_graph_store.ImportGraphStore"
             ),
             "SectionStore": ("fitz_ai.engines.fitz_krag.ingestion" ".section_store.SectionStore"),
+            "TableStoreKrag": ("fitz_ai.engines.fitz_krag.ingestion" ".table_store.TableStore"),
             "ensure_schema": ("fitz_ai.engines.fitz_krag.ingestion" ".schema.ensure_schema"),
             # strategies
             "CodeSearchStrategy": (
@@ -112,10 +117,16 @@ class TestEngineInit:
                 "fitz_ai.engines.fitz_krag.retrieval"
                 ".strategies.section_search.SectionSearchStrategy"
             ),
+            "TableSearchStrategy": (
+                "fitz_ai.engines.fitz_krag.retrieval" ".strategies.table_search.TableSearchStrategy"
+            ),
             # retrieval
             "RetrievalRouter": ("fitz_ai.engines.fitz_krag.retrieval" ".router.RetrievalRouter"),
             "ContentReader": ("fitz_ai.engines.fitz_krag.retrieval" ".reader.ContentReader"),
             "CodeExpander": ("fitz_ai.engines.fitz_krag.retrieval" ".expander.CodeExpander"),
+            "TableQueryHandler": (
+                "fitz_ai.engines.fitz_krag.retrieval" ".table_handler.TableQueryHandler"
+            ),
             # query analysis
             "QueryAnalyzer": ("fitz_ai.engines.fitz_krag" ".query_analyzer.QueryAnalyzer"),
             # context + generation
@@ -123,6 +134,8 @@ class TestEngineInit:
             "CodeSynthesizer": (
                 "fitz_ai.engines.fitz_krag.generation" ".synthesizer.CodeSynthesizer"
             ),
+            # shared tabular
+            "PostgresTableStore": ("fitz_ai.tabular.store.postgres.PostgresTableStore"),
         }
 
         patchers = {key: patch(target) for key, target in names.items()}
@@ -156,11 +169,13 @@ class TestEngineInit:
         # Strategies and router created
         _patches["CodeSearchStrategy"].assert_called_once()
         _patches["SectionSearchStrategy"].assert_called_once()
+        _patches["TableSearchStrategy"].assert_called_once()
         _patches["RetrievalRouter"].assert_called_once()
 
-        # Reader, expander, analyzer, assembler, synthesizer created
+        # Reader, expander, analyzer, assembler, synthesizer, table handler created
         _patches["ContentReader"].assert_called_once()
         _patches["CodeExpander"].assert_called_once()
+        _patches["TableQueryHandler"].assert_called_once()
         _patches["QueryAnalyzer"].assert_called_once()
         _patches["ContextAssembler"].assert_called_once()
         _patches["CodeSynthesizer"].assert_called_once()
@@ -212,6 +227,8 @@ class TestAnswer:
         expanded = [MagicMock(name="expanded1")]
         engine._expander.expand.return_value = expanded
 
+        # Table handler passes through (side_effect from _make_engine)
+
         context = MagicMock(name="context")
         engine._assembler.assemble.return_value = context
 
@@ -239,6 +256,7 @@ class TestAnswer:
             engine._config.top_read,
         )
         engine._expander.expand.assert_called_once_with([read_1])
+        engine._table_handler.process.assert_called_once_with(query.text, expanded)
         engine._assembler.assemble.assert_called_once_with(
             query.text,
             expanded,
@@ -385,6 +403,37 @@ class TestAnswer:
         with pytest.raises(KnowledgeError, match="KRAG pipeline error"):
             engine.answer(query)
 
+    def test_answer_with_table_results(self):
+        """Table handler is invoked after expansion."""
+        engine = _make_engine()
+        query = _make_query("what is the average salary?")
+
+        engine._query_analyzer.analyze.return_value = MagicMock()
+        engine._retrieval_router.retrieve.return_value = [MagicMock()]
+
+        read_result = MagicMock(name="table_read_result")
+        engine._reader.read.return_value = [read_result]
+
+        expanded = [read_result]
+        engine._expander.expand.return_value = expanded
+
+        # Override side_effect for this test to verify table_handler is called
+        augmented = [MagicMock(name="augmented")]
+        engine._table_handler.process.side_effect = None
+        engine._table_handler.process.return_value = augmented
+
+        engine._assembler.assemble.return_value = "context"
+        engine._synthesizer.generate.return_value = Answer(
+            text="The average salary is $50k.",
+            provenance=[],
+            metadata={},
+        )
+
+        result = engine.answer(query)
+
+        engine._table_handler.process.assert_called_once_with(query.text, expanded)
+        engine._assembler.assemble.assert_called_once_with(query.text, augmented)
+
 
 # ---------------------------------------------------------------------------
 # TestIngest
@@ -410,6 +459,8 @@ class TestIngest:
             embedder=engine._embedder,
             connection_manager=engine._connection_manager,
             collection=engine._config.collection,
+            table_store=engine._table_store,
+            pg_table_store=engine._pg_table_store,
         )
         mock_pipeline_cls.return_value.ingest.assert_called_once_with(
             source,

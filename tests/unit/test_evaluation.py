@@ -17,13 +17,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.governance import GovernanceDecision, GovernanceLog
 from fitz_ai.evaluation.models import (
     AbstainTrend,
     ConstraintFrequency,
     GovernanceFlip,
     ModeDistribution,
 )
+from fitz_ai.governance import GovernanceDecision, GovernanceLog
 
 # =============================================================================
 # GovernanceLog Tests

@@ -14,9 +14,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from fitz_ai.core.answer_mode import AnswerMode
-
 import pytest
+
+from fitz_ai.core.answer_mode import AnswerMode
 
 # Pure logic tests - run on every commit
 pytestmark = pytest.mark.tier1

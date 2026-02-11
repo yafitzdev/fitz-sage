@@ -27,6 +27,7 @@ _KIND_TO_STRATEGY: dict[AddressKind, str] = {
     AddressKind.FILE: "code",
     AddressKind.SECTION: "section",
     AddressKind.CHUNK: "chunk",
+    AddressKind.TABLE: "table",
 }
 
 

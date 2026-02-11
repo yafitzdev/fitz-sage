@@ -36,6 +36,7 @@ class TestQueryType:
         assert QueryType.DOCUMENTATION.value == "documentation"
         assert QueryType.GENERAL.value == "general"
         assert QueryType.CROSS.value == "cross"
+        assert QueryType.DATA.value == "data"
 
     def test_parse_valid(self):
         assert _parse_query_type("code") == QueryType.CODE
@@ -51,26 +52,38 @@ class TestQueryAnalysis:
     def test_strategy_weights_code(self):
         analysis = QueryAnalysis(primary_type=QueryType.CODE)
         weights = analysis.strategy_weights
-        assert weights["code"] == 0.8
+        assert weights["code"] == 0.75
         assert weights["section"] == 0.1
+        assert weights["table"] == 0.05
         assert weights["chunk"] == 0.1
 
     def test_strategy_weights_documentation(self):
         analysis = QueryAnalysis(primary_type=QueryType.DOCUMENTATION)
         weights = analysis.strategy_weights
-        assert weights["section"] == 0.8
+        assert weights["section"] == 0.75
         assert weights["code"] == 0.1
+        assert weights["table"] == 0.05
 
     def test_strategy_weights_cross(self):
         analysis = QueryAnalysis(primary_type=QueryType.CROSS)
         weights = analysis.strategy_weights
-        assert weights["code"] == 0.4
-        assert weights["section"] == 0.4
+        assert weights["code"] == 0.35
+        assert weights["section"] == 0.35
+        assert weights["table"] == 0.1
 
     def test_strategy_weights_general(self):
         analysis = QueryAnalysis(primary_type=QueryType.GENERAL)
         weights = analysis.strategy_weights
-        assert weights["chunk"] == 0.4
+        assert weights["chunk"] == 0.35
+        assert weights["table"] == 0.15
+
+    def test_strategy_weights_data(self):
+        analysis = QueryAnalysis(primary_type=QueryType.DATA)
+        weights = analysis.strategy_weights
+        assert weights["table"] == 0.85
+        assert weights["code"] == 0.05
+        assert weights["section"] == 0.05
+        assert weights["chunk"] == 0.05
 
     def test_frozen(self):
         analysis = QueryAnalysis(primary_type=QueryType.CODE)
@@ -161,3 +174,19 @@ class TestQueryAnalyzer:
         result = analyzer.analyze("test")
         assert result.primary_type == QueryType.CODE
         assert result.entities == ()
+
+    def test_classifies_data_query(self, analyzer, mock_chat):
+        mock_chat.chat.return_value = _mock_response(
+            {
+                "primary_type": "data",
+                "confidence": 0.9,
+                "entities": ["salary"],
+                "refined_query": "average salary from the dataset",
+            }
+        )
+        result = analyzer.analyze("what's the average salary?")
+        assert result.primary_type == QueryType.DATA
+        assert result.confidence == 0.9
+
+    def test_data_type_parsed(self):
+        assert _parse_query_type("data") == QueryType.DATA

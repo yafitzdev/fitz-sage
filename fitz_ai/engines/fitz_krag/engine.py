@@ -81,6 +81,13 @@ class FitzKragEngine:
         self._import_store = ImportGraphStore(self._connection_manager, self._config.collection)
         self._section_store = SectionStore(self._connection_manager, self._config.collection)
 
+        # Table stores
+        from fitz_ai.engines.fitz_krag.ingestion.table_store import TableStore
+        from fitz_ai.tabular.store.postgres import PostgresTableStore
+
+        self._table_store = TableStore(self._connection_manager, self._config.collection)
+        self._pg_table_store = PostgresTableStore(self._config.collection)
+
         # Ensure schema exists
         embedding_dim = self._embedder.dimensions
         ensure_schema(self._connection_manager, self._config.collection, embedding_dim)
@@ -95,17 +102,26 @@ class FitzKragEngine:
         from fitz_ai.engines.fitz_krag.retrieval.strategies.section_search import (
             SectionSearchStrategy,
         )
+        from fitz_ai.engines.fitz_krag.retrieval.strategies.table_search import (
+            TableSearchStrategy,
+        )
 
         code_strategy = CodeSearchStrategy(self._symbol_store, self._embedder, self._config)
         section_strategy = SectionSearchStrategy(self._section_store, self._embedder, self._config)
+        table_strategy = TableSearchStrategy(self._table_store, self._embedder, self._config)
         self._retrieval_router = RetrievalRouter(
             code_strategy=code_strategy,
             chunk_strategy=None,
             config=self._config,
             section_strategy=section_strategy,
+            table_strategy=table_strategy,
         )
         self._reader = ContentReader(
-            self._raw_store, section_store=self._section_store, config=self._config
+            self._raw_store,
+            section_store=self._section_store,
+            config=self._config,
+            table_store=self._table_store,
+            pg_table_store=self._pg_table_store,
         )
         self._expander = CodeExpander(
             self._raw_store,
@@ -144,6 +160,11 @@ class FitzKragEngine:
             cloud_config = CloudConfig(**self._config.cloud)
             cloud_config.validate_config()
             self._cloud_client = CloudClient(cloud_config, cloud_config.org_id or "")
+
+        # Table query handler
+        from fitz_ai.engines.fitz_krag.retrieval.table_handler import TableQueryHandler
+
+        self._table_handler = TableQueryHandler(self._chat, self._pg_table_store, self._config)
 
         # Shared detection
         self._detection_orchestrator: Any = None
@@ -207,6 +228,9 @@ class FitzKragEngine:
 
             # 4. Expand with context
             expanded = self._expander.expand(read_results)
+
+            # 4.5. Execute table queries (SQL generation + execution)
+            expanded = self._table_handler.process(query.text, expanded)
 
             # 5. Run guardrails (ReadResult satisfies EvidenceItem protocol)
             answer_mode = AnswerMode.TRUSTWORTHY
@@ -322,6 +346,8 @@ class FitzKragEngine:
             embedder=self._embedder,
             connection_manager=self._connection_manager,
             collection=col,
+            table_store=self._table_store,
+            pg_table_store=self._pg_table_store,
         )
         return pipeline.ingest(source)
 

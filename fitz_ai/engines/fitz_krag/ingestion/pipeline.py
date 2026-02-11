@@ -31,11 +31,13 @@ from fitz_ai.engines.fitz_krag.ingestion.strategies.technical_doc import (
     TechnicalDocIngestStrategy,
 )
 from fitz_ai.engines.fitz_krag.ingestion.symbol_store import SymbolStore
+from fitz_ai.engines.fitz_krag.ingestion.table_store import TableStore
 
 if TYPE_CHECKING:
     from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
     from fitz_ai.llm.providers.base import ChatProvider, EmbeddingProvider
     from fitz_ai.storage.postgres import PostgresConnectionManager
+    from fitz_ai.tabular.store.postgres import PostgresTableStore
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +71,8 @@ class KragIngestPipeline:
         embedder: "EmbeddingProvider",
         connection_manager: "PostgresConnectionManager",
         collection: str,
+        table_store: "TableStore | None" = None,
+        pg_table_store: "PostgresTableStore | None" = None,
     ):
         self._config = config
         self._chat = chat
@@ -81,6 +85,8 @@ class KragIngestPipeline:
         self._symbol_store = SymbolStore(connection_manager, collection)
         self._import_store = ImportGraphStore(connection_manager, collection)
         self._section_store = SectionStore(connection_manager, collection)
+        self._table_store = table_store or TableStore(connection_manager, collection)
+        self._pg_table_store = pg_table_store
 
         # Code strategies
         self._strategies: dict[str, Any] = {}
@@ -169,12 +175,15 @@ class KragIngestPipeline:
             elif existing_hashes[rel_path] != content_hash:
                 changed_files.append((rel_path, abs_path))
 
+        table_extensions = set(self._config.table_extensions)
+
         # 3. Process new/changed files
         all_symbols: list[SymbolEntry] = []
         all_symbol_file_ids: list[str] = []
         all_import_edges: list[dict[str, Any]] = []
         all_sections: list[SectionEntry] = []
         all_section_file_ids: list[str] = []
+        all_table_metas: list[dict[str, Any]] = []
 
         for rel_path, abs_path in new_files + changed_files:
             file_id = existing_ids.get(rel_path, str(uuid.uuid4()))
@@ -187,6 +196,10 @@ class KragIngestPipeline:
                     all_symbols.extend(symbols)
                     all_symbol_file_ids.extend([file_id] * len(symbols))
                     all_import_edges.extend(import_edges)
+            elif ext in table_extensions:
+                table_meta = self._process_table_file(rel_path, abs_path, file_id)
+                if table_meta:
+                    all_table_metas.append(table_meta)
             elif ext in DOC_EXTENSIONS:
                 sections = self._process_doc_file(rel_path, abs_path, file_id)
                 if sections:
@@ -259,7 +272,18 @@ class KragIngestPipeline:
             self._section_store.upsert_batch(section_dicts)
             stats["sections_embedded"] = len(section_vectors)
 
-        # 4c. Resolve import target_file_ids now that all files are stored
+        # 4c. Batch summarize + embed tables
+        if all_table_metas:
+            table_summaries = self._summarize_tables(all_table_metas)
+            table_vectors = self._embed_summaries(table_summaries)
+
+            for i, meta in enumerate(all_table_metas):
+                meta["summary"] = table_summaries[i] if i < len(table_summaries) else None
+                meta["summary_vector"] = table_vectors[i] if i < len(table_vectors) else None
+            self._table_store.upsert_batch(all_table_metas)
+            stats["tables_ingested"] = len(all_table_metas)
+
+        # 4d. Resolve import target_file_ids now that all files are stored
         all_path_to_id = self._raw_store.list_ids_by_path()
         resolved = self._import_store.resolve_targets(all_path_to_id)
         stats["imports_resolved"] = resolved
@@ -268,7 +292,14 @@ class KragIngestPipeline:
         deleted_paths = set(existing_hashes.keys()) - current_paths
         for del_path in deleted_paths:
             if del_path in existing_ids:
-                self._raw_store.delete(existing_ids[del_path])
+                file_id = existing_ids[del_path]
+                # Clean up table data for deleted files
+                table_records = self._table_store.get_by_file(file_id)
+                for rec in table_records:
+                    if self._pg_table_store:
+                        self._pg_table_store.delete(rec["table_id"])
+                self._table_store.delete_by_file(file_id)
+                self._raw_store.delete(file_id)
         stats["files_deleted"] = len(deleted_paths)
 
         logger.info(
@@ -280,7 +311,7 @@ class KragIngestPipeline:
         return stats
 
     def _scan_files(self, source: Path) -> list[Path]:
-        """Scan source for files matching enabled code + document strategies."""
+        """Scan source for files matching enabled code + document + table strategies."""
         extensions = set()
         for lang in self._config.code_languages:
             for ext, lang_name in EXTENSION_MAP.items():
@@ -289,6 +320,9 @@ class KragIngestPipeline:
 
         # Include document extensions
         extensions.update(DOC_EXTENSIONS)
+
+        # Include table extensions
+        extensions.update(self._config.table_extensions)
 
         if source.is_file():
             if source.suffix.lower() in extensions:
@@ -531,6 +565,130 @@ class KragIngestPipeline:
             content = sec.content[:800] if sec.content else "(no content)"
             parts.append(
                 f"Section {i + 1}: '{sec.title}' (level {sec.level})\n" f"Content:\n{content}"
+            )
+        return "\n\n".join(parts)
+
+    def _process_table_file(
+        self, rel_path: str, abs_path: Path, file_id: str
+    ) -> dict[str, Any] | None:
+        """Process a table file: store raw preview + store in PostgresTableStore."""
+        try:
+            from fitz_ai.tabular.parser.csv_parser import get_sample_rows, parse_csv
+
+            parsed = parse_csv(abs_path)
+        except Exception as e:
+            logger.warning(f"CSV parsing failed for {abs_path}: {e}")
+            return None
+
+        # Store raw file with first 50 lines as preview
+        try:
+            content = abs_path.read_text(encoding="utf-8", errors="replace")
+        except Exception as e:
+            logger.warning(f"Cannot read {abs_path}: {e}")
+            return None
+
+        preview_lines = content.splitlines()[:50]
+        preview = "\n".join(preview_lines)
+        ext = abs_path.suffix.lower()
+        content_hash = hashlib.sha256(content.encode()).hexdigest()
+
+        self._raw_store.upsert(
+            file_id=file_id,
+            path=rel_path,
+            content=preview,
+            content_hash=content_hash,
+            file_type=ext,
+            size_bytes=len(content.encode()),
+        )
+
+        # Store in shared PostgresTableStore
+        if self._pg_table_store:
+            try:
+                self._pg_table_store.store(
+                    table_id=parsed.table_id,
+                    columns=parsed.columns,
+                    rows=parsed.rows,
+                    source_file=rel_path,
+                    file_hash=content_hash,
+                )
+            except Exception as e:
+                logger.warning(f"PostgresTableStore.store failed for {rel_path}: {e}")
+                return None
+
+        # Delete old table metadata for this file
+        self._table_store.delete_by_file(file_id)
+
+        # Build human-readable name from filename
+        name = abs_path.stem.replace("_", " ").replace("-", " ").title()
+
+        # Get sample rows for summary prompt
+        try:
+            samples = get_sample_rows(parsed, n=3)
+        except Exception:
+            samples = []
+
+        return {
+            "id": str(uuid.uuid4()),
+            "raw_file_id": file_id,
+            "table_id": parsed.table_id,
+            "name": name,
+            "columns": parsed.columns,
+            "row_count": parsed.row_count,
+            "metadata": {"source_file": rel_path, "sample_rows": samples},
+        }
+
+    def _summarize_tables(self, table_metas: list[dict[str, Any]]) -> list[str]:
+        """Generate schema descriptions for tables, batched."""
+        summaries: list[str] = []
+        batch_size = self._config.summary_batch_size
+
+        for i in range(0, len(table_metas), batch_size):
+            batch = table_metas[i : i + batch_size]
+            prompt = self._build_table_summary_prompt(batch)
+
+            try:
+                response = self._chat.chat(
+                    [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You describe table schemas. For each table, write a concise "
+                                "1-2 sentence description of what data it contains and what "
+                                "questions it could answer. Return a JSON array of strings, "
+                                "one per table, in the same order."
+                            ),
+                        },
+                        {"role": "user", "content": prompt},
+                    ]
+                )
+                batch_summaries = self._parse_summary_response(response, len(batch))
+            except Exception as e:
+                logger.warning(f"Table summary generation failed for batch: {e}")
+                batch_summaries = [
+                    f"Table {m['name']} with columns: {', '.join(m['columns'][:10])}" for m in batch
+                ]
+            summaries.extend(batch_summaries)
+
+        return summaries
+
+    def _build_table_summary_prompt(self, batch: list[dict[str, Any]]) -> str:
+        """Build prompt for table batch summarization."""
+        parts = []
+        for i, meta in enumerate(batch):
+            cols = ", ".join(meta["columns"][:20])
+            samples = meta.get("metadata", {}).get("sample_rows", [])
+            sample_str = ""
+            if samples:
+                sample_lines = []
+                for row in samples[:2]:
+                    pairs = [f"{col}={val}" for col, val in zip(meta["columns"], row) if val]
+                    sample_lines.append(" | ".join(pairs[:8]))
+                sample_str = f"\nSample rows:\n" + "\n".join(sample_lines)
+            parts.append(
+                f"Table {i + 1}: '{meta['name']}'\n"
+                f"Columns: {cols}\n"
+                f"Row count: {meta['row_count']}"
+                f"{sample_str}"
             )
         return "\n\n".join(parts)
 
