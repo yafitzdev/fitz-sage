@@ -47,10 +47,14 @@ class PythonCodeIngestStrategy:
             elif isinstance(node, ast.ClassDef):
                 # Class itself
                 symbols.append(_extract_class(node, lines, module_name))
-                # Methods
+                # Methods and class-level constants
                 for item in node.body:
                     if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         symbols.append(_extract_method(item, lines, module_name, node.name))
+                    elif isinstance(item, ast.Assign):
+                        entry = _extract_constant(item, lines, module_name, class_name=node.name)
+                        if entry:
+                            symbols.append(entry)
 
             elif isinstance(node, ast.Assign):
                 entry = _extract_constant(node, lines, module_name)
@@ -160,8 +164,9 @@ def _extract_constant(
     node: ast.Assign,
     lines: list[str],
     module_name: str,
+    class_name: str | None = None,
 ) -> SymbolEntry | None:
-    """Extract a module-level UPPER_CASE constant."""
+    """Extract a module-level or class-level UPPER_CASE constant."""
     if len(node.targets) != 1:
         return None
     target = node.targets[0]
@@ -175,9 +180,11 @@ def _extract_constant(
     end = node.end_lineno or start
     source = "\n".join(lines[start - 1 : end])
 
+    qualified = f"{module_name}.{class_name}.{name}" if class_name else f"{module_name}.{name}"
+
     return SymbolEntry(
         name=name,
-        qualified_name=f"{module_name}.{name}",
+        qualified_name=qualified,
         kind="constant",
         start_line=start,
         end_line=end,

@@ -47,12 +47,12 @@ The benchmark is deliberately hard. 92% of cases are rated "hard" — boundary c
 
 The cases were generated in 4 rounds with independent blind validation at each stage:
 
-| Version | Cases | Method | Validation |
-|---------|-------|--------|------------|
-| v1.0 | 200 | Hand-crafted from 21 experiments | Expert review |
-| v2.0 | +525 | LLM-assisted boundary sampling | 95.4% blind agreement |
-| v3.0 | +123 | Targeted edge cases (code, adversarial) | 94% blind agreement |
-| v4.0 | +199 | Classifier failure-mode targeting | 93.5% blind agreement |
+| Round | Cases | Method | Validation |
+|-------|-------|--------|------------|
+| 1 | 200 | Hand-crafted from 21 experiments | Expert review |
+| 2 | +525 | LLM-assisted boundary sampling | 95.4% blind agreement |
+| 3 | +123 | Targeted edge cases (code, adversarial) | 94% blind agreement |
+| 4 | +199 | Classifier failure-mode targeting | 93.5% blind agreement |
 
 Blind validation means an independent LLM labels each case without seeing the expected answer. Cases below 90% agreement are reviewed, relabeled, or removed.
 
@@ -216,9 +216,9 @@ python -m tools.governance.train_classifier --mode twostage --time-budget 200
 
 ## Technical Specification
 
-For the full experimental record with all training history, ablation results, and confusion matrices:
+For the full experimental record with training history, ablation results, and what worked/failed:
 
-**[Technical analysis](../evaluation/fitz-gov-3.0-analysis.md)** — How we got from 26.9% (rules) to 90.9% (two-stage ML)
+**[fitz-gov 3.0 results](../evaluation/fitz-gov-3.0-results.md)** — How we got from 26.9% (rules) to 90.9% (two-stage ML)
 
 ## Why This Matters
 

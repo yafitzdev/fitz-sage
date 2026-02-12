@@ -53,7 +53,7 @@ _TYPE_WEIGHTS: dict[QueryType, dict[str, float]] = {
     QueryType.DOCUMENTATION: {"code": 0.1, "section": 0.75, "table": 0.05, "chunk": 0.1},
     QueryType.GENERAL: {"code": 0.25, "section": 0.25, "table": 0.15, "chunk": 0.35},
     QueryType.CROSS: {"code": 0.35, "section": 0.35, "table": 0.1, "chunk": 0.2},
-    QueryType.DATA: {"code": 0.05, "section": 0.05, "table": 0.85, "chunk": 0.05},
+    QueryType.DATA: {"code": 0.05, "section": 0.15, "table": 0.70, "chunk": 0.10},
 }
 
 ANALYSIS_PROMPT = """Classify this search query by knowledge type. Return JSON only.
@@ -72,7 +72,7 @@ Return this exact structure:
 Categories:
 - "code": References functions, classes, methods, implementations, code behavior
 - "documentation": References document sections, specs, procedures, policies
-- "data": References tables, datasets, CSV data, statistics, aggregations, filtering records
+- "data": Explicitly asks about CSV files, spreadsheet data, database tables, or SQL-like operations (filter rows, count records, aggregate columns). Queries referencing alphanumeric record identifiers (e.g. E016, ID-123) typically target data records. NOT for questions about facts, specifications, or information that happen to involve numbers
 - "general": Overview questions, summaries, "what does this project do"
 - "cross": Explicitly asks about both code and documentation together
 

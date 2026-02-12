@@ -77,13 +77,30 @@ class SectionStore:
             conn.commit()
 
     def search_bm25(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
-        """Full-text search using ts_rank on content_tsv."""
+        """Full-text search using ts_rank on content_tsv with parent context.
+
+        Joins child sections with their parent so that subsection searches
+        inherit the parent's terms (e.g. "Model Y200" context flows into
+        the child "Specifications" section).  Uses per-term OR matching in
+        the WHERE clause so sections matching *any* query term are candidates,
+        while ts_rank naturally ranks sections with more matching terms higher.
+        """
         sql = f"""
-            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
-                   "content", "summary", "parent_section_id", "position", "metadata",
-                   ts_rank("content_tsv", plainto_tsquery('english', %s)) AS "rank"
-            FROM {TABLE}
-            WHERE "content_tsv" @@ plainto_tsquery('english', %s)
+            SELECT s."id", s."raw_file_id", s."title", s."level",
+                   s."page_start", s."page_end", s."content", s."summary",
+                   s."parent_section_id", s."position", s."metadata",
+                   ts_rank(
+                       s."content_tsv" || COALESCE(p."content_tsv", ''::tsvector),
+                       to_tsquery(
+                           replace(plainto_tsquery('english', %s)::text, ' & ', ' | ')
+                       )
+                   ) AS "rank"
+            FROM {TABLE} s
+            LEFT JOIN {TABLE} p ON s."parent_section_id" = p."id"
+            WHERE (s."content_tsv" || COALESCE(p."content_tsv", ''::tsvector))
+                  @@ to_tsquery(
+                      replace(plainto_tsquery('english', %s)::text, ' & ', ' | ')
+                  )
             ORDER BY "rank" DESC
             LIMIT %s
         """

@@ -66,19 +66,45 @@ class TableStore:
             conn.commit()
 
     def search_by_name(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
-        """ILIKE search on name and column names."""
-        pattern = f"%{query}%"
+        """ILIKE search on name and column names using individual query words.
+
+        Extracts significant words from the query (length >= 3) and matches
+        each against table names and column names.  Basic plural stemming
+        (strip trailing 's') ensures 'managers' matches 'manager_id'.
+        """
+        keywords = set()
+        for word in query.lower().split():
+            word = word.strip("?.,!;:()")
+            if len(word) < 3:
+                continue
+            keywords.add(word)
+            if word.endswith("s") and len(word) > 4:
+                keywords.add(word[:-1])
+
+        if not keywords:
+            return []
+
+        conditions = []
+        params: list[object] = []
+        for kw in keywords:
+            pattern = f"%{kw}%"
+            conditions.append(
+                '"name" ILIKE %s OR EXISTS '
+                '(SELECT 1 FROM unnest("columns") AS col WHERE col ILIKE %s)'
+            )
+            params.extend([pattern, pattern])
+
+        where_clause = " OR ".join(f"({c})" for c in conditions)
         sql = f"""
             SELECT "id", "raw_file_id", "table_id", "name", "columns", "row_count",
                    "summary", "metadata"
             FROM {TABLE}
-            WHERE "name" ILIKE %s OR EXISTS (
-                SELECT 1 FROM unnest("columns") AS col WHERE col ILIKE %s
-            )
+            WHERE {where_clause}
             LIMIT %s
         """
+        params.append(limit)
         with self._cm.connection(self._collection) as conn:
-            rows = conn.execute(sql, (pattern, pattern, limit)).fetchall()
+            rows = conn.execute(sql, tuple(params)).fetchall()
         return [_row_to_dict(row) for row in rows]
 
     def search_by_vector(self, vector: list[float], limit: int = 10) -> list[dict[str, Any]]:

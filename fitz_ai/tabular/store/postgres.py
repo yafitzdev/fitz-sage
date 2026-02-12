@@ -171,7 +171,7 @@ class PostgresTableStore:
                                 row = row + [""] * (len(sanitized_cols) - len(row))
                             elif len(row) > len(sanitized_cols):
                                 row = row[: len(sanitized_cols)]
-                            padded_batch.append((row_num, *row))
+                            padded_batch.append((row_num, *(None if v == "" else v for v in row)))
 
                         cur.executemany(
                             f'INSERT INTO "{table_name}" VALUES ({placeholders})',

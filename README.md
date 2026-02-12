@@ -229,7 +229,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 
 ### Governance — Know What You Don't Know
 
-[Feature docs](docs/features/governance-benchmarking.md) • [Benchmark results](docs/evaluation/fitz-gov-3.0-results.md) • [Technical analysis](docs/evaluation/fitz-gov-3.0-analysis.md)
+[Feature docs](docs/features/governance-benchmarking.md) • [Benchmark results](docs/evaluation/fitz-gov-3.0-results.md)
 
 Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty using a two-stage ML classifier trained on 1,100+ labeled cases from [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty.
 
