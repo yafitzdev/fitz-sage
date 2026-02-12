@@ -1,6 +1,6 @@
 # The Governance Journey
 
-The complete story of how Fitz learned to say "I don't know" — from hand-coded rules to a trained ML classifier, across 28 experiments, 1,113 labeled cases, and a lot of humility about what 69.1% accuracy actually means.
+The complete story of how Fitz learned to say "I don't know" — from hand-coded rules to a two-stage ML classifier, across 1,113 labeled cases and many experiments. This document covers the journey through the 4-class era (Chapters 1-9). For the 3-class pivot and final 90.9% result, see [fitz-gov 3.0 analysis](evaluation/fitz-gov-3.0-analysis.md).
 
 ---
 
@@ -289,24 +289,15 @@ The fix path: make constraint signals richer (CA confidence scores instead of bi
 
 ---
 
-## Chapter 10: The Road to 70%+
+## Chapter 10: Beyond 4-Class
 
-The goal is 70%+ recall in every category. Current gaps:
+The 4-class approach hit a ceiling at 69.1%. The breakthrough came from recognizing that confident vs qualified was inseparable with current features (max r=0.23), collapsing to a 3-class taxonomy (abstain/disputed/trustworthy), and decomposing into two binary classifiers.
 
-| Class | Current | Gap | Approach |
-|-------|---------|-----|----------|
-| Abstain | 85% | Met | Maintain |
-| Disputed | 67% | -3pp | Richer CA signals (confidence scores, not just binary) |
-| Qualified | 66% | -4pp | Hedging language features, evidence completeness |
-| Confident | 62% | -8pp | Source agreement feature, resolved contradiction detector |
+The two-stage ML classifier achieved **90.9% overall accuracy** (93.7% abstain, 94.4% disputed, 89.0% trustworthy) with only 15 critical cases (false trustworthy).
 
-High-impact, low-effort actions:
-1. Cross-validation + per-class optimization (custom scoring function)
-2. Governor fallback for low-confidence predictions (calibrated thresholds)
-3. Richer constraint signals (CA confidence as continuous feature)
-4. Real-world failure collection (highest-value training examples)
-
-The ceiling with current features is 69.1%. Breaking through requires structural improvements to the feature extraction layer — making constraint signals discriminative enough to outrank context length proxies.
+For the full story of the 3-class pivot, two-stage architecture, failed and successful approaches, and the embedding distribution fix that produced the final +14pp jump, see:
+- [fitz-gov 3.0 results](evaluation/fitz-gov-3.0-results.md) — What was achieved
+- [fitz-gov 3.0 analysis](evaluation/fitz-gov-3.0-analysis.md) — How we got there
 
 ---
 
@@ -326,6 +317,9 @@ The ceiling with current features is 69.1%. Breaking through requires structural
 | Feb 8, 2026 | Experiment 6: GBT 69.1%. Confident +14pp. Disputed regressed -11pp. |
 | Feb 8, 2026 | Experiment 7: Two optimization attempts failed. 69.1% confirmed as ceiling. |
 | Feb 8, 2026 | Shipped model_v3.joblib. Documentation complete. |
+| Feb 9, 2026 | 3-class pivot (confident+qualified → trustworthy). Two-stage binary classifiers. 82.96%. |
+| Feb 10, 2026 | Inter-chunk features, feature parity fix, safety-first thresholds. 76.5%. |
+| Feb 11, 2026 | Embedding distribution fix. **90.9%** (93.7/94.4/89.0). 15 critical cases. |
 
 ---
 
@@ -333,17 +327,17 @@ The ceiling with current features is 69.1%. Breaking through requires structural
 
 | File | Purpose |
 |------|---------|
-| `fitz_ai/core/guardrails/plugins/` | The 5 constraints (IE, CA, CAA, SIT, AV) |
-| `fitz_ai/core/guardrails/feature_extractor.py` | Runtime feature extraction (58 features) |
+| `fitz_ai/governance/constraints/` | The 5 constraints (IE, CA, CAA, SIT, AV) |
+| `fitz_ai/governance/constraints/feature_extractor.py` | Runtime feature extraction (50 features) |
+| `fitz_ai/governance/decider.py` | GovernanceDecider (production two-stage classifier) |
 | `tools/governance/extract_features.py` | Offline feature extraction from fitz-gov cases |
-| `tools/governance/eval_pipeline.py` | Full pipeline eval (real embeddings + detection) |
-| `tools/governance/train_classifier.py` | Multi-model training with hyperparameter search |
-| `tools/governance/data/model_v3.joblib` | The shipped GBT classifier |
-| `tools/governance/data/eval_results_v2.csv` | 1113 cases with all features and labels |
-| `docs/evaluation/classifier/NOTEPAD.md` | Living experiment log (7 experiments) |
+| `tools/governance/train_classifier.py` | Two-stage training with hyperparameter search |
+| `tools/governance/calibrate_thresholds.py` | Threshold sweep for critical case minimization |
+| `tools/governance/data/model_v5_calibrated.joblib` | Production model artifact |
+| `tools/governance/data/features.csv` | 1113 rows x 50 columns |
 | `docs/evaluation/fitz-gov-3.0-results.md` | Benchmark results |
-| `docs/evaluation/fitz-gov-3.0-analysis.md` | Deep failure analysis |
-| `docs/evaluation/later/CLASSIFIER_NEXT_STEPS.md` | Roadmap to 70%+ |
+| `docs/evaluation/fitz-gov-3.0-analysis.md` | Technical analysis |
+| `docs/evaluation/RESEARCH_NOTEPAD.md` | Detailed experiment log |
 | `docs/features/governance-benchmarking.md` | Public-facing feature documentation |
 
 ---

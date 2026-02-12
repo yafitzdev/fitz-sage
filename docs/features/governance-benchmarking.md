@@ -217,7 +217,7 @@ python -m tools.governance.train_classifier --mode twostage --time-budget 200
 
 For the full experimental record with all training history, ablation results, and confusion matrices:
 
-**[Classifier NOTEPAD](../evaluation/classifier/NOTEPAD.md)** — Living document with complete experiment log
+**[Technical analysis](../evaluation/fitz-gov-3.0-analysis.md)** — How we got from 26.9% (rules) to 90.9% (two-stage ML)
 
 ## Why This Matters
 

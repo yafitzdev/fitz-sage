@@ -172,12 +172,16 @@ ConstraintResult(
 
 ### Signal resolution
 
-| Signals | Resolved Mode |
-|---------|--------------|
-| No constraints triggered | CONFIDENT |
-| `qualified` only | QUALIFIED |
-| `disputed` (any) | DISPUTED |
-| `abstain` (any) | ABSTAIN |
+Constraint signals are used as **features** for a two-stage ML classifier (GovernanceDecider), not as direct priority rules. The classifier predicts one of 3 classes:
+
+| Classifier Output | AnswerMode | Condition |
+|-------------------|------------|-----------|
+| abstain | ABSTAIN | P(answerable) < threshold |
+| disputed | DISPUTED | P(trustworthy) < threshold |
+| trustworthy | CONFIDENT | No constraints fired |
+| trustworthy | QUALIFIED | Any constraint fired |
+
+See [governance benchmarking](features/governance-benchmarking.md) for details on the two-stage classifier.
 
 ---
 
