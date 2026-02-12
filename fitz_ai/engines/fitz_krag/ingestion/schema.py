@@ -16,6 +16,7 @@ Tables:
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING
 
 from fitz_ai.core.exceptions import ConfigurationError
@@ -212,7 +213,7 @@ def _validate_vector_dimensions(
 
         result = conn.execute(
             """
-            SELECT atttypmod - 4 as dim
+            SELECT format_type(atttypid, atttypmod)
             FROM pg_attribute
             WHERE attrelid = 'krag_section_index'::regclass
             AND attname = 'summary_vector'
@@ -220,7 +221,8 @@ def _validate_vector_dimensions(
         ).fetchone()
 
         if result:
-            existing_dim = result[0]
+            match = re.search(r"vector\((\d+)\)", result[0])
+            existing_dim = int(match.group(1)) if match else None
             if existing_dim != embedding_dim:
                 raise ConfigurationError(
                     f"Embedding dimension mismatch: existing schema has {existing_dim}d vectors "

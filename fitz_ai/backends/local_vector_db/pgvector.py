@@ -12,6 +12,7 @@ Design principles:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -158,7 +159,7 @@ class PgVectorDB:
                 # Table exists, get and verify dimension
                 result = conn.execute(
                     """
-                    SELECT atttypmod - 4 as dim
+                    SELECT format_type(atttypid, atttypmod)
                     FROM pg_attribute
                     WHERE attrelid = 'chunks'::regclass
                     AND attname = 'vector'
@@ -166,7 +167,8 @@ class PgVectorDB:
                 ).fetchone()
 
                 if result:
-                    existing_dim = result[0]
+                    match = re.search(r"vector\((\d+)\)", result[0])
+                    existing_dim = int(match.group(1)) if match else None
                     if existing_dim != dim:
                         raise ValueError(
                             f"Dimension mismatch: collection '{collection}' has dim={existing_dim}, "
@@ -706,19 +708,22 @@ class PgVectorDB:
                 # Check if chunks table exists and get dimension
                 result = conn.execute(
                     """
-                    SELECT atttypmod - 4 as dim
+                    SELECT format_type(atttypid, atttypmod)
                     FROM pg_attribute
                     WHERE attrelid = 'chunks'::regclass
                     AND attname = 'vector'
                     """
                 ).fetchone()
 
-                if result and result[0]:
-                    self._initialized_collections[collection] = result[0]
-                    logger.debug(
-                        f"{VECTOR_DB} Discovered collection '{collection}' (dim={result[0]})"
-                    )
-                    return True
+                if result:
+                    match = re.search(r"vector\((\d+)\)", result[0])
+                    dim = int(match.group(1)) if match else None
+                    if dim:
+                        self._initialized_collections[collection] = dim
+                        logger.debug(
+                            f"{VECTOR_DB} Discovered collection '{collection}' (dim={dim})"
+                        )
+                        return True
         except Exception:
             pass
         return False
