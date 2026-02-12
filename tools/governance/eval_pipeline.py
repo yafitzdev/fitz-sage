@@ -254,20 +254,34 @@ def fill_defaults(features: dict[str, Any]) -> dict[str, Any]:
 
 
 class GovernanceClassifier:
-    """Wrapper for trained classifier model inference."""
+    """Wrapper for trained classifier model inference.
+
+    Supports both formats:
+    - 4-class: single model with {"model", "encoders", "feature_names", "labels"}
+    - twostage: two binary classifiers with {"stage1_model", "stage2_model", ...}
+    """
 
     def __init__(self, model_path: Path):
         artifact = joblib.load(model_path)
-        self.model = artifact["model"]
         self.encoders = artifact["encoders"]
         self.feature_names = artifact["feature_names"]
         self.labels = artifact["labels"]
-        self.model_name = artifact.get("model_name", "unknown")
-        print(f"Loaded classifier: {self.model_name} ({len(self.feature_names)} features)")
+        self._mode = artifact.get("mode", "4class")
 
-    def predict(self, features: dict[str, Any]) -> str:
-        """Predict governance mode from feature dict."""
-        # Build feature vector in same order as training
+        if self._mode == "twostage":
+            self._stage1 = artifact["stage1_model"]
+            self._stage2 = artifact["stage2_model"]
+            s1_name = artifact.get("stage1_name", "unknown")
+            s2_name = artifact.get("stage2_name", "unknown")
+            acc = artifact.get("combined_accuracy", 0)
+            print(f"Loaded twostage classifier: {s1_name}/{s2_name} ({len(self.feature_names)} features, {acc:.1%} acc)")
+        else:
+            self.model = artifact["model"]
+            self.model_name = artifact.get("model_name", "unknown")
+            print(f"Loaded classifier: {self.model_name} ({len(self.feature_names)} features)")
+
+    def _build_row(self, features: dict[str, Any]) -> pd.DataFrame:
+        """Build feature DataFrame from feature dict."""
         row = {}
         for name in self.feature_names:
             val = features.get(name, 0)
@@ -288,10 +302,23 @@ class GovernanceClassifier:
                 except (ValueError, TypeError):
                     val = 0
             row[name] = val
+        return pd.DataFrame([[row[name] for name in self.feature_names]], columns=self.feature_names)
 
-        X = pd.DataFrame([[row[name] for name in self.feature_names]], columns=self.feature_names)
-        pred_idx = self.model.predict(X)[0]
-        return self.labels[pred_idx] if isinstance(pred_idx, int) else str(pred_idx)
+    def predict(self, features: dict[str, Any]) -> str:
+        """Predict governance mode from feature dict."""
+        X = self._build_row(features)
+
+        if self._mode == "twostage":
+            # Stage 1: abstain vs answerable
+            stage1_pred = self._stage1.predict(X)[0]
+            if str(stage1_pred) == "abstain":
+                return "abstain"
+            # Stage 2: disputed vs trustworthy
+            stage2_pred = self._stage2.predict(X)[0]
+            return str(stage2_pred)
+        else:
+            pred_idx = self.model.predict(X)[0]
+            return self.labels[pred_idx] if isinstance(pred_idx, int) else str(pred_idx)
 
 
 # ---------------------------------------------------------------------------
@@ -357,21 +384,33 @@ def process_case(
 # ---------------------------------------------------------------------------
 
 
-def print_evaluation(rows: list[dict[str, Any]]) -> None:
+def _collapse_3class(label: str) -> str:
+    """Collapse confident/qualified → trustworthy for two-stage comparison."""
+    return "trustworthy" if label in ("confident", "qualified") else label
+
+
+def print_evaluation(rows: list[dict[str, Any]], twostage: bool = False) -> None:
     """Print comprehensive evaluation comparing governor vs classifier vs expected."""
     n = len(rows)
-    modes = ["abstain", "disputed", "qualified", "confident"]
 
     expected = [r["expected_mode"] for r in rows]
     governor = [r["governor_predicted"] for r in rows]
     classifier = [r["classifier_predicted"] for r in rows]
+
+    # Collapse to 3-class if twostage
+    if twostage:
+        expected = [_collapse_3class(e) for e in expected]
+        governor = [_collapse_3class(g) for g in governor]
+        modes = ["abstain", "disputed", "trustworthy"]
+    else:
+        modes = ["abstain", "disputed", "qualified", "confident"]
 
     gov_correct = sum(1 for e, g in zip(expected, governor) if e == g)
     cls_correct = sum(1 for e, c in zip(expected, classifier) if e == c)
     agreement = sum(1 for g, c in zip(governor, classifier) if g == c)
 
     print("\n" + "=" * 70)
-    print("FULL PIPELINE EVALUATION RESULTS")
+    print(f"FULL PIPELINE EVALUATION RESULTS ({'3-class twostage' if twostage else '4-class'})")
     print("=" * 70)
 
     print(f"\nTotal cases: {n}")
@@ -384,8 +423,8 @@ def print_evaluation(rows: list[dict[str, Any]]) -> None:
 
     # Per-class breakdown
     print("\n--- Per-class accuracy ---")
-    print(f"{'Mode':12s} {'Count':>6s} {'Governor':>10s} {'Classifier':>12s} {'Delta':>8s}")
-    print("-" * 50)
+    print(f"{'Mode':14s} {'Count':>6s} {'Governor':>10s} {'Classifier':>12s} {'Delta':>8s}")
+    print("-" * 52)
     for mode in modes:
         mode_rows = [(e, g, c) for e, g, c in zip(expected, governor, classifier) if e == mode]
         if not mode_rows:
@@ -395,24 +434,22 @@ def print_evaluation(rows: list[dict[str, Any]]) -> None:
         cls_ok = sum(1 for e, g, c in mode_rows if e == c)
         delta = cls_ok - gov_ok
         print(
-            f"{mode:12s} {cnt:6d} {gov_ok:4d} ({100 * gov_ok / cnt:5.1f}%) "
+            f"{mode:14s} {cnt:6d} {gov_ok:4d} ({100 * gov_ok / cnt:5.1f}%) "
             f"{cls_ok:4d} ({100 * cls_ok / cnt:5.1f}%) {delta:+4d}"
         )
 
     # Confusion matrices
+    col_width = 12
     for name, preds in [("Governor", governor), ("Classifier", classifier)]:
         print(f"\n--- {name} confusion matrix ---")
-        print(
-            f"{'predicted ->':>20s} {'abstain':>10s} {'confident':>10s} {'disputed':>10s} {'qualified':>10s}"
-        )
-        print("-" * 62)
+        header = f"{'predicted ->':>20s}" + "".join(f"{m:>{col_width}s}" for m in modes)
+        print(header)
+        print("-" * (20 + col_width * len(modes)))
         for actual_mode in modes:
             counts = Counter(p for e, p in zip(expected, preds) if e == actual_mode)
             row_vals = [counts.get(m, 0) for m in modes]
             label = f"actual {actual_mode}"
-            print(
-                f"{label:>20s} {row_vals[0]:10d} {row_vals[1]:10d} {row_vals[2]:10d} {row_vals[3]:10d}"
-            )
+            print(f"{label:>20s}" + "".join(f"{v:>{col_width}d}" for v in row_vals))
 
     # Disagreement analysis
     disagree = [
@@ -545,7 +582,7 @@ def main():
     print(f"Saved {len(all_rows)} rows to {args.output}")
 
     # Evaluation
-    print_evaluation(all_rows)
+    print_evaluation(all_rows, twostage=classifier._mode == "twostage")
 
 
 if __name__ == "__main__":
