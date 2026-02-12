@@ -26,7 +26,7 @@ This is why the state of the art in governance accuracy is in the 60-75% range, 
 
 ## fitz-gov: The Benchmark
 
-[fitz-gov](https://github.com/yafitzdev/fitz-gov) is a governance calibration benchmark with **1,100+ labeled test cases** across 4 modes:
+[fitz-gov](https://github.com/yafitzdev/fitz-gov) is a governance calibration benchmark with **1,100+ labeled test cases** across 6 categories:
 
 | Category | What It Tests | Cases | Example |
 |------|---------------|-------|---------|
@@ -74,28 +74,28 @@ Five constraints run on every query, each contributing diagnostic signals:
 
 Additionally, embedding-based features (vector scores, score distributions), inter-chunk text features (pairwise overlap, assertion density, TF-IDF similarity), and query classification features (temporal, comparison, aggregation detection) feed into the classifier.
 
-**Total: 51 features** across constraint metadata, retrieval scores, text analysis, and query classification.
+**Total: 50 features** across constraint metadata, retrieval scores, text analysis, and query classification.
 
 ### Layer 2: Two-Stage ML Classifier (Decision)
 
 A two-stage binary classifier replaces the hand-coded priority rules that previously made governance decisions.
 
 ```
-Stage 1: Random Forest — Answerability
+Stage 1: Extra Trees — Answerability
     "Can the evidence answer this query?"
     → NO  → ABSTAIN
     → YES → pass to Stage 2
 
-Stage 2: Extra Trees — Conflict Detection
+Stage 2: Random Forest — Conflict Detection
     "Do the sources conflict?"
     → YES → DISPUTED
     → NO  → TRUSTWORTHY
 ```
 
-The trustworthy output maps back to 4 modes at runtime: if constraints fired during processing, it becomes QUALIFIED (hedged); if no constraints fired, it becomes CONFIDENT (direct answer).
+The TRUSTWORTHY output drives two response behaviors at runtime: if constraints fired during processing, the response is hedged (trustworthy_hedged cases test this); if no constraints fired, the response is direct (trustworthy_direct cases test this).
 
 Why two-stage over 4-class:
-- **Confident vs qualified is inseparable** from features alone (max correlation r=0.23). Collapsing them into "trustworthy" and using constraint signals for the split is more reliable.
+- **Direct vs hedged is inseparable** from features alone (max correlation r=0.23). Collapsing them into "trustworthy" and using constraint signals for the split is more reliable.
 - **Binary classifiers are easier to calibrate.** Each stage has one threshold to tune, with clear safety trade-offs.
 - **Staged approach improved accuracy by +9.4pp** over the best 4-class model.
 
@@ -107,18 +107,18 @@ The classifier is tiny (~5MB), runs in microseconds, and adds zero latency to th
 
 | Decision | Meaning | Recall |
 |----------|---------|--------|
-| **ABSTAIN** | Evidence doesn't answer the question | **81.2%** |
-| **DISPUTED** | Sources contradict each other | **89.7%** |
-| **TRUSTWORTHY** | Consistent, sufficient evidence | **70.6%** |
+| **ABSTAIN** | Evidence doesn't answer the question | **93.7%** |
+| **DISPUTED** | Sources contradict each other | **94.4%** |
+| **TRUSTWORTHY** | Consistent, sufficient evidence | **89.0%** |
 
-For comparison, the rule-based governor achieves 27% accuracy on the same test set (it over-predicts "disputed" after conflict detection tuning). A naive baseline that always predicts "qualified" would score 34%.
+For comparison, the rule-based governor achieves 27% accuracy on the same test set (it over-predicts "disputed" after conflict detection tuning). A naive baseline that always predicts "trustworthy" would score 34%.
 
 ### Safety-First Threshold Tuning
 
-The Stage 2 threshold is tuned for safety, not balanced accuracy. At s2=0.785:
-- **89.7% disputed recall** — 9 out of 10 real conflicts are caught
-- **70.6% trustworthy recall** — crosses the 70% usability threshold
-- **Only 3 dangerous errors** in 1,100+ cases — over-confidence (trustworthy when should be disputed) is the rarest failure mode
+The Stage 2 threshold is tuned for safety, not balanced accuracy. At s2=0.79:
+- **94.4% disputed recall** — nearly all real conflicts are caught
+- **89.0% trustworthy recall** — well above the 70% usability threshold
+- **15 dangerous errors** in 1,100+ cases — over-confidence (trustworthy when should be disputed) is the rarest failure mode
 
 The most common error is over-hedging: predicting "disputed" when the answer is actually "trustworthy." This is annoying but harmless. The opposite (missing a real conflict) is dangerous but rare.
 
@@ -134,7 +134,8 @@ The most common error is over-hedging: predicting "disputed" when the answer is 
 | 6 (expanded data) | 1113, real | 69.1% | +199 cases, confident +14pp, disputed -16pp (harder cases) |
 | 7 (dead code cleanup) | 1113, 29 features | 80.7% | Removed 18 dead features, no regression |
 | 8 (inter-chunk features) | 1113, 51 features | **82.1%** | TF-IDF similarity, assertion density, length CV |
-| **Production** | 1113, calibrated | **81.2 / 89.7 / 70.6** | Safety-first thresholds, two-stage RF+ET |
+| 9 (feature parity fix) | 1113, 50 features | **90.9%** | Fixed embedding distribution, removed dead feature |
+| **Production** | 1113, calibrated | **93.7 / 94.4 / 89.0** | Safety-first thresholds, two-stage ET+RF |
 
 ### Why These Numbers Are Honest
 
@@ -207,7 +208,7 @@ python -m tools.governance.train_classifier --mode twostage --time-budget 200
 |------|---------|
 | **Test cases** | [fitz-gov](https://github.com/yafitzdev/fitz-gov) (1,100+ cases) |
 | **Constraints** | `fitz_ai/core/guardrails/plugins/` (IE, CA, CAA, SIT, AV) |
-| **Feature extraction** | `fitz_ai/core/guardrails/feature_extractor.py` (51 features) |
+| **Feature extraction** | `fitz_ai/core/guardrails/feature_extractor.py` (50 features) |
 | **GovernanceDecider** | `fitz_ai/core/guardrails/governance_decider.py` (two-stage ML) |
 | **Training pipeline** | `tools/governance/train_classifier.py` |
 | **Evaluation pipeline** | `tools/governance/eval_pipeline.py` |
