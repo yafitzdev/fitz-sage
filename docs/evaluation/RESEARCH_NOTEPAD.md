@@ -2216,7 +2216,8 @@ Saved as `model_v5_calibrated.joblib`.
 | Two-stage + inter-chunk (v7) | Feb 10 | 78.92% | +10.5pp Stage 2 CV, model_v7 |
 | Two-stage + parity fix (v8) | Feb 10 | 78.92% | 51 features, production parity, model_v5 overwritten |
 | Safety-first (s2=0.80) | Feb 10 | 75.3% | Disputed 89.7%, trustworthy 67.6% |
-| **Sweet-spot (s2=0.785)** | **Feb 10** | **76.5%** | **Disputed 89.7%, trustworthy 70.6%, abstain 81.2%. Production model.** |
+| Sweet-spot (s2=0.785) | Feb 10 | 76.5% | Disputed 89.7%, trustworthy 70.6%, abstain 81.2% |
+| **Retrained (real embeddings)** | **Feb 11** | **90.9%** | **Embedding distribution fix. 93.7/94.4/89.0. 15 critical cases. Production model.** |
 
 ### Dead Code & Feature Audit
 

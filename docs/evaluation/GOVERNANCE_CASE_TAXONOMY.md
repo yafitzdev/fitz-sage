@@ -4,6 +4,8 @@ Complete taxonomy of governance case types for the fitz-gov benchmark.
 
 **Status**: Complete. All cases merged into `fitz-gov/data/tier1_core/`. Current version: **v3.0.0**.
 
+**Production mapping**: fitz-gov data uses 4-class labels (abstain/disputed/qualified/confident). Production maps to 3-class: qualified + confident -> **trustworthy**. The classifier predicts trustworthy; response generation adds caveats if constraints fired (qualified behavior) or answers directly if not (confident behavior). See [fitz-gov-3.0-results.md](fitz-gov-3.0-results.md) for details on the 3-class taxonomy.
+
 **Repository**: `C:\Users\yanfi\PycharmProjects\fitz-gov`
 
 **Data structure** (after cleanup):
