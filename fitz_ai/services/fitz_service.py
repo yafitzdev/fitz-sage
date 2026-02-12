@@ -39,7 +39,6 @@ from fitz_ai.core import Answer
 from fitz_ai.logging.logger import get_logger
 
 if TYPE_CHECKING:
-    from fitz_ai.core.chunk import Chunk
     from fitz_ai.retrieval.rewriter.types import ConversationContext
 
 logger = get_logger(__name__)
@@ -223,45 +222,6 @@ class FitzService:
         except Exception as e:
             logger.error(f"Query failed: {e}")
             raise QueryError(f"Query failed: {e}") from e
-
-    def retrieve(
-        self,
-        question: str,
-        collection: str,
-        *,
-        top_k: int | None = None,
-    ) -> list["Chunk"]:
-        """
-        Retrieve relevant chunks without generating an answer.
-
-        Useful for debugging retrieval or building custom pipelines.
-
-        Args:
-            question: The query
-            collection: Collection to search
-            top_k: Number of chunks to retrieve
-
-        Returns:
-            List of relevant chunks
-        """
-        from fitz_ai.runtime import create_engine
-
-        if not self._collection_exists(collection):
-            raise CollectionNotFoundError(collection)
-
-        try:
-            engine = create_engine(collection=collection, top_k=top_k)
-
-            # Access retrieval directly if available
-            if hasattr(engine, "retrieve"):
-                return engine.retrieve(question)
-
-            # Fallback: run full pipeline and return chunks from provenance
-            answer = engine.answer(question)
-            return [p.metadata.get("chunk") for p in answer.provenance if p.metadata.get("chunk")]
-
-        except Exception as e:
-            raise QueryError(f"Retrieval failed: {e}") from e
 
     # =========================================================================
     # Ingestion Operations
