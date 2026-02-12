@@ -571,7 +571,7 @@ def fitz_gov_benchmark(
         Optional[list[str]],
         typer.Option(
             "--category",
-            help="Categories to test: abstention, dispute, qualification, confidence, grounding, relevance.",
+            help="Categories to test: abstention, dispute, trustworthy_hedged, trustworthy_direct, grounding, relevance.",
         ),
     ] = None,
     data_dir: Annotated[
@@ -646,8 +646,8 @@ def fitz_gov_benchmark(
     Fitz's core differentiator - tests governance mode classification:
     - abstention: Should refuse when evidence insufficient
     - dispute: Should flag conflicting information
-    - qualification: Should hedge uncertain claims
-    - confidence: Should answer directly when evidence is clear
+    - trustworthy_hedged: Should hedge uncertain claims
+    - trustworthy_direct: Should answer directly when evidence is clear
 
     Outputs accuracy by category and a confusion matrix.
 
@@ -734,8 +734,8 @@ def _display_fitz_gov_rich(result) -> None:
     gov_cats = [
         FitzGovCategory.ABSTENTION,
         FitzGovCategory.DISPUTE,
-        FitzGovCategory.QUALIFICATION,
-        FitzGovCategory.CONFIDENCE,
+        FitzGovCategory.TRUSTWORTHY_HEDGED,
+        FitzGovCategory.TRUSTWORTHY_DIRECT,
     ]
     for cat in gov_cats:
         cat_result = result.category_results.get(cat)
@@ -796,8 +796,8 @@ def _display_fitz_gov_plain(result) -> None:
     gov_cats = [
         FitzGovCategory.ABSTENTION,
         FitzGovCategory.DISPUTE,
-        FitzGovCategory.QUALIFICATION,
-        FitzGovCategory.CONFIDENCE,
+        FitzGovCategory.TRUSTWORTHY_HEDGED,
+        FitzGovCategory.TRUSTWORTHY_DIRECT,
     ]
     for cat in gov_cats:
         cat_result = result.category_results.get(cat)

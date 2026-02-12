@@ -8,7 +8,7 @@ Industry-standard benchmark:
 Fitz-native benchmarks:
 - RGB: Robustness (noise, rejection, conflicts)
 - fitz-gov: Comprehensive governance calibration (Fitz's differentiator)
-  - abstention, dispute, qualification, confidence (governance modes)
+  - abstention, dispute, trustworthy_hedged, trustworthy_direct (governance modes)
   - grounding, relevance (answer quality)
 
 Usage:

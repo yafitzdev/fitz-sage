@@ -220,7 +220,7 @@ class BenchmarkDashboard:
             )
 
             # Governance mode categories
-            for cat in ["abstention", "dispute", "qualification", "confidence"]:
+            for cat in ["abstention", "dispute", "trustworthy_hedged", "trustworthy_direct"]:
                 cat_result = result.get(cat)
                 if cat_result:
                     table.add_row(
