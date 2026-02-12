@@ -256,9 +256,10 @@ def fill_defaults(features: dict[str, Any]) -> dict[str, Any]:
 class GovernanceClassifier:
     """Wrapper for trained classifier model inference.
 
-    Supports both formats:
+    Supports three formats:
     - 4-class: single model with {"model", "encoders", "feature_names", "labels"}
     - twostage: two binary classifiers with {"stage1_model", "stage2_model", ...}
+    - calibrated: twostage with predict_proba thresholds (matches production GovernanceDecider)
     """
 
     def __init__(self, model_path: Path):
@@ -267,6 +268,8 @@ class GovernanceClassifier:
         self.feature_names = artifact["feature_names"]
         self.labels = artifact["labels"]
         self._mode = artifact.get("mode", "4class")
+        self._s1_threshold = artifact.get("stage1_threshold", None)
+        self._s2_threshold = artifact.get("stage2_threshold", None)
 
         if self._mode == "twostage":
             self._stage1 = artifact["stage1_model"]
@@ -274,7 +277,12 @@ class GovernanceClassifier:
             s1_name = artifact.get("stage1_name", "unknown")
             s2_name = artifact.get("stage2_name", "unknown")
             acc = artifact.get("combined_accuracy", 0)
-            print(f"Loaded twostage classifier: {s1_name}/{s2_name} ({len(self.feature_names)} features, {acc:.1%} acc)")
+            calibrated = self._s1_threshold is not None
+            print(
+                f"Loaded twostage classifier: {s1_name}/{s2_name} "
+                f"({len(self.feature_names)} features, {acc:.1%} acc"
+                f"{f', calibrated s1={self._s1_threshold:.2f} s2={self._s2_threshold:.2f}' if calibrated else ', raw'})"
+            )
         else:
             self.model = artifact["model"]
             self.model_name = artifact.get("model_name", "unknown")
@@ -305,20 +313,49 @@ class GovernanceClassifier:
         return pd.DataFrame([[row[name] for name in self.feature_names]], columns=self.feature_names)
 
     def predict(self, features: dict[str, Any]) -> str:
-        """Predict governance mode from feature dict."""
+        """Predict governance mode from feature dict.
+
+        Uses predict_proba with calibrated thresholds when available
+        (matches production GovernanceDecider behavior).
+        """
         X = self._build_row(features)
 
         if self._mode == "twostage":
-            # Stage 1: abstain vs answerable
-            stage1_pred = self._stage1.predict(X)[0]
-            if str(stage1_pred) == "abstain":
-                return "abstain"
-            # Stage 2: disputed vs trustworthy
-            stage2_pred = self._stage2.predict(X)[0]
-            return str(stage2_pred)
+            if self._s1_threshold is not None:
+                return self._predict_calibrated(X)
+            return self._predict_raw(X)
         else:
             pred_idx = self.model.predict(X)[0]
             return self.labels[pred_idx] if isinstance(pred_idx, int) else str(pred_idx)
+
+    def _predict_calibrated(self, X: pd.DataFrame) -> str:
+        """Two-stage prediction with calibrated probability thresholds."""
+        # Stage 1: answerable vs abstain
+        s1_probas = self._stage1.predict_proba(X)
+        s1_classes = list(self._stage1.classes_)
+        answerable_idx = s1_classes.index("answerable")
+        p_answerable = float(s1_probas[0, answerable_idx])
+
+        if p_answerable < self._s1_threshold:
+            return "abstain"
+
+        # Stage 2: trustworthy vs disputed
+        s2_probas = self._stage2.predict_proba(X)
+        s2_classes = list(self._stage2.classes_)
+        trustworthy_idx = s2_classes.index("trustworthy")
+        p_trustworthy = float(s2_probas[0, trustworthy_idx])
+
+        if p_trustworthy >= self._s2_threshold:
+            return "trustworthy"
+        return "disputed"
+
+    def _predict_raw(self, X: pd.DataFrame) -> str:
+        """Two-stage prediction with raw class predictions (no thresholds)."""
+        stage1_pred = self._stage1.predict(X)[0]
+        if str(stage1_pred) == "abstain":
+            return "abstain"
+        stage2_pred = self._stage2.predict(X)[0]
+        return str(stage2_pred)
 
 
 # ---------------------------------------------------------------------------

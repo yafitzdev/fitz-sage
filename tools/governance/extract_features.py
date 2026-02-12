@@ -7,8 +7,8 @@ Loads labeled cases from fitz-gov, runs each constraint individually
 via the feature_extractor, and saves to CSV.
 
 Usage:
-    python -m tools.governance.extract_features
-    python -m tools.governance.extract_features --chat cohere --workers 100
+    python -m tools.governance.extract_features --embedding ollama --chat ollama
+    python -m tools.governance.extract_features --chat cohere --embedding cohere --workers 3
     python -m tools.governance.extract_features --limit 10  # Quick test
 """
 
@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import sys
 import threading
 import time
@@ -44,7 +45,8 @@ from fitz_ai.governance.constraints.plugins.insufficient_evidence import (
 from fitz_ai.governance.constraints.plugins.specific_info_type import (
     SpecificInfoTypeConstraint,
 )
-from fitz_ai.llm import get_chat_factory
+from fitz_ai.llm import get_chat_factory, get_embedder
+from fitz_ai.retrieval.detection.registry import DetectionOrchestrator
 
 # Default path to fitz-gov tier1 data (sibling repo)
 _DEFAULT_DATA_DIR = (
@@ -143,6 +145,37 @@ def case_to_chunks(case: dict[str, Any]) -> list[Chunk]:
     return chunks
 
 
+def _cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
+    """Compute cosine similarity between two vectors."""
+    dot = sum(a * b for a, b in zip(vec1, vec2))
+    norm1 = math.sqrt(sum(a * a for a in vec1))
+    norm2 = math.sqrt(sum(b * b for b in vec2))
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    return dot / (norm1 * norm2)
+
+
+def enrich_chunks_with_embeddings(
+    query: str,
+    chunks: list[Chunk],
+    embedder,
+) -> None:
+    """Compute embeddings and set vector_score on each chunk (in-place).
+
+    Simulates the vector_score that production retrieval provides from pgvector.
+    """
+    try:
+        texts = [query] + [c.content for c in chunks]
+        embeddings = embedder.embed_batch(texts)
+        query_emb = embeddings[0]
+        for i, chunk in enumerate(chunks):
+            chunk.metadata["vector_score"] = _cosine_similarity(query_emb, embeddings[i + 1])
+    except Exception as e:
+        print(f"  WARNING: Embedding failed: {e}", file=sys.stderr)
+        for chunk in chunks:
+            chunk.metadata["vector_score"] = 0.0
+
+
 def make_constraints(chat) -> list:
     """Create a fresh set of constraints (one set per worker thread)."""
     return [
@@ -206,8 +239,17 @@ def get_governor_prediction(result_map: dict[str, ConstraintResult]) -> str:
 _thread_local = threading.local()
 
 
-def process_case(case: dict[str, Any], chat) -> dict[str, Any] | None:
-    """Process a single case. Thread-safe via thread-local constraints."""
+def process_case(
+    case: dict[str, Any],
+    chat,
+    embedder=None,
+    detection_orchestrator: DetectionOrchestrator | None = None,
+) -> dict[str, Any] | None:
+    """Process a single case with full feature enrichment.
+
+    Matches production behavior: computes vector_score (Tier 2) and
+    detection summary (Tier 3) so training features match inference.
+    """
     # Each thread gets its own constraint instances to avoid shared state
     if not hasattr(_thread_local, "constraints"):
         _thread_local.constraints = make_constraints(chat)
@@ -216,8 +258,21 @@ def process_case(case: dict[str, Any], chat) -> dict[str, Any] | None:
     query = case["query"]
     chunks = case_to_chunks(case)
 
+    # Tier 2: compute vector_score (matches production retrieval behavior)
+    if embedder is not None:
+        enrich_chunks_with_embeddings(query, chunks, embedder)
+
+    # Tier 3: detection summary
+    detection_summary = None
+    if detection_orchestrator is not None:
+        try:
+            detection_summary = detection_orchestrator.detect_for_retrieval(query)
+        except Exception as e:
+            print(f"  WARNING: Detection failed for {case_id}: {e}", file=sys.stderr)
+
+    # Tier 1: run constraints individually
     result_map = run_constraints_individually(query, chunks, _thread_local.constraints)
-    features = extract_features(query, chunks, result_map, detection_summary=None)
+    features = extract_features(query, chunks, result_map, detection_summary)
     features = fill_defaults(features)
     governor_predicted = get_governor_prediction(result_map)
 
@@ -244,10 +299,13 @@ def main():
         "--chat", type=str, default=None, help="Override chat provider (e.g. 'cohere', 'anthropic')"
     )
     parser.add_argument(
+        "--embedding", type=str, default=None, help="Embedding provider (e.g. 'ollama', 'cohere')"
+    )
+    parser.add_argument(
         "--workers",
         type=int,
-        default=3,
-        help="Concurrent workers (default: 3, each makes ~7 LLM calls)",
+        default=1,
+        help="Concurrent workers (default: 1)",
     )
     args = parser.parse_args()
 
@@ -261,6 +319,20 @@ def main():
     chat = chat_factory("fast")
     model_name = getattr(chat, "_model", "unknown")
     print(f"Using chat provider: {chat_spec} (model: {model_name})")
+
+    # Embedding client (Tier 2: vector_score)
+    embedder = None
+    embed_spec = args.embedding or cfg.embedding
+    if embed_spec:
+        embed_config = {k: v for k, v in cfg.embedding_kwargs.model_dump().items() if v is not None}
+        embedder = get_embedder(embed_spec, config=embed_config)
+        print(f"Embedding provider: {embed_spec}")
+    else:
+        print("WARNING: No embedding provider — vector_score will be 0 (use --embedding)")
+
+    # Detection orchestrator (Tier 3)
+    detection_orchestrator = DetectionOrchestrator(chat_factory=chat_factory)
+    print("Detection orchestrator ready")
     print(f"Concurrency: {args.workers} workers")
 
     # Load cases
@@ -270,23 +342,39 @@ def main():
         cases = cases[: args.limit]
     print(f"Loaded {len(cases)} cases")
 
-    # Process cases concurrently
+    # Process cases
     all_rows: list[dict[str, Any]] = []
     errors = 0
     start_time = time.time()
 
-    with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        futures = {executor.submit(process_case, case, chat): case["id"] for case in cases}
-
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Extracting features"):
-            case_id = futures[future]
+    if args.workers <= 1:
+        for case in tqdm(cases, desc="Extracting features"):
             try:
-                row = future.result()
+                row = process_case(case, chat, embedder, detection_orchestrator)
                 if row:
                     all_rows.append(row)
             except Exception as e:
                 errors += 1
-                print(f"\n  ERROR on case {case_id}: {e}", file=sys.stderr)
+                print(f"\n  ERROR on case {case['id']}: {e}", file=sys.stderr)
+    else:
+        with ThreadPoolExecutor(max_workers=args.workers) as executor:
+            futures = {
+                executor.submit(process_case, case, chat, embedder, detection_orchestrator): case[
+                    "id"
+                ]
+                for case in cases
+            }
+            for future in tqdm(
+                as_completed(futures), total=len(futures), desc="Extracting features"
+            ):
+                case_id = futures[future]
+                try:
+                    row = future.result()
+                    if row:
+                        all_rows.append(row)
+                except Exception as e:
+                    errors += 1
+                    print(f"\n  ERROR on case {case_id}: {e}", file=sys.stderr)
 
     elapsed = time.time() - start_time
     print(f"\nProcessed {len(all_rows)} cases in {elapsed:.1f}s ({errors} errors)")
