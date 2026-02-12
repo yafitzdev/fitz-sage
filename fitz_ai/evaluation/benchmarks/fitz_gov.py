@@ -291,8 +291,6 @@ class FitzGovBenchmark:
             except Exception as e:
                 logger.warning(f"Chunk enrichment failed: {e}")
 
-        pipeline = engine._pipeline
-
         # Step 1: Run constraints on injected chunks
         if self._use_fusion or self._adaptive or self._model_override:
             # Create constraints with fusion/adaptive mode for contradiction detection
@@ -308,12 +306,12 @@ class FitzGovBenchmark:
             if self._chat_factory_override:
                 fast_chat = self._chat_factory_override("fast")
             else:
-                fast_chat = pipeline.chat_factory("fast")
-            # Get embedder from pipeline for semantic relevance checking
-            embedder = pipeline.embedder.embed
+                fast_chat = engine._chat_factory("fast")
+            # Get embedder from engine for semantic relevance checking
+            embedder = engine._embedder.embed
             constraints = [
                 InsufficientEvidenceConstraint(embedder=embedder, chat=fast_chat),
-                SpecificInfoTypeConstraint(),  # NEW: Detect missing specific info types
+                SpecificInfoTypeConstraint(),
                 CausalAttributionConstraint(),
                 ConflictAwareConstraint(
                     chat=fast_chat,
@@ -325,7 +323,7 @@ class FitzGovBenchmark:
             ]
             constraint_results = run_constraints(query.text, chunks, constraints)
         else:
-            constraint_results = run_constraints(query.text, chunks, pipeline.constraints)
+            constraint_results = run_constraints(query.text, chunks, engine._constraints)
 
         # Step 2: Get governance decision
         governor = AnswerGovernor()
@@ -347,23 +345,28 @@ class FitzGovBenchmark:
             )
 
         # Full mode: run LLM generation for answer quality evaluation
-        # Step 3: Process context through context pipeline
-        processed_chunks = pipeline.context.process(chunks)
+        # Wrap chunks as ReadResult objects (KRAG's assembler/synthesizer expect ReadResult)
+        from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
 
-        # Step 4: Build prompt with governance mode
-        prompt = pipeline.rgs.build_prompt(query.text, processed_chunks)
-        prompt = pipeline._apply_answer_mode_to_prompt(prompt, governance.mode)
-
-        # Step 5: Generate answer via LLM
-        messages = [
-            {"role": "system", "content": prompt.system},
-            {"role": "user", "content": prompt.user},
+        read_results = [
+            ReadResult(
+                address=Address(
+                    kind=AddressKind.SECTION,
+                    source_id=chunk.id,
+                    location="fitz_gov_benchmark",
+                    summary=chunk.content[:100],
+                ),
+                content=chunk.content,
+                file_path="fitz_gov_benchmark",
+                metadata=chunk.metadata,
+            )
+            for chunk in chunks
         ]
-        chat_client = pipeline._select_chat_for_routing()
-        raw_response = chat_client.chat(messages)
 
-        # Step 6: Build structured answer
-        answer = pipeline.rgs.build_answer(raw_response, processed_chunks, mode=governance.mode)
+        context = engine._assembler.assemble(query.text, read_results)
+        answer = engine._synthesizer.generate(
+            query.text, context, read_results, answer_mode=governance.mode
+        )
 
         return answer
 

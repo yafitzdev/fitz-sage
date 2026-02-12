@@ -677,9 +677,8 @@ def fitz_gov_benchmark(
         data_dir=data_dir,
         full_mode=full,
         enrich_chunks=enrich,
-        deterministic=deterministic,
-        use_fusion=fusion,
-        adaptive=adaptive,
+        use_fusion=fusion if not deterministic else False,
+        adaptive=adaptive if not deterministic else False,
         model_override=model,
     )
 
