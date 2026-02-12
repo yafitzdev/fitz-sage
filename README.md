@@ -143,7 +143,7 @@ You can—but you'll hit walls fast.
 **Honest answers ✅** → [Governance Benchmark](docs/features/governance-benchmarking.md)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."
 > 
-> → Fitz detects disputes at **89.7% recall** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 1,100+ case benchmark for epistemic honesty.
+> → Fitz detects disputes at **94.4% recall** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 1,100+ case benchmark for epistemic honesty.
 
 **Queries that actually work 📊**
 > Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, address-based code retrieval with import graph traversal, and SQL execution for tabular data. No configuration—it just works.
@@ -243,16 +243,16 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
   │ 5 Constraints       │     Contradiction detection, evidence sufficiency,
   │ (epistemic sensors) │     causal attribution, answer verification, specific info type
   └──────────┬──────────┘
-             │ 51 features extracted
+             │ 50 features extracted
              ▼
   ┌─────────────────────┐
-  │ Stage 1: RF         │     Can the evidence answer this query?
+  │ Stage 1: ET         │     Can the evidence answer this query?
   │ Answerability       ├───► NO ──► ABSTAIN
   └──────────┬──────────┘
              │ YES
              ▼
   ┌─────────────────────┐     Do the sources conflict?
-  │ Stage 2: ET         ├───► YES ──► DISPUTED
+  │ Stage 2: RF         ├───► YES ──► DISPUTED
   │ Conflict Detection  │
   └──────────┬──────────┘
              │                Consistent evidence found
@@ -264,9 +264,9 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 
 | Decision | Meaning                              | Recall |
 |----------|--------------------------------------|--------|
-| **ABSTAIN** | Evidence doesn't answer the question | **81.2%** |
-| **DISPUTED** | Sources contradict each other        | **89.7%** |
-| **TRUSTWORTHY** | Consistent, sufficient evidence      | **70.6%** |
+| **ABSTAIN** | Evidence doesn't answer the question | **93.7%** |
+| **DISPUTED** | Sources contradict each other        | **94.4%** |
+| **TRUSTWORTHY** | Consistent, sufficient evidence      | **89.0%** |
 
 <br>
 
@@ -274,7 +274,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 > Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. 92% of our test cases are rated "hard."
 
 <strong>The system fails safe 🛡️</strong>
-> The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence ("trustworthy" instead of "disputed") is the rarest error mode: only 3 cases in 1,100+.
+> The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence ("trustworthy" instead of "disputed") is the rarest error mode: only 15 cases in 1,100+ (all hard difficulty).
 
 <strong>These scores are a floor, not a ceiling 👣</strong>
 > All benchmarks were measured using `qwen2.5:3b` — a 3B parameter local model. The governance constraints run on the fast-tier LLM to keep latency low. Stronger models produce better constraint signals, which feed better features into the classifier. Upgrading your chat provider should improve governance accuracy for free.
