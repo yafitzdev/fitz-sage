@@ -28,12 +28,12 @@ This is why the state of the art in governance accuracy is in the 60-75% range, 
 
 [fitz-gov](https://github.com/yafitzdev/fitz-gov) is a governance calibration benchmark with **1,100+ labeled test cases** across 4 modes:
 
-| Mode | What It Tests | Cases | Example |
+| Category | What It Tests | Cases | Example |
 |------|---------------|-------|---------|
-| **ABSTAIN** | Context doesn't answer the question | 237 | Query: "Tokyo population" / Context: about Osaka |
-| **DISPUTED** | Sources make mutually exclusive claims | 196 | Source A: "Project succeeded" / Source B: "Project failed" |
-| **QUALIFIED** | Evidence exists but needs caveats | 360 | Causal question with only correlational data |
-| **CONFIDENT** | Clear, consistent evidence | 254 | Direct factual answer supported by all sources |
+| **Abstention** | Context doesn't answer the question | 237 | Query: "Tokyo population" / Context: about Osaka |
+| **Dispute** | Sources make mutually exclusive claims | 196 | Source A: "Project succeeded" / Source B: "Project failed" |
+| **Trustworthy Hedged** | Evidence exists but needs caveats | 360 | Causal question with only correlational data |
+| **Trustworthy Direct** | Clear, consistent evidence | 254 | Direct factual answer supported by all sources |
 
 Each test case provides a query, 2-4 context passages (bypassing retrieval for controlled testing), and the expected governance mode with a rationale.
 

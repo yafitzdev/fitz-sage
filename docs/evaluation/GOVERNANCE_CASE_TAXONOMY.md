@@ -4,7 +4,7 @@ Complete taxonomy of governance case types for the fitz-gov benchmark.
 
 **Status**: Complete. All cases merged into `fitz-gov/data/tier1_core/`. Current version: **v3.0.0**.
 
-**Production mapping**: fitz-gov data uses 4-class labels (abstain/disputed/qualified/confident). Production maps to 3-class: qualified + confident -> **trustworthy**. The classifier predicts trustworthy; response generation adds caveats if constraints fired (qualified behavior) or answers directly if not (confident behavior). See [fitz-gov-3.0-results.md](fitz-gov-3.0-results.md) for details on the 3-class taxonomy.
+**Production mapping**: fitz-gov uses 3-mode labels (abstain/disputed/trustworthy) and 6 test categories: abstention, dispute, trustworthy_hedged, trustworthy_direct, grounding, relevance. Both trustworthy_hedged and trustworthy_direct map to TRUSTWORTHY mode — the category name describes the expected response behavior (hedged vs direct). See [fitz-gov-3.0-results.md](fitz-gov-3.0-results.md) for details on the 3-class taxonomy.
 
 **Repository**: `C:\Users\yanfi\PycharmProjects\fitz-gov`
 
@@ -24,7 +24,7 @@ fitz-gov/data/
 | Metric | Value |
 |--------|-------|
 | Total cases (tier0 + tier1) | 1173 |
-| Governance cases (abstain/dispute/qualify/confident) | 1091 (1047 tier1 + 44 tier0) |
+| Governance cases (abstain/dispute/trustworthy_hedged/trustworthy_direct) | 1091 (1047 tier1 + 44 tier0) |
 | Other cases (grounding/relevance) | 82 |
 | Unique subcategories (consolidated) | 54 |
 | Total cases removed (duplicates) | 8 |
@@ -32,15 +32,15 @@ fitz-gov/data/
 
 ### Per-Mode Distribution (tier1_core, governance only)
 
-| Mode | Cases | % |
+| Category | Cases | % |
 |------|-------|---|
-| Qualification | 360 | 34.4% |
-| Confidence | 254 | 24.3% |
+| Trustworthy Hedged | 360 | 34.4% |
+| Trustworthy Direct | 254 | 24.3% |
 | Abstention | 237 | 22.6% |
 | Dispute | 196 | 18.7% |
 | **Total** | **1047** | 100% |
 
-Max:min class ratio is 2.2:1. Qualification remains largest but class balance improved significantly from v2.0 (was 2.9:1).
+Max:min class ratio is 2.2:1. Trustworthy Hedged remains largest but class balance improved significantly from v2.0 (was 2.9:1).
 
 ---
 
@@ -54,8 +54,8 @@ Hand-crafted cases derived from failure analysis across 21 evaluation experiment
 |----------|-------|-----------|
 | Abstention | 40 | easy/medium |
 | Dispute | 40 | easy/medium |
-| Qualification | 40 | easy/medium |
-| Confidence | 30 | easy/medium |
+| Trustworthy Hedged | 40 | easy/medium |
+| Trustworthy Direct | 30 | easy/medium |
 | Grounding | 25 | easy/medium |
 | Relevance | 25 | easy/medium |
 | **Total** | **200** | |
@@ -151,7 +151,7 @@ Also includes: `adjacent_product` (5), `high_similarity_wrong_entity` (5), `irre
 
 Also includes: `numerical_disagreement` (6), `temporal_conflict` (3), `source_conflict` (4), `methodological_conflict` (3), `scope_conflict` (2), and 10 more low-count subcategories.
 
-### Qualify — answer requires caveats or hedging (318 cases, 56 subcategories)
+### Trustworthy Hedged — answer requires caveats or hedging (318 cases, 56 subcategories)
 
 | Case type | Subcategory | Cases | Signal |
 |-----------|-------------|-------|--------|
@@ -180,7 +180,7 @@ Also includes: `numerical_disagreement` (6), `temporal_conflict` (3), `source_co
 
 Also includes: `adjacent_entity_overlap` (5), `partial_answer` (5), `related_missing_specific` (5), `right_topic_wrong_infotype` (5), `tangential_useful` (5), `implicit_assumptions` (5), `old_likely_valid` (5), `cross_domain_transfer` (4), `prediction_insufficient_data` (6), and 18 more subcategories from pre-expansion and three-way cases.
 
-### Confident — clear, consistent evidence (142 cases, 38 subcategories)
+### Trustworthy Direct — clear, consistent evidence (142 cases, 38 subcategories)
 
 | Case type | Subcategory | Cases | Signal |
 |-----------|-------------|-------|--------|
@@ -206,7 +206,7 @@ Also includes: `apparent_contradiction_granularity` (5), `minor_disagreement_cle
 
 Cases where classification is hard. These are the highest-value test cases and were the primary focus of the expansion.
 
-### Abstain <-> Confident (11 subcategories)
+### Abstain <-> Trustworthy Direct (11 subcategories)
 
 | Case type | Correct mode | Subcategory | Cases | Why it's confusing |
 |-----------|--------------|-------------|-------|--------------------|
@@ -217,7 +217,7 @@ Cases where classification is hard. These are the highest-value test cases and w
 | Partial schema match | abstain | `partial_schema_match` | 5 | Table has some columns, missing key one |
 | High embedding similarity, wrong entity | abstain | `high_similarity_wrong_entity` | 5 | Embeddings can't distinguish |
 
-### Abstain <-> Qualify (5 subcategories)
+### Abstain <-> Trustworthy Hedged (5 subcategories)
 
 | Case type | Correct mode | Subcategory | Cases | Why it's confusing |
 |-----------|--------------|-------------|-------|--------------------|
@@ -234,7 +234,7 @@ Cases where classification is hard. These are the highest-value test cases and w
 | Irrelevant content with internal tension | abstain | `irrelevant_internal_tension` | 5 | Chunks contradict but don't answer |
 | Off-topic contradiction | abstain | `off_topic_contradiction` | 5 | Real contradiction, wrong subject |
 
-### Dispute <-> Qualify (14 subcategories — primary bottleneck)
+### Dispute <-> Trustworthy Hedged (14 subcategories — primary bottleneck)
 
 The densest boundary in the taxonomy. 140+ cases across both dispute and qualify sides.
 
@@ -255,7 +255,7 @@ The densest boundary in the taxonomy. 140+ cases across both dispute and qualify
 | Source quality asymmetry | qualify | `source_quality_asymmetry` | 10 | Study vs anecdote disagree |
 | Different framing, same fact | confident | `different_framing_same_fact` | 10 | Apparent contradiction resolves |
 
-### Qualify <-> Confident (6 subcategories)
+### Trustworthy Hedged <-> Trustworthy Direct (6 subcategories)
 
 | Case type | Correct mode | Subcategory | Cases | Why it's confusing |
 |-----------|--------------|-------------|-------|--------------------|
@@ -266,7 +266,7 @@ The densest boundary in the taxonomy. 140+ cases across both dispute and qualify
 | Near-complete evidence | confident | `near_complete_evidence` | 5 | 95% present, minor detail missing |
 | Multiple sources, slight variation | confident | `slight_variation_same_answer` | 5 | Phrasing differs, substance matches |
 
-### Dispute <-> Confident (3 subcategories)
+### Dispute <-> Trustworthy Direct (3 subcategories)
 
 | Case type | Correct mode | Subcategory | Cases | Why it's confusing |
 |-----------|--------------|-------------|-------|--------------------|
@@ -280,7 +280,7 @@ The densest boundary in the taxonomy. 140+ cases across both dispute and qualify
 
 Cases where multiple signals compete. These are the hardest cases and where hand-tuned priority rules break down. Generated as 90 cases across 13 subcategories.
 
-### Dispute <-> Qualify <-> Confident
+### Dispute <-> Trustworthy Hedged <-> Trustworthy Direct
 
 | Case type | Correct mode | Subcategory | Cases | Competing signals |
 |-----------|--------------|-------------|-------|-------------------|
@@ -289,7 +289,7 @@ Cases where multiple signals compete. These are the hardest cases and where hand
 | Opposing with consensus | confident | `opposing_with_consensus` | 6 | 9 studies say X, 1 says Y |
 | Hedged contradiction, corroborated | qualify | `hedged_contradiction_corroborated` | 8 | "X may cause Y" vs "X does not" + corroboration |
 
-### Abstain <-> Qualify <-> Confident
+### Abstain <-> Trustworthy Hedged <-> Trustworthy Direct
 
 | Case type | Correct mode | Subcategory | Cases | Competing signals |
 |-----------|--------------|-------------|-------|-------------------|
@@ -298,7 +298,7 @@ Cases where multiple signals compete. These are the hardest cases and where hand
 | Partial answer from definitive source | qualify | `partial_answer_definitive` | 7 | Partial but what's there is authoritative |
 | Cross-domain transfer | qualify | `cross_domain_transfer` | 4 | Concepts transfer across domains |
 
-### Abstain <-> Dispute <-> Qualify
+### Abstain <-> Dispute <-> Trustworthy Hedged
 
 | Case type | Correct mode | Subcategory | Cases | Competing signals |
 |-----------|--------------|-------------|-------|-------------------|
