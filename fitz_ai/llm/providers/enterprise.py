@@ -174,10 +174,13 @@ class EnterpriseEmbedding:
     @property
     def dimensions(self) -> int:
         """Return embedding dimensions."""
-        if self._dimensions:
-            return self._dimensions
-        # Default assumption for OpenAI-compatible embeddings
-        return 1536
+        if self._dimensions is None:
+            try:
+                result = self.embed("test")
+                self._dimensions = len(result)
+            except Exception:
+                return 1536
+        return self._dimensions or 1536
 
 
 __all__ = [

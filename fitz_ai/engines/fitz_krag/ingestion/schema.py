@@ -18,6 +18,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from fitz_ai.core.exceptions import ConfigurationError
+
 if TYPE_CHECKING:
     from fitz_ai.storage.postgres import PostgresConnectionManager
 
@@ -184,6 +186,49 @@ def _table_hnsw_index_ddl() -> str:
     """
 
 
+def _validate_vector_dimensions(
+    connection_manager: "PostgresConnectionManager",
+    collection: str,
+    embedding_dim: int,
+) -> None:
+    """
+    Validate that existing vector columns match the expected embedding dimension.
+
+    CREATE TABLE IF NOT EXISTS silently ignores dimension changes when the table
+    already exists. This check catches mismatches early with a clear error message.
+    """
+    with connection_manager.connection(collection) as conn:
+        table_exists = conn.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_name = 'krag_section_index'
+            )
+            """
+        ).fetchone()[0]
+
+        if not table_exists:
+            return
+
+        result = conn.execute(
+            """
+            SELECT atttypmod - 4 as dim
+            FROM pg_attribute
+            WHERE attrelid = 'krag_section_index'::regclass
+            AND attname = 'summary_vector'
+            """
+        ).fetchone()
+
+        if result:
+            existing_dim = result[0]
+            if existing_dim != embedding_dim:
+                raise ConfigurationError(
+                    f"Embedding dimension mismatch: existing schema has {existing_dim}d vectors "
+                    f"but current embedder reports {embedding_dim}d. If you changed embedding "
+                    "models, re-ingest with 'fitz ingest --force --rebuild-schema' to rebuild."
+                )
+
+
 def ensure_schema(
     connection_manager: "PostgresConnectionManager",
     collection: str,
@@ -194,6 +239,8 @@ def ensure_schema(
 
     Called on engine init / first ingest. Safe to call multiple times.
     """
+    _validate_vector_dimensions(connection_manager, collection, embedding_dim)
+
     with connection_manager.connection(collection) as conn:
         conn.execute(_raw_files_ddl())
         conn.execute(_symbol_index_ddl(embedding_dim))

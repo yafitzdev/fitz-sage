@@ -184,10 +184,13 @@ class CohereEmbedding:
     @property
     def dimensions(self) -> int:
         """Return embedding dimensions."""
-        if self._dimensions:
-            return self._dimensions
-        # Default dimensions for embed-multilingual-v3.0
-        return 1024
+        if self._dimensions is None:
+            try:
+                result = self.embed("test")
+                self._dimensions = len(result)
+            except Exception:
+                return 1024
+        return self._dimensions or 1024
 
 
 class CohereRerank:

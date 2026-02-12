@@ -156,11 +156,13 @@ class KragE2ERunner:
         use_cache: bool = True,
     ):
         self.fixtures_dir = fixtures_dir or FIXTURES_DIR
-        self.collection = f"{collection_prefix}_{uuid.uuid4().hex[:8]}"
+        self._base_collection = f"{collection_prefix}_{uuid.uuid4().hex[:8]}"
         self.engine = None
         self._setup_complete = False
         self._current_tier: str | None = None
         self._tiered_results: TieredRunResult | None = None
+        self._tier_collections: set[str] = set()
+        self._ingested_collections: set[str] = set()
 
         cache_config = get_cache_config()
         self.cache = ResponseCache(
@@ -189,7 +191,7 @@ class KragE2ERunner:
         from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
         from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
 
-        logger.info(f"KRAG E2E Setup: Creating collection '{self.collection}'")
+        logger.info(f"KRAG E2E Setup: Creating collection '{self._base_collection}'")
 
         start_time = time.time()
 
@@ -214,12 +216,15 @@ class KragE2ERunner:
             f"vector_db={vector_db_plugin}"
         )
 
+        tier_collection = self._collection_for_tier(tier_name)
+        self._tier_collections.add(tier_collection)
+
         # Build KRAG config
         config_dict = {
             "chat": chat_plugin,
             "embedding": embedding_plugin,
             "vector_db": vector_db_plugin,
-            "collection": self.collection,
+            "collection": tier_collection,
             # Disable guardrails for E2E tests to isolate retrieval testing
             "enable_guardrails": False,
             # Relax strict grounding for test flexibility
@@ -240,6 +245,7 @@ class KragE2ERunner:
         logger.info(f"KRAG E2E Setup: Ingesting fixtures from '{self.fixtures_dir}'")
 
         stats = self.engine.ingest(self.fixtures_dir, force=True)
+        self._ingested_collections.add(tier_collection)
 
         ingestion_duration = time.time() - start_time
         logger.info(
@@ -254,11 +260,16 @@ class KragE2ERunner:
 
         return ingestion_duration
 
+    def _collection_for_tier(self, tier_name: str) -> str:
+        """Return a unique collection name for the given tier."""
+        return f"{self._base_collection}_{tier_name}"
+
     def _rebuild_engine(self, tier_name: str) -> None:
         """
         Rebuild engine with a different tier's configuration.
 
-        If the embedding changes, re-ingests with the new embedding.
+        Each tier gets its own collection to avoid dimension conflicts.
+        Only ingests if the tier's collection hasn't been ingested yet.
 
         Args:
             tier_name: Name of the tier to switch to
@@ -275,16 +286,6 @@ class KragE2ERunner:
         e2e_config = load_e2e_config()
         tier_config = get_tier_config(tier_name, e2e_config)
 
-        # Check if embedding changed
-        current_tier_config = (
-            get_tier_config(self._current_tier, e2e_config) if self._current_tier else None
-        )
-        current_embedding = (
-            current_tier_config["embedding"]["plugin_name"] if current_tier_config else None
-        )
-        new_embedding = tier_config["embedding"]["plugin_name"]
-        needs_reingest = current_embedding != new_embedding
-
         chat_plugin = tier_config["chat"]["plugin_name"]
         chat_kwargs = tier_config["chat"].get("kwargs", {})
         embedding_plugin = tier_config["embedding"]["plugin_name"]
@@ -292,12 +293,15 @@ class KragE2ERunner:
         vector_db_plugin = tier_config["vector_db"]["plugin_name"]
         vector_db_kwargs = tier_config["vector_db"].get("kwargs", {})
 
-        # Rebuild engine with new tier config
+        tier_collection = self._collection_for_tier(tier_name)
+        self._tier_collections.add(tier_collection)
+
+        # Rebuild engine with new tier config and tier-specific collection
         config_dict = {
             "chat": chat_plugin,
             "embedding": embedding_plugin,
             "vector_db": vector_db_plugin,
-            "collection": self.collection,
+            "collection": tier_collection,
             "enable_guardrails": False,
             "strict_grounding": False,
             "top_addresses": 20,
@@ -310,12 +314,12 @@ class KragE2ERunner:
         cfg = FitzKragConfig(**config_dict)
         self.engine = FitzKragEngine(cfg)
 
-        if needs_reingest:
+        if tier_collection not in self._ingested_collections:
             logger.info(
-                f"KRAG E2E: Embedding changed ({current_embedding} -> {new_embedding}), "
-                "re-ingesting..."
+                f"KRAG E2E: New collection for tier '{tier_name}', ingesting..."
             )
             self.engine.ingest(self.fixtures_dir, force=True)
+            self._ingested_collections.add(tier_collection)
 
         self._current_tier = tier_name
         logger.info(f"KRAG E2E: Switched to tier '{tier_name}' (chat={chat_plugin})")
@@ -325,19 +329,22 @@ class KragE2ERunner:
         if not self.engine:
             return
 
-        logger.info(f"KRAG E2E Teardown: Cleaning collection '{self.collection}'")
+        logger.info(f"KRAG E2E Teardown: Cleaning {len(self._tier_collections)} tier collections")
 
-        try:
-            self._cleanup_collection()
-        except Exception as e:
-            logger.warning(f"KRAG E2E Teardown: Cleanup error: {e}")
+        for collection in self._tier_collections:
+            try:
+                self._cleanup_collection(collection)
+            except Exception as e:
+                logger.warning(f"KRAG E2E Teardown: Cleanup error for '{collection}': {e}")
 
         self.engine = None
         self._setup_complete = False
         logger.info("KRAG E2E Teardown: Complete")
 
-    def _cleanup_collection(self) -> None:
-        """Drop PostgreSQL tables and vector data for the test collection."""
+    def _cleanup_collection(self, collection: str | None = None) -> None:
+        """Drop PostgreSQL tables and vector data for a test collection."""
+        collection = collection or self._base_collection
+
         from fitz_ai.storage.postgres import PostgresConnectionManager
 
         try:
@@ -353,11 +360,11 @@ class KragE2ERunner:
             for table_name in table_names:
                 try:
                     conn_mgr.execute(
-                        self.collection, f'DROP TABLE IF EXISTS "{table_name}" CASCADE'
+                        collection, f'DROP TABLE IF EXISTS "{table_name}" CASCADE'
                     )
                 except Exception:
                     pass
-            logger.debug(f"Dropped KRAG tables for collection '{self.collection}'")
+            logger.debug(f"Dropped KRAG tables for collection '{collection}'")
         except Exception as e:
             logger.debug(f"PostgreSQL cleanup failed (non-fatal): {e}")
 
@@ -366,7 +373,7 @@ class KragE2ERunner:
 
         for path_fn in [FitzPaths.vocabulary, FitzPaths.entity_graph]:
             try:
-                path = path_fn(self.collection)
+                path = path_fn(collection)
                 if path.exists():
                     path.unlink()
             except Exception:
@@ -462,7 +469,7 @@ class KragE2ERunner:
         total_duration = time.time() - start_time
 
         run_result = E2ERunResult(
-            collection=self.collection,
+            collection=self._base_collection,
             scenario_results=results,
             total_duration_s=total_duration,
         )
