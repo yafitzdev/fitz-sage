@@ -1573,13 +1573,13 @@ Selected **s1=0.55, s2=0.79** — highest trustworthy recall while keeping criti
 
 **Comparison to all previous experiments**:
 
-| Approach | Overall | Abstain | Disputed | Trustworthy | Critical |
-|----------|---------|---------|----------|-------------|----------|
-| Governor (rules) | 26.9% | — | — | — | — |
-| 4-class GBT (Exp 6) | 69.1% | 85% | 67% | n/a | n/a |
-| Two-stage (Exp 8) | 78.5% | 79% | 33% | 91% | n/a |
-| Safety-first (pre-Exp 9) | ~81% | 81.2% | 89.7% | 70.6% | ~3 |
-| **Exp 9 (s1=0.55, s2=0.79)** | **90.9%** | **93.7%** | **94.4%** | **89.0%** | **15** |
+| Approach | Overall | Abstain | Disputed | Trustworthy |
+|----------|---------|---------|----------|-------------|
+| Governor (rules) | 26.9% | — | — | — |
+| 4-class GBT (Exp 6) | 69.1% | 85% | 67% | n/a |
+| Two-stage (Exp 8) | 78.5% | 79% | 33% | 91% |
+| Pre-Exp 9 baseline | ~81% | 81.2% | 89.7% | 70.6% |
+| **Exp 9 (s1=0.55, s2=0.79)** | **90.9%** | **93.7%** | **94.4%** | **89.0%** |
 
 The +10-12pp improvement across all classes came entirely from fixing the train/eval feature distribution mismatch (adding real embeddings + detection to training data).
 

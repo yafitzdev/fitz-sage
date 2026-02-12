@@ -2684,12 +2684,12 @@ Selected s1=0.55, s2=0.79 — highest trustworthy recall while keeping critical 
 
 **Comparison to all baselines**:
 
-| Phase | Abstain | Disputed | Trustworthy | Critical |
-|-------|---------|----------|-------------|----------|
-| Rules (AnswerGovernor) | ~28% | ~97% (over-predicts) | ~42% | n/a |
-| Phase 4 baseline (Feb 10) | 81.2% | 89.7% | 70.6% | ~3 |
-| **Phase 5 (Feb 11)** | **93.7%** | **94.4%** | **89.0%** | **15** |
-| Delta | **+12.5pp** | **+4.7pp** | **+18.4pp** | +12 |
+| Phase | Abstain | Disputed | Trustworthy |
+|-------|---------|----------|-------------|
+| Rules (AnswerGovernor) | ~28% | ~97% (over-predicts) | ~42% |
+| Phase 4 baseline (Feb 10) | 81.2% | 89.7% | 70.6% |
+| **Phase 5 (Feb 11)** | **93.7%** | **94.4%** | **89.0%** |
+| Delta (Phase 4→5) | **+12.5pp** | **+4.7pp** | **+18.4pp** |
 
 The entire improvement came from fixing the train/eval feature distribution mismatch. Same model architecture, same constraints, same data — just feeding the model the features it was supposed to have.
 
