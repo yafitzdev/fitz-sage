@@ -11,8 +11,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from fitz_ai.cloud.cache_key import CacheVersions
 from fitz_ai.cloud.client import CacheLookupResult
 from fitz_ai.core import Answer, Provenance
@@ -127,46 +125,46 @@ class TestCloudClientInit:
         mock_cloud_config_instance.org_id = "org-123"
 
         with (
-            patch(f"fitz_ai.llm.client.get_chat", return_value=MagicMock()),
+            patch("fitz_ai.llm.client.get_chat", return_value=MagicMock()),
             patch(
-                f"fitz_ai.llm.client.get_embedder",
+                "fitz_ai.llm.client.get_embedder",
                 return_value=MagicMock(dimensions=1024),
             ),
             patch(
-                f"fitz_ai.storage.postgres.PostgresConnectionManager.get_instance",
+                "fitz_ai.storage.postgres.PostgresConnectionManager.get_instance",
                 return_value=MagicMock(),
             ),
             patch(
-                f"fitz_ai.engines.fitz_krag.ingestion.raw_file_store.RawFileStore",
+                "fitz_ai.engines.fitz_krag.ingestion.raw_file_store.RawFileStore",
             ),
             patch(
-                f"fitz_ai.engines.fitz_krag.ingestion.symbol_store.SymbolStore",
+                "fitz_ai.engines.fitz_krag.ingestion.symbol_store.SymbolStore",
             ),
             patch(
-                f"fitz_ai.engines.fitz_krag.ingestion.import_graph_store.ImportGraphStore",
+                "fitz_ai.engines.fitz_krag.ingestion.import_graph_store.ImportGraphStore",
             ),
             patch(
-                f"fitz_ai.engines.fitz_krag.ingestion.section_store.SectionStore",
+                "fitz_ai.engines.fitz_krag.ingestion.section_store.SectionStore",
             ),
-            patch(f"fitz_ai.engines.fitz_krag.ingestion.schema.ensure_schema"),
+            patch("fitz_ai.engines.fitz_krag.ingestion.schema.ensure_schema"),
             patch(
-                f"fitz_ai.engines.fitz_krag.retrieval.strategies.code_search.CodeSearchStrategy",
-            ),
-            patch(
-                f"fitz_ai.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy",
-            ),
-            patch(f"fitz_ai.engines.fitz_krag.retrieval.router.RetrievalRouter"),
-            patch(f"fitz_ai.engines.fitz_krag.retrieval.reader.ContentReader"),
-            patch(f"fitz_ai.engines.fitz_krag.retrieval.expander.CodeExpander"),
-            patch(f"fitz_ai.engines.fitz_krag.query_analyzer.QueryAnalyzer"),
-            patch(
-                f"fitz_ai.engines.fitz_krag.context.assembler.ContextAssembler",
+                "fitz_ai.engines.fitz_krag.retrieval.strategies.code_search.CodeSearchStrategy",
             ),
             patch(
-                f"fitz_ai.engines.fitz_krag.generation.synthesizer.CodeSynthesizer",
+                "fitz_ai.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy",
             ),
-            patch(f"fitz_ai.cloud.client.CloudClient", mock_cloud_client_cls),
-            patch(f"fitz_ai.cloud.config.CloudConfig", mock_cloud_config_cls),
+            patch("fitz_ai.engines.fitz_krag.retrieval.router.RetrievalRouter"),
+            patch("fitz_ai.engines.fitz_krag.retrieval.reader.ContentReader"),
+            patch("fitz_ai.engines.fitz_krag.retrieval.expander.CodeExpander"),
+            patch("fitz_ai.engines.fitz_krag.query_analyzer.QueryAnalyzer"),
+            patch(
+                "fitz_ai.engines.fitz_krag.context.assembler.ContextAssembler",
+            ),
+            patch(
+                "fitz_ai.engines.fitz_krag.generation.synthesizer.CodeSynthesizer",
+            ),
+            patch("fitz_ai.cloud.client.CloudClient", mock_cloud_client_cls),
+            patch("fitz_ai.cloud.config.CloudConfig", mock_cloud_config_cls),
         ):
             cloud_dict = {"enabled": True, "api_key": "key", "org_key": "org"}
             config = _make_config(cloud=cloud_dict, enable_detection=False)

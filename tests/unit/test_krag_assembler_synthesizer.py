@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fitz_ai.core import Answer, GenerationError, Provenance
+from fitz_ai.core import Answer, GenerationError
 from fitz_ai.engines.fitz_krag.context.assembler import (
     CHARS_PER_TOKEN,
     ContextAssembler,

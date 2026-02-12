@@ -10,7 +10,6 @@ are grouped by HEADING elements into a hierarchical tree.
 from __future__ import annotations
 
 import logging
-import uuid
 from dataclasses import dataclass, field
 from typing import Any
 

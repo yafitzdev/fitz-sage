@@ -204,10 +204,10 @@ class TestDimensionMismatch:
         conn = MagicMock()
 
         # First call: table exists check returns True
-        # Second call: dimension check returns 384
+        # Second call: format_type() returns column type string
         conn.execute.side_effect = [
             MagicMock(fetchone=Mock(return_value=(True,))),  # table exists
-            MagicMock(fetchone=Mock(return_value=(384,))),  # existing dim
+            MagicMock(fetchone=Mock(return_value=("vector(384)",))),  # existing dim
         ]
 
         mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
@@ -371,7 +371,7 @@ class TestCollectionDiscovery:
     def test_discover_existing_collection(self, pgvector_db, mock_connection_manager):
         """Discover existing collection from database."""
         conn = MagicMock()
-        conn.execute.return_value.fetchone.return_value = (1536,)
+        conn.execute.return_value.fetchone.return_value = ("vector(1536)",)
 
         mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
         mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
@@ -634,10 +634,16 @@ class TestVectorValidation:
         conn.cursor.return_value.__enter__ = Mock(return_value=cursor)
         conn.cursor.return_value.__exit__ = Mock(return_value=False)
 
+        # Mock: table exists with dim=384, so dim=0 triggers mismatch
+        conn.execute.side_effect = [
+            MagicMock(fetchone=Mock(return_value=(True,))),  # table exists
+            MagicMock(fetchone=Mock(return_value=("vector(384)",))),  # existing dim
+        ]
+
         mock_connection_manager.connection.return_value.__enter__ = Mock(return_value=conn)
         mock_connection_manager.connection.return_value.__exit__ = Mock(return_value=False)
 
-        # Empty vector should fail during schema setup (dim=0)
+        # Empty vector should fail during schema setup (dim=0 vs existing 384)
         with patch("pgvector.psycopg.register_vector"):
             # Either raises or handles gracefully
             try:

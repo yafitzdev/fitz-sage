@@ -11,8 +11,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
 from fitz_ai.engines.fitz_krag.retrieval.router import RetrievalRouter
@@ -251,7 +249,7 @@ class TestRouterDetection:
     def test_retrieve_with_comparison_entities_uses_llm_queries(self):
         """Router.retrieve with comparison_entities generates LLM-focused queries."""
         addr1 = _make_address("a.py", "mod.alpha", 0.9)
-        addr2 = _make_address("b.py", "mod.beta", 0.8)
+        _make_address("b.py", "mod.beta", 0.8)  # noqa: F841 - defined for test context
 
         code_strategy = MagicMock(name="code_strategy")
         code_strategy.retrieve.return_value = [addr1]

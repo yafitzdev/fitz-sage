@@ -9,9 +9,7 @@ skip expansion, and expansion failures are handled gracefully.
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from fitz_ai.engines.fitz_krag.retrieval.router import RetrievalRouter
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind

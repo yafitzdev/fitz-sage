@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from fitz_ai.engines.fitz_krag.retrieval.table_handler import TableQueryHandler
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
 

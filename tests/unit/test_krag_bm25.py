@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from fitz_ai.engines.fitz_krag.retrieval.strategies.code_search import CodeSearchStrategy
 from fitz_ai.engines.fitz_krag.types import AddressKind
 

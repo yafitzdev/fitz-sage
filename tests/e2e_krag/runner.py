@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import Optional
 
 from fitz_ai.logging.logger import get_logger
-
 from tests.e2e_krag.cache import ResponseCache
 from tests.e2e_krag.config import get_cache_config, get_tier_config, get_tier_names, load_e2e_config
 from tests.e2e_krag.scenarios import SCENARIOS, TestScenario
@@ -280,6 +279,10 @@ class KragE2ERunner:
 
         logger.info(f"KRAG E2E: Switching to tier '{tier_name}'")
 
+        # Close old engine's connection pools to free pgserver connections
+        if self.engine:
+            self.engine._connection_manager.close_pool(self.engine._config.collection)
+
         from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
         from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
 
@@ -315,9 +318,7 @@ class KragE2ERunner:
         self.engine = FitzKragEngine(cfg)
 
         if tier_collection not in self._ingested_collections:
-            logger.info(
-                f"KRAG E2E: New collection for tier '{tier_name}', ingesting..."
-            )
+            logger.info(f"KRAG E2E: New collection for tier '{tier_name}', ingesting...")
             self.engine.ingest(self.fixtures_dir, force=True)
             self._ingested_collections.add(tier_collection)
 
@@ -359,9 +360,7 @@ class KragE2ERunner:
             ]
             for table_name in table_names:
                 try:
-                    conn_mgr.execute(
-                        collection, f'DROP TABLE IF EXISTS "{table_name}" CASCADE'
-                    )
+                    conn_mgr.execute(collection, f'DROP TABLE IF EXISTS "{table_name}" CASCADE')
                 except Exception:
                     pass
             logger.debug(f"Dropped KRAG tables for collection '{collection}'")
@@ -462,9 +461,7 @@ class KragE2ERunner:
             results.append(result)
 
             status = "PASS" if result.validation.passed else "FAIL"
-            logger.info(
-                f"  [{status}] {scenario.id}: {scenario.name} ({result.duration_ms:.0f}ms)"
-            )
+            logger.info(f"  [{status}] {scenario.id}: {scenario.name} ({result.duration_ms:.0f}ms)")
 
         total_duration = time.time() - start_time
 

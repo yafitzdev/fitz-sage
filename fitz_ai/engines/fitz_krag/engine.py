@@ -18,7 +18,6 @@ from fitz_ai.core import (
     ConfigurationError,
     GenerationError,
     KnowledgeError,
-    Provenance,
     Query,
     QueryError,
 )
@@ -373,7 +372,7 @@ class FitzKragEngine:
 
     def _check_cloud_cache(self, query_text: str, addresses: list) -> Answer | None:
         """Check cloud cache for a previously cached answer."""
-        from fitz_ai.cloud.cache_key import CacheVersions, compute_retrieval_fingerprint
+        from fitz_ai.cloud.cache_key import compute_retrieval_fingerprint
 
         try:
             query_embedding = self._embedder.embed(query_text)
@@ -400,7 +399,7 @@ class FitzKragEngine:
 
     def _store_cloud_cache(self, query_text: str, addresses: list, answer: Answer) -> None:
         """Store an answer in the cloud cache."""
-        from fitz_ai.cloud.cache_key import CacheVersions, compute_retrieval_fingerprint
+        from fitz_ai.cloud.cache_key import compute_retrieval_fingerprint
 
         try:
             query_embedding = getattr(self, "_cached_query_embedding", None)

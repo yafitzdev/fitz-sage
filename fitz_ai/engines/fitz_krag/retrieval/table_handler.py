@@ -131,6 +131,12 @@ class TableQueryHandler:
             return result
 
         col_names, rows = exec_result
+
+        # If SQL returned 0 rows, don't augment — the table has no relevant data
+        if not rows:
+            logger.debug(f"SQL returned 0 rows for query '{query[:50]}', dropping table result")
+            return result
+
         name = result.address.metadata.get("name", result.address.location)
         columns = result.address.metadata.get("columns", original_cols)
 

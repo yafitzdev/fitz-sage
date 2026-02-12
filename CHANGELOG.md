@@ -11,6 +11,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.0] - 2026-02-12
+
+### 🎉 Highlights
+
+**KRAG Engine — Sole Engine Architecture** — The Knowledge Routing Augmented Generation (KRAG) engine replaces `fitz_rag` as the only engine. KRAG introduces multi-strategy query routing (code, section, table, chunk), multi-language code extraction (Python, TypeScript, Java, Go), and address-based retrieval with full expansion (references, imports, section context). The `fitz_rag` engine has been deleted entirely — no shims, no compatibility layer.
+
+**Multi-Strategy Query Routing** — Queries are classified by `QueryAnalyzer` into types (code, documentation, data, cross, general) and routed to specialized retrieval strategies with weighted scoring. Each strategy searches a different index (symbol index, section index, table store, chunk store) and results are merged and ranked.
+
+**Retrieval Robustness** — New `min_relevance_score` config field (default 0.15) filters out low-relevance results from vector search, preventing nonsense queries from polluting LLM context. Strategy calls are wrapped in try-except for graceful handling of missing tables on cloud tiers. Connection pool lifecycle management prevents pool exhaustion across tier switches.
+
+### 🚀 Added
+
+#### KRAG Engine (`fitz_ai/engines/fitz_krag/`)
+- `FitzKragEngine` — Full `KnowledgeEngine` implementation with multi-strategy retrieval
+- `QueryAnalyzer` — LLM-based query classification into code/documentation/data/cross/general types
+- `QueryAnalysis` — Frozen dataclass with `strategy_weights` for weighted retrieval routing
+- `RetrievalRouter` — Dispatches to code, section, table, chunk strategies and merges results
+- `AddressExpander` — Expands retrieved addresses with references, imports, and section context
+- `KRAGPipeline` — Full pipeline orchestration (analyze → route → expand → generate)
+
+#### Multi-Language Code Extraction
+- `PythonExtractor` — AST-based extraction of classes, functions, imports with relative import resolution
+- `TypeScriptExtractor` — TypeScript/JavaScript class, function, interface extraction
+- `JavaExtractor` — Java class, method, interface extraction
+- `GoExtractor` — Go struct, function, interface extraction
+- Symbol index for code-aware retrieval across all supported languages
+
+#### Retrieval Robustness
+- `min_relevance_score` config field — Filters addresses below threshold after ranking
+- Graceful strategy failure handling — Missing tables/indices log warnings instead of crashing
+- `PostgresConnectionManager.close_pool()` — Explicit pool cleanup to prevent connection exhaustion
+- Pool cleanup on tier switch in e2e test runner
+
+#### OllamaVision Provider
+- `OllamaVision` — Local VLM provider for figure description during ingestion
+- VLM parsing integration in KRAG ingestion pipeline
+
+#### Guardrails & Governance Integration
+- Guardrails (conflict-aware, insufficient-evidence, causal-attribution) integrated into KRAG
+- Cloud cache integration for KRAG pipeline
+- Shared detection system (`DetectionOrchestrator`) integrated into KRAG retrieval
+
+### 🔄 Changed
+
+- **Sole engine**: `fitz_krag` is now the only engine — all CLI, runtime, SDK, and API paths updated
+- **`fitz init`**: Engine selection removed; KRAG plugin selection integrated
+- **DATA query weights**: Rebalanced from `{table: 0.85, section: 0.05}` to `{table: 0.70, section: 0.15}` to prevent document-content queries from being misrouted to table strategy
+- **DATA classification prompt**: Sharpened to distinguish explicit tabular operations from questions about facts/specifications that happen to involve numbers
+- **pgvector dimension detection**: Now uses `format_type(atttypid, atttypmod)` returning strings like `"vector(384)"` instead of raw integer dimension queries, preventing dimension mismatch across embedding model changes
+- **Governance thresholds**: Tuned to s1=0.55, s2=0.79 (15 critical cases)
+- **Two-stage classifier**: Added support in eval pipeline
+- **Test suite**: Security, chaos, load, and performance tests migrated from fitz_rag to KRAG API
+
+### 🗑️ Removed
+
+#### fitz_rag Engine (replaced by fitz_krag)
+- `fitz_ai/engines/fitz_rag/` — Entire engine directory deleted
+- `fitz_ai/engines/fitz_rag/retrieval/` — RAG pipeline, steps, strategies
+- `fitz_ai/engines/fitz_rag/generation/` — RGS answer generation
+- `fitz_ai/engines/fitz_rag/config/` — Engine configuration
+- All `fitz_rag` imports, references, and CLI assumptions removed across codebase
+
+#### Other Removals
+- `LLMError` compatibility shim — Direct imports only
+- `BasePluginConfig` / `PluginKwargs` duplicates — Extracted to `core/config.py`
+- Governance guardrails moved from `core/` to shared `fitz_ai/governance/`
+
+### 🔧 Fixed
+
+- **Vector dimension mismatch**: pgvector now detects and prevents dimension mismatches when switching embedding models on an existing collection
+- **Query misrouting**: Document-content queries (battery sizes, CEO names) no longer misclassified as DATA queries
+- **CSV NULL handling**: Empty CSV cells stored as SQL NULL instead of empty string, fixing `IS NULL` queries
+- **Connection pool exhaustion**: Pools explicitly closed when switching tiers, preventing PoolTimeout errors
+- **EngineRegistry global state**: Integration tests no longer pollute the global engine registry
+- **Nonsense query handling**: Low-relevance results filtered out, preventing irrelevant context from reaching the LLM
+
+### 📚 Documentation
+
+- Updated README governance numbers to current v3.0 results
+- Rewritten v3.0 evaluation docs to reflect 3-class ML classifier
+- Updated fitz-gov category references after qualification/confidence rename
+- Governance benchmarking docs updated with production numbers
+- Research notepad restructured to prevent LLM taxonomy confusion
+
+### 📦 Migration from 0.8.x
+
+This is a **breaking release**. The `fitz_rag` engine no longer exists.
+
+- **Import paths**: Replace all `fitz_ai.engines.fitz_rag` imports with `fitz_ai.engines.fitz_krag`
+- **Engine name**: Replace `engine="fitz_rag"` with `engine="fitz_krag"` in all API/SDK calls
+- **Config files**: Engine config is now at `engines/fitz_krag/config/default.yaml`
+- **No compatibility layer**: There are no shims or deprecation warnings — update all references
+
+---
+
 ## [0.8.1] - 2026-02-09
 
 ### 🎉 Highlights
@@ -1478,7 +1573,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.7.0...v0.7.1

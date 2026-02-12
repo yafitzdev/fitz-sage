@@ -10,10 +10,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from fitz_ai.core import Answer, Provenance
-from fitz_ai.core.answer_mode import AnswerMode
 from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
 

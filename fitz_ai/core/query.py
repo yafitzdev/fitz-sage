@@ -15,6 +15,8 @@ class Query:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
-        """Validate query after initialization."""
-        if not self.text or not self.text.strip():
+        """Validate and normalize query text."""
+        if self.text is None:
+            self.text = ""
+        if isinstance(self.text, str) and not self.text.strip():
             raise ValueError("Query text cannot be empty")

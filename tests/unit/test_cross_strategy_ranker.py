@@ -7,7 +7,6 @@ import pytest
 
 from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
 from fitz_ai.engines.fitz_krag.retrieval.ranker import (
-    ENTITY_MATCH_BONUS,
     CrossStrategyRanker,
 )
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind

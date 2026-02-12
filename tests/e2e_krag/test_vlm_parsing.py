@@ -56,7 +56,9 @@ def _model_available(model: str) -> bool:
         data = resp.json()
         model_names = [m.get("name", "") for m in data.get("models", [])]
         # Match with or without tag suffix
-        return any(model in name or name.startswith(model.split(":")[0] + ":") for name in model_names)
+        return any(
+            model in name or name.startswith(model.split(":")[0] + ":") for name in model_names
+        )
     except Exception:
         return False
 
@@ -120,7 +122,6 @@ def vlm_krag_engine(set_workspace):
     from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
     from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
     from fitz_ai.storage.postgres import PostgresConnectionManager
-
     from tests.e2e_krag.config import get_tier_config, get_tier_names, load_e2e_config
 
     collection = f"e2e_vlm_{uuid.uuid4().hex[:8]}"

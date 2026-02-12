@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind
 
 if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
+    from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis
 
 logger = logging.getLogger(__name__)
 

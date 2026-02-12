@@ -6,8 +6,6 @@ from __future__ import annotations
 import sys
 from unittest.mock import MagicMock
 
-import pytest
-
 # ---------------------------------------------------------------------------
 # Mock tree-sitter modules so tests run without optional dependency
 # ---------------------------------------------------------------------------

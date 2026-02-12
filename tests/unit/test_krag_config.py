@@ -1,7 +1,6 @@
 # tests/unit/test_krag_config.py
 """Tests for FitzKragConfig schema and defaults."""
 
-from pathlib import Path
 
 import pytest
 import yaml

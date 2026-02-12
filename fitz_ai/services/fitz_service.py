@@ -623,7 +623,6 @@ class FitzService:
 
         # Check config exists
         from fitz_ai.core.paths import FitzPaths
-
         from fitz_ai.runtime import get_default_engine
 
         config_path = FitzPaths.engine_config(get_default_engine())

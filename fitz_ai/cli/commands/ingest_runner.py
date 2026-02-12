@@ -121,5 +121,3 @@ def command(
     ui.error(f"Engine '{engine}' does not support persistent ingestion.")
     ui.info(f"Use 'fitz quickstart <folder> \"question\" --engine {engine}' instead.")
     raise typer.Exit(1)
-
-

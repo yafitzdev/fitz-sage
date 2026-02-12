@@ -17,7 +17,7 @@ from fitz_ai.core.answer_mode import AnswerMode
 from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
-from fitz_ai.governance.instructions import MODE_INSTRUCTIONS, get_mode_instruction
+from fitz_ai.governance.instructions import get_mode_instruction
 from fitz_ai.governance.protocol import EvidenceItem
 
 # ---------------------------------------------------------------------------

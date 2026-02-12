@@ -32,7 +32,7 @@ def pytest_collection_modifyitems(items):
             item.add_marker(pytest.mark.security)
 
 
-from tests.e2e_krag.config import get_tier_names, load_test_config
+from tests.e2e_krag.config import get_tier_names, load_e2e_config
 
 
 def with_tiered_fallback(test_fn: Callable) -> Callable:
@@ -42,20 +42,20 @@ def with_tiered_fallback(test_fn: Callable) -> Callable:
     Usage:
         @with_tiered_fallback
         def test_something(self):
-            result = self.runner.pipeline.run("query")
-            assert "expected" in result.answer
+            answer = self.runner.engine.answer(Query(text="query"))
+            assert "expected" in answer.text
     """
 
     @functools.wraps(test_fn)
     def wrapper(self, *args, **kwargs):
-        config = load_test_config()
+        config = load_e2e_config()
         tier_names = get_tier_names(config)
 
         last_error = None
         for tier_name in tier_names:
             try:
                 # Switch to this tier
-                self.runner._rebuild_pipeline(tier_name)
+                self.runner._rebuild_engine(tier_name)
 
                 # Run the test
                 test_fn(self, *args, **kwargs)
@@ -73,18 +73,20 @@ def with_tiered_fallback(test_fn: Callable) -> Callable:
 
 
 @pytest.fixture
-def tiered_pipeline(e2e_runner):
+def tiered_pipeline(krag_e2e_runner):
     """
     Fixture providing a pipeline that automatically retries with cloud tier.
 
     Returns a callable that runs a query and assertion with tiered fallback.
     """
-    config = load_test_config()
+    from fitz_ai.core import Query
+
+    config = load_e2e_config()
     tier_names = get_tier_names(config)
 
     def run_with_fallback(query: str, assertion: Callable[[str], bool], error_msg: str = ""):
         """
-        Run query through pipeline, retrying with cloud tier if assertion fails.
+        Run query through engine, retrying with cloud tier if assertion fails.
 
         Args:
             query: The query to run
@@ -102,12 +104,12 @@ def tiered_pipeline(e2e_runner):
 
         for tier_name in tier_names:
             try:
-                e2e_runner._rebuild_pipeline(tier_name)
-                result = e2e_runner.pipeline.run(query)
-                last_answer = result.answer
+                krag_e2e_runner._rebuild_engine(tier_name)
+                answer = krag_e2e_runner.engine.answer(Query(text=query))
+                last_answer = answer.text
 
-                if assertion(result.answer):
-                    return result.answer
+                if assertion(answer.text):
+                    return answer.text
                 else:
                     last_error = AssertionError(
                         f"{error_msg or 'Assertion failed'} (tier={tier_name}): {last_answer[:200]}"

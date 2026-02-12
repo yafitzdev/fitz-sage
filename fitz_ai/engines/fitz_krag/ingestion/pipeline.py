@@ -13,8 +13,8 @@ import hashlib
 import json
 import logging
 import uuid
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fitz_ai.engines.fitz_krag.ingestion.import_graph_store import ImportGraphStore
@@ -528,9 +528,7 @@ class KragIngestPipeline:
 
             vision_client = get_vision(
                 self._config.vision,
-                config=(
-                    self._config.vision_kwargs.model_dump(exclude_none=True) or None
-                ),
+                config=(self._config.vision_kwargs.model_dump(exclude_none=True) or None),
             )
             if vision_client:
                 for parser in router._parsers.values():
@@ -779,7 +777,7 @@ class KragIngestPipeline:
                 for row in samples[:2]:
                     pairs = [f"{col}={val}" for col, val in zip(meta["columns"], row) if val]
                     sample_lines.append(" | ".join(pairs[:8]))
-                sample_str = f"\nSample rows:\n" + "\n".join(sample_lines)
+                sample_str = "\nSample rows:\n" + "\n".join(sample_lines)
             parts.append(
                 f"Table {i + 1}: '{meta['name']}'\n"
                 f"Columns: {cols}\n"

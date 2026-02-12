@@ -16,6 +16,8 @@ from pathlib import Path
 import psutil
 import pytest
 
+from fitz_ai.core import Query
+
 pytestmark = pytest.mark.scalability
 
 
@@ -86,8 +88,8 @@ class TestConcurrentQueries:
     """Test behavior under concurrent query load."""
 
     @pytest.fixture(autouse=True)
-    def setup_pipeline(self, e2e_runner):
-        self.runner = e2e_runner
+    def setup_pipeline(self, krag_e2e_runner):
+        self.runner = krag_e2e_runner
 
     def test_concurrent_queries(self):
         """Multiple concurrent queries should not fail."""
@@ -102,9 +104,9 @@ class TestConcurrentQueries:
         def run_query(query: str) -> tuple[str, float, bool]:
             start = time.perf_counter()
             try:
-                result = self.runner.pipeline.run(query)
+                answer = self.runner.engine.answer(Query(text=query))
                 elapsed = time.perf_counter() - start
-                return (query, elapsed, result is not None)
+                return (query, elapsed, answer is not None)
             except Exception:
                 elapsed = time.perf_counter() - start
                 return (query, elapsed, False)
@@ -133,7 +135,7 @@ class TestConcurrentQueries:
 
         start = time.perf_counter()
         for _ in range(num_queries):
-            self.runner.pipeline.run(query)
+            self.runner.engine.answer(Query(text=query))
         elapsed = time.perf_counter() - start
 
         qps = num_queries / elapsed

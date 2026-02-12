@@ -310,7 +310,9 @@ class GovernanceClassifier:
                 except (ValueError, TypeError):
                     val = 0
             row[name] = val
-        return pd.DataFrame([[row[name] for name in self.feature_names]], columns=self.feature_names)
+        return pd.DataFrame(
+            [[row[name] for name in self.feature_names]], columns=self.feature_names
+        )
 
     def predict(self, features: dict[str, Any]) -> str:
         """Predict governance mode from feature dict.

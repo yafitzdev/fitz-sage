@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import pytest
 
+from fitz_ai.core import Query
+
 from .conftest import PERF_THRESHOLDS
 
 pytestmark = pytest.mark.performance
@@ -18,15 +20,15 @@ class TestQueryLatency:
     """Query latency benchmarks."""
 
     @pytest.fixture(autouse=True)
-    def setup_pipeline(self, e2e_runner):
-        """Use e2e runner's pre-ingested data."""
-        self.runner = e2e_runner
+    def setup_pipeline(self, krag_e2e_runner):
+        """Use KRAG runner's pre-ingested data."""
+        self.runner = krag_e2e_runner
 
     def test_simple_query_latency(self, measure_perf):
         """Simple factual query should be fast."""
 
         def query():
-            return self.runner.pipeline.run("Where is TechCorp headquartered?")
+            return self.runner.engine.answer(Query(text="Where is TechCorp headquartered?"))
 
         metrics = measure_perf(query, iterations=5, warmup=1)
 
@@ -43,8 +45,8 @@ class TestQueryLatency:
         """Multi-hop query latency."""
 
         def query():
-            return self.runner.pipeline.run(
-                "What does Sarah Chen's company's main competitor manufacture?"
+            return self.runner.engine.answer(
+                Query(text="What does Sarah Chen's company's main competitor manufacture?")
             )
 
         metrics = measure_perf(query, iterations=5, warmup=1)
@@ -60,11 +62,13 @@ class TestQueryLatency:
         """Long multi-part query latency."""
 
         def query():
-            return self.runner.pipeline.run(
-                "I need a comprehensive analysis of TechCorp's product lineup "
-                "including all vehicle models with their prices, ranges, battery "
-                "capacities, and key distinguishing features. Also include "
-                "information about the target market segment for each model."
+            return self.runner.engine.answer(
+                Query(
+                    text="I need a comprehensive analysis of TechCorp's product lineup "
+                    "including all vehicle models with their prices, ranges, battery "
+                    "capacities, and key distinguishing features. Also include "
+                    "information about the target market segment for each model."
+                )
             )
 
         # 2 iterations enough to measure latency variance
@@ -78,15 +82,18 @@ class TestRetrievalLatency:
     """Retrieval-only latency (no LLM generation)."""
 
     @pytest.fixture(autouse=True)
-    def setup_pipeline(self, e2e_runner):
-        self.runner = e2e_runner
+    def setup_pipeline(self, krag_e2e_runner):
+        self.runner = krag_e2e_runner
 
     def test_retrieval_only_latency(self, measure_perf):
         """Pure retrieval without LLM should be very fast."""
 
+        analyzer = self.runner.engine._query_analyzer
+
         def retrieve():
-            # Access retrieval step directly
-            return self.runner.pipeline.retrieval.retrieve("TechCorp electric vehicles")
+            query_text = "TechCorp electric vehicles"
+            analysis = analyzer.analyze(query_text)
+            return self.runner.engine._retrieval_router.retrieve(query_text, analysis)
 
         metrics = measure_perf(retrieve, iterations=10, warmup=2)
 
@@ -104,14 +111,14 @@ class TestMemoryUsage:
     """Memory usage benchmarks."""
 
     @pytest.fixture(autouse=True)
-    def setup_pipeline(self, e2e_runner):
-        self.runner = e2e_runner
+    def setup_pipeline(self, krag_e2e_runner):
+        self.runner = krag_e2e_runner
 
     def test_query_memory_stability(self, measure_perf):
         """Memory should not grow unbounded across queries."""
 
         def query():
-            return self.runner.pipeline.run("What is TechCorp?")
+            return self.runner.engine.answer(Query(text="What is TechCorp?"))
 
         # 8 iterations is enough to detect memory leaks
         metrics = measure_perf(query, iterations=8, warmup=1)

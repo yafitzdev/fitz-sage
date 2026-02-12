@@ -37,6 +37,7 @@ from fitz_ai.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
+
 def _default_engine() -> str:
     from fitz_ai.runtime import get_default_engine
 

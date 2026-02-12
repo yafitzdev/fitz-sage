@@ -80,10 +80,10 @@ class TestQueryAnalysis:
     def test_strategy_weights_data(self):
         analysis = QueryAnalysis(primary_type=QueryType.DATA)
         weights = analysis.strategy_weights
-        assert weights["table"] == 0.85
+        assert weights["table"] == 0.70
         assert weights["code"] == 0.05
-        assert weights["section"] == 0.05
-        assert weights["chunk"] == 0.05
+        assert weights["section"] == 0.15
+        assert weights["chunk"] == 0.10
 
     def test_frozen(self):
         analysis = QueryAnalysis(primary_type=QueryType.CODE)

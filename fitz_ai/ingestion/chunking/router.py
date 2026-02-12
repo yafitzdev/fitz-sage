@@ -25,8 +25,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List
 
-from fitz_ai.ingestion.chunking.config import ChunkingRouterConfig
 from fitz_ai.ingestion.chunking.base import Chunker
+from fitz_ai.ingestion.chunking.config import ChunkingRouterConfig
 from fitz_ai.ingestion.chunking.registry import (
     get_chunker_for_extension,
     get_chunking_plugin,

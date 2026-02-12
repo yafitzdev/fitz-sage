@@ -1,8 +1,6 @@
 # tests/unit/test_krag_registration.py
 """Tests for fitz_krag engine registration."""
 
-import pytest
-
 
 class TestKragRegistration:
     def test_engine_registers_in_global_registry(self):

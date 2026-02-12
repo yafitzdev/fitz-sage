@@ -490,6 +490,16 @@ class PostgresConnectionManager:
 
             logger.info(f"{STORAGE} pgserver restarted successfully")
 
+    def close_pool(self, collection: str) -> None:
+        """Close and remove the connection pool for a specific collection."""
+        if collection in self._pools:
+            try:
+                self._pools[collection].close()
+                logger.debug(f"{STORAGE} Closed pool for '{collection}'")
+            except Exception as e:
+                logger.warning(f"{STORAGE} Error closing pool '{collection}': {e}")
+            del self._pools[collection]
+
     def get_pool(self, collection: str) -> "ConnectionPool":
         """
         Get connection pool for a collection.

@@ -58,9 +58,7 @@ def _select_plugins(system, non_interactive: bool) -> dict:
     all_vector_db = available_vector_db_plugins()
 
     # Filter to available, then order by preference (first = default)
-    avail_chat = _order_by_preference(
-        filter_available_plugins(all_chat, "chat", system), "chat"
-    )
+    avail_chat = _order_by_preference(filter_available_plugins(all_chat, "chat", system), "chat")
     avail_embedding = _order_by_preference(
         filter_available_plugins(all_embedding, "embedding", system), "embedding"
     )

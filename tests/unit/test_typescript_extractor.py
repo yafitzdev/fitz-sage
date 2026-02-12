@@ -6,8 +6,6 @@ from __future__ import annotations
 import sys
 from unittest.mock import MagicMock
 
-import pytest
-
 # ---------------------------------------------------------------------------
 # Mock tree-sitter modules so tests run without optional dependency
 # ---------------------------------------------------------------------------
@@ -22,7 +20,6 @@ import fitz_ai.engines.fitz_krag.ingestion.strategies.typescript as _ts_mod  # n
 from fitz_ai.engines.fitz_krag.ingestion.strategies.typescript import (  # noqa: E402
     TypeScriptIngestStrategy,
     _extract_import,
-    _extract_lexical,
     _node_text,
     _path_to_module,
     _walk_node,

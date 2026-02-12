@@ -108,7 +108,11 @@ class PluginType(Enum):
             PluginType.LLM_EMBEDDING: package_root / "llm" / "embedding",
             PluginType.LLM_RERANK: package_root / "llm" / "rerank",
             PluginType.VECTOR_DB: package_root / "vector_db" / "plugins",
-            PluginType.RETRIEVAL: package_root / "engines" / "fitz_krag" / "retrieval" / "strategies",
+            PluginType.RETRIEVAL: package_root
+            / "engines"
+            / "fitz_krag"
+            / "retrieval"
+            / "strategies",
             PluginType.CHUNKER: package_root / "ingestion" / "chunking" / "plugins" / "default",
             PluginType.READER: package_root / "ingestion" / "reader" / "plugins",
             PluginType.CONSTRAINT: package_root / "core" / "guardrails" / "plugins",

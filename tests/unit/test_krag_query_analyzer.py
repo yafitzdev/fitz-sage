@@ -107,13 +107,13 @@ class TestQueryAnalysis:
         }
 
     def test_strategy_weights_data(self) -> None:
-        """DATA type produces table-heavy weights."""
+        """DATA type produces table-heavy weights with section floor for hybrid retrieval."""
         analysis = QueryAnalysis(primary_type=QueryType.DATA)
         assert analysis.strategy_weights == {
             "code": 0.05,
-            "section": 0.05,
-            "table": 0.85,
-            "chunk": 0.05,
+            "section": 0.15,
+            "table": 0.70,
+            "chunk": 0.10,
         }
 
     def test_strategy_weights_returns_copy(self) -> None:

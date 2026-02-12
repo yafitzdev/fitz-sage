@@ -808,7 +808,7 @@ class TestCodeExpander:
         summaries = [r for r in expanded if r.metadata.get("context_type") == "import_summaries"]
         assert len(summaries) == 1
         # Only 2 lines despite 10 available symbols
-        lines = [l for l in summaries[0].content.splitlines() if l.startswith("- ")]
+        lines = [line for line in summaries[0].content.splitlines() if line.startswith("- ")]
         assert len(lines) == 2
 
 

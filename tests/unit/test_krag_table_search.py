@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from fitz_ai.engines.fitz_krag.retrieval.strategies.table_search import (
     TableSearchStrategy,
 )

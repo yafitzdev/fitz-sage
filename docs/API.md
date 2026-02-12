@@ -298,7 +298,7 @@ Health check endpoint.
 ```json
 {
   "status": "healthy",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "config_exists": true
 }
 ```

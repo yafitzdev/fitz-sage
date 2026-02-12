@@ -3,10 +3,7 @@
 
 from __future__ import annotations
 
-import json
-from unittest.mock import MagicMock, call
-
-import pytest
+from unittest.mock import MagicMock
 
 from fitz_ai.engines.fitz_krag.ingestion.table_store import TABLE, TableStore, _vector_to_pg
 

@@ -13,8 +13,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from fitz_ai.engines.fitz_krag.retrieval.expander import CodeExpander
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
 

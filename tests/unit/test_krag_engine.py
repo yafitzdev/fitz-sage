@@ -103,8 +103,8 @@ class TestEngineInit:
         """
         names = {
             # llm
-            "get_chat": f"fitz_ai.llm.client.get_chat",
-            "get_embedder": f"fitz_ai.llm.client.get_embedder",
+            "get_chat": "fitz_ai.llm.client.get_chat",
+            "get_embedder": "fitz_ai.llm.client.get_embedder",
             # storage
             "PostgresConnectionManager": ("fitz_ai.storage.postgres.PostgresConnectionManager"),
             # stores
@@ -436,7 +436,7 @@ class TestAnswer:
             metadata={},
         )
 
-        result = engine.answer(query)
+        engine.answer(query)
 
         engine._table_handler.process.assert_called_once_with(query.text, expanded)
         engine._assembler.assemble.assert_called_once_with(query.text, augmented)
@@ -472,7 +472,9 @@ class TestIngest:
             entity_graph_store=engine._entity_graph_store,
         )
         mock_pipeline_cls.return_value.ingest.assert_called_once_with(
-            source, force=False, on_progress=None,
+            source,
+            force=False,
+            on_progress=None,
         )
         assert result == expected_stats
 

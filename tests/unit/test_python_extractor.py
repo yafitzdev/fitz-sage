@@ -195,7 +195,7 @@ class TestModulePath:
     def test_init_path(self, strategy):
         source = "X = 1\n"
         # __init__.py should not include __init__ in the module name
-        result = strategy.extract(source, "pkg/__init__.py")
+        strategy.extract(source, "pkg/__init__.py")
         # Constants with single char are not UPPER_CASE per regex
         # Use a proper constant name
         source2 = "MAX = 1\n"

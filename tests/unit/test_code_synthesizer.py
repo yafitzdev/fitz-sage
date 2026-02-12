@@ -7,8 +7,6 @@ import pytest
 
 from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 from fitz_ai.engines.fitz_krag.generation.synthesizer import (
-    SYSTEM_PROMPT_GROUNDED,
-    SYSTEM_PROMPT_OPEN,
     CodeSynthesizer,
 )
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult

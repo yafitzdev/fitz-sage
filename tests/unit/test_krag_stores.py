@@ -1,7 +1,7 @@
 # tests/unit/test_krag_stores.py
 """Tests for KRAG stores (RawFileStore, SymbolStore, ImportGraphStore) with mocked DB."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

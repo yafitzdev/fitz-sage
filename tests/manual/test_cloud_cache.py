@@ -31,8 +31,8 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from fitz_ai.core import Query  # noqa: E402
-from fitz_ai.engines.fitz_krag.engine import FitzKragEngine  # noqa: E402
 from fitz_ai.engines.fitz_krag.config import FitzKragConfig  # noqa: E402
+from fitz_ai.engines.fitz_krag.engine import FitzKragEngine  # noqa: E402
 
 
 def test_cache_flow():

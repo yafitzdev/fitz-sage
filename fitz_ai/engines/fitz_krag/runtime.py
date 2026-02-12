@@ -5,7 +5,7 @@ Fitz KRAG Runtime - Engine registration and entry points.
 Auto-registers the fitz_krag engine with the global registry on import.
 """
 
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from fitz_ai.config import load_engine_config
 from fitz_ai.core import Answer

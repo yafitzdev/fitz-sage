@@ -111,18 +111,27 @@ class RetrievalRouter:
 
             # Run code strategy (skip if weight below threshold)
             if not weights or weights.get("code", 1.0) > 0.05:
-                code_addresses = self._code_strategy.retrieve(q, limit)
-                batch.extend(code_addresses)
+                try:
+                    code_addresses = self._code_strategy.retrieve(q, limit)
+                    batch.extend(code_addresses)
+                except Exception as e:
+                    logger.warning(f"Code strategy failed for query '{q[:50]}': {e}")
 
             # Run section strategy if available and weighted
             if self._section_strategy and (not weights or weights.get("section", 1.0) > 0.05):
-                section_addresses = self._section_strategy.retrieve(q, limit)
-                batch.extend(section_addresses)
+                try:
+                    section_addresses = self._section_strategy.retrieve(q, limit)
+                    batch.extend(section_addresses)
+                except Exception as e:
+                    logger.warning(f"Section strategy failed for query '{q[:50]}': {e}")
 
             # Run table strategy if available and weighted
             if self._table_strategy and (not weights or weights.get("table", 1.0) > 0.05):
-                table_addresses = self._table_strategy.retrieve(q, limit)
-                batch.extend(table_addresses)
+                try:
+                    table_addresses = self._table_strategy.retrieve(q, limit)
+                    batch.extend(table_addresses)
+                except Exception as e:
+                    logger.warning(f"Table strategy failed for query '{q[:50]}': {e}")
 
             # Tag addresses with temporal reference if this query is temporal
             if temporal_tag:
@@ -137,9 +146,12 @@ class RetrievalRouter:
             and (not weights or weights.get("chunk", 1.0) > 0.05)
             and len(all_addresses) < self._config.top_addresses // 2
         ):
-            chunk_limit = self._config.top_addresses - len(all_addresses)
-            chunk_addresses = self._chunk_strategy.retrieve(query, chunk_limit)
-            all_addresses.extend(chunk_addresses)
+            try:
+                chunk_limit = self._config.top_addresses - len(all_addresses)
+                chunk_addresses = self._chunk_strategy.retrieve(query, chunk_limit)
+                all_addresses.extend(chunk_addresses)
+            except Exception as e:
+                logger.warning(f"Chunk fallback failed: {e}")
 
         # Deduplicate
         deduped = self._deduplicate(all_addresses)
@@ -152,11 +164,24 @@ class RetrievalRouter:
         if analysis:
             ranker = CrossStrategyRanker()
             ranked = ranker.rank(deduped, analysis)
-            return ranked[: self._config.top_addresses]
+            result = ranked[: self._config.top_addresses]
+        else:
+            # Fallback: sort by score
+            deduped.sort(key=lambda a: a.score, reverse=True)
+            result = deduped[: self._config.top_addresses]
 
-        # Fallback: sort by score
-        deduped.sort(key=lambda a: a.score, reverse=True)
-        return deduped[: self._config.top_addresses]
+        # Filter out addresses below minimum relevance threshold
+        min_score = getattr(self._config, "min_relevance_score", 0)
+        if isinstance(min_score, (int, float)) and min_score > 0:
+            filtered = [a for a in result if a.score >= min_score]
+            if len(filtered) < len(result):
+                logger.debug(
+                    f"Relevance filter: {len(result)} -> {len(filtered)} addresses "
+                    f"(min_score={min_score})"
+                )
+            result = filtered
+
+        return result
 
     def _extract_temporal_refs(self, detection: Any) -> list[str]:
         """Extract temporal reference texts from detection metadata."""
