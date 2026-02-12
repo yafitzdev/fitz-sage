@@ -192,7 +192,7 @@ class FitzService:
         Args:
             question: The question to ask
             collection: Collection to query
-            top_k: Number of chunks to retrieve (uses config default if None)
+            top_k: Number of results to retrieve (uses config default if None)
             conversation_context: For query rewriting (pronoun resolution)
             engine: Engine to use (None = user's default engine)
 
@@ -203,30 +203,22 @@ class FitzService:
             QueryError: If query fails
             CollectionNotFoundError: If collection doesn't exist
         """
+        from fitz_ai.core import Query
         from fitz_ai.runtime import create_engine
 
         if not question or not question.strip():
             raise QueryError("Question cannot be empty")
 
-        # Verify collection exists
-        if not self._collection_exists(collection):
-            raise CollectionNotFoundError(collection)
-
         try:
-            # Create engine with collection override
-            engine_instance = create_engine(
-                engine,
-                collection=collection,
-                top_k=top_k,
-            )
+            engine_instance = create_engine(engine)
+            engine_instance.load(collection)
 
-            # Run query
-            answer = engine_instance.answer(
-                question,
-                conversation_context=conversation_context,
-            )
+            metadata: dict[str, Any] = {}
+            if conversation_context is not None:
+                metadata["conversation_context"] = conversation_context
 
-            return answer
+            query_obj = Query(text=question, metadata=metadata)
+            return engine_instance.answer(query_obj)
 
         except Exception as e:
             logger.error(f"Query failed: {e}")
