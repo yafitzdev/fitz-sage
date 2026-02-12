@@ -79,29 +79,30 @@
 
 ## Experimental Results
 
-### Benchmark v1.0 (200 cases)
+### Per-class recall across all versions
 
-| Approach | Overall | Key Innovation | Notes |
-|----------|---------|----------------|-------|
-| Baseline | 49% | Per-chunk stance | Independent analysis insufficient |
-| + Pairwise | 57.5% | Compare chunks together | +67.5% dispute detection |
-| + Adaptive | 62.5% | Query-type routing | Balances dispute/qualification |
-| + Entity match | 70.5% | Critical term matching | +12.5% abstention |
-| + Aspect | 72.5% | Same entity, different aspect | +17.5% abstention |
-| + Numerical | 73% | Statistical variance | +5% qualification |
-| + Answer verify | 72% | LLM jury (3/3) | Safety over metrics |
+| Version | Cases | Decision | Abstain | Disputed | Trustworthy | Notes |
+|---------|-------|----------|---------|----------|-------------|-------|
+| v1.0 | 200 | Rules (governor) | 72.5% | 90.0% | — | 4-class (conf 86.7%, qual 72.5%) |
+| v2.0 | 331 | Rules (governor) | 57.1% | 89.1% | — | 4-class (conf 79.4%, qual 47.1%) |
+| v3.0 (Exp 6) | 1113 | ML (4-class GBT) | 85.0% | 67.0% | — | 4-class (conf 62%, qual 66%) |
+| v3.0 (3-class pivot) | 1113 | ML (two-stage) | 79.0% | 33.0% | 91.0% | Confident+qualified merged |
+| v3.0 (calibrated) | 1113 | ML (two-stage, s2=0.80) | 81.2% | 89.7% | 70.6% | Safety-first thresholds |
+| **v3.0 (retrained)** | **1113** | **ML (two-stage, s1=0.55, s2=0.79)** | **93.7%** | **94.4%** | **89.0%** | **Real embeddings + detection** |
 
-### Benchmark v2.0 (331 cases)
+v1.0/v2.0 used a 4-class taxonomy (abstain/disputed/qualified/confident) with rule-based priority decisions. v3.0 collapsed to 3-class (abstain/disputed/trustworthy) after analysis showed confident vs qualified was inseparable with current features (max correlation r=0.23).
 
-| Category | v1.0 | v2.0 | Δ | New Cases |
-|----------|------|------|---|-----------|
-| Overall | 72% | 63.14% | -8.86% | +131 |
-| Abstention | 72.5% | 57.14% | -15.36% | +23 |
-| Dispute | 90% | 89.09% | -0.91% | +15 |
-| Qualification | 72.5% | 47.06% | -25.44% | +28 |
-| Confidence | 86.67% | 79.37% | -7.30% | +33 |
-| Grounding | — | 97.62% | — | +17 |
-| Relevance | 0%? | 2.50% | — | +15 |
+### Constraint development progression (v1.0, 200 cases)
+
+| Approach | Overall | Key Innovation |
+|----------|---------|----------------|
+| Baseline | 49% | Per-chunk stance analysis |
+| + Pairwise | 57.5% | Compare chunks together |
+| + Adaptive | 62.5% | Query-type routing |
+| + Entity match | 70.5% | Critical term matching |
+| + Aspect | 72.5% | Same entity, different aspect detection |
+| + Numerical | 73% | Statistical variance detector |
+| + Answer verify | 72% | LLM jury (3/3 votes, safety over metrics) |
 
 ---
 
