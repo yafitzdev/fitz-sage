@@ -92,18 +92,6 @@
 
 v1.0/v2.0 used a 4-class taxonomy (abstain/disputed/qualified/confident) with rule-based priority decisions. v3.0 collapsed to 3-class (abstain/disputed/trustworthy) after analysis showed confident vs qualified was inseparable with current features (max correlation r=0.23).
 
-### Constraint development progression (v1.0, 200 cases)
-
-| Approach | Overall | Key Innovation |
-|----------|---------|----------------|
-| Baseline | 49% | Per-chunk stance analysis |
-| + Pairwise | 57.5% | Compare chunks together |
-| + Adaptive | 62.5% | Query-type routing |
-| + Entity match | 70.5% | Critical term matching |
-| + Aspect | 72.5% | Same entity, different aspect detection |
-| + Numerical | 73% | Statistical variance detector |
-| + Answer verify | 72% | LLM jury (3/3 votes, safety over metrics) |
-
 ---
 
 ## Failure Analysis
