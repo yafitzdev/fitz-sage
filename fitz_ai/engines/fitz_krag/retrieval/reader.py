@@ -146,7 +146,9 @@ class ContentReader:
 
             for name in ("rapidocr", "docling", "RapidOCR",
                         "fitz_ai.ingestion.parser"):
-                _logging.getLogger(name).setLevel(_logging.WARNING)
+                _l = _logging.getLogger(name)
+                _l.setLevel(_logging.WARNING)
+                _l.handlers.clear()
 
             source_file = SourceFile(uri=path.as_uri(), local_path=path)
             router = ParserRouter()

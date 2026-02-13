@@ -99,6 +99,10 @@ class QueryAnalyzer:
 
         try:
             response = self._chat.chat([{"role": "user", "content": prompt}])
+            if not response:
+                return QueryAnalysis(
+                    primary_type=QueryType.GENERAL, confidence=0.3, refined_query=query
+                )
             return self._parse_response(response, query)
         except Exception as e:
             logger.warning(f"Query analysis failed, defaulting to GENERAL: {e}")

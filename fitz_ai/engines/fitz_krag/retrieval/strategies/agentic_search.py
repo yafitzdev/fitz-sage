@@ -221,12 +221,7 @@ class AgenticSearchStrategy:
             from fitz_ai.ingestion.parser import ParserRouter
             from fitz_ai.ingestion.source.base import SourceFile
 
-            # Suppress noisy third-party logs during parsing
-            import logging as _logging
-
-            for name in ("rapidocr", "docling", "RapidOCR",
-                        "fitz_ai.ingestion.parser"):
-                _logging.getLogger(name).setLevel(_logging.WARNING)
+            _suppress_parser_logs()
 
             source_file = SourceFile(uri=path.as_uri(), local_path=path)
             router = ParserRouter()
@@ -304,6 +299,17 @@ class AgenticSearchStrategy:
             )
 
         return addresses
+
+
+def _suppress_parser_logs() -> None:
+    """Suppress noisy third-party logs from PDF/doc parsers."""
+    import logging as _logging
+
+    for name in ("rapidocr", "docling", "RapidOCR",
+                 "fitz_ai.ingestion.parser"):
+        _logger = _logging.getLogger(name)
+        _logger.setLevel(_logging.WARNING)
+        _logger.handlers.clear()
 
 
 def _tokenize(text: str) -> list[str]:
