@@ -25,7 +25,7 @@ def _display_collections_table(collections: list[dict[str, Any]]) -> None:
         table = Table(show_header=True, header_style="bold")
         table.add_column("#", style="dim", width=3)
         table.add_column("Collection", style="cyan")
-        table.add_column("Chunks", justify="right")
+        table.add_column("Items", justify="right")
 
         for i, coll in enumerate(collections, 1):
             table.add_row(
@@ -37,7 +37,7 @@ def _display_collections_table(collections: list[dict[str, Any]]) -> None:
         console.print(table)
     else:
         for i, coll in enumerate(collections, 1):
-            print(f"  {i}. {coll['name']} ({coll.get('count', '?')} chunks)")
+            print(f"  {i}. {coll['name']} ({coll.get('count', '?')} items)")
 
 
 def _display_collection_info(name: str, chunk_count: int, metadata: dict[str, Any]) -> None:
@@ -52,13 +52,13 @@ def _display_collection_info(name: str, chunk_count: int, metadata: dict[str, An
         table.add_column("Value", style="cyan")
 
         table.add_row("Name", name)
-        table.add_row("Chunks", str(chunk_count))
+        table.add_row("Items", str(chunk_count))
         table.add_row("Vector Size", str(metadata.get("vector_size", "?")))
 
         console.print(Panel(table, title=f"[bold]{name}[/bold]", border_style="blue"))
     else:
         print(f"  Name: {name}")
-        print(f"  Chunks: {chunk_count}")
+        print(f"  Items: {chunk_count}")
         print(f"  Vector Size: {metadata.get('vector_size', '?')}")
 
 
@@ -140,7 +140,7 @@ def command() -> None:
         )
 
         if action == "Delete collection":
-            ui.warning(f"This will delete '{selected_collection}' with {chunk_count} chunks.")
+            ui.warning(f"This will delete '{selected_collection}' with {chunk_count} items.")
 
             if ui.prompt_confirm("Are you sure?", default=False):
                 try:
