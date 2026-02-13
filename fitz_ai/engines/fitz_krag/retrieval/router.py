@@ -40,6 +40,7 @@ class RetrievalRouter:
         section_strategy: "SectionSearchStrategy | None" = None,
         table_strategy: "TableSearchStrategy | None" = None,
         chat_factory: Any = None,
+        agentic_strategy: Any = None,
     ):
         self._code_strategy = code_strategy
         self._chunk_strategy = chunk_strategy
@@ -47,6 +48,7 @@ class RetrievalRouter:
         self._table_strategy = table_strategy
         self._config = config
         self._chat_factory = chat_factory
+        self._agentic_strategy = agentic_strategy
         self._keyword_matcher: Any = None  # Set by engine for vocabulary filtering
 
     def retrieve(
@@ -138,6 +140,14 @@ class RetrievalRouter:
                 batch = self._tag_temporal(batch, temporal_tag)
 
             all_addresses.extend(batch)
+
+        # Agentic search for unindexed files
+        if self._agentic_strategy:
+            try:
+                agentic_addresses = self._agentic_strategy.retrieve(query, limit)
+                all_addresses.extend(agentic_addresses)
+            except Exception as e:
+                logger.warning(f"Agentic strategy failed: {e}")
 
         # Chunk fallback when other results are insufficient
         if (

@@ -1,5 +1,5 @@
 # fitz_ai/api/routes/ingest.py
-"""Document ingestion endpoints."""
+"""Document point/indexing endpoints."""
 
 from __future__ import annotations
 
@@ -7,32 +7,30 @@ from fastapi import APIRouter
 
 from fitz_ai.api.dependencies import get_service
 from fitz_ai.api.error_handlers import handle_api_errors
-from fitz_ai.api.models.schemas import IngestRequest, IngestResponse
+from fitz_ai.api.models.schemas import PointRequest, PointResponse
 
 router = APIRouter(tags=["ingest"])
 
 
-@router.post("/ingest", response_model=IngestResponse)
+@router.post("/point", response_model=PointResponse)
 @handle_api_errors
-async def ingest(request: IngestRequest) -> IngestResponse:
+async def point(request: PointRequest) -> PointResponse:
     """
-    Ingest documents into the knowledge base.
+    Point at a folder for progressive querying.
 
-    Provide a path to a file or directory. Documents will be parsed,
-    indexed for code symbols and document sections, and stored in
-    the database.
+    Queries work immediately via agentic search. Background indexing
+    runs silently — queries get progressively faster over time.
     """
     service = get_service()
 
-    result = service.ingest(
+    manifest = service.point(
         source=request.source,
         collection=request.collection,
-        force=request.force,
     )
 
-    return IngestResponse(
-        documents=result.documents_processed,
-        sections=result.sections_created,
-        symbols=result.symbols_created,
-        collection=result.collection,
+    file_count = len(manifest.entries())
+
+    return PointResponse(
+        files=file_count,
+        collection=request.collection,
     )

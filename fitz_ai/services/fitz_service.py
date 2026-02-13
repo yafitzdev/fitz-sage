@@ -19,11 +19,11 @@ Usage:
 
     service = FitzService()
 
+    # Point at docs (progressive querying)
+    manifest = service.point("/path/to/docs", collection="docs")
+
     # Query
     answer = service.query("What is RAG?", collection="docs")
-
-    # Ingest
-    result = service.ingest("/path/to/docs", collection="docs")
 
     # Collections
     collections = service.list_collections()
@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.core import Answer
 from fitz_ai.logging.logger import get_logger
@@ -47,21 +47,6 @@ logger = get_logger(__name__)
 # =============================================================================
 # Result Types
 # =============================================================================
-
-
-@dataclass
-class IngestResult:
-    """Result of an ingestion operation."""
-
-    collection: str
-    documents_processed: int
-    sections_created: int = 0
-    symbols_created: int = 0
-    tables_created: int = 0
-    scanned: int = 0
-    skipped: int = 0
-    errors: list[str] = field(default_factory=list)
-    duration_seconds: float = 0.0
 
 
 @dataclass
@@ -113,12 +98,6 @@ class CollectionNotFoundError(FitzServiceError):
 
 class ConfigurationError(FitzServiceError):
     """Configuration is invalid or missing."""
-
-    pass
-
-
-class IngestError(FitzServiceError):
-    """Ingestion failed."""
 
     pass
 
@@ -197,33 +176,28 @@ class FitzService:
             raise QueryError(f"Query failed: {e}") from e
 
     # =========================================================================
-    # Ingestion Operations
+    # Point Operations
     # =========================================================================
 
-    def ingest(
+    def point(
         self,
         source: str | Path,
         collection: str,
-        *,
-        force: bool = False,
-        on_progress: Callable[[int, int, str], None] | None = None,
-    ) -> IngestResult:
-        """
-        Ingest documents into a collection using KRAG-native pipeline.
+    ) -> Any:
+        """Point at a source directory for progressive querying.
 
-        Incremental by default - only processes new/changed files.
+        Builds manifest, starts background worker, returns immediately.
+        Queries work instantly via agentic search; progressively faster
+        as background indexing completes.
 
         Args:
             source: Path to file or directory
             collection: Target collection name
-            force: Re-ingest everything regardless of state
-            on_progress: Callback(current, total, file_path)
 
         Returns:
-            IngestResult with statistics
+            FileManifest with registered files
 
         Raises:
-            IngestError: If ingestion fails
             ValueError: If source doesn't exist
         """
         from fitz_ai.runtime import create_engine
@@ -232,27 +206,9 @@ class FitzService:
         if not source_path.exists():
             raise ValueError(f"Source path does not exist: {source_path}")
 
-        try:
-            engine = create_engine()
-            engine.load(collection)
-
-            stats = engine.ingest(
-                source_path, collection, force=force, on_progress=on_progress
-            )
-
-            return IngestResult(
-                collection=collection,
-                documents_processed=stats.get("files_new", 0) + stats.get("files_changed", 0),
-                sections_created=stats.get("sections_extracted", 0),
-                symbols_created=stats.get("symbols_extracted", 0),
-                tables_created=stats.get("tables_ingested", 0),
-                scanned=stats.get("files_scanned", 0),
-                skipped=stats.get("files_scanned", 0) - stats.get("files_new", 0) - stats.get("files_changed", 0),
-            )
-
-        except Exception as e:
-            logger.error(f"Ingestion failed: {e}")
-            raise IngestError(f"Ingestion failed: {e}") from e
+        engine = create_engine()
+        engine.load(collection)
+        return engine.point(source_path, collection)
 
     # =========================================================================
     # Collection Operations

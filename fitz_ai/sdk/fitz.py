@@ -10,7 +10,6 @@ This is a thin wrapper around FitzService that adds:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
@@ -24,37 +23,27 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-@dataclass
-class IngestStats:
-    """Statistics from an ingestion operation."""
-
-    documents: int
-    sections: int
-    symbols: int
-    collection: str
-
-
 class fitz:
     """
     Stateful SDK for the Fitz RAG framework.
 
     Provides a simple two-step workflow:
-    1. Ingest documents: fitz.ingest("./docs")
+    1. Point at docs: fitz.point("./docs")
     2. Ask questions: answer = fitz.ask("question?")
 
-    The Fitz object remembers its collection and configuration,
-    allowing multiple queries without re-specifying settings.
+    Queries work immediately via agentic LLM-driven search.
+    Background indexing runs silently — queries get progressively faster.
 
     Examples:
         Simple usage:
         >>> f = fitz()
-        >>> f.ingest("./docs")
+        >>> f.point("./docs")
         >>> answer = f.ask("What is the refund policy?")
         >>> print(answer.text)
 
         With collection name:
         >>> f = fitz(collection="physics")
-        >>> f.ingest("./physics_papers")
+        >>> f.point("./physics_papers")
         >>> answer = f.ask("Explain entanglement")
 
         With custom config:
@@ -103,50 +92,18 @@ class fitz:
 
         return FitzPaths.config()
 
-    def ingest(
-        self,
-        source: Union[str, Path],
-        *,
-        force: bool = False,
-    ) -> IngestStats:
-        """
-        Ingest documents into the knowledge base.
-
-        Incremental by default - only processes new/changed files.
+    def point(self, source: Union[str, Path]) -> None:
+        """Point at a folder for immediate querying with background indexing.
 
         Args:
-            source: Path to a file or directory to ingest.
-            force: Re-ingest all files regardless of state.
-
-        Returns:
-            IngestStats with document, section, and symbol counts.
+            source: Path to a file or directory to query.
 
         Raises:
             ConfigurationError: If config cannot be loaded/created.
-            ValueError: If source path doesn't exist or no documents found.
+            ValueError: If source path doesn't exist.
         """
-        # Ensure config exists
         self._ensure_config()
-
-        # Delegate to service
-        result = self._service.ingest(
-            source=source,
-            collection=self._collection,
-            force=force,
-        )
-
-        logger.info(
-            f"Ingested {result.documents_processed} documents "
-            f"({result.sections_created} sections, {result.symbols_created} symbols) "
-            f"into collection '{self._collection}'"
-        )
-
-        return IngestStats(
-            documents=result.documents_processed,
-            sections=result.sections_created,
-            symbols=result.symbols_created,
-            collection=self._collection,
-        )
+        self._service.point(source=source, collection=self._collection)
 
     def ask(
         self,

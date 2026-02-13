@@ -196,6 +196,37 @@ class SectionStore:
             rows = conn.execute(sql, (section["raw_file_id"],)).fetchall()
         return [_row_to_dict(row) for row in rows]
 
+    def update_summaries_by_file(self, raw_file_id: str, summaries: list[str]) -> None:
+        """Update summaries for all sections in a file, in position order."""
+        ids_sql = f"""
+            SELECT "id" FROM {TABLE}
+            WHERE "raw_file_id" = %s
+            ORDER BY "position"
+        """
+        update_sql = f'UPDATE {TABLE} SET "summary" = %s WHERE "id" = %s'
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(ids_sql, (raw_file_id,)).fetchall()
+            for i, row in enumerate(rows):
+                if i < len(summaries):
+                    conn.execute(update_sql, (summaries[i], row[0]))
+            conn.commit()
+
+    def update_vectors_by_file(self, raw_file_id: str, vectors: list[list[float]]) -> None:
+        """Update summary_vector for all sections in a file, in position order."""
+        ids_sql = f"""
+            SELECT "id" FROM {TABLE}
+            WHERE "raw_file_id" = %s
+            ORDER BY "position"
+        """
+        update_sql = f'UPDATE {TABLE} SET "summary_vector" = %s::vector WHERE "id" = %s'
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(ids_sql, (raw_file_id,)).fetchall()
+            for i, row in enumerate(rows):
+                if i < len(vectors):
+                    vector_str = _vector_to_pg(vectors[i])
+                    conn.execute(update_sql, (vector_str, row[0]))
+            conn.commit()
+
     def delete_by_file(self, raw_file_id: str) -> None:
         """Delete all sections for a file."""
         sql = f'DELETE FROM {TABLE} WHERE "raw_file_id" = %s'

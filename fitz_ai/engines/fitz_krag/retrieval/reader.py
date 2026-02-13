@@ -8,6 +8,7 @@ Addresses are lightweight pointers; reading fetches the actual content.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
@@ -32,12 +33,14 @@ class ContentReader:
         config: "FitzKragConfig | None" = None,
         table_store: "TableStore | None" = None,
         pg_table_store: "PostgresTableStore | None" = None,
+        source_dir: "Path | None" = None,
     ):
         self._raw_store = raw_store
         self._section_store = section_store
         self._config = config
         self._table_store = table_store
         self._pg_table_store = pg_table_store
+        self._source_dir = source_dir
 
     def read(self, addresses: list[Address], limit: int) -> list[ReadResult]:
         """Read content for top addresses."""
@@ -66,10 +69,17 @@ class ContentReader:
         """Read symbol content from raw file by line range."""
         raw_file = self._raw_store.get(addr.source_id)
         if not raw_file:
-            logger.debug(f"Raw file not found for symbol address: {addr.source_id}")
-            return None
+            # Disk fallback for agentic (unindexed) addresses
+            content = self._read_from_disk(addr)
+            if content is None:
+                logger.debug(f"Raw file not found for symbol address: {addr.source_id}")
+                return None
+            lines = content.splitlines()
+            file_path = addr.metadata.get("disk_path", addr.location)
+        else:
+            lines = raw_file["content"].splitlines()
+            file_path = raw_file["path"]
 
-        lines = raw_file["content"].splitlines()
         start = addr.metadata.get("start_line", 1) - 1  # 0-indexed
         end = addr.metadata.get("end_line", len(lines))
         code = "\n".join(lines[max(0, start) : end])
@@ -77,7 +87,7 @@ class ContentReader:
         return ReadResult(
             address=addr,
             content=code,
-            file_path=raw_file["path"],
+            file_path=file_path,
             line_range=(start + 1, end),
         )
 
@@ -85,13 +95,37 @@ class ContentReader:
         """Read entire file content."""
         raw_file = self._raw_store.get(addr.source_id)
         if not raw_file:
-            return None
+            # Disk fallback for agentic (unindexed) addresses
+            content = self._read_from_disk(addr)
+            if content is None:
+                return None
+            file_path = addr.metadata.get("disk_path", addr.location)
+            return ReadResult(
+                address=addr,
+                content=content,
+                file_path=file_path,
+            )
 
         return ReadResult(
             address=addr,
             content=raw_file["content"],
             file_path=raw_file["path"],
         )
+
+    def _read_from_disk(self, addr: Address) -> str | None:
+        """Read file content from disk when not in database (agentic path)."""
+        if not self._source_dir:
+            return None
+        disk_path = addr.metadata.get("disk_path")
+        if not disk_path:
+            return None
+        try:
+            full_path = self._source_dir / disk_path
+            if full_path.exists():
+                return full_path.read_text(encoding="utf-8", errors="replace")
+        except Exception as e:
+            logger.debug(f"Disk read failed for {disk_path}: {e}")
+        return None
 
     def _read_chunk(self, addr: Address) -> ReadResult | None:
         """Read chunk content (stored in address metadata)."""

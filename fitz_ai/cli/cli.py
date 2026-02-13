@@ -5,8 +5,7 @@ Fitz CLI - Main application.
 Commands:
     fitz quickstart    Zero-friction RAG in one command (START HERE)
     fitz init          Setup wizard (for custom configuration)
-    fitz ingest        Ingest documents
-    fitz ingest-table  Ingest CSV/Excel as structured table
+    fitz point         Point at a folder to start querying immediately
     fitz query         Query knowledge base
     fitz chat          Interactive conversation with your knowledge base
     fitz collections   Manage collections (list, info, delete)
@@ -72,28 +71,16 @@ def init(
     mod.command(non_interactive=non_interactive, show_config=show_config)
 
 
-@app.command("ingest")
-def ingest(
-    source: Optional[str] = typer.Argument(None, help="Path to documents (file or directory)."),
-    collection: Optional[str] = typer.Option(None, "--collection", "-c", help="Collection name."),
-    engine: Optional[str] = typer.Option(None, "--engine", "-e", help="Engine to use."),
-    non_interactive: bool = typer.Option(False, "--yes", "-y", help="Non-interactive mode."),
-    force: bool = typer.Option(False, "--force", "-f", help="Force re-ingest all files."),
-    artifacts: Optional[str] = typer.Option(
-        None, "--artifacts", "-a", help="Artifacts to generate."
-    ),
+@app.command("point")
+def point(
+    source: Path = typer.Argument(..., help="Path to documents directory."),
+    collection: str = typer.Option("default", "--collection", "-c", help="Collection name."),
 ) -> None:
-    """Ingest documents into the knowledge base. Hierarchical summaries are always generated."""
-    from fitz_ai.cli.commands import ingest as mod
+    """Point at a folder to start querying immediately."""
+    from fitz_ai.cli.commands import point as mod
 
-    mod.command(
-        source=source,
-        collection=collection,
-        engine=engine,
-        non_interactive=non_interactive,
-        force=force,
-        artifacts=artifacts,
-    )
+    mod.command(source=source, collection=collection)
+
 
 
 @app.command("query")
@@ -200,27 +187,6 @@ def plugin(
         tier=tier,
     )
 
-
-@app.command("ingest-table")
-def ingest_table(
-    source: Path = typer.Argument(..., help="Path to CSV or Excel file."),
-    table_name: Optional[str] = typer.Option(None, "--table", "-t", help="Table name."),
-    primary_key: Optional[str] = typer.Option(None, "--pk", help="Primary key column."),
-    collection: Optional[str] = typer.Option(None, "--collection", "-c", help="Collection name."),
-    sheet: Optional[str] = typer.Option(None, "--sheet", "-s", help="Excel sheet name."),
-    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing table."),
-) -> None:
-    """Ingest a CSV or Excel file as a structured table for SQL-like queries."""
-    from fitz_ai.cli.commands import tables as mod
-
-    mod.ingest_table_command(
-        source=source,
-        table_name=table_name,
-        primary_key=primary_key,
-        collection=collection,
-        sheet=sheet,
-        force=force,
-    )
 
 
 # =============================================================================

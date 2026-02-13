@@ -2,16 +2,16 @@
 """
 Fitz SDK - Stateful Python interface for the Fitz RAG framework.
 
-Provides a simple two-step API for ingesting documents and asking questions.
+Provides a simple two-step API for pointing at documents and asking questions.
 
 Examples:
     >>> from fitz_ai import fitz
     >>> f = fitz()
-    >>> f.ingest("./docs")
+    >>> f.point("./docs")
     >>> answer = f.ask("What is quantum computing?")
     >>> print(answer.text)
 """
 
-from .fitz import IngestStats, fitz
+from .fitz import fitz
 
-__all__ = ["fitz", "IngestStats"]
+__all__ = ["fitz"]

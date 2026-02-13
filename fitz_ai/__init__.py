@@ -101,7 +101,7 @@ def __getattr__(name: str):
         return getattr(runtime, name)
 
     # SDK
-    if name in ("IngestStats", "fitz"):
+    if name == "fitz":
         from fitz_ai import sdk
 
         return getattr(sdk, name)
@@ -110,7 +110,7 @@ def __getattr__(name: str):
 
 
 # =============================================================================
-# MODULE-LEVEL SDK (matches CLI: fitz ingest, fitz query)
+# MODULE-LEVEL SDK (matches CLI: fitz point, fitz query)
 # =============================================================================
 
 _default_fitz = None
@@ -126,23 +126,19 @@ def _get_default_fitz():
     return _default_fitz
 
 
-def ingest(source, collection: str = None, clear_existing: bool = False):
+def point(source, collection: str = None):
     """
-    Ingest documents into the knowledge base.
+    Point at a folder for immediate querying with background indexing.
 
-    Module-level convenience function matching `fitz ingest` CLI.
+    Module-level convenience function matching `fitz point` CLI.
 
     Args:
-        source: Path to file or directory to ingest.
+        source: Path to file or directory.
         collection: Collection name (uses default if not specified).
-        clear_existing: If True, clear collection before ingesting.
-
-    Returns:
-        IngestStats with document and chunk counts.
 
     Examples:
         >>> import fitz_ai
-        >>> fitz_ai.ingest("./docs")
+        >>> fitz_ai.point("./docs")
         >>> answer = fitz_ai.query("What is X?")
     """
     global _default_fitz
@@ -151,7 +147,7 @@ def ingest(source, collection: str = None, clear_existing: bool = False):
 
         _default_fitz = fitz(collection=collection)
     f = _get_default_fitz()
-    return f.ingest(source, clear_existing=clear_existing)
+    return f.point(source)
 
 
 def query(question: str, top_k: int = None):
@@ -169,7 +165,7 @@ def query(question: str, top_k: int = None):
 
     Examples:
         >>> import fitz_ai
-        >>> fitz_ai.ingest("./docs")
+        >>> fitz_ai.point("./docs")
         >>> answer = fitz_ai.query("What is the refund policy?")
         >>> print(answer.text)
     """
@@ -207,7 +203,6 @@ __all__ = [
     "get_engine_registry",
     # SDK
     "fitz",
-    "IngestStats",
-    "ingest",
+    "point",
     "query",
 ]

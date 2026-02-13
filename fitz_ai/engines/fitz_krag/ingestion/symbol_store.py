@@ -180,6 +180,52 @@ class SymbolStore:
             results.append(d)
         return results
 
+    def get_summaries_by_file(self, raw_file_id: str) -> list[dict[str, Any]]:
+        """Get symbol IDs, names, kinds, and summaries for a file."""
+        sql = f"""
+            SELECT "id", "name", "kind", "summary"
+            FROM {TABLE}
+            WHERE "raw_file_id" = %s
+            ORDER BY "start_line"
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, (raw_file_id,)).fetchall()
+        return [
+            {"id": row[0], "name": row[1], "kind": row[2], "summary": row[3]}
+            for row in rows
+        ]
+
+    def update_summaries_by_file(self, raw_file_id: str, summaries: list[str]) -> None:
+        """Update summaries for all symbols in a file, in start_line order."""
+        ids_sql = f"""
+            SELECT "id" FROM {TABLE}
+            WHERE "raw_file_id" = %s
+            ORDER BY "start_line"
+        """
+        update_sql = f'UPDATE {TABLE} SET "summary" = %s WHERE "id" = %s'
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(ids_sql, (raw_file_id,)).fetchall()
+            for i, row in enumerate(rows):
+                if i < len(summaries):
+                    conn.execute(update_sql, (summaries[i], row[0]))
+            conn.commit()
+
+    def update_vectors_by_file(self, raw_file_id: str, vectors: list[list[float]]) -> None:
+        """Update summary_vector for all symbols in a file, in start_line order."""
+        ids_sql = f"""
+            SELECT "id" FROM {TABLE}
+            WHERE "raw_file_id" = %s
+            ORDER BY "start_line"
+        """
+        update_sql = f'UPDATE {TABLE} SET "summary_vector" = %s::vector WHERE "id" = %s'
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(ids_sql, (raw_file_id,)).fetchall()
+            for i, row in enumerate(rows):
+                if i < len(vectors):
+                    vector_str = _vector_to_pg(vectors[i])
+                    conn.execute(update_sql, (vector_str, row[0]))
+            conn.commit()
+
 
 def _vector_to_pg(vector: list[float] | None) -> str | None:
     """Convert a float list to pgvector string format."""

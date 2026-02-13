@@ -9,7 +9,6 @@ content is read on demand after ranking.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -50,14 +49,39 @@ class FitzKragEngine:
     def __init__(self, config: FitzKragConfig):
         try:
             self._config = config
+            self._bg_worker: Any = None
+            self._manifest: Any = None
+            self._source_dir: Path | None = None
             self._init_components()
         except Exception as e:
             raise ConfigurationError(f"Failed to initialize Fitz KRAG engine: {e}") from e
 
     def load(self, collection: str) -> None:
         """Load a collection, reinitializing collection-dependent components."""
+        # Stop background worker when switching collections
+        if self._bg_worker and collection != self._config.collection:
+            self._bg_worker.stop()
+            self._bg_worker = None
+            self._manifest = None
+            self._source_dir = None
+
         self._config.collection = collection
         self._init_components()
+
+        # Re-wire progressive state if still active after reload
+        if self._manifest and self._source_dir:
+            from fitz_ai.engines.fitz_krag.retrieval.strategies.agentic_search import (
+                AgenticSearchStrategy,
+            )
+
+            agentic = AgenticSearchStrategy(
+                manifest=self._manifest,
+                source_dir=self._source_dir,
+                chat_factory=self._chat_factory,
+                config=self._config,
+            )
+            self._retrieval_router._agentic_strategy = agentic
+            self._reader._source_dir = self._source_dir
 
     def _init_components(self) -> None:
         """Initialize engine components lazily."""
@@ -275,6 +299,8 @@ class FitzKragEngine:
         if not query.text or not query.text.strip():
             raise QueryError("Query text cannot be empty")
 
+        if self._bg_worker:
+            self._bg_worker.signal_query_start()
         try:
             # 0. Sanitize and normalize query
             import re
@@ -377,6 +403,16 @@ class FitzKragEngine:
             if self._cloud_client:
                 self._store_cloud_cache(query.text, addresses, answer)
 
+            # 7.6. Boost queried files for background worker priority
+            if self._bg_worker:
+                queried_paths = [
+                    a.metadata.get("disk_path")
+                    for a in addresses
+                    if a.metadata.get("disk_path")
+                ]
+                if queried_paths:
+                    self._bg_worker.boost_files(queried_paths)
+
             return answer
 
         except Exception as e:
@@ -387,6 +423,9 @@ class FitzKragEngine:
                 raise GenerationError(f"Generation failed: {e}") from e
             else:
                 raise KnowledgeError(f"KRAG pipeline error: {e}") from e
+        finally:
+            if self._bg_worker:
+                self._bg_worker.signal_query_end()
 
     def _check_cloud_cache(self, query_text: str, addresses: list) -> Answer | None:
         """Check cloud cache for a previously cached answer."""
@@ -450,40 +489,82 @@ class FitzKragEngine:
             prompt_template="default",
         )
 
-    def ingest(
-        self,
-        source: Path,
-        collection: str | None = None,
-        force: bool = False,
-        on_progress: Callable[[int, int, str], None] | None = None,
-    ) -> dict:
-        """
-        Ingest source files into the KRAG knowledge store.
+    def point(self, source: Path, collection: str | None = None) -> Any:
+        """Register source directory for progressive querying.
+
+        1. Build manifest (fast, no LLM/embedding)
+        2. Ensure PostgreSQL schema exists (for background worker)
+        3. Create AgenticSearchStrategy, wire into router
+        4. Set source_dir on ContentReader (disk fallback)
+        5. Start BackgroundIngestWorker
+        6. Return manifest immediately
 
         Args:
             source: Path to source directory or file
-            collection: Collection name override (uses config default if None)
-            force: If True, re-ingest all files regardless of hash state
-            on_progress: Optional callback(current, total, file_path) for progress
+            collection: Collection name override
 
         Returns:
-            Stats dict with files, symbols, imports counts
+            FileManifest with registered files
         """
-        from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+        from fitz_ai.core.paths import FitzPaths
+        from fitz_ai.engines.fitz_krag.progressive.builder import ManifestBuilder
+        from fitz_ai.engines.fitz_krag.retrieval.strategies.agentic_search import (
+            AgenticSearchStrategy,
+        )
 
         col = collection or self._config.collection
-        pipeline = KragIngestPipeline(
+        source = Path(source).resolve()
+
+        # 0. Stop existing background worker if re-pointing
+        if self._bg_worker:
+            self._bg_worker.stop()
+            self._bg_worker = None
+
+        # 1. Build manifest
+        manifest_path = FitzPaths.workspace() / "collections" / col / "manifest.json"
+        builder = ManifestBuilder(self._config)
+        manifest = builder.build(source, manifest_path)
+        self._manifest = manifest
+        self._source_dir = source
+
+        # 2. Schema already ensured in _init_components()
+
+        # 3. Create agentic strategy and wire into router
+        agentic = AgenticSearchStrategy(
+            manifest=manifest,
+            source_dir=source,
+            chat_factory=self._chat_factory,
+            config=self._config,
+        )
+        self._retrieval_router._agentic_strategy = agentic
+
+        # 4. Set source_dir on ContentReader for disk fallback
+        self._reader._source_dir = source
+
+        # 5. Start background worker
+        from fitz_ai.engines.fitz_krag.progressive.worker import BackgroundIngestWorker
+
+        self._bg_worker = BackgroundIngestWorker(
+            manifest=manifest,
+            source_dir=source,
             config=self._config,
             chat=self._chat,
             embedder=self._embedder,
             connection_manager=self._connection_manager,
             collection=col,
-            table_store=self._table_store,
-            pg_table_store=self._pg_table_store,
+            stores={
+                "raw": self._raw_store,
+                "symbol": self._symbol_store,
+                "import": self._import_store,
+                "section": self._section_store,
+                "table": self._table_store,
+            },
             vocabulary_store=self._vocabulary_store,
             entity_graph_store=self._entity_graph_store,
         )
-        return pipeline.ingest(source, force=force, on_progress=on_progress)
+        self._bg_worker.start()
+
+        return manifest
 
     @property
     def config(self) -> FitzKragConfig:

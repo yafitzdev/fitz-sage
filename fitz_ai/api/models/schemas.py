@@ -66,21 +66,23 @@ class ChatResponse(BaseModel):
     )
 
 
-class IngestRequest(BaseModel):
-    """Request to ingest documents."""
+class PointRequest(BaseModel):
+    """Request to point at a source directory for progressive querying."""
 
-    source: str = Field(..., description="Path to file or directory to ingest")
+    source: str = Field(..., description="Path to file or directory")
     collection: str = Field("default", description="Target collection name")
-    force: bool = Field(False, description="Re-ingest all files regardless of state")
 
 
-class IngestResponse(BaseModel):
-    """Response from an ingestion request."""
+class PointResponse(BaseModel):
+    """Response from a point request."""
 
-    documents: int = Field(..., description="Number of documents ingested")
-    sections: int = Field(0, description="Number of document sections created")
-    symbols: int = Field(0, description="Number of code symbols created")
+    files: int = Field(..., description="Number of files registered")
     collection: str = Field(..., description="Target collection name")
+
+
+# Backward-compatible aliases
+IngestRequest = PointRequest
+IngestResponse = PointResponse
 
 
 class CollectionInfo(BaseModel):

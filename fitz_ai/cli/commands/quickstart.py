@@ -58,7 +58,7 @@ def command(
     ),
 ) -> None:
     """
-    One-command RAG: ingest docs and ask a question.
+    One-command RAG: point at docs and ask a question.
 
     Examples:
         fitz quickstart                                      # Interactive
@@ -143,10 +143,10 @@ def _run_quickstart(source: Path, question: str, collection: str, verbose: bool)
         _create_provider_config(engine_config_path, provider, extra)
 
     # =========================================================================
-    # Step 3: Ingest Documents
+    # Step 3: Register Documents
     # =========================================================================
 
-    ui.step(1, 3, f"Ingesting documents from {source}...")
+    ui.step(1, 3, f"Registering documents from {source}...")
 
     try:
         stats = _run_ingestion(
@@ -154,21 +154,11 @@ def _run_quickstart(source: Path, question: str, collection: str, verbose: bool)
             collection=collection,
             verbose=verbose,
         )
-        sections = stats.get("sections_extracted", 0)
-        symbols = stats.get("symbols_extracted", 0)
         files = stats.get("files_new", 0) + stats.get("files_changed", 0)
-
-        parts = []
-        if sections:
-            parts.append(f"{sections} sections")
-        if symbols:
-            parts.append(f"{symbols} symbols")
-
-        detail = f" ({', '.join(parts)})" if parts else ""
-        ui.success(f"Ingested {files} documents{detail}")
+        ui.success(f"Registered {files} files — ready for queries")
 
     except Exception as e:
-        ui.error(f"Ingestion failed: {e}")
+        ui.error(f"Registration failed: {e}")
         if verbose:
             import traceback
 
@@ -571,9 +561,9 @@ def _run_ingestion(
     verbose: bool = False,
 ) -> dict:
     """
-    Run KRAG-native ingestion (sections, symbols, tables).
+    Point at source directory for progressive querying.
 
-    Returns stats dict from KragIngestPipeline.
+    Returns stats dict with file count from manifest.
     """
     from fitz_ai.runtime import create_engine, get_default_engine
 
@@ -581,7 +571,9 @@ def _run_ingestion(
     engine = create_engine(engine_name)
     engine.load(collection)
 
-    return engine.ingest(source, collection, force=True)
+    manifest = engine.point(source, collection)
+    file_count = len(manifest.entries())
+    return {"files_new": file_count, "files_changed": 0}
 
 
 # =============================================================================
@@ -711,4 +703,4 @@ def _run_table_quickstart(source: Path, question: str, verbose: bool) -> None:
     print()
     ui.info("Table was queried directly (fast path, no persistent indexing).")
     ui.info("To index for future RAG queries, use:")
-    ui.info(f"  fitz ingest {source} --collection my_tables")
+    ui.info(f"  fitz point {source} --collection my_tables")
