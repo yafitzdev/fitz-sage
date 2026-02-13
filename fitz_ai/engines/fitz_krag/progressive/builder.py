@@ -93,6 +93,7 @@ class ManifestBuilder:
                 content_hash = hashlib.sha256(raw_bytes).hexdigest()
                 existing_entry = existing.get(rel_path)
                 if existing_entry and existing_entry.content_hash == content_hash:
+                    manifest.add(existing_entry)
                     continue
 
                 file_id = existing_entry.file_id if existing_entry else str(uuid.uuid4())
@@ -119,9 +120,10 @@ class ManifestBuilder:
 
             content_hash = hashlib.sha256(content.encode()).hexdigest()
 
-            # Skip unchanged files
+            # Re-add unchanged files (manifest was cleared, so we must re-add)
             existing_entry = existing.get(rel_path)
             if existing_entry and existing_entry.content_hash == content_hash:
+                manifest.add(existing_entry)
                 continue
 
             file_id = existing_entry.file_id if existing_entry else str(uuid.uuid4())
