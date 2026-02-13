@@ -55,16 +55,12 @@ class IngestResult:
 
     collection: str
     documents_processed: int
-    chunks_created: int
-    chunks_new: int = 0
-    chunks_updated: int = 0
-    chunks_deleted: int = 0
-    errors: list[str] = field(default_factory=list)
+    sections_created: int = 0
+    symbols_created: int = 0
+    tables_created: int = 0
     scanned: int = 0
     skipped: int = 0
-    enriched: int = 0
-    artifacts_generated: int = 0
-    hierarchy_summaries: int = 0
+    errors: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0
 
 
@@ -131,29 +127,6 @@ class QueryError(FitzServiceError):
     """Query failed."""
 
     pass
-
-
-# =============================================================================
-# Adapters
-# =============================================================================
-
-
-class _VectorDBWriterAdapter:
-    """Adapts vector DB client to VectorDBWriter protocol."""
-
-    def __init__(self, client):
-        self._client = client
-
-    def upsert(
-        self, collection: str, points: list[dict[str, Any]], defer_persist: bool = False
-    ) -> None:
-        """Upsert points into collection."""
-        self._client.upsert(collection, points, defer_persist=defer_persist)
-
-    def flush(self) -> None:
-        """Flush any pending writes to disk."""
-        if hasattr(self._client, "flush"):
-            self._client.flush()
 
 
 # =============================================================================
@@ -233,11 +206,10 @@ class FitzService:
         collection: str,
         *,
         force: bool = False,
-        artifacts: str | None = "none",
         on_progress: Callable[[int, int, str], None] | None = None,
     ) -> IngestResult:
         """
-        Ingest documents into a collection.
+        Ingest documents into a collection using KRAG-native pipeline.
 
         Incremental by default - only processes new/changed files.
 
@@ -245,7 +217,6 @@ class FitzService:
             source: Path to file or directory
             collection: Target collection name
             force: Re-ingest everything regardless of state
-            artifacts: "none", "all", or comma-separated list
             on_progress: Callback(current, total, file_path)
 
         Returns:
@@ -255,186 +226,33 @@ class FitzService:
             IngestError: If ingestion fails
             ValueError: If source doesn't exist
         """
-        from fitz_ai.ingestion.diff import run_diff_ingest
+        from fitz_ai.runtime import create_engine
 
         source_path = Path(source)
         if not source_path.exists():
             raise ValueError(f"Source path does not exist: {source_path}")
 
         try:
-            (
-                state_manager,
-                writer,
-                embedder,
-                parser_router,
-                chunking_router,
-                embedding_id,
-                vector_db_plugin,
-                enrichment_pipeline,
-            ) = self._build_ingest_components(source_path, artifacts)
+            engine = create_engine()
+            engine.load(collection)
 
-            has_artifacts = artifacts and artifacts != "none"
-
-            summary = run_diff_ingest(
-                source=str(source_path),
-                state_manager=state_manager,
-                vector_db_writer=writer,
-                embedder=embedder,
-                parser_router=parser_router,
-                chunking_router=chunking_router,
-                collection=collection,
-                embedding_id=embedding_id,
-                vector_db_id=vector_db_plugin,
-                enrichment_pipeline=enrichment_pipeline,
-                force=force,
-                on_progress=on_progress,
-                skip_artifacts=not has_artifacts,
+            stats = engine.ingest(
+                source_path, collection, force=force, on_progress=on_progress
             )
 
-            return self._summary_to_result(summary, collection)
+            return IngestResult(
+                collection=collection,
+                documents_processed=stats.get("files_new", 0) + stats.get("files_changed", 0),
+                sections_created=stats.get("sections_extracted", 0),
+                symbols_created=stats.get("symbols_extracted", 0),
+                tables_created=stats.get("tables_ingested", 0),
+                scanned=stats.get("files_scanned", 0),
+                skipped=stats.get("files_scanned", 0) - stats.get("files_new", 0) - stats.get("files_changed", 0),
+            )
 
         except Exception as e:
             logger.error(f"Ingestion failed: {e}")
             raise IngestError(f"Ingestion failed: {e}") from e
-
-    def _build_ingest_components(self, source: Path, artifacts: str | None = None) -> tuple:
-        """Build all components required for diff ingestion."""
-        from fitz_ai.cli.commands.ingest_config import build_chunking_router_config
-        from fitz_ai.cli.context import CLIContext
-        from fitz_ai.ingestion.chunking.router import ChunkingRouter
-        from fitz_ai.ingestion.parser import ParserRouter
-        from fitz_ai.ingestion.state import IngestStateManager
-
-        ctx = CLIContext.load()
-
-        state_manager = IngestStateManager()
-        state_manager.load()
-
-        parser_router = ParserRouter(docling_parser=ctx.parser)
-        router_config = build_chunking_router_config(ctx)
-        chunking_router = ChunkingRouter.from_config(router_config)
-
-        embedder = ctx.get_embedder()
-        vector_client = ctx.get_vector_db_client()
-        writer = _VectorDBWriterAdapter(vector_client)
-
-        enrichment_pipeline = self._build_enrichment_pipeline(ctx, source, artifacts)
-
-        return (
-            state_manager,
-            writer,
-            embedder,
-            parser_router,
-            chunking_router,
-            ctx.embedding_id,
-            ctx.vector_db_plugin,
-            enrichment_pipeline,
-        )
-
-    def _build_enrichment_pipeline(self, ctx, source: Path, artifacts: str | None):
-        """Build enrichment pipeline with artifact configuration."""
-        from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
-
-        # Parse artifact selection
-        if artifacts == "none" or artifacts is None:
-            selected_artifacts: list[str] = []
-        elif artifacts == "all":
-            from fitz_ai.cli.commands.ingest_helpers import get_available_artifacts
-
-            available = get_available_artifacts(has_llm=bool(ctx.chat_plugin))
-            selected_artifacts = [name for name, _ in available]
-        else:
-            selected_artifacts = [a.strip() for a in artifacts.split(",") if a.strip()]
-
-        enrichment_cfg: dict[str, Any] = {"enabled": True}
-        if selected_artifacts:
-            enrichment_cfg["artifacts"] = {"enabled": selected_artifacts}
-
-        config = EnrichmentConfig.model_validate(enrichment_cfg)
-        chat_factory = ctx.get_chat_factory() if ctx.chat_plugin else None
-
-        return EnrichmentPipeline(
-            config=config,
-            project_root=source.resolve(),
-            chat_factory=chat_factory,
-        )
-
-    def _summary_to_result(self, summary, collection: str) -> IngestResult:
-        """Convert IngestSummary to IngestResult."""
-        return IngestResult(
-            collection=collection,
-            documents_processed=summary.ingested,
-            chunks_created=summary.ingested,
-            chunks_new=summary.ingested - summary.rechunked,
-            chunks_updated=summary.rechunked,
-            chunks_deleted=summary.marked_deleted,
-            errors=summary.error_details,
-            scanned=summary.scanned,
-            skipped=summary.skipped,
-            enriched=summary.enriched,
-            artifacts_generated=summary.artifacts_generated,
-            hierarchy_summaries=summary.hierarchy_summaries,
-            duration_seconds=summary.duration_seconds,
-        )
-
-    def ingest_text(
-        self,
-        text: str,
-        collection: str,
-        *,
-        source_id: str = "direct_text",
-        metadata: dict[str, Any] | None = None,
-    ) -> IngestResult:
-        """
-        Ingest raw text directly (without file).
-
-        Args:
-            text: Text content to ingest
-            collection: Target collection
-            source_id: Identifier for the text source
-            metadata: Additional metadata to attach
-
-        Returns:
-            IngestResult with statistics
-        """
-        from fitz_ai.ingestion.chunking.router import ChunkingRouter
-        from fitz_ai.llm import get_embedder
-        from fitz_ai.vector_db.registry import get_vector_db_plugin
-        from fitz_ai.vector_db.writer import VectorDBWriter
-
-        if not text or not text.strip():
-            raise ValueError("Text cannot be empty")
-
-        try:
-            # Create chunks from text
-            chunker = ChunkingRouter.from_defaults().get_chunker(".txt")
-            from fitz_ai.ingestion.parser.base import ParsedDocument
-
-            doc = ParsedDocument(
-                full_text=text,
-                sections=[],
-                metadata={"source_id": source_id, **(metadata or {})},
-            )
-            chunks = chunker.chunk(doc)
-
-            # Embed chunks
-            embedder = get_embedder()
-            vectors = [embedder.embed(c.content) for c in chunks]
-
-            # Store
-            vdb = get_vector_db_plugin()
-            writer = VectorDBWriter(client=vdb)
-            writer.upsert(collection=collection, chunks=chunks, vectors=vectors)
-
-            return IngestResult(
-                collection=collection,
-                documents_processed=1,
-                chunks_created=len(chunks),
-                chunks_new=len(chunks),
-            )
-
-        except Exception as e:
-            raise IngestError(f"Text ingestion failed: {e}") from e
 
     # =========================================================================
     # Collection Operations
