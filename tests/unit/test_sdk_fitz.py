@@ -76,11 +76,10 @@ class TestFitzConfigCreation:
 
         config = yaml.safe_load(config_path.read_text())
 
-        # Flat format keys (v0.8.0+)
+        # Flat format keys (v0.9.0+ KRAG)
         assert "chat" in config
         assert "embedding" in config
         assert "vector_db" in config
-        assert "retrieval_plugin" in config
         assert "rerank" in config
         assert "collection" in config
 
@@ -197,10 +196,11 @@ class TestIngestStats:
         """Test IngestStats has expected fields."""
         from fitz_ai.sdk import IngestStats
 
-        stats = IngestStats(documents=10, chunks=50, collection="test")
+        stats = IngestStats(documents=10, sections=50, symbols=5, collection="test")
 
         assert stats.documents == 10
-        assert stats.chunks == 50
+        assert stats.sections == 50
+        assert stats.symbols == 5
         assert stats.collection == "test"
 
 

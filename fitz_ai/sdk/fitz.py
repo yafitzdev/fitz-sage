@@ -108,7 +108,6 @@ class fitz:
         source: Union[str, Path],
         *,
         force: bool = False,
-        artifacts: Optional[str] = "none",
     ) -> IngestStats:
         """
         Ingest documents into the knowledge base.
@@ -118,7 +117,6 @@ class fitz:
         Args:
             source: Path to a file or directory to ingest.
             force: Re-ingest all files regardless of state.
-            artifacts: "none", "all", or comma-separated list of artifact types.
 
         Returns:
             IngestStats with document, section, and symbol counts.
@@ -135,7 +133,6 @@ class fitz:
             source=source,
             collection=self._collection,
             force=force,
-            artifacts=artifacts,
         )
 
         logger.info(

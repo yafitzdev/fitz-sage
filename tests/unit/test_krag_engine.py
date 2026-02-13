@@ -298,7 +298,7 @@ class TestAnswer:
 
         result = engine.answer(query)
 
-        assert "No relevant code" in result.text
+        assert "No information found" in result.text
         assert result.provenance == []
         assert result.metadata["engine"] == "fitz_krag"
         assert result.metadata["query"] == query.text
