@@ -729,7 +729,7 @@ def _display_fitz_gov_rich(result) -> None:
     table.add_column("Total", justify="right")
 
     # Import FitzGovCategory for dict access
-    from fitz_gov import FitzGovCategory
+    from fitz_ai.evaluation.benchmarks.fitz_gov import FitzGovCategory
 
     gov_cats = [
         FitzGovCategory.ABSTENTION,
@@ -789,7 +789,7 @@ def _display_fitz_gov_rich(result) -> None:
 
 def _display_fitz_gov_plain(result) -> None:
     """Display fitz-gov results in plain text."""
-    from fitz_gov import FitzGovCategory
+    from fitz_ai.evaluation.benchmarks.fitz_gov import FitzGovCategory
 
     print("Governance Mode Categories:")
     print("-" * 40)
