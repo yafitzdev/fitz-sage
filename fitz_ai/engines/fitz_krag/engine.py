@@ -276,15 +276,28 @@ class FitzKragEngine:
             raise QueryError("Query text cannot be empty")
 
         try:
+            # 0. Sanitize and normalize query
+            import re
+
+            sanitized = re.sub(r"<[^>]+>", "", query.text).strip()
+            if not sanitized:
+                sanitized = query.text.strip()
+
+            # Truncate excessively long queries
+            MAX_QUERY_LENGTH = 500
+            if len(sanitized) > MAX_QUERY_LENGTH:
+                sanitized = sanitized[:MAX_QUERY_LENGTH]
+                logger.debug(f"Query truncated to {MAX_QUERY_LENGTH} chars")
+
             # 0.5. Rewrite query for retrieval optimization
-            retrieval_query = query.text
+            retrieval_query = sanitized
             if self._query_rewriter:
                 try:
-                    result = self._query_rewriter.rewrite(query.text)
-                    if result.rewritten_query != query.text:
+                    result = self._query_rewriter.rewrite(sanitized)
+                    if result.rewritten_query != sanitized:
                         retrieval_query = result.rewritten_query
                         logger.debug(
-                            f"Query rewritten: '{query.text[:50]}' -> '{retrieval_query[:50]}'"
+                            f"Query rewritten: '{sanitized[:50]}' -> '{retrieval_query[:50]}'"
                         )
                 except Exception as e:
                     logger.warning(f"Query rewriting failed, using original: {e}")
@@ -309,9 +322,9 @@ class FitzKragEngine:
 
             if not addresses:
                 return Answer(
-                    text="No relevant code or documents found for this query.",
+                    text="No information found. The available documents do not contain relevant content for this query.",
                     provenance=[],
-                    metadata={"engine": "fitz_krag", "query": query.text},
+                    metadata={"engine": "fitz_krag", "query": query.text, "mode": "abstain"},
                 )
 
             # 2.5. Rerank addresses (when reranker configured)
@@ -341,23 +354,23 @@ class FitzKragEngine:
             expanded = self._expander.expand(read_results)
 
             # 4.5. Execute table queries (SQL generation + execution)
-            expanded = self._table_handler.process(query.text, expanded)
+            expanded = self._table_handler.process(sanitized, expanded)
 
             # 5. Run guardrails (ReadResult satisfies EvidenceItem protocol)
             answer_mode = AnswerMode.TRUSTWORTHY
             if self._constraints and self._governor:
                 from fitz_ai.governance import run_constraints
 
-                constraint_results = run_constraints(query.text, expanded, self._constraints)
+                constraint_results = run_constraints(sanitized, expanded, self._constraints)
                 governance = self._governor.decide(constraint_results)
                 answer_mode = governance.mode
 
             # 6. Assemble context
-            context = self._assembler.assemble(query.text, expanded)
+            context = self._assembler.assemble(sanitized, expanded)
 
             # 7. Generate answer with answer mode
             answer = self._synthesizer.generate(
-                query.text, context, expanded, answer_mode=answer_mode
+                sanitized, context, expanded, answer_mode=answer_mode
             )
 
             # 7.5. Store in cloud cache
