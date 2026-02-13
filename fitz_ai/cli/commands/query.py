@@ -212,7 +212,9 @@ def _run_persistent_ingest_query(
         # Point at source if provided
         if source is not None:
             ui.info(f"Registering {source}...")
-            manifest = engine_instance.point(source, collection, start_worker=False)
+            manifest = engine_instance.point(
+                source, collection, start_worker=False, progress=ui.info
+            )
             ui.info(f"Registered {len(manifest.entries())} files")
         else:
             ui.info(f"Loading collection '{collection}'...")

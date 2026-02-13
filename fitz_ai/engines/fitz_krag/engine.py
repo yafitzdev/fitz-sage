@@ -90,15 +90,18 @@ class FitzKragEngine:
 
     def _wire_agentic_strategy(self) -> None:
         """Wire agentic strategy + disk fallback from current manifest/source_dir."""
+        from fitz_ai.core.paths import FitzPaths
         from fitz_ai.engines.fitz_krag.retrieval.strategies.agentic_search import (
             AgenticSearchStrategy,
         )
 
+        col_dir = FitzPaths.workspace() / "collections" / self._config.collection
         agentic = AgenticSearchStrategy(
             manifest=self._manifest,
             source_dir=self._source_dir,
             chat_factory=self._chat_factory,
             config=self._config,
+            cache_dir=col_dir / "parsed",
         )
         self._retrieval_router._agentic_strategy = agentic
         self._reader._source_dir = self._source_dir
@@ -575,11 +578,16 @@ class FitzKragEngine:
         )
 
     def point(
-        self, source: Path, collection: str | None = None, *, start_worker: bool = True
+        self,
+        source: Path,
+        collection: str | None = None,
+        *,
+        start_worker: bool = True,
+        progress: Callable[[str], None] | None = None,
     ) -> Any:
         """Register source directory for progressive querying.
 
-        1. Build manifest (fast, no LLM/embedding)
+        1. Build manifest (fast, no LLM/embedding; parses + caches rich docs)
         2. Persist source_dir so future processes can find it
         3. Create AgenticSearchStrategy, wire into router
         4. Set source_dir on ContentReader (disk fallback)
@@ -590,6 +598,7 @@ class FitzKragEngine:
             source: Path to source directory or file
             collection: Collection name override
             start_worker: Whether to start background indexing (False for CLI)
+            progress: Optional callback for status updates
 
         Returns:
             FileManifest with registered files
@@ -615,7 +624,7 @@ class FitzKragEngine:
         col_dir = FitzPaths.workspace() / "collections" / col
         manifest_path = col_dir / "manifest.json"
         builder = ManifestBuilder(self._config)
-        manifest = builder.build(source, manifest_path)
+        manifest = builder.build(source, manifest_path, progress=progress)
         self._manifest = manifest
         self._source_dir = source_dir
 
@@ -629,6 +638,7 @@ class FitzKragEngine:
             source_dir=source_dir,
             chat_factory=self._chat_factory,
             config=self._config,
+            cache_dir=col_dir / "parsed",
         )
         self._retrieval_router._agentic_strategy = agentic
 

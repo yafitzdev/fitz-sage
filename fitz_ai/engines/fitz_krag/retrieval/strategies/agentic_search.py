@@ -33,9 +33,6 @@ logger = logging.getLogger(__name__)
 _BM25_PREFILTER_THRESHOLD = 50
 _LLM_MAX_FILES = 10
 
-# Extensions that need parser-based extraction (not plain text readable)
-_RICH_DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".html", ".htm"}
-
 
 class AgenticSearchStrategy:
     """LLM-driven file selection from manifest for unindexed files."""
@@ -46,11 +43,13 @@ class AgenticSearchStrategy:
         source_dir: Path,
         chat_factory: Any,
         config: "FitzKragConfig",
+        cache_dir: Path | None = None,
     ) -> None:
         self._manifest = manifest
         self._source_dir = source_dir
         self._chat_factory = chat_factory
         self._config = config
+        self._cache_dir = cache_dir
 
     def retrieve(self, query: str, limit: int) -> list[Address]:
         """Retrieve addresses for unindexed files via LLM file selection.
@@ -68,29 +67,33 @@ class AgenticSearchStrategy:
         if not unindexed:
             return []
 
-        # BM25 pre-filter if too many files
-        if len(unindexed) > _BM25_PREFILTER_THRESHOLD:
-            unindexed = self._bm25_prefilter(unindexed, query)
+        # Fast path: single file — skip LLM selection entirely
+        if len(unindexed) <= 3:
+            selected_entries = unindexed
+        else:
+            # BM25 pre-filter if too many files
+            if len(unindexed) > _BM25_PREFILTER_THRESHOLD:
+                unindexed = self._bm25_prefilter(unindexed, query)
 
-        # Build manifest text for LLM
-        manifest_text = self._manifest.to_manifest_text(unindexed)
+            # Build manifest text for LLM
+            manifest_text = self._manifest.to_manifest_text(unindexed)
 
-        # LLM selects files
-        selected_paths = self._llm_select_files(manifest_text, query)
+            # LLM selects files
+            selected_paths = self._llm_select_files(manifest_text, query)
 
-        # Path-match fallback: always include files whose path contains query terms
-        entries_map = {e.rel_path: e for e in unindexed}
-        path_matched = self._path_match_files(unindexed, query)
-        for pm in path_matched:
-            if pm not in selected_paths:
-                selected_paths.append(pm)
+            # Path-match fallback: always include files whose path contains query terms
+            entries_map = {e.rel_path: e for e in unindexed}
+            path_matched = self._path_match_files(unindexed, query)
+            for pm in path_matched:
+                if pm not in selected_paths:
+                    selected_paths.append(pm)
 
-        if not selected_paths:
-            return []
+            if not selected_paths:
+                return []
 
-        selected_entries = [
-            entries_map[p] for p in selected_paths if p in entries_map
-        ]
+            selected_entries = [
+                entries_map[p] for p in selected_paths if p in entries_map
+            ]
 
         # Create addresses from selected files
         addresses: list[Address] = []
@@ -198,7 +201,7 @@ class AgenticSearchStrategy:
         return matched[:_LLM_MAX_FILES]
 
     def _read_from_disk(self, entry: "ManifestEntry") -> str | None:
-        """Read file content from disk, using parser for rich docs (PDF, DOCX, etc.)."""
+        """Read file content from disk, using parsed cache for rich docs."""
         try:
             path = Path(entry.abs_path)
             if not path.exists():
@@ -208,28 +211,22 @@ class AgenticSearchStrategy:
 
             ext = path.suffix.lower()
             if ext in _RICH_DOC_EXTENSIONS:
-                return self._parse_rich_doc(path)
+                from fitz_ai.engines.fitz_krag.progressive.parsed_cache import (
+                    get_parsed_text,
+                )
+
+                if self._cache_dir:
+                    return get_parsed_text(path, entry.content_hash, self._cache_dir)
+                # No cache dir — fall through to direct parse
+                from fitz_ai.engines.fitz_krag.progressive.parsed_cache import (
+                    _parse,
+                )
+
+                return _parse(path)
 
             return path.read_text(encoding="utf-8", errors="replace")
         except Exception as e:
             logger.debug(f"Cannot read {entry.rel_path} from disk: {e}")
-            return None
-
-    def _parse_rich_doc(self, path: Path) -> str | None:
-        """Parse a rich document (PDF, DOCX, etc.) using the parser system."""
-        try:
-            from fitz_ai.ingestion.parser import ParserRouter
-            from fitz_ai.ingestion.source.base import SourceFile
-
-            _suppress_parser_logs()
-
-            source_file = SourceFile(uri=path.as_uri(), local_path=path)
-            router = ParserRouter()
-            parsed = router.parse(source_file)
-            text = parsed.full_text
-            return text if text and text.strip() else None
-        except Exception as e:
-            logger.warning(f"Parser failed for {path.name}: {e}")
             return None
 
     def _create_addresses(
@@ -299,17 +296,6 @@ class AgenticSearchStrategy:
             )
 
         return addresses
-
-
-def _suppress_parser_logs() -> None:
-    """Suppress noisy third-party logs from PDF/doc parsers."""
-    import logging as _logging
-
-    for name in ("rapidocr", "docling", "RapidOCR",
-                 "fitz_ai.ingestion.parser"):
-        _logger = _logging.getLogger(name)
-        _logger.setLevel(_logging.WARNING)
-        _logger.handlers.clear()
 
 
 def _tokenize(text: str) -> list[str]:

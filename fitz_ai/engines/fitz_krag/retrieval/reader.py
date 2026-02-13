@@ -113,8 +113,6 @@ class ContentReader:
             file_path=raw_file["path"],
         )
 
-    _RICH_DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".html", ".htm"}
-
     def _read_from_disk(self, addr: Address) -> str | None:
         """Read file content from disk when not in database (agentic path)."""
         if not self._source_dir:
@@ -123,41 +121,27 @@ class ContentReader:
         if not disk_path:
             return None
         try:
+            from fitz_ai.engines.fitz_krag.progressive.parsed_cache import (
+                RICH_DOC_EXTENSIONS,
+                get_parsed_text,
+            )
+
             full_path = self._source_dir / disk_path
             if not full_path.exists():
                 return None
             ext = full_path.suffix.lower()
-            if ext in self._RICH_DOC_EXTENSIONS:
-                return self._parse_rich_doc(full_path)
+            if ext in RICH_DOC_EXTENSIONS:
+                content_hash = addr.metadata.get("content_hash", "")
+                cache_dir = getattr(self, "_cache_dir", None)
+                if cache_dir and content_hash:
+                    return get_parsed_text(full_path, content_hash, cache_dir)
+                from fitz_ai.engines.fitz_krag.progressive.parsed_cache import _parse
+
+                return _parse(full_path)
             return full_path.read_text(encoding="utf-8", errors="replace")
         except Exception as e:
             logger.debug(f"Disk read failed for {disk_path}: {e}")
         return None
-
-    @staticmethod
-    def _parse_rich_doc(path: Path) -> str | None:
-        """Parse a rich document (PDF, DOCX, etc.) using the parser system."""
-        try:
-            from fitz_ai.ingestion.parser import ParserRouter
-            from fitz_ai.ingestion.source.base import SourceFile
-
-            # Suppress noisy third-party logs during parsing
-            import logging as _logging
-
-            for name in ("rapidocr", "docling", "RapidOCR",
-                        "fitz_ai.ingestion.parser"):
-                _l = _logging.getLogger(name)
-                _l.setLevel(_logging.WARNING)
-                _l.handlers.clear()
-
-            source_file = SourceFile(uri=path.as_uri(), local_path=path)
-            router = ParserRouter()
-            parsed = router.parse(source_file)
-            text = parsed.full_text
-            return text if text and text.strip() else None
-        except Exception as e:
-            logger.warning(f"Parser failed for {path.name}: {e}")
-            return None
 
     def _read_chunk(self, addr: Address) -> ReadResult | None:
         """Read chunk content (stored in address metadata)."""

@@ -59,15 +59,27 @@ class ManifestBuilder:
     def __init__(self, config: "FitzKragConfig") -> None:
         self._config = config
 
-    def build(self, source: Path, manifest_path: Path) -> FileManifest:
+    def build(
+        self,
+        source: Path,
+        manifest_path: Path,
+        *,
+        progress: Any = None,
+    ) -> FileManifest:
         """Scan directory, extract symbols/headings, create manifest.
 
         Reuses:
         - PythonCodeIngestStrategy().extract() for .py (stdlib ast, ~50ms/file)
         - _extract_headings() for .md/.rst/.txt (regex, instant)
+        - parsed_cache for rich docs (PDF, DOCX) — parse once, cache forever
 
         No LLM calls, no embedding calls, no PostgreSQL.
         """
+        from fitz_ai.engines.fitz_krag.progressive.parsed_cache import (
+            RICH_DOC_EXTENSIONS,
+            get_parsed_text,
+        )
+
         manifest = FileManifest(manifest_path)
         existing = manifest.entries()
 
@@ -77,13 +89,18 @@ class ManifestBuilder:
         # When source is a single file, use its parent as the base directory
         base_dir = source.parent if source.is_file() else source
 
+        # Parsed text cache lives next to the manifest
+        cache_dir = manifest_path.parent / "parsed"
+
+        _progress = progress or (lambda _: None)
+
         file_paths = self._scan_files(source)
         for abs_path in file_paths:
             rel_path = self._relative_path(abs_path, base_dir)
             ext = abs_path.suffix.lower()
 
-            # Rich docs (PDF, DOCX, etc.) — hash raw bytes, no text extraction
-            if ext in _RICH_DOC_EXTENSIONS:
+            # Rich docs (PDF, DOCX, etc.) — hash raw bytes, parse + cache text
+            if ext in RICH_DOC_EXTENSIONS:
                 try:
                     raw_bytes = abs_path.read_bytes()
                 except Exception as e:
@@ -95,6 +112,10 @@ class ManifestBuilder:
                 if existing_entry and existing_entry.content_hash == content_hash:
                     manifest.add(existing_entry)
                     continue
+
+                # Parse and cache text (only on first registration or content change)
+                _progress(f"Parsing {abs_path.name}...")
+                get_parsed_text(abs_path, content_hash, cache_dir)
 
                 file_id = existing_entry.file_id if existing_entry else str(uuid.uuid4())
                 entry = ManifestEntry(
