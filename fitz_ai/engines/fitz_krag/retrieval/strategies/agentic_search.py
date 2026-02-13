@@ -33,6 +33,9 @@ logger = logging.getLogger(__name__)
 _BM25_PREFILTER_THRESHOLD = 50
 _LLM_MAX_FILES = 10
 
+# Extensions that need parser-based extraction (not plain text readable)
+_RICH_DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".html", ".htm"}
+
 
 class AgenticSearchStrategy:
     """LLM-driven file selection from manifest for unindexed files."""
@@ -195,17 +198,39 @@ class AgenticSearchStrategy:
         return matched[:_LLM_MAX_FILES]
 
     def _read_from_disk(self, entry: "ManifestEntry") -> str | None:
-        """Read file content directly from source directory."""
+        """Read file content from disk, using parser for rich docs (PDF, DOCX, etc.)."""
         try:
             path = Path(entry.abs_path)
             if not path.exists():
-                # Try relative to source_dir
                 path = self._source_dir / entry.rel_path
             if not path.exists():
                 return None
+
+            ext = path.suffix.lower()
+            if ext in _RICH_DOC_EXTENSIONS:
+                return self._parse_rich_doc(path)
+
             return path.read_text(encoding="utf-8", errors="replace")
         except Exception as e:
             logger.debug(f"Cannot read {entry.rel_path} from disk: {e}")
+            return None
+
+    def _parse_rich_doc(self, path: Path) -> str | None:
+        """Parse a rich document (PDF, DOCX, etc.) using the parser system."""
+        try:
+            from fitz_ai.ingestion.parser import ParserRouter
+            from fitz_ai.ingestion.source.base import SourceFile
+
+            source_file = SourceFile(
+                uri=path.as_uri(),
+                local_path=path,
+            )
+            router = ParserRouter()
+            parsed = router.parse(source_file)
+            text = parsed.full_text
+            return text if text and text.strip() else None
+        except Exception as e:
+            logger.warning(f"Parser failed for {path.name}: {e}")
             return None
 
     def _create_addresses(

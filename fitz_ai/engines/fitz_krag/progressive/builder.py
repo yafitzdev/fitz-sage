@@ -27,11 +27,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Extensions we track (code + docs + tables)
+# Extensions we track (code + docs + tables + rich docs)
 _CODE_EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".java", ".go"}
 _DOC_EXTENSIONS = {".md", ".rst", ".txt"}
 _TABLE_EXTENSIONS = {".csv", ".xlsx"}
-_ALL_EXTENSIONS = _CODE_EXTENSIONS | _DOC_EXTENSIONS | _TABLE_EXTENSIONS
+_RICH_DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".html", ".htm"}
+_ALL_EXTENSIONS = _CODE_EXTENSIONS | _DOC_EXTENSIONS | _TABLE_EXTENSIONS | _RICH_DOC_EXTENSIONS
 
 # Directories to skip
 _SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", ".tox", ".eggs"}
@@ -75,7 +76,35 @@ class ManifestBuilder:
             rel_path = self._relative_path(abs_path, source)
             ext = abs_path.suffix.lower()
 
-            # Read file content and compute hash
+            # Rich docs (PDF, DOCX, etc.) — hash raw bytes, no text extraction
+            if ext in _RICH_DOC_EXTENSIONS:
+                try:
+                    raw_bytes = abs_path.read_bytes()
+                except Exception as e:
+                    logger.warning(f"Cannot read {abs_path}: {e}")
+                    continue
+
+                content_hash = hashlib.sha256(raw_bytes).hexdigest()
+                existing_entry = existing.get(rel_path)
+                if existing_entry and existing_entry.content_hash == content_hash:
+                    continue
+
+                file_id = existing_entry.file_id if existing_entry else str(uuid.uuid4())
+                entry = ManifestEntry(
+                    file_id=file_id,
+                    rel_path=rel_path,
+                    abs_path=str(abs_path),
+                    content_hash=content_hash,
+                    file_type=ext,
+                    size_bytes=len(raw_bytes),
+                    state=FileState.REGISTERED,
+                    symbols=[],
+                    headings=[],
+                )
+                manifest.add(entry)
+                continue
+
+            # Text-based files — read as text, extract symbols/headings
             try:
                 content = abs_path.read_text(encoding="utf-8", errors="replace")
             except Exception as e:

@@ -508,16 +508,39 @@ class BackgroundIngestWorker:
             logger.warning(f"Section embedding failed for {entry.rel_path}: {e}")
 
     def _read_file(self, entry: "ManifestEntry") -> str | None:
-        """Read file content from disk."""
+        """Read file content from disk, using parser for rich docs."""
         try:
             path = Path(entry.abs_path)
             if not path.exists():
                 path = self._source_dir / entry.rel_path
             if not path.exists():
                 return None
+
+            ext = path.suffix.lower()
+            if ext in {".pdf", ".docx", ".pptx", ".html", ".htm"}:
+                return self._parse_rich_doc(path)
+
             content = path.read_text(encoding="utf-8", errors="replace")
             # Strip NUL bytes for PostgreSQL compatibility
             return content.replace("\x00", "")
         except Exception as e:
             logger.debug(f"Cannot read {entry.rel_path}: {e}")
+            return None
+
+    def _parse_rich_doc(self, path: Path) -> str | None:
+        """Parse a rich document (PDF, DOCX, etc.) using the parser system."""
+        try:
+            from fitz_ai.ingestion.parser import ParserRouter
+            from fitz_ai.ingestion.source.base import SourceFile
+
+            source_file = SourceFile(uri=path.as_uri(), local_path=path)
+            router = ParserRouter()
+            parsed = router.parse(source_file)
+            text = parsed.full_text
+            if text:
+                # Strip NUL bytes for PostgreSQL compatibility
+                return text.replace("\x00", "")
+            return None
+        except Exception as e:
+            logger.warning(f"Parser failed for {path.name}: {e}")
             return None
