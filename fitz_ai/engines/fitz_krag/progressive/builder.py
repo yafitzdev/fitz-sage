@@ -108,14 +108,17 @@ class ManifestBuilder:
                     continue
 
                 content_hash = hashlib.sha256(raw_bytes).hexdigest()
+
+                # Ensure parsed text is cached (cheap if already cached)
+                cache_file = cache_dir / f"{content_hash}.txt"
+                if not cache_file.exists():
+                    _progress(f"Parsing {abs_path.name}...")
+                    get_parsed_text(abs_path, content_hash, cache_dir)
+
                 existing_entry = existing.get(rel_path)
                 if existing_entry and existing_entry.content_hash == content_hash:
                     manifest.add(existing_entry)
                     continue
-
-                # Parse and cache text (only on first registration or content change)
-                _progress(f"Parsing {abs_path.name}...")
-                get_parsed_text(abs_path, content_hash, cache_dir)
 
                 file_id = existing_entry.file_id if existing_entry else str(uuid.uuid4())
                 entry = ManifestEntry(
