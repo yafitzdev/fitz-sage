@@ -1,9 +1,11 @@
 # fitz_ai/cli/commands/config.py
 """
-Configuration command.
+Configuration command — view config, run diagnostics, test connections.
 
 Usage:
     fitz config                # Show current config
+    fitz config --doctor       # Run system diagnostics
+    fitz config --test         # Test actual connections
     fitz config --json         # Output as JSON
     fitz config --path         # Show config file path
     fitz config --edit         # Open config in editor
@@ -14,12 +16,13 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import typer
 
 from fitz_ai.cli.context import CLIContext
-from fitz_ai.cli.ui import RICH, Table, console, ui
+from fitz_ai.cli.ui import RICH, Panel, Table, console, ui
 from fitz_ai.core.paths import FitzPaths
 from fitz_ai.logging.logger import get_logger
 
@@ -172,43 +175,30 @@ def _get_config_path() -> Path:
 
 
 def command(
-    show_path: bool = typer.Option(
-        False,
-        "--path",
-        "-p",
-        help="Show config file path only.",
-    ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="Output as JSON.",
-    ),
-    raw: bool = typer.Option(
-        False,
-        "--raw",
-        "-r",
-        help="Show raw YAML file.",
-    ),
-    edit: bool = typer.Option(
-        False,
-        "--edit",
-        "-e",
-        help="Open config in editor.",
-    ),
+    show_path: bool = typer.Option(False, "--path", "-p", help="Show config file path only."),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output as JSON."),
+    raw: bool = typer.Option(False, "--raw", "-r", help="Show raw YAML file."),
+    edit: bool = typer.Option(False, "--edit", "-e", help="Open config in editor."),
+    doctor: bool = typer.Option(False, "--doctor", "-d", help="Run system diagnostics."),
+    test: bool = typer.Option(False, "--test", "-t", help="Test actual connections."),
 ) -> None:
     """
-    View and manage Fitz configuration.
-
-    Shows a summary of your current configuration settings.
+    View configuration and run diagnostics.
 
     Examples:
         fitz config              # Show config summary
-        fitz config --raw        # Show raw YAML
-        fitz config --json       # Output as JSON
-        fitz config --path       # Show file path
+        fitz config --doctor     # System diagnostics
+        fitz config --test       # Test connections
         fitz config --edit       # Open in editor
     """
+    # =========================================================================
+    # Doctor mode
+    # =========================================================================
+
+    if doctor or test:
+        _run_doctor(test=test)
+        return
+
     # =========================================================================
     # Get config path
     # =========================================================================
@@ -224,7 +214,7 @@ def command(
             print(str(config_path))
         else:
             ui.error("Config not found.")
-            ui.info("Run 'fitz quickstart' or 'fitz init' to create one.")
+            ui.info("Run 'fitz init' to create one.")
             raise typer.Exit(1)
         return
 
@@ -235,7 +225,7 @@ def command(
     if edit:
         if not config_path.exists():
             ui.error("No config file to edit.")
-            ui.info("Run 'fitz quickstart' or 'fitz init' first.")
+            ui.info("Run 'fitz init' first.")
             raise typer.Exit(1)
 
         _open_in_editor(config_path)
@@ -246,13 +236,6 @@ def command(
     # =========================================================================
 
     ctx = CLIContext.load()
-
-    # =========================================================================
-    # Header
-    # =========================================================================
-
-    ui.header("Fitz Config", "Check your RAG configuration")
-    ui.info(f"Source: {ctx.config_source}")
 
     # =========================================================================
     # JSON output
@@ -274,7 +257,134 @@ def command(
     # Summary view (default)
     # =========================================================================
 
+    ui.info(f"Source: {ctx.config_source}")
     _show_config_summary(ctx)
+    ui.info("Tip: Use --raw for full YAML, --edit to modify, --doctor for diagnostics")
 
-    # Show helpful hints
-    ui.info("Tip: Use --raw for full YAML, --edit to modify")
+
+# =============================================================================
+# Doctor (diagnostics)
+# =============================================================================
+
+
+def _run_doctor(test: bool = False) -> None:
+    """Run system diagnostics."""
+    from fitz_ai.core.detect import detect_system_status
+
+    issues = []
+    warnings = []
+
+    # System
+    ui.section("System")
+
+    version = sys.version.split()[0]
+    ok = sys.version_info >= (3, 10)
+    ui.status("Python", ok, f"Python {version}")
+    if not ok:
+        issues.append("Python 3.10+ required")
+
+    workspace = FitzPaths.workspace()
+    ui.status("Workspace", workspace.exists(), str(workspace) if workspace.exists() else "Not found (run 'fitz init')")
+    if not workspace.exists():
+        warnings.append("Run 'fitz init' to create workspace")
+
+    ctx = CLIContext.load()
+    ui.status("Config", ctx.has_user_config, "Valid" if ctx.has_user_config else "Using defaults (run 'fitz init')")
+    if not ctx.has_user_config:
+        warnings.append("Run 'fitz init' to create config")
+
+    # Services
+    ui.section("Services")
+
+    system = detect_system_status()
+
+    if system.ollama.available:
+        ui.status("Ollama", True, system.ollama.details)
+    else:
+        ui.warning("Ollama", system.ollama.details)
+
+    if system.pgvector.available:
+        ui.status("pgvector", True, "installed")
+    else:
+        ui.warning("pgvector", system.pgvector.details)
+
+    # API Keys
+    ui.section("API Keys")
+
+    for name, key_status in system.api_keys.items():
+        if key_status.available:
+            ui.status(name.capitalize(), True, "configured")
+        else:
+            ui.warning(name.capitalize(), f"${key_status.env_var} not set")
+
+    # Connection Tests
+    if test:
+        ui.section("Connection Tests")
+
+        # Embedding
+        try:
+            if ctx.embedding_plugin:
+                embedder = ctx.get_embedder()
+                vector = embedder.embed("test")
+                if vector and len(vector) > 0:
+                    ui.status("Embedding", True, f"{ctx.embedding_plugin} (dim={len(vector)})")
+                else:
+                    ui.status("Embedding", False, "Empty response")
+                    issues.append("Embedding returned empty")
+            else:
+                ui.status("Embedding", False, "Not configured")
+                issues.append("Embedding not configured")
+        except Exception as e:
+            ui.status("Embedding", False, str(e)[:50])
+            issues.append(f"Embedding failed: {str(e)[:50]}")
+
+        # Chat
+        try:
+            if ctx.chat_plugin:
+                ctx.get_chat()
+                ui.status("Chat", True, f"{ctx.chat_plugin} ready")
+            else:
+                ui.status("Chat", False, "Not configured")
+                issues.append("Chat not configured")
+        except Exception as e:
+            ui.status("Chat", False, str(e)[:50])
+            issues.append(f"Chat failed: {str(e)[:50]}")
+
+        # Vector DB
+        try:
+            if ctx.vector_db_plugin:
+                client = ctx.get_vector_db_client()
+                collections = client.list_collections()
+                ui.status("Vector DB", True, f"{ctx.vector_db_plugin} ({len(collections)} collections)")
+            else:
+                ui.status("Vector DB", False, "Not configured")
+                issues.append("Vector DB not configured")
+        except Exception as e:
+            ui.status("Vector DB", False, str(e)[:50])
+            issues.append(f"Vector DB failed: {str(e)[:50]}")
+
+    # Summary
+    print()
+
+    if issues:
+        if RICH:
+            console.print(
+                Panel(
+                    "\n".join(f"[red]x[/red] {issue}" for issue in issues),
+                    title="[red]Issues Found[/red]",
+                    border_style="red",
+                )
+            )
+        else:
+            print("Issues Found:")
+            for issue in issues:
+                print(f"  x {issue}")
+        raise typer.Exit(1)
+    elif warnings:
+        ui.print("Some warnings, but Fitz should work.", "yellow")
+        if not test:
+            ui.info("Run 'fitz config --test' to verify connections")
+    else:
+        ui.success("All checks passed!")
+        if not test:
+            ui.info("Run 'fitz config --test' to verify connections")

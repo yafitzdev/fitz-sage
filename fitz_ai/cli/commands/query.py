@@ -14,11 +14,11 @@ Usage:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import typer
 
-from fitz_ai.cli.ui import display_answer, ui
+from fitz_ai.cli.ui import RICH, console, display_answer, ui
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.runtime import create_engine, get_default_engine, get_engine_registry
 from fitz_ai.services import FitzService
@@ -70,6 +70,7 @@ def command(
     source: Optional[Path] = None,
     collection: Optional[str] = None,
     engine: Optional[str] = None,
+    chat: bool = False,
 ) -> None:
     """Query your knowledge base."""
     # =========================================================================
@@ -102,7 +103,7 @@ def command(
 
     # Engines with persistent ingest support
     if caps.supports_persistent_ingest:
-        _run_persistent_ingest_query(question, source, collection, engine)
+        _run_persistent_ingest_query(question, source, collection, engine, chat=chat)
     # Engines with collection support use FitzService
     elif caps.supports_collections:
         _run_collection_query(question, collection, engine)
@@ -167,6 +168,8 @@ def _run_persistent_ingest_query(
     source: Optional[Path],
     collection: Optional[str],
     engine_name: str,
+    *,
+    chat: bool = False,
 ) -> None:
     """Run query using an engine with persistent ingest support."""
 
@@ -193,15 +196,16 @@ def _run_persistent_ingest_query(
             ui.error(f"Collection '{collection}' not found. Available: {', '.join(collections)}")
             raise typer.Exit(1)
 
-    # Prompt for question if not provided
-    if question is None:
-        question_text = ui.prompt_text("Question")
-    else:
-        question_text = question
+    # Prompt for question if not provided (and not chat mode)
+    if not chat:
+        if question is None:
+            question_text = ui.prompt_text("Question")
+        else:
+            question_text = question
 
     print()
 
-    # Create engine, load collection, and query
+    # Create engine and load/point collection
     try:
         engine_instance = create_engine(engine_name)
 
@@ -214,11 +218,14 @@ def _run_persistent_ingest_query(
             ui.info(f"Loading collection '{collection}'...")
             engine_instance.load(collection)
 
-        from fitz_ai.core import Query
+        if chat:
+            _chat_loop(engine_instance, collection)
+        else:
+            from fitz_ai.core import Query
 
-        query = Query(text=question_text)
-        answer = engine_instance.answer(query, progress=ui.info)
-        display_answer(answer)
+            query = Query(text=question_text)
+            answer = engine_instance.answer(query, progress=ui.info)
+            display_answer(answer)
     except Exception as e:
         # Show clean error message, full traceback only at debug level
         ui.error(f"Query failed: {_get_root_cause(e)}")
@@ -289,3 +296,96 @@ def _run_generic_query(question: Optional[str], engine_name: str) -> None:
         ui.error(f"Query failed: {_get_root_cause(e)}")
         logger.debug("Query error", exc_info=True)
         raise typer.Exit(1)
+
+
+# =============================================================================
+# Chat Mode
+# =============================================================================
+
+
+def _chat_loop(engine: Any, collection: str) -> None:
+    """Interactive chat loop with conversation history."""
+    from fitz_ai.core import Query
+
+    if RICH:
+        console.print(
+            f"\n[bold green]Chat started[/bold green] with collection: [cyan]{collection}[/cyan]"
+        )
+        console.print(
+            "[dim]Type 'exit' or 'quit' to end. Press Ctrl+C to interrupt.[/dim]\n"
+        )
+    else:
+        print(f"\nChat started with collection: {collection}")
+        print("Type 'exit' or 'quit' to end. Press Ctrl+C to interrupt.\n")
+
+    history: List[Dict[str, str]] = []
+
+    try:
+        while True:
+            try:
+                if RICH:
+                    from rich.prompt import Prompt
+
+                    user_input = Prompt.ask("\n[bold green]You[/bold green]")
+                else:
+                    user_input = input("\nYou: ").strip()
+            except EOFError:
+                break
+
+            if user_input.lower() in ("exit", "quit", "q"):
+                break
+
+            if not user_input.strip():
+                continue
+
+            try:
+                answer = engine.answer(Query(text=user_input), progress=ui.info)
+            except Exception as e:
+                ui.error(f"Query failed: {e}")
+                logger.debug("Query error", exc_info=True)
+                continue
+
+            # Display response
+            if RICH:
+                from rich.markdown import Markdown
+                from rich.padding import Padding
+                from rich.panel import Panel
+
+                console.print()
+                panel = Panel(
+                    Markdown(answer.text),
+                    title="[bold cyan]Assistant[/bold cyan]",
+                    title_align="left",
+                    border_style="cyan",
+                    padding=(0, 1),
+                )
+                console.print(Padding(panel, (0, 0, 0, 12)))
+            else:
+                print(f"\nAssistant: {answer.text}")
+
+            # Show sources
+            if answer.provenance:
+                from fitz_ai.cli.ui import display_sources
+                from fitz_ai.core.chunk import Chunk
+
+                chunks = [
+                    Chunk(
+                        content=p.excerpt or "",
+                        metadata={"source": p.source_id},
+                    )
+                    for p in answer.provenance
+                    if p.excerpt
+                ]
+                if chunks:
+                    display_sources(chunks, indent=12)
+
+            history.append({"role": "user", "content": user_input})
+            history.append({"role": "assistant", "content": answer.text})
+
+    except KeyboardInterrupt:
+        pass
+
+    if RICH:
+        console.print("\n[dim]Chat ended. Goodbye![/dim]")
+    else:
+        print("\nChat ended. Goodbye!")

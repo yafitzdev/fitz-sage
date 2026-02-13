@@ -3,17 +3,13 @@
 Fitz CLI - Main application.
 
 Commands:
-    fitz query         Query knowledge base (use --source to register docs first)
-    fitz init          Setup wizard (for custom configuration)
-    fitz chat          Interactive conversation with your knowledge base
+    fitz query         Query knowledge base (--source to register, --chat for interactive)
+    fitz init          Setup wizard
     fitz collections   Manage collections (list, info, delete)
-    fitz tables        Manage structured tables (list, info, delete)
+    fitz config        View config, run diagnostics (--doctor, --test)
     fitz serve         Start the REST API server
-    fitz config        View configuration
-    fitz doctor        System diagnostics
     fitz reset         Reset pgserver database (when stuck/corrupted)
-    fitz engine        View or set the default engine for all commands
-    fitz plugin        Generate plugins using LLM
+    fitz eval          Evaluation tools
 
 NOTE: Commands use lazy loading - heavy imports only happen when a command is invoked.
 """
@@ -45,6 +41,20 @@ app = typer.Typer(
 # This keeps CLI startup fast by avoiding heavy imports (torch, pydantic models, etc.).
 
 
+@app.command("query")
+def query(
+    question: Optional[str] = typer.Argument(None, help="Question to ask."),
+    source: Optional[Path] = typer.Option(None, "--source", "-s", help="Path to documents (registers before querying)."),
+    collection: Optional[str] = typer.Option(None, "--collection", "-c", help="Collection name."),
+    engine: Optional[str] = typer.Option(None, "--engine", "-e", help="Engine to use."),
+    chat: bool = typer.Option(False, "--chat", help="Interactive chat mode."),
+) -> None:
+    """Query the knowledge base. Use --source to register docs, --chat for interactive mode."""
+    from fitz_ai.cli.commands import query as mod
+
+    mod.command(question=question, source=source, collection=collection, engine=engine, chat=chat)
+
+
 @app.command("init")
 def init(
     non_interactive: bool = typer.Option(False, "--non-interactive", "-y", help="Use defaults."),
@@ -56,35 +66,27 @@ def init(
     mod.command(non_interactive=non_interactive, show_config=show_config)
 
 
-@app.command("query")
-def query(
-    question: Optional[str] = typer.Argument(None, help="Question to ask."),
-    source: Optional[Path] = typer.Option(None, "--source", "-s", help="Path to documents (registers before querying)."),
-    collection: Optional[str] = typer.Option(None, "--collection", "-c", help="Collection name."),
-    engine: Optional[str] = typer.Option(None, "--engine", "-e", help="Engine to use."),
-) -> None:
-    """Query the knowledge base. Use --source to point at docs first."""
-    from fitz_ai.cli.commands import query as mod
-
-    mod.command(question=question, source=source, collection=collection, engine=engine)
-
-
-@app.command("chat")
-def chat(
-    collection: Optional[str] = typer.Option(None, "--collection", "-c", help="Collection name."),
-) -> None:
-    """Interactive chat with your knowledge base."""
-    from fitz_ai.cli.commands import chat as mod
-
-    mod.command(collection=collection)
-
-
 @app.command("collections")
 def collections() -> None:
     """Manage collections (list, info, delete)."""
     from fitz_ai.cli.commands import collections as mod
 
     mod.command()
+
+
+@app.command("config")
+def config(
+    show_path: bool = typer.Option(False, "--path", "-p", help="Show config file path."),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+    raw: bool = typer.Option(False, "--raw", help="Show raw YAML."),
+    edit: bool = typer.Option(False, "--edit", "-e", help="Open config in editor."),
+    doctor: bool = typer.Option(False, "--doctor", "-d", help="Run system diagnostics."),
+    test: bool = typer.Option(False, "--test", "-t", help="Test actual connections."),
+) -> None:
+    """View configuration and run diagnostics."""
+    from fitz_ai.cli.commands import config as mod
+
+    mod.command(show_path=show_path, as_json=as_json, raw=raw, edit=edit, doctor=doctor, test=test)
 
 
 @app.command("serve")
@@ -99,30 +101,6 @@ def serve(
     mod.command(host=host, port=port, reload=reload)
 
 
-@app.command("config")
-def config(
-    show_path: bool = typer.Option(False, "--path", "-p", help="Show config file path."),
-    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
-    raw: bool = typer.Option(False, "--raw", help="Show raw YAML."),
-    edit: bool = typer.Option(False, "--edit", "-e", help="Open config in editor."),
-) -> None:
-    """View or edit configuration."""
-    from fitz_ai.cli.commands import config as mod
-
-    mod.command(show_path=show_path, as_json=as_json, raw=raw, edit=edit)
-
-
-@app.command("doctor")
-def doctor(
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed output."),
-    test: bool = typer.Option(False, "--test", "-t", help="Run connectivity tests."),
-) -> None:
-    """System diagnostics and health check."""
-    from fitz_ai.cli.commands import doctor as mod
-
-    mod.command(verbose=verbose, test=test)
-
-
 @app.command("reset")
 def reset(
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt."),
@@ -133,52 +111,16 @@ def reset(
     mod.reset(force=force)
 
 
-@app.command("engine")
-def engine(
-    name: Optional[str] = typer.Argument(None, help="Engine name to set as default."),
-    list_available: bool = typer.Option(False, "--list", "-l", help="List available engines."),
-) -> None:
-    """View or set the default engine for all commands."""
-    from fitz_ai.cli.commands import engine as mod
-
-    mod.command(name=name, list_available=list_available)
-
-
-@app.command("plugin")
-def plugin(
-    plugin_type: Optional[str] = typer.Argument(None, help="Plugin type to generate."),
-    description: Optional[str] = typer.Argument(None, help="Description of the plugin."),
-    chat_plugin: Optional[str] = typer.Option(None, "--chat-plugin", "-p", help="Chat plugin."),
-    tier: str = typer.Option("smart", "--tier", "-t", help="Model tier."),
-) -> None:
-    """Generate a plugin using LLM."""
-    from fitz_ai.cli.commands import plugin as mod
-
-    mod.command(
-        plugin_type=plugin_type,
-        description=description,
-        chat_plugin=chat_plugin,
-        tier=tier,
-    )
-
-
-
 # =============================================================================
 # SUBCOMMAND GROUPS
 # =============================================================================
-# Commands that have subcommands (like "fitz keywords list")
-# Note: Lazy import to avoid startup overhead
 
 
 def _register_subcommands() -> None:
     """Register subcommand groups with lazy imports."""
     from fitz_ai.cli.commands.eval import app as eval_app
-    from fitz_ai.cli.commands.keywords import app as keywords_app
-    from fitz_ai.cli.commands.tables import app as tables_app
 
     app.add_typer(eval_app, name="eval")
-    app.add_typer(keywords_app, name="keywords")
-    app.add_typer(tables_app, name="tables")
 
 
 _register_subcommands()
