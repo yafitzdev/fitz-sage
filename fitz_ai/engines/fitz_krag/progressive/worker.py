@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _CODE_EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".java", ".go"}
+_TABLE_EXTENSIONS = {".csv", ".tsv"}
 
 
 class BackgroundIngestWorker:
@@ -52,6 +53,7 @@ class BackgroundIngestWorker:
         stores: dict[str, Any],
         vocabulary_store: Any = None,
         entity_graph_store: Any = None,
+        pg_table_store: Any = None,
     ) -> None:
         self._manifest = manifest
         self._source_dir = source_dir
@@ -67,6 +69,7 @@ class BackgroundIngestWorker:
         self._table_store = stores["table"]
         self._vocabulary_store = vocabulary_store
         self._entity_graph_store = entity_graph_store
+        self._pg_table_store = pg_table_store
 
         # Parsed text cache dir — same location builder uses
         # Access manifest's private _path (same package, internal use)
@@ -219,6 +222,9 @@ class BackgroundIngestWorker:
                     except Exception as e:
                         logger.warning(f"Go strategy unavailable: {e}")
 
+                elif ext in _TABLE_EXTENSIONS:
+                    self._process_table_file(entry, content, content_hash)
+
                 elif ext in DOC_EXTENSIONS or ext == "":
                     self._process_doc_sections(entry, content, doc_strategy)
 
@@ -304,6 +310,138 @@ class BackgroundIngestWorker:
         except Exception as e:
             logger.debug(f"Doc section extraction failed for {entry.rel_path}: {e}")
 
+    def _process_table_file(
+        self, entry: "ManifestEntry", content: str, content_hash: str
+    ) -> None:
+        """Parse CSV, store rows in PostgresTableStore, store metadata in TableStore."""
+        from fitz_ai.tabular.parser.csv_parser import get_sample_rows, parse_csv
+
+        abs_path = Path(entry.abs_path)
+        try:
+            parsed = parse_csv(abs_path)
+        except Exception as e:
+            logger.warning(f"CSV parsing failed for {entry.rel_path}: {e}")
+            return
+
+        # Store raw preview (first 50 lines) for ContentReader
+        preview_lines = content.splitlines()[:50]
+        self._raw_store.upsert(
+            file_id=entry.file_id,
+            path=entry.rel_path,
+            content="\n".join(preview_lines),
+            content_hash=content_hash,
+            file_type=entry.file_type,
+            size_bytes=entry.size_bytes,
+        )
+
+        # Store all rows in PostgresTableStore for SQL queries
+        if self._pg_table_store:
+            try:
+                self._pg_table_store.store(
+                    table_id=parsed.table_id,
+                    columns=parsed.columns,
+                    rows=parsed.rows,
+                    source_file=entry.rel_path,
+                    file_hash=content_hash,
+                )
+            except Exception as e:
+                logger.warning(f"PostgresTableStore.store failed for {entry.rel_path}: {e}")
+                return
+
+        # Delete old table metadata for this file
+        self._table_store.delete_by_file(entry.file_id)
+
+        # Build human-readable name from filename
+        name = Path(entry.rel_path).stem.replace("_", " ").replace("-", " ").title()
+
+        # Get sample rows for summarization prompt
+        try:
+            samples = get_sample_rows(parsed, n=3)
+        except Exception:
+            samples = []
+
+        # Store metadata in krag_table_index
+        self._table_store.upsert_batch([{
+            "id": str(uuid.uuid4()),
+            "raw_file_id": entry.file_id,
+            "table_id": parsed.table_id,
+            "name": name,
+            "columns": parsed.columns,
+            "row_count": parsed.row_count,
+            "summary": None,
+            "summary_vector": None,
+            "metadata": {"source_file": entry.rel_path, "sample_rows": samples},
+        }])
+
+    def _summarize_table(self, entry: "ManifestEntry") -> None:
+        """Generate LLM summary for table schema."""
+        records = self._table_store.get_by_file(entry.file_id)
+        if not records:
+            return
+
+        for record in records:
+            cols = ", ".join(record["columns"][:20])
+            samples = record.get("metadata", {}).get("sample_rows", [])
+            sample_str = ""
+            if samples:
+                sample_lines = []
+                for row in samples[:2]:
+                    pairs = [
+                        f"{col}={val}"
+                        for col, val in zip(record["columns"], row)
+                        if val
+                    ]
+                    sample_lines.append(" | ".join(pairs[:8]))
+                sample_str = "\nSample rows:\n" + "\n".join(sample_lines)
+
+            prompt = (
+                f"Table: '{record['name']}'\n"
+                f"Columns: {cols}\n"
+                f"Row count: {record['row_count']}"
+                f"{sample_str}"
+            )
+
+            try:
+                response = self._chat.chat([
+                    {
+                        "role": "system",
+                        "content": (
+                            "You describe table schemas. Write a concise 1-2 sentence "
+                            "description of what data this table contains and what "
+                            "questions it could answer. Return ONLY the description text."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ])
+                summary = response.strip()
+            except Exception as e:
+                logger.warning(f"Table summary generation failed for {entry.rel_path}: {e}")
+                summary = f"Table {record['name']} with columns: {cols}"
+
+            self._table_store.update_summary(record["id"], summary)
+
+    def _embed_table(self, entry: "ManifestEntry") -> None:
+        """Compute and store embeddings for table summaries."""
+        records = self._table_store.get_by_file(entry.file_id)
+        if not records:
+            return
+
+        texts = []
+        record_ids = []
+        for record in records:
+            text = record.get("summary") or (
+                f"Table {record['name']} with columns: {', '.join(record['columns'][:20])}"
+            )
+            texts.append(text)
+            record_ids.append(record["id"])
+
+        try:
+            vectors = self._embedder.embed_batch(texts)
+            for record_id, vector in zip(record_ids, vectors):
+                self._table_store.update_vector(record_id, vector)
+        except Exception as e:
+            logger.warning(f"Table embedding failed for {entry.rel_path}: {e}")
+
     def _process_parsed_files(self) -> None:
         """PARSED → SUMMARIZED: Generate LLM summaries."""
         # Collect symbols needing summaries
@@ -322,6 +460,8 @@ class BackgroundIngestWorker:
 
                 if ext in _CODE_EXTENSIONS:
                     self._summarize_file_symbols(entry)
+                elif ext in _TABLE_EXTENSIONS:
+                    self._summarize_table(entry)
                 else:
                     self._summarize_file_sections(entry)
 
@@ -472,6 +612,8 @@ class BackgroundIngestWorker:
 
                 if ext in _CODE_EXTENSIONS:
                     self._embed_file_symbols(entry)
+                elif ext in _TABLE_EXTENSIONS:
+                    self._embed_table(entry)
                 else:
                     self._embed_file_sections(entry)
 

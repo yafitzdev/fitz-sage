@@ -156,6 +156,21 @@ class TableStore:
             rows = conn.execute(sql, (raw_file_id,)).fetchall()
         return [_row_to_dict(row) for row in rows]
 
+    def update_summary(self, table_index_id: str, summary: str) -> None:
+        """Update summary for a single table record."""
+        sql = f'UPDATE {TABLE} SET "summary" = %s WHERE "id" = %s'
+        with self._cm.connection(self._collection) as conn:
+            conn.execute(sql, (summary, table_index_id))
+            conn.commit()
+
+    def update_vector(self, table_index_id: str, vector: list[float]) -> None:
+        """Update summary_vector for a single table record."""
+        vector_str = _vector_to_pg(vector)
+        sql = f'UPDATE {TABLE} SET "summary_vector" = %s::vector WHERE "id" = %s'
+        with self._cm.connection(self._collection) as conn:
+            conn.execute(sql, (vector_str, table_index_id))
+            conn.commit()
+
     def delete_by_file(self, raw_file_id: str) -> None:
         """Delete table metadata when source file is removed."""
         sql = f'DELETE FROM {TABLE} WHERE "raw_file_id" = %s'

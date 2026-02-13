@@ -666,6 +666,7 @@ class FitzKragEngine:
                 },
                 vocabulary_store=self._vocabulary_store,
                 entity_graph_store=self._entity_graph_store,
+                pg_table_store=self._pg_table_store,
             )
             self._bg_worker.start()
 

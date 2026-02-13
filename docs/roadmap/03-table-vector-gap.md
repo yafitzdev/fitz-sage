@@ -1,7 +1,7 @@
 # docs/roadmap/03-table-vector-gap.md
 # Problem: CSV rows invisible to semantic search
 
-## Status: Open
+## Status: Done (basic table processing in progressive pipeline)
 ## Impact: Medium
 ## Effort: Medium
 
