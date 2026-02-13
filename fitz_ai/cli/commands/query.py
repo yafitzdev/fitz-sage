@@ -5,14 +5,15 @@ Query command - Engine-agnostic query interface.
 Uses the default engine (set via 'fitz engine'). Override with --engine.
 
 Usage:
-    fitz query                          # Interactive mode
-    fitz query "What is RAG?"           # Direct query
-    fitz query -c my_collection         # Specify collection
-    fitz query --engine custom          # Use a custom engine
+    fitz query "What is RAG?"                      # Query existing collection
+    fitz query "What is RAG?" --source ./docs      # Point at docs first, then query
+    fitz query -c my_collection                    # Specify collection
+    fitz query --engine custom                     # Use a custom engine
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -65,34 +66,12 @@ def _get_root_cause(exc: Exception) -> str:
 
 
 def command(
-    question: Optional[str] = typer.Argument(
-        None,
-        help="Question to ask (will prompt if not provided).",
-    ),
-    collection: Optional[str] = typer.Option(
-        None,
-        "--collection",
-        "-c",
-        help="Collection to query (engines with collection support).",
-    ),
-    engine: Optional[str] = typer.Option(
-        None,
-        "--engine",
-        "-e",
-        help="Engine to use. Uses default from 'fitz engine' if not specified.",
-    ),
+    question: Optional[str] = None,
+    source: Optional[Path] = None,
+    collection: Optional[str] = None,
+    engine: Optional[str] = None,
 ) -> None:
-    """
-    Query your knowledge base.
-
-    Uses the default engine (set via 'fitz engine'). Override with --engine.
-
-    Examples:
-        fitz query                         # Interactive mode
-        fitz query "What is RAG?"          # Direct query
-        fitz query "question" -e custom    # Use a custom engine
-        fitz query "question" -c my_coll   # Specify collection
-    """
+    """Query your knowledge base."""
     # =========================================================================
     # Engine selection (use default if not specified)
     # =========================================================================
@@ -116,9 +95,14 @@ def command(
         _show_documents_required_message(engine, caps)
         raise typer.Exit(0)
 
+    # Validate --source path if provided
+    if source is not None and not source.exists():
+        ui.error(f"Path does not exist: {source}")
+        raise typer.Exit(1)
+
     # Engines with persistent ingest support
     if caps.supports_persistent_ingest:
-        _run_persistent_ingest_query(question, collection, engine)
+        _run_persistent_ingest_query(question, source, collection, engine)
     # Engines with collection support use FitzService
     elif caps.supports_collections:
         _run_collection_query(question, collection, engine)
@@ -134,7 +118,7 @@ def _show_documents_required_message(engine_name: str, caps) -> None:
     else:
         ui.warning(f"Engine '{engine_name}' requires documents to be loaded first.")
         ui.info(
-            f"Use 'fitz quickstart <folder> \"question\" --engine {engine_name}' for one-off queries."
+            f"Use 'fitz query \"question\" --source <folder> --engine {engine_name}' instead."
         )
     print()
     ui.info("Or use the Python API:")
@@ -155,7 +139,7 @@ def _select_collection(service: FitzService, requested: Optional[str]) -> str:
     if not collections:
         print()
         ui.warning("No collections found in vector database.")
-        ui.info("Run 'fitz point ./docs' first to register documents.")
+        ui.info("Run 'fitz query \"question\" --source ./docs' to get started.")
         raise typer.Exit(0)
 
     collection_names = [c.name for c in collections]
@@ -165,7 +149,7 @@ def _select_collection(service: FitzService, requested: Optional[str]) -> str:
             print()
             ui.warning(f"Collection '{requested}' not found.")
             ui.info(f"Available collections: {', '.join(collection_names)}")
-            ui.info("Use -c <collection> to specify another, or run 'fitz point' to create it.")
+            ui.info("Use -c <collection> to specify another, or use --source to register documents.")
             raise typer.Exit(0)
         return requested
 
@@ -179,29 +163,35 @@ def _select_collection(service: FitzService, requested: Optional[str]) -> str:
 
 
 def _run_persistent_ingest_query(
-    question: Optional[str], collection: Optional[str], engine_name: str
+    question: Optional[str],
+    source: Optional[Path],
+    collection: Optional[str],
+    engine_name: str,
 ) -> None:
     """Run query using an engine with persistent ingest support."""
 
-    # Get list of available collections via registry (no hardcoded imports)
-    registry = get_engine_registry()
-    collections = registry.get_list_collections(engine_name)
+    # If --source provided, point first (auto-creates collection)
+    if source is not None:
+        collection = collection or "default"
+    else:
+        # No source — need an existing collection
+        registry = get_engine_registry()
+        collections = registry.get_list_collections(engine_name)
 
-    if not collections:
-        ui.warning(f"No {engine_name} collections found.")
-        ui.info(f"Run 'fitz point ./docs' first to register documents.")
-        raise typer.Exit(0)
+        if not collections:
+            ui.warning("No collections found.")
+            ui.info("Run 'fitz query \"question\" --source ./docs' to get started.")
+            raise typer.Exit(0)
 
-    # Collection selection
-    if collection is None:
-        if len(collections) == 1:
-            collection = collections[0]
-        else:
-            print()
-            collection = ui.prompt_numbered_choice("Collection", collections, collections[0])
-    elif collection not in collections:
-        ui.error(f"Collection '{collection}' not found. Available: {', '.join(collections)}")
-        raise typer.Exit(1)
+        if collection is None:
+            if len(collections) == 1:
+                collection = collections[0]
+            else:
+                print()
+                collection = ui.prompt_numbered_choice("Collection", collections, collections[0])
+        elif collection not in collections:
+            ui.error(f"Collection '{collection}' not found. Available: {', '.join(collections)}")
+            raise typer.Exit(1)
 
     # Prompt for question if not provided
     if question is None:
@@ -215,8 +205,14 @@ def _run_persistent_ingest_query(
     try:
         engine_instance = create_engine(engine_name)
 
-        ui.info(f"Loading collection '{collection}'...")
-        engine_instance.load(collection)
+        # Point at source if provided
+        if source is not None:
+            ui.info(f"Registering {source}...")
+            manifest = engine_instance.point(source, collection, start_worker=False)
+            ui.info(f"Registered {len(manifest.entries())} files")
+        else:
+            ui.info(f"Loading collection '{collection}'...")
+            engine_instance.load(collection)
 
         from fitz_ai.core import Query
 

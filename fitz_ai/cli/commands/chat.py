@@ -182,7 +182,7 @@ def _run_collection_chat(collection: Optional[str]) -> None:
     collections = registry.get_list_collections(engine_name)
     if not collections:
         ui.error(f"No collections found for engine '{engine_name}'.")
-        ui.info("Run 'fitz point ./docs' first to register documents.")
+        ui.info("Run 'fitz query \"question\" --source ./docs' first to register documents.")
         raise typer.Exit(1)
 
     if collection and collection not in collections:

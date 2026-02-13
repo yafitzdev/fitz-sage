@@ -3,10 +3,8 @@
 Fitz CLI - Main application.
 
 Commands:
-    fitz quickstart    Zero-friction RAG in one command (START HERE)
+    fitz query         Query knowledge base (use --source to register docs first)
     fitz init          Setup wizard (for custom configuration)
-    fitz point         Point at a folder to start querying immediately
-    fitz query         Query knowledge base
     fitz chat          Interactive conversation with your knowledge base
     fitz collections   Manage collections (list, info, delete)
     fitz tables        Manage structured tables (list, info, delete)
@@ -34,7 +32,7 @@ import typer  # noqa: E402
 
 app = typer.Typer(
     name="fitz",
-    help='Fitz - local-first RAG framework. Start with: fitz quickstart ./docs "your question"',
+    help='Fitz - local-first RAG framework. Start with: fitz query "your question" --source ./docs',
     no_args_is_help=True,
     add_completion=False,
 )
@@ -45,19 +43,6 @@ app = typer.Typer(
 # =============================================================================
 # Each command is a thin wrapper that imports the real implementation only when invoked.
 # This keeps CLI startup fast by avoiding heavy imports (torch, pydantic models, etc.).
-
-
-@app.command("quickstart")
-def quickstart(
-    source: Optional[Path] = typer.Argument(None, help="Path to documents (file or directory)."),
-    question: Optional[str] = typer.Argument(None, help="Question to ask about your documents."),
-    collection: str = typer.Option("quickstart", "--collection", "-c", help="Collection name."),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed progress."),
-) -> None:
-    """One-command RAG: ingest docs and ask a question."""
-    from fitz_ai.cli.commands import quickstart as mod
-
-    mod.command(source=source, question=question, collection=collection, verbose=verbose)
 
 
 @app.command("init")
@@ -71,28 +56,17 @@ def init(
     mod.command(non_interactive=non_interactive, show_config=show_config)
 
 
-@app.command("point")
-def point(
-    source: Path = typer.Argument(..., help="Path to documents directory."),
-    collection: str = typer.Option("default", "--collection", "-c", help="Collection name."),
-) -> None:
-    """Point at a folder to start querying immediately."""
-    from fitz_ai.cli.commands import point as mod
-
-    mod.command(source=source, collection=collection)
-
-
-
 @app.command("query")
 def query(
     question: Optional[str] = typer.Argument(None, help="Question to ask."),
+    source: Optional[Path] = typer.Option(None, "--source", "-s", help="Path to documents (registers before querying)."),
     collection: Optional[str] = typer.Option(None, "--collection", "-c", help="Collection name."),
     engine: Optional[str] = typer.Option(None, "--engine", "-e", help="Engine to use."),
 ) -> None:
-    """Query the knowledge base."""
+    """Query the knowledge base. Use --source to point at docs first."""
     from fitz_ai.cli.commands import query as mod
 
-    mod.command(question=question, collection=collection, engine=engine)
+    mod.command(question=question, source=source, collection=collection, engine=engine)
 
 
 @app.command("chat")
