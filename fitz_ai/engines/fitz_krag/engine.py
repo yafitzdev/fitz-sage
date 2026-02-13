@@ -30,6 +30,19 @@ logger = get_logger(__name__)
 CLOUD_OPTIMIZER_VERSION = "1.0"
 
 
+def _report_timings(
+    progress: Callable[[str], None],
+    timings: list[tuple[str, float]],
+    pipeline_start: float,
+) -> None:
+    """Report pipeline timing breakdown via progress callback."""
+    import time
+
+    total = time.perf_counter() - pipeline_start
+    parts = "  ".join(f"{name}: {dur:.1f}s" for name, dur in timings)
+    progress(f"Pipeline: {total:.1f}s total — {parts}")
+
+
 class FitzKragEngine:
     """
     Fitz KRAG engine implementation.
@@ -338,6 +351,8 @@ class FitzKragEngine:
         if self._bg_worker:
             self._bg_worker.signal_query_start()
         try:
+            import time
+
             # 0. Sanitize and normalize query
             import re
 
@@ -365,9 +380,12 @@ class FitzKragEngine:
                     logger.warning(f"Query rewriting failed, using original: {e}")
 
             _progress = progress or (lambda _: None)
+            timings: list[tuple[str, float]] = []
+            pipeline_start = time.perf_counter()
 
             # 1. Analyze query intent + detection in parallel
             _progress("Analyzing query...")
+            t0 = time.perf_counter()
             from concurrent.futures import ThreadPoolExecutor
 
             with ThreadPoolExecutor(max_workers=2) as pool:
@@ -381,9 +399,11 @@ class FitzKragEngine:
                 )
                 analysis = analysis_future.result()
                 detection = detection_future.result() if detection_future else None
+            timings.append(("Analysis + Detection", time.perf_counter() - t0))
 
             # 2. Retrieve addresses (or multi-hop)
             _progress("Retrieving relevant sources...")
+            t0 = time.perf_counter()
             if self._hop_controller:
                 # Multi-hop: iterative retrieve → read → evaluate → bridge
                 read_results = self._hop_controller.execute(retrieval_query, analysis, detection)
@@ -392,8 +412,10 @@ class FitzKragEngine:
                 addresses = self._retrieval_router.retrieve(
                     retrieval_query, analysis, detection=detection, progress=progress
                 )
+            timings.append(("Retrieval", time.perf_counter() - t0))
 
             if not addresses:
+                _report_timings(_progress, timings, pipeline_start)
                 return Answer(
                     text="No information found. The available documents do not contain relevant content for this query.",
                     provenance=[],
@@ -402,7 +424,9 @@ class FitzKragEngine:
 
             # 2.5. Rerank addresses (when reranker configured)
             if self._address_reranker and not self._hop_controller:
+                t0 = time.perf_counter()
                 addresses = self._address_reranker.rerank(retrieval_query, addresses)
+                timings.append(("Rerank", time.perf_counter() - t0))
 
             # 2.6. Check cloud cache (early return on hit)
             if self._cloud_client:
@@ -415,9 +439,12 @@ class FitzKragEngine:
                 pass  # read_results already populated by hop controller
             else:
                 _progress(f"Reading content from {min(len(addresses), self._config.top_read)} sources...")
+                t0 = time.perf_counter()
                 read_results = self._reader.read(addresses, self._config.top_read)
+                timings.append(("Read content", time.perf_counter() - t0))
 
             if not read_results:
+                _report_timings(_progress, timings, pipeline_start)
                 return Answer(
                     text="Found matching symbols but could not read their content.",
                     provenance=[],
@@ -425,7 +452,9 @@ class FitzKragEngine:
                 )
 
             # 4. Expand with context
+            t0 = time.perf_counter()
             expanded = self._expander.expand(read_results)
+            timings.append(("Expand context", time.perf_counter() - t0))
 
             # 4.5. Execute table queries (SQL generation + execution)
             expanded = self._table_handler.process(sanitized, expanded)
@@ -433,20 +462,27 @@ class FitzKragEngine:
             # 5. Run guardrails (ReadResult satisfies EvidenceItem protocol)
             answer_mode = AnswerMode.TRUSTWORTHY
             if self._constraints and self._governor:
+                t0 = time.perf_counter()
                 from fitz_ai.governance import run_constraints
 
                 constraint_results = run_constraints(sanitized, expanded, self._constraints)
                 governance = self._governor.decide(constraint_results)
                 answer_mode = governance.mode
+                timings.append(("Guardrails", time.perf_counter() - t0))
 
             # 6. Assemble context
             context = self._assembler.assemble(sanitized, expanded)
 
             # 7. Generate answer with answer mode
             _progress("Generating answer...")
+            t0 = time.perf_counter()
             answer = self._synthesizer.generate(
                 sanitized, context, expanded, answer_mode=answer_mode
             )
+            timings.append(("Generation", time.perf_counter() - t0))
+
+            # Report timing breakdown
+            _report_timings(_progress, timings, pipeline_start)
 
             # 7.5. Store in cloud cache
             if self._cloud_client:
