@@ -30,7 +30,8 @@ correspond to the numbered source blocks.
 Rules:
 - Only use information from the provided context
 - Cite specific sources with [S1], [S2] markers
-- If the context doesn't contain enough information, say so
+- If the context does not contain relevant information to answer the question, \
+respond with "No information found" or "Unable to find relevant information"
 - Reference specific files and line numbers when helpful
 - Be precise about what the code does, not what it might do"""
 
@@ -38,7 +39,8 @@ SYSTEM_PROMPT_OPEN = """\
 You are a code-aware assistant. Answer questions using the provided source code \
 and documentation context as primary references. Cite sources using [S1], [S2], \
 etc. markers. You may supplement with general knowledge when the context is \
-insufficient, but clearly indicate when doing so."""
+insufficient, but clearly indicate when doing so. If the context does not contain \
+relevant information, respond with "No information found"."""
 
 
 class CodeSynthesizer:

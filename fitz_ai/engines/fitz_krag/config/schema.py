@@ -148,7 +148,7 @@ class FitzKragConfig(BasePluginConfig):
     )
 
     min_relevance_score: float = Field(
-        default=0.25,
+        default=0.35,
         ge=0.0,
         le=1.0,
         description="Minimum address score after ranking to keep. Filters out irrelevant results.",
