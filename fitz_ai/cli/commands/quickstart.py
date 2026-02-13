@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import typer
 
@@ -154,14 +154,18 @@ def _run_quickstart(source: Path, question: str, collection: str, verbose: bool)
             collection=collection,
             verbose=verbose,
         )
-        hierarchy_info = (
-            f", {stats['hierarchy_summaries']} summaries"
-            if stats.get("hierarchy_summaries")
-            else ""
-        )
-        ui.success(
-            f"Ingested {stats['documents']} documents ({stats['chunks']} chunks{hierarchy_info})"
-        )
+        sections = stats.get("sections_extracted", 0)
+        symbols = stats.get("symbols_extracted", 0)
+        files = stats.get("files_new", 0) + stats.get("files_changed", 0)
+
+        parts = []
+        if sections:
+            parts.append(f"{sections} sections")
+        if symbols:
+            parts.append(f"{symbols} symbols")
+
+        detail = f" ({', '.join(parts)})" if parts else ""
+        ui.success(f"Ingested {files} documents{detail}")
 
     except Exception as e:
         ui.error(f"Ingestion failed: {e}")
@@ -567,135 +571,17 @@ def _run_ingestion(
     verbose: bool = False,
 ) -> dict:
     """
-    Run document ingestion with hierarchical summaries.
+    Run KRAG-native ingestion (sections, symbols, tables).
 
-    Returns dict with 'documents', 'chunks', and 'hierarchy_summaries' counts.
+    Returns stats dict from KragIngestPipeline.
     """
-    from fitz_ai.cli.context import CLIContext
-    from fitz_ai.ingestion.chunking.config import (
-        ChunkingRouterConfig,
-        ExtensionChunkerConfig,
-    )
-    from fitz_ai.ingestion.chunking.router import ChunkingRouter
-    from fitz_ai.ingestion.diff.scanner import FileScanner
-    from fitz_ai.ingestion.enrichment.config import HierarchyConfig
-    from fitz_ai.ingestion.enrichment.hierarchy.enricher import HierarchyEnricher
-    from fitz_ai.ingestion.parser import ParserRouter
-    from fitz_ai.ingestion.source.base import SourceFile
-    from fitz_ai.vector_db.writer import VectorDBWriter
+    from fitz_ai.runtime import create_engine, get_default_engine
 
-    # Load config via CLIContext (typed access)
-    ctx = CLIContext.load()
+    engine_name = get_default_engine()
+    engine = create_engine(engine_name)
+    engine.load(collection)
 
-    # Step 1: Discover and parse documents
-    if verbose:
-        ui.info("Discovering and parsing documents...")
-
-    scanner = FileScanner()
-    scan_result = scanner.scan(str(source))
-
-    if not scan_result.files:
-        raise ValueError(f"No documents found in {source}")
-
-    # Quickstart skips VLM for speed - use 'fitz ingest' for VLM figure description
-    parser_router = ParserRouter(docling_parser="docling")
-    parsed_docs = []
-    for file_info in scan_result.files:
-        source_file = SourceFile(
-            uri=Path(file_info.path).as_uri(),
-            local_path=Path(file_info.path),
-            metadata={},
-        )
-        try:
-            parsed_doc = parser_router.parse(source_file)
-            if parsed_doc.full_text.strip():
-                parsed_docs.append(parsed_doc)
-        except Exception as e:
-            if verbose:
-                ui.warning(f"Failed to parse {file_info.path}: {e}")
-
-    if not parsed_docs:
-        raise ValueError(f"No documents could be parsed in {source}")
-
-    if verbose:
-        ui.info(f"Parsed {len(parsed_docs)} documents")
-
-    # Step 2: Chunk documents
-    if verbose:
-        ui.info("Chunking documents...")
-
-    # Build chunking config from CLIContext
-    chunking_config = ChunkingRouterConfig(
-        default=ExtensionChunkerConfig(
-            plugin_name="recursive",
-            kwargs={"chunk_size": ctx.chunk_size, "chunk_overlap": ctx.chunk_overlap},
-        ),
-        by_extension={},
-        warn_on_fallback=False,
-    )
-    chunking_router = ChunkingRouter.from_config(chunking_config)
-
-    chunks: List = []
-    for parsed_doc in parsed_docs:
-        ext = Path(parsed_doc.metadata.get("source_file", ".txt")).suffix or ".txt"
-        chunker = chunking_router.get_chunker(ext)
-        doc_chunks = chunker.chunk(parsed_doc)
-        # Set source metadata for hierarchy grouping
-        source_file = parsed_doc.metadata.get("source_file", "unknown")
-        for chunk in doc_chunks:
-            chunk.metadata["source"] = source_file
-        chunks.extend(doc_chunks)
-
-    if not chunks:
-        raise ValueError("No chunks created from documents")
-
-    if verbose:
-        ui.info(f"Created {len(chunks)} chunks")
-
-    # Step 3: Hierarchical enrichment (group summaries + corpus summary)
-    if verbose:
-        ui.info("Generating hierarchical summaries...")
-
-    # Get chat factory for summarization using CLIContext
-    chat_factory = ctx.get_chat_factory()
-
-    # Create hierarchy enricher with simple mode defaults
-    hierarchy_config = HierarchyConfig(group_by="source")
-    hierarchy_enricher = HierarchyEnricher(config=hierarchy_config, chat_factory=chat_factory)
-
-    # Enrich chunks (adds L1 summaries as metadata, returns chunks + L2 corpus summary)
-    original_chunk_count = len(chunks)
-    chunks = hierarchy_enricher.enrich(chunks)
-    hierarchy_summaries = len(chunks) - original_chunk_count
-
-    if verbose:
-        ui.info(f"Generated {hierarchy_summaries} hierarchy summary chunks")
-
-    # Step 4: Embed chunks
-    if verbose:
-        ui.info("Generating embeddings...")
-
-    embedder = ctx.get_embedder()
-
-    vectors = []
-    for chunk in chunks:
-        vec = embedder.embed(chunk.content)
-        vectors.append(vec)
-
-    # Step 4: Store in vector DB
-    if verbose:
-        ui.info("Storing vectors...")
-
-    vdb_plugin = ctx.get_vector_db_client()
-
-    writer = VectorDBWriter(client=vdb_plugin)
-    writer.upsert(collection=collection, chunks=chunks, vectors=vectors)
-
-    return {
-        "documents": len(parsed_docs),
-        "chunks": original_chunk_count,
-        "hierarchy_summaries": hierarchy_summaries,
-    }
+    return engine.ingest(source, collection, force=True)
 
 
 # =============================================================================

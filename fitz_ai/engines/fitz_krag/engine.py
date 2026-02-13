@@ -54,6 +54,11 @@ class FitzKragEngine:
         except Exception as e:
             raise ConfigurationError(f"Failed to initialize Fitz KRAG engine: {e}") from e
 
+    def load(self, collection: str) -> None:
+        """Load a collection, reinitializing collection-dependent components."""
+        self._config.collection = collection
+        self._init_components()
+
     def _init_components(self) -> None:
         """Initialize engine components lazily."""
         from fitz_ai.llm.client import get_chat, get_embedder

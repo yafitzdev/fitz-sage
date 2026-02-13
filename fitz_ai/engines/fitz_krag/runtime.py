@@ -95,6 +95,54 @@ def _register_fitz_krag_engine():
 
             return FitzKragConfig(**config_dict)
 
+    def fitz_krag_list_collections():
+        """List KRAG collections by finding fitz_* databases with krag_raw_files table."""
+        import logging
+
+        from fitz_ai.storage.postgres import get_connection_manager
+
+        logger = logging.getLogger(__name__)
+        try:
+            manager = get_connection_manager()
+            if not manager._started:
+                manager.start()
+
+            with manager.connection("postgres") as conn:
+                result = conn.execute(
+                    """
+                    SELECT datname FROM pg_database
+                    WHERE datistemplate = false
+                    AND datname LIKE 'fitz_%'
+                    AND datname NOT LIKE 'fitz_fitz_%'
+                    ORDER BY datname
+                    """
+                ).fetchall()
+                candidate_dbs = [row[0] for row in result]
+
+            collections = []
+            for db_name in candidate_dbs:
+                collection_name = db_name[5:]  # Remove "fitz_"
+                if collection_name in ("c__ingest_state", "public", "postgres", "default"):
+                    continue
+                try:
+                    with manager.connection(collection_name) as conn:
+                        has_krag = conn.execute(
+                            """
+                            SELECT 1 FROM information_schema.tables
+                            WHERE table_name = 'krag_raw_files' AND table_schema = 'public'
+                            LIMIT 1
+                            """
+                        ).fetchone()
+                        if has_krag:
+                            collections.append(collection_name)
+                except Exception:
+                    pass
+
+            return sorted(collections)
+        except Exception as e:
+            logger.warning(f"Failed to list KRAG collections: {e}")
+            return []
+
     capabilities = EngineCapabilities(
         supports_collections=True,
         requires_documents_at_query=False,
@@ -115,6 +163,7 @@ def _register_fitz_krag_engine():
             config_type=FitzKragConfig,
             config_loader=fitz_krag_config_loader,
             default_config_path=get_default_config_path,
+            list_collections=fitz_krag_list_collections,
             capabilities=capabilities,
         )
     except ValueError:
