@@ -5,14 +5,13 @@ Java ingestion strategy using tree-sitter.
 Extracts classes, interfaces, enums, records, methods, constructors, fields,
 and import relationships.
 Requires: tree-sitter, tree-sitter-java (optional dependency).
+Falls back to regex-based extraction when tree-sitter is not installed.
 """
 
 from __future__ import annotations
 
 import logging
-
-import tree_sitter_java as ts_java
-from tree_sitter import Language, Parser
+import re
 
 from fitz_ai.engines.fitz_krag.ingestion.strategies.base import (
     ImportEdge,
@@ -22,7 +21,40 @@ from fitz_ai.engines.fitz_krag.ingestion.strategies.base import (
 
 logger = logging.getLogger(__name__)
 
-JAVA_LANGUAGE = Language(ts_java.language())
+try:
+    import tree_sitter_java as ts_java
+    from tree_sitter import Language, Parser
+
+    JAVA_LANGUAGE = Language(ts_java.language())
+    _HAS_TREE_SITTER = True
+except ImportError:
+    _HAS_TREE_SITTER = False
+
+_warned_no_tree_sitter = False
+
+# --- Regex patterns for fallback ---
+_CLASS_RE = re.compile(
+    r"^\s*(?:public|private|protected)?\s*(?:abstract\s+)?(?:final\s+)?class\s+(\w+)",
+    re.MULTILINE,
+)
+_INTERFACE_RE = re.compile(
+    r"^\s*(?:public|private|protected)?\s*interface\s+(\w+)", re.MULTILINE
+)
+_ENUM_RE = re.compile(
+    r"^\s*(?:public|private|protected)?\s*enum\s+(\w+)", re.MULTILINE
+)
+_RECORD_RE = re.compile(
+    r"^\s*(?:public|private|protected)?\s*record\s+(\w+)", re.MULTILINE
+)
+_METHOD_RE = re.compile(
+    r"^\s*(?:public|private|protected)?\s*(?:static\s+)?(?:final\s+)?"
+    r"(?:abstract\s+)?(?:synchronized\s+)?(?:\w+(?:<[^>]+>)?(?:\[\])*)\s+(\w+)\s*\(",
+    re.MULTILINE,
+)
+_IMPORT_RE = re.compile(
+    r"^\s*import\s+(?:static\s+)?([a-zA-Z_][\w.]*(?:\.\*)?)\s*;", re.MULTILINE
+)
+_PACKAGE_RE = re.compile(r"^\s*package\s+([\w.]+)\s*;", re.MULTILINE)
 
 
 class JavaIngestStrategy:
@@ -33,12 +65,15 @@ class JavaIngestStrategy:
 
     def extract(self, source: str, file_path: str) -> IngestResult:
         """Extract symbols and imports from Java source."""
+        if not _HAS_TREE_SITTER:
+            return _regex_fallback(source, file_path)
+
         try:
             parser = Parser(JAVA_LANGUAGE)
             tree = parser.parse(source.encode("utf-8"))
         except Exception as e:
             logger.warning(f"Parse error for {file_path}: {e}")
-            return IngestResult()
+            return _regex_fallback(source, file_path)
 
         lines = source.splitlines()
         package = _extract_package(tree.root_node)
@@ -48,6 +83,100 @@ class JavaIngestStrategy:
 
         _walk_node(tree.root_node, lines, module_name, symbols, imports)
         return IngestResult(symbols=symbols, imports=imports)
+
+
+def _regex_fallback(source: str, file_path: str) -> IngestResult:
+    """Extract symbols via regex when tree-sitter is unavailable."""
+    global _warned_no_tree_sitter
+    if not _warned_no_tree_sitter:
+        logger.warning(
+            "tree-sitter-java not installed, using regex fallback. "
+            "Install with: pip install fitz-ai[krag-java]"
+        )
+        _warned_no_tree_sitter = True
+
+    # Detect package for qualified names
+    pkg_match = _PACKAGE_RE.search(source)
+    module_name = pkg_match.group(1) if pkg_match else _path_to_module(file_path)
+
+    symbols: list[SymbolEntry] = []
+    imports: list[ImportEdge] = []
+
+    for m in _CLASS_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="class",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"class {m.group(1)}",
+        ))
+
+    for m in _INTERFACE_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="interface",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"interface {m.group(1)}",
+        ))
+
+    for m in _ENUM_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="enum",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"enum {m.group(1)}",
+        ))
+
+    for m in _RECORD_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="record",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"record {m.group(1)}",
+        ))
+
+    for m in _METHOD_RE.finditer(source):
+        name = m.group(1)
+        # Skip false positives: Java keywords that look like method return types
+        if name in ("if", "else", "for", "while", "switch", "return", "new", "class"):
+            continue
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=name,
+            qualified_name=f"{module_name}.{name}",
+            kind="method",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"{name}()",
+        ))
+
+    for m in _IMPORT_RE.finditer(source):
+        full_import = m.group(1)
+        parts = full_import.rsplit(".", 1)
+        if len(parts) == 2:
+            module, name = parts
+            imports.append(ImportEdge(
+                target_module=module,
+                import_names=[name] if name != "*" else [],
+            ))
+        else:
+            imports.append(ImportEdge(target_module=full_import, import_names=[]))
+
+    return IngestResult(symbols=symbols, imports=imports)
+
+
+# --- Tree-sitter extraction (used when tree-sitter is available) ---
 
 
 def _walk_node(node, lines, module_name, symbols, imports, class_name=None):

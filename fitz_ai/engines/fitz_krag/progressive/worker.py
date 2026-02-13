@@ -195,7 +195,7 @@ class BackgroundIngestWorker:
                             ts_strategy = TypeScriptIngestStrategy()
                         result = ts_strategy.extract(content, entry.rel_path)
                     except Exception as e:
-                        logger.debug(f"TypeScript strategy unavailable: {e}")
+                        logger.warning(f"TypeScript strategy unavailable: {e}")
 
                 elif ext == ".java":
                     try:
@@ -206,7 +206,7 @@ class BackgroundIngestWorker:
                             java_strategy = JavaIngestStrategy()
                         result = java_strategy.extract(content, entry.rel_path)
                     except Exception as e:
-                        logger.debug(f"Java strategy unavailable: {e}")
+                        logger.warning(f"Java strategy unavailable: {e}")
 
                 elif ext == ".go":
                     try:
@@ -217,7 +217,7 @@ class BackgroundIngestWorker:
                             go_strategy = GoIngestStrategy()
                         result = go_strategy.extract(content, entry.rel_path)
                     except Exception as e:
-                        logger.debug(f"Go strategy unavailable: {e}")
+                        logger.warning(f"Go strategy unavailable: {e}")
 
                 elif ext in DOC_EXTENSIONS or ext == "":
                     self._process_doc_sections(entry, content, doc_strategy)

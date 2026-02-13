@@ -5,14 +5,13 @@ Go ingestion strategy using tree-sitter.
 Extracts functions, methods (with receiver), types (struct, interface),
 const/var declarations, and import relationships.
 Requires: tree-sitter, tree-sitter-go (optional dependency).
+Falls back to regex-based extraction when tree-sitter is not installed.
 """
 
 from __future__ import annotations
 
 import logging
-
-import tree_sitter_go as ts_go
-from tree_sitter import Language, Parser
+import re
 
 from fitz_ai.engines.fitz_krag.ingestion.strategies.base import (
     ImportEdge,
@@ -22,7 +21,26 @@ from fitz_ai.engines.fitz_krag.ingestion.strategies.base import (
 
 logger = logging.getLogger(__name__)
 
-GO_LANGUAGE = Language(ts_go.language())
+try:
+    import tree_sitter_go as ts_go
+    from tree_sitter import Language, Parser
+
+    GO_LANGUAGE = Language(ts_go.language())
+    _HAS_TREE_SITTER = True
+except ImportError:
+    _HAS_TREE_SITTER = False
+
+_warned_no_tree_sitter = False
+
+# --- Regex patterns for fallback ---
+_FUNC_RE = re.compile(r"^func\s+(\w+)\s*\(", re.MULTILINE)
+_METHOD_RE = re.compile(r"^func\s+\([^)]+\)\s+(\w+)\s*\(", re.MULTILINE)
+_STRUCT_RE = re.compile(r"^type\s+(\w+)\s+struct\b", re.MULTILINE)
+_IFACE_RE = re.compile(r"^type\s+(\w+)\s+interface\b", re.MULTILINE)
+_TYPE_RE = re.compile(r"^type\s+(\w+)\s+\w", re.MULTILINE)
+_CONST_RE = re.compile(r"^\s*(\w+)\s*(?:=|[A-Z])", re.MULTILINE)
+_PACKAGE_RE = re.compile(r"^package\s+(\w+)", re.MULTILINE)
+_IMPORT_RE = re.compile(r'"([^"]+)"', re.MULTILINE)
 
 
 class GoIngestStrategy:
@@ -33,12 +51,15 @@ class GoIngestStrategy:
 
     def extract(self, source: str, file_path: str) -> IngestResult:
         """Extract symbols and imports from Go source."""
+        if not _HAS_TREE_SITTER:
+            return _regex_fallback(source, file_path)
+
         try:
             parser = Parser(GO_LANGUAGE)
             tree = parser.parse(source.encode("utf-8"))
         except Exception as e:
             logger.warning(f"Parse error for {file_path}: {e}")
-            return IngestResult()
+            return _regex_fallback(source, file_path)
 
         lines = source.splitlines()
         package = _extract_package(tree.root_node)
@@ -76,6 +97,105 @@ class GoIngestStrategy:
                 imports.extend(edges)
 
         return IngestResult(symbols=symbols, imports=imports)
+
+
+def _regex_fallback(source: str, file_path: str) -> IngestResult:
+    """Extract symbols via regex when tree-sitter is unavailable."""
+    global _warned_no_tree_sitter
+    if not _warned_no_tree_sitter:
+        logger.warning(
+            "tree-sitter-go not installed, using regex fallback. "
+            "Install with: pip install fitz-ai[krag-go]"
+        )
+        _warned_no_tree_sitter = True
+
+    pkg_match = _PACKAGE_RE.search(source)
+    module_name = pkg_match.group(1) if pkg_match else _path_to_module(file_path)
+
+    symbols: list[SymbolEntry] = []
+    imports: list[ImportEdge] = []
+
+    # Track structs/interfaces to exclude from generic type matches
+    seen_type_names: set[str] = set()
+
+    for m in _FUNC_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="function",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"func {m.group(1)}()",
+        ))
+
+    for m in _METHOD_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="method",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"func (...) {m.group(1)}()",
+        ))
+
+    for m in _STRUCT_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        seen_type_names.add(m.group(1))
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="struct",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"type {m.group(1)} struct",
+        ))
+
+    for m in _IFACE_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        seen_type_names.add(m.group(1))
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="interface",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"type {m.group(1)} interface",
+        ))
+
+    # Generic type aliases (exclude already-captured structs/interfaces)
+    for m in _TYPE_RE.finditer(source):
+        name = m.group(1)
+        if name in seen_type_names:
+            continue
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=name,
+            qualified_name=f"{module_name}.{name}",
+            kind="type",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"type {name}",
+        ))
+
+    # Extract import paths from import blocks
+    import_block = re.search(r"^import\s*\((.*?)\)", source, re.MULTILINE | re.DOTALL)
+    if import_block:
+        for m in _IMPORT_RE.finditer(import_block.group(1)):
+            path = m.group(1)
+            name = path.rsplit("/", 1)[-1]
+            imports.append(ImportEdge(target_module=path, import_names=[name]))
+    # Single-line imports
+    for m in re.finditer(r'^import\s+"([^"]+)"', source, re.MULTILINE):
+        path = m.group(1)
+        name = path.rsplit("/", 1)[-1]
+        imports.append(ImportEdge(target_module=path, import_names=[name]))
+
+    return IngestResult(symbols=symbols, imports=imports)
+
+
+# --- Tree-sitter extraction (used when tree-sitter is available) ---
 
 
 def _extract_function(node, lines, module_name):

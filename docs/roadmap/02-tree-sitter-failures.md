@@ -1,7 +1,7 @@
 # docs/roadmap/02-tree-sitter-failures.md
 # Problem: Non-Python code silently loses all symbols
 
-## Status: Open
+## Status: Done (regex fallback + warning log levels)
 ## Impact: High
 ## Effort: Low
 

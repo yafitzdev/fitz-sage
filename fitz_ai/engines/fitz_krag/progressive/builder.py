@@ -273,7 +273,7 @@ class ManifestBuilder:
                 for sym in result.symbols
             ]
         except Exception as e:
-            logger.debug(f"TypeScript symbol extraction failed for {file_path}: {e}")
+            logger.warning(f"TypeScript symbol extraction failed for {file_path}: {e}")
             return []
 
     def _extract_java_symbols(
@@ -300,7 +300,7 @@ class ManifestBuilder:
                 for sym in result.symbols
             ]
         except Exception as e:
-            logger.debug(f"Java symbol extraction failed for {file_path}: {e}")
+            logger.warning(f"Java symbol extraction failed for {file_path}: {e}")
             return []
 
     def _extract_go_symbols(
@@ -327,7 +327,7 @@ class ManifestBuilder:
                 for sym in result.symbols
             ]
         except Exception as e:
-            logger.debug(f"Go symbol extraction failed for {file_path}: {e}")
+            logger.warning(f"Go symbol extraction failed for {file_path}: {e}")
             return []
 
     def _extract_headings(self, content: str) -> list[ManifestHeading]:

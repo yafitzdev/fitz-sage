@@ -4,14 +4,13 @@ TypeScript/JavaScript ingestion strategy using tree-sitter.
 
 Extracts functions, classes, interfaces, type aliases, and import relationships.
 Requires: tree-sitter, tree-sitter-typescript (optional dependency).
+Falls back to regex-based extraction when tree-sitter is not installed.
 """
 
 from __future__ import annotations
 
 import logging
-
-import tree_sitter_typescript as ts_typescript
-from tree_sitter import Language, Parser
+import re
 
 from fitz_ai.engines.fitz_krag.ingestion.strategies.base import (
     ImportEdge,
@@ -21,8 +20,41 @@ from fitz_ai.engines.fitz_krag.ingestion.strategies.base import (
 
 logger = logging.getLogger(__name__)
 
-TS_LANGUAGE = Language(ts_typescript.language_typescript())
-TSX_LANGUAGE = Language(ts_typescript.language_tsx())
+try:
+    import tree_sitter_typescript as ts_typescript
+    from tree_sitter import Language, Parser
+
+    TS_LANGUAGE = Language(ts_typescript.language_typescript())
+    TSX_LANGUAGE = Language(ts_typescript.language_tsx())
+    _HAS_TREE_SITTER = True
+except ImportError:
+    _HAS_TREE_SITTER = False
+
+_warned_no_tree_sitter = False
+
+# --- Regex patterns for fallback ---
+_FUNC_RE = re.compile(
+    r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+(\w+)\s*\(",
+    re.MULTILINE,
+)
+_CLASS_RE = re.compile(
+    r"^\s*(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+(\w+)",
+    re.MULTILINE,
+)
+_INTERFACE_RE = re.compile(
+    r"^\s*(?:export\s+)?interface\s+(\w+)", re.MULTILINE
+)
+_TYPE_RE = re.compile(
+    r"^\s*(?:export\s+)?type\s+(\w+)\s*=", re.MULTILINE
+)
+_ARROW_RE = re.compile(
+    r"^\s*(?:export\s+)?const\s+(\w+)\s*=\s*(?:\([^)]*\)|[a-zA-Z_]\w*)\s*=>",
+    re.MULTILINE,
+)
+_IMPORT_RE = re.compile(
+    r"""^\s*import\s+(?:.*?\s+from\s+)?['"]([^'"]+)['"]""",
+    re.MULTILINE,
+)
 
 
 class TypeScriptIngestStrategy:
@@ -33,13 +65,16 @@ class TypeScriptIngestStrategy:
 
     def extract(self, source: str, file_path: str) -> IngestResult:
         """Extract symbols and imports from TypeScript/JavaScript source."""
+        if not _HAS_TREE_SITTER:
+            return _regex_fallback(source, file_path)
+
         try:
             lang = TSX_LANGUAGE if file_path.endswith((".tsx", ".jsx")) else TS_LANGUAGE
             parser = Parser(lang)
             tree = parser.parse(source.encode("utf-8"))
         except Exception as e:
             logger.warning(f"Parse error for {file_path}: {e}")
-            return IngestResult()
+            return _regex_fallback(source, file_path)
 
         lines = source.splitlines()
         module_name = _path_to_module(file_path)
@@ -48,6 +83,85 @@ class TypeScriptIngestStrategy:
 
         _walk_node(tree.root_node, lines, module_name, symbols, imports)
         return IngestResult(symbols=symbols, imports=imports)
+
+
+def _regex_fallback(source: str, file_path: str) -> IngestResult:
+    """Extract symbols via regex when tree-sitter is unavailable."""
+    global _warned_no_tree_sitter
+    if not _warned_no_tree_sitter:
+        logger.warning(
+            "tree-sitter-typescript not installed, using regex fallback. "
+            "Install with: pip install fitz-ai[krag-typescript]"
+        )
+        _warned_no_tree_sitter = True
+
+    module_name = _path_to_module(file_path)
+    lines = source.splitlines()
+    symbols: list[SymbolEntry] = []
+    imports: list[ImportEdge] = []
+
+    for m in _FUNC_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="function",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"function {m.group(1)}()",
+        ))
+
+    for m in _CLASS_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="class",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"class {m.group(1)}",
+        ))
+
+    for m in _INTERFACE_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="interface",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"interface {m.group(1)}",
+        ))
+
+    for m in _TYPE_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="type",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"type {m.group(1)}",
+        ))
+
+    for m in _ARROW_RE.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="function",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"const {m.group(1)} = () => ...",
+        ))
+
+    for m in _IMPORT_RE.finditer(source):
+        imports.append(ImportEdge(target_module=m.group(1), import_names=[]))
+
+    return IngestResult(symbols=symbols, imports=imports)
+
+
+# --- Tree-sitter extraction (used when tree-sitter is available) ---
 
 
 def _walk_node(node, lines, module_name, symbols, imports):
