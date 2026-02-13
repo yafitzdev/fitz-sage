@@ -221,10 +221,14 @@ class AgenticSearchStrategy:
             from fitz_ai.ingestion.parser import ParserRouter
             from fitz_ai.ingestion.source.base import SourceFile
 
-            source_file = SourceFile(
-                uri=path.as_uri(),
-                local_path=path,
-            )
+            # Suppress noisy third-party logs during parsing
+            import logging as _logging
+
+            for name in ("rapidocr", "docling", "RapidOCR",
+                        "fitz_ai.ingestion.parser"):
+                _logging.getLogger(name).setLevel(_logging.WARNING)
+
+            source_file = SourceFile(uri=path.as_uri(), local_path=path)
             router = ParserRouter()
             parsed = router.parse(source_file)
             text = parsed.full_text
@@ -278,11 +282,12 @@ class AgenticSearchStrategy:
                     metadata={
                         "disk_path": entry.rel_path,
                         "agentic": True,
+                        "text": content,
                     },
                 )
             )
         else:
-            # Generic file
+            # Generic file (includes rich docs like PDF)
             addresses.append(
                 Address(
                     kind=AddressKind.FILE,
@@ -293,6 +298,7 @@ class AgenticSearchStrategy:
                     metadata={
                         "disk_path": entry.rel_path,
                         "agentic": True,
+                        "text": content,
                     },
                 )
             )

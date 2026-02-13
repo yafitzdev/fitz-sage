@@ -16,6 +16,11 @@ NOTE: Commands use lazy loading - heavy imports only happen when a command is in
 
 from __future__ import annotations
 
+import logging
+
+# Suppress noisy third-party and internal INFO logs in CLI
+logging.basicConfig(level=logging.WARNING)
+
 # Platform configuration - must run before any HuggingFace imports
 from fitz_ai.core.platform import configure_huggingface_windows
 

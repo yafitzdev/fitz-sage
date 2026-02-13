@@ -95,8 +95,9 @@ class ContentReader:
         """Read entire file content."""
         raw_file = self._raw_store.get(addr.source_id)
         if not raw_file:
-            # Disk fallback for agentic (unindexed) addresses
-            content = self._read_from_disk(addr)
+            # Check for pre-loaded text from agentic search (avoids re-parsing PDFs)
+            text = addr.metadata.get("text")
+            content = text if text else self._read_from_disk(addr)
             if content is None:
                 return None
             file_path = addr.metadata.get("disk_path", addr.location)
@@ -112,6 +113,8 @@ class ContentReader:
             file_path=raw_file["path"],
         )
 
+    _RICH_DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".html", ".htm"}
+
     def _read_from_disk(self, addr: Address) -> str | None:
         """Read file content from disk when not in database (agentic path)."""
         if not self._source_dir:
@@ -121,11 +124,38 @@ class ContentReader:
             return None
         try:
             full_path = self._source_dir / disk_path
-            if full_path.exists():
-                return full_path.read_text(encoding="utf-8", errors="replace")
+            if not full_path.exists():
+                return None
+            ext = full_path.suffix.lower()
+            if ext in self._RICH_DOC_EXTENSIONS:
+                return self._parse_rich_doc(full_path)
+            return full_path.read_text(encoding="utf-8", errors="replace")
         except Exception as e:
             logger.debug(f"Disk read failed for {disk_path}: {e}")
         return None
+
+    @staticmethod
+    def _parse_rich_doc(path: Path) -> str | None:
+        """Parse a rich document (PDF, DOCX, etc.) using the parser system."""
+        try:
+            from fitz_ai.ingestion.parser import ParserRouter
+            from fitz_ai.ingestion.source.base import SourceFile
+
+            # Suppress noisy third-party logs during parsing
+            import logging as _logging
+
+            for name in ("rapidocr", "docling", "RapidOCR",
+                        "fitz_ai.ingestion.parser"):
+                _logging.getLogger(name).setLevel(_logging.WARNING)
+
+            source_file = SourceFile(uri=path.as_uri(), local_path=path)
+            router = ParserRouter()
+            parsed = router.parse(source_file)
+            text = parsed.full_text
+            return text if text and text.strip() else None
+        except Exception as e:
+            logger.warning(f"Parser failed for {path.name}: {e}")
+            return None
 
     def _read_chunk(self, addr: Address) -> ReadResult | None:
         """Read chunk content (stored in address metadata)."""
