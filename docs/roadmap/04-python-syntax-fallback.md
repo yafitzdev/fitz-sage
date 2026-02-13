@@ -1,7 +1,7 @@
 # docs/roadmap/04-python-syntax-fallback.md
 # Problem: Python syntax errors = zero extraction
 
-## Status: Open
+## Status: Done (regex fallback in PythonCodeIngestStrategy)
 ## Impact: Medium
 ## Effort: Low
 

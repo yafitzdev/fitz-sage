@@ -32,8 +32,8 @@ class PythonCodeIngestStrategy:
         try:
             tree = ast.parse(source)
         except SyntaxError as e:
-            logger.warning(f"Syntax error parsing {file_path}: {e}")
-            return IngestResult()
+            logger.warning(f"Syntax error in {file_path}: {e}, using regex fallback")
+            return _regex_fallback(source, file_path)
 
         lines = source.splitlines()
         module_name = _path_to_module(file_path)
@@ -84,6 +84,61 @@ class PythonCodeIngestStrategy:
                     imports.append(ImportEdge(target_module=node.module, import_names=names))
 
         return IngestResult(symbols=symbols, imports=imports)
+
+
+# --- Regex fallback for files with syntax errors ---
+
+_RX_FUNC = re.compile(r"^(?:async\s+)?def\s+(\w+)\s*\(", re.MULTILINE)
+_RX_CLASS = re.compile(r"^class\s+(\w+)\s*[:\(]", re.MULTILINE)
+_RX_CONST = re.compile(r"^([A-Z][A-Z0-9_]{2,})\s*=", re.MULTILINE)
+_RX_IMPORT = re.compile(r"^(?:from\s+([\w.]+)\s+)?import\s+(\w+)", re.MULTILINE)
+
+
+def _regex_fallback(source: str, file_path: str) -> IngestResult:
+    """Extract symbols via regex when ast.parse() fails due to syntax errors."""
+    module_name = _path_to_module(file_path)
+    symbols: list[SymbolEntry] = []
+    imports: list[ImportEdge] = []
+
+    for m in _RX_FUNC.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="function",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"def {m.group(1)}()",
+        ))
+
+    for m in _RX_CLASS.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="class",
+            start_line=line_no,
+            end_line=line_no,
+            signature=f"class {m.group(1)}",
+        ))
+
+    for m in _RX_CONST.finditer(source):
+        line_no = source[: m.start()].count("\n") + 1
+        symbols.append(SymbolEntry(
+            name=m.group(1),
+            qualified_name=f"{module_name}.{m.group(1)}",
+            kind="constant",
+            start_line=line_no,
+            end_line=line_no,
+        ))
+
+    for m in _RX_IMPORT.finditer(source):
+        if m.group(1):  # "from X import Y"
+            imports.append(ImportEdge(target_module=m.group(1), import_names=[m.group(2)]))
+        else:  # "import X"
+            imports.append(ImportEdge(target_module=m.group(2), import_names=[]))
+
+    return IngestResult(symbols=symbols, imports=imports)
 
 
 def _extract_function(
