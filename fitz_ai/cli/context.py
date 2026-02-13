@@ -600,7 +600,7 @@ class CLIContext:
 
         collections = self.get_collections()
         if not collections:
-            ui.error("No collections found. Run 'fitz ingest' first.")
+            ui.error("No collections found. Run 'fitz query \"question\" --source ./docs' first.")
             raise typer.Exit(1)
         return collections
 

@@ -221,9 +221,9 @@ def _show_next_steps() -> None:
 [green]Your configuration is ready![/green]
 
 Next steps:
-  [cyan]fitz ingest ./docs[/cyan]          # Ingest documents
-  [cyan]fitz query "your question"[/cyan]  # Query knowledge base
-  [cyan]fitz doctor[/cyan]                 # Verify setup
+  [cyan]fitz query "your question" --source ./docs[/cyan]  # Register + query
+  [cyan]fitz query "your question"[/cyan]                  # Query existing collection
+  [cyan]fitz config --doctor[/cyan]                        # Verify setup
 """
         )
     else:
@@ -232,9 +232,9 @@ Next steps:
 Your configuration is ready!
 
 Next steps:
-  fitz ingest ./docs          # Ingest documents
-  fitz query "your question"  # Query knowledge base
-  fitz doctor                 # Verify setup
+  fitz query "your question" --source ./docs  # Register + query
+  fitz query "your question"                  # Query existing collection
+  fitz config --doctor                        # Verify setup
 """
         )
 

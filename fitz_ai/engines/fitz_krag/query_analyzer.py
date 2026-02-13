@@ -129,7 +129,7 @@ class QueryAnalyzer:
                 refined_query=original_query,
             )
 
-        primary = _parse_query_type(data.get("primary_type", "general"))
+        primary = _parse_query_type(data.get("primary_type") or "general")
         secondary = None
         if data.get("secondary_type"):
             secondary = _parse_query_type(data["secondary_type"])

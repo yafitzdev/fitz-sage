@@ -63,6 +63,13 @@ def _parse(path: Path) -> str | None:
     """Parse a rich document using the parser system."""
     global _parser_logs_suppressed
     try:
+        # Globally disable INFO logs during parsing — RapidOCR overrides
+        # its logger level during init, so per-logger suppression doesn't work.
+        import logging as _logging
+
+        if not _parser_logs_suppressed:
+            _logging.disable(_logging.INFO)
+
         from fitz_ai.ingestion.parser import ParserRouter
         from fitz_ai.ingestion.source.base import SourceFile
 
@@ -70,20 +77,25 @@ def _parse(path: Path) -> str | None:
         router = ParserRouter()
         parsed = router.parse(source_file)
 
-        # Suppress after first parse (loggers created during import chain)
         if not _parser_logs_suppressed:
+            _logging.disable(_logging.NOTSET)
             _suppress_parser_logs()
             _parser_logs_suppressed = True
 
         text = parsed.full_text
         return text if text and text.strip() else None
     except Exception as e:
+        # Re-enable logging even on failure
+        if not _parser_logs_suppressed:
+            import logging as _logging
+
+            _logging.disable(_logging.NOTSET)
         logger.warning(f"Parser failed for {path.name}: {e}")
         return None
 
 
 def _suppress_parser_logs() -> None:
-    """Suppress noisy third-party logs from PDF/doc parsers."""
+    """Suppress noisy third-party logs from PDF/doc parsers permanently."""
     import logging as _logging
 
     for name in ("rapidocr", "docling", "RapidOCR",

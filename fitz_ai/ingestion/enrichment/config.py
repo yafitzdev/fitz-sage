@@ -77,7 +77,7 @@ class HierarchyConfig(BaseModel):
     - Level 2: Corpus summary (summary of all groups)
 
     Zero-config mode (recommended):
-        Just set enabled=True or use `fitz ingest --hierarchy`.
+        Just set enabled=True in the engine config.
         Uses smart defaults: group_by="source", default prompts.
 
     Semantic grouping mode:

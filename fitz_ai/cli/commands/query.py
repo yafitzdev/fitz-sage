@@ -207,6 +207,10 @@ def _run_persistent_ingest_query(
 
     # Create engine and load/point collection
     try:
+        import time
+
+        wall_start = time.perf_counter()
+
         engine_instance = create_engine(engine_name)
 
         # Point at source if provided
@@ -227,6 +231,8 @@ def _run_persistent_ingest_query(
 
             query = Query(text=question_text)
             answer = engine_instance.answer(query, progress=ui.info)
+            wall_total = time.perf_counter() - wall_start
+            ui.info(f"Total wall-clock: {wall_total:.1f}s")
             display_answer(answer)
     except Exception as e:
         # Show clean error message, full traceback only at debug level

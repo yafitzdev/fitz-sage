@@ -3,12 +3,11 @@
 Fitz CLI - Clean, minimal CLI.
 
 Usage:
-    fitz init               # Setup wizard
-    fitz ingest ./src       # Ingest documents
-    fitz query "question"   # Query knowledge base
-    fitz collections        # List/manage collections
-    fitz config             # Show configuration
-    fitz doctor             # System diagnostics
+    fitz init                                        # Setup wizard
+    fitz query "question" --source ./docs            # Register + query
+    fitz query "question"                            # Query existing collection
+    fitz collections                                 # List/manage collections
+    fitz config                                      # Show configuration
 """
 
 from fitz_ai.cli.cli import app  # noqa: E402

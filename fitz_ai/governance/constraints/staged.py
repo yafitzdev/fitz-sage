@@ -93,27 +93,59 @@ class StagedConstraintPipeline:
         self.stages = stages
 
     def run(self, query: str, chunks: Sequence[EvidenceItem]) -> list[ConstraintResult]:
-        """Execute staged pipeline, return all constraint results."""
+        """Execute staged pipeline, return all constraint results.
+
+        Runs Stage 1 (Relevance) first; if it passes, runs remaining stages
+        in parallel to reduce total LLM latency.
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         all_results: list[ConstraintResult] = []
         context = StageContext()
 
+        # Separate first stage (gate) from the rest
+        remaining_stages: list[ConstraintStage] = []
+        gate_done = False
+
         for stage in self.stages:
-            if self._should_skip(stage, context):
-                logger.debug(
-                    f"{PIPELINE} StagedPipeline: skipping stage '{stage.name}' "
-                    f"(relevance_signal={context.relevance_signal})"
-                )
-                continue
+            if not gate_done:
+                # Run gate stage sequentially
+                if self._should_skip(stage, context):
+                    logger.debug(
+                        f"{PIPELINE} StagedPipeline: skipping stage '{stage.name}' "
+                        f"(relevance_signal={context.relevance_signal})"
+                    )
+                    continue
 
-            stage_results = self._run_stage(query, chunks, stage)
-            all_results.extend(stage_results)
-            self._update_context(stage, stage_results, context)
+                stage_results = self._run_stage(query, chunks, stage)
+                all_results.extend(stage_results)
+                self._update_context(stage, stage_results, context)
+                gate_done = True
 
-            if self._check_short_circuit(stage, stage_results):
-                logger.info(
-                    f"{PIPELINE} StagedPipeline: stage '{stage.name}' triggered short-circuit"
-                )
-                break
+                if self._check_short_circuit(stage, stage_results):
+                    logger.info(
+                        f"{PIPELINE} StagedPipeline: stage '{stage.name}' triggered short-circuit"
+                    )
+                    break
+            else:
+                if not self._should_skip(stage, context):
+                    remaining_stages.append(stage)
+
+        # Run remaining stages in parallel (e.g. Sufficiency + Consistency)
+        if remaining_stages:
+            with ThreadPoolExecutor(max_workers=len(remaining_stages)) as pool:
+                futures = {
+                    pool.submit(self._run_stage, query, chunks, stage): stage
+                    for stage in remaining_stages
+                }
+                for future in as_completed(futures):
+                    stage = futures[future]
+                    try:
+                        stage_results = future.result()
+                        all_results.extend(stage_results)
+                        self._update_context(stage, stage_results, context)
+                    except Exception as e:
+                        logger.warning(f"{PIPELINE} Stage '{stage.name}' failed: {e}")
 
         denied_count = sum(1 for r in all_results if not r.allow_decisive_answer)
         logger.debug(

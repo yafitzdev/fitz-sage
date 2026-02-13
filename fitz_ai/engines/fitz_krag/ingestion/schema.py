@@ -227,7 +227,7 @@ def _validate_vector_dimensions(
                 raise ConfigurationError(
                     f"Embedding dimension mismatch: existing schema has {existing_dim}d vectors "
                     f"but current embedder reports {embedding_dim}d. If you changed embedding "
-                    "models, re-ingest with 'fitz ingest --force --rebuild-schema' to rebuild."
+                    "models, delete the collection and re-register to rebuild."
                 )
 
 
