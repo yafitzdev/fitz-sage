@@ -68,6 +68,10 @@ class BackgroundIngestWorker:
         self._vocabulary_store = vocabulary_store
         self._entity_graph_store = entity_graph_store
 
+        # Parsed text cache dir — same location builder uses
+        # Access manifest's private _path (same package, internal use)
+        self._cache_dir = manifest._path.parent / "parsed" if hasattr(manifest, '_path') else None
+
         self._stop_event = threading.Event()
         self._query_active = threading.Event()  # Set = query is running
         self._thread: threading.Thread | None = None
@@ -508,7 +512,7 @@ class BackgroundIngestWorker:
             logger.warning(f"Section embedding failed for {entry.rel_path}: {e}")
 
     def _read_file(self, entry: "ManifestEntry") -> str | None:
-        """Read file content from disk, using parser for rich docs."""
+        """Read file content from disk, using parsed cache for rich docs."""
         try:
             path = Path(entry.abs_path)
             if not path.exists():
@@ -518,29 +522,30 @@ class BackgroundIngestWorker:
 
             ext = path.suffix.lower()
             if ext in {".pdf", ".docx", ".pptx", ".html", ".htm"}:
-                return self._parse_rich_doc(path)
+                # Use parsed cache — builder already populated it during point()
+                if self._cache_dir and entry.content_hash:
+                    from fitz_ai.engines.fitz_krag.progressive.parsed_cache import (
+                        get_parsed_text,
+                    )
+
+                    text = get_parsed_text(path, entry.content_hash, self._cache_dir)
+                    if text:
+                        return text.replace("\x00", "")
+                    return None
+                # No cache available — fall through to direct parse
+                from fitz_ai.ingestion.parser import ParserRouter
+                from fitz_ai.ingestion.source.base import SourceFile
+
+                source_file = SourceFile(uri=path.as_uri(), local_path=path)
+                parsed = ParserRouter().parse(source_file)
+                text = parsed.full_text
+                if text:
+                    return text.replace("\x00", "")
+                return None
 
             content = path.read_text(encoding="utf-8", errors="replace")
             # Strip NUL bytes for PostgreSQL compatibility
             return content.replace("\x00", "")
         except Exception as e:
             logger.debug(f"Cannot read {entry.rel_path}: {e}")
-            return None
-
-    def _parse_rich_doc(self, path: Path) -> str | None:
-        """Parse a rich document (PDF, DOCX, etc.) using the parser system."""
-        try:
-            from fitz_ai.ingestion.parser import ParserRouter
-            from fitz_ai.ingestion.source.base import SourceFile
-
-            source_file = SourceFile(uri=path.as_uri(), local_path=path)
-            router = ParserRouter()
-            parsed = router.parse(source_file)
-            text = parsed.full_text
-            if text:
-                # Strip NUL bytes for PostgreSQL compatibility
-                return text.replace("\x00", "")
-            return None
-        except Exception as e:
-            logger.warning(f"Parser failed for {path.name}: {e}")
             return None

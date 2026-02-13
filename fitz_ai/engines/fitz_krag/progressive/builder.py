@@ -120,6 +120,17 @@ class ManifestBuilder:
                     manifest.add(existing_entry)
                     continue
 
+                # Read cached headings extracted during Docling parse
+                from fitz_ai.engines.fitz_krag.progressive.parsed_cache import (
+                    get_parsed_headings,
+                )
+
+                heading_dicts = get_parsed_headings(content_hash, cache_dir)
+                headings = [
+                    ManifestHeading(title=h["title"], level=h["level"])
+                    for h in heading_dicts
+                ]
+
                 file_id = existing_entry.file_id if existing_entry else str(uuid.uuid4())
                 entry = ManifestEntry(
                     file_id=file_id,
@@ -130,7 +141,7 @@ class ManifestBuilder:
                     size_bytes=len(raw_bytes),
                     state=FileState.REGISTERED,
                     symbols=[],
-                    headings=[],
+                    headings=headings,
                 )
                 manifest.add(entry)
                 continue

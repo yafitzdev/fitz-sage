@@ -5,6 +5,9 @@ Parsed text cache for rich documents (PDF, DOCX, PPTX, HTML).
 Caches parsed text by content hash so documents are only parsed once.
 Cache lives at ~/.fitz/collections/{col}/parsed/{content_hash}.txt.
 
+Also caches heading structure from Docling parses:
+    ~/.fitz/collections/{col}/parsed/{content_hash}.headings.json
+
 PDF strategy:
   1. Try fast native text extraction via pypdfium2 (<1s for 100 pages)
   2. If PDF has embedded text (born-digital), use it directly
@@ -13,6 +16,7 @@ PDF strategy:
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -51,9 +55,9 @@ def get_parsed_text(
 
     # Parse — try fast extraction for PDFs, Docling for everything else
     if path.suffix.lower() == ".pdf":
-        text = _parse_pdf_fast(path)
+        text, headings = _parse_pdf_fast(path)
     else:
-        text = _parse_docling(path)
+        text, headings = _parse_docling(path)
 
     if not text:
         return None
@@ -65,14 +69,43 @@ def get_parsed_text(
     except Exception as e:
         logger.debug(f"Failed to cache parsed text for {path.name}: {e}")
 
+    # Save headings to cache (if Docling produced them)
+    if headings:
+        try:
+            headings_path = cache_dir / f"{content_hash}.headings.json"
+            headings_path.write_text(json.dumps(headings), encoding="utf-8")
+        except Exception as e:
+            logger.debug(f"Failed to cache headings for {path.name}: {e}")
+
     return text
 
 
-def _parse_pdf_fast(path: Path) -> str | None:
+def get_parsed_headings(content_hash: str, cache_dir: Path) -> list[dict]:
+    """Read cached headings for a rich document.
+
+    Returns:
+        List of {"title": str, "level": int} dicts, or empty list.
+    """
+    headings_path = cache_dir / f"{content_hash}.headings.json"
+    if not headings_path.exists():
+        return []
+    try:
+        data = json.loads(headings_path.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            return data
+    except Exception:
+        pass
+    return []
+
+
+def _parse_pdf_fast(path: Path) -> tuple[str | None, list[dict] | None]:
     """Extract text from PDF using fast native extraction, falling back to Docling.
 
     Born-digital PDFs (LaTeX, Word-exported, etc.) have embedded text that
     can be extracted in <1s. Only scanned/image PDFs need OCR via Docling.
+
+    Returns:
+        (text, headings) — headings is None for pypdfium2 fast path.
     """
     try:
         import pypdfium2 as pdfium
@@ -97,7 +130,7 @@ def _parse_pdf_fast(path: Path) -> str | None:
                 f"Fast PDF extract: {n_pages} pages, {total_chars} chars, "
                 f"{avg_chars:.0f} avg chars/page"
             )
-            return "\n\n".join(pages)
+            return "\n\n".join(pages), None
 
         # Too little text — likely scanned/image PDF, fall back to Docling
         logger.debug(
@@ -113,8 +146,12 @@ def _parse_pdf_fast(path: Path) -> str | None:
 _parser_logs_suppressed = False
 
 
-def _parse_docling(path: Path) -> str | None:
-    """Parse a rich document using Docling (with OCR for scanned PDFs)."""
+def _parse_docling(path: Path) -> tuple[str | None, list[dict] | None]:
+    """Parse a rich document using Docling (with OCR for scanned PDFs).
+
+    Returns:
+        (text, headings) — headings extracted from Docling's element structure.
+    """
     global _parser_logs_suppressed
     try:
         # Globally disable INFO logs during parsing — RapidOCR overrides
@@ -124,6 +161,7 @@ def _parse_docling(path: Path) -> str | None:
         if not _parser_logs_suppressed:
             _logging.disable(_logging.INFO)
 
+        from fitz_ai.core.document import ElementType
         from fitz_ai.ingestion.parser import ParserRouter
         from fitz_ai.ingestion.source.base import SourceFile
 
@@ -137,14 +175,27 @@ def _parse_docling(path: Path) -> str | None:
             _parser_logs_suppressed = True
 
         text = parsed.full_text
-        return text if text and text.strip() else None
+        text = text if text and text.strip() else None
+
+        # Extract headings from structured elements
+        headings: list[dict] | None = None
+        if parsed.elements:
+            heading_list = [
+                {"title": el.content.strip(), "level": el.level or 1}
+                for el in parsed.elements
+                if el.type == ElementType.HEADING and el.content and el.content.strip()
+            ]
+            if heading_list:
+                headings = heading_list
+
+        return text, headings
     except Exception as e:
         if not _parser_logs_suppressed:
             import logging as _logging
 
             _logging.disable(_logging.NOTSET)
         logger.warning(f"Parser failed for {path.name}: {e}")
-        return None
+        return None, None
 
 
 def _suppress_parser_logs() -> None:
