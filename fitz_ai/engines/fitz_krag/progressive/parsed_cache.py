@@ -2,8 +2,13 @@
 """
 Parsed text cache for rich documents (PDF, DOCX, PPTX, HTML).
 
-Caches Docling-parsed text by content hash so PDFs are only parsed once.
+Caches parsed text by content hash so documents are only parsed once.
 Cache lives at ~/.fitz/collections/{col}/parsed/{content_hash}.txt.
+
+PDF strategy:
+  1. Try fast native text extraction via pypdfium2 (<1s for 100 pages)
+  2. If PDF has embedded text (born-digital), use it directly
+  3. If scanned/image PDF (no extractable text), fall back to Docling+OCR
 """
 
 from __future__ import annotations
@@ -14,6 +19,9 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 RICH_DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".html", ".htm"}
+
+# Minimum average chars per page to consider a PDF as having extractable text
+_MIN_CHARS_PER_PAGE = 50
 
 
 def get_parsed_text(
@@ -41,8 +49,12 @@ def get_parsed_text(
         except Exception:
             pass  # Cache corrupt, re-parse
 
-    # Parse with Docling
-    text = _parse(path)
+    # Parse — try fast extraction for PDFs, Docling for everything else
+    if path.suffix.lower() == ".pdf":
+        text = _parse_pdf_fast(path)
+    else:
+        text = _parse_docling(path)
+
     if not text:
         return None
 
@@ -56,11 +68,53 @@ def get_parsed_text(
     return text
 
 
+def _parse_pdf_fast(path: Path) -> str | None:
+    """Extract text from PDF using fast native extraction, falling back to Docling.
+
+    Born-digital PDFs (LaTeX, Word-exported, etc.) have embedded text that
+    can be extracted in <1s. Only scanned/image PDFs need OCR via Docling.
+    """
+    try:
+        import pypdfium2 as pdfium
+
+        pdf = pdfium.PdfDocument(str(path))
+        n_pages = len(pdf)
+
+        pages: list[str] = []
+        for i in range(n_pages):
+            page = pdf[i]
+            text = page.get_textpage().get_text_bounded()
+            if text and text.strip():
+                pages.append(text.strip())
+
+        pdf.close()
+
+        total_chars = sum(len(p) for p in pages)
+        avg_chars = total_chars / max(n_pages, 1)
+
+        if avg_chars >= _MIN_CHARS_PER_PAGE:
+            logger.debug(
+                f"Fast PDF extract: {n_pages} pages, {total_chars} chars, "
+                f"{avg_chars:.0f} avg chars/page"
+            )
+            return "\n\n".join(pages)
+
+        # Too little text — likely scanned/image PDF, fall back to Docling
+        logger.debug(
+            f"PDF has low text density ({avg_chars:.0f} chars/page), "
+            f"falling back to Docling+OCR"
+        )
+    except Exception as e:
+        logger.debug(f"Fast PDF extraction failed, falling back to Docling: {e}")
+
+    return _parse_docling(path)
+
+
 _parser_logs_suppressed = False
 
 
-def _parse(path: Path) -> str | None:
-    """Parse a rich document using the parser system."""
+def _parse_docling(path: Path) -> str | None:
+    """Parse a rich document using Docling (with OCR for scanned PDFs)."""
     global _parser_logs_suppressed
     try:
         # Globally disable INFO logs during parsing — RapidOCR overrides
@@ -85,7 +139,6 @@ def _parse(path: Path) -> str | None:
         text = parsed.full_text
         return text if text and text.strip() else None
     except Exception as e:
-        # Re-enable logging even on failure
         if not _parser_logs_suppressed:
             import logging as _logging
 
