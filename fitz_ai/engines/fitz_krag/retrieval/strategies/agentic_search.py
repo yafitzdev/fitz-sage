@@ -74,11 +74,17 @@ class AgenticSearchStrategy:
 
         # LLM selects files
         selected_paths = self._llm_select_files(manifest_text, query)
+
+        # Path-match fallback: always include files whose path contains query terms
+        entries_map = {e.rel_path: e for e in unindexed}
+        path_matched = self._path_match_files(unindexed, query)
+        for pm in path_matched:
+            if pm not in selected_paths:
+                selected_paths.append(pm)
+
         if not selected_paths:
             return []
 
-        # Map selected paths to entries
-        entries_map = {e.rel_path: e for e in unindexed}
         selected_entries = [
             entries_map[p] for p in selected_paths if p in entries_map
         ]
@@ -135,7 +141,7 @@ class AgenticSearchStrategy:
     def _llm_select_files(self, manifest_text: str, query: str) -> list[str]:
         """Single LLM call to select relevant files from manifest."""
         try:
-            chat = self._chat_factory("fast")
+            chat = self._chat_factory("balanced")
             prompt = (
                 "You are a file selection assistant. Given a user query and a manifest "
                 "of available files, select the most relevant files.\n\n"
@@ -165,6 +171,28 @@ class AgenticSearchStrategy:
             logger.warning(f"Agentic file selection failed: {e}")
 
         return []
+
+    def _path_match_files(
+        self, entries: list["ManifestEntry"], query: str
+    ) -> list[str]:
+        """Return rel_paths of files whose path contains meaningful query terms."""
+        # Extract non-stopword tokens from query
+        tokens = _tokenize(query)
+        stopwords = {"what", "is", "the", "how", "does", "do", "are", "was", "were",
+                      "can", "will", "about", "where", "when", "which", "who", "why",
+                      "show", "me", "tell", "find", "get", "all", "this", "that", "it"}
+        terms = [t for t in tokens if t not in stopwords and len(t) > 2]
+        if not terms:
+            return []
+
+        matched: list[str] = []
+        for entry in entries:
+            path_lower = entry.rel_path.lower()
+            for term in terms:
+                if term in path_lower:
+                    matched.append(entry.rel_path)
+                    break
+        return matched[:_LLM_MAX_FILES]
 
     def _read_from_disk(self, entry: "ManifestEntry") -> str | None:
         """Read file content directly from source directory."""
@@ -251,7 +279,8 @@ def _tokenize(text: str) -> list[str]:
     """Simple whitespace + punctuation tokenizer."""
     import re
 
-    return [t.lower() for t in re.split(r"[\s/._\-:;,(){}[\]]+", text) if len(t) > 1]
+    tokens = re.split(r"[\s/._\-:;,(){}[\]]+", text)
+    return [re.sub(r"[?!\"']+$", "", t).lower() for t in tokens if len(t) > 1]
 
 
 def _entry_to_text(entry: "ManifestEntry") -> str:

@@ -27,7 +27,7 @@ def command(source: Path, collection: str) -> None:
     from fitz_ai.services import FitzService
 
     service = FitzService()
-    manifest = service.point(source=source, collection=collection)
+    manifest = service.point(source=source, collection=collection, start_worker=False)
     file_count = len(manifest.entries())
 
     ui.success(f"Ready! {file_count} files registered.")

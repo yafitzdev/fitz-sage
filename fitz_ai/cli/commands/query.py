@@ -94,12 +94,6 @@ def command(
         fitz query "question" -c my_coll   # Specify collection
     """
     # =========================================================================
-    # Header
-    # =========================================================================
-
-    ui.header("Fitz Query", "Query your knowledge base")
-
-    # =========================================================================
     # Engine selection (use default if not specified)
     # =========================================================================
 
@@ -110,8 +104,6 @@ def command(
     elif engine not in registry.list():
         ui.error(f"Unknown engine: '{engine}'. Available: {', '.join(registry.list())}")
         raise typer.Exit(1)
-
-    ui.info(f"Engine: {engine}")
 
     # =========================================================================
     # Capabilities-based routing
@@ -163,7 +155,7 @@ def _select_collection(service: FitzService, requested: Optional[str]) -> str:
     if not collections:
         print()
         ui.warning("No collections found in vector database.")
-        ui.info("Run 'fitz ingest ./docs' first to ingest documents.")
+        ui.info("Run 'fitz point ./docs' first to register documents.")
         raise typer.Exit(0)
 
     collection_names = [c.name for c in collections]
@@ -173,7 +165,7 @@ def _select_collection(service: FitzService, requested: Optional[str]) -> str:
             print()
             ui.warning(f"Collection '{requested}' not found.")
             ui.info(f"Available collections: {', '.join(collection_names)}")
-            ui.info("Use -c <collection> to specify another, or run 'fitz ingest' to create it.")
+            ui.info("Use -c <collection> to specify another, or run 'fitz point' to create it.")
             raise typer.Exit(0)
         return requested
 
@@ -197,14 +189,13 @@ def _run_persistent_ingest_query(
 
     if not collections:
         ui.warning(f"No {engine_name} collections found.")
-        ui.info(f"Run 'fitz ingest ./docs -e {engine_name}' first to ingest documents.")
+        ui.info(f"Run 'fitz point ./docs' first to register documents.")
         raise typer.Exit(0)
 
     # Collection selection
     if collection is None:
         if len(collections) == 1:
             collection = collections[0]
-            ui.info(f"Using collection: {collection}")
         else:
             print()
             collection = ui.prompt_numbered_choice("Collection", collections, collections[0])
@@ -219,21 +210,18 @@ def _run_persistent_ingest_query(
         question_text = question
 
     print()
-    ui.info(f"Engine: {engine_name} | Collection: {collection}")
-    print()
 
     # Create engine, load collection, and query
     try:
         engine_instance = create_engine(engine_name)
 
-        ui.info("Loading collection...")
+        ui.info(f"Loading collection '{collection}'...")
         engine_instance.load(collection)
 
-        ui.info("Querying...")
         from fitz_ai.core import Query
 
         query = Query(text=question_text)
-        answer = engine_instance.answer(query)
+        answer = engine_instance.answer(query, progress=ui.info)
         display_answer(answer)
     except Exception as e:
         # Show clean error message, full traceback only at debug level

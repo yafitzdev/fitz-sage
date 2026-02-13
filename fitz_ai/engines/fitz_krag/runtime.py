@@ -122,7 +122,7 @@ def _register_fitz_krag_engine():
             collections = []
             for db_name in candidate_dbs:
                 collection_name = db_name[5:]  # Remove "fitz_"
-                if collection_name in ("c__ingest_state", "public", "postgres", "default"):
+                if collection_name in ("c__ingest_state", "public", "postgres"):
                     continue
                 try:
                     with manager.connection(collection_name) as conn:
@@ -137,6 +137,19 @@ def _register_fitz_krag_engine():
                             collections.append(collection_name)
                 except Exception:
                     pass
+
+            # Also discover collections with manifests (pointed but not yet fully indexed)
+            try:
+                from fitz_ai.core.paths import FitzPaths
+
+                collections_dir = FitzPaths.workspace() / "collections"
+                if collections_dir.exists():
+                    for child in collections_dir.iterdir():
+                        if child.is_dir() and (child / "manifest.json").exists():
+                            if child.name not in collections:
+                                collections.append(child.name)
+            except Exception:
+                pass
 
             return sorted(collections)
         except Exception as e:

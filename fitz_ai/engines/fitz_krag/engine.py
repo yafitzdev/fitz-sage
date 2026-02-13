@@ -10,7 +10,7 @@ content is read on demand after ranking.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from fitz_ai.core import (
     Answer,
@@ -70,18 +70,51 @@ class FitzKragEngine:
 
         # Re-wire progressive state if still active after reload
         if self._manifest and self._source_dir:
-            from fitz_ai.engines.fitz_krag.retrieval.strategies.agentic_search import (
-                AgenticSearchStrategy,
-            )
+            self._wire_agentic_strategy()
+        else:
+            # Auto-detect persisted manifest from a previous `point()` call
+            self._try_load_persisted_manifest(collection)
 
-            agentic = AgenticSearchStrategy(
-                manifest=self._manifest,
-                source_dir=self._source_dir,
-                chat_factory=self._chat_factory,
-                config=self._config,
-            )
-            self._retrieval_router._agentic_strategy = agentic
-            self._reader._source_dir = self._source_dir
+    def _wire_agentic_strategy(self) -> None:
+        """Wire agentic strategy + disk fallback from current manifest/source_dir."""
+        from fitz_ai.engines.fitz_krag.retrieval.strategies.agentic_search import (
+            AgenticSearchStrategy,
+        )
+
+        agentic = AgenticSearchStrategy(
+            manifest=self._manifest,
+            source_dir=self._source_dir,
+            chat_factory=self._chat_factory,
+            config=self._config,
+        )
+        self._retrieval_router._agentic_strategy = agentic
+        self._reader._source_dir = self._source_dir
+
+    def _try_load_persisted_manifest(self, collection: str) -> None:
+        """Load manifest + source_dir from disk if they exist from a prior point() call."""
+        from fitz_ai.core.paths import FitzPaths
+
+        col_dir = FitzPaths.workspace() / "collections" / collection
+        manifest_path = col_dir / "manifest.json"
+        source_dir_path = col_dir / "source_dir.txt"
+
+        if not manifest_path.exists() or not source_dir_path.exists():
+            return
+
+        try:
+            from fitz_ai.engines.fitz_krag.progressive.manifest import FileManifest
+
+            source_dir = Path(source_dir_path.read_text(encoding="utf-8").strip())
+            if not source_dir.exists():
+                logger.debug(f"Persisted source_dir no longer exists: {source_dir}")
+                return
+
+            self._manifest = FileManifest(manifest_path)
+            self._source_dir = source_dir
+            self._wire_agentic_strategy()
+            logger.info(f"Loaded manifest for collection '{collection}' ({len(self._manifest.entries())} files)")
+        except Exception as e:
+            logger.debug(f"Failed to load persisted manifest: {e}")
 
     def _init_components(self) -> None:
         """Initialize engine components lazily."""
@@ -160,10 +193,15 @@ class FitzKragEngine:
             self._config,
         )
 
+        # Chat factory (shared by detection, rewriter, HyDE, multi-hop, enrichment)
+        from fitz_ai.llm.factory import get_chat_factory
+
+        self._chat_factory = get_chat_factory(self._config.chat)
+
         # Query Analysis
         from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalyzer
 
-        self._query_analyzer = QueryAnalyzer(self._chat)
+        self._query_analyzer = QueryAnalyzer(self._chat_factory("fast"))
 
         # Context + Generation
         from fitz_ai.engines.fitz_krag.context.assembler import ContextAssembler
@@ -195,11 +233,6 @@ class FitzKragEngine:
         from fitz_ai.engines.fitz_krag.retrieval.table_handler import TableQueryHandler
 
         self._table_handler = TableQueryHandler(self._chat, self._pg_table_store, self._config)
-
-        # Chat factory (shared by detection, rewriter, HyDE, multi-hop, enrichment)
-        from fitz_ai.llm.factory import get_chat_factory
-
-        self._chat_factory = get_chat_factory(self._config.chat)
 
         # Shared detection
         self._detection_orchestrator: Any = None
@@ -283,7 +316,9 @@ class FitzKragEngine:
                 max_hops=self._config.max_hops,
             )
 
-    def answer(self, query: Query) -> Answer:
+    def answer(
+        self, query: Query, *, progress: Callable[[str], None] | None = None
+    ) -> Answer:
         """
         Execute a query using KRAG approach.
 
@@ -292,6 +327,7 @@ class FitzKragEngine:
 
         Args:
             query: Query object with question text
+            progress: Optional callback for status updates (e.g. ui.info)
 
         Returns:
             Answer with file:line provenance
@@ -328,22 +364,33 @@ class FitzKragEngine:
                 except Exception as e:
                     logger.warning(f"Query rewriting failed, using original: {e}")
 
-            # 1. Analyze query intent
-            analysis = self._query_analyzer.analyze(retrieval_query)
+            _progress = progress or (lambda _: None)
 
-            # 1.5. Run shared detection (temporal, comparison, expansion)
-            detection = None
-            if self._detection_orchestrator:
-                detection = self._detection_orchestrator.detect_for_retrieval(retrieval_query)
+            # 1. Analyze query intent + detection in parallel
+            _progress("Analyzing query...")
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                analysis_future = pool.submit(self._query_analyzer.analyze, retrieval_query)
+                detection_future = (
+                    pool.submit(
+                        self._detection_orchestrator.detect_for_retrieval, retrieval_query
+                    )
+                    if self._detection_orchestrator
+                    else None
+                )
+                analysis = analysis_future.result()
+                detection = detection_future.result() if detection_future else None
 
             # 2. Retrieve addresses (or multi-hop)
+            _progress("Retrieving relevant sources...")
             if self._hop_controller:
                 # Multi-hop: iterative retrieve → read → evaluate → bridge
                 read_results = self._hop_controller.execute(retrieval_query, analysis, detection)
                 addresses = [r.address for r in read_results] if read_results else []
             else:
                 addresses = self._retrieval_router.retrieve(
-                    retrieval_query, analysis, detection=detection
+                    retrieval_query, analysis, detection=detection, progress=progress
                 )
 
             if not addresses:
@@ -367,6 +414,7 @@ class FitzKragEngine:
             if self._hop_controller:
                 pass  # read_results already populated by hop controller
             else:
+                _progress(f"Reading content from {min(len(addresses), self._config.top_read)} sources...")
                 read_results = self._reader.read(addresses, self._config.top_read)
 
             if not read_results:
@@ -395,6 +443,7 @@ class FitzKragEngine:
             context = self._assembler.assemble(sanitized, expanded)
 
             # 7. Generate answer with answer mode
+            _progress("Generating answer...")
             answer = self._synthesizer.generate(
                 sanitized, context, expanded, answer_mode=answer_mode
             )
@@ -489,19 +538,22 @@ class FitzKragEngine:
             prompt_template="default",
         )
 
-    def point(self, source: Path, collection: str | None = None) -> Any:
+    def point(
+        self, source: Path, collection: str | None = None, *, start_worker: bool = True
+    ) -> Any:
         """Register source directory for progressive querying.
 
         1. Build manifest (fast, no LLM/embedding)
-        2. Ensure PostgreSQL schema exists (for background worker)
+        2. Persist source_dir so future processes can find it
         3. Create AgenticSearchStrategy, wire into router
         4. Set source_dir on ContentReader (disk fallback)
-        5. Start BackgroundIngestWorker
+        5. Optionally start BackgroundIngestWorker
         6. Return manifest immediately
 
         Args:
             source: Path to source directory or file
             collection: Collection name override
+            start_worker: Whether to start background indexing (False for CLI)
 
         Returns:
             FileManifest with registered files
@@ -521,13 +573,16 @@ class FitzKragEngine:
             self._bg_worker = None
 
         # 1. Build manifest
-        manifest_path = FitzPaths.workspace() / "collections" / col / "manifest.json"
+        col_dir = FitzPaths.workspace() / "collections" / col
+        manifest_path = col_dir / "manifest.json"
         builder = ManifestBuilder(self._config)
         manifest = builder.build(source, manifest_path)
         self._manifest = manifest
         self._source_dir = source
 
-        # 2. Schema already ensured in _init_components()
+        # 2. Persist source_dir so `fitz query` can find it across processes
+        col_dir.mkdir(parents=True, exist_ok=True)
+        (col_dir / "source_dir.txt").write_text(str(source), encoding="utf-8")
 
         # 3. Create agentic strategy and wire into router
         agentic = AgenticSearchStrategy(
@@ -541,28 +596,29 @@ class FitzKragEngine:
         # 4. Set source_dir on ContentReader for disk fallback
         self._reader._source_dir = source
 
-        # 5. Start background worker
-        from fitz_ai.engines.fitz_krag.progressive.worker import BackgroundIngestWorker
+        # 5. Start background worker (skip for short-lived CLI processes)
+        if start_worker:
+            from fitz_ai.engines.fitz_krag.progressive.worker import BackgroundIngestWorker
 
-        self._bg_worker = BackgroundIngestWorker(
-            manifest=manifest,
-            source_dir=source,
-            config=self._config,
-            chat=self._chat,
-            embedder=self._embedder,
-            connection_manager=self._connection_manager,
-            collection=col,
-            stores={
-                "raw": self._raw_store,
-                "symbol": self._symbol_store,
-                "import": self._import_store,
-                "section": self._section_store,
-                "table": self._table_store,
-            },
-            vocabulary_store=self._vocabulary_store,
-            entity_graph_store=self._entity_graph_store,
-        )
-        self._bg_worker.start()
+            self._bg_worker = BackgroundIngestWorker(
+                manifest=manifest,
+                source_dir=source,
+                config=self._config,
+                chat=self._chat,
+                embedder=self._embedder,
+                connection_manager=self._connection_manager,
+                collection=col,
+                stores={
+                    "raw": self._raw_store,
+                    "symbol": self._symbol_store,
+                    "import": self._import_store,
+                    "section": self._section_store,
+                    "table": self._table_store,
+                },
+                vocabulary_store=self._vocabulary_store,
+                entity_graph_store=self._entity_graph_store,
+            )
+            self._bg_worker.start()
 
         return manifest
 

@@ -215,7 +215,7 @@ class BackgroundIngestWorker:
                     except Exception as e:
                         logger.debug(f"Go strategy unavailable: {e}")
 
-                elif ext in DOC_EXTENSIONS:
+                elif ext in DOC_EXTENSIONS or ext == "":
                     self._process_doc_sections(entry, content, doc_strategy)
 
                 # Store symbols and imports from code extraction

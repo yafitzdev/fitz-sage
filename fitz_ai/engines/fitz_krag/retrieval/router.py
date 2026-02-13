@@ -6,7 +6,7 @@ Retrieval router — dispatches queries to available strategies and merges resul
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from fitz_ai.engines.fitz_krag.types import Address
 
@@ -56,6 +56,7 @@ class RetrievalRouter:
         query: str,
         analysis: "QueryAnalysis | None" = None,
         detection: "Any | None" = None,
+        progress: Callable[[str], None] | None = None,
     ) -> list[Address]:
         """
         Retrieve addresses using strategy weights from query analysis.
@@ -144,7 +145,21 @@ class RetrievalRouter:
         # Agentic search for unindexed files
         if self._agentic_strategy:
             try:
+                _progress = progress or (lambda _: None)
+                _progress("Agentic search: scanning unindexed files...")
                 agentic_addresses = self._agentic_strategy.retrieve(query, limit)
+                if agentic_addresses:
+                    # Summarize what was found
+                    paths = set()
+                    for a in agentic_addresses:
+                        dp = a.metadata.get("disk_path")
+                        if dp:
+                            parts = dp.replace("\\", "/").split("/")
+                            paths.add(parts[-1] if parts else dp)
+                    files_str = ", ".join(sorted(paths)[:5])
+                    _progress(f"Agentic search: found {len(agentic_addresses)} results from {len(paths)} files ({files_str})")
+                else:
+                    _progress("Agentic search: no matching files found")
                 all_addresses.extend(agentic_addresses)
             except Exception as e:
                 logger.warning(f"Agentic strategy failed: {e}")

@@ -183,16 +183,19 @@ class FitzService:
         self,
         source: str | Path,
         collection: str,
+        *,
+        start_worker: bool = True,
     ) -> Any:
         """Point at a source directory for progressive querying.
 
-        Builds manifest, starts background worker, returns immediately.
-        Queries work instantly via agentic search; progressively faster
-        as background indexing completes.
+        Builds manifest, returns immediately. Queries work instantly via
+        agentic search; progressively faster as background indexing completes.
 
         Args:
             source: Path to file or directory
             collection: Target collection name
+            start_worker: Whether to start background indexing thread.
+                         False for short-lived CLI processes, True for SDK/API.
 
         Returns:
             FileManifest with registered files
@@ -208,7 +211,7 @@ class FitzService:
 
         engine = create_engine()
         engine.load(collection)
-        return engine.point(source_path, collection)
+        return engine.point(source_path, collection, start_worker=start_worker)
 
     # =========================================================================
     # Collection Operations

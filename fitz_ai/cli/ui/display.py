@@ -56,50 +56,44 @@ def display_answer(answer, show_sources: bool = True) -> None:
             print()
             table = Table(title="Sources")
             table.add_column("#", style="dim", width=3)
-            table.add_column("Document", style="cyan", max_width=40)
-            table.add_column("Chunk", style="dim", justify="center", width=5)
-            table.add_column("Vector", style="yellow", justify="right", width=7)
-            table.add_column("Rerank", style="green", justify="right", width=7)
+            table.add_column("File", style="cyan", max_width=50)
+            table.add_column("Location", style="yellow", max_width=20)
             table.add_column("Excerpt", style="dim", max_width=45)
 
             for i, source in enumerate(sources[:5], 1):
-                # Support multiple attribute names across different source types
-                # Core Provenance uses source_id/excerpt, chunks use doc_id/content
-                doc_id = getattr(source, "source_id", None) or getattr(
-                    source, "doc_id", getattr(source, "source_file", "?")
-                )
+                metadata = getattr(source, "metadata", {})
                 content = getattr(source, "excerpt", None) or getattr(
                     source, "content", getattr(source, "text", "")
                 )
-                metadata = getattr(source, "metadata", {})
 
-                # Get filename only (not full path)
-                filename = os.path.basename(doc_id) if doc_id else "?"
+                # Resolve display name: file_path > disk_path > source_id
+                file_path = metadata.get("file_path") or metadata.get("disk_path", "")
+                if file_path:
+                    parts = file_path.replace("\\", "/").split("/")
+                    display_name = "/".join(parts[-2:]) if len(parts) > 1 else parts[0]
+                else:
+                    doc_id = getattr(source, "source_id", None) or getattr(
+                        source, "doc_id", getattr(source, "source_file", "?")
+                    )
+                    display_name = os.path.basename(doc_id) if doc_id else "?"
+                    title = metadata.get("title", "")
+                    if title:
+                        display_name = title
 
-                # Get title if available, otherwise use filename
-                title = metadata.get("title", "")
-                display_name = title if title else filename
-
-                # Truncate display name if too long
-                if len(display_name) > 38:
-                    display_name = display_name[:35] + "..."
-
-                # Get chunk index or rank
-                chunk_idx = metadata.get("chunk_index", metadata.get("rank", "-"))
-                chunk_str = str(chunk_idx) if chunk_idx != "-" else "-"
-
-                # Get scores
-                vector_score = metadata.get("vector_score")
-                rerank_score = metadata.get("rerank_score")
-                vector_str = f"{vector_score:.3f}" if vector_score is not None else "-"
-                rerank_str = f"{rerank_score:.3f}" if rerank_score is not None else "-"
+                # Location: line range or section title
+                location = ""
+                line_range = metadata.get("line_range")
+                if line_range:
+                    location = f"L{line_range[0]}-{line_range[1]}"
+                elif metadata.get("section_title"):
+                    location = metadata["section_title"][:18]
 
                 # Excerpt
                 excerpt = content[:70] + "..." if len(content) > 70 else content
                 excerpt = excerpt.replace("\n", " ").replace("\r", " ")
                 excerpt = _sanitize_for_display(excerpt)
 
-                table.add_row(str(i), display_name, chunk_str, vector_str, rerank_str, excerpt)
+                table.add_row(str(i), display_name, location, excerpt)
 
             console.print(table)
     else:
@@ -112,32 +106,21 @@ def display_answer(answer, show_sources: bool = True) -> None:
         if show_sources and sources:
             print("Sources:")
             for i, source in enumerate(sources[:5], 1):
-                # Support multiple attribute names across different source types
-                doc_id = getattr(source, "source_id", None) or getattr(
-                    source, "doc_id", getattr(source, "source_file", "?")
-                )
                 metadata = getattr(source, "metadata", {})
 
-                # Get filename only
-                filename = os.path.basename(doc_id) if doc_id else "?"
-                title = metadata.get("title", "")
-                display_name = title if title else filename
+                file_path = metadata.get("file_path") or metadata.get("disk_path", "")
+                if file_path:
+                    display_name = file_path.replace("\\", "/")
+                else:
+                    doc_id = getattr(source, "source_id", None) or getattr(
+                        source, "doc_id", getattr(source, "source_file", "?")
+                    )
+                    display_name = os.path.basename(doc_id) if doc_id else "?"
 
-                # Get chunk index or rank
-                chunk_idx = metadata.get("chunk_index", metadata.get("rank", ""))
-                chunk_str = f" [chunk {chunk_idx}]" if chunk_idx != "" else ""
+                line_range = metadata.get("line_range")
+                loc = f" L{line_range[0]}-{line_range[1]}" if line_range else ""
 
-                # Get scores
-                vector_score = metadata.get("vector_score")
-                rerank_score = metadata.get("rerank_score")
-                scores = []
-                if vector_score is not None:
-                    scores.append(f"vec={vector_score:.3f}")
-                if rerank_score is not None:
-                    scores.append(f"rerank={rerank_score:.3f}")
-                score_str = f" ({', '.join(scores)})" if scores else ""
-
-                print(f"  [{i}] {display_name}{chunk_str}{score_str}")
+                print(f"  [{i}] {display_name}{loc}")
 
 
 def display_sources(chunks, max_sources: int = 5, indent: int = 0) -> None:

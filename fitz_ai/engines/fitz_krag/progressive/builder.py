@@ -39,6 +39,18 @@ _SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", ".tox", ".
 # Heading regex for markdown
 _MD_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 
+# Max bytes to probe for binary detection
+_BINARY_PROBE_SIZE = 8192
+
+
+def _is_text_file(path: Path) -> bool:
+    """Check if an extensionless file is text by probing for null bytes."""
+    try:
+        chunk = path.read_bytes()[:_BINARY_PROBE_SIZE]
+        return b"\x00" not in chunk and len(chunk) > 0
+    except Exception:
+        return False
+
 
 class ManifestBuilder:
     """Builds a FileManifest from a source directory using fast extraction."""
@@ -91,7 +103,7 @@ class ManifestBuilder:
                 symbols = self._extract_java_symbols(content, rel_path)
             elif ext == ".go":
                 symbols = self._extract_go_symbols(content, rel_path)
-            elif ext in _DOC_EXTENSIONS:
+            elif ext in _DOC_EXTENSIONS or ext == "":
                 headings = self._extract_headings(content)
 
             entry = ManifestEntry(
@@ -113,13 +125,18 @@ class ManifestBuilder:
     def _scan_files(self, source: Path) -> list[Path]:
         """Scan directory for trackable files."""
         if source.is_file():
-            if source.suffix.lower() in _ALL_EXTENSIONS:
+            if source.suffix.lower() in _ALL_EXTENSIONS or _is_text_file(source):
                 return [source]
             return []
 
         files: list[Path] = []
         for ext in _ALL_EXTENSIONS:
             files.extend(source.rglob(f"*{ext}"))
+
+        # Also pick up extensionless text files
+        for f in source.rglob("*"):
+            if f.is_file() and not f.suffix and _is_text_file(f):
+                files.append(f)
 
         return sorted(
             f for f in files
