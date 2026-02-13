@@ -567,6 +567,9 @@ class FitzKragEngine:
         col = collection or self._config.collection
         source = Path(source).resolve()
 
+        # When source is a single file, use its parent as the source directory
+        source_dir = source.parent if source.is_file() else source
+
         # 0. Stop existing background worker if re-pointing
         if self._bg_worker:
             self._bg_worker.stop()
@@ -578,23 +581,23 @@ class FitzKragEngine:
         builder = ManifestBuilder(self._config)
         manifest = builder.build(source, manifest_path)
         self._manifest = manifest
-        self._source_dir = source
+        self._source_dir = source_dir
 
         # 2. Persist source_dir so `fitz query` can find it across processes
         col_dir.mkdir(parents=True, exist_ok=True)
-        (col_dir / "source_dir.txt").write_text(str(source), encoding="utf-8")
+        (col_dir / "source_dir.txt").write_text(str(source_dir), encoding="utf-8")
 
         # 3. Create agentic strategy and wire into router
         agentic = AgenticSearchStrategy(
             manifest=manifest,
-            source_dir=source,
+            source_dir=source_dir,
             chat_factory=self._chat_factory,
             config=self._config,
         )
         self._retrieval_router._agentic_strategy = agentic
 
         # 4. Set source_dir on ContentReader for disk fallback
-        self._reader._source_dir = source
+        self._reader._source_dir = source_dir
 
         # 5. Start background worker (skip for short-lived CLI processes)
         if start_worker:
@@ -602,7 +605,7 @@ class FitzKragEngine:
 
             self._bg_worker = BackgroundIngestWorker(
                 manifest=manifest,
-                source_dir=source,
+                source_dir=source_dir,
                 config=self._config,
                 chat=self._chat,
                 embedder=self._embedder,

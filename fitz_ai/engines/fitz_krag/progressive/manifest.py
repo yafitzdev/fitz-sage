@@ -95,6 +95,11 @@ class FileManifest:
         with self._lock:
             self._entries[entry.rel_path] = entry
 
+    def clear(self) -> None:
+        """Remove all entries."""
+        with self._lock:
+            self._entries.clear()
+
     def update_state(self, rel_path: str, state: FileState) -> None:
         """Transition a file to a new state."""
         with self._lock:

@@ -71,9 +71,15 @@ class ManifestBuilder:
         manifest = FileManifest(manifest_path)
         existing = manifest.entries()
 
+        # Clear old entries — each point() replaces the manifest completely
+        manifest.clear()
+
+        # When source is a single file, use its parent as the base directory
+        base_dir = source.parent if source.is_file() else source
+
         file_paths = self._scan_files(source)
         for abs_path in file_paths:
-            rel_path = self._relative_path(abs_path, source)
+            rel_path = self._relative_path(abs_path, base_dir)
             ext = abs_path.suffix.lower()
 
             # Rich docs (PDF, DOCX, etc.) — hash raw bytes, no text extraction
