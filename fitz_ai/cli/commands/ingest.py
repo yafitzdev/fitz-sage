@@ -12,8 +12,6 @@ This module is the entry point for the ingest command.
 Implementation is split across:
     - ingest_helpers.py: Content detection and utility functions
     - ingest_direct.py: Direct text ingestion
-    - ingest_config.py: Config building helpers
-    - ingest_adapters.py: Protocol adapters
     - ingest_engines.py: Engine-specific ingestion
     - ingest_runner.py: Main ingestion orchestration
 """
