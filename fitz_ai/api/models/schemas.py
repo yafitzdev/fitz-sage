@@ -21,7 +21,7 @@ class QueryRequest(BaseModel):
 
     question: str = Field(..., description="The question to ask", min_length=1)
     collection: str = Field("default", description="Collection to query")
-    top_k: Optional[int] = Field(None, description="Number of chunks to retrieve", ge=1)
+    top_k: Optional[int] = Field(None, description="Number of results to retrieve", ge=1)
     conversation_history: List["ChatMessage"] = Field(
         default_factory=list,
         description="Optional conversation history for query rewriting (resolves pronouns like 'their' → 'TechCorp')",
@@ -53,7 +53,7 @@ class ChatRequest(BaseModel):
         default_factory=list, description="Previous conversation messages"
     )
     collection: str = Field("default", description="Collection to query")
-    top_k: Optional[int] = Field(None, description="Number of chunks to retrieve", ge=1)
+    top_k: Optional[int] = Field(None, description="Number of results to retrieve", ge=1)
 
 
 class ChatResponse(BaseModel):
@@ -71,14 +71,15 @@ class IngestRequest(BaseModel):
 
     source: str = Field(..., description="Path to file or directory to ingest")
     collection: str = Field("default", description="Target collection name")
-    clear_existing: bool = Field(False, description="Clear existing collection before ingesting")
+    force: bool = Field(False, description="Re-ingest all files regardless of state")
 
 
 class IngestResponse(BaseModel):
     """Response from an ingestion request."""
 
     documents: int = Field(..., description="Number of documents ingested")
-    chunks: int = Field(..., description="Number of chunks created")
+    sections: int = Field(0, description="Number of document sections created")
+    symbols: int = Field(0, description="Number of code symbols created")
     collection: str = Field(..., description="Target collection name")
 
 
@@ -86,14 +87,14 @@ class CollectionInfo(BaseModel):
     """Basic information about a collection."""
 
     name: str = Field(..., description="Collection name")
-    chunk_count: int = Field(..., description="Number of chunks in the collection")
+    item_count: int = Field(..., description="Number of items in the collection")
 
 
 class CollectionStats(BaseModel):
     """Detailed statistics for a collection."""
 
     name: str = Field(..., description="Collection name")
-    chunk_count: int = Field(..., description="Number of chunks")
+    item_count: int = Field(..., description="Number of items")
     metadata: Dict[str, Any] = Field(
         default_factory=dict, description="Additional collection metadata"
     )

@@ -18,19 +18,21 @@ async def ingest(request: IngestRequest) -> IngestResponse:
     """
     Ingest documents into the knowledge base.
 
-    Provide a path to a file or directory. Documents will be chunked,
-    embedded, and stored in the vector database.
+    Provide a path to a file or directory. Documents will be parsed,
+    indexed for code symbols and document sections, and stored in
+    the database.
     """
     service = get_service()
 
     result = service.ingest(
         source=request.source,
         collection=request.collection,
-        clear_existing=request.clear_existing,
+        force=request.force,
     )
 
     return IngestResponse(
         documents=result.documents_processed,
-        chunks=result.chunks_created,
+        sections=result.sections_created,
+        symbols=result.symbols_created,
         collection=result.collection,
     )

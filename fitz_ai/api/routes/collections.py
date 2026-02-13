@@ -15,15 +15,11 @@ router = APIRouter(prefix="/collections", tags=["collections"])
 @router.get("", response_model=list[CollectionInfo])
 @handle_api_errors
 async def list_collections() -> list[CollectionInfo]:
-    """
-    List all available collections.
-
-    Returns collection names and chunk counts.
-    """
+    """List all available collections."""
     service = get_service()
     collections = service.list_collections()
 
-    return [CollectionInfo(name=c.name, chunk_count=c.chunk_count) for c in collections]
+    return [CollectionInfo(name=c.name, item_count=c.chunk_count) for c in collections]
 
 
 @router.get("/{name}", response_model=CollectionStats)
@@ -37,7 +33,7 @@ async def get_collection(name: str) -> CollectionStats:
 
     return CollectionStats(
         name=info.name,
-        chunk_count=info.chunk_count,
+        item_count=info.chunk_count,
         metadata=info.metadata,
     )
 
