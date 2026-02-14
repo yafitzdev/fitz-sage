@@ -54,6 +54,7 @@ class BackgroundIngestWorker:
         vocabulary_store: Any = None,
         entity_graph_store: Any = None,
         pg_table_store: Any = None,
+        enricher: Any = None,
     ) -> None:
         self._manifest = manifest
         self._source_dir = source_dir
@@ -70,6 +71,7 @@ class BackgroundIngestWorker:
         self._vocabulary_store = vocabulary_store
         self._entity_graph_store = entity_graph_store
         self._pg_table_store = pg_table_store
+        self._enricher = enricher
 
         # Parsed text cache dir — same location builder uses
         # Access manifest's private _path (same package, internal use)
@@ -125,6 +127,9 @@ class BackgroundIngestWorker:
 
             # Phase 2: PARSED → SUMMARIZED (LLM, pauses during queries)
             self._process_parsed_files()
+
+            # Phase 2.5: Enrich SUMMARIZED files with keywords + entities (LLM)
+            self._enrich_summarized_files()
 
             # Phase 3: SUMMARIZED → EMBEDDED (embedding API, concurrent)
             self._process_summarized_files()
@@ -652,6 +657,54 @@ class BackgroundIngestWorker:
             self._section_store.update_vectors_by_file(entry.file_id, vectors)
         except Exception as e:
             logger.warning(f"Section embedding failed for {entry.rel_path}: {e}")
+
+    # ------------------------------------------------------------------
+    # Enrichment (between summarize and embed)
+    # ------------------------------------------------------------------
+
+    def _enrich_summarized_files(self) -> None:
+        """Enrich SUMMARIZED files with keywords + entities via LLM."""
+        if not self._enricher:
+            return
+
+        for entry in self._get_ordered_files(FileState.SUMMARIZED):
+            if self._stop_event.is_set():
+                return
+
+            # Pause during active queries (LLM priority)
+            while self._query_active.is_set() and not self._stop_event.is_set():
+                self._stop_event.wait(timeout=0.5)
+            if self._stop_event.is_set():
+                return
+
+            try:
+                ext = entry.file_type
+                if ext in _CODE_EXTENSIONS:
+                    self._enrich_file_symbols(entry)
+                elif ext not in _TABLE_EXTENSIONS:
+                    self._enrich_file_sections(entry)
+            except Exception as e:
+                logger.warning(f"Background enrichment failed for {entry.rel_path}: {e}")
+
+    def _enrich_file_symbols(self, entry: "ManifestEntry") -> None:
+        """Enrich symbols with keywords + entities."""
+        symbols = self._symbol_store.get_by_file(entry.file_id)
+        if not symbols:
+            return
+        self._enricher.enrich_symbols(symbols)
+        self._symbol_store.update_enrichment_by_file(entry.file_id, symbols)
+
+    def _enrich_file_sections(self, entry: "ManifestEntry") -> None:
+        """Enrich sections with keywords + entities."""
+        sections = self._section_store.get_by_file(entry.file_id)
+        if not sections:
+            return
+        self._enricher.enrich_sections(sections)
+        self._section_store.update_enrichment_by_file(entry.file_id, sections)
+
+    # ------------------------------------------------------------------
+    # File reading
+    # ------------------------------------------------------------------
 
     def _read_file(self, entry: "ManifestEntry") -> str | None:
         """Read file content from disk, using parsed cache for rich docs."""

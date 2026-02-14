@@ -34,8 +34,9 @@ class SectionSearchStrategy:
         self._embedder = embedder
         self._config = config
         self._hyde_generator: Any = None  # Set by engine if HyDE enabled
+        self._raw_store: Any = None  # Set by engine for freshness boosting
 
-    def retrieve(self, query: str, limit: int) -> list[Address]:
+    def retrieve(self, query: str, limit: int, detection: Any = None) -> list[Address]:
         """
         Retrieve section addresses matching the query.
 
@@ -67,7 +68,14 @@ class SectionSearchStrategy:
         semantic_weight = self._config.section_semantic_weight
         merged = self._merge_results(bm25_results, semantic_results, bm25_weight, semantic_weight)
 
-        # 5. Convert to Address objects
+        # 5. Keyword enrichment boost (from stored keywords)
+        merged = self._apply_keyword_enrichment_boost(query, merged)
+
+        # 6. Freshness boost (when detection signals boost_recency)
+        if detection and getattr(detection, "boost_recency", False) and self._raw_store:
+            merged = self._apply_recency_boost(merged)
+
+        # 7. Convert to Address objects
         return [self._to_address(r) for r in merged[:limit]]
 
     def _run_hyde(self, query: str, limit: int) -> list[dict[str, Any]]:
@@ -132,6 +140,51 @@ class SectionSearchStrategy:
             entry["combined_score"] = scores[sid]
             result.append(entry)
         return result
+
+    def _apply_recency_boost(self, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Boost results from recently updated files."""
+        if not results:
+            return results
+        file_ids = list({r["raw_file_id"] for r in results})
+        try:
+            timestamps = self._raw_store.get_updated_timestamps(file_ids)
+            if not timestamps:
+                return results
+            sorted_files = sorted(
+                timestamps, key=lambda fid: timestamps[fid] or "", reverse=True
+            )
+            top_quarter = set(sorted_files[: max(1, len(sorted_files) // 4)])
+            top_half = set(sorted_files[: max(1, len(sorted_files) // 2)])
+            for r in results:
+                fid = r["raw_file_id"]
+                if fid in top_quarter:
+                    r["combined_score"] = r.get("combined_score", 0) + 0.1
+                elif fid in top_half:
+                    r["combined_score"] = r.get("combined_score", 0) + 0.05
+            results.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
+        except Exception as e:
+            logger.debug(f"Recency boost skipped: {e}")
+        return results
+
+    def _apply_keyword_enrichment_boost(
+        self, query: str, results: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Boost results that have matching enriched keywords."""
+        query_terms = [w.lower().strip("?.,!;:()") for w in query.split() if len(w) >= 3]
+        if not query_terms:
+            return results
+        try:
+            keyword_hits = self._section_store.search_by_keywords(query_terms, limit=50)
+            keyword_ids = {r["id"] for r in keyword_hits}
+            if keyword_ids:
+                for r in results:
+                    if r["id"] in keyword_ids:
+                        r["combined_score"] = r.get("combined_score", 0) + 0.1
+                # Re-sort after boost
+                results.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
+        except Exception as e:
+            logger.debug(f"Keyword enrichment boost skipped: {e}")
+        return results
 
     def _to_address(self, section: dict[str, Any]) -> Address:
         """Convert a section store row to an Address."""

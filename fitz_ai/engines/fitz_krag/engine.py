@@ -292,6 +292,9 @@ class FitzKragEngine:
         if self._hyde_generator:
             code_strategy._hyde_generator = self._hyde_generator
             section_strategy._hyde_generator = self._hyde_generator
+        # Wire raw_store for freshness boosting
+        code_strategy._raw_store = self._raw_store
+        section_strategy._raw_store = self._raw_store
 
         # Vocabulary store + keyword matcher
         self._vocabulary_store: Any = None
@@ -371,11 +374,12 @@ class FitzKragEngine:
 
             # 0.5. Rewrite query for retrieval optimization
             retrieval_query = sanitized
+            rewrite_result = None
             if self._query_rewriter:
                 try:
-                    result = self._query_rewriter.rewrite(sanitized)
-                    if result.rewritten_query != sanitized:
-                        retrieval_query = result.rewritten_query
+                    rewrite_result = self._query_rewriter.rewrite(sanitized)
+                    if rewrite_result.rewritten_query != sanitized:
+                        retrieval_query = rewrite_result.rewritten_query
                         logger.debug(
                             f"Query rewritten: '{sanitized[:50]}' -> '{retrieval_query[:50]}'"
                         )
@@ -413,7 +417,11 @@ class FitzKragEngine:
                 addresses = [r.address for r in read_results] if read_results else []
             else:
                 addresses = self._retrieval_router.retrieve(
-                    retrieval_query, analysis, detection=detection, progress=progress
+                    retrieval_query,
+                    analysis,
+                    detection=detection,
+                    rewrite_result=rewrite_result,
+                    progress=progress,
                 )
             timings.append(("Retrieval", time.perf_counter() - t0))
 
@@ -649,6 +657,13 @@ class FitzKragEngine:
         if start_worker:
             from fitz_ai.engines.fitz_krag.progressive.worker import BackgroundIngestWorker
 
+            # Create enricher for background worker if enabled
+            enricher = None
+            if self._config.enable_enrichment:
+                from fitz_ai.engines.fitz_krag.ingestion.enricher import KragEnricher
+
+                enricher = KragEnricher(self._chat)
+
             self._bg_worker = BackgroundIngestWorker(
                 manifest=manifest,
                 source_dir=source_dir,
@@ -667,6 +682,7 @@ class FitzKragEngine:
                 vocabulary_store=self._vocabulary_store,
                 entity_graph_store=self._entity_graph_store,
                 pg_table_store=self._pg_table_store,
+                enricher=enricher,
             )
             self._bg_worker.start()
 

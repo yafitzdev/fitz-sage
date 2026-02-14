@@ -34,7 +34,7 @@ class TableSearchStrategy:
         self._embedder = embedder
         self._config = config
 
-    def retrieve(self, query: str, limit: int) -> list[Address]:
+    def retrieve(self, query: str, limit: int, detection: Any = None) -> list[Address]:
         """
         Retrieve table addresses matching the query.
 

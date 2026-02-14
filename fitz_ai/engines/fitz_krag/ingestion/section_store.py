@@ -163,6 +163,21 @@ class SectionStore:
             rows = conn.execute(sql, (raw_file_id,)).fetchall()
         return [_row_to_dict(row) for row in rows]
 
+    def search_by_keywords(self, terms: list[str], limit: int = 20) -> list[dict[str, Any]]:
+        """Find sections with matching enriched keywords (array overlap)."""
+        if not terms:
+            return []
+        sql = f"""
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata"
+            FROM {TABLE}
+            WHERE "keywords" && %s
+            LIMIT %s
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, (terms, limit)).fetchall()
+        return [_row_to_dict(row) for row in rows]
+
     def get_children(self, section_id: str) -> list[dict[str, Any]]:
         """Get child sections of a parent."""
         sql = f"""
@@ -209,6 +224,27 @@ class SectionStore:
             for i, row in enumerate(rows):
                 if i < len(summaries):
                     conn.execute(update_sql, (summaries[i], row[0]))
+            conn.commit()
+
+    def update_enrichment_by_file(
+        self, raw_file_id: str, enriched_dicts: list[dict[str, Any]]
+    ) -> None:
+        """Update keywords, entities, and metadata for sections in a file."""
+        sql = (
+            f'UPDATE {TABLE} SET "keywords" = %s, "entities" = %s::jsonb,'
+            f' "metadata" = %s::jsonb WHERE "id" = %s'
+        )
+        with self._cm.connection(self._collection) as conn:
+            for item in enriched_dicts:
+                conn.execute(
+                    sql,
+                    (
+                        item.get("keywords", []),
+                        json.dumps(item.get("entities", [])),
+                        json.dumps(item.get("metadata", {})),
+                        item["id"],
+                    ),
+                )
             conn.commit()
 
     def update_vectors_by_file(self, raw_file_id: str, vectors: list[list[float]]) -> None:

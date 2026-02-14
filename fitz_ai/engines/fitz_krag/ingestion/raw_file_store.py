@@ -109,6 +109,16 @@ class RawFileStore:
             rows = conn.execute(sql).fetchall()
         return {row[0]: row[1] for row in rows}
 
+    def get_updated_timestamps(self, file_ids: list[str]) -> dict[str, Any]:
+        """Get {file_id: updated_at} for batch of file IDs."""
+        if not file_ids:
+            return {}
+        placeholders = ", ".join(["%s"] * len(file_ids))
+        sql = f'SELECT "id", "updated_at" FROM {TABLE} WHERE "id" IN ({placeholders})'
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, file_ids).fetchall()
+        return {row[0]: row[1] for row in rows}
+
     def list_ids_by_path(self) -> dict[str, str]:
         """Return {path: file_id} for all stored files."""
         sql = f'SELECT "path", "id" FROM {TABLE}'

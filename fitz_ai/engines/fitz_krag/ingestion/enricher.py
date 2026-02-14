@@ -26,7 +26,7 @@ class KragEnricher:
         self._batch_size = batch_size
 
     def enrich_symbols(self, symbol_dicts: list[dict[str, Any]]) -> None:
-        """Enrich symbol dicts in-place with keywords and entities."""
+        """Enrich symbol dicts in-place with keywords, entities, and temporal metadata."""
         for i in range(0, len(symbol_dicts), self._batch_size):
             batch = symbol_dicts[i : i + self._batch_size]
             items = [
@@ -40,9 +40,14 @@ class KragEnricher:
             for j, enrichment in enumerate(enriched):
                 batch[j]["keywords"] = enrichment.get("keywords", [])
                 batch[j]["entities"] = enrichment.get("entities", [])
+                temporal = enrichment.get("temporal")
+                if temporal and isinstance(temporal, dict):
+                    meta = batch[j].get("metadata") or {}
+                    meta["temporal"] = temporal
+                    batch[j]["metadata"] = meta
 
     def enrich_sections(self, section_dicts: list[dict[str, Any]]) -> None:
-        """Enrich section dicts in-place with keywords and entities."""
+        """Enrich section dicts in-place with keywords, entities, and temporal metadata."""
         for i in range(0, len(section_dicts), self._batch_size):
             batch = section_dicts[i : i + self._batch_size]
             items = [
@@ -56,6 +61,11 @@ class KragEnricher:
             for j, enrichment in enumerate(enriched):
                 batch[j]["keywords"] = enrichment.get("keywords", [])
                 batch[j]["entities"] = enrichment.get("entities", [])
+                temporal = enrichment.get("temporal")
+                if temporal and isinstance(temporal, dict):
+                    meta = batch[j].get("metadata") or {}
+                    meta["temporal"] = temporal
+                    batch[j]["metadata"] = meta
 
     def _enrich_batch(self, items: list[dict[str, str]]) -> list[dict[str, Any]]:
         """Run a single LLM call to extract keywords + entities for a batch."""
@@ -70,14 +80,17 @@ class KragEnricher:
                     {
                         "role": "system",
                         "content": (
-                            "Extract keywords and entities from each item.\n"
+                            "Extract keywords, entities, and temporal references from each item.\n"
                             "Keywords: exact-match identifiers (function names, class names, "
                             "technical terms, IDs, abbreviations).\n"
                             "Entities: named entities with types "
-                            '(e.g., {"name": "PostgreSQL", "type": "technology"}).\n\n'
+                            '(e.g., {"name": "PostgreSQL", "type": "technology"}).\n'
+                            "Temporal: dates, version numbers, and time references found in the text "
+                            '(e.g., {"dates": ["2024-03"], "versions": ["v2.3"], "refs": ["latest"]}).'
+                            " Return empty object if none found.\n\n"
                             "Return a JSON array with one object per item:\n"
-                            '[{"keywords": ["kw1", "kw2"], '
-                            '"entities": [{"name": "X", "type": "T"}]}, ...]'
+                            '[{"keywords": ["kw1"], "entities": [{"name": "X", "type": "T"}], '
+                            '"temporal": {"dates": [], "versions": [], "refs": []}}, ...]'
                         ),
                     },
                     {"role": "user", "content": prompt},
