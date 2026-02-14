@@ -38,6 +38,9 @@ class Feature(Enum):
     FIGURE_RETRIEVAL = "figure_retrieval"
     HYDE = "hyde"
     QUERY_REWRITING = "query_rewriting"
+    PPTX_RETRIEVAL = "pptx_retrieval"
+    XLSX_QUERY = "xlsx_query"
+    SQL_SEARCH = "sql_search"
 
 
 @dataclass
@@ -1744,6 +1747,214 @@ PDF_DOCX_SCENARIOS: list[TestScenario] = [
         query="What are the key drivers for quantum computing market growth?",
         # Text around the figure discusses drivers
         must_contain_any=["pharmaceutical", "financial", "cryptography", "supply chain"],
+        min_sources=1,
+    ),
+]
+
+
+# =============================================================================
+# Format-Specific Scenarios (PPTX, XLSX, SQL, Go, Java, TypeScript)
+# =============================================================================
+# These scenarios test file type coverage beyond the core MD/PY/CSV/PDF/DOCX.
+# Run with: pytest -m e2e_krag_formats
+
+FORMAT_SCENARIOS: list[TestScenario] = [
+    # =========================================================================
+    # PPTX Scenarios (Meridian Health Q3 2025 Review)
+    # =========================================================================
+    TestScenario(
+        id="E166",
+        name="PPTX: revenue from slide content",
+        feature=Feature.PPTX_RETRIEVAL,
+        query="What was Meridian Health's Q3 revenue?",
+        must_contain_any=["847", "million"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E167",
+        name="PPTX: patient count metric",
+        feature=Feature.PPTX_RETRIEVAL,
+        query="How many patients did Meridian Health serve in Q3?",
+        must_contain_any=["2.4 million", "2,400,000", "2.4"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E168",
+        name="PPTX: expansion plans",
+        feature=Feature.PPTX_RETRIEVAL,
+        query="What are Meridian Health's expansion plans?",
+        must_contain_any=["Austin", "Denver", "Portland", "clinics"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E169",
+        name="PPTX: key metrics aggregation",
+        feature=Feature.PPTX_RETRIEVAL,
+        query="List the key metrics from the Meridian Health quarterly review",
+        must_contain_any=["satisfaction", "readmission", "wait time", "telehealth"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E170",
+        name="PPTX: presenter metadata",
+        feature=Feature.BASIC_RETRIEVAL,
+        query="Who presented the Meridian Health quarterly review?",
+        must_contain_any=["Sarah Mitchell", "Chief Medical Officer"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # XLSX Scenarios (Engineering & Marketing Budgets)
+    # =========================================================================
+    TestScenario(
+        id="E171",
+        name="XLSX: engineering budget total",
+        feature=Feature.XLSX_QUERY,
+        query="What is the total engineering budget?",
+        must_contain_any=["engineering", "salaries", "infrastructure", "budget"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E172",
+        name="XLSX: cross-sheet comparison",
+        feature=Feature.XLSX_QUERY,
+        query="Compare the engineering and marketing department budgets",
+        must_contain_any=["engineering", "marketing"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E173",
+        name="XLSX: specific line item",
+        feature=Feature.XLSX_QUERY,
+        query="How much does the company spend on AWS cloud hosting?",
+        must_contain_any=["85,000", "92,000", "380,000", "AWS", "cloud"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E174",
+        name="XLSX: category identification",
+        feature=Feature.XLSX_QUERY,
+        query="What are the main budget categories for engineering?",
+        must_contain_any=["Salaries", "Infrastructure", "Tools", "Training", "Hardware"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E175",
+        name="XLSX: marketing specific data",
+        feature=Feature.XLSX_QUERY,
+        query="How much does marketing spend on Google Ads?",
+        must_contain_any=["45,000", "52,000", "210,000", "Google"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # SQL Scenarios (NovaMart E-Commerce Schema)
+    # =========================================================================
+    TestScenario(
+        id="E176",
+        name="SQL: table listing",
+        feature=Feature.SQL_SEARCH,
+        query="What tables exist in the NovaMart ecommerce schema?",
+        must_contain_any=["customers", "products", "orders", "order_items"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E177",
+        name="SQL: column details",
+        feature=Feature.SQL_SEARCH,
+        query="What columns does the orders table have?",
+        must_contain_any=["order_id", "customer_id", "status", "total_cents"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E178",
+        name="SQL: foreign key relationships",
+        feature=Feature.CODE_SEARCH,
+        query="How are customers and orders related in the ecommerce schema?",
+        must_contain_any=["customer_id", "REFERENCES", "foreign"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E179",
+        name="SQL: index detection",
+        feature=Feature.SQL_SEARCH,
+        query="What indexes exist in the NovaMart ecommerce database?",
+        must_contain_any=["idx_", "INDEX", "index"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Go Scenarios (TaskFlow HTTP Server)
+    # =========================================================================
+    TestScenario(
+        id="E180",
+        name="Go: HTTP route listing",
+        feature=Feature.CODE_SEARCH,
+        query="What HTTP routes does the Go TaskFlow server handle?",
+        must_contain_any=["/health", "/api/tasks", "HandleFunc"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E181",
+        name="Go: authentication",
+        feature=Feature.CODE_SEARCH,
+        query="How does the Go TaskFlow server authenticate requests?",
+        must_contain_any=["AuthMiddleware", "Bearer", "Authorization", "token"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E182",
+        name="Go: middleware",
+        feature=Feature.CODE_SEARCH,
+        query="What middleware does the Go TaskFlow server use?",
+        must_contain_any=["LoggingMiddleware", "AuthMiddleware", "logging"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # Java Scenarios (Nexus Platform UserService)
+    # =========================================================================
+    TestScenario(
+        id="E183",
+        name="Java: CRUD operations",
+        feature=Feature.CODE_SEARCH,
+        query="What CRUD operations does the Java UserService provide?",
+        must_contain_any=["createUser", "getUserById", "updateUser", "deactivateUser"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E184",
+        name="Java: exception handling",
+        feature=Feature.CODE_SEARCH,
+        query="What exceptions does the Java UserService throw?",
+        must_contain_any=[
+            "UserNotFoundException",
+            "DuplicateEmailException",
+            "IllegalArgumentException",
+        ],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E185",
+        name="Java: annotations",
+        feature=Feature.CODE_SEARCH,
+        query="What annotations are used on the Java UserService?",
+        must_contain_any=["@Service", "@Transactional"],
+        min_sources=1,
+    ),
+    # =========================================================================
+    # TypeScript Scenarios (InventoryHub API Client)
+    # =========================================================================
+    TestScenario(
+        id="E186",
+        name="TypeScript: API endpoints",
+        feature=Feature.CODE_SEARCH,
+        query="What API endpoints does the TypeScript InventoryHub client call?",
+        must_contain_any=["/api/products", "/api/warehouses", "/api/shipments"],
+        min_sources=1,
+    ),
+    TestScenario(
+        id="E187",
+        name="TypeScript: interfaces",
+        feature=Feature.CODE_SEARCH,
+        query="What TypeScript interfaces are defined in the InventoryHub api_client?",
+        must_contain_any=["Product", "Warehouse", "Shipment"],
         min_sources=1,
     ),
 ]

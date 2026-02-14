@@ -247,6 +247,7 @@ markers = [
     "e2e_parser: marks tests as parser e2e tests (PDF/DOCX parsing)",
     "e2e_krag: marks tests as KRAG end-to-end tests requiring real LLM and ingestion",
     "e2e_krag_parser: marks tests as KRAG parser e2e tests (PDF/DOCX parsing)",
+    "e2e_krag_formats: marks tests as KRAG format e2e tests (PPTX/XLSX/SQL/Go/Java/TS)",
     "postgres: marks tests as postgres-specific (pgvector, table store)",
     "llm: marks tests requiring real LLM API calls",
     "embeddings: marks tests requiring real embedding API calls",

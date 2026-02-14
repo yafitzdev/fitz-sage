@@ -230,6 +230,60 @@ class TestContextAssembler:
         unknown_output = asm.assemble("q", [unknown_result])
         assert "```\n" in unknown_output
 
+    # -- test_assemble_no_file_header ---------------------------------------
+
+    def test_assemble_no_file_header(self) -> None:
+        """include_file_header=False omits file path from header."""
+        asm = ContextAssembler(_make_config(include_file_header=False))
+        result = _make_result(file_path="src/mod.py")
+        output = asm.assemble("test", [result])
+
+        assert "[S1]" in output
+        assert "# src/mod.py" not in output
+
+    # -- test_assemble_chunk_no_language ------------------------------------
+
+    def test_assemble_chunk_no_language(self) -> None:
+        """CHUNK addresses use a bare code fence without language hint."""
+        asm = ContextAssembler(_make_config())
+        addr = Address(kind=AddressKind.CHUNK, source_id="c1", location="doc", summary="")
+        result = ReadResult(address=addr, content="some text", file_path="doc.pdf")
+        output = asm.assemble("test", [result])
+
+        assert "```\n" in output
+
+    # -- test_assemble_kind_label ------------------------------------------
+
+    def test_assemble_kind_label(self) -> None:
+        """Address metadata 'kind' appears as a label in the header."""
+        asm = ContextAssembler(_make_config())
+        result = _make_result(address_metadata={"kind": "function"})
+        output = asm.assemble("test", [result])
+
+        assert "[function]" in output
+
+    # -- test_assemble_section_single_page ---------------------------------
+
+    def test_assemble_section_single_page(self) -> None:
+        """Single-page section shows 'page 1' not 'pages 1-1'."""
+        asm = ContextAssembler(_make_config())
+        result = _make_result(
+            kind=AddressKind.SECTION,
+            file_path="doc.pdf",
+            content="Introduction text.",
+            line_range=None,
+            metadata={
+                "page_start": 1,
+                "page_end": 1,
+                "section_title": "Introduction",
+                "section_level": 1,
+            },
+        )
+        output = asm.assemble("test", [result])
+
+        assert "page 1" in output
+        assert "pages" not in output
+
     # -- test_assemble_context_type_shown -----------------------------------
 
     def test_assemble_context_type_shown(self) -> None:
