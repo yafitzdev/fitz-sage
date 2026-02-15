@@ -178,10 +178,12 @@ class TestImportExtraction:
 
 
 class TestSyntaxError:
-    def test_invalid_syntax_returns_empty(self, strategy):
+    def test_invalid_syntax_uses_regex_fallback(self, strategy):
         source = "def broken(:\n    pass\n"
         result = strategy.extract(source, "broken.py")
-        assert len(result.symbols) == 0
+        # Regex fallback extracts function signature even from invalid syntax
+        assert len(result.symbols) == 1
+        assert result.symbols[0].name == "broken"
         assert len(result.imports) == 0
 
 

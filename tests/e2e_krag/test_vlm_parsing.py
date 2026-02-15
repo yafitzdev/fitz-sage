@@ -153,8 +153,21 @@ def vlm_krag_engine(set_workspace):
     cfg = FitzKragConfig(**config_dict)
     engine = FitzKragEngine(cfg)
 
-    # Ingest fixtures with VLM-powered parsing
-    stats = engine.ingest(FIXTURES_PARSER_DIR, force=True)
+    # Ingest fixtures with VLM-powered parsing via KragIngestPipeline
+    from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+
+    pipeline = KragIngestPipeline(
+        config=engine._config,
+        chat=engine._chat,
+        embedder=engine._embedder,
+        connection_manager=engine._connection_manager,
+        collection=engine._config.collection,
+        table_store=engine._table_store,
+        pg_table_store=engine._pg_table_store,
+        vocabulary_store=engine._vocabulary_store,
+        entity_graph_store=engine._entity_graph_store,
+    )
+    stats = pipeline.ingest(FIXTURES_PARSER_DIR, force=True)
     print(
         f"\nVLM KRAG ingest: {stats.get('files_scanned', 0)} files, "
         f"{stats.get('sections_extracted', 0)} sections"

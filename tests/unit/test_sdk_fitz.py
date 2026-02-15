@@ -109,41 +109,6 @@ class TestFitzConfigCreation:
             f._ensure_config()
 
 
-class TestFitzIngest:
-    """Tests for fitz.ingest() method."""
-
-    def test_raises_on_nonexistent_source(self, tmp_path):
-        """Test that ValueError is raised for nonexistent source."""
-        from fitz_ai.sdk import fitz
-
-        f = fitz(config_path=tmp_path / "config.yaml")
-
-        with pytest.raises(ValueError, match="does not exist"):
-            f.ingest("/nonexistent/path")
-
-    def test_raises_on_empty_source(self, tmp_path):
-        """Test that IngestError is raised when no documents found."""
-        from fitz_ai.sdk import fitz
-        from fitz_ai.services.fitz_service import IngestError
-
-        config_path = tmp_path / "config.yaml"
-        f = fitz(config_path=config_path)
-
-        # Create empty docs directory
-        docs_path = tmp_path / "empty_docs"
-        docs_path.mkdir()
-
-        # Create config first
-        f._create_default_config(config_path)
-
-        # Mock FitzService.ingest to raise IngestError (no documents)
-        with patch.object(f._service, "ingest") as mock_ingest:
-            mock_ingest.side_effect = IngestError("No documents found")
-
-            with pytest.raises(IngestError, match="No documents found"):
-                f.ingest(docs_path)
-
-
 class TestFitzAsk:
     """Tests for fitz.ask() method."""
 
@@ -189,21 +154,6 @@ class TestFitzQuery:
             f.query("")
 
 
-class TestIngestStats:
-    """Tests for IngestStats dataclass."""
-
-    def test_ingest_stats_fields(self):
-        """Test IngestStats has expected fields."""
-        from fitz_ai.sdk import IngestStats
-
-        stats = IngestStats(documents=10, sections=50, symbols=5, collection="test")
-
-        assert stats.documents == 10
-        assert stats.sections == 50
-        assert stats.symbols == 5
-        assert stats.collection == "test"
-
-
 class TestFitzExports:
     """Tests for SDK exports."""
 
@@ -218,19 +168,6 @@ class TestFitzExports:
         from fitz_ai import fitz
 
         assert fitz is not None
-
-    def test_ingest_stats_exported_from_top_level(self):
-        """Test IngestStats is exported from fitz_ai."""
-        from fitz_ai import IngestStats
-
-        assert IngestStats is not None
-
-    def test_module_level_ingest_exported(self):
-        """Test module-level ingest() is exported."""
-        import fitz_ai
-
-        assert hasattr(fitz_ai, "ingest")
-        assert callable(fitz_ai.ingest)
 
     def test_module_level_query_exported(self):
         """Test module-level query() is exported."""

@@ -75,8 +75,12 @@ class SectionSearchStrategy:
         if detection and getattr(detection, "boost_recency", False) and self._raw_store:
             merged = self._apply_recency_boost(merged)
 
-        # 7. Convert to Address objects
-        return [self._to_address(r) for r in merged[:limit]]
+        # 7. Enrich with parent titles for breadcrumb location
+        top_results = merged[:limit]
+        self._enrich_with_parent_titles(top_results)
+
+        # 8. Convert to Address objects
+        return [self._to_address(r) for r in top_results]
 
     def _run_hyde(self, query: str, limit: int) -> list[dict[str, Any]]:
         """Generate hypothetical docs via HyDE and search with their embeddings."""
@@ -119,10 +123,12 @@ class SectionSearchStrategy:
         scores: dict[str, float] = {}
         by_id: dict[str, dict[str, Any]] = {}
 
-        # Normalize BM25 scores by rank
+        # Use rank-based scoring for BM25 (ts_rank raw values are too small
+        # to combine meaningfully with cosine similarity; rank position gives
+        # a 0-1 normalized signal that merges well with semantic scores).
         for rank, r in enumerate(bm25_results):
             sid = r["id"]
-            rank_score = r.get("bm25_score", 1.0 / (rank + 1))
+            rank_score = 1.0 / (rank + 1)
             scores[sid] = scores.get(sid, 0) + bm25_weight * rank_score
             by_id[sid] = r
 
@@ -186,12 +192,42 @@ class SectionSearchStrategy:
             logger.debug(f"Keyword enrichment boost skipped: {e}")
         return results
 
+    def _enrich_with_parent_titles(self, results: list[dict[str, Any]]) -> None:
+        """Batch-fetch parent section titles and attach to results.
+
+        This enables breadcrumb-style location (e.g. "Model X100 > Specifications")
+        so that the ranker's entity match bonus considers parent context.
+        """
+        parent_ids = {
+            r["parent_section_id"]
+            for r in results
+            if r.get("parent_section_id")
+        }
+        if not parent_ids:
+            return
+
+        parent_titles: dict[str, str] = {}
+        for pid in parent_ids:
+            parent = self._section_store.get(pid)
+            if parent:
+                parent_titles[pid] = parent["title"]
+
+        for r in results:
+            pid = r.get("parent_section_id")
+            if pid and pid in parent_titles:
+                r["parent_title"] = parent_titles[pid]
+
     def _to_address(self, section: dict[str, Any]) -> Address:
         """Convert a section store row to an Address."""
+        # Build breadcrumb location from parent title when available
+        title = section["title"]
+        parent_title = section.get("parent_title")
+        location = f"{parent_title} > {title}" if parent_title else title
+
         return Address(
             kind=AddressKind.SECTION,
             source_id=section["raw_file_id"],
-            location=section["title"],
+            location=location,
             summary=section.get("summary") or section["title"],
             score=section.get("combined_score", 0.0),
             metadata={

@@ -67,6 +67,10 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._vocabulary_store = None
     engine._keyword_matcher = None
     engine._entity_graph_store = None
+    engine._bg_worker = None
+    engine._manifest = None
+    engine._source_dir = None
+    engine._hyde_generator = None
     return engine
 
 
@@ -94,12 +98,14 @@ def _make_address(
 def _make_detection_summary(
     query_variations: list[str] | None = None,
     comparison_entities: list[str] | None = None,
+    comparison_queries: list[str] | None = None,
     fetch_multiplier: int = 1,
 ) -> MagicMock:
     """Create a mock DetectionSummary with specified attributes."""
     detection = MagicMock(name="detection_summary")
     detection.query_variations = query_variations or []
     detection.comparison_entities = comparison_entities or []
+    detection.comparison_queries = comparison_queries or []
     detection.fetch_multiplier = fetch_multiplier
     return detection
 
@@ -246,10 +252,9 @@ class TestRouterDetection:
         # Both addresses returned
         assert len(results) == 2
 
-    def test_retrieve_with_comparison_entities_uses_llm_queries(self):
-        """Router.retrieve with comparison_entities generates LLM-focused queries."""
+    def test_retrieve_with_comparison_queries_from_detection(self):
+        """Router.retrieve uses comparison_queries from DetectionSummary."""
         addr1 = _make_address("a.py", "mod.alpha", 0.9)
-        _make_address("b.py", "mod.beta", 0.8)  # noqa: F841 - defined for test context
 
         code_strategy = MagicMock(name="code_strategy")
         code_strategy.retrieve.return_value = [addr1]
@@ -257,25 +262,20 @@ class TestRouterDetection:
         section_strategy = MagicMock(name="section_strategy")
         section_strategy.retrieve.return_value = []
 
-        mock_chat = MagicMock(name="chat")
-        mock_chat.chat.return_value = '["React hooks state", "Vue composition API", "React vs Vue"]'
-        mock_factory = MagicMock(return_value=mock_chat)
-
         config = _make_config(top_addresses=10, fallback_to_chunks=False)
         router = RetrievalRouter(
             code_strategy=code_strategy,
             chunk_strategy=None,
             config=config,
             section_strategy=section_strategy,
-            chat_factory=mock_factory,
         )
 
         detection = _make_detection_summary(
-            comparison_entities=["React", "Vue"],
+            comparison_queries=["React hooks state", "Vue composition API", "React vs Vue"],
         )
         router.retrieve("compare frameworks", detection=detection)
 
-        # Code strategy called 4 times: original + 3 LLM-generated entity queries
+        # Code strategy called 4 times: original + 3 comparison queries
         assert code_strategy.retrieve.call_count == 4
         calls = code_strategy.retrieve.call_args_list
         assert calls[0].args[0] == "compare frameworks"
@@ -283,8 +283,8 @@ class TestRouterDetection:
         assert calls[2].args[0] == "Vue composition API"
         assert calls[3].args[0] == "React vs Vue"
 
-    def test_retrieve_comparison_fallback_without_chat_factory(self):
-        """Without chat_factory, comparison falls back to naive entity append."""
+    def test_retrieve_comparison_fallback_to_entity_append(self):
+        """Without comparison_queries, comparison falls back to naive entity append."""
         code_strategy = MagicMock(name="code_strategy")
         code_strategy.retrieve.return_value = [_make_address()]
 
@@ -297,7 +297,6 @@ class TestRouterDetection:
             chunk_strategy=None,
             config=config,
             section_strategy=section_strategy,
-            chat_factory=None,  # No LLM
         )
 
         detection = _make_detection_summary(comparison_entities=["A", "B"])
@@ -372,7 +371,8 @@ class TestEngineAnswerDetectionFlow:
 
         # Router called with detection result
         engine._retrieval_router.retrieve.assert_called_once_with(
-            query.text, analysis, detection=mock_detection
+            query.text, analysis, detection=mock_detection,
+            rewrite_result=None, progress=None,
         )
 
     def test_detection_disabled_stays_none_in_answer_flow(self):
@@ -396,7 +396,8 @@ class TestEngineAnswerDetectionFlow:
 
         # Router called with detection=None (no detection)
         engine._retrieval_router.retrieve.assert_called_once_with(
-            query.text, analysis, detection=None
+            query.text, analysis, detection=None,
+            rewrite_result=None, progress=None,
         )
 
 

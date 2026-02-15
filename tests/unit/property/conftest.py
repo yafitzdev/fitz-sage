@@ -9,7 +9,7 @@ Profiles:
 """
 
 import pytest
-from hypothesis import Phase, Verbosity, settings
+from hypothesis import HealthCheck, Phase, Verbosity, settings
 
 # Register Hypothesis profiles
 settings.register_profile(
@@ -26,6 +26,7 @@ settings.register_profile(
     verbosity=Verbosity.normal,
     phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink],
     deadline=1000,  # 1 second per example
+    suppress_health_check=[HealthCheck.too_slow],
 )
 
 settings.register_profile(

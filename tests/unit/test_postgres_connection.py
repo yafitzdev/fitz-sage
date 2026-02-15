@@ -209,10 +209,14 @@ class TestAutoRecovery:
         # Directly clear singleton without calling stop() to avoid hanging
         PostgresConnectionManager._instance = None
 
+    @patch("fitz_ai.storage.postgres._kill_zombie_postgres_processes")
+    @patch("fitz_ai.storage.postgres.time.sleep")
     @patch("fitz_ai.storage.postgres.shutil.rmtree")
     @patch("fitz_ai.storage.postgres.FitzPaths.ensure_pgdata")
-    def test_recovery_deletes_pgdata_on_failure(self, mock_ensure_pgdata, mock_rmtree):
-        """Recovery deletes corrupted pgdata directory."""
+    def test_recovery_deletes_pgdata_on_failure(
+        self, mock_ensure_pgdata, mock_rmtree, mock_sleep, mock_kill
+    ):
+        """Nuclear recovery deletes corrupted pgdata when both Step 1 and Step 2 fail."""
         import sys
         from pathlib import Path
 
@@ -221,7 +225,8 @@ class TestAutoRecovery:
         config = StorageConfig(mode=StorageMode.LOCAL)
         manager = PostgresConnectionManager(config)
 
-        # Mock pgserver module
+        # Mock pgserver module - fail on calls 1 and 2 (Step 1 + patient retry),
+        # succeed on call 3 (nuclear recovery)
         mock_pgserver_module = MagicMock()
         call_count = 0
         mock_server = MagicMock()
@@ -230,7 +235,7 @@ class TestAutoRecovery:
         def mock_get_server(path):
             nonlocal call_count
             call_count += 1
-            if call_count == 1:
+            if call_count <= 2:
                 raise Exception("Corrupted database")
             return mock_server
 
@@ -243,8 +248,48 @@ class TestAutoRecovery:
                 with patch("pathlib.Path.exists", return_value=True):
                     manager._start_pgserver(allow_recovery=True)
 
-        # Verify rmtree was called for recovery
+        # Verify rmtree was called for nuclear recovery
         assert mock_rmtree.called
+
+    @patch("fitz_ai.storage.postgres._kill_zombie_postgres_processes")
+    @patch("fitz_ai.storage.postgres.time.sleep")
+    @patch("fitz_ai.storage.postgres.FitzPaths.ensure_pgdata")
+    def test_patient_retry_succeeds_without_nuclear(
+        self, mock_ensure_pgdata, mock_sleep, mock_kill
+    ):
+        """Patient retry (Step 2) succeeds when WAL recovery completed in background."""
+        import sys
+        from pathlib import Path
+
+        mock_ensure_pgdata.return_value = Path("/tmp/test_pgdata")
+
+        config = StorageConfig(mode=StorageMode.LOCAL)
+        manager = PostgresConnectionManager(config)
+
+        # Fail on call 1 (Step 1), succeed on call 2 (patient retry)
+        mock_pgserver_module = MagicMock()
+        call_count = 0
+        mock_server = MagicMock()
+        mock_server.get_uri.return_value = "postgresql://localhost/postgres"
+
+        def mock_get_server(path):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise Exception("Recovery in progress")
+            return mock_server
+
+        mock_pgserver_module.get_server = mock_get_server
+        mock_pgserver_module.PostgresServer = MagicMock()
+        mock_pgserver_module.PostgresServer._instances = {}
+
+        with patch.dict(sys.modules, {"fitz_pgserver": mock_pgserver_module}):
+            with patch("pathlib.Path.mkdir"):
+                manager._start_pgserver(allow_recovery=True)
+
+        # Should have succeeded on call 2 without nuclear recovery
+        assert call_count == 2
+        assert manager._base_uri == "postgresql://localhost/postgres"
 
     def test_recovery_disabled_raises_immediately(self):
         """With recovery disabled, failure raises immediately."""

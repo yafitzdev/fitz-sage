@@ -99,6 +99,35 @@ class GoIngestStrategy:
         return IngestResult(symbols=symbols, imports=imports)
 
 
+def _regex_extract_block(lines: list[str], start_line: int) -> tuple[str, int]:
+    """Extract a brace-delimited block starting from a given line.
+
+    Returns (source_text, end_line) where end_line is 1-indexed.
+    Walks forward from start_line counting braces until the opening brace
+    is closed. Falls back to a 20-line window if no braces found.
+    """
+    depth = 0
+    found_open = False
+    end = start_line  # 1-indexed
+
+    for i in range(start_line - 1, min(len(lines), start_line + 50)):
+        line = lines[i]
+        for ch in line:
+            if ch == "{":
+                depth += 1
+                found_open = True
+            elif ch == "}":
+                depth -= 1
+        end = i + 1
+        if found_open and depth <= 0:
+            break
+
+    if not found_open:
+        end = min(len(lines), start_line + 20)
+
+    return "\n".join(lines[start_line - 1 : end]), end
+
+
 def _regex_fallback(source: str, file_path: str) -> IngestResult:
     """Extract symbols via regex when tree-sitter is unavailable."""
     global _warned_no_tree_sitter
@@ -111,6 +140,7 @@ def _regex_fallback(source: str, file_path: str) -> IngestResult:
 
     pkg_match = _PACKAGE_RE.search(source)
     module_name = pkg_match.group(1) if pkg_match else _path_to_module(file_path)
+    lines = source.splitlines()
 
     symbols: list[SymbolEntry] = []
     imports: list[ImportEdge] = []
@@ -120,48 +150,56 @@ def _regex_fallback(source: str, file_path: str) -> IngestResult:
 
     for m in _FUNC_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
+        block, end_line = _regex_extract_block(lines, line_no)
         symbols.append(SymbolEntry(
             name=m.group(1),
             qualified_name=f"{module_name}.{m.group(1)}",
             kind="function",
             start_line=line_no,
-            end_line=line_no,
+            end_line=end_line,
             signature=f"func {m.group(1)}()",
+            source=block,
         ))
 
     for m in _METHOD_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
+        block, end_line = _regex_extract_block(lines, line_no)
         symbols.append(SymbolEntry(
             name=m.group(1),
             qualified_name=f"{module_name}.{m.group(1)}",
             kind="method",
             start_line=line_no,
-            end_line=line_no,
+            end_line=end_line,
             signature=f"func (...) {m.group(1)}()",
+            source=block,
         ))
 
     for m in _STRUCT_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
+        block, end_line = _regex_extract_block(lines, line_no)
         seen_type_names.add(m.group(1))
         symbols.append(SymbolEntry(
             name=m.group(1),
             qualified_name=f"{module_name}.{m.group(1)}",
             kind="struct",
             start_line=line_no,
-            end_line=line_no,
+            end_line=end_line,
             signature=f"type {m.group(1)} struct",
+            source=block,
         ))
 
     for m in _IFACE_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
+        block, end_line = _regex_extract_block(lines, line_no)
         seen_type_names.add(m.group(1))
         symbols.append(SymbolEntry(
             name=m.group(1),
             qualified_name=f"{module_name}.{m.group(1)}",
             kind="interface",
             start_line=line_no,
-            end_line=line_no,
+            end_line=end_line,
             signature=f"type {m.group(1)} interface",
+            source=block,
         ))
 
     # Generic type aliases (exclude already-captured structs/interfaces)
@@ -170,13 +208,15 @@ def _regex_fallback(source: str, file_path: str) -> IngestResult:
         if name in seen_type_names:
             continue
         line_no = source[: m.start()].count("\n") + 1
+        block, end_line = _regex_extract_block(lines, line_no)
         symbols.append(SymbolEntry(
             name=name,
             qualified_name=f"{module_name}.{name}",
             kind="type",
             start_line=line_no,
-            end_line=line_no,
+            end_line=end_line,
             signature=f"type {name}",
+            source=block,
         ))
 
     # Extract import paths from import blocks

@@ -300,15 +300,14 @@ class PostgresConnectionManager:
         """
         Start embedded pgserver (fitz-pgserver fork).
 
-        fitz-pgserver handles most robustness issues internally:
-        - Unique log file names per session (avoids Windows sharing violations)
-        - Proper crash recovery via WAL replay
-
-        We only do nuclear recovery (delete pgdata) as a last resort when
-        pgserver itself fails to start.
+        Recovery strategy (3 steps):
+        1. Kill zombies + try starting pgserver
+        2. If failed, clear pgserver cache and retry (WAL recovery may have
+           completed but pgserver timed out waiting for the checkpoint)
+        3. Nuclear recovery: delete pgdata entirely, reinitialize with timeout
 
         Args:
-            allow_recovery: If True, attempt nuclear recovery on failure
+            allow_recovery: If True, attempt recovery on failure
 
         Raises:
             ImportError: If fitz-pgserver package not installed
@@ -329,9 +328,12 @@ class PostgresConnectionManager:
         data_dir.mkdir(parents=True, exist_ok=True)
 
         # =================================================================
-        # STEP 1: Try to start pgserver directly
+        # STEP 1: Kill zombies preemptively, then try to start pgserver
         # =================================================================
-        # fitz-pgserver handles crash recovery internally via unique log files
+        # Zombie postgres from a previous crash can hold locks and block
+        # WAL recovery or new startup entirely. Kill them first.
+        _kill_zombie_postgres_processes()
+
         logger.info(f"{STORAGE} Starting pgserver at {data_dir}")
 
         startup_error = None
@@ -344,17 +346,45 @@ class PostgresConnectionManager:
             startup_error = e
             logger.warning(f"{STORAGE} pgserver startup failed: {e}")
 
-        # =================================================================
-        # STEP 2: Nuclear recovery - delete everything and retry once
-        # =================================================================
         if not allow_recovery:
             raise RuntimeError(f"pgserver failed to start: {startup_error}")
 
+        # =================================================================
+        # STEP 2: Patient retry - WAL recovery may have completed but
+        # pgserver timed out before the checkpoint finished. Clear the
+        # cached dead instance and try again.
+        # =================================================================
+        logger.info(
+            f"{STORAGE} Retrying startup (WAL recovery may have completed in background)..."
+        )
+
+        # Kill any processes left from the failed attempt
+        _kill_zombie_postgres_processes()
+        time.sleep(1.0 if sys.platform == "win32" else 0.5)
+
+        # Clear pgserver's cached dead instance so get_server() creates fresh
+        if resolved_path in pgserver.PostgresServer._instances:
+            del pgserver.PostgresServer._instances[resolved_path]
+
+        try:
+            self._pgserver = pgserver.get_server(str(data_dir))
+            self._base_uri = self._pgserver.get_uri()
+            logger.info(f"{STORAGE} pgserver started on retry (post-recovery)")
+            return
+        except Exception as e:
+            logger.warning(f"{STORAGE} Retry also failed: {e}")
+
+        # =================================================================
+        # STEP 3: Nuclear recovery - delete everything and reinitialize
+        # =================================================================
         logger.warning(f"{STORAGE} Attempting nuclear recovery (deleting pgdata)...")
 
-        # Kill ALL postgres processes
+        # Kill ALL postgres processes aggressively
         _kill_zombie_postgres_processes()
-        time.sleep(0.5 if sys.platform == "win32" else 0.2)
+        time.sleep(1.5 if sys.platform == "win32" else 0.5)
+        # Kill again - sometimes processes respawn during shutdown
+        _kill_zombie_postgres_processes()
+        time.sleep(1.0 if sys.platform == "win32" else 0.3)
 
         # Delete pgdata completely
         if data_dir.exists():
@@ -368,20 +398,50 @@ class PostgresConnectionManager:
         if resolved_path in pgserver.PostgresServer._instances:
             del pgserver.PostgresServer._instances[resolved_path]
 
-        # Recreate and retry
+        # Recreate and retry WITH timeout protection
+        # initdb can hang if zombie processes still hold resources
         data_dir.mkdir(parents=True, exist_ok=True)
 
-        try:
-            self._pgserver = pgserver.get_server(str(data_dir))
-            self._base_uri = self._pgserver.get_uri()
-            logger.info(f"{STORAGE} pgserver started after nuclear recovery")
-            return
-        except Exception as retry_error:
+        server_result: list[Any] = []
+        server_error: list[Exception] = []
+
+        def _try_start():
+            try:
+                srv = pgserver.get_server(str(data_dir))
+                server_result.append(srv)
+            except Exception as ex:
+                server_error.append(ex)
+
+        start_thread = threading.Thread(target=_try_start, daemon=True)
+        start_thread.start()
+        start_thread.join(timeout=60)  # 60s timeout for initdb + first start
+
+        if start_thread.is_alive():
+            # initdb or startup hung - kill everything and fail with clear message
+            logger.error(f"{STORAGE} Nuclear recovery timed out (initdb hung)")
+            _kill_zombie_postgres_processes()
+            raise RuntimeError(
+                f"pgserver initialization timed out after 60 seconds. "
+                f"Manually delete {data_dir} and restart."
+            )
+
+        if server_error:
             raise RuntimeError(
                 f"pgserver failed even after nuclear recovery. "
                 f"Try manually deleting {data_dir} and restarting. "
-                f"Error: {retry_error}"
+                f"Error: {server_error[0]}"
             )
+
+        if server_result:
+            self._pgserver = server_result[0]
+            self._base_uri = self._pgserver.get_uri()
+            logger.info(f"{STORAGE} pgserver started after nuclear recovery")
+            return
+
+        raise RuntimeError(
+            f"pgserver nuclear recovery produced no result. "
+            f"Try manually deleting {data_dir} and restarting."
+        )
 
     def _get_uri(self, database: str = "postgres") -> str:
         """Get connection URI for a database (cached)."""

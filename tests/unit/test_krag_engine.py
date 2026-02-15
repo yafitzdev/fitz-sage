@@ -73,6 +73,10 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._vocabulary_store = None
     engine._keyword_matcher = None
     engine._entity_graph_store = None
+    engine._bg_worker = None
+    engine._manifest = None
+    engine._source_dir = None
+    engine._hyde_generator = None
     return engine
 
 
@@ -143,6 +147,8 @@ class TestEngineInit:
             ),
             # shared tabular
             "PostgresTableStore": ("fitz_ai.tabular.store.postgres.PostgresTableStore"),
+            # factory
+            "get_chat_factory": "fitz_ai.llm.factory.get_chat_factory",
         }
 
         patchers = {key: patch(target) for key, target in names.items()}
@@ -257,6 +263,8 @@ class TestAnswer:
             query.text,
             analysis,
             detection=None,
+            rewrite_result=None,
+            progress=None,
         )
         engine._reader.read.assert_called_once_with(
             [address_1, address_2],
@@ -440,72 +448,6 @@ class TestAnswer:
 
         engine._table_handler.process.assert_called_once_with(query.text, expanded)
         engine._assembler.assemble.assert_called_once_with(query.text, augmented)
-
-
-# ---------------------------------------------------------------------------
-# TestIngest
-# ---------------------------------------------------------------------------
-
-
-class TestIngest:
-    """Tests for the ingest() method."""
-
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.KragIngestPipeline")
-    def test_ingest_delegates_to_pipeline(self, mock_pipeline_cls):
-        """ingest() creates a KragIngestPipeline and calls .ingest()."""
-        engine = _make_engine()
-        source = Path("/repo/src")
-        expected_stats = {"files": 5, "symbols": 42, "imports": 10}
-        mock_pipeline_cls.return_value.ingest.return_value = expected_stats
-
-        result = engine.ingest(source)
-
-        mock_pipeline_cls.assert_called_once_with(
-            config=engine._config,
-            chat=engine._chat,
-            embedder=engine._embedder,
-            connection_manager=engine._connection_manager,
-            collection=engine._config.collection,
-            table_store=engine._table_store,
-            pg_table_store=engine._pg_table_store,
-            vocabulary_store=engine._vocabulary_store,
-            entity_graph_store=engine._entity_graph_store,
-        )
-        mock_pipeline_cls.return_value.ingest.assert_called_once_with(
-            source,
-            force=False,
-            on_progress=None,
-        )
-        assert result == expected_stats
-
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.KragIngestPipeline")
-    def test_ingest_uses_collection_override(self, mock_pipeline_cls):
-        """
-        When a collection override is provided, it is used instead of
-        the config default.
-        """
-        engine = _make_engine(collection="default_col")
-        source = Path("/repo/src")
-        mock_pipeline_cls.return_value.ingest.return_value = {}
-
-        engine.ingest(source, collection="override_col")
-
-        call_kwargs = mock_pipeline_cls.call_args
-        assert call_kwargs.kwargs["collection"] == "override_col"
-
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.KragIngestPipeline")
-    def test_ingest_none_collection_uses_config(self, mock_pipeline_cls):
-        """
-        When collection is None, the config's collection is used.
-        """
-        engine = _make_engine(collection="from_config")
-        source = Path("/repo/src")
-        mock_pipeline_cls.return_value.ingest.return_value = {}
-
-        engine.ingest(source, collection=None)
-
-        call_kwargs = mock_pipeline_cls.call_args
-        assert call_kwargs.kwargs["collection"] == "from_config"
 
 
 # ---------------------------------------------------------------------------

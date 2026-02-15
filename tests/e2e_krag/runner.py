@@ -7,7 +7,7 @@ Equivalent to tests/e2e/runner.py but uses FitzKragEngine instead of RAGPipeline
 Handles the full lifecycle:
 1. Create a unique test collection
 2. Create FitzKragEngine with collection
-3. Ingest test fixtures via engine.ingest()
+3. Ingest test fixtures via KragIngestPipeline
 4. Run test scenarios via engine.answer()
 5. Clean up PostgreSQL tables for collection
 """
@@ -18,7 +18,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from fitz_ai.logging.logger import get_logger
 from tests.e2e_krag.cache import ResponseCache
@@ -138,7 +138,7 @@ class KragE2ERunner:
     """
     End-to-end test runner for FitzKragEngine.
 
-    Uses FitzKragEngine.ingest() for document ingestion and
+    Uses KragIngestPipeline for document ingestion and
     FitzKragEngine.answer() for query execution.
 
     Usage:
@@ -240,17 +240,17 @@ class KragE2ERunner:
         cfg = FitzKragConfig(**config_dict)
         self.engine = FitzKragEngine(cfg)
 
-        # Ingest fixtures
+        # Ingest fixtures via KragIngestPipeline (engine no longer exposes ingest())
         logger.info(f"KRAG E2E Setup: Ingesting fixtures from '{self.fixtures_dir}'")
 
-        stats = self.engine.ingest(self.fixtures_dir, force=True)
+        stats = self._run_ingest_pipeline(self.engine, self.fixtures_dir)
         self._ingested_collections.add(tier_collection)
 
         ingestion_duration = time.time() - start_time
         logger.info(
-            f"KRAG E2E Setup: Ingested {stats.get('files', 0)} files, "
-            f"{stats.get('symbols', 0)} symbols, "
-            f"{stats.get('sections', 0)} sections in {ingestion_duration:.1f}s"
+            f"KRAG E2E Setup: Ingested {stats.get('files_new', 0)} files, "
+            f"{stats.get('symbols_extracted', 0)} symbols, "
+            f"{stats.get('sections_extracted', 0)} sections in {ingestion_duration:.1f}s"
         )
 
         self._setup_complete = True
@@ -319,11 +319,29 @@ class KragE2ERunner:
 
         if tier_collection not in self._ingested_collections:
             logger.info(f"KRAG E2E: New collection for tier '{tier_name}', ingesting...")
-            self.engine.ingest(self.fixtures_dir, force=True)
+            self._run_ingest_pipeline(self.engine, self.fixtures_dir)
             self._ingested_collections.add(tier_collection)
 
         self._current_tier = tier_name
         logger.info(f"KRAG E2E: Switched to tier '{tier_name}' (chat={chat_plugin})")
+
+    @staticmethod
+    def _run_ingest_pipeline(engine: Any, fixtures_dir: Path) -> dict[str, Any]:
+        """Run KragIngestPipeline using the engine's initialized components."""
+        from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+
+        pipeline = KragIngestPipeline(
+            config=engine._config,
+            chat=engine._chat,
+            embedder=engine._embedder,
+            connection_manager=engine._connection_manager,
+            collection=engine._config.collection,
+            table_store=engine._table_store,
+            pg_table_store=engine._pg_table_store,
+            vocabulary_store=engine._vocabulary_store,
+            entity_graph_store=engine._entity_graph_store,
+        )
+        return pipeline.ingest(fixtures_dir, force=True)
 
     def teardown(self) -> None:
         """Clean up the test environment."""

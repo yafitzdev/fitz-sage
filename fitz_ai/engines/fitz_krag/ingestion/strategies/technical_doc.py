@@ -18,7 +18,7 @@ from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 logger = logging.getLogger(__name__)
 
 # File extensions this strategy handles
-DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".html", ".md", ".rst", ".txt"}
+DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".html", ".md", ".rst", ".txt", ".sql"}
 
 
 @dataclass

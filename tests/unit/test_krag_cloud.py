@@ -68,6 +68,10 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._vocabulary_store = None
     engine._keyword_matcher = None
     engine._entity_graph_store = None
+    engine._bg_worker = None
+    engine._manifest = None
+    engine._source_dir = None
+    engine._hyde_generator = None
     return engine
 
 
@@ -117,55 +121,43 @@ class TestCloudClientInit:
         Engine with a cloud dict containing enabled=True creates a
         CloudClient instance during _init_components.
         """
-        _ENGINE_MOD = "fitz_ai.engines.fitz_krag.engine"
+        from contextlib import ExitStack
 
         mock_cloud_client_cls = MagicMock(name="CloudClient")
         mock_cloud_config_cls = MagicMock(name="CloudConfig")
         mock_cloud_config_instance = mock_cloud_config_cls.return_value
         mock_cloud_config_instance.org_id = "org-123"
 
-        with (
+        patches = [
             patch("fitz_ai.llm.client.get_chat", return_value=MagicMock()),
-            patch(
-                "fitz_ai.llm.client.get_embedder",
-                return_value=MagicMock(dimensions=1024),
-            ),
-            patch(
-                "fitz_ai.storage.postgres.PostgresConnectionManager.get_instance",
-                return_value=MagicMock(),
-            ),
-            patch(
-                "fitz_ai.engines.fitz_krag.ingestion.raw_file_store.RawFileStore",
-            ),
-            patch(
-                "fitz_ai.engines.fitz_krag.ingestion.symbol_store.SymbolStore",
-            ),
-            patch(
-                "fitz_ai.engines.fitz_krag.ingestion.import_graph_store.ImportGraphStore",
-            ),
-            patch(
-                "fitz_ai.engines.fitz_krag.ingestion.section_store.SectionStore",
-            ),
+            patch("fitz_ai.llm.client.get_embedder", return_value=MagicMock(dimensions=1024)),
+            patch("fitz_ai.storage.postgres.PostgresConnectionManager.get_instance", return_value=MagicMock()),
+            patch("fitz_ai.engines.fitz_krag.ingestion.raw_file_store.RawFileStore"),
+            patch("fitz_ai.engines.fitz_krag.ingestion.symbol_store.SymbolStore"),
+            patch("fitz_ai.engines.fitz_krag.ingestion.import_graph_store.ImportGraphStore"),
+            patch("fitz_ai.engines.fitz_krag.ingestion.section_store.SectionStore"),
+            patch("fitz_ai.engines.fitz_krag.ingestion.table_store.TableStore"),
             patch("fitz_ai.engines.fitz_krag.ingestion.schema.ensure_schema"),
-            patch(
-                "fitz_ai.engines.fitz_krag.retrieval.strategies.code_search.CodeSearchStrategy",
-            ),
-            patch(
-                "fitz_ai.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy",
-            ),
+            patch("fitz_ai.engines.fitz_krag.retrieval.strategies.code_search.CodeSearchStrategy"),
+            patch("fitz_ai.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy"),
+            patch("fitz_ai.engines.fitz_krag.retrieval.strategies.table_search.TableSearchStrategy"),
             patch("fitz_ai.engines.fitz_krag.retrieval.router.RetrievalRouter"),
             patch("fitz_ai.engines.fitz_krag.retrieval.reader.ContentReader"),
             patch("fitz_ai.engines.fitz_krag.retrieval.expander.CodeExpander"),
+            patch("fitz_ai.engines.fitz_krag.retrieval.table_handler.TableQueryHandler"),
             patch("fitz_ai.engines.fitz_krag.query_analyzer.QueryAnalyzer"),
-            patch(
-                "fitz_ai.engines.fitz_krag.context.assembler.ContextAssembler",
-            ),
-            patch(
-                "fitz_ai.engines.fitz_krag.generation.synthesizer.CodeSynthesizer",
-            ),
+            patch("fitz_ai.engines.fitz_krag.context.assembler.ContextAssembler"),
+            patch("fitz_ai.engines.fitz_krag.generation.synthesizer.CodeSynthesizer"),
+            patch("fitz_ai.tabular.store.postgres.PostgresTableStore"),
+            patch("fitz_ai.llm.factory.get_chat_factory"),
             patch("fitz_ai.cloud.client.CloudClient", mock_cloud_client_cls),
             patch("fitz_ai.cloud.config.CloudConfig", mock_cloud_config_cls),
-        ):
+        ]
+
+        with ExitStack() as stack:
+            for p in patches:
+                stack.enter_context(p)
+
             cloud_dict = {"enabled": True, "api_key": "key", "org_key": "org"}
             config = _make_config(cloud=cloud_dict, enable_detection=False)
             engine = FitzKragEngine(config)

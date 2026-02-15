@@ -97,11 +97,15 @@ class TestRetrieve:
             ),
         ]
         mock_section_store.search_by_vector.return_value = []
+        # Parent lookup returns the parent section with its title
+        mock_section_store.get.return_value = _make_section_result(
+            id_="parent1", title="Parent Section"
+        )
 
         results = strategy.retrieve("query", limit=5)
         addr = results[0]
         assert addr.source_id == "file1"
-        assert addr.location == "Introduction"
+        assert addr.location == "Parent Section > Introduction"
         assert addr.metadata["section_id"] == "sec1"
         assert addr.metadata["level"] == 2
         assert addr.metadata["page_start"] == 5
@@ -162,8 +166,9 @@ class TestHybridMerge:
 
         results = strategy.retrieve("query", limit=5)
         assert len(results) == 1
-        # Score = bm25_weight * 0.5 = 0.6 * 0.5 = 0.3
-        assert results[0].score == pytest.approx(0.3)
+        # BM25 uses rank-based scoring: rank 0 -> 1/(0+1) = 1.0
+        # Score = bm25_weight * 1.0 = 0.6 * 1.0 = 0.6
+        assert results[0].score == pytest.approx(0.6)
 
 
 class TestToAddress:

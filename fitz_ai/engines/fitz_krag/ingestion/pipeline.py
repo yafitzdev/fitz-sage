@@ -459,21 +459,37 @@ class KragIngestPipeline:
 
         return result.symbols, import_edges
 
+    # Binary document formats where read_text() produces garbled output.
+    # For these, we hash the raw bytes and store Docling-extracted text instead.
+    _BINARY_DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx"}
+
     def _process_doc_file(
         self, rel_path: str, abs_path: Path, file_id: str
     ) -> list[SectionEntry] | None:
-        """Process a document file: store raw + parse + extract sections."""
-        try:
-            content = abs_path.read_text(encoding="utf-8", errors="replace")
-            # Strip NUL bytes — binary formats (DOCX, PDF) produce them via
-            # errors="replace" and PostgreSQL TEXT fields reject 0x00.
-            content = content.replace("\x00", "")
-        except Exception as e:
-            logger.warning(f"Cannot read {abs_path}: {e}")
+        """Process a document file: parse + store raw + extract sections."""
+        ext = abs_path.suffix.lower()
+        is_binary = ext in self._BINARY_DOC_EXTENSIONS
+
+        # Hash raw bytes for stable change detection
+        content_hash = _hash_file(abs_path)
+
+        # Parse document to get structured elements
+        parsed_doc = self._parse_document(abs_path)
+        if not parsed_doc:
             return None
 
-        ext = abs_path.suffix.lower()
-        content_hash = hashlib.sha256(content.encode()).hexdigest()
+        if is_binary:
+            # For binary formats, store parsed text instead of garbled read_text()
+            content = "\n\n".join(
+                el.content for el in parsed_doc.elements if el.content
+            )
+        else:
+            try:
+                content = abs_path.read_text(encoding="utf-8", errors="replace")
+                content = content.replace("\x00", "")
+            except Exception as e:
+                logger.warning(f"Cannot read {abs_path}: {e}")
+                return None
 
         # Store raw file
         self._raw_store.upsert(
@@ -482,13 +498,8 @@ class KragIngestPipeline:
             content=content,
             content_hash=content_hash,
             file_type=ext,
-            size_bytes=len(content.encode()),
+            size_bytes=abs_path.stat().st_size,
         )
-
-        # Parse document to get structured elements
-        parsed_doc = self._parse_document(abs_path)
-        if not parsed_doc:
-            return None
 
         # Extract sections from parsed document
         result: DocIngestResult = self._doc_strategy.extract(parsed_doc, rel_path)

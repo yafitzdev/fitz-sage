@@ -69,6 +69,10 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._vocabulary_store = None
     engine._keyword_matcher = None
     engine._entity_graph_store = None
+    engine._bg_worker = None
+    engine._manifest = None
+    engine._source_dir = None
+    engine._hyde_generator = None
     return engine
 
 

@@ -59,6 +59,14 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._hop_controller = None
     engine._table_store = MagicMock(name="table_store")
     engine._pg_table_store = MagicMock(name="pg_table_store")
+    engine._chat_factory = None
+    engine._vocabulary_store = None
+    engine._keyword_matcher = None
+    engine._entity_graph_store = None
+    engine._bg_worker = None
+    engine._manifest = None
+    engine._source_dir = None
+    engine._hyde_generator = None
     return engine
 
 
@@ -130,6 +138,8 @@ class TestQueryRewriting:
             "authentication module implementation",
             engine._query_analyzer.analyze.return_value,
             detection=None,
+            rewrite_result=rewrite_result,
+            progress=None,
         )
 
         assert result is expected
@@ -159,6 +169,8 @@ class TestQueryRewriting:
             "What is the login function?",
             engine._query_analyzer.analyze.return_value,
             detection=None,
+            rewrite_result=rewrite_result,
+            progress=None,
         )
 
         assert result is expected
@@ -186,6 +198,8 @@ class TestQueryRewriting:
             "How does auth work?",
             engine._query_analyzer.analyze.return_value,
             detection=None,
+            rewrite_result=None,
+            progress=None,
         )
 
         assert result is expected
@@ -208,6 +222,8 @@ class TestQueryRewriting:
             "Where is UserService defined?",
             engine._query_analyzer.analyze.return_value,
             detection=None,
+            rewrite_result=None,
+            progress=None,
         )
 
         assert result is expected

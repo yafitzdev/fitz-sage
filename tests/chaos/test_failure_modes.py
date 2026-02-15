@@ -31,46 +31,50 @@ class TestLLMFailures:
         self.runner = krag_e2e_runner
 
     def test_llm_timeout_handling(self):
-        """LLM timeout should be handled gracefully."""
+        """LLM timeout should be handled gracefully.
+
+        Mocks _query_analyzer.analyze to raise TimeoutError, simulating an LLM
+        timeout at the first pipeline step. The engine's answer() catches the
+        exception and wraps it as KnowledgeError.
+
+        Note: We mock analyze() directly rather than the underlying chat client
+        because QueryAnalyzer internally catches LLM exceptions and returns
+        degraded results. Mocking at this level tests the engine's own error
+        handling in answer() (lines 514-521).
+        """
         import asyncio
 
         from fitz_ai.core.exceptions import GenerationError, KnowledgeError
 
         with patch.object(
-            self.runner.engine._chat,
-            "chat",
+            self.runner.engine._query_analyzer,
+            "analyze",
             side_effect=asyncio.TimeoutError("LLM timeout"),
         ):
-            try:
-                answer = self.runner.engine.answer(Query(text="What is TechCorp?"))
-                # Should either return a graceful error or raise a handled exception
-                assert answer is None or "error" in answer.text.lower()
-            except (GenerationError, KnowledgeError):
-                # Expected exception - system handled it properly
-                pass
-            except Exception as e:
-                # Other exceptions are acceptable as long as they're handled
-                assert "timeout" in str(e).lower() or "unavailable" in str(e).lower()
+            with pytest.raises((GenerationError, KnowledgeError)):
+                self.runner.engine.answer(Query(text="What is TechCorp?"))
 
     def test_llm_rate_limit_handling(self):
-        """Rate limit errors should be handled."""
+        """Rate limit errors should be handled.
+
+        Mocks _query_analyzer.analyze to raise a rate limit error, simulating
+        an LLM rate limit at the first pipeline step. The engine's answer()
+        catches the exception and wraps it as KnowledgeError.
+
+        Note: We mock analyze() directly rather than the underlying chat client
+        because QueryAnalyzer internally catches LLM exceptions and returns
+        degraded results. Mocking at this level tests the engine's own error
+        handling in answer() (lines 514-521).
+        """
         from fitz_ai.core.exceptions import GenerationError, KnowledgeError
 
         with patch.object(
-            self.runner.engine._chat,
-            "chat",
+            self.runner.engine._query_analyzer,
+            "analyze",
             side_effect=Exception("Rate limit exceeded. Retry after 60 seconds."),
         ):
-            try:
-                answer = self.runner.engine.answer(Query(text="What is TechCorp?"))
-                # Should handle gracefully
-                assert answer is None or "error" in str(answer).lower()
-            except (GenerationError, KnowledgeError):
-                # Expected exception - system handled it properly
-                pass
-            except Exception as e:
-                # Other handled exceptions are acceptable
-                assert "rate" in str(e).lower() or "limit" in str(e).lower()
+            with pytest.raises((GenerationError, KnowledgeError)):
+                self.runner.engine.answer(Query(text="What is TechCorp?"))
 
 
 class TestRetrievalFailures:
