@@ -176,14 +176,14 @@ def enrich_chunks_with_embeddings(
             chunk.metadata["vector_score"] = 0.0
 
 
-def make_constraints(chat, embedder=None) -> list:
+def make_constraints(chat, chat_balanced=None, embedder=None) -> list:
     """Create a fresh set of constraints (one set per worker thread)."""
     return [
         InsufficientEvidenceConstraint(chat=chat, embedder=embedder),
         CausalAttributionConstraint(),
         SpecificInfoTypeConstraint(),
         ConflictAwareConstraint(chat=chat),
-        AnswerVerificationConstraint(chat=chat),
+        AnswerVerificationConstraint(chat=chat, chat_balanced=chat_balanced),
     ]
 
 
@@ -242,6 +242,7 @@ _thread_local = threading.local()
 def process_case(
     case: dict[str, Any],
     chat,
+    chat_balanced=None,
     embedder=None,
     detection_orchestrator: DetectionOrchestrator | None = None,
 ) -> dict[str, Any] | None:
@@ -252,7 +253,9 @@ def process_case(
     """
     # Each thread gets its own constraint instances to avoid shared state
     if not hasattr(_thread_local, "constraints"):
-        _thread_local.constraints = make_constraints(chat, embedder=embedder)
+        _thread_local.constraints = make_constraints(
+            chat, chat_balanced=chat_balanced, embedder=embedder
+        )
 
     case_id = case["id"]
     query = case["query"]
@@ -317,8 +320,10 @@ def main():
     chat_config = {k: v for k, v in cfg.chat_kwargs.model_dump().items() if v is not None}
     chat_factory = get_chat_factory(chat_spec, config=chat_config)
     chat = chat_factory("fast")
+    chat_balanced = chat_factory("balanced")
     model_name = getattr(chat, "_model", "unknown")
-    print(f"Using chat provider: {chat_spec} (model: {model_name})")
+    balanced_model = getattr(chat_balanced, "_model", "unknown")
+    print(f"Using chat provider: {chat_spec} (fast: {model_name}, balanced: {balanced_model})")
 
     # Embedding client (Tier 2: vector_score)
     embedder = None
@@ -350,7 +355,7 @@ def main():
     if args.workers <= 1:
         for case in tqdm(cases, desc="Extracting features"):
             try:
-                row = process_case(case, chat, embedder, detection_orchestrator)
+                row = process_case(case, chat, chat_balanced, embedder, detection_orchestrator)
                 if row:
                     all_rows.append(row)
             except Exception as e:
@@ -359,7 +364,7 @@ def main():
     else:
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
             futures = {
-                executor.submit(process_case, case, chat, embedder, detection_orchestrator): case[
+                executor.submit(process_case, case, chat, chat_balanced, embedder, detection_orchestrator): case[
                     "id"
                 ]
                 for case in cases

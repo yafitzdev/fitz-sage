@@ -235,7 +235,9 @@ class FitzKragEngine:
             from fitz_ai.governance import AnswerGovernor, create_default_constraints
 
             self._constraints = create_default_constraints(
-                chat=self._chat, embedder=self._embedder
+                chat=self._chat,
+                chat_balanced=self._chat_factory("balanced"),
+                embedder=self._embedder,
             )
             self._governor = AnswerGovernor()
 

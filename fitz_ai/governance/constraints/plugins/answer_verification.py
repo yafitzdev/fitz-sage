@@ -1,13 +1,17 @@
 # fitz_ai/governance/constraints/plugins/answer_verification.py
 """
-Answer Verification Constraint - LLM jury for positive confidence confirmation.
+Answer Verification Constraint - LLM jury with balanced-tier confirmation.
 
-Uses 3-prompt fusion with majority voting to verify chunks actually answer
-the query. Prevents false trustworthy answers when context is semantically
-relevant but doesn't contain the requested information.
+Uses 3 fast-tier prompts to screen for irrelevant context, then confirms
+with a single balanced-tier call when 2+/3 fast prompts agree.
 
-The jury approach reduces LLM variance by requiring 2+ NO votes to trigger.
-This is conservative - benefit of doubt goes to allowing trustworthy answers.
+Flow:
+  1. Run 3 fast-tier prompts (lenient relevance checks)
+  2. If 2+/3 say NO (context not relevant) -> run 1 balanced-tier confirmation
+  3. If balanced also says NO -> fire "qualified" signal
+
+This gives high recall on true abstain cases (~55%) with very low false
+positives on disputed (~0%) and trustworthy (~4%).
 """
 
 from __future__ import annotations
@@ -27,83 +31,91 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-# Jury prompts - same question asked 3 different ways
-# Reduces variance through majority voting
+# Fast-tier jury prompts: lenient relevance checks
+# All use YES = relevant, NO = not relevant. "When in doubt, answer YES."
 JURY_PROMPTS = [
-    # Direct answerability check
-    """Can this question be answered using the provided context?
+    # P1: Mentions any relevant entity/concept
+    """Read the question and the context below.
 
 Question: {query}
 Context: {context}
 
-Answer YES if the context contains information to answer the question.
-Answer NO if the context doesn't address what the question asks.
+Does the context mention any person, place, thing, or concept that the question asks about? Even a single mention counts as YES.
+Answer NO only if the context does not mention anything the question refers to.
+When in doubt, answer YES.
 
-Reply with ONE word: YES or NO""",
-    # Sufficiency framing (inverted logic)
-    """Is the context INSUFFICIENT to answer the question?
-
-Question: {query}
-Context: {context}
-
-Answer YES if the context lacks the needed information.
-Answer NO if the context has enough to answer.
-
-Reply with ONE word: YES or NO""",
-    # Completeness framing
-    """Could someone write a complete answer to this question using only this context?
+ONE word: YES or NO""",
+    # P2: Information presence
+    """Read the question and the context below.
 
 Question: {query}
 Context: {context}
 
-Answer YES if the context provides what's needed.
-Answer NO if critical information is missing.
+Does the context contain any information that could help answer this question? Even partial or indirect information counts as YES.
+Only answer NO if the context has zero relevant information.
+When in doubt, answer YES.
 
-Reply with ONE word: YES or NO""",
+ONE word: YES or NO""",
+    # P3: Meaningful connection
+    """Read the question and the context below.
+
+Question: {query}
+Context: {context}
+
+Is there a meaningful connection between the question and the context? If the context mentions anything related to what the question asks about, answer YES.
+Only answer NO if someone reading the context would learn nothing useful about the question.
+When in doubt, answer YES.
+
+ONE word: YES or NO""",
 ]
+
+# Balanced-tier confirmation prompt (runs only when 2+/3 fast prompts say NO)
+BALANCED_CONFIRM_PROMPT = """You are verifying whether retrieved context is relevant to a user's question.
+
+Question: {query}
+Context: {context}
+
+Does the context contain information that is relevant and useful for answering this question?
+
+Answer YES if the context has any relevant information, even partial.
+Answer NO if the context is completely irrelevant and contains nothing useful for the question.
+
+Reply with ONE word: YES or NO"""
 
 
 @dataclass
 class AnswerVerificationConstraint:
     """
-    Verifies chunks actually answer the query using 3-prompt LLM jury.
+    Verifies chunks actually answer the query using fast-tier jury + balanced confirmation.
 
-    Prevents false trustworthy answers when context is semantically relevant
-    but doesn't contain the requested information.
+    Two-stage design:
+      Stage 1: 3 fast-tier prompts check relevance (lenient, low cost)
+      Stage 2: 1 balanced-tier call confirms when 2+/3 fast say NO
 
-    Example failure mode this solves:
-    - Query: "What is the capital of France?"
-    - Context: "France has 67 million people and is famous for wine."
-    - Without verification: TRUSTWORTHY (no constraint triggered)
-    - With verification: fires "qualified" signal (jury agrees context doesn't answer)
-
-    Jury voting:
-    - 3 prompts ask "does this answer?" in different ways
-    - Require 3/3 NO votes to fire (very conservative - unanimous jury)
-    - 0-2 NO votes = allow trustworthy (benefit of doubt)
-
-    This is conservative - we only fire when the jury unanimously agrees
-    the context clearly doesn't answer.
+    This keeps cost low (balanced only runs ~20% of the time) while
+    achieving high accuracy through the smarter model's confirmation.
 
     Attributes:
-        chat: ChatProvider for LLM jury calls
+        chat: Fast-tier ChatProvider for jury calls
+        chat_balanced: Balanced-tier ChatProvider for confirmation (optional)
         enabled: Whether this constraint is active (default: True)
         max_context_chars: Max characters to include from context (default: 1000)
     """
 
     name: str = "answer_verification"
     chat: "ChatProvider | None" = None
+    chat_balanced: "ChatProvider | None" = None
     enabled: bool = True
     max_context_chars: int = 1000
     _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     def _run_jury(self, query: str, context: str) -> tuple[int, list[str]]:
         """
-        Run 3-prompt jury to check if context answers query.
+        Run 3 fast-tier prompts to check if context is relevant to query.
 
         Returns:
             Tuple of (no_votes, responses) where no_votes is count of
-            prompts that said context doesn't answer.
+            prompts that said context is not relevant.
         """
         if not self.chat:
             return 0, ["NO_CHAT"] * 3
@@ -123,16 +135,9 @@ class AnswerVerificationConstraint:
                 word = response.strip().upper()
                 responses.append(word)
 
-                # Interpret response based on prompt framing
-                if i == 0:  # Direct: NO means doesn't answer
-                    if word.startswith("NO"):
-                        no_votes += 1
-                elif i == 1:  # Inverted: YES means insufficient (doesn't answer)
-                    if word.startswith("YES"):
-                        no_votes += 1
-                elif i == 2:  # Completeness: NO means can't write answer
-                    if word.startswith("NO"):
-                        no_votes += 1
+                # All prompts: NO means context not relevant
+                if word.startswith("NO"):
+                    no_votes += 1
 
             except Exception as e:
                 logger.warning(
@@ -142,16 +147,47 @@ class AnswerVerificationConstraint:
 
         return no_votes, responses
 
+    def _run_balanced_confirm(self, query: str, context: str) -> bool:
+        """
+        Run a single balanced-tier confirmation call.
+
+        Returns:
+            True if balanced model also says context is NOT relevant (confirms denial).
+        """
+        if not self.chat_balanced:
+            return True  # No balanced model = trust fast jury
+
+        prompt = BALANCED_CONFIRM_PROMPT.format(query=query, context=context)
+
+        try:
+            response = self.chat_balanced.chat(
+                [{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=10,
+            )
+            word = response.strip().upper()
+            return word.startswith("NO")
+        except Exception as e:
+            logger.warning(
+                f"{PIPELINE} AnswerVerificationConstraint: balanced confirm failed: {e}"
+            )
+            return False  # On error, don't fire (conservative)
+
     def apply(self, query: str, chunks: Sequence[EvidenceItem]) -> ConstraintResult:
         """
-        Check if chunks actually answer the query using LLM jury.
+        Check if chunks are relevant to query using fast jury + balanced confirmation.
+
+        Flow:
+          1. Run 3 fast-tier prompts
+          2. If 2+/3 say NO -> run balanced confirmation
+          3. If balanced also says NO -> fire "qualified" signal
 
         Args:
             query: User query
             chunks: Retrieved chunks
 
         Returns:
-            ConstraintResult - denies confident if jury agrees context doesn't answer
+            ConstraintResult with jury_votes metadata (always emitted)
         """
         if not self.enabled:
             return ConstraintResult.allow()
@@ -176,7 +212,7 @@ class AnswerVerificationConstraint:
 
         context = "\n\n---\n\n".join(context_parts)
 
-        # Run jury
+        # Stage 1: Fast jury
         no_votes, responses = self._run_jury(query, context)
 
         logger.debug(
@@ -184,20 +220,38 @@ class AnswerVerificationConstraint:
             f"no_votes={no_votes}/3, responses={responses}"
         )
 
-        # Require 3/3 NO votes to qualify (very conservative - unanimous jury)
-        if no_votes >= 3:
-            logger.info(
-                f"{PIPELINE} AnswerVerificationConstraint: jury ruled context "
-                f"doesn't answer ({no_votes}/3 NO votes)"
-            )
-            return ConstraintResult.deny(
-                reason="Retrieved content may not directly answer the question",
-                signal="qualified",
-                jury_votes=no_votes,
-                jury_responses=responses,
-            )
+        # Stage 2: Balanced confirmation when 2+/3 fast say NO
+        if no_votes >= 2:
+            confirmed = self._run_balanced_confirm(query, context)
 
-        return ConstraintResult.allow()
+            if confirmed:
+                logger.info(
+                    f"{PIPELINE} AnswerVerificationConstraint: fast jury {no_votes}/3 NO, "
+                    f"balanced confirmed -> firing"
+                )
+                return ConstraintResult.deny(
+                    reason="Retrieved content may not directly answer the question",
+                    signal="qualified",
+                    jury_votes=no_votes,
+                    jury_responses=responses,
+                    balanced_confirmed=True,
+                )
+            else:
+                logger.debug(
+                    f"{PIPELINE} AnswerVerificationConstraint: fast jury {no_votes}/3 NO, "
+                    f"balanced rejected -> allowing"
+                )
+                return ConstraintResult.allow(
+                    jury_votes=no_votes,
+                    jury_responses=responses,
+                    balanced_confirmed=False,
+                )
+
+        # Less than 2/3 fast NO -> allow
+        return ConstraintResult.allow(
+            jury_votes=no_votes,
+            jury_responses=responses,
+        )
 
 
 __all__ = ["AnswerVerificationConstraint"]

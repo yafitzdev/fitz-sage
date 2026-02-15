@@ -200,14 +200,14 @@ def enrich_chunks_with_embeddings(
 # ---------------------------------------------------------------------------
 
 
-def make_constraints(chat) -> list:
+def make_constraints(chat, chat_balanced=None) -> list:
     """Create a fresh set of constraints."""
     return [
         InsufficientEvidenceConstraint(chat=chat),
         CausalAttributionConstraint(),
         SpecificInfoTypeConstraint(),
         ConflictAwareConstraint(chat=chat),
-        AnswerVerificationConstraint(chat=chat),
+        AnswerVerificationConstraint(chat=chat, chat_balanced=chat_balanced),
     ]
 
 

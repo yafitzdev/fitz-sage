@@ -45,13 +45,15 @@ if TYPE_CHECKING:
 
 def create_default_constraints(
     chat: "ChatProvider | None" = None,
+    chat_balanced: "ChatProvider | None" = None,
     embedder: "Embedder | None" = None,
 ) -> list[ConstraintPlugin]:
     """
     Create the default constraint plugins using LLM-based detection.
 
     Args:
-        chat: ChatProvider for LLM-based contradiction detection
+        chat: Fast-tier ChatProvider for LLM-based detection
+        chat_balanced: Balanced-tier ChatProvider for AV confirmation (optional)
         embedder: Embedder for IE similarity checks (enables entity/aspect detection)
 
     Returns:
@@ -64,8 +66,8 @@ def create_default_constraints(
         CausalAttributionConstraint(),
         # LLM pairwise comparison: detect contradictions
         ConflictAwareConstraint(chat=chat),
-        # LLM jury: verify chunks actually answer the query
-        AnswerVerificationConstraint(chat=chat),
+        # LLM jury + balanced confirmation: verify chunks answer the query
+        AnswerVerificationConstraint(chat=chat, chat_balanced=chat_balanced),
     ]
 
 

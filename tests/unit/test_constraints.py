@@ -477,12 +477,12 @@ class TestAnswerVerificationConstraint:
         mock_chat.chat.assert_not_called()
 
     def test_jury_unanimous_yes_allows_answer(self):
-        """Should allow when all 3 jury prompts say context answers."""
+        """Should allow when all 3 jury prompts say context is relevant."""
         from fitz_ai.governance import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
-        # Prompt 1: YES (answers), Prompt 2: NO (not insufficient), Prompt 3: YES (complete)
-        mock_chat.chat.side_effect = ["YES", "NO", "YES"]
+        # All 3 prompts: YES (context is relevant)
+        mock_chat.chat.side_effect = ["YES", "YES", "YES"]
         constraint = AnswerVerificationConstraint(chat=mock_chat)
 
         chunks = [make_chunk("1", "Paris is the capital of France.")]
@@ -491,63 +491,66 @@ class TestAnswerVerificationConstraint:
         assert result.allow_decisive_answer is True
         assert mock_chat.chat.call_count == 3
 
-    def test_jury_unanimous_no_qualifies_answer(self):
-        """Should qualify when all 3 jury prompts say context doesn't answer."""
+    def test_jury_2no_balanced_confirms_qualifies(self):
+        """Should qualify when 2/3 fast say NO and balanced confirms."""
         from fitz_ai.governance import AnswerVerificationConstraint
 
-        mock_chat = MagicMock()
-        # Prompt 1: NO (doesn't answer), Prompt 2: YES (insufficient), Prompt 3: NO (incomplete)
-        mock_chat.chat.side_effect = ["NO", "YES", "NO"]
-        constraint = AnswerVerificationConstraint(chat=mock_chat)
+        mock_fast = MagicMock()
+        mock_balanced = MagicMock()
+        # 2/3 fast say NO, balanced confirms NO
+        mock_fast.chat.side_effect = ["NO", "NO", "YES"]
+        mock_balanced.chat.return_value = "NO"
+        constraint = AnswerVerificationConstraint(chat=mock_fast, chat_balanced=mock_balanced)
 
         chunks = [make_chunk("1", "France has 67 million people.")]
         result = constraint.apply("What is the capital of France?", chunks)
 
         assert result.allow_decisive_answer is False
         assert result.signal == "qualified"
+        assert mock_balanced.chat.call_count == 1
 
-    def test_jury_2_no_votes_allows(self):
-        """Should allow when only 2 out of 3 jury prompts say doesn't answer (need 3/3)."""
+    def test_jury_2no_balanced_rejects_allows(self):
+        """Should allow when 2/3 fast say NO but balanced says YES (overrides)."""
         from fitz_ai.governance import AnswerVerificationConstraint
 
-        mock_chat = MagicMock()
-        # Prompt 1: NO, Prompt 2: YES (insufficient), Prompt 3: YES (answers)
-        # Only 2 NO votes (prompt 1 + prompt 2 inverted) - not enough for 3/3
-        mock_chat.chat.side_effect = ["NO", "YES", "YES"]
-        constraint = AnswerVerificationConstraint(chat=mock_chat)
+        mock_fast = MagicMock()
+        mock_balanced = MagicMock()
+        # 2/3 fast say NO, but balanced says YES (context is relevant)
+        mock_fast.chat.side_effect = ["NO", "NO", "YES"]
+        mock_balanced.chat.return_value = "YES"
+        constraint = AnswerVerificationConstraint(chat=mock_fast, chat_balanced=mock_balanced)
 
         chunks = [make_chunk("1", "France is in Europe.")]
         result = constraint.apply("What is the capital of France?", chunks)
 
-        # 2 NO votes is not enough - need unanimous 3/3
         assert result.allow_decisive_answer is True
 
     def test_jury_1_no_vote_allows(self):
-        """Should allow when only 1 out of 3 jury prompts says doesn't answer."""
+        """Should allow when only 1/3 fast say NO (no balanced call needed)."""
         from fitz_ai.governance import AnswerVerificationConstraint
 
-        mock_chat = MagicMock()
-        # Prompt 1: YES, Prompt 2: NO (not insufficient), Prompt 3: NO (one says incomplete)
-        mock_chat.chat.side_effect = ["YES", "NO", "NO"]
-        constraint = AnswerVerificationConstraint(chat=mock_chat)
+        mock_fast = MagicMock()
+        mock_balanced = MagicMock()
+        mock_fast.chat.side_effect = ["YES", "NO", "YES"]
+        constraint = AnswerVerificationConstraint(chat=mock_fast, chat_balanced=mock_balanced)
 
         chunks = [make_chunk("1", "Paris is the capital of France.")]
         result = constraint.apply("What is the capital of France?", chunks)
 
-        # Only 1 NO vote (prompt 3), need 2+ to qualify
         assert result.allow_decisive_answer is True
+        # Balanced should NOT be called when <2 fast NO votes
+        mock_balanced.chat.assert_not_called()
 
     def test_jury_error_counted_as_abstain(self):
         """Should handle LLM errors gracefully."""
         from fitz_ai.governance import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
-        # First two succeed, third errors
+        # First two succeed, third errors - only 1 NO vote
         mock_chat.chat.side_effect = ["YES", "NO", Exception("LLM error")]
         constraint = AnswerVerificationConstraint(chat=mock_chat)
 
         chunks = [make_chunk("1", "Some content.")]
         result = constraint.apply("Any question?", chunks)
 
-        # Only 0 NO votes counted (prompt 1=YES, prompt 2=NO means not insufficient)
         assert result.allow_decisive_answer is True
