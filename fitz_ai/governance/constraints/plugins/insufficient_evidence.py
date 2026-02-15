@@ -656,7 +656,7 @@ def _llm_rank_primary_entity(
     Returns a set with at most one entity, or empty set if LLM says NONE
     or validation rejects the choice.
     """
-    if not chat or not specific_entities:
+    if not chat:
         return set()
 
     # Build candidate list from specific entities (deterministic, closed set)
@@ -904,8 +904,10 @@ class InsufficientEvidenceConstraint:
         # Extract specific, critical, and primary entities from query
         specific_entities, critical_entities, primary_entities = _extract_specific_entities(query)
 
-        # LLM fallback: if heuristic found no primary entities, ask LLM to rank candidates
-        if not primary_entities and self.chat and specific_entities:
+        # LLM fallback: if heuristic found no primary entities, ask LLM to rank candidates.
+        # Runs even when specific_entities is empty — _llm_rank_primary_entity generates
+        # additional candidates from query words (covers lowercase proper nouns like "helios").
+        if not primary_entities and self.chat:
             llm_primary = _llm_rank_primary_entity(query, specific_entities, self.chat)
             if llm_primary:
                 primary_entities = llm_primary
@@ -980,7 +982,11 @@ class InsufficientEvidenceConstraint:
                 summary_match = _has_summary_overlap(query, chunks)
                 diag["ie_summary_overlap"] = summary_match
                 if not summary_match:
-                    return False, max_sim, "no_summary_overlap", diag
+                    # Before declaring irrelevant, check raw content as fallback.
+                    # LLM-generated summaries may omit proper nouns present in source
+                    # (e.g., "helios" in content but summary says "system architecture").
+                    if not _has_lexical_overlap(query, chunks):
+                        return False, max_sim, "no_summary_overlap", diag
 
         # 6. ASPECT COMPATIBILITY CHECK: Entity matches but aspect might differ
         # e.g., Query "What causes Alzheimer's?" vs Chunk "Alzheimer's symptoms include..."
