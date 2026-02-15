@@ -134,10 +134,15 @@ class FitzKragEngine:
 
     def _init_components(self) -> None:
         """Initialize engine components lazily."""
+        import time as _t
+
+        import threading
         from concurrent.futures import ThreadPoolExecutor
 
         from fitz_ai.llm.client import get_chat, get_embedder
         from fitz_ai.storage.postgres import PostgresConnectionManager
+
+        _t0 = _t.perf_counter()
 
         # LLM providers and PostgreSQL are independent — init in parallel.
         # PostgreSQL startup (pgserver) can take 1-2s; LLM provider init
@@ -159,7 +164,25 @@ class FitzKragEngine:
             self._embedder = embed_future.result()
             self._connection_manager = pg_future.result()
 
-        # Ingestion stores
+        _t1 = _t.perf_counter()
+        logger.debug(f"[init] providers+pg: {(_t1-_t0)*1000:.0f}ms")
+
+        # embed.dimensions calls self.embed("test") internally — triggers
+        # embedding model cold start (~2s). Fire it in a background thread
+        # so it overlaps with store object creation below.
+        dim_result: dict[str, int | None] = {"value": None}
+        dim_error: list[Exception] = []
+
+        def _resolve_dimensions():
+            try:
+                dim_result["value"] = self._embedder.dimensions
+            except Exception as e:
+                dim_error.append(e)
+
+        dim_thread = threading.Thread(target=_resolve_dimensions, daemon=True)
+        dim_thread.start()
+
+        # Ingestion stores (created while embed.dimensions resolves)
         from fitz_ai.engines.fitz_krag.ingestion.import_graph_store import ImportGraphStore
         from fitz_ai.engines.fitz_krag.ingestion.raw_file_store import RawFileStore
         from fitz_ai.engines.fitz_krag.ingestion.schema import ensure_schema
@@ -178,11 +201,10 @@ class FitzKragEngine:
         self._table_store = TableStore(self._connection_manager, self._config.collection)
         self._pg_table_store = PostgresTableStore(self._config.collection)
 
-        # Ensure schema exists
-        embedding_dim = self._embedder.dimensions
-        ensure_schema(self._connection_manager, self._config.collection, embedding_dim)
+        _ts1 = _t.perf_counter()
+        logger.debug(f"[init] store objects: {(_ts1-_t1)*1000:.0f}ms")
 
-        # Retrieval
+        # Retrieval (created while embed.dimensions resolves in background)
         from fitz_ai.engines.fitz_krag.retrieval.expander import CodeExpander
         from fitz_ai.engines.fitz_krag.retrieval.reader import ContentReader
         from fitz_ai.engines.fitz_krag.retrieval.router import RetrievalRouter
@@ -222,6 +244,9 @@ class FitzKragEngine:
             self._import_store,
             self._config,
         )
+
+        _t3 = _t.perf_counter()
+        logger.debug(f"[init] strategies: {(_t3-_ts1)*1000:.0f}ms")
 
         # Chat factory (shared by detection, rewriter, HyDE, multi-hop, enrichment)
         from fitz_ai.llm.factory import get_chat_factory
@@ -354,10 +379,26 @@ class FitzKragEngine:
                 max_hops=self._config.max_hops,
             )
 
-        # Pre-warm LLM + embedding models in background.
-        # By the time answer() is called (after file registration), models are loaded.
+        _t4 = _t.perf_counter()
+        logger.debug(f"[init] components: {(_t4-_t3)*1000:.0f}ms")
+
+        # Now collect embed.dimensions — should be done after ~2s of overlapped work
+        dim_thread.join()
+        if dim_error:
+            raise dim_error[0]
+        embedding_dim = dim_result["value"]
+        ensure_schema(self._connection_manager, self._config.collection, embedding_dim)
+
+        _t5 = _t.perf_counter()
+        logger.debug(
+            f"[init] embed.dimensions+schema: {(_t5-_t4)*1000:.0f}ms, "
+            f"total: {(_t5-_t0)*1000:.0f}ms"
+        )
+
+        # Pre-warm LLM in background.
+        # By the time answer() is called (after file registration), model is loaded.
         self._warmup_thread: Any = None
-        self._warmup_llm_and_embedder()
+        self._warmup_llm()
 
     # Keywords that signal the query may have temporal/comparison/aggregation intent.
     # If none match, the detection LLM call can be skipped safely.
@@ -398,27 +439,21 @@ class FitzKragEngine:
 
         return False
 
-    def _warmup_llm_and_embedder(self) -> None:
-        """Fire lightweight calls to pre-load LLM and embedding models.
+    def _warmup_llm(self) -> None:
+        """Fire a lightweight LLM call to pre-load the model.
 
         Runs in a background thread so model loading overlaps with file
-        registration and other CLI setup. The models are warm by the time
-        answer() is called.
+        registration and other CLI setup. The embedding model is already
+        warmed by the embed.dimensions call during init.
         """
         import threading
 
         def _warmup():
             try:
-                # Warm the "fast" LLM tier (used by analysis + detection)
                 chat = self._chat_factory("fast")
                 chat.chat([{"role": "user", "content": "hi"}])
             except Exception:
                 pass  # Best-effort — cold start just means slower first query
-            try:
-                # Warm the embedding model
-                self._embedder.embed("warmup")
-            except Exception:
-                pass
 
         self._warmup_thread = threading.Thread(target=_warmup, daemon=True)
         self._warmup_thread.start()
