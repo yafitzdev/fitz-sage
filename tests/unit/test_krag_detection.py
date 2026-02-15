@@ -352,8 +352,8 @@ class TestEngineAnswerDetectionFlow:
         mock_orchestrator.detect_for_retrieval.return_value = mock_detection
         engine._detection_orchestrator = mock_orchestrator
 
-        # Wire up pipeline stages
-        query = _make_query("How does auth work?")
+        # Wire up pipeline stages (query must trigger detection — contains keyword)
+        query = _make_query("compare the latest auth changes between modules")
         analysis = MagicMock(name="analysis")
         engine._query_analyzer.analyze.return_value = analysis
         engine._retrieval_router.retrieve.return_value = [MagicMock()]

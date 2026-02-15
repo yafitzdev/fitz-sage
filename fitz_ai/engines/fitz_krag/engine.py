@@ -134,18 +134,30 @@ class FitzKragEngine:
 
     def _init_components(self) -> None:
         """Initialize engine components lazily."""
+        from concurrent.futures import ThreadPoolExecutor
+
         from fitz_ai.llm.client import get_chat, get_embedder
         from fitz_ai.storage.postgres import PostgresConnectionManager
 
-        self._chat = get_chat(
-            self._config.chat,
-            config=self._config.chat_kwargs.model_dump(exclude_none=True) or None,
-        )
-        self._embedder = get_embedder(
-            self._config.embedding,
-            config=self._config.embedding_kwargs.model_dump(exclude_none=True) or None,
-        )
-        self._connection_manager = PostgresConnectionManager.get_instance()
+        # LLM providers and PostgreSQL are independent — init in parallel.
+        # PostgreSQL startup (pgserver) can take 1-2s; LLM provider init
+        # creates HTTP clients. Overlapping saves the slower of the two.
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            chat_future = pool.submit(
+                get_chat,
+                self._config.chat,
+                config=self._config.chat_kwargs.model_dump(exclude_none=True) or None,
+            )
+            embed_future = pool.submit(
+                get_embedder,
+                self._config.embedding,
+                config=self._config.embedding_kwargs.model_dump(exclude_none=True) or None,
+            )
+            pg_future = pool.submit(PostgresConnectionManager.get_instance)
+
+            self._chat = chat_future.result()
+            self._embedder = embed_future.result()
+            self._connection_manager = pg_future.result()
 
         # Ingestion stores
         from fitz_ai.engines.fitz_krag.ingestion.import_graph_store import ImportGraphStore
@@ -347,6 +359,45 @@ class FitzKragEngine:
         self._warmup_thread: Any = None
         self._warmup_llm_and_embedder()
 
+    # Keywords that signal the query may have temporal/comparison/aggregation intent.
+    # If none match, the detection LLM call can be skipped safely.
+    _DETECTION_KEYWORDS = frozenset([
+        # Temporal
+        "latest", "recent", "last", "before", "after", "since", "until",
+        "new", "old", "updated", "changed", "history", "previous",
+        # Comparison
+        "vs", "versus", "compare", "differ", "difference", "between",
+        "better", "worse", "advantage", "disadvantage",
+        # Aggregation
+        "how many", "count", "list", "all", "every", "enumerate", "total",
+        "summarize", "overview",
+        # Freshness
+        "current", "now", "today",
+    ])
+
+    @staticmethod
+    def _needs_detection(query: str) -> bool:
+        """Return True if query may benefit from LLM detection.
+
+        Short, simple queries without temporal/comparison/aggregation
+        keywords won't trigger any detection module, so we can skip the
+        LLM call entirely.
+        """
+        words = query.lower().split()
+        n = len(words)
+
+        # Long or complex queries: always run detection
+        if n > 10:
+            return True
+
+        # Check for detection-triggering keywords
+        query_lower = query.lower()
+        for kw in FitzKragEngine._DETECTION_KEYWORDS:
+            if kw in query_lower:
+                return True
+
+        return False
+
     def _warmup_llm_and_embedder(self) -> None:
         """Fire lightweight calls to pre-load LLM and embedding models.
 
@@ -436,11 +487,17 @@ class FitzKragEngine:
 
             with ThreadPoolExecutor(max_workers=3) as pool:
                 analysis_future = pool.submit(self._query_analyzer.analyze, retrieval_query)
+                # Skip detection LLM call for simple queries that won't trigger
+                # any detection (temporal, comparison, aggregation, etc.)
+                need_detection = (
+                    self._detection_orchestrator
+                    and self._needs_detection(retrieval_query)
+                )
                 detection_future = (
                     pool.submit(
                         self._detection_orchestrator.detect_for_retrieval, retrieval_query
                     )
-                    if self._detection_orchestrator
+                    if need_detection
                     else None
                 )
                 # Pre-warm embedding model: embed the base query in parallel with
