@@ -300,7 +300,10 @@ class PostgresConnectionManager:
         """
         Start embedded pgserver (fitz-pgserver fork).
 
-        Recovery strategy (3 steps):
+        Strategy:
+        0. Check if PostgreSQL is already running (postmaster.pid). If so,
+           connect directly — no lock needed. This allows multiple processes
+           (e.g. pytest + fitz query) to share the same server.
         1. Kill zombies + try starting pgserver
         2. If failed, clear pgserver cache and retry (WAL recovery may have
            completed but pgserver timed out waiting for the checkpoint)
@@ -328,6 +331,17 @@ class PostgresConnectionManager:
         data_dir.mkdir(parents=True, exist_ok=True)
 
         # =================================================================
+        # STEP 0: Check if PostgreSQL is already running (another process
+        # started it). If so, connect directly without acquiring the lock.
+        # This is the common case when pytest and fitz query run together.
+        # =================================================================
+        uri = self._try_connect_existing(data_dir)
+        if uri:
+            self._base_uri = uri
+            logger.info(f"{STORAGE} Connected to existing PostgreSQL server")
+            return
+
+        # =================================================================
         # STEP 1: Kill zombies preemptively, then try to start pgserver
         # =================================================================
         # Zombie postgres from a previous crash can hold locks and block
@@ -348,6 +362,17 @@ class PostgresConnectionManager:
 
         if not allow_recovery:
             raise RuntimeError(f"pgserver failed to start: {startup_error}")
+
+        # =================================================================
+        # STEP 1.5: Lock contention — another process may be holding the
+        # pgserver lock right now (e.g. starting up). Wait and check if
+        # PostgreSQL becomes available.
+        # =================================================================
+        uri = self._wait_for_existing_server(data_dir, timeout=15)
+        if uri:
+            self._base_uri = uri
+            logger.info(f"{STORAGE} Connected to PostgreSQL server (started by another process)")
+            return
 
         # =================================================================
         # STEP 2: Patient retry - WAL recovery may have completed but
@@ -442,6 +467,52 @@ class PostgresConnectionManager:
             f"pgserver nuclear recovery produced no result. "
             f"Try manually deleting {data_dir} and restarting."
         )
+
+    def _try_connect_existing(self, data_dir: Path) -> str | None:
+        """Check if PostgreSQL is already running and connectable.
+
+        Reads postmaster.pid to find the running server's connection info,
+        then verifies the connection actually works. Returns URI on success.
+        """
+        try:
+            from fitz_pgserver.utils import PostmasterInfo
+
+            pinfo = PostmasterInfo.read_from_pgdata(data_dir)
+            if pinfo is None or not pinfo.is_running() or pinfo.status != "ready":
+                return None
+
+            uri = pinfo.get_uri()
+
+            # Verify the connection actually works
+            psycopg = _get_psycopg()
+            with psycopg.connect(uri, autocommit=True, connect_timeout=5) as conn:
+                conn.execute("SELECT 1")
+
+            return uri
+        except Exception as e:
+            logger.debug(f"{STORAGE} No existing server to connect to: {e}")
+            return None
+
+    def _wait_for_existing_server(
+        self, data_dir: Path, timeout: int = 15
+    ) -> str | None:
+        """Wait for another process to finish starting PostgreSQL.
+
+        When pgserver lock acquisition fails, it usually means another process
+        is starting the server right now. Poll postmaster.pid until the server
+        becomes ready instead of escalating to nuclear recovery.
+        """
+        logger.info(
+            f"{STORAGE} Waiting up to {timeout}s for another process to finish "
+            f"starting PostgreSQL..."
+        )
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            time.sleep(1.0)
+            uri = self._try_connect_existing(data_dir)
+            if uri:
+                return uri
+        return None
 
     def _get_uri(self, database: str = "postgres") -> str:
         """Get connection URI for a database (cached)."""

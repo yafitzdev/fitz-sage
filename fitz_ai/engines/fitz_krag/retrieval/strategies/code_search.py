@@ -36,7 +36,15 @@ class CodeSearchStrategy:
         self._hyde_generator: Any = None  # Set by engine if HyDE enabled
         self._raw_store: Any = None  # Set by engine for freshness boosting
 
-    def retrieve(self, query: str, limit: int, detection: Any = None) -> list[Address]:
+    def retrieve(
+        self,
+        query: str,
+        limit: int,
+        detection: Any = None,
+        *,
+        query_vector: list[float] | None = None,
+        hyde_vectors: list[list[float]] | None = None,
+    ) -> list[Address]:
         """
         Retrieve code symbol addresses matching the query.
 
@@ -45,6 +53,10 @@ class CodeSearchStrategy:
         3. Semantic search: embed query, search summary_vector
         4. HyDE search: embed hypothetical docs, search (when enabled)
         5. Hybrid merge with configurable weights
+
+        Args:
+            query_vector: Pre-computed query embedding (skips internal embed call).
+            hyde_vectors: Pre-computed HyDE hypothesis embeddings (skips HyDE generate + embed).
         """
         fetch_limit = limit * 2
 
@@ -60,15 +72,16 @@ class CodeSearchStrategy:
 
         # 3. Semantic search
         try:
-            query_vector = self._embedder.embed(query)
+            if query_vector is None:
+                query_vector = self._embedder.embed(query)
             semantic_results = self._symbol_store.search_by_vector(query_vector, limit=fetch_limit)
         except Exception as e:
             logger.warning(f"Semantic search failed, using keyword only: {e}")
             semantic_results = []
 
         # 4. HyDE search
-        if self._hyde_generator:
-            hyde_results = self._run_hyde(query, fetch_limit)
+        if self._hyde_generator or hyde_vectors:
+            hyde_results = self._run_hyde(query, fetch_limit, hyde_vectors=hyde_vectors)
             semantic_results = self._merge_hyde(semantic_results, hyde_results)
 
         # 5. Hybrid merge
@@ -84,9 +97,27 @@ class CodeSearchStrategy:
         # 8. Convert to Address objects
         return [self._to_address(r) for r in merged[:limit]]
 
-    def _run_hyde(self, query: str, limit: int) -> list[dict[str, Any]]:
-        """Generate hypothetical docs via HyDE and search with their embeddings."""
+    def _run_hyde(
+        self,
+        query: str,
+        limit: int,
+        *,
+        hyde_vectors: list[list[float]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Generate hypothetical docs via HyDE and search with their embeddings.
+
+        Args:
+            hyde_vectors: Pre-computed hypothesis embeddings. When provided,
+                          skips HyDE generation and embedding entirely.
+        """
         try:
+            if hyde_vectors:
+                all_results: list[dict[str, Any]] = []
+                for vec in hyde_vectors:
+                    results = self._symbol_store.search_by_vector(vec, limit=limit)
+                    all_results.extend(results)
+                return all_results
+
             hypotheses = self._hyde_generator.generate(query)
             all_results: list[dict[str, Any]] = []
             for hyp in hypotheses:

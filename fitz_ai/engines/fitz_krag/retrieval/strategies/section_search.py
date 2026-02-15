@@ -36,7 +36,15 @@ class SectionSearchStrategy:
         self._hyde_generator: Any = None  # Set by engine if HyDE enabled
         self._raw_store: Any = None  # Set by engine for freshness boosting
 
-    def retrieve(self, query: str, limit: int, detection: Any = None) -> list[Address]:
+    def retrieve(
+        self,
+        query: str,
+        limit: int,
+        detection: Any = None,
+        *,
+        query_vector: list[float] | None = None,
+        hyde_vectors: list[list[float]] | None = None,
+    ) -> list[Address]:
         """
         Retrieve section addresses matching the query.
 
@@ -44,6 +52,10 @@ class SectionSearchStrategy:
         2. Semantic search on section summaries
         3. HyDE search (when enabled)
         4. Hybrid merge — BM25 weighted higher
+
+        Args:
+            query_vector: Pre-computed query embedding (skips internal embed call).
+            hyde_vectors: Pre-computed HyDE hypothesis embeddings (skips HyDE generate + embed).
         """
         fetch_limit = limit * 2
 
@@ -52,15 +64,16 @@ class SectionSearchStrategy:
 
         # 2. Semantic search
         try:
-            query_vector = self._embedder.embed(query)
+            if query_vector is None:
+                query_vector = self._embedder.embed(query)
             semantic_results = self._section_store.search_by_vector(query_vector, limit=fetch_limit)
         except Exception as e:
             logger.warning(f"Semantic section search failed, using BM25 only: {e}")
             semantic_results = []
 
         # 3. HyDE search
-        if self._hyde_generator:
-            hyde_results = self._run_hyde(query, fetch_limit)
+        if self._hyde_generator or hyde_vectors:
+            hyde_results = self._run_hyde(query, fetch_limit, hyde_vectors=hyde_vectors)
             semantic_results = self._merge_hyde(semantic_results, hyde_results)
 
         # 4. Hybrid merge
@@ -82,9 +95,27 @@ class SectionSearchStrategy:
         # 8. Convert to Address objects
         return [self._to_address(r) for r in top_results]
 
-    def _run_hyde(self, query: str, limit: int) -> list[dict[str, Any]]:
-        """Generate hypothetical docs via HyDE and search with their embeddings."""
+    def _run_hyde(
+        self,
+        query: str,
+        limit: int,
+        *,
+        hyde_vectors: list[list[float]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Generate hypothetical docs via HyDE and search with their embeddings.
+
+        Args:
+            hyde_vectors: Pre-computed hypothesis embeddings. When provided,
+                          skips HyDE generation and embedding entirely.
+        """
         try:
+            if hyde_vectors:
+                all_results: list[dict[str, Any]] = []
+                for vec in hyde_vectors:
+                    results = self._section_store.search_by_vector(vec, limit=limit)
+                    all_results.extend(results)
+                return all_results
+
             hypotheses = self._hyde_generator.generate(query)
             all_results: list[dict[str, Any]] = []
             for hyp in hypotheses:

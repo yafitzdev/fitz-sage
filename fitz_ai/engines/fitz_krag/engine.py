@@ -195,6 +195,7 @@ class FitzKragEngine:
             table_strategy=table_strategy,
             chat_factory=None,  # Set after chat_factory is created
             embedder=self._embedder,
+            hyde_generator=None,  # Set after HyDE generator is created
         )
         self._reader = ContentReader(
             self._raw_store,

@@ -6,6 +6,7 @@ Retrieval router — dispatches queries to available strategies and merges resul
 from __future__ import annotations
 
 import logging
+from concurrent.futures import Future, ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Callable
 
 from fitz_ai.engines.fitz_krag.types import Address
@@ -41,6 +42,8 @@ class RetrievalRouter:
         table_strategy: "TableSearchStrategy | None" = None,
         chat_factory: Any = None,
         agentic_strategy: Any = None,
+        embedder: Any = None,
+        hyde_generator: Any = None,
     ):
         self._code_strategy = code_strategy
         self._chunk_strategy = chunk_strategy
@@ -49,6 +52,8 @@ class RetrievalRouter:
         self._config = config
         self._chat_factory = chat_factory
         self._agentic_strategy = agentic_strategy
+        self._embedder = embedder
+        self._hyde_generator = hyde_generator
         self._keyword_matcher: Any = None  # Set by engine for vocabulary filtering
 
     def retrieve(
@@ -119,60 +124,88 @@ class RetrievalRouter:
             for eq in expanded:
                 tagged_queries.append((eq, None))
 
-        for q, temporal_tag in tagged_queries:
-            batch: list[Address] = []
-
-            # Run code strategy (skip if weight below threshold)
-            if not weights or weights.get("code", 1.0) > 0.05:
-                try:
-                    code_addresses = self._code_strategy.retrieve(q, limit, detection=detection)
-                    batch.extend(code_addresses)
-                except Exception as e:
-                    logger.warning(f"Code strategy failed for query '{q[:50]}': {e}")
-
-            # Run section strategy if available and weighted
-            if self._section_strategy and (not weights or weights.get("section", 1.0) > 0.05):
-                try:
-                    section_addresses = self._section_strategy.retrieve(q, limit, detection=detection)
-                    batch.extend(section_addresses)
-                except Exception as e:
-                    logger.warning(f"Section strategy failed for query '{q[:50]}': {e}")
-
-            # Run table strategy if available and weighted
-            if self._table_strategy and (not weights or weights.get("table", 1.0) > 0.05):
-                try:
-                    table_addresses = self._table_strategy.retrieve(q, limit, detection=detection)
-                    batch.extend(table_addresses)
-                except Exception as e:
-                    logger.warning(f"Table strategy failed for query '{q[:50]}': {e}")
-
-            # Tag addresses with temporal reference if this query is temporal
-            if temporal_tag:
-                batch = self._tag_temporal(batch, temporal_tag)
-
-            all_addresses.extend(batch)
-
-        # Agentic search for unindexed files
-        if self._agentic_strategy:
+        # Pre-compute embeddings and HyDE vectors once for all queries
+        unique_queries = list(dict.fromkeys(q for q, _ in tagged_queries))
+        query_vectors: dict[str, list[float]] = {}
+        if self._embedder:
             try:
-                _progress = progress or (lambda _: None)
-                _progress("Agentic search: scanning unindexed files...")
-                agentic_addresses = self._agentic_strategy.retrieve(query, limit)
-                if agentic_addresses:
-                    # Summarize what was found
-                    paths = set()
-                    for a in agentic_addresses:
-                        dp = a.metadata.get("disk_path")
-                        if dp:
-                            parts = dp.replace("\\", "/").split("/")
-                            paths.add(parts[-1] if parts else dp)
-                    files_str = ", ".join(sorted(paths)[:5])
-                    _progress(f"Agentic search: found {len(agentic_addresses)} results from {len(paths)} files ({files_str})")
-                else:
-                    _progress("Agentic search: no matching files found")
-                all_addresses.extend(agentic_addresses)
+                vectors = self._embedder.embed_batch(unique_queries)
+                query_vectors = dict(zip(unique_queries, vectors))
             except Exception as e:
-                logger.warning(f"Agentic strategy failed: {e}")
+                logger.warning(f"Batch embedding failed, strategies will embed individually: {e}")
+
+        hyde_vectors_map: dict[str, list[list[float]]] = {}
+        if self._hyde_generator and self._embedder:
+            all_hypotheses: list[str] = []
+            hyp_ranges: list[tuple[str, int, int]] = []  # (query_text, start_idx, count)
+            for q_text in unique_queries:
+                try:
+                    hyps = self._hyde_generator.generate(q_text)
+                    hyp_ranges.append((q_text, len(all_hypotheses), len(hyps)))
+                    all_hypotheses.extend(hyps)
+                except Exception:
+                    hyp_ranges.append((q_text, 0, 0))
+            if all_hypotheses:
+                try:
+                    hyp_vecs = self._embedder.embed_batch(all_hypotheses)
+                    for q_text, start, count in hyp_ranges:
+                        if count > 0:
+                            hyde_vectors_map[q_text] = hyp_vecs[start : start + count]
+                except Exception as e:
+                    logger.warning(f"Batch HyDE embedding failed: {e}")
+
+        # Submit all strategy calls concurrently
+        _progress = progress or (lambda _: None)
+        pool = ThreadPoolExecutor(max_workers=4)
+        futures: list[tuple[Future, str | None]] = []  # (future, temporal_tag)
+        try:
+            for q, temporal_tag in tagged_queries:
+                qv = query_vectors.get(q)
+                hv = hyde_vectors_map.get(q)
+
+                if not weights or weights.get("code", 1.0) > 0.05:
+                    fut = pool.submit(
+                        self._run_strategy, self._code_strategy, q, limit, detection, qv, hv
+                    )
+                    futures.append((fut, temporal_tag))
+
+                if self._section_strategy and (not weights or weights.get("section", 1.0) > 0.05):
+                    fut = pool.submit(
+                        self._run_strategy, self._section_strategy, q, limit, detection, qv, hv
+                    )
+                    futures.append((fut, temporal_tag))
+
+                if self._table_strategy and (not weights or weights.get("table", 1.0) > 0.05):
+                    fut = pool.submit(
+                        self._run_strategy_table, self._table_strategy, q, limit, detection, qv
+                    )
+                    futures.append((fut, temporal_tag))
+
+            # Submit agentic search in the same pool
+            agentic_future: Future | None = None
+            if self._agentic_strategy:
+                _progress("Agentic search: scanning unindexed files...")
+                agentic_future = pool.submit(self._run_agentic, query, limit, _progress)
+
+            # Collect strategy results
+            for fut, temporal_tag in futures:
+                try:
+                    batch = fut.result(timeout=60)
+                    if temporal_tag:
+                        batch = self._tag_temporal(batch, temporal_tag)
+                    all_addresses.extend(batch)
+                except Exception as e:
+                    logger.warning(f"Strategy failed: {e}")
+
+            # Collect agentic results
+            if agentic_future:
+                try:
+                    agentic_addresses = agentic_future.result(timeout=60)
+                    all_addresses.extend(agentic_addresses)
+                except Exception as e:
+                    logger.warning(f"Agentic strategy failed: {e}")
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
 
         # Chunk fallback when other results are insufficient
         if (
@@ -217,6 +250,71 @@ class RetrievalRouter:
             result = filtered
 
         return result
+
+    def _run_strategy(
+        self,
+        strategy: Any,
+        query: str,
+        limit: int,
+        detection: Any,
+        query_vector: list[float] | None,
+        hyde_vectors: list[list[float]] | None,
+    ) -> list[Address]:
+        """Run a single strategy with pre-computed vectors."""
+        try:
+            return strategy.retrieve(
+                query, limit, detection=detection,
+                query_vector=query_vector, hyde_vectors=hyde_vectors,
+            )
+        except Exception as e:
+            logger.warning(f"{type(strategy).__name__} failed for '{query[:50]}': {e}")
+            return []
+
+    def _run_strategy_table(
+        self,
+        strategy: Any,
+        query: str,
+        limit: int,
+        detection: Any,
+        query_vector: list[float] | None,
+    ) -> list[Address]:
+        """Run table strategy with pre-computed query vector (no HyDE)."""
+        try:
+            return strategy.retrieve(
+                query, limit, detection=detection,
+                query_vector=query_vector,
+            )
+        except Exception as e:
+            logger.warning(f"TableSearchStrategy failed for '{query[:50]}': {e}")
+            return []
+
+    def _run_agentic(
+        self,
+        query: str,
+        limit: int,
+        progress: Callable[[str], None],
+    ) -> list[Address]:
+        """Run agentic search with progress reporting."""
+        try:
+            agentic_addresses = self._agentic_strategy.retrieve(query, limit)
+            if agentic_addresses:
+                paths = set()
+                for a in agentic_addresses:
+                    dp = a.metadata.get("disk_path")
+                    if dp:
+                        parts = dp.replace("\\", "/").split("/")
+                        paths.add(parts[-1] if parts else dp)
+                files_str = ", ".join(sorted(paths)[:5])
+                progress(
+                    f"Agentic search: found {len(agentic_addresses)} results "
+                    f"from {len(paths)} files ({files_str})"
+                )
+            else:
+                progress("Agentic search: no matching files found")
+            return agentic_addresses
+        except Exception as e:
+            logger.warning(f"Agentic strategy failed: {e}")
+            return []
 
     def _extract_temporal_refs(self, detection: Any) -> list[str]:
         """Extract temporal reference texts from detection metadata."""

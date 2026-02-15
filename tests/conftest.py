@@ -47,15 +47,12 @@ import yaml
 
 def postgres_deps_available() -> bool:
     """Check if PostgreSQL dependencies (psycopg, pgvector, pgserver) are available."""
-    try:
-        import pgserver  # noqa: F401
-        import pgvector  # noqa: F401
-        import psycopg  # noqa: F401
-        import psycopg_pool  # noqa: F401
+    from importlib.util import find_spec
 
-        return True
-    except ImportError:
-        return False
+    for mod in ("fitz_pgserver", "pgvector", "psycopg", "psycopg_pool"):
+        if find_spec(mod) is None:
+            return False
+    return True
 
 
 # Export for use in test files

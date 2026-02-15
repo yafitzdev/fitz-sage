@@ -68,9 +68,24 @@ class AgenticSearchStrategy:
         if not unindexed:
             return []
 
-        # Fast path: single file — skip LLM selection entirely
-        if len(unindexed) <= 3:
-            selected_entries = unindexed
+        # Fast path: few files — skip LLM, use BM25 + path matching
+        _SKIP_LLM_THRESHOLD = 15
+        if len(unindexed) <= _SKIP_LLM_THRESHOLD:
+            path_matched = set(self._path_match_files(unindexed, query))
+            scored = self._bm25_prefilter(unindexed, query)
+            top: list["ManifestEntry"] = []
+            seen: set[str] = set()
+            # Prioritize path matches first
+            for entry in scored:
+                if entry.rel_path in path_matched and entry.rel_path not in seen:
+                    top.append(entry)
+                    seen.add(entry.rel_path)
+            # Then BM25 order
+            for entry in scored:
+                if entry.rel_path not in seen:
+                    top.append(entry)
+                    seen.add(entry.rel_path)
+            selected_entries = top[:_LLM_MAX_FILES]
         else:
             # BM25 pre-filter if too many files
             if len(unindexed) > _BM25_PREFILTER_THRESHOLD:
@@ -148,7 +163,7 @@ class AgenticSearchStrategy:
     def _llm_select_files(self, manifest_text: str, query: str) -> list[str]:
         """Single LLM call to select relevant files from manifest."""
         try:
-            chat = self._chat_factory("balanced")
+            chat = self._chat_factory("fast")
             prompt = (
                 "You are a file selection assistant. Given a user query and a manifest "
                 "of available files, select the most relevant files.\n\n"

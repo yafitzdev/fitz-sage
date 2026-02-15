@@ -125,7 +125,9 @@ class TestRetrievalRouter:
 
         result = router.retrieve("find func")
 
-        code_strat.retrieve.assert_called_once_with("find func", 10, detection=None)
+        code_strat.retrieve.assert_called_once_with(
+            "find func", 10, detection=None, query_vector=None, hyde_vectors=None
+        )
         assert len(result) == 2
         # Without analysis, sorted by score descending
         assert result[0].score >= result[1].score

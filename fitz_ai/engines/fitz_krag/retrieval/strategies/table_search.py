@@ -34,13 +34,23 @@ class TableSearchStrategy:
         self._embedder = embedder
         self._config = config
 
-    def retrieve(self, query: str, limit: int, detection: Any = None) -> list[Address]:
+    def retrieve(
+        self,
+        query: str,
+        limit: int,
+        detection: Any = None,
+        *,
+        query_vector: list[float] | None = None,
+    ) -> list[Address]:
         """
         Retrieve table addresses matching the query.
 
         1. Keyword search on table name and column names
         2. Semantic search on schema summaries
         3. Hybrid merge with configurable weights
+
+        Args:
+            query_vector: Pre-computed query embedding (skips internal embed call).
         """
         fetch_limit = limit * 2
 
@@ -49,7 +59,8 @@ class TableSearchStrategy:
 
         # 2. Semantic search
         try:
-            query_vector = self._embedder.embed(query)
+            if query_vector is None:
+                query_vector = self._embedder.embed(query)
             semantic_results = self._table_store.search_by_vector(query_vector, limit=fetch_limit)
         except Exception as e:
             logger.warning(f"Semantic table search failed, using keyword only: {e}")
