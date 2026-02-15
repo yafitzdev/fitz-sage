@@ -259,13 +259,11 @@ class TestAnswer:
         engine._query_analyzer.analyze.assert_called_once_with(
             query.text,
         )
-        engine._retrieval_router.retrieve.assert_called_once_with(
-            query.text,
-            analysis,
-            detection=None,
-            rewrite_result=None,
-            progress=None,
-        )
+        engine._retrieval_router.retrieve.assert_called_once()
+        call_args = engine._retrieval_router.retrieve.call_args
+        assert call_args[0] == (query.text, analysis)
+        assert call_args[1]["detection"] is None
+        assert call_args[1]["rewrite_result"] is None
         engine._reader.read.assert_called_once_with(
             [address_1, address_2],
             engine._config.top_read,

@@ -80,7 +80,11 @@ class CodeSearchStrategy:
             semantic_results = []
 
         # 4. HyDE search
-        if self._hyde_generator or hyde_vectors:
+        # hyde_vectors=None → not pre-computed, strategy may generate its own
+        # hyde_vectors=[] → router intentionally skipped HyDE, don't generate
+        # hyde_vectors=[...] → use pre-computed vectors
+        skip_hyde = hyde_vectors is not None and len(hyde_vectors) == 0
+        if not skip_hyde and (self._hyde_generator or hyde_vectors):
             hyde_results = self._run_hyde(query, fetch_limit, hyde_vectors=hyde_vectors)
             semantic_results = self._merge_hyde(semantic_results, hyde_results)
 

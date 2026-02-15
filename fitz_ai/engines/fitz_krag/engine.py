@@ -404,7 +404,7 @@ class FitzKragEngine:
             t0 = time.perf_counter()
             from concurrent.futures import ThreadPoolExecutor
 
-            with ThreadPoolExecutor(max_workers=2) as pool:
+            with ThreadPoolExecutor(max_workers=3) as pool:
                 analysis_future = pool.submit(self._query_analyzer.analyze, retrieval_query)
                 detection_future = (
                     pool.submit(
@@ -413,8 +413,18 @@ class FitzKragEngine:
                     if self._detection_orchestrator
                     else None
                 )
+                # Pre-warm embedding model: embed the base query in parallel with
+                # analysis+detection so the cold-start cost (~2s) is hidden.
+                embed_future = pool.submit(self._embedder.embed_batch, [retrieval_query])
                 analysis = analysis_future.result()
                 detection = detection_future.result() if detection_future else None
+                try:
+                    precomputed_vectors = embed_future.result()
+                    precomputed_query_vector = (
+                        dict(zip([retrieval_query], precomputed_vectors))
+                    )
+                except Exception:
+                    precomputed_query_vector = None
             timings.append(("Analysis + Detection", time.perf_counter() - t0))
 
             # 2. Retrieve addresses (or multi-hop)
@@ -431,6 +441,7 @@ class FitzKragEngine:
                     detection=detection,
                     rewrite_result=rewrite_result,
                     progress=progress,
+                    precomputed_query_vectors=precomputed_query_vector,
                 )
             timings.append(("Retrieval", time.perf_counter() - t0))
 

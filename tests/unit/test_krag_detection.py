@@ -370,10 +370,10 @@ class TestEngineAnswerDetectionFlow:
         mock_orchestrator.detect_for_retrieval.assert_called_once_with(query.text)
 
         # Router called with detection result
-        engine._retrieval_router.retrieve.assert_called_once_with(
-            query.text, analysis, detection=mock_detection,
-            rewrite_result=None, progress=None,
-        )
+        engine._retrieval_router.retrieve.assert_called_once()
+        call_args = engine._retrieval_router.retrieve.call_args
+        assert call_args[0] == (query.text, analysis)
+        assert call_args[1]["detection"] is mock_detection
 
     def test_detection_disabled_stays_none_in_answer_flow(self):
         """When detection is disabled, detection stays None through answer flow."""
@@ -395,10 +395,10 @@ class TestEngineAnswerDetectionFlow:
         engine.answer(query)
 
         # Router called with detection=None (no detection)
-        engine._retrieval_router.retrieve.assert_called_once_with(
-            query.text, analysis, detection=None,
-            rewrite_result=None, progress=None,
-        )
+        engine._retrieval_router.retrieve.assert_called_once()
+        call_args = engine._retrieval_router.retrieve.call_args
+        assert call_args[0] == (query.text, analysis)
+        assert call_args[1]["detection"] is None
 
 
 # ---------------------------------------------------------------------------

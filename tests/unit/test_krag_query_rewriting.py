@@ -134,13 +134,10 @@ class TestQueryRewriting:
         )
 
         # Router receives the rewritten query
-        engine._retrieval_router.retrieve.assert_called_once_with(
-            "authentication module implementation",
-            engine._query_analyzer.analyze.return_value,
-            detection=None,
-            rewrite_result=rewrite_result,
-            progress=None,
-        )
+        engine._retrieval_router.retrieve.assert_called_once()
+        call_args = engine._retrieval_router.retrieve.call_args
+        assert call_args[0] == ("authentication module implementation", engine._query_analyzer.analyze.return_value)
+        assert call_args[1]["rewrite_result"] is rewrite_result
 
         assert result is expected
 
@@ -165,13 +162,10 @@ class TestQueryRewriting:
         engine._query_analyzer.analyze.assert_called_once_with(
             "What is the login function?",
         )
-        engine._retrieval_router.retrieve.assert_called_once_with(
-            "What is the login function?",
-            engine._query_analyzer.analyze.return_value,
-            detection=None,
-            rewrite_result=rewrite_result,
-            progress=None,
-        )
+        engine._retrieval_router.retrieve.assert_called_once()
+        call_args = engine._retrieval_router.retrieve.call_args
+        assert call_args[0] == ("What is the login function?", engine._query_analyzer.analyze.return_value)
+        assert call_args[1]["rewrite_result"] is rewrite_result
 
         assert result is expected
 
@@ -194,13 +188,10 @@ class TestQueryRewriting:
         engine._query_analyzer.analyze.assert_called_once_with(
             "How does auth work?",
         )
-        engine._retrieval_router.retrieve.assert_called_once_with(
-            "How does auth work?",
-            engine._query_analyzer.analyze.return_value,
-            detection=None,
-            rewrite_result=None,
-            progress=None,
-        )
+        engine._retrieval_router.retrieve.assert_called_once()
+        call_args = engine._retrieval_router.retrieve.call_args
+        assert call_args[0] == ("How does auth work?", engine._query_analyzer.analyze.return_value)
+        assert call_args[1]["rewrite_result"] is None
 
         assert result is expected
 
@@ -218,12 +209,9 @@ class TestQueryRewriting:
         engine._query_analyzer.analyze.assert_called_once_with(
             "Where is UserService defined?",
         )
-        engine._retrieval_router.retrieve.assert_called_once_with(
-            "Where is UserService defined?",
-            engine._query_analyzer.analyze.return_value,
-            detection=None,
-            rewrite_result=None,
-            progress=None,
-        )
+        engine._retrieval_router.retrieve.assert_called_once()
+        call_args = engine._retrieval_router.retrieve.call_args
+        assert call_args[0] == ("Where is UserService defined?", engine._query_analyzer.analyze.return_value)
+        assert call_args[1]["rewrite_result"] is None
 
         assert result is expected

@@ -56,6 +56,83 @@ class RetrievalRouter:
         self._hyde_generator = hyde_generator
         self._keyword_matcher: Any = None  # Set by engine for vocabulary filtering
 
+    @staticmethod
+    def _should_run_hyde(
+        analysis: "QueryAnalysis | None", detection: "Any | None"
+    ) -> bool:
+        """Decide whether HyDE is likely to improve retrieval for this query.
+
+        HyDE helps abstract/conceptual queries where user words don't match
+        document vocabulary. It adds no value for direct code lookups, data/SQL
+        queries, or high-confidence queries that already match well.
+        """
+        if not analysis:
+            return True  # No signal — run HyDE to be safe
+
+        # Complex intent detected — always run HyDE
+        if detection and (
+            getattr(detection, "has_comparison_intent", False)
+            or getattr(detection, "has_temporal_intent", False)
+            or getattr(detection, "has_aggregation_intent", False)
+        ):
+            return True
+
+        # Code queries: keyword/AST search is primary, HyDE prose doesn't help
+        if analysis.primary_type.value == "code" and analysis.confidence >= 0.7:
+            return False
+
+        # Data queries: table search uses SQL, not vector similarity
+        if analysis.primary_type.value == "data":
+            return False
+
+        # Very high confidence: query already matches document vocabulary well
+        if analysis.confidence >= 0.9:
+            return False
+
+        return True
+
+    @staticmethod
+    def _should_run_multi_query(
+        analysis: "QueryAnalysis | None",
+    ) -> bool:
+        """Decide whether multi-query expansion adds value."""
+        if not analysis:
+            return True
+
+        # Code/data queries don't benefit from prose decomposition
+        if analysis.primary_type.value in ("code", "data"):
+            return False
+
+        # High confidence means the query is already focused
+        if analysis.confidence >= 0.8:
+            return False
+
+        return True
+
+    @staticmethod
+    def _should_run_agentic(
+        analysis: "QueryAnalysis | None",
+    ) -> bool:
+        """Decide whether agentic file scanning adds value.
+
+        Agentic search scans unindexed files — most valuable for code queries
+        or low-confidence queries where indexed content may be insufficient.
+        For clear, high-confidence queries, indexed content suffices.
+        """
+        if not analysis:
+            return True
+
+        # Data queries: agentic scans files, not tables
+        if analysis.primary_type.value == "data":
+            return False
+
+        # High-confidence queries: indexed strategies should find what's needed.
+        # Only code queries at moderate confidence benefit (unindexed source files).
+        if analysis.confidence >= 0.85 and analysis.primary_type.value != "code":
+            return False
+
+        return True
+
     def retrieve(
         self,
         query: str,
@@ -63,6 +140,7 @@ class RetrievalRouter:
         detection: "Any | None" = None,
         rewrite_result: "Any | None" = None,
         progress: Callable[[str], None] | None = None,
+        precomputed_query_vectors: dict[str, list[float]] | None = None,
     ) -> list[Address]:
         """
         Retrieve addresses using strategy weights from query analysis.
@@ -118,6 +196,7 @@ class RetrievalRouter:
             self._config.enable_multi_query
             and self._chat_factory
             and len(query) >= self._config.multi_query_min_length
+            and self._should_run_multi_query(analysis)
         ):
             # Fallback: only when rewriter is disabled or didn't decompose
             expanded = self._expand_query(query)
@@ -125,17 +204,38 @@ class RetrievalRouter:
                 tagged_queries.append((eq, None))
 
         # Pre-compute embeddings and HyDE vectors once for all queries
+        import time as _time
+
         unique_queries = list(dict.fromkeys(q for q, _ in tagged_queries))
         query_vectors: dict[str, list[float]] = {}
-        if self._embedder:
+        # Use pre-computed vectors from engine (overlapped with analysis+detection)
+        if precomputed_query_vectors:
+            query_vectors.update(precomputed_query_vectors)
+        # Embed any queries not already pre-computed (expansions, variations)
+        missing = [q for q in unique_queries if q not in query_vectors]
+        if missing and self._embedder:
             try:
-                vectors = self._embedder.embed_batch(unique_queries)
-                query_vectors = dict(zip(unique_queries, vectors))
+                _t0 = _time.perf_counter()
+                vectors = self._embedder.embed_batch(missing)
+                query_vectors.update(dict(zip(missing, vectors)))
+                _embed_ms = (_time.perf_counter() - _t0) * 1000
             except Exception as e:
+                _embed_ms = 0
                 logger.warning(f"Batch embedding failed, strategies will embed individually: {e}")
+        else:
+            _embed_ms = 0
+
+        run_hyde = self._should_run_hyde(analysis, detection)
+        run_agentic = self._should_run_agentic(analysis)
+        logger.debug(
+            f"Retrieval gates: hyde={run_hyde}, agentic={run_agentic}, "
+            f"type={analysis.primary_type.value if analysis else 'none'}, "
+            f"conf={analysis.confidence if analysis else 0:.2f}, "
+            f"queries={len(unique_queries)}, embed={_embed_ms:.0f}ms"
+        )
 
         hyde_vectors_map: dict[str, list[list[float]]] = {}
-        if self._hyde_generator and self._embedder:
+        if self._hyde_generator and self._embedder and run_hyde:
             all_hypotheses: list[str] = []
             hyp_ranges: list[tuple[str, int, int]] = []  # (query_text, start_idx, count)
             for q_text in unique_queries:
@@ -155,13 +255,16 @@ class RetrievalRouter:
                     logger.warning(f"Batch HyDE embedding failed: {e}")
 
         # Submit all strategy calls concurrently
+        _t_strategies = _time.perf_counter()
         _progress = progress or (lambda _: None)
         pool = ThreadPoolExecutor(max_workers=4)
         futures: list[tuple[Future, str | None]] = []  # (future, temporal_tag)
         try:
             for q, temporal_tag in tagged_queries:
                 qv = query_vectors.get(q)
-                hv = hyde_vectors_map.get(q)
+                # Empty list signals "HyDE intentionally skipped" to strategies
+                # (vs None = "not pre-computed, generate your own")
+                hv = hyde_vectors_map.get(q) if run_hyde else []
 
                 if not weights or weights.get("code", 1.0) > 0.05:
                     fut = pool.submit(
@@ -183,7 +286,7 @@ class RetrievalRouter:
 
             # Submit agentic search in the same pool
             agentic_future: Future | None = None
-            if self._agentic_strategy:
+            if self._agentic_strategy and run_agentic:
                 _progress("Agentic search: scanning unindexed files...")
                 agentic_future = pool.submit(self._run_agentic, query, limit, _progress)
 
@@ -206,6 +309,9 @@ class RetrievalRouter:
                     logger.warning(f"Agentic strategy failed: {e}")
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
+
+        _strategies_ms = (_time.perf_counter() - _t_strategies) * 1000
+        logger.debug(f"Retrieval breakdown: strategies={_strategies_ms:.0f}ms")
 
         # Chunk fallback when other results are insufficient
         if (

@@ -96,6 +96,8 @@ def _custom_weight_analysis(
         "chunk": chunk,
     }
     analysis.entities = entities
+    analysis.primary_type = QueryType.GENERAL
+    analysis.confidence = 0.5
     return analysis
 
 
