@@ -355,6 +355,17 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
     # New: AV votes * vector score — qualified signal
     if "av_jury_votes_no" in X.columns and "mean_vector_score" in X.columns:
         X["ix_av_votes_x_vector"] = X["av_jury_votes_no"] * X["mean_vector_score"]
+    # New: disputed signal * av votes — strong disputed indicator
+    if "has_disputed_signal" in X.columns and "av_jury_votes_no" in X.columns:
+        X["ix_disputed_x_av"] = X["has_disputed_signal"] * X["av_jury_votes_no"]
+    # New: context similarity spread — conflicting contexts signal disputed
+    if "ctx_max_pairwise_sim" in X.columns and "ctx_min_pairwise_sim" in X.columns:
+        X["ix_ctx_sim_spread"] = X["ctx_max_pairwise_sim"] - X["ctx_min_pairwise_sim"]
+    # New: vector score * contradiction count — disputed cases with high vector match
+    if "mean_vector_score" in X.columns and "ctx_contradiction_count" in X.columns:
+        X["ix_vector_x_contradiction"] = (
+            X["mean_vector_score"] * X["ctx_contradiction_count"]
+        )
 
     return X, encoders
 
@@ -819,7 +830,42 @@ def train_twostage(
     s1_search.fit(X_train, y_s1_train)
     s1_model = s1_search.best_estimator_
 
-    s1_pred_test = s1_model.predict(X_test)
+    # Stage 1 threshold tuning: trade small answerable recall for better abstain recall
+    s1_threshold = 0.5
+    if hasattr(s1_model, "predict_proba"):
+        from sklearn.model_selection import cross_val_predict as cvp_s1
+
+        s1_cv_proba = cvp_s1(s1_model, X_train, y_s1_train, cv=cv, method="predict_proba")
+        abs_mask_cv = y_s1_train == 0
+        ans_mask_cv = y_s1_train == 1
+        s1_candidates = []
+        for thresh in np.arange(0.30, 0.70, 0.005):
+            preds = (s1_cv_proba[:, 1] >= thresh).astype(int)
+            abs_r = (preds[abs_mask_cv] == 0).mean() if abs_mask_cv.any() else 0
+            ans_r = (preds[ans_mask_cv] == 1).mean() if ans_mask_cv.any() else 0
+            s1_candidates.append((thresh, abs_r, ans_r))
+        # Find threshold: maximize abstain recall with answerable recall >= 0.93
+        s1_eligible = [(t, ar, anr) for t, ar, anr in s1_candidates if anr >= 0.93]
+        if s1_eligible:
+            s1_threshold, _, _ = max(s1_eligible, key=lambda x: x[1])
+        else:
+            s1_eligible = [(t, ar, anr) for t, ar, anr in s1_candidates if anr >= 0.90]
+            if s1_eligible:
+                s1_threshold, _, _ = max(s1_eligible, key=lambda x: x[1])
+        # Show effect
+        preds_at_s1 = (s1_cv_proba[:, 1] >= s1_threshold).astype(int)
+        abs_r_at = (preds_at_s1[abs_mask_cv] == 0).mean()
+        ans_r_at = (preds_at_s1[ans_mask_cv] == 1).mean()
+        print(f"\n  Stage 1 threshold: {s1_threshold:.3f} (default 0.50)")
+        print(f"  CV abstain recall:    {abs_r_at:.3f}")
+        print(f"  CV answerable recall: {ans_r_at:.3f}")
+
+    # Apply threshold to test set
+    if hasattr(s1_model, "predict_proba") and s1_threshold != 0.5:
+        s1_proba_test = s1_model.predict_proba(X_test)
+        s1_pred_test = (s1_proba_test[:, 1] >= s1_threshold).astype(int)
+    else:
+        s1_pred_test = s1_model.predict(X_test)
     s1_acc = accuracy_score(y_s1_test, s1_pred_test)
     cm_s1 = confusion_matrix(y_s1_test, s1_pred_test, labels=[0, 1])
     print(f"  Best: {s1_search.best_score_:.4f} CV -> {s1_acc:.4f} test")
@@ -906,39 +952,101 @@ def train_twostage(
             verbose=-1,
         )
 
-    print("\n--- Stage 2: Quick comparison ---")
+    print("\n--- Stage 2: Quick comparison (recall_macro) ---")
     s2_results = {}
     for name, model in s2_models.items():
-        cv_scores = cross_val_score(model, X_answerable, y_answerable, cv=cv, scoring="accuracy")
+        cv_scores = cross_val_score(
+            model, X_answerable, y_answerable, cv=cv, scoring="recall_macro"
+        )
         model.fit(X_train_s2, y_train_s2)
         s2_results[name] = {"model": model, "cv": cv_scores.mean(), "cv_std": cv_scores.std()}
         print(f"  {name:6s}: CV={cv_scores.mean():.4f} (+/-{cv_scores.std():.4f})")
 
-    # Tune top Stage 2 model
+    # Tune top 3 Stage 2 models and build stacking ensemble
     s2_ranked = sorted(s2_results.items(), key=lambda x: x[1]["cv"], reverse=True)
-    s2_best_name = s2_ranked[0][0]
-    print(f"\n--- Stage 2: Tuning {s2_best_name} ({time_per_stage}s budget) ---")
+    s2_top3 = s2_ranked[:3]
+    print(f"\n--- Stage 2: Tuning top 3 for ensemble ({time_per_stage}s budget) ---")
+    s2_tuned_models = {}
+    time_per_s2_model = time_per_stage // len(s2_top3)
+    for s2_name, _ in s2_top3:
+        n_iter_s2 = max(10, int(time_per_s2_model / 3))
+        s2_search = RandomizedSearchCV(
+            s1_base[s2_name],
+            s1_param_grids[s2_name],
+            n_iter=n_iter_s2,
+            cv=cv,
+            scoring="recall_macro",
+            random_state=seed,
+            n_jobs=-1 if s2_name not in ("GBT", "XGB", "LGBM") else 1,
+        )
+        s2_search.fit(X_train_s2, y_train_s2)
+        s2_tuned_models[s2_name] = s2_search.best_estimator_
+        print(f"  {s2_name}: CV={s2_search.best_score_:.4f}")
 
-    s2_search = RandomizedSearchCV(
-        s1_base[s2_best_name],  # reuse base model constructors
-        s1_param_grids[s2_best_name],
-        n_iter=n_iter,
-        cv=cv,
-        scoring="accuracy",
-        random_state=seed,
-        n_jobs=-1 if s2_best_name not in ("GBT", "XGB", "LGBM") else 1,
+    # Build Stage 2 stacking ensemble for more robust predictions
+    s2_estimators = [(name, model) for name, model in s2_tuned_models.items()]
+    s2_model = StackingClassifier(
+        estimators=s2_estimators,
+        final_estimator=LogisticRegression(
+            class_weight="balanced", max_iter=1000, random_state=seed
+        ),
+        cv=5,
+        n_jobs=1,
+        passthrough=False,
     )
-    s2_search.fit(X_train_s2, y_train_s2)
-    s2_model = s2_search.best_estimator_
-    print(f"  Best CV: {s2_search.best_score_:.4f}")
-    print(f"  Params: {s2_search.best_params_}")
+    s2_model.fit(X_train_s2, y_train_s2)
+    s2_best_name = "Ensemble(" + "+".join(s2_tuned_models.keys()) + ")"
+    print(f"  Stage 2 ensemble: {s2_best_name}")
 
-    if hasattr(s2_model, "feature_importances_"):
-        imp = s2_model.feature_importances_
-        order = np.argsort(imp)[::-1]
-        print("\n  Stage 2 top 10 features:")
-        for rank, idx in enumerate(order[:10], 1):
-            print(f"    {rank:2d}. {feature_names[idx]:40s} {imp[idx]:.4f}")
+    # ---- Stage 2: Threshold tuning for disputed recall ----
+    # Default threshold 0.5 favors trustworthy (majority). Lower threshold = more disputed.
+    s2_threshold = 0.5
+    if hasattr(s2_model, "predict_proba"):
+        print("\n--- Stage 2: Threshold tuning for disputed recall ---")
+        # Use CV predictions on answerable training data
+        from sklearn.model_selection import cross_val_predict
+
+        s2_cv_proba = cross_val_predict(
+            s2_model, X_answerable, y_answerable, cv=cv, method="predict_proba"
+        )
+        # s2_cv_proba[:, 1] = P(trustworthy), lower threshold = more disputed
+        # Strategy: find threshold that achieves disputed recall >= 0.85
+        # while maximizing trustworthy recall. If impossible, find best
+        # balance with minimum trustworthy recall >= 0.78.
+        disp_mask = y_answerable == 0
+        trust_mask = y_answerable == 1
+        candidates = []
+        for thresh in np.arange(0.30, 0.80, 0.005):
+            preds = (s2_cv_proba[:, 1] >= thresh).astype(int)
+            disp_recall = (preds[disp_mask] == 0).mean() if disp_mask.any() else 0
+            trust_recall = (preds[trust_mask] == 1).mean() if trust_mask.any() else 0
+            candidates.append((thresh, disp_recall, trust_recall))
+
+        # Phase 1: find threshold achieving disputed >= 0.85 with max trustworthy
+        phase1 = [(t, dr, tr) for t, dr, tr in candidates if dr >= 0.85]
+        if phase1:
+            # Pick highest trustworthy recall among those meeting disputed target
+            best_thresh, _, _ = max(phase1, key=lambda x: x[2])
+        else:
+            # Phase 2: maximize disputed recall with trustworthy >= 0.78
+            phase2 = [(t, dr, tr) for t, dr, tr in candidates if tr >= 0.78]
+            if phase2:
+                best_thresh, _, _ = max(phase2, key=lambda x: x[1])
+            else:
+                # Phase 3: best balance (weighted)
+                best_thresh, _, _ = max(
+                    candidates, key=lambda x: x[1] * 0.6 + x[2] * 0.4
+                )
+        s2_threshold = best_thresh
+        # Show effect of chosen threshold
+        preds_at_thresh = (s2_cv_proba[:, 1] >= s2_threshold).astype(int)
+        disp_mask = y_answerable == 0
+        trust_mask = y_answerable == 1
+        disp_r = (preds_at_thresh[disp_mask] == 0).mean()
+        trust_r = (preds_at_thresh[trust_mask] == 1).mean()
+        print(f"  Optimal threshold: {s2_threshold:.2f} (default 0.50)")
+        print(f"  CV disputed recall:    {disp_r:.3f}")
+        print(f"  CV trustworthy recall: {trust_r:.3f}")
 
     # ---- Combined evaluation ----
     print(f"\n{'='*60}")
@@ -948,7 +1056,11 @@ def train_twostage(
     final_pred = np.full(len(y3_test), "abstain", dtype=object)
     s1_answerable_mask = s1_pred_test == 1
     if s1_answerable_mask.any():
-        s2_preds_int = s2_model.predict(X_test[s1_answerable_mask])
+        if hasattr(s2_model, "predict_proba") and s2_threshold != 0.5:
+            s2_proba = s2_model.predict_proba(X_test[s1_answerable_mask])
+            s2_preds_int = (s2_proba[:, 1] >= s2_threshold).astype(int)
+        else:
+            s2_preds_int = s2_model.predict(X_test[s1_answerable_mask])
         answerable_positions = np.where(s1_answerable_mask)[0]
         for i, pos in enumerate(answerable_positions):
             final_pred[pos] = _s2_label_map[int(s2_preds_int[i])]
@@ -989,10 +1101,12 @@ def train_twostage(
         "mode": "twostage",
         "stage1_model": s1_model,
         "stage1_name": f"{s1_best_name} (tuned)",
+        "stage1_threshold": s1_threshold,
         "stage1_accuracy": s1_acc,
         "stage2_model": s2_model,
         "stage2_name": f"{s2_best_name} (tuned)",
         "stage2_cv": s2_search.best_score_,
+        "stage2_threshold": s2_threshold,
         "combined_accuracy": combined_acc,
         "combined_recalls": recalls,
         "encoders": encoders,
