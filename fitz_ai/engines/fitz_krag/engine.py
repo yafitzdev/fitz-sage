@@ -342,6 +342,36 @@ class FitzKragEngine:
                 max_hops=self._config.max_hops,
             )
 
+        # Pre-warm LLM + embedding models in background.
+        # By the time answer() is called (after file registration), models are loaded.
+        self._warmup_thread: Any = None
+        self._warmup_llm_and_embedder()
+
+    def _warmup_llm_and_embedder(self) -> None:
+        """Fire lightweight calls to pre-load LLM and embedding models.
+
+        Runs in a background thread so model loading overlaps with file
+        registration and other CLI setup. The models are warm by the time
+        answer() is called.
+        """
+        import threading
+
+        def _warmup():
+            try:
+                # Warm the "fast" LLM tier (used by analysis + detection)
+                chat = self._chat_factory("fast")
+                chat.chat([{"role": "user", "content": "hi"}])
+            except Exception:
+                pass  # Best-effort — cold start just means slower first query
+            try:
+                # Warm the embedding model
+                self._embedder.embed("warmup")
+            except Exception:
+                pass
+
+        self._warmup_thread = threading.Thread(target=_warmup, daemon=True)
+        self._warmup_thread.start()
+
     def answer(
         self, query: Query, *, progress: Callable[[str], None] | None = None
     ) -> Answer:
