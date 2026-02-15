@@ -71,13 +71,46 @@ def _extract_constraint_features(
     signals = [r.signal for r in constraint_results.values() if r.signal]
     features["has_qualified_signal"] = "qualified" in signals
 
+    # Aggregate signal features (any constraint emitting these signals)
+    features["has_abstain_signal"] = "abstain" in signals
+    features["has_disputed_signal"] = "disputed" in signals
+
+    # AV constraint: also track av_fired
+    av = constraint_results.get("answer_verification")
+    if av:
+        features["av_fired"] = not av.allow_decisive_answer
+        features["av_jury_votes_no"] = av.metadata.get("jury_votes")
+    else:
+        features["av_fired"] = None
+        features["av_jury_votes_no"] = None
+
     # IE constraint features
     ie = constraint_results.get("insufficient_evidence")
     if ie:
+        m = ie.metadata
         features["ie_fired"] = not ie.allow_decisive_answer
         features["ie_signal"] = ie.signal
+        features["ie_max_similarity"] = m.get("max_similarity")
+        features["ie_entity_match_found"] = m.get("ie_entity_match_found")
+        features["ie_primary_match_found"] = m.get("ie_primary_match_found")
+        features["ie_critical_match_found"] = m.get("ie_critical_match_found")
+        features["ie_query_aspect"] = m.get("ie_query_aspect")
+        features["ie_summary_overlap"] = m.get("ie_summary_overlap")
+        features["ie_has_matching_aspect"] = m.get("ie_has_matching_aspect")
+        features["ie_has_conflicting_aspect"] = m.get("ie_has_conflicting_aspect")
+        features["ie_detection_reason"] = m.get("detection_reason")
     else:
         features["ie_fired"] = None
+        features["ie_signal"] = None
+        features["ie_max_similarity"] = None
+        features["ie_entity_match_found"] = None
+        features["ie_primary_match_found"] = None
+        features["ie_critical_match_found"] = None
+        features["ie_query_aspect"] = None
+        features["ie_summary_overlap"] = None
+        features["ie_has_matching_aspect"] = None
+        features["ie_has_conflicting_aspect"] = None
+        features["ie_detection_reason"] = None
 
     # ConflictAware features
     ca = constraint_results.get("conflict_aware")
@@ -86,10 +119,11 @@ def _extract_constraint_features(
         features["ca_fired"] = not ca.allow_decisive_answer
         features["ca_signal"] = ca.signal
         features["ca_numerical_variance_detected"] = m.get("ca_numerical_variance_detected")
-        features["ca_skipped_hedged_pairs"] = m.get("ca_skipped_hedged_pairs")
         features["ca_pairs_checked"] = m.get("ca_pairs_checked")
         features["ca_first_evidence_char"] = m.get("ca_first_evidence_char")
         features["ca_evidence_characters"] = m.get("ca_evidence_characters")
+        features["ca_is_uncertainty_query"] = m.get("ca_is_uncertainty_query")
+        features["ca_relevance_filtered_count"] = m.get("ca_relevance_filtered_count")
     else:
         features["ca_fired"] = None
 
@@ -115,17 +149,39 @@ def _extract_constraint_features(
     else:
         features["sit_fired"] = None
 
-    # AnswerVerification features
-    av = constraint_results.get("answer_verification")
-    if av:
-        features["av_jury_votes_no"] = av.metadata.get("jury_votes")
-    else:
-        features["av_jury_votes_no"] = None
+    # (AV constraint features extracted above with aggregate signals)
+
+
+_COMPARISON_WORDS = {"vs", "versus", "compare", "compared", "differ", "difference", "between"}
+_QUESTION_TYPE_RE = re.compile(r"^(what|how|why|when|where|who|which|is|are|was|were|do|does|did|can|could|should|will|would)\b", re.IGNORECASE)
 
 
 def _extract_query_features(features: dict[str, Any], query: str) -> None:
     """Extract cheap features from the query text."""
     features["query_word_count"] = len(query.split())
+
+    # Comparison words
+    q_lower_words = set(query.lower().split())
+    features["query_has_comparison_words"] = bool(q_lower_words & _COMPARISON_WORDS)
+
+    # Question type classification
+    m = _QUESTION_TYPE_RE.match(query.strip())
+    if m:
+        word = m.group(1).lower()
+        if word in ("what", "which"):
+            features["query_question_type"] = "what"
+        elif word == "how":
+            features["query_question_type"] = "how"
+        elif word == "why":
+            features["query_question_type"] = "why"
+        elif word in ("when", "where"):
+            features["query_question_type"] = "when_where"
+        elif word == "who":
+            features["query_question_type"] = "who"
+        else:
+            features["query_question_type"] = "yes_no"
+    else:
+        features["query_question_type"] = "other"
 
 
 def _extract_chunk_features(
@@ -137,6 +193,9 @@ def _extract_chunk_features(
     if not chunks:
         features["num_unique_sources"] = 0
         features["mean_vector_score"] = None
+        features["max_vector_score"] = None
+        features["min_vector_score"] = None
+        features["std_vector_score"] = None
         features["score_spread"] = None
         features["vocab_overlap_ratio"] = 0.0
         # Inter-chunk defaults (including ctx_* features)
@@ -145,6 +204,7 @@ def _extract_chunk_features(
             "min_pairwise_overlap",
             "chunk_length_cv",
             "assertion_density",
+            "hedge_density",
             "number_density",
             "ctx_length_mean",
             "ctx_length_std",
@@ -184,9 +244,15 @@ def _extract_chunk_features(
 
     if scores:
         features["mean_vector_score"] = statistics.mean(scores)
+        features["max_vector_score"] = max(scores)
+        features["min_vector_score"] = min(scores)
+        features["std_vector_score"] = statistics.pstdev(scores) if len(scores) > 1 else 0.0
         features["score_spread"] = max(scores) - min(scores)
     else:
         features["mean_vector_score"] = None
+        features["max_vector_score"] = None
+        features["min_vector_score"] = None
+        features["std_vector_score"] = None
         features["score_spread"] = None
 
     # Vocabulary overlap between query and chunks
@@ -364,6 +430,7 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
         "min_pairwise_overlap": 0.0,
         "chunk_length_cv": 0.0,
         "assertion_density": 0.0,
+        "hedge_density": 0.0,
         "number_density": 0.0,
         "ctx_length_mean": 0.0,
         "ctx_length_std": 0.0,
@@ -443,6 +510,10 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
     else:
         features["assertion_density"] = 0.0
 
+    # --- Hedge density (raw hedge count / total words) ---
+    total_words = sum(chunk_lengths)
+    features["hedge_density"] = total_hedge / total_words if total_words > 0 else 0.0
+
     # --- Number density (numbers per chunk) ---
     features["number_density"] = total_numbers / len(chunks)
 
@@ -496,10 +567,18 @@ def _extract_detection_features(features: dict[str, Any], detection_summary: Any
     if detection_summary is None:
         features["detection_temporal"] = None
         features["detection_comparison"] = None
+        features["detection_aggregation"] = None
+        features["detection_boost_recency"] = None
+        features["detection_boost_authority"] = None
+        features["detection_needs_rewriting"] = None
         return
 
     features["detection_temporal"] = getattr(detection_summary, "has_temporal_intent", None)
     features["detection_comparison"] = getattr(detection_summary, "has_comparison_intent", None)
+    features["detection_aggregation"] = getattr(detection_summary, "has_aggregation_intent", None)
+    features["detection_boost_recency"] = getattr(detection_summary, "boost_recency", None)
+    features["detection_boost_authority"] = getattr(detection_summary, "boost_authority", None)
+    features["detection_needs_rewriting"] = getattr(detection_summary, "needs_rewriting", None)
 
 
 __all__ = ["extract_features"]

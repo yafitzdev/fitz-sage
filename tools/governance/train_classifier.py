@@ -81,31 +81,50 @@ _META_COLS = {
 # Categorical features that need label encoding
 _CATEGORICAL_FEATURES = {
     "ie_signal",
+    "ie_query_aspect",
+    "ie_detection_reason",
     "ca_signal",
     "ca_first_evidence_char",
     "ca_evidence_characters",
     "caa_query_type",
     "sit_info_type_requested",
+    "query_question_type",
 }
 
 # Dead features: constant zero/single-value across all cases — adds noise
-_DEAD_FEATURES = {"ie_fired", "ie_signal", "num_unique_sources"}
+# num_unique_sources: always 1 in fitz-gov (single doc_id per case)
+_DEAD_FEATURES = {"num_unique_sources"}
 
 # Boolean features to convert to int
 _BOOL_FEATURES = {
     "ie_fired",
+    "ie_entity_match_found",
+    "ie_primary_match_found",
+    "ie_critical_match_found",
+    "ie_has_matching_aspect",
+    "ie_has_conflicting_aspect",
+    "ie_summary_overlap",
     "ca_fired",
     "ca_numerical_variance_detected",
+    "ca_is_uncertainty_query",
     "caa_fired",
     "caa_has_causal_evidence",
     "caa_has_predictive_evidence",
     "sit_fired",
     "sit_entity_mismatch",
     "sit_has_specific_info",
+    "av_fired",
+    "has_abstain_signal",
+    "has_disputed_signal",
     "has_qualified_signal",
+    "query_has_comparison_words",
+    "has_distinct_years",
     "detection_temporal",
     "detection_comparison",
-    "has_distinct_years",
+    "detection_aggregation",
+    "detection_boost_recency",
+    "detection_boost_authority",
+    "detection_needs_rewriting",
 }
 
 # Markers for context feature extraction
@@ -313,6 +332,10 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
     for col in X.columns:
         X[col] = pd.to_numeric(X[col], errors="coerce").fillna(0)
 
+    # Log-transform ctx_number_variance (max can be 7.4 trillion — huge range)
+    if "ctx_number_variance" in X.columns:
+        X["ctx_number_variance"] = np.log1p(X["ctx_number_variance"])
+
     # Interaction features (derived from existing columns, no re-extraction needed)
     if "ca_fired" in X.columns and "mean_vector_score" in X.columns:
         X["ix_ca_x_vector"] = X["ca_fired"] * X["mean_vector_score"]
@@ -326,6 +349,12 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
         X["ix_score_confidence"] = X["mean_vector_score"] - X["score_spread"]
     if "ca_pairs_checked" in X.columns and "has_disputed_signal" in X.columns:
         X["ix_ca_pairs_x_disputed"] = X["ca_pairs_checked"] * X["has_disputed_signal"]
+    # New: IE similarity * IE fired — strong abstain signal
+    if "ie_max_similarity" in X.columns and "ie_fired" in X.columns:
+        X["ix_ie_sim_x_fired"] = X["ie_max_similarity"] * X["ie_fired"]
+    # New: AV votes * vector score — qualified signal
+    if "av_jury_votes_no" in X.columns and "mean_vector_score" in X.columns:
+        X["ix_av_votes_x_vector"] = X["av_jury_votes_no"] * X["mean_vector_score"]
 
     return X, encoders
 

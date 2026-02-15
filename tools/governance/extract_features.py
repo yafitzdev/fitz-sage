@@ -62,6 +62,7 @@ _BOOL_FEATURES = {
     "ie_critical_match_found",
     "ie_has_matching_aspect",
     "ie_has_conflicting_aspect",
+    "ie_summary_overlap",
     "ca_fired",
     "ca_numerical_variance_detected",
     "ca_is_uncertainty_query",
@@ -75,6 +76,8 @@ _BOOL_FEATURES = {
     "has_abstain_signal",
     "has_disputed_signal",
     "has_qualified_signal",
+    "query_has_comparison_words",
+    "has_distinct_years",
     "detection_temporal",
     "detection_aggregation",
     "detection_comparison",
@@ -85,8 +88,6 @@ _BOOL_FEATURES = {
 
 _NUMERIC_FEATURES = {
     "ie_max_similarity",
-    "ie_summary_overlap",
-    "ca_skipped_hedged_pairs",
     "ca_pairs_checked",
     "ca_relevance_filtered_count",
     "av_jury_votes_no",
@@ -95,19 +96,25 @@ _NUMERIC_FEATURES = {
     "num_chunks",
     "num_unique_sources",
     "mean_vector_score",
+    "max_vector_score",
+    "min_vector_score",
     "std_vector_score",
     "score_spread",
     "vocab_overlap_ratio",
+    "hedge_density",
+    "year_count",
 }
 
 _STRING_FEATURES = {
     "ie_signal",
     "ie_query_aspect",
+    "ie_detection_reason",
     "ca_signal",
     "ca_first_evidence_char",
     "ca_evidence_characters",
     "caa_query_type",
     "sit_info_type_requested",
+    "query_question_type",
     "dominant_content_type",
 }
 

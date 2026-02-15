@@ -62,35 +62,55 @@ _DEFAULT_OUTPUT = Path(__file__).resolve().parent / "data" / "eval_results.csv"
 # Feature type sets (copied from extract_features.py / train_classifier.py for preprocessing)
 _BOOL_FEATURES = {
     "ie_fired",
+    "ie_entity_match_found",
+    "ie_primary_match_found",
+    "ie_critical_match_found",
+    "ie_has_matching_aspect",
+    "ie_has_conflicting_aspect",
+    "ie_summary_overlap",
     "ca_fired",
     "ca_numerical_variance_detected",
+    "ca_is_uncertainty_query",
     "caa_fired",
     "caa_has_causal_evidence",
     "caa_has_predictive_evidence",
     "sit_fired",
     "sit_entity_mismatch",
     "sit_has_specific_info",
+    "av_fired",
+    "has_abstain_signal",
+    "has_disputed_signal",
     "has_qualified_signal",
+    "query_has_comparison_words",
+    "has_distinct_years",
     "detection_temporal",
     "detection_comparison",
-    "has_distinct_years",
+    "detection_aggregation",
+    "detection_boost_recency",
+    "detection_boost_authority",
+    "detection_needs_rewriting",
 }
 
 _NUMERIC_FEATURES = {
-    "ca_skipped_hedged_pairs",
+    "ie_max_similarity",
     "ca_pairs_checked",
+    "ca_relevance_filtered_count",
     "av_jury_votes_no",
     "num_constraints_fired",
     "query_word_count",
     "num_chunks",
     "num_unique_sources",
     "mean_vector_score",
+    "max_vector_score",
+    "min_vector_score",
+    "std_vector_score",
     "score_spread",
     "vocab_overlap_ratio",
     "max_pairwise_overlap",
     "min_pairwise_overlap",
     "chunk_length_cv",
     "assertion_density",
+    "hedge_density",
     "number_density",
     "ctx_length_mean",
     "ctx_length_std",
@@ -107,11 +127,14 @@ _NUMERIC_FEATURES = {
 
 _STRING_FEATURES = {
     "ie_signal",
+    "ie_query_aspect",
+    "ie_detection_reason",
     "ca_signal",
     "ca_first_evidence_char",
     "ca_evidence_characters",
     "caa_query_type",
     "sit_info_type_requested",
+    "query_question_type",
 }
 
 _META_COLS = {
@@ -200,10 +223,10 @@ def enrich_chunks_with_embeddings(
 # ---------------------------------------------------------------------------
 
 
-def make_constraints(chat, chat_balanced=None) -> list:
+def make_constraints(chat, chat_balanced=None, embedder=None) -> list:
     """Create a fresh set of constraints."""
     return [
-        InsufficientEvidenceConstraint(chat=chat),
+        InsufficientEvidenceConstraint(chat=chat, embedder=embedder),
         CausalAttributionConstraint(),
         SpecificInfoTypeConstraint(),
         ConflictAwareConstraint(chat=chat),
@@ -373,11 +396,14 @@ def process_case(
     embedder,
     detection_orchestrator: DetectionOrchestrator,
     classifier: GovernanceClassifier,
+    chat_balanced=None,
 ) -> dict[str, Any] | None:
     """Process a single case with full feature enrichment."""
     # Thread-local constraints
     if not hasattr(_thread_local, "constraints"):
-        _thread_local.constraints = make_constraints(chat)
+        _thread_local.constraints = make_constraints(
+            chat, chat_balanced=chat_balanced, embedder=embedder
+        )
 
     query = case["query"]
     chunks = case_to_chunks(case)
@@ -544,6 +570,7 @@ def main():
     chat_config = {k: v for k, v in cfg.chat_kwargs.model_dump().items() if v is not None}
     chat_factory = get_chat_factory(chat_spec, config=chat_config)
     chat = chat_factory("fast")
+    chat_balanced = chat_factory("balanced")
     print(f"Chat provider: {chat_spec}")
 
     # Embedding client
@@ -575,7 +602,7 @@ def main():
         # Single-threaded (simpler for debugging)
         for case in tqdm(cases, desc="Evaluating"):
             try:
-                row = process_case(case, chat, embedder, detection_orchestrator, classifier)
+                row = process_case(case, chat, embedder, detection_orchestrator, classifier, chat_balanced=chat_balanced)
                 if row:
                     all_rows.append(row)
             except Exception as e:
@@ -587,7 +614,8 @@ def main():
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
             futures = {
                 executor.submit(
-                    process_case, case, chat, embedder, detection_orchestrator, classifier
+                    process_case, case, chat, embedder, detection_orchestrator, classifier,
+                    chat_balanced=chat_balanced,
                 ): case["id"]
                 for case in cases
             }
