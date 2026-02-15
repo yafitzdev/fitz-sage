@@ -212,17 +212,22 @@ def _run_persistent_ingest_query(
         wall_start = time.perf_counter()
 
         engine_instance = create_engine(engine_name)
+        t_engine = time.perf_counter() - wall_start
 
         # Point at source if provided
         if source is not None:
+            t0 = time.perf_counter()
             ui.info(f"Registering {source}...")
             manifest = engine_instance.point(
                 source, collection, start_worker=False, progress=ui.info
             )
+            t_point = time.perf_counter() - t0
             ui.info(f"Registered {len(manifest.entries())} files")
         else:
+            t0 = time.perf_counter()
             ui.info(f"Loading collection '{collection}'...")
             engine_instance.load(collection)
+            t_point = time.perf_counter() - t0
 
         if chat:
             _chat_loop(engine_instance, collection)
@@ -232,7 +237,10 @@ def _run_persistent_ingest_query(
             query = Query(text=question_text)
             answer = engine_instance.answer(query, progress=ui.info)
             wall_total = time.perf_counter() - wall_start
-            ui.info(f"Total wall-clock: {wall_total:.1f}s")
+            ui.info(
+                f"Total wall-clock: {wall_total:.1f}s "
+                f"(engine={t_engine:.1f}s, register={t_point:.1f}s)"
+            )
             display_answer(answer)
     except Exception as e:
         # Show clean error message, full traceback only at debug level

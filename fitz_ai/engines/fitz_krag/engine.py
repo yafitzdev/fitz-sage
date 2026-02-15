@@ -439,6 +439,45 @@ class FitzKragEngine:
 
         return False
 
+    # Words to ignore when extracting entities from a query.
+    _STOP_WORDS = frozenset(
+        "what where who when how is are does do did the a an of in to for on "
+        "with by from about it this that these those my your its can could "
+        "should would will shall may might be been being have has had".split()
+    )
+
+    @staticmethod
+    def _fast_analyze(query: str) -> "QueryAnalysis | None":
+        """Try to classify simple queries without an LLM call.
+
+        Returns QueryAnalysis for short, straightforward queries where LLM
+        classification adds no value. Returns None for complex queries that
+        need LLM analysis.
+        """
+        from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
+
+        words = query.split()
+        n = len(words)
+
+        # Complex queries always need LLM analysis
+        if n > 8:
+            return None
+
+        # Extract entities: non-stop content words (preserving original case)
+        entities = tuple(
+            w.rstrip("?.,!;:")
+            for w in words
+            if w.lower().rstrip("?.,!;:") not in FitzKragEngine._STOP_WORDS
+            and len(w) > 1
+        )
+
+        return QueryAnalysis(
+            primary_type=QueryType.GENERAL,
+            confidence=0.9,
+            entities=entities,
+            refined_query=query,
+        )
+
     def _warmup_llm(self) -> None:
         """Fire a lightweight LLM call to pre-load the model.
 
@@ -520,28 +559,50 @@ class FitzKragEngine:
             t0 = time.perf_counter()
             from concurrent.futures import ThreadPoolExecutor
 
-            with ThreadPoolExecutor(max_workers=3) as pool:
-                analysis_future = pool.submit(self._query_analyzer.analyze, retrieval_query)
-                # Skip detection LLM call for simple queries that won't trigger
-                # any detection (temporal, comparison, aggregation, etc.)
-                need_detection = (
-                    self._detection_orchestrator
-                    and self._needs_detection(retrieval_query)
-                )
-                detection_future = (
-                    pool.submit(
-                        self._detection_orchestrator.detect_for_retrieval, retrieval_query
+            # Short, simple queries can be classified heuristically — skip
+            # the analysis LLM call entirely (~2.5s saved).
+            fast_analysis = self._fast_analyze(retrieval_query)
+            need_llm_analysis = fast_analysis is None
+
+            need_detection = (
+                self._detection_orchestrator
+                and self._needs_detection(retrieval_query)
+            )
+
+            # Only spin up thread pool if we have LLM work to do
+            if need_llm_analysis or need_detection:
+                with ThreadPoolExecutor(max_workers=3) as pool:
+                    analysis_future = (
+                        pool.submit(self._query_analyzer.analyze, retrieval_query)
+                        if need_llm_analysis
+                        else None
                     )
-                    if need_detection
-                    else None
-                )
-                # Pre-warm embedding model: embed the base query in parallel with
-                # analysis+detection so the cold-start cost (~2s) is hidden.
-                embed_future = pool.submit(self._embedder.embed_batch, [retrieval_query])
-                analysis = analysis_future.result()
-                detection = detection_future.result() if detection_future else None
+                    detection_future = (
+                        pool.submit(
+                            self._detection_orchestrator.detect_for_retrieval, retrieval_query
+                        )
+                        if need_detection
+                        else None
+                    )
+                    embed_future = pool.submit(self._embedder.embed_batch, [retrieval_query])
+
+                    analysis = (
+                        analysis_future.result() if analysis_future else fast_analysis
+                    )
+                    detection = detection_future.result() if detection_future else None
+                    try:
+                        precomputed_vectors = embed_future.result()
+                        precomputed_query_vector = (
+                            dict(zip([retrieval_query], precomputed_vectors))
+                        )
+                    except Exception:
+                        precomputed_query_vector = None
+            else:
+                # Simple query: no LLM calls needed, just embed
+                analysis = fast_analysis
+                detection = None
                 try:
-                    precomputed_vectors = embed_future.result()
+                    precomputed_vectors = self._embedder.embed_batch([retrieval_query])
                     precomputed_query_vector = (
                         dict(zip([retrieval_query], precomputed_vectors))
                     )
