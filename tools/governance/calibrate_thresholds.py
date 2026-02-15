@@ -2,7 +2,7 @@
 """
 Per-stage calibrated thresholds for two-stage governance classifier.
 
-Loads model_v5_twostage.joblib and eval_results_v2.csv, reproduces the exact
+Loads model_v5_twostage.joblib and features.csv, reproduces the exact
 train/test split, extracts predict_proba() on test cases for each stage, and
 sweeps per-stage thresholds.
 
@@ -36,10 +36,12 @@ from tools.governance.train_classifier import (
     _3CLASS_LABELS,
     _BOOL_FEATURES,
     _CATEGORICAL_FEATURES,
+    _DEAD_FEATURES,
     _META_COLS,
     _collapse_to_3class,
     compute_context_features,
     load_cases_by_id,
+    prepare_features as _train_prepare_features,
 )
 
 _DATA_DIR = Path(__file__).resolve().parent / "data"
@@ -55,7 +57,7 @@ _TWOSTAGE_OUTPUT_PATH = _DATA_DIR / "model_v5_calibrated.joblib"
 _4CLASS_MODEL_PATH = _DATA_DIR / "model_v3.joblib"
 _4CLASS_OUTPUT_PATH = _DATA_DIR / "model_v3_calibrated.joblib"
 
-_EVAL_CSV = _DATA_DIR / "eval_results_v2.csv"
+_EVAL_CSV = _DATA_DIR / "features.csv"
 
 SEED = 42
 TEST_SIZE = 0.2
@@ -67,9 +69,18 @@ TEST_SIZE = 0.2
 
 
 def prepare_features(df: pd.DataFrame, encoders: dict[str, LabelEncoder]) -> pd.DataFrame:
-    """Prepare feature matrix using pre-fitted encoders from the saved artifact."""
+    """Prepare feature matrix using pre-fitted encoders from the saved artifact.
+
+    Uses the same logic as train_classifier.prepare_features (dead feature removal,
+    interaction features) but applies pre-fitted encoders instead of fitting new ones.
+    """
     feature_cols = [c for c in df.columns if c not in _META_COLS]
     X = df[feature_cols].copy()
+
+    # Drop dead features (same as training)
+    dead_present = [c for c in _DEAD_FEATURES if c in X.columns]
+    if dead_present:
+        X = X.drop(columns=dead_present)
 
     for col in _CATEGORICAL_FEATURES:
         if col not in X.columns:
@@ -91,6 +102,20 @@ def prepare_features(df: pd.DataFrame, encoders: dict[str, LabelEncoder]) -> pd.
     X = X.fillna(0)
     for col in X.columns:
         X[col] = pd.to_numeric(X[col], errors="coerce").fillna(0)
+
+    # Interaction features (same as training)
+    if "ca_fired" in X.columns and "mean_vector_score" in X.columns:
+        X["ix_ca_x_vector"] = X["ca_fired"] * X["mean_vector_score"]
+    if "ctx_contradiction_count" in X.columns and "ctx_total_chars" in X.columns:
+        X["ix_contradiction_density"] = X["ctx_contradiction_count"] / (
+            X["ctx_total_chars"] + 1
+        )
+    if "ctx_negation_count" in X.columns and "ctx_total_chars" in X.columns:
+        X["ix_negation_density"] = X["ctx_negation_count"] / (X["ctx_total_chars"] + 1)
+    if "mean_vector_score" in X.columns and "score_spread" in X.columns:
+        X["ix_score_confidence"] = X["mean_vector_score"] - X["score_spread"]
+    if "ca_pairs_checked" in X.columns and "has_disputed_signal" in X.columns:
+        X["ix_ca_pairs_x_disputed"] = X["ca_pairs_checked"] * X["has_disputed_signal"]
 
     return X
 
@@ -184,9 +209,13 @@ def twostage_predict(
     final_preds = np.full(n, "abstain", dtype=object)
 
     # Stage 1: answerable vs abstain
+    # Handles both string labels (["abstain", "answerable"]) and int labels ([0, 1])
     s1_probas = s1_model.predict_proba(X)
     s1_classes = list(s1_model.classes_)
-    answerable_idx = s1_classes.index("answerable")
+    if "answerable" in s1_classes:
+        answerable_idx = s1_classes.index("answerable")
+    else:
+        answerable_idx = s1_classes.index(1)  # int encoding: 0=abstain, 1=answerable
 
     # Cases where P(answerable) >= threshold -> pass to Stage 2
     s1_answerable_mask = s1_probas[:, answerable_idx] >= s1_threshold
@@ -198,7 +227,10 @@ def twostage_predict(
         X_answerable = X[s1_answerable_mask]
         s2_probas = s2_model.predict_proba(X_answerable)
         s2_classes = list(s2_model.classes_)
-        trustworthy_idx = s2_classes.index("trustworthy")
+        if "trustworthy" in s2_classes:
+            trustworthy_idx = s2_classes.index("trustworthy")
+        else:
+            trustworthy_idx = s2_classes.index(1)  # int encoding: 0=disputed, 1=trustworthy
 
         s2_probas_full[s1_answerable_mask] = s2_probas
 
@@ -332,27 +364,28 @@ def calibrate_twostage(model_path: Path, eval_csv: Path, output_path: Path):
     print(f"{'='*70}")
 
     s1_classes = list(s1_model.classes_)
-    answerable_idx = s1_classes.index("answerable")
-    # Stage 1 proba stats
+    answerable_idx = s1_classes.index(1) if 1 in s1_classes else s1_classes.index("answerable")
+    # Stage 1 proba stats — use int labels (0=abstain, 1=answerable) to match model
     y_s1_true = np.array(
-        ["abstain" if lbl == "abstain" else "answerable" for lbl in y3_test],
-        dtype=object,
+        [0 if lbl == "abstain" else 1 for lbl in y3_test],
+        dtype=int,
     )
+    _s1_display = {1: "answerable", 0: "abstain"}
     print("\nStage 1 P(answerable) stats:")
-    for true_label in ["answerable", "abstain"]:
+    for true_label in [1, 0]:
         mask = y_s1_true == true_label
         if mask.sum() > 0:
             probs = s1_probas[mask, answerable_idx]
             print(
-                f"  {true_label:12s}: mean={probs.mean():.3f} "
+                f"  {_s1_display[true_label]:12s}: mean={probs.mean():.3f} "
                 f"median={np.median(probs):.3f} min={probs.min():.3f} max={probs.max():.3f}"
             )
 
     # Stage 2 proba stats (for answerable cases only)
     s2_classes = list(s2_model.classes_)
-    trustworthy_idx = s2_classes.index("trustworthy")
+    trustworthy_idx = s2_classes.index(1) if 1 in s2_classes else s2_classes.index("trustworthy")
 
-    answerable_mask = y_s1_true == "answerable"
+    answerable_mask = y_s1_true == 1
     if answerable_mask.any():
         s2_preds_probas = s2_model.predict_proba(X_test[answerable_mask])
         y_answerable_true = y3_test[answerable_mask]

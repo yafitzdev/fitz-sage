@@ -46,6 +46,20 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import SVC
 from sklearn.utils.class_weight import compute_sample_weight
 
+try:
+    from xgboost import XGBClassifier
+
+    _HAS_XGB = True
+except ImportError:
+    _HAS_XGB = False
+
+try:
+    from lightgbm import LGBMClassifier
+
+    _HAS_LGBM = True
+except ImportError:
+    _HAS_LGBM = False
+
 _DATA_DIR = Path(__file__).resolve().parent / "data"
 _DEFAULT_INPUT = _DATA_DIR / "features.csv"
 _DEFAULT_MODEL_OUTPUT = _DATA_DIR / "model_v1.joblib"
@@ -73,6 +87,9 @@ _CATEGORICAL_FEATURES = {
     "caa_query_type",
     "sit_info_type_requested",
 }
+
+# Dead features: constant zero/single-value across all cases — adds noise
+_DEAD_FEATURES = {"ie_fired", "ie_signal", "num_unique_sources"}
 
 # Boolean features to convert to int
 _BOOL_FEATURES = {
@@ -273,6 +290,12 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
     X = df[feature_cols].copy()
     encoders: dict[str, LabelEncoder] = {}
 
+    # Drop dead features (constant zero / single-value across all cases)
+    dead_present = [c for c in _DEAD_FEATURES if c in X.columns]
+    if dead_present:
+        X = X.drop(columns=dead_present)
+        print(f"  Dropped {len(dead_present)} dead features: {dead_present}")
+
     for col in _CATEGORICAL_FEATURES:
         if col not in X.columns:
             continue
@@ -289,6 +312,20 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
     X = X.fillna(0)
     for col in X.columns:
         X[col] = pd.to_numeric(X[col], errors="coerce").fillna(0)
+
+    # Interaction features (derived from existing columns, no re-extraction needed)
+    if "ca_fired" in X.columns and "mean_vector_score" in X.columns:
+        X["ix_ca_x_vector"] = X["ca_fired"] * X["mean_vector_score"]
+    if "ctx_contradiction_count" in X.columns and "ctx_total_chars" in X.columns:
+        X["ix_contradiction_density"] = X["ctx_contradiction_count"] / (
+            X["ctx_total_chars"] + 1
+        )
+    if "ctx_negation_count" in X.columns and "ctx_total_chars" in X.columns:
+        X["ix_negation_density"] = X["ctx_negation_count"] / (X["ctx_total_chars"] + 1)
+    if "mean_vector_score" in X.columns and "score_spread" in X.columns:
+        X["ix_score_confidence"] = X["mean_vector_score"] - X["score_spread"]
+    if "ca_pairs_checked" in X.columns and "has_disputed_signal" in X.columns:
+        X["ix_ca_pairs_x_disputed"] = X["ca_pairs_checked"] * X["has_disputed_signal"]
 
     return X, encoders
 
@@ -574,13 +611,14 @@ def train_twostage(
         stratify=y_3class,
     )
     y_s1_train = np.array(
-        ["abstain" if lbl == "abstain" else "answerable" for lbl in y3_train],
-        dtype=object,
+        [0 if lbl == "abstain" else 1 for lbl in y3_train],
+        dtype=int,
     )
     y_s1_test = np.array(
-        ["abstain" if lbl == "abstain" else "answerable" for lbl in y3_test],
-        dtype=object,
+        [0 if lbl == "abstain" else 1 for lbl in y3_test],
+        dtype=int,
     )
+    _s1_label_map = {0: "abstain", 1: "answerable"}
 
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
     time_per_stage = time_budget // 2
@@ -590,10 +628,10 @@ def train_twostage(
     print("STAGE 1: answerable vs abstain")
     print(f"{'='*60}")
     print(
-        f"Train: {sum(y_s1_train == 'answerable')} answerable, {sum(y_s1_train == 'abstain')} abstain"
+        f"Train: {sum(y_s1_train == 1)} answerable, {sum(y_s1_train == 0)} abstain"
     )
     print(
-        f"Test:  {sum(y_s1_test == 'answerable')} answerable, {sum(y_s1_test == 'abstain')} abstain"
+        f"Test:  {sum(y_s1_test == 1)} answerable, {sum(y_s1_test == 0)} abstain"
     )
 
     s1_models = {
@@ -617,15 +655,39 @@ def train_twostage(
             random_state=seed,
         ),
     }
+    if _HAS_XGB:
+        n_abstain = sum(y_s1_train == 0)
+        n_answerable = sum(y_s1_train == 1)
+        s1_models["XGB"] = XGBClassifier(
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.1,
+            scale_pos_weight=n_abstain / n_answerable if n_answerable > 0 else 1,
+            random_state=seed,
+            n_jobs=-1,
+            eval_metric="logloss",
+            verbosity=0,
+        )
+    if _HAS_LGBM:
+        s1_models["LGBM"] = LGBMClassifier(
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.1,
+            class_weight="balanced",
+            random_state=seed,
+            n_jobs=-1,
+            verbose=-1,
+        )
 
     print("\n--- Stage 1: Quick comparison ---")
+    print("  Selection: best abstain recall (answerable recall >= 0.80)")
     s1_results = {}
     for name, model in s1_models.items():
         cv_scores = cross_val_score(model, X_train, y_s1_train, cv=cv, scoring="accuracy")
         model.fit(X_train, y_s1_train)
         pred = model.predict(X_test)
         acc = accuracy_score(y_s1_test, pred)
-        cm = confusion_matrix(y_s1_test, pred, labels=["abstain", "answerable"])
+        cm = confusion_matrix(y_s1_test, pred, labels=[0, 1])
         abs_recall = cm[0, 0] / cm[0].sum() if cm[0].sum() > 0 else 0
         ans_recall = cm[1, 1] / cm[1].sum() if cm[1].sum() > 0 else 0
         s1_results[name] = {
@@ -633,15 +695,28 @@ def train_twostage(
             "acc": acc,
             "cv": cv_scores.mean(),
             "cv_std": cv_scores.std(),
+            "abs_recall": abs_recall,
+            "ans_recall": ans_recall,
         }
         print(
             f"  {name:6s}: test={acc:.4f}, CV={cv_scores.mean():.4f} (+/-{cv_scores.std():.4f})"
             f"  abstain={abs_recall:.3f} answerable={ans_recall:.3f}"
         )
 
-    # Hyperparameter search on top Stage 1 model
-    s1_ranked = sorted(s1_results.items(), key=lambda x: x[1]["acc"], reverse=True)
+    # Stage 1 selection: best abstain recall with answerable recall >= 0.80
+    # Stage 1's job is to CATCH abstain cases — overall accuracy favors majority class
+    _MIN_ANS_RECALL = 0.80
+    s1_eligible = [
+        (name, info)
+        for name, info in s1_results.items()
+        if info["ans_recall"] >= _MIN_ANS_RECALL
+    ]
+    if not s1_eligible:
+        s1_eligible = list(s1_results.items())  # fallback: all models
+    s1_ranked = sorted(s1_eligible, key=lambda x: x[1]["abs_recall"], reverse=True)
     s1_best_name = s1_ranked[0][0]
+    print(f"\n  Selected: {s1_best_name} (abstain={s1_results[s1_best_name]['abs_recall']:.3f},"
+          f" answerable={s1_results[s1_best_name]['ans_recall']:.3f})")
     print(f"\n--- Stage 1: Tuning {s1_best_name} ({time_per_stage}s budget) ---")
 
     s1_param_grids = {
@@ -663,6 +738,26 @@ def train_twostage(
             "learning_rate": uniform(0.01, 0.3),
             "subsample": uniform(0.6, 0.4),
         },
+        "XGB": {
+            "n_estimators": randint(100, 600),
+            "max_depth": randint(2, 10),
+            "learning_rate": uniform(0.01, 0.3),
+            "subsample": uniform(0.6, 0.4),
+            "colsample_bytree": uniform(0.3, 0.7),
+            "reg_alpha": uniform(0, 1),
+            "reg_lambda": uniform(0.5, 2),
+            "min_child_weight": randint(1, 10),
+        },
+        "LGBM": {
+            "n_estimators": randint(100, 600),
+            "max_depth": [-1, 5, 10, 15, 20],
+            "learning_rate": uniform(0.01, 0.3),
+            "subsample": uniform(0.6, 0.4),
+            "colsample_bytree": uniform(0.3, 0.7),
+            "reg_alpha": uniform(0, 1),
+            "reg_lambda": uniform(0.5, 2),
+            "num_leaves": randint(15, 63),
+        },
     }
 
     s1_base = {
@@ -670,23 +765,34 @@ def train_twostage(
         "ET": ExtraTreesClassifier(class_weight="balanced", random_state=seed, n_jobs=-1),
         "GBT": GradientBoostingClassifier(random_state=seed),
     }
+    if _HAS_XGB:
+        s1_base["XGB"] = XGBClassifier(
+            random_state=seed, n_jobs=-1, eval_metric="logloss", verbosity=0
+        )
+    if _HAS_LGBM:
+        s1_base["LGBM"] = LGBMClassifier(
+            class_weight="balanced", random_state=seed, n_jobs=-1, verbose=-1
+        )
 
     n_iter = max(10, int(time_per_stage / 3))
+    # Stage 1 optimizes for balanced recall (macro), not accuracy.
+    # Accuracy favors the majority class (answerable), but Stage 1's job
+    # is to CATCH abstain cases — recall_macro balances both classes equally.
     s1_search = RandomizedSearchCV(
         s1_base[s1_best_name],
         s1_param_grids[s1_best_name],
         n_iter=n_iter,
         cv=cv,
-        scoring="accuracy",
+        scoring="recall_macro",
         random_state=seed,
-        n_jobs=-1 if s1_best_name != "GBT" else 1,
+        n_jobs=-1 if s1_best_name not in ("GBT", "XGB", "LGBM") else 1,
     )
     s1_search.fit(X_train, y_s1_train)
     s1_model = s1_search.best_estimator_
 
     s1_pred_test = s1_model.predict(X_test)
     s1_acc = accuracy_score(y_s1_test, s1_pred_test)
-    cm_s1 = confusion_matrix(y_s1_test, s1_pred_test, labels=["abstain", "answerable"])
+    cm_s1 = confusion_matrix(y_s1_test, s1_pred_test, labels=[0, 1])
     print(f"  Best: {s1_search.best_score_:.4f} CV -> {s1_acc:.4f} test")
     print(f"  Params: {s1_search.best_params_}")
     print(f"  Abstain recall:    {cm_s1[0,0]}/{cm_s1[0].sum()} ({cm_s1[0,0]/cm_s1[0].sum():.3f})")
@@ -704,23 +810,27 @@ def train_twostage(
     print("STAGE 2: trustworthy vs disputed")
     print(f"{'='*60}")
 
-    answerable_train = y_s1_train == "answerable"
+    answerable_train = y_s1_train == 1
     X_train_s2 = X_train[answerable_train]
-    y_train_s2 = y3_train[answerable_train]
+    y_train_s2_str = y3_train[answerable_train]
+    # Encode: disputed=0, trustworthy=1
+    y_train_s2 = np.array(
+        [0 if lbl == "disputed" else 1 for lbl in y_train_s2_str], dtype=int
+    )
+    _s2_label_map = {0: "disputed", 1: "trustworthy"}
     print(
-        f"Train: {sum(y_train_s2 == 'trustworthy')} trustworthy, {sum(y_train_s2 == 'disputed')} disputed"
+        f"Train: {sum(y_train_s2 == 1)} trustworthy, {sum(y_train_s2 == 0)} disputed"
     )
 
     # Full answerable data for CV
-    answerable_all = (
-        np.array(
-            ["abstain" if lbl == "abstain" else "answerable" for lbl in y_3class],
-            dtype=object,
-        )
-        == "answerable"
+    answerable_all = np.array(
+        [lbl != "abstain" for lbl in y_3class],
+        dtype=bool,
     )
     X_answerable = X[answerable_all]
-    y_answerable = y_3class[answerable_all]
+    y_answerable = np.array(
+        [0 if lbl == "disputed" else 1 for lbl in y_3class[answerable_all]], dtype=int
+    )
 
     s2_models = {
         "ET": ExtraTreesClassifier(
@@ -743,6 +853,29 @@ def train_twostage(
             random_state=seed,
         ),
     }
+    if _HAS_XGB:
+        n_tw = sum(y_train_s2 == 1)
+        n_dp = sum(y_train_s2 == 0)
+        s2_models["XGB"] = XGBClassifier(
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.1,
+            scale_pos_weight=n_dp / n_tw if n_tw > 0 else 1,
+            random_state=seed,
+            n_jobs=-1,
+            eval_metric="logloss",
+            verbosity=0,
+        )
+    if _HAS_LGBM:
+        s2_models["LGBM"] = LGBMClassifier(
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.1,
+            class_weight="balanced",
+            random_state=seed,
+            n_jobs=-1,
+            verbose=-1,
+        )
 
     print("\n--- Stage 2: Quick comparison ---")
     s2_results = {}
@@ -764,7 +897,7 @@ def train_twostage(
         cv=cv,
         scoring="accuracy",
         random_state=seed,
-        n_jobs=-1 if s2_best_name != "GBT" else 1,
+        n_jobs=-1 if s2_best_name not in ("GBT", "XGB", "LGBM") else 1,
     )
     s2_search.fit(X_train_s2, y_train_s2)
     s2_model = s2_search.best_estimator_
@@ -784,12 +917,12 @@ def train_twostage(
     print(f"{'='*60}")
 
     final_pred = np.full(len(y3_test), "abstain", dtype=object)
-    s1_answerable_mask = s1_pred_test == "answerable"
+    s1_answerable_mask = s1_pred_test == 1
     if s1_answerable_mask.any():
-        s2_preds = s2_model.predict(X_test[s1_answerable_mask])
+        s2_preds_int = s2_model.predict(X_test[s1_answerable_mask])
         answerable_positions = np.where(s1_answerable_mask)[0]
         for i, pos in enumerate(answerable_positions):
-            final_pred[pos] = s2_preds[i]
+            final_pred[pos] = _s2_label_map[int(s2_preds_int[i])]
 
     combined_acc = accuracy_score(y3_test, final_pred)
     print(f"\nCombined accuracy: {combined_acc:.4f} ({sum(y3_test == final_pred)}/{len(y3_test)})")
