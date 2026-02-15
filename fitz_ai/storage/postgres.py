@@ -684,34 +684,63 @@ class PostgresConnectionManager:
             Database connection from pool.
         """
         psycopg = _get_psycopg()
+        try:
+            from psycopg_pool import PoolTimeout
+        except ImportError:
+            PoolTimeout = None
 
         try:
             pool = self.get_pool(collection)
             with pool.connection() as conn:
                 yield conn
-        except (psycopg.OperationalError, psycopg.errors.ConnectionTimeout) as e:
-            # Pool's reconnect failed - try pgserver restart as last resort
-            logger.warning(f"{STORAGE} Pool connection failed ({e}), attempting recovery...")
+        except Exception as e:
+            # Distinguish pool exhaustion (busy) from real connection failures (dead)
+            is_pool_timeout = PoolTimeout and isinstance(e, PoolTimeout)
 
-            # Clear this pool
-            if collection in self._pools:
+            if is_pool_timeout:
+                # Pool exhaustion: all connections in use, NOT a PostgreSQL failure.
+                # Do NOT restart pgserver — just wait briefly and retry once.
+                logger.warning(
+                    f"{STORAGE} Pool exhausted ({e}), retrying after brief wait..."
+                )
+                import time as _time
+
+                _time.sleep(1.0)
                 try:
-                    self._pools[collection].close()
-                except Exception:
-                    pass
-                del self._pools[collection]
+                    pool = self.get_pool(collection)
+                    with pool.connection() as conn:
+                        yield conn
+                except Exception as retry_error:
+                    raise RuntimeError(
+                        f"Pool still exhausted after retry: {retry_error}"
+                    ) from e
 
-            # Try restarting pgserver
-            try:
-                self._restart_pgserver()
-                # Retry once with fresh pool
-                pool = self.get_pool(collection)
-                with pool.connection() as conn:
-                    yield conn
-            except Exception as retry_error:
-                raise RuntimeError(
-                    f"Connection failed even after pgserver restart: {retry_error}"
-                ) from e
+            elif isinstance(e, (psycopg.OperationalError, psycopg.errors.ConnectionTimeout)):
+                # Real connection failure — try pgserver restart as last resort
+                logger.warning(
+                    f"{STORAGE} Connection failed ({e}), attempting recovery..."
+                )
+
+                # Clear this pool
+                if collection in self._pools:
+                    try:
+                        self._pools[collection].close()
+                    except Exception:
+                        pass
+                    del self._pools[collection]
+
+                # Try restarting pgserver
+                try:
+                    self._restart_pgserver()
+                    pool = self.get_pool(collection)
+                    with pool.connection() as conn:
+                        yield conn
+                except Exception as retry_error:
+                    raise RuntimeError(
+                        f"Connection failed even after pgserver restart: {retry_error}"
+                    ) from e
+            else:
+                raise
 
     def execute(self, collection: str, sql: str, params: tuple = ()) -> Any:
         """

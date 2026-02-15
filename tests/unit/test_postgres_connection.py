@@ -574,8 +574,8 @@ class TestPoolExhaustion:
         # Directly clear singleton without calling stop() to avoid hanging
         PostgresConnectionManager._instance = None
 
-    def test_connection_pool_exhaustion_blocks(self):
-        """When pool exhausted, new requests should raise after recovery fails."""
+    def test_connection_pool_exhaustion_retries_without_restart(self):
+        """Pool exhaustion should retry gracefully, NOT restart pgserver."""
         from psycopg_pool import PoolTimeout
 
         config = StorageConfig(
@@ -593,15 +593,15 @@ class TestPoolExhaustion:
         mock_pool.connection.side_effect = PoolTimeout("Pool exhausted")
         manager._pools["test_coll"] = mock_pool
 
-        # Mock get_pool to always return our mock pool (prevents recovery from creating new pool)
-        # Mock _restart_pgserver to be a no-op
         with patch.object(manager, "get_pool", return_value=mock_pool):
-            with patch.object(manager, "_restart_pgserver"):
-                # PoolTimeout inherits from psycopg.OperationalError, so code enters recovery
-                # Recovery also fails, so it wraps in RuntimeError
-                with pytest.raises(RuntimeError, match="Connection failed even after"):
+            with patch.object(manager, "_restart_pgserver") as mock_restart:
+                # Pool exhaustion retries once but does NOT restart pgserver
+                with pytest.raises(RuntimeError, match="Pool still exhausted"):
                     with manager.connection("test_coll"):
                         pass
+
+                # Critical: pgserver was NOT restarted for pool exhaustion
+                mock_restart.assert_not_called()
 
 
 # =============================================================================
