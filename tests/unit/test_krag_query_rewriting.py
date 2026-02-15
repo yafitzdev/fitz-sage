@@ -112,12 +112,12 @@ class TestQueryRewriting:
     def test_rewrite_called_and_rewritten_query_used(self):
         """When rewriter returns a different query, it's used for analysis and retrieval."""
         engine = _make_engine()
-        query = _make_query("How does auth work?")
+        query = _make_query("How does the authentication system handle user login sessions securely?")
 
         # Set up rewriter
         rewriter = MagicMock(name="rewriter")
         rewrite_result = MagicMock()
-        rewrite_result.rewritten_query = "authentication module implementation"
+        rewrite_result.rewritten_query = "authentication module implementation for secure user login session handling"
         rewriter.rewrite.return_value = rewrite_result
         engine._query_rewriter = rewriter
 
@@ -126,17 +126,17 @@ class TestQueryRewriting:
         result = engine.answer(query)
 
         # Rewriter called with original query
-        rewriter.rewrite.assert_called_once_with("How does auth work?")
+        rewriter.rewrite.assert_called_once_with(query.text)
 
         # Analyzer receives the rewritten query
         engine._query_analyzer.analyze.assert_called_once_with(
-            "authentication module implementation",
+            rewrite_result.rewritten_query,
         )
 
         # Router receives the rewritten query
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[0] == ("authentication module implementation", engine._query_analyzer.analyze.return_value)
+        assert call_args[0] == (rewrite_result.rewritten_query, engine._query_analyzer.analyze.return_value)
         assert call_args[1]["rewrite_result"] is rewrite_result
 
         assert result is expected
@@ -144,11 +144,11 @@ class TestQueryRewriting:
     def test_original_query_used_when_rewrite_returns_same_text(self):
         """When rewriter returns the same text, original query flows through unchanged."""
         engine = _make_engine()
-        query = _make_query("What is the login function?")
+        query = _make_query("What is the login function and how does it validate user credentials?")
 
         rewriter = MagicMock(name="rewriter")
         rewrite_result = MagicMock()
-        rewrite_result.rewritten_query = "What is the login function?"
+        rewrite_result.rewritten_query = query.text
         rewriter.rewrite.return_value = rewrite_result
         engine._query_rewriter = rewriter
 
@@ -156,15 +156,13 @@ class TestQueryRewriting:
 
         result = engine.answer(query)
 
-        rewriter.rewrite.assert_called_once_with("What is the login function?")
+        rewriter.rewrite.assert_called_once_with(query.text)
 
         # Analyzer and router use the original query (same as rewritten)
-        engine._query_analyzer.analyze.assert_called_once_with(
-            "What is the login function?",
-        )
+        engine._query_analyzer.analyze.assert_called_once_with(query.text)
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[0] == ("What is the login function?", engine._query_analyzer.analyze.return_value)
+        assert call_args[0] == (query.text, engine._query_analyzer.analyze.return_value)
         assert call_args[1]["rewrite_result"] is rewrite_result
 
         assert result is expected
@@ -172,7 +170,7 @@ class TestQueryRewriting:
     def test_fallback_to_original_on_rewrite_error(self):
         """When rewriter raises an exception, the original query is used."""
         engine = _make_engine()
-        query = _make_query("How does auth work?")
+        query = _make_query("How does the authentication system work when handling multiple sessions?")
 
         rewriter = MagicMock(name="rewriter")
         rewriter.rewrite.side_effect = RuntimeError("LLM timeout")
@@ -182,15 +180,13 @@ class TestQueryRewriting:
 
         result = engine.answer(query)
 
-        rewriter.rewrite.assert_called_once_with("How does auth work?")
+        rewriter.rewrite.assert_called_once_with(query.text)
 
         # Falls back to original query text
-        engine._query_analyzer.analyze.assert_called_once_with(
-            "How does auth work?",
-        )
+        engine._query_analyzer.analyze.assert_called_once_with(query.text)
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[0] == ("How does auth work?", engine._query_analyzer.analyze.return_value)
+        assert call_args[0] == (query.text, engine._query_analyzer.analyze.return_value)
         assert call_args[1]["rewrite_result"] is None
 
         assert result is expected
@@ -198,7 +194,7 @@ class TestQueryRewriting:
     def test_rewriting_skipped_when_rewriter_is_none(self):
         """When _query_rewriter is None, the original query flows through directly."""
         engine = _make_engine()
-        query = _make_query("Where is UserService defined?")
+        query = _make_query("Where is the UserService class defined and what methods does it expose?")
         assert engine._query_rewriter is None
 
         expected = _wire_happy_path(engine, query.text)
@@ -206,12 +202,10 @@ class TestQueryRewriting:
         result = engine.answer(query)
 
         # Analyzer uses original query directly
-        engine._query_analyzer.analyze.assert_called_once_with(
-            "Where is UserService defined?",
-        )
+        engine._query_analyzer.analyze.assert_called_once_with(query.text)
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[0] == ("Where is UserService defined?", engine._query_analyzer.analyze.return_value)
+        assert call_args[0] == (query.text, engine._query_analyzer.analyze.return_value)
         assert call_args[1]["rewrite_result"] is None
 
         assert result is expected

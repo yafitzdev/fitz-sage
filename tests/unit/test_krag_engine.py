@@ -221,7 +221,7 @@ class TestAnswer:
     def test_answer_full_flow(self):
         """Happy path: every stage returns valid data."""
         engine = _make_engine()
-        query = _make_query("What does the login function do?")
+        query = _make_query("What does the login function do when the user provides invalid credentials?")
 
         # Wire up the pipeline stages
         analysis = MagicMock(name="analysis")
