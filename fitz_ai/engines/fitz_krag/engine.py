@@ -194,6 +194,7 @@ class FitzKragEngine:
             section_strategy=section_strategy,
             table_strategy=table_strategy,
             chat_factory=None,  # Set after chat_factory is created
+            embedder=self._embedder,
         )
         self._reader = ContentReader(
             self._raw_store,
@@ -232,7 +233,9 @@ class FitzKragEngine:
         if self._config.enable_guardrails:
             from fitz_ai.governance import AnswerGovernor, create_default_constraints
 
-            self._constraints = create_default_constraints(chat=self._chat)
+            self._constraints = create_default_constraints(
+                chat=self._chat, embedder=self._embedder
+            )
             self._governor = AnswerGovernor()
 
         # Cloud cache
@@ -292,6 +295,7 @@ class FitzKragEngine:
         if self._hyde_generator:
             code_strategy._hyde_generator = self._hyde_generator
             section_strategy._hyde_generator = self._hyde_generator
+            self._retrieval_router._hyde_generator = self._hyde_generator
         # Wire raw_store for freshness boosting
         code_strategy._raw_store = self._raw_store
         section_strategy._raw_store = self._raw_store
@@ -372,10 +376,15 @@ class FitzKragEngine:
                 sanitized = sanitized[:MAX_QUERY_LENGTH]
                 logger.debug(f"Query truncated to {MAX_QUERY_LENGTH} chars")
 
+            _progress = progress or (lambda _: None)
+            timings: list[tuple[str, float]] = []
+            pipeline_start = time.perf_counter()
+
             # 0.5. Rewrite query for retrieval optimization
             retrieval_query = sanitized
             rewrite_result = None
             if self._query_rewriter:
+                t0 = time.perf_counter()
                 try:
                     rewrite_result = self._query_rewriter.rewrite(sanitized)
                     if rewrite_result.rewritten_query != sanitized:
@@ -385,10 +394,7 @@ class FitzKragEngine:
                         )
                 except Exception as e:
                     logger.warning(f"Query rewriting failed, using original: {e}")
-
-            _progress = progress or (lambda _: None)
-            timings: list[tuple[str, float]] = []
-            pipeline_start = time.perf_counter()
+                timings.append(("Rewrite", time.perf_counter() - t0))
 
             # 1. Analyze query intent + detection in parallel
             _progress("Analyzing query...")

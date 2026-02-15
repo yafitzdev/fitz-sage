@@ -40,24 +40,26 @@ from .governor import AnswerGovernor, GovernanceDecision, GovernanceLog, decide_
 from .protocol import EvidenceItem
 
 if TYPE_CHECKING:
-    from fitz_ai.llm.providers.base import ChatProvider
+    from fitz_ai.llm.providers.base import ChatProvider, Embedder
 
 
 def create_default_constraints(
     chat: "ChatProvider | None" = None,
+    embedder: "Embedder | None" = None,
 ) -> list[ConstraintPlugin]:
     """
     Create the default constraint plugins using LLM-based detection.
 
     Args:
         chat: ChatProvider for LLM-based contradiction detection
+        embedder: Embedder for IE similarity checks (enables entity/aspect detection)
 
     Returns:
         List of constraint plugins
     """
     return [
-        # Empty context only - abstain if no chunks retrieved
-        InsufficientEvidenceConstraint(chat=chat),
+        # Embedding similarity + entity matching for relevance detection
+        InsufficientEvidenceConstraint(chat=chat, embedder=embedder),
         # Keywords: "why" query + no "because" evidence
         CausalAttributionConstraint(),
         # LLM pairwise comparison: detect contradictions

@@ -176,10 +176,10 @@ def enrich_chunks_with_embeddings(
             chunk.metadata["vector_score"] = 0.0
 
 
-def make_constraints(chat) -> list:
+def make_constraints(chat, embedder=None) -> list:
     """Create a fresh set of constraints (one set per worker thread)."""
     return [
-        InsufficientEvidenceConstraint(chat=chat),
+        InsufficientEvidenceConstraint(chat=chat, embedder=embedder),
         CausalAttributionConstraint(),
         SpecificInfoTypeConstraint(),
         ConflictAwareConstraint(chat=chat),
@@ -252,7 +252,7 @@ def process_case(
     """
     # Each thread gets its own constraint instances to avoid shared state
     if not hasattr(_thread_local, "constraints"):
-        _thread_local.constraints = make_constraints(chat)
+        _thread_local.constraints = make_constraints(chat, embedder=embedder)
 
     case_id = case["id"]
     query = case["query"]
