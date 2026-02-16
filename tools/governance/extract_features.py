@@ -189,7 +189,9 @@ def make_constraints(chat, chat_balanced=None, embedder=None) -> list:
         InsufficientEvidenceConstraint(chat=chat, embedder=embedder),
         CausalAttributionConstraint(),
         SpecificInfoTypeConstraint(),
-        ConflictAwareConstraint(chat=chat),
+        ConflictAwareConstraint(
+            chat=chat, adaptive=True, embedder=embedder.embed if embedder else None
+        ),
         AnswerVerificationConstraint(chat=chat, chat_balanced=chat_balanced),
     ]
 

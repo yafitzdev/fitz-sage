@@ -269,14 +269,15 @@ class FitzKragEngine:
         self._constraints: list[Any] = []
         self._governor: Any = None
         if self._config.enable_guardrails:
-            from fitz_ai.governance import AnswerGovernor, create_default_constraints
+            from fitz_ai.governance import create_default_constraints
+            from fitz_ai.governance.decider import GovernanceDecider
 
             self._constraints = create_default_constraints(
                 chat=self._chat,
                 chat_balanced=self._chat_factory("balanced"),
                 embedder=self._embedder,
             )
-            self._governor = AnswerGovernor()
+            self._governor = GovernanceDecider()
 
         # Cloud cache
         self._cloud_client: Any = None
@@ -685,9 +686,21 @@ class FitzKragEngine:
             if self._constraints and self._governor:
                 t0 = time.perf_counter()
                 from fitz_ai.governance import run_constraints
+                from fitz_ai.governance.constraints.feature_extractor import extract_features
 
                 constraint_results = run_constraints(sanitized, expanded, self._constraints)
-                governance = self._governor.decide(constraint_results)
+                # Build constraint_name -> result dict for feature extraction
+                cr_dict = {
+                    r.metadata.get("constraint_name", f"c{i}"): r
+                    for i, r in enumerate(constraint_results)
+                }
+                features = extract_features(
+                    sanitized,
+                    expanded,
+                    cr_dict,
+                    detection_summary=detection,
+                )
+                governance = self._governor.decide(constraint_results, features=features)
                 answer_mode = governance.mode
                 timings.append(("Guardrails", time.perf_counter() - t0))
 

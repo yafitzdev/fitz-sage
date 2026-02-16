@@ -117,18 +117,15 @@ class RetrievalRouter:
 
         Agentic search scans unindexed files — most valuable for code queries
         or low-confidence queries where indexed content may be insufficient.
-        For clear, high-confidence queries, indexed content suffices.
+        For clear, high-confidence queries against fully indexed collections,
+        indexed content suffices. However, when point() was used (progressive
+        mode), agentic is often the ONLY retrieval path and must always run.
         """
         if not analysis:
             return True
 
         # Data queries: agentic scans files, not tables
         if analysis.primary_type.value == "data":
-            return False
-
-        # High-confidence queries: indexed strategies should find what's needed.
-        # Only code queries at moderate confidence benefit (unindexed source files).
-        if analysis.confidence >= 0.85 and analysis.primary_type.value != "code":
             return False
 
         return True

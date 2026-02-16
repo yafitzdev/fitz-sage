@@ -11,8 +11,8 @@ fitz_krag:
   # Core Plugins (shared infrastructure)
   # ===========================================================================
 
-  chat: cohere
-  embedding: cohere
+  chat: ollama
+  embedding: ollama
   vector_db: pgvector
   rerank: null
   parser: docling

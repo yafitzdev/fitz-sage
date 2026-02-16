@@ -256,11 +256,11 @@ def _extract_chunk_features(
         features["score_spread"] = None
 
     # Vocabulary overlap between query and chunks
-    query_words = set(query.lower().split())
-    query_content_words = query_words - _STOP_WORDS
+    query_words = {w.strip("?.,!;:()[]\"'") for w in query.lower().split()}
+    query_content_words = query_words - _STOP_WORDS - {""}
     if query_content_words:
         chunk_text = " ".join(c.content.lower() for c in chunks)
-        chunk_words = set(chunk_text.split())
+        chunk_words = {w.strip("?.,!;:()[]\"'") for w in chunk_text.split()}
         overlap = query_content_words & chunk_words
         features["vocab_overlap_ratio"] = len(overlap) / len(query_content_words)
     else:

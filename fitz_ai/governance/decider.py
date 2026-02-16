@@ -63,8 +63,8 @@ _MODEL_FILENAME = "model_v5_calibrated.joblib"
 def _find_model_path() -> Path | None:
     """Search for the model artifact in known locations."""
     candidates = [
-        # Development: tools/governance/data/
-        Path(__file__).resolve().parent.parent
+        # Development: tools/governance/data/ (project root)
+        Path(__file__).resolve().parent.parent.parent
         / "tools"
         / "governance"
         / "data"
@@ -126,6 +126,12 @@ class GovernanceDecider:
 
         try:
             label, confidence = self._predict(features)
+            logger.debug(
+                f"GovernanceDecider: ML prediction={label} (conf={confidence:.3f}) | "
+                f"ie_signal={features.get('ie_signal')} ie_sim={features.get('ie_max_similarity')} "
+                f"chunks={features.get('num_chunks')} denials={features.get('num_constraints_fired')} "
+                f"vocab_overlap={features.get('vocab_overlap_ratio')}"
+            )
         except Exception as e:
             logger.warning(f"GovernanceDecider: prediction failed, falling back: {e}")
             return self._governor.decide(constraint_results)
@@ -144,14 +150,21 @@ class GovernanceDecider:
         )
 
     def _predict(self, features: dict[str, Any]) -> tuple[str, float]:
-        """Run two-stage prediction. Returns (label, confidence)."""
+        """Run two-stage prediction. Returns (label, confidence).
 
+        Stage 1 classes: 0=abstain, 1=answerable (int labels from training).
+        Stage 2 classes: 0=disputed, 1=trustworthy (int labels from training).
+        """
         X = self._prepare_features(features)
 
         # Stage 1: answerable vs abstain
         s1_probas = self._s1_model.predict_proba(X)
         s1_classes = list(self._s1_model.classes_)
-        answerable_idx = s1_classes.index("answerable")
+        # Class 1 = answerable (may be int or string depending on model)
+        try:
+            answerable_idx = s1_classes.index(1)
+        except ValueError:
+            answerable_idx = s1_classes.index("answerable")
         p_answerable = float(s1_probas[0, answerable_idx])
 
         if p_answerable < self._s1_threshold:
@@ -160,7 +173,11 @@ class GovernanceDecider:
         # Stage 2: trustworthy vs disputed
         s2_probas = self._s2_model.predict_proba(X)
         s2_classes = list(self._s2_model.classes_)
-        trustworthy_idx = s2_classes.index("trustworthy")
+        # Class 1 = trustworthy (may be int or string depending on model)
+        try:
+            trustworthy_idx = s2_classes.index(1)
+        except ValueError:
+            trustworthy_idx = s2_classes.index("trustworthy")
         p_trustworthy = float(s2_probas[0, trustworthy_idx])
 
         if p_trustworthy >= self._s2_threshold:
@@ -198,7 +215,6 @@ class GovernanceDecider:
                 )
 
         # Fill NaN, convert all to numeric
-        X = X.fillna(0).infer_objects(copy=False)
         for col in X.columns:
             X[col] = pd.to_numeric(X[col], errors="coerce").fillna(0)
 

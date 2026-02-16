@@ -922,6 +922,10 @@ class InsufficientEvidenceConstraint:
             chunk_emb = self._get_embedding(chunk.content)
             if chunk_emb:
                 sim = _cosine_similarity(query_emb, chunk_emb)
+                logger.debug(
+                    f"{PIPELINE} IE sim: {sim:.4f} | chunk_len={len(chunk.content)} "
+                    f"| first_50={chunk.content[:50]!r}"
+                )
                 max_sim = max(max_sim, sim)
 
             # Check entity matching
