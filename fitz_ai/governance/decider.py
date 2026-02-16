@@ -1,14 +1,16 @@
 # fitz_ai/governance/decider.py
 """
-ML-based governance decider using a two-stage calibrated classifier.
+ML-based governance decider using a 4-question atomic cascade classifier.
 
-Replaces hand-coded AnswerGovernor priority rules with a trained classifier
-that predicts governance mode from constraint features. Falls back to
+Replaces hand-coded AnswerGovernor priority rules with trained classifiers
+that predict governance mode from constraint features. Falls back to
 AnswerGovernor on any error (fail-open).
 
-Two-stage prediction:
-  Stage 1: answerable vs abstain
-  Stage 2: trustworthy vs disputed
+4-question cascade:
+  Q1: Is evidence sufficient?      → No = ABSTAIN  (ML)
+  Q2: Is there material conflict?  → routes Q3/Q4  (rule: ca_fired)
+  Q3: Is the conflict resolved?    → Yes=TRUSTWORTHY, No=DISPUTED (ML)
+  Q4: Is evidence truly solid?     → Yes=TRUSTWORTHY, No=ABSTAIN  (ML)
 
 3-class output mapped to AnswerMode:
   abstain → ABSTAIN
@@ -33,35 +35,52 @@ logger = logging.getLogger(__name__)
 # Feature type sets (must match train_classifier.py exactly)
 _CATEGORICAL_FEATURES = {
     "ie_signal",
+    "ie_query_aspect",
+    "ie_detection_reason",
     "ca_signal",
     "ca_first_evidence_char",
     "ca_evidence_characters",
     "caa_query_type",
     "sit_info_type_requested",
+    "query_question_type",
 }
 
 _BOOL_FEATURES = {
     "ie_fired",
+    "ie_entity_match_found",
+    "ie_primary_match_found",
+    "ie_critical_match_found",
+    "ie_has_matching_aspect",
+    "ie_has_conflicting_aspect",
     "ca_fired",
     "ca_numerical_variance_detected",
+    "ca_is_uncertainty_query",
     "caa_fired",
     "caa_has_causal_evidence",
     "caa_has_predictive_evidence",
     "sit_fired",
     "sit_entity_mismatch",
     "sit_has_specific_info",
+    "av_fired",
+    "av_strong_denial",
+    "has_abstain_signal",
+    "has_disputed_signal",
     "has_qualified_signal",
+    "has_any_denial",
+    "query_has_comparison_words",
+    "has_distinct_years",
     "detection_temporal",
     "detection_comparison",
-    "has_distinct_years",
-    "av_strong_denial",
-    "has_any_denial",
+    "detection_aggregation",
+    "detection_boost_recency",
+    "detection_boost_authority",
+    "detection_needs_rewriting",
     "has_cross_chunk_divergence",
     "has_within_chunk_divergence",
 }
 
 # Default model search paths (relative to package root)
-_MODEL_FILENAME = "model_v5_calibrated.joblib"
+_MODEL_FILENAME = "model_v6_cascade.joblib"
 
 
 def _find_model_path() -> Path | None:
@@ -96,18 +115,39 @@ class GovernanceDecider:
             import joblib
 
             artifact = joblib.load(path)
-            self._s1_model = artifact["stage1_model"]
-            self._s2_model = artifact["stage2_model"]
-            self._s1_threshold = artifact.get("stage1_threshold", 0.5)
-            self._s2_threshold = artifact.get("stage2_threshold", 0.5)
-            self._encoders = artifact.get("encoders", {})
-            self._feature_names = artifact["feature_names"]
-            self._available = True
-            logger.info(
-                f"GovernanceDecider: loaded model from {path} "
-                f"(s1={self._s1_threshold:.2f}, s2={self._s2_threshold:.2f}, "
-                f"{len(self._feature_names)} features)"
-            )
+            mode = artifact.get("mode", "twostage")
+
+            if mode == "cascade":
+                self._mode = "cascade"
+                self._q1_model = artifact["q1_model"]
+                self._q3_model = artifact["q3_model"]
+                self._q4_model = artifact["q4_model"]
+                self._q1_threshold = artifact.get("q1_threshold", 0.5)
+                self._q3_threshold = artifact.get("q3_threshold", 0.5)
+                self._q4_threshold = artifact.get("q4_threshold", 0.5)
+                self._conflict_feature = artifact.get("conflict_feature", "ca_fired")
+                self._encoders = artifact.get("encoders", {})
+                self._feature_names = artifact["feature_names"]
+                self._available = True
+                logger.info(
+                    f"GovernanceDecider: loaded cascade model from {path} "
+                    f"(q1={self._q1_threshold:.2f}, q3={self._q3_threshold:.2f}, "
+                    f"q4={self._q4_threshold:.2f}, {len(self._feature_names)} features)"
+                )
+            else:
+                self._mode = "twostage"
+                self._s1_model = artifact["stage1_model"]
+                self._s2_model = artifact["stage2_model"]
+                self._s1_threshold = artifact.get("stage1_threshold", 0.5)
+                self._s2_threshold = artifact.get("stage2_threshold", 0.5)
+                self._encoders = artifact.get("encoders", {})
+                self._feature_names = artifact["feature_names"]
+                self._available = True
+                logger.info(
+                    f"GovernanceDecider: loaded twostage model from {path} "
+                    f"(s1={self._s1_threshold:.2f}, s2={self._s2_threshold:.2f}, "
+                    f"{len(self._feature_names)} features)"
+                )
         except Exception as e:
             logger.warning(f"GovernanceDecider: failed to load model from {path}: {e}")
 
@@ -132,7 +172,7 @@ class GovernanceDecider:
             label, confidence = self._predict(features)
             logger.debug(
                 f"GovernanceDecider: ML prediction={label} (conf={confidence:.3f}) | "
-                f"ie_signal={features.get('ie_signal')} ie_sim={features.get('ie_max_similarity')} "
+                f"ie_signal={features.get('ie_signal')} "
                 f"chunks={features.get('num_chunks')} denials={features.get('num_constraints_fired')} "
                 f"vocab_overlap={features.get('vocab_overlap_ratio')}"
             )
@@ -154,17 +194,72 @@ class GovernanceDecider:
         )
 
     def _predict(self, features: dict[str, Any]) -> tuple[str, float]:
-        """Run two-stage prediction. Returns (label, confidence).
+        """Run prediction. Dispatches to cascade or twostage based on model type."""
+        if self._mode == "cascade":
+            return self._predict_cascade(features)
+        return self._predict_twostage(features)
 
-        Stage 1 classes: 0=abstain, 1=answerable (int labels from training).
-        Stage 2 classes: 0=disputed, 1=trustworthy (int labels from training).
+    def _predict_cascade(self, features: dict[str, Any]) -> tuple[str, float]:
+        """Run 4-question cascade prediction. Returns (label, confidence).
+
+        Q1: Is evidence sufficient? → No = abstain
+        Q2: Is there material conflict? (rule: ca_fired)
+        Q3: conflict path → Is conflict resolved? → Yes=trustworthy, No=disputed
+        Q4: clean path → Is evidence solid? → Yes=trustworthy, No=abstain
         """
+        X = self._prepare_features(features)
+
+        # Q1: Is evidence sufficient?
+        q1_probas = self._q1_model.predict_proba(X)
+        q1_classes = list(self._q1_model.classes_)
+        try:
+            answerable_idx = q1_classes.index(1)
+        except ValueError:
+            answerable_idx = q1_classes.index("answerable")
+        p_answerable = float(q1_probas[0, answerable_idx])
+
+        if p_answerable < self._q1_threshold:
+            return "abstain", 1.0 - p_answerable
+
+        # Q2: Is there material conflict? (rule)
+        has_conflict = bool(features.get(self._conflict_feature, False))
+
+        if has_conflict:
+            # Q3: Is the conflict resolved?
+            q3_probas = self._q3_model.predict_proba(X)
+            q3_classes = list(self._q3_model.classes_)
+            try:
+                resolved_idx = q3_classes.index(1)
+            except ValueError:
+                resolved_idx = q3_classes.index("resolved")
+            p_resolved = float(q3_probas[0, resolved_idx])
+
+            if p_resolved >= self._q3_threshold:
+                return "trustworthy", p_resolved
+            else:
+                return "disputed", 1.0 - p_resolved
+        else:
+            # Q4: Is evidence truly solid?
+            q4_probas = self._q4_model.predict_proba(X)
+            q4_classes = list(self._q4_model.classes_)
+            try:
+                solid_idx = q4_classes.index(1)
+            except ValueError:
+                solid_idx = q4_classes.index("solid")
+            p_solid = float(q4_probas[0, solid_idx])
+
+            if p_solid >= self._q4_threshold:
+                return "trustworthy", p_solid
+            else:
+                return "abstain", 1.0 - p_solid
+
+    def _predict_twostage(self, features: dict[str, Any]) -> tuple[str, float]:
+        """Run two-stage prediction (legacy). Returns (label, confidence)."""
         X = self._prepare_features(features)
 
         # Stage 1: answerable vs abstain
         s1_probas = self._s1_model.predict_proba(X)
         s1_classes = list(self._s1_model.classes_)
-        # Class 1 = answerable (may be int or string depending on model)
         try:
             answerable_idx = s1_classes.index(1)
         except ValueError:
@@ -177,7 +272,6 @@ class GovernanceDecider:
         # Stage 2: trustworthy vs disputed
         s2_probas = self._s2_model.predict_proba(X)
         s2_classes = list(self._s2_model.classes_)
-        # Class 1 = trustworthy (may be int or string depending on model)
         try:
             trustworthy_idx = s2_classes.index(1)
         except ValueError:
