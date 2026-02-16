@@ -196,7 +196,7 @@ include = ["fitz_ai*"]
 exclude = ["tests*", "tools*", "examples*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.yaml", "*.yml"]
+"*" = ["*.yaml", "*.yml", "*.joblib"]
 
 [project.scripts]
 fitz = "fitz_ai.cli.cli:app"
