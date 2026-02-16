@@ -1285,7 +1285,13 @@ def train_twostage(
 # Q2 conflict routing: ca_fired indicates material conflict in evidence
 _CONFLICT_FEATURE = "ca_fired"
 
-_CASCADE_OUTPUT = _DATA_DIR / "model_v6_cascade.joblib"
+_CASCADE_OUTPUT = (
+    Path(__file__).resolve().parent.parent.parent
+    / "fitz_ai"
+    / "governance"
+    / "data"
+    / "model_v6_cascade.joblib"
+)
 
 
 def _train_binary_stage(

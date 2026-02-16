@@ -84,21 +84,9 @@ _MODEL_FILENAME = "model_v6_cascade.joblib"
 
 
 def _find_model_path() -> Path | None:
-    """Search for the model artifact in known locations."""
-    candidates = [
-        # Packaged: fitz_ai/governance/data/ (ships with pip install)
-        Path(__file__).resolve().parent / "data" / _MODEL_FILENAME,
-        # Development: tools/governance/data/ (project root)
-        Path(__file__).resolve().parent.parent.parent
-        / "tools"
-        / "governance"
-        / "data"
-        / _MODEL_FILENAME,
-    ]
-    for path in candidates:
-        if path.exists():
-            return path
-    return None
+    """Find the model artifact shipped with the package."""
+    path = Path(__file__).resolve().parent / "data" / _MODEL_FILENAME
+    return path if path.exists() else None
 
 
 class GovernanceDecider:
