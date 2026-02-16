@@ -700,6 +700,12 @@ class FitzKragEngine:
                     cr_dict,
                     detection_summary=detection,
                 )
+                # For agentic results with no vector scores, use IE similarity as fallback
+                if features.get("mean_vector_score") is None and features.get("ie_max_similarity"):
+                    ie_sim = features["ie_max_similarity"]
+                    features["mean_vector_score"] = ie_sim
+                    features["max_vector_score"] = ie_sim
+                    features["min_vector_score"] = ie_sim
                 governance = self._governor.decide(constraint_results, features=features)
                 answer_mode = governance.mode
                 timings.append(("Guardrails", time.perf_counter() - t0))

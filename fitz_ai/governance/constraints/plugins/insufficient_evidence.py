@@ -872,17 +872,17 @@ class InsufficientEvidenceConstraint:
     def name(self) -> str:
         return "insufficient_evidence"
 
-    def _get_embedding(self, text: str) -> list[float] | None:
+    def _get_embedding(self, text: str, *, task_type: str = "query") -> list[float] | None:
         """Get embedding with caching."""
         if not self.embedder:
             return None
 
-        cache_key = hash(text[:200])
+        cache_key = hash((text[:200], task_type))
         if cache_key in self._cache:
             return self._cache[cache_key]
 
         try:
-            embedding = self.embedder.embed(text, task_type="query")
+            embedding = self.embedder.embed(text, task_type=task_type)
             self._cache[cache_key] = embedding
             return embedding
         except Exception as e:
@@ -919,7 +919,7 @@ class InsufficientEvidenceConstraint:
         primary_match_found = False
 
         for chunk in chunks:
-            chunk_emb = self._get_embedding(chunk.content)
+            chunk_emb = self._get_embedding(chunk.content, task_type="document")
             if chunk_emb:
                 sim = _cosine_similarity(query_emb, chunk_emb)
                 logger.debug(

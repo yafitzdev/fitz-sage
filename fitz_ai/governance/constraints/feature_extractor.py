@@ -447,6 +447,22 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
     }
     if len(chunks) < 2:
         features.update(_defaults)
+        # Still compute single-chunk stats (ctx_length_mean, ctx_total_chars, etc.)
+        if len(chunks) == 1:
+            text = chunks[0].content
+            features["ctx_length_mean"] = float(len(text))
+            features["ctx_total_chars"] = float(len(text))
+            words = text.lower().split()
+            features["number_density"] = float(len(_NUMBER_RE.findall(text)))
+            word_set = set(words)
+            total_hedge = len(word_set & _HEDGE_WORDS)
+            total_assert = len(word_set & _ASSERTION_WORDS)
+            epistemic_total = total_assert + total_hedge
+            if epistemic_total > 0:
+                features["assertion_density"] = (total_assert - total_hedge) / epistemic_total
+            years = set(_YEAR_RE.findall(text))
+            features["year_count"] = len(years)
+            features["has_distinct_years"] = len(years) > 1
         return
 
     # Precompute per-chunk data

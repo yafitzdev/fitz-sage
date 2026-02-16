@@ -141,7 +141,6 @@ class AgenticSearchStrategy:
             doc_text = _entry_to_text(entry)
             doc_tokens = _tokenize(doc_text)
             if not doc_tokens:
-                scored.append((0.0, entry))
                 continue
 
             doc_tf = Counter(doc_tokens)
@@ -155,7 +154,8 @@ class AgenticSearchStrategy:
                     # TF saturation
                     score += qf * (tf / (tf + 1.0 + 0.5 * doc_len / 100.0))
 
-            scored.append((score, entry))
+            if score > 0:
+                scored.append((score, entry))
 
         scored.sort(key=lambda x: x[0], reverse=True)
         return [e for _, e in scored[:_BM25_PREFILTER_THRESHOLD]]
