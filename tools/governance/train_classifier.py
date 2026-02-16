@@ -93,7 +93,9 @@ _CATEGORICAL_FEATURES = {
 
 # Dead features: constant zero/single-value across all cases — adds noise
 # num_unique_sources: always 1 in fitz-gov (single doc_id per case)
-_DEAD_FEATURES = {"num_unique_sources"}
+# ie_max_similarity: 100% identical to max_vector_score (redundant)
+# ie_summary_overlap: always False (fitz-gov chunks lack enrichment metadata)
+_DEAD_FEATURES = {"num_unique_sources", "ie_max_similarity", "ie_summary_overlap"}
 
 # Boolean features to convert to int
 _BOOL_FEATURES = {
@@ -114,9 +116,11 @@ _BOOL_FEATURES = {
     "sit_entity_mismatch",
     "sit_has_specific_info",
     "av_fired",
+    "av_strong_denial",
     "has_abstain_signal",
     "has_disputed_signal",
     "has_qualified_signal",
+    "has_any_denial",
     "query_has_comparison_words",
     "has_distinct_years",
     "detection_temporal",
@@ -366,6 +370,21 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
         X["ix_vector_x_contradiction"] = (
             X["mean_vector_score"] * X["ctx_contradiction_count"]
         )
+    # New: AV fires but IE doesn't — abstain signal missed by IE (helps Stage 1)
+    if "av_fired" in X.columns and "ie_fired" in X.columns:
+        X["ix_av_no_ie"] = X["av_fired"] * (1 - X["ie_fired"])
+    # New: Strong AV denial without IE — strong abstain indicator
+    if "av_strong_denial" in X.columns and "ie_fired" in X.columns:
+        X["ix_av_strong_no_ie"] = X["av_strong_denial"] * (1 - X["ie_fired"])
+    # New: Multiple constraints fire — compound caution signal
+    if "num_constraints_fired" in X.columns:
+        X["ix_multi_denial"] = (X["num_constraints_fired"] >= 2).astype(int)
+    # New: Any denial with low vector score — irrelevant retrieval
+    if "has_any_denial" in X.columns and "mean_vector_score" in X.columns:
+        X["ix_denial_low_vector"] = X["has_any_denial"] * (1 - X["mean_vector_score"])
+    # New: AV jury votes * abstain signal — reinforced abstain
+    if "av_jury_votes_no" in X.columns and "has_abstain_signal" in X.columns:
+        X["ix_av_x_abstain"] = X["av_jury_votes_no"] * X["has_abstain_signal"]
 
     return X, encoders
 

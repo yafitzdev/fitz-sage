@@ -79,10 +79,21 @@ def _extract_constraint_features(
     av = constraint_results.get("answer_verification")
     if av:
         features["av_fired"] = not av.allow_decisive_answer
-        features["av_jury_votes_no"] = av.metadata.get("jury_votes")
+        jury_votes = av.metadata.get("jury_votes")
+        features["av_jury_votes_no"] = jury_votes
+        # Strong AV denial: 2+ jury votes means multiple jurors agree answer is wrong
+        features["av_strong_denial"] = (jury_votes or 0) >= 2
     else:
         features["av_fired"] = None
         features["av_jury_votes_no"] = None
+        features["av_strong_denial"] = False
+
+    # Composite features: help Stage 1 detect abstain without relying solely on IE
+    features["has_any_denial"] = num_denials > 0
+    features["num_strong_denials"] = sum(
+        1 for r in constraint_results.values()
+        if not r.allow_decisive_answer and r.signal in ("abstain", "disputed")
+    )
 
     # IE constraint features
     ie = constraint_results.get("insufficient_evidence")
