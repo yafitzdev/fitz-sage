@@ -54,6 +54,8 @@ _BOOL_FEATURES = {
     "detection_temporal",
     "detection_comparison",
     "has_distinct_years",
+    "av_strong_denial",
+    "has_any_denial",
 }
 
 # Default model search paths (relative to package root)

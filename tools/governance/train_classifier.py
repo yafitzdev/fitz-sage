@@ -64,6 +64,7 @@ _DATA_DIR = Path(__file__).resolve().parent / "data"
 _DEFAULT_INPUT = _DATA_DIR / "features.csv"
 _DEFAULT_MODEL_OUTPUT = _DATA_DIR / "model_v1.joblib"
 _DEFAULT_TWOSTAGE_OUTPUT = _DATA_DIR / "model_v5_twostage.joblib"
+_DEFAULT_CALIBRATED_OUTPUT = _DATA_DIR / "model_v5_calibrated.joblib"
 _DEFAULT_FITZGOV_DIR = (
     Path(__file__).resolve().parent.parent.parent.parent / "fitz-gov" / "data" / "tier1_core"
 )
@@ -1143,6 +1144,185 @@ def train_twostage(
 
 
 # ---------------------------------------------------------------------------
+# Calibrate: safety-focused threshold tuning
+# ---------------------------------------------------------------------------
+
+
+def calibrate_thresholds(
+    X: pd.DataFrame,
+    y_4class: np.ndarray,
+    feature_names: list[str],
+    encoders: dict[str, LabelEncoder],
+    model_path: Path,
+    output_path: Path,
+    seed: int = 42,
+):
+    """Calibrate thresholds to minimize dangerous false-trustworthy predictions.
+
+    Loads a trained two-stage model, runs CV predictions on ALL data,
+    then sweeps both thresholds jointly to find the operating point that
+    minimizes cases where the model predicts trustworthy but the true label
+    is abstain or disputed (the most dangerous failure mode).
+    """
+    y_3class = _collapse_to_3class(y_4class)
+
+    print(f"Loading trained model from {model_path}...")
+    artifact = joblib.load(model_path)
+    s1_model = artifact["stage1_model"]
+    s2_model = artifact["stage2_model"]
+    s1_name = artifact.get("stage1_name", "unknown")
+    s2_name = artifact.get("stage2_name", "unknown")
+    old_s1_thresh = artifact.get("stage1_threshold", 0.5)
+    old_s2_thresh = artifact.get("stage2_threshold", 0.5)
+    print(f"  Stage 1: {s1_name} (threshold={old_s1_thresh:.3f})")
+    print(f"  Stage 2: {s2_name} (threshold={old_s2_thresh:.3f})")
+
+    # Stage 1: CV predictions on full dataset
+    print(f"\nRunning Stage 1 CV predictions on {len(X)} samples...")
+    y_s1 = np.array([0 if lbl == "abstain" else 1 for lbl in y_3class], dtype=int)
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
+    from sklearn.model_selection import cross_val_predict
+
+    s1_cv_proba = cross_val_predict(s1_model, X, y_s1, cv=cv, method="predict_proba")
+
+    # Stage 2: CV predictions on answerable subset
+    answerable_mask = y_3class != "abstain"
+    X_answerable = X[answerable_mask]
+    y_answerable = np.array(
+        [0 if lbl == "disputed" else 1 for lbl in y_3class[answerable_mask]], dtype=int
+    )
+    print(f"Running Stage 2 CV predictions on {len(X_answerable)} answerable samples...")
+    s2_cv_proba = cross_val_predict(s2_model, X_answerable, y_answerable, cv=cv, method="predict_proba")
+
+    # Build full-dataset index mapping: answerable_indices[i] -> position in s2_cv_proba
+    answerable_indices = np.where(answerable_mask)[0]
+
+    # Sweep both thresholds jointly
+    print("\n" + "=" * 60)
+    print("SAFETY CALIBRATION: minimizing false-trustworthy")
+    print("=" * 60)
+
+    # For each (s1_thresh, s2_thresh), simulate two-stage prediction on all data
+    best_result = None
+    results = []
+
+    for s1_t in np.arange(0.40, 0.75, 0.005):
+        for s2_t in np.arange(0.40, 0.80, 0.005):
+            # Stage 1: predict abstain vs answerable
+            s1_pred = (s1_cv_proba[:, 1] >= s1_t).astype(int)  # 1=answerable
+
+            # Stage 2: for those predicted answerable, predict disputed vs trustworthy
+            final_pred = np.full(len(y_3class), "abstain", dtype=object)
+            for i in range(len(y_3class)):
+                if s1_pred[i] == 1:  # predicted answerable
+                    # Find this sample in s2_cv_proba
+                    pos = np.searchsorted(answerable_indices, i)
+                    if pos < len(answerable_indices) and answerable_indices[pos] == i:
+                        p_trust = s2_cv_proba[pos, 1]
+                        final_pred[i] = "trustworthy" if p_trust >= s2_t else "disputed"
+                    else:
+                        # Abstain case predicted answerable by S1 — S2 wasn't trained on it
+                        # Use S1's probability to decide (will be marked as disputed for safety)
+                        final_pred[i] = "disputed"
+
+            # Count dangerous misfires: predicted trustworthy but actually abstain or disputed
+            false_trustworthy = 0
+            false_trust_abstain = 0
+            false_trust_disputed = 0
+            for i in range(len(y_3class)):
+                if final_pred[i] == "trustworthy" and y_3class[i] != "trustworthy":
+                    false_trustworthy += 1
+                    if y_3class[i] == "abstain":
+                        false_trust_abstain += 1
+                    else:
+                        false_trust_disputed += 1
+
+            accuracy = (final_pred == y_3class).mean()
+            # Per-class recalls
+            abs_total = (y_3class == "abstain").sum()
+            disp_total = (y_3class == "disputed").sum()
+            trust_total = (y_3class == "trustworthy").sum()
+            abs_recall = ((final_pred[y_3class == "abstain"] == "abstain").sum() / abs_total) if abs_total else 0
+            disp_recall = ((final_pred[y_3class == "disputed"] == "disputed").sum() / disp_total) if disp_total else 0
+            trust_recall = ((final_pred[y_3class == "trustworthy"] == "trustworthy").sum() / trust_total) if trust_total else 0
+
+            results.append({
+                "s1_t": s1_t, "s2_t": s2_t,
+                "accuracy": accuracy,
+                "false_trustworthy": false_trustworthy,
+                "false_trust_abstain": false_trust_abstain,
+                "false_trust_disputed": false_trust_disputed,
+                "abs_recall": abs_recall,
+                "disp_recall": disp_recall,
+                "trust_recall": trust_recall,
+            })
+
+    # Strategy: minimize false_trustworthy, with accuracy >= 0.78 and trust_recall >= 0.70
+    eligible = [r for r in results if r["accuracy"] >= 0.78 and r["trust_recall"] >= 0.70]
+    if not eligible:
+        # Relax: accuracy >= 0.75
+        eligible = [r for r in results if r["accuracy"] >= 0.75 and r["trust_recall"] >= 0.65]
+    if not eligible:
+        eligible = results
+
+    # Primary: minimize false_trustworthy. Tiebreak: maximize accuracy.
+    best = min(eligible, key=lambda r: (r["false_trustworthy"], -r["accuracy"]))
+
+    print(f"\nBefore calibration (s1={old_s1_thresh:.3f}, s2={old_s2_thresh:.3f}):")
+    old = next(r for r in results
+               if abs(r["s1_t"] - old_s1_thresh) < 0.003 and abs(r["s2_t"] - old_s2_thresh) < 0.003)
+    print(f"  Accuracy:           {old['accuracy']:.4f}")
+    print(f"  False trustworthy:  {old['false_trustworthy']} ({old['false_trust_abstain']} abstain, {old['false_trust_disputed']} disputed)")
+    print(f"  Abstain recall:     {old['abs_recall']:.4f}")
+    print(f"  Disputed recall:    {old['disp_recall']:.4f}")
+    print(f"  Trustworthy recall: {old['trust_recall']:.4f}")
+
+    print(f"\nAfter calibration (s1={best['s1_t']:.3f}, s2={best['s2_t']:.3f}):")
+    print(f"  Accuracy:           {best['accuracy']:.4f}")
+    print(f"  False trustworthy:  {best['false_trustworthy']} ({best['false_trust_abstain']} abstain, {best['false_trust_disputed']} disputed)")
+    print(f"  Abstain recall:     {best['abs_recall']:.4f}")
+    print(f"  Disputed recall:    {best['disp_recall']:.4f}")
+    print(f"  Trustworthy recall: {best['trust_recall']:.4f}")
+
+    delta_ft = best["false_trustworthy"] - old["false_trustworthy"]
+    delta_acc = best["accuracy"] - old["accuracy"]
+    print(f"\n  Delta false trustworthy: {delta_ft:+d}")
+    print(f"  Delta accuracy:          {delta_acc:+.4f}")
+
+    # Show top 5 alternatives for comparison
+    eligible_sorted = sorted(eligible, key=lambda r: (r["false_trustworthy"], -r["accuracy"]))
+    print(f"\nTop 5 operating points (sorted by fewest false trustworthy):")
+    print(f"  {'s1':>6s}  {'s2':>6s}  {'acc':>6s}  {'FT':>4s}  {'abs_r':>6s}  {'dis_r':>6s}  {'tru_r':>6s}")
+    for r in eligible_sorted[:5]:
+        marker = " <-- selected" if r is best else ""
+        print(f"  {r['s1_t']:6.3f}  {r['s2_t']:6.3f}  {r['accuracy']:6.4f}  {r['false_trustworthy']:4d}  "
+              f"{r['abs_recall']:6.4f}  {r['disp_recall']:6.4f}  {r['trust_recall']:6.4f}{marker}")
+
+    # Save calibrated artifact
+    calibrated = dict(artifact)
+    calibrated["stage1_threshold"] = float(best["s1_t"])
+    calibrated["stage2_threshold"] = float(best["s2_t"])
+    calibrated["calibration"] = {
+        "false_trustworthy": best["false_trustworthy"],
+        "false_trust_abstain": best["false_trust_abstain"],
+        "false_trust_disputed": best["false_trust_disputed"],
+        "accuracy": best["accuracy"],
+        "recalls": {
+            "abstain": best["abs_recall"],
+            "disputed": best["disp_recall"],
+            "trustworthy": best["trust_recall"],
+        },
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(calibrated, output_path)
+    print(f"\nCalibrated model saved to {output_path}")
+    print(f"  s1_threshold: {best['s1_t']:.3f} (was {old_s1_thresh:.3f})")
+    print(f"  s2_threshold: {best['s2_t']:.3f} (was {old_s2_thresh:.3f})")
+
+    return calibrated
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1170,14 +1350,19 @@ def main():
     )
     parser.add_argument(
         "--mode",
-        choices=["4class", "twostage"],
+        choices=["4class", "twostage", "calibrate"],
         default="4class",
-        help="Training mode: 4class (legacy) or twostage (recommended)",
+        help="Training mode: 4class (legacy), twostage, or calibrate (safety threshold tuning)",
     )
     args = parser.parse_args()
 
     if args.output is None:
-        args.output = _DEFAULT_TWOSTAGE_OUTPUT if args.mode == "twostage" else _DEFAULT_MODEL_OUTPUT
+        if args.mode == "calibrate":
+            args.output = _DEFAULT_CALIBRATED_OUTPUT
+        elif args.mode == "twostage":
+            args.output = _DEFAULT_TWOSTAGE_OUTPUT
+        else:
+            args.output = _DEFAULT_MODEL_OUTPUT
 
     # Load data
     print(f"Loading features from {args.input}...")
@@ -1190,6 +1375,19 @@ def main():
         df = enrich_with_context_features(df, args.data_dir)
     elif not args.no_context_features:
         print(f"WARNING: {args.data_dir} not found, skipping context features")
+
+    # Calibrate mode: safety-focused threshold tuning on existing model
+    if args.mode == "calibrate":
+        X, encoders = prepare_features(df)
+        feature_names = list(X.columns)
+        y_4class = df["expected_mode"].values
+        calibrate_thresholds(
+            X, y_4class, feature_names, encoders,
+            model_path=_DEFAULT_TWOSTAGE_OUTPUT,
+            output_path=args.output,
+            seed=args.seed,
+        )
+        return
 
     # Two-stage mode: delegate to dedicated function
     if args.mode == "twostage":
