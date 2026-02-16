@@ -31,12 +31,12 @@ class FitzKragConfig(BasePluginConfig):
     # ==========================================================================
 
     chat: str = Field(
-        default="cohere",
+        default="ollama",
         description="Chat plugin: 'provider' or 'provider/model'",
     )
 
     embedding: str = Field(
-        default="cohere",
+        default="ollama",
         description="Embedding plugin: 'provider' or 'provider/model'",
     )
 

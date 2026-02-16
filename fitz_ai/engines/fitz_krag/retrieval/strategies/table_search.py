@@ -60,7 +60,7 @@ class TableSearchStrategy:
         # 2. Semantic search
         try:
             if query_vector is None:
-                query_vector = self._embedder.embed(query)
+                query_vector = self._embedder.embed(query, task_type="query")
             semantic_results = self._table_store.search_by_vector(query_vector, limit=fetch_limit)
         except Exception as e:
             logger.warning(f"Semantic table search failed, using keyword only: {e}")

@@ -882,7 +882,7 @@ class InsufficientEvidenceConstraint:
             return self._cache[cache_key]
 
         try:
-            embedding = self.embedder.embed(text)
+            embedding = self.embedder.embed(text, task_type="query")
             self._cache[cache_key] = embedding
             return embedding
         except Exception as e:

@@ -59,7 +59,7 @@ class TracingEmbedder:
         self.embed_batch_calls = 0
         self.total_texts_embedded = 0
 
-    def embed(self, text: str) -> List[float]:
+    def embed(self, text: str, **kwargs) -> List[float]:
         self.embed_calls += 1
         self.total_texts_embedded += 1
         self._tracker.log("embed()", f"call #{self.embed_calls}, text_len={len(text)}")
@@ -67,7 +67,7 @@ class TracingEmbedder:
             time.sleep(self._delay)
         return [0.1] * self._dim
 
-    def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    def embed_batch(self, texts: List[str], **kwargs) -> List[List[float]]:
         self.embed_batch_calls += 1
         self.total_texts_embedded += len(texts)
         self._tracker.log(

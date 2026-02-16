@@ -133,7 +133,7 @@ class EnterpriseEmbedding:
         self._model = model
         self._dimensions = dimensions
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, *, task_type: str | None = None) -> list[float]:
         """Embed a single text."""
         body: dict[str, Any] = {
             "model": self._model,
@@ -151,7 +151,7 @@ class EnterpriseEmbedding:
             return data["data"][0].get("embedding", [])
         return []
 
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    def embed_batch(self, texts: list[str], *, task_type: str | None = None) -> list[list[float]]:
         """Embed multiple texts."""
         body: dict[str, Any] = {
             "model": self._model,

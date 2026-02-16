@@ -610,7 +610,7 @@ class FitzKragEngine:
                 analysis = fast_analysis
                 detection = None
                 try:
-                    precomputed_vectors = self._embedder.embed_batch([sanitized])
+                    precomputed_vectors = self._embedder.embed_batch([sanitized], task_type="query")
                     precomputed_query_vector = (
                         dict(zip([sanitized], precomputed_vectors))
                     )
@@ -751,7 +751,7 @@ class FitzKragEngine:
         from fitz_ai.cloud.cache_key import compute_retrieval_fingerprint
 
         try:
-            query_embedding = self._embedder.embed(query_text)
+            query_embedding = self._embedder.embed(query_text, task_type="query")
             fingerprint = compute_retrieval_fingerprint([a.source_id for a in addresses])
             versions = self._build_cache_versions()
 
@@ -780,7 +780,7 @@ class FitzKragEngine:
         try:
             query_embedding = getattr(self, "_cached_query_embedding", None)
             if query_embedding is None:
-                query_embedding = self._embedder.embed(query_text)
+                query_embedding = self._embedder.embed(query_text, task_type="query")
 
             fingerprint = compute_retrieval_fingerprint([a.source_id for a in addresses])
             versions = self._build_cache_versions()

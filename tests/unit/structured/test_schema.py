@@ -25,7 +25,7 @@ class MockEmbeddingClient:
         self.dim = dim
         self.calls: list[str] = []
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, **kwargs) -> list[float]:
         """Generate deterministic embedding based on text hash."""
         self.calls.append(text)
         # Create deterministic embedding from text

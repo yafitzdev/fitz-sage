@@ -61,24 +61,28 @@ class StreamingChatProvider(Protocol):
 class EmbeddingProvider(Protocol):
     """Protocol for embedding providers."""
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, *, task_type: str | None = None) -> list[float]:
         """
         Embed a single text.
 
         Args:
             text: Text to embed.
+            task_type: "query" for retrieval queries, "document" for ingestion.
+                       None uses provider default.
 
         Returns:
             Embedding vector.
         """
         ...
 
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    def embed_batch(self, texts: list[str], *, task_type: str | None = None) -> list[list[float]]:
         """
         Embed multiple texts.
 
         Args:
             texts: List of texts to embed.
+            task_type: "query" for retrieval queries, "document" for ingestion.
+                       None uses provider default.
 
         Returns:
             List of embedding vectors (same order as input).

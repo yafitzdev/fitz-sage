@@ -129,6 +129,27 @@ class OllamaEmbedding:
         base_url: Ollama server URL.
     """
 
+    # Models that use task-type prefixes for better retrieval quality.
+    # Maps model name substring → {task_type: prefix}.
+    _TASK_PREFIXES: dict[str, dict[str, str]] = {
+        "nomic-embed": {
+            "query": "search_query: ",
+            "document": "search_document: ",
+        },
+        "e5": {
+            "query": "query: ",
+            "document": "passage: ",
+        },
+        "bge": {
+            "query": "Represent this sentence for searching relevant passages: ",
+            "document": "",
+        },
+        "gte": {
+            "query": "query: ",
+            "document": "passage: ",
+        },
+    }
+
     def __init__(
         self,
         model: str | None = None,
@@ -138,12 +159,29 @@ class OllamaEmbedding:
         self._model = model or EMBEDDING_MODEL
         self._client = httpx.Client(base_url=self._base_url, timeout=60.0)
         self._dimensions: int | None = None
+        self._prefix_map = self._resolve_prefixes()
 
-    def embed(self, text: str) -> list[float]:
+    def _resolve_prefixes(self) -> dict[str, str]:
+        """Find task-type prefixes for the current model."""
+        model_lower = self._model.lower()
+        for key, prefixes in self._TASK_PREFIXES.items():
+            if key in model_lower:
+                return prefixes
+        return {}
+
+    def _apply_prefix(self, text: str, task_type: str | None) -> str:
+        """Prepend task-type prefix if applicable."""
+        if task_type and self._prefix_map:
+            prefix = self._prefix_map.get(task_type, "")
+            if prefix:
+                return prefix + text
+        return text
+
+    def embed(self, text: str, *, task_type: str | None = None) -> list[float]:
         """Embed a single text."""
         payload = {
             "model": self._model,
-            "input": text,
+            "input": self._apply_prefix(text, task_type),
         }
 
         response = self._client.post("/api/embed", json=payload)
@@ -158,14 +196,15 @@ class OllamaEmbedding:
 
         raise RuntimeError(f"Unexpected embedding response: {data}")
 
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    def embed_batch(self, texts: list[str], *, task_type: str | None = None) -> list[list[float]]:
         """Embed multiple texts."""
         if not texts:
             return []
 
+        prefixed = [self._apply_prefix(t, task_type) for t in texts]
         payload = {
             "model": self._model,
-            "input": texts,
+            "input": prefixed,
         }
 
         response = self._client.post("/api/embed", json=payload)

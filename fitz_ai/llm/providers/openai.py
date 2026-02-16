@@ -149,12 +149,12 @@ class OpenAIEmbedding:
         self._model = model or EMBEDDING_MODEL
         self._dimensions = dimensions
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, *, task_type: str | None = None) -> list[float]:
         """Embed a single text."""
         result = self.embed_batch([text])
         return result[0]
 
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    def embed_batch(self, texts: list[str], *, task_type: str | None = None) -> list[list[float]]:
         """Embed multiple texts."""
         if not texts:
             return []

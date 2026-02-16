@@ -12,8 +12,8 @@ class TestFitzKragConfig:
     def test_minimal_config(self):
         config = FitzKragConfig(collection="test")
         assert config.collection == "test"
-        assert config.chat == "cohere"
-        assert config.embedding == "cohere"
+        assert config.chat == "ollama"
+        assert config.embedding == "ollama"
 
     def test_defaults(self):
         config = FitzKragConfig(collection="test")
@@ -69,7 +69,7 @@ class TestDefaultYaml:
         with path.open("r", encoding="utf-8") as f:
             raw = yaml.safe_load(f)
         assert "fitz_krag" in raw
-        assert raw["fitz_krag"]["chat"] == "cohere"
+        assert raw["fitz_krag"]["chat"] == "ollama"
         assert raw["fitz_krag"]["collection"] == "default"
 
     def test_default_yaml_creates_valid_config(self):

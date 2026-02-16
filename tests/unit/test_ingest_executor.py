@@ -57,10 +57,10 @@ class MockEmbedder:
     def __init__(self, dim: int = 4):
         self._dim = dim
 
-    def embed(self, text: str) -> List[float]:
+    def embed(self, text: str, **kwargs) -> List[float]:
         return [0.1] * self._dim
 
-    def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    def embed_batch(self, texts: List[str], **kwargs) -> List[List[float]]:
         return [[0.1] * self._dim for _ in texts]
 
 

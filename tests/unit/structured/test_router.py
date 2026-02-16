@@ -34,7 +34,7 @@ class MockEmbeddingClient:
     def __init__(self, dim: int = 4):
         self.dim = dim
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, **kwargs) -> list[float]:
         """Generate embedding that creates predictable similarity."""
         text_lower = text.lower()
         vec = [0.1] * self.dim

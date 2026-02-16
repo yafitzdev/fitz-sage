@@ -213,7 +213,7 @@ class RetrievalRouter:
         if missing and self._embedder:
             try:
                 _t0 = _time.perf_counter()
-                vectors = self._embedder.embed_batch(missing)
+                vectors = self._embedder.embed_batch(missing, task_type="query")
                 query_vectors.update(dict(zip(missing, vectors)))
                 _embed_ms = (_time.perf_counter() - _t0) * 1000
             except Exception as e:
@@ -244,7 +244,7 @@ class RetrievalRouter:
                     hyp_ranges.append((q_text, 0, 0))
             if all_hypotheses:
                 try:
-                    hyp_vecs = self._embedder.embed_batch(all_hypotheses)
+                    hyp_vecs = self._embedder.embed_batch(all_hypotheses, task_type="document")
                     for q_text, start, count in hyp_ranges:
                         if count > 0:
                             hyde_vectors_map[q_text] = hyp_vecs[start : start + count]

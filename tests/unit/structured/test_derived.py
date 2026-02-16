@@ -37,11 +37,11 @@ class MockEmbeddingClient:
         self.calls: list[str] = []
         self.batch_calls: list[list[str]] = []
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, **kwargs) -> list[float]:
         self.calls.append(text)
         return [0.1] * self.dim
 
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    def embed_batch(self, texts: list[str], **kwargs) -> list[list[float]]:
         self.batch_calls.append(texts)
         return [[0.1 * i] * self.dim for i in range(len(texts))]
 

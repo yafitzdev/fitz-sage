@@ -339,7 +339,7 @@ class DiffIngestExecutor:
         # Phase 2: Batch embed ALL texts at once
         if all_texts:
             t0 = time.perf_counter()
-            all_vectors = self._embedder.embed_batch(all_texts)
+            all_vectors = self._embedder.embed_batch(all_texts, task_type="document")
             embed_time = time.perf_counter() - t0
             logger.info(f"Embedded {len(all_texts)} chunks in {embed_time:.2f}s")
         else:
@@ -749,7 +749,7 @@ class DiffIngestExecutor:
                 on_progress(0, total, "Embedding...")
 
             texts_to_embed = [artifact.content for artifact in artifacts]
-            vectors = self._embedder.embed_batch(texts_to_embed)
+            vectors = self._embedder.embed_batch(texts_to_embed, task_type="document")
 
             # Build points with vectors
             points = []

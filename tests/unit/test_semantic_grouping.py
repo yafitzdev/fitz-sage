@@ -239,7 +239,7 @@ class TestHierarchyEnricherSemantic:
         mock_chat.chat.return_value = "Group summary"
 
         # Mock embedder returns different embeddings for different topics
-        def mock_embed(text: str) -> list:
+        def mock_embed(text: str, **kwargs) -> list:
             if "Topic A" in text:
                 return [1.0, 0.0, 0.0]
             else:

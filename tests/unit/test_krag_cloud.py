@@ -220,7 +220,7 @@ class TestCheckCloudCache:
         engine._check_cloud_cache("test query", addresses)
 
         # Embedder called with query text
-        engine._embedder.embed.assert_called_once_with("test query")
+        engine._embedder.embed.assert_called_once_with("test query", task_type="query")
 
         # lookup_cache called with embedding and fingerprint
         call_kwargs = engine._cloud_client.lookup_cache.call_args

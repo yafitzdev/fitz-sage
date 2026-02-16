@@ -65,7 +65,7 @@ class SectionSearchStrategy:
         # 2. Semantic search
         try:
             if query_vector is None:
-                query_vector = self._embedder.embed(query)
+                query_vector = self._embedder.embed(query, task_type="query")
             semantic_results = self._section_store.search_by_vector(query_vector, limit=fetch_limit)
         except Exception as e:
             logger.warning(f"Semantic section search failed, using BM25 only: {e}")
@@ -121,7 +121,7 @@ class SectionSearchStrategy:
             hypotheses = self._hyde_generator.generate(query)
             all_results: list[dict[str, Any]] = []
             for hyp in hypotheses:
-                hyp_vector = self._embedder.embed(hyp)
+                hyp_vector = self._embedder.embed(hyp, task_type="document")
                 results = self._section_store.search_by_vector(hyp_vector, limit=limit)
                 all_results.extend(results)
             return all_results

@@ -30,7 +30,7 @@ class MockEmbeddingClient:
     def __init__(self, dim: int = 4):
         self.dim = dim
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
+    def embed(self, texts: list[str], **kwargs) -> list[list[float]]:
         """Generate deterministic embeddings."""
         return [[hash(t) % 1000 / 1000.0] * self.dim for t in texts]
 

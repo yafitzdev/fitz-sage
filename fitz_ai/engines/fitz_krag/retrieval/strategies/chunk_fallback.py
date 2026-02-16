@@ -36,7 +36,7 @@ class ChunkFallbackStrategy:
     def retrieve(self, query: str, limit: int) -> list[Address]:
         """Search chunks via vector DB and wrap as CHUNK addresses."""
         try:
-            query_vector = self._embedder.embed(query)
+            query_vector = self._embedder.embed(query, task_type="query")
             results = self._vector_db.search(
                 collection_name=self._config.collection,
                 query_vector=query_vector,

@@ -178,7 +178,7 @@ class DerivedStore:
         )
 
         # Generate embedding for sentence
-        vector = self._embedding.embed(sentence)
+        vector = self._embedding.embed(sentence, task_type="document")
 
         # Store in vector DB
         point = {
@@ -228,7 +228,7 @@ class DerivedStore:
             records.append(record)
 
         # Generate embeddings for all sentences
-        vectors = self._embedding.embed_batch([r.content for r in records])
+        vectors = self._embedding.embed_batch([r.content for r in records], task_type="document")
 
         # Build points
         points = []

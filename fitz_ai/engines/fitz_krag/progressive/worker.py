@@ -441,7 +441,7 @@ class BackgroundIngestWorker:
             record_ids.append(record["id"])
 
         try:
-            vectors = self._embedder.embed_batch(texts)
+            vectors = self._embedder.embed_batch(texts, task_type="document")
             for record_id, vector in zip(record_ids, vectors):
                 self._table_store.update_vector(record_id, vector)
         except Exception as e:
@@ -637,7 +637,7 @@ class BackgroundIngestWorker:
 
         texts = [s.get("summary") or f"{s.get('kind', '')} {s.get('name', '')}" for s in summaries]
         try:
-            vectors = self._embedder.embed_batch(texts)
+            vectors = self._embedder.embed_batch(texts, task_type="document")
             self._symbol_store.update_vectors_by_file(entry.file_id, vectors)
         except Exception as e:
             logger.warning(f"Embedding failed for {entry.rel_path}: {e}")
@@ -653,7 +653,7 @@ class BackgroundIngestWorker:
             for s in sections
         ]
         try:
-            vectors = self._embedder.embed_batch(texts)
+            vectors = self._embedder.embed_batch(texts, task_type="document")
             self._section_store.update_vectors_by_file(entry.file_id, vectors)
         except Exception as e:
             logger.warning(f"Section embedding failed for {entry.rel_path}: {e}")

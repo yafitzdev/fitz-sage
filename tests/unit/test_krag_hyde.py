@@ -84,7 +84,7 @@ class TestCodeSearchHyDE:
 
         # Semantic returns one result
         sem_row = _make_symbol_row("sem1", score=0.85, name="login")
-        embedder.embed.side_effect = lambda text: [0.1] * 3  # dummy vector
+        embedder.embed.side_effect = lambda text, **kw: [0.1] * 3  # dummy vector
         store.search_by_vector.return_value = [sem_row]
 
         # HyDE generator
@@ -188,7 +188,7 @@ class TestCodeSearchHyDE:
         result = strategy.retrieve("find func", limit=5)
 
         # No HyDE calls: embedder called once (query), vector search once
-        embedder.embed.assert_called_once_with("find func")
+        embedder.embed.assert_called_once_with("find func", task_type="query")
         store.search_by_vector.assert_called_once()
 
         assert len(result) > 0
@@ -242,7 +242,7 @@ class TestSectionSearchHyDE:
         sem_row = _make_section_row("sem1", score=0.7, title="Configuration")
         hyde_row = _make_section_row("hyde1", score=0.6, title="Deployment")
 
-        embedder.embed.side_effect = lambda text: [0.1]
+        embedder.embed.side_effect = lambda text, **kw: [0.1]
         store.search_by_vector.side_effect = [
             [sem_row],  # semantic
             [hyde_row],  # HyDE hypothesis 1
@@ -293,7 +293,7 @@ class TestSectionSearchHyDE:
 
         result = strategy.retrieve("setup guide", limit=5)
 
-        embedder.embed.assert_called_once_with("setup guide")
+        embedder.embed.assert_called_once_with("setup guide", task_type="query")
         store.search_by_vector.assert_called_once()
         assert len(result) > 0
 

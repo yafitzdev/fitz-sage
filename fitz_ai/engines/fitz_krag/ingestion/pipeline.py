@@ -802,7 +802,7 @@ class KragIngestPipeline:
         if not summaries:
             return []
         try:
-            return self._embedder.embed_batch(summaries)
+            return self._embedder.embed_batch(summaries, task_type="document")
         except Exception as e:
             logger.warning(f"Embedding failed: {e}")
             return []

@@ -59,7 +59,7 @@ class EmbeddingProvider:
 
         embeddings = []
         for chunk in chunks:
-            vector = self._embedder.embed(chunk.content)
+            vector = self._embedder.embed(chunk.content, task_type="document")
             embeddings.append(vector)
 
         return np.array(embeddings, dtype=np.float32)

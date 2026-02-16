@@ -214,7 +214,7 @@ class SchemaStore:
         """
         # Generate searchable text and embedding
         search_text = schema.to_search_text()
-        embedding = self._embedding.embed(search_text)
+        embedding = self._embedding.embed(search_text, task_type="document")
 
         if not embedding:
             raise ValueError(f"Failed to generate embedding for table {schema.table_name}")
@@ -296,7 +296,7 @@ class SchemaStore:
             List of matching schemas with scores
         """
         # Embed the query
-        embedding = self._embedding.embed(query)
+        embedding = self._embedding.embed(query, task_type="query")
 
         if not embedding:
             logger.warning("Failed to generate query embedding for schema search")
