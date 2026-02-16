@@ -399,6 +399,21 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
             * (1 - X["ca_fired"])
         )
 
+    # Q3-specific features: distinguish data-rich trustworthy from genuine disputes
+    if "ctx_number_count" in X.columns and "num_chunks" in X.columns:
+        X["numerical_richness_per_chunk"] = X["ctx_number_count"] / X["num_chunks"].clip(lower=1)
+    if "within_chunk_num_conflicts" in X.columns and "cross_chunk_num_conflicts" in X.columns:
+        total_conflicts = X["cross_chunk_num_conflicts"] + X["within_chunk_num_conflicts"]
+        X["conflict_internality_ratio"] = X["within_chunk_num_conflicts"] / total_conflicts.clip(
+            lower=1
+        )
+    if "ctx_total_chars" in X.columns and "num_chunks" in X.columns:
+        X["chars_per_chunk"] = X["ctx_total_chars"] / X["num_chunks"].clip(lower=1)
+    if "ctx_contradiction_count" in X.columns and "ctx_total_chars" in X.columns:
+        X["contradiction_per_char"] = X["ctx_contradiction_count"] / X["ctx_total_chars"].clip(
+            lower=1
+        )
+
     return X, encoders
 
 
@@ -1384,9 +1399,9 @@ def train_cascade(
     print("Q3: Is the conflict resolved? (conflict path: trustworthy vs disputed)")
     print(f"{'='*60}")
 
-    # Q3 training: conflict cases, label disputed=0 (unresolved), trustworthy=1 (resolved)
-    # Abstain cases in conflict path get labeled 0 (unresolved → safe fallback to disputed)
-    q3_train_mask = conflict_train
+    # Q3 training: conflict cases, trustworthy=1 (resolved) vs disputed=0 (unresolved)
+    # Exclude abstain cases from Q3 training — they are noise (lack evidence, not unresolved conflicts)
+    q3_train_mask = conflict_train & (y3_train != "abstain")
     q3_test_mask = conflict_test
 
     y_q3_train = np.where(y3_train[q3_train_mask] == "trustworthy", 1, 0)
@@ -1394,13 +1409,15 @@ def train_cascade(
     X_q3_train = X_train[q3_train_mask]
     X_q3_test = X_test[q3_test_mask]
 
-    print(f"  Train: {sum(y_q3_train == 1)} resolved (trustworthy), {sum(y_q3_train == 0)} unresolved (disputed+abstain)")
+    n_abstain_removed = conflict_train.sum() - q3_train_mask.sum()
+    print(f"  Train: {sum(y_q3_train == 1)} resolved (trustworthy), {sum(y_q3_train == 0)} unresolved (disputed)")
+    print(f"  Removed {n_abstain_removed} abstain cases from Q3 training (noise)")
     print(f"  Test:  {sum(y_q3_test == 1)} resolved, {sum(y_q3_test == 0)} unresolved")
 
     q3_model, q3_threshold, q3_name = _train_binary_stage(
         "Q3", X_q3_train, y_q3_train, X_q3_test, y_q3_test, feature_names,
         time_per_q, seed, class_labels=("unresolved", "resolved"),
-        optimize_recall_class=0,  # optimize unresolved (disputed) recall
+        optimize_recall_class=1,  # optimize resolved (trustworthy) recall
     )
 
     # ================================================================

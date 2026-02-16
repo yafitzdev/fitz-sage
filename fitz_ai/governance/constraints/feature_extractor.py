@@ -609,6 +609,23 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
     _compute_cross_chunk_numerical_divergence(features, texts)
     _compute_within_chunk_numerical_divergence(features, texts)
 
+    # --- Q3-specific features: distinguish data-rich documents from real conflicts ---
+    features["numerical_richness_per_chunk"] = (
+        features["ctx_number_count"] / max(len(chunks), 1)
+    )
+    features["conflict_internality_ratio"] = (
+        features["within_chunk_num_conflicts"]
+        / max(
+            features["cross_chunk_num_conflicts"]
+            + features["within_chunk_num_conflicts"],
+            1,
+        )
+    )
+    features["chars_per_chunk"] = features["ctx_total_chars"] / max(len(chunks), 1)
+    features["contradiction_per_char"] = features["ctx_contradiction_count"] / max(
+        features["ctx_total_chars"], 1
+    )
+
 
 def _extract_numbers_from_text(text: str) -> list[float]:
     """Extract significant numbers from text, excluding years and trivial values."""

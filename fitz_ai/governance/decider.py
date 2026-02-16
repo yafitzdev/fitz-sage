@@ -316,6 +316,72 @@ class GovernanceDecider:
         for col in X.columns:
             X[col] = pd.to_numeric(X[col], errors="coerce").fillna(0)
 
+        # Log-transform ctx_number_variance (matches training)
+        if "ctx_number_variance" in X.columns:
+            import numpy as np
+
+            X["ctx_number_variance"] = np.log1p(X["ctx_number_variance"])
+
+        # Interaction features (must match prepare_features in train_classifier.py)
+        if "ca_fired" in X.columns and "mean_vector_score" in X.columns:
+            X["ix_ca_x_vector"] = X["ca_fired"] * X["mean_vector_score"]
+        if "ctx_contradiction_count" in X.columns and "ctx_total_chars" in X.columns:
+            X["ix_contradiction_density"] = X["ctx_contradiction_count"] / (
+                X["ctx_total_chars"] + 1
+            )
+        if "ctx_negation_count" in X.columns and "ctx_total_chars" in X.columns:
+            X["ix_negation_density"] = X["ctx_negation_count"] / (X["ctx_total_chars"] + 1)
+        if "mean_vector_score" in X.columns and "score_spread" in X.columns:
+            X["ix_score_confidence"] = X["mean_vector_score"] - X["score_spread"]
+        if "ca_pairs_checked" in X.columns and "has_disputed_signal" in X.columns:
+            X["ix_ca_pairs_x_disputed"] = X["ca_pairs_checked"] * X["has_disputed_signal"]
+        if "ie_max_similarity" in X.columns and "ie_fired" in X.columns:
+            X["ix_ie_sim_x_fired"] = X["ie_max_similarity"] * X["ie_fired"]
+        if "av_jury_votes_no" in X.columns and "mean_vector_score" in X.columns:
+            X["ix_av_votes_x_vector"] = X["av_jury_votes_no"] * X["mean_vector_score"]
+        if "has_disputed_signal" in X.columns and "av_jury_votes_no" in X.columns:
+            X["ix_disputed_x_av"] = X["has_disputed_signal"] * X["av_jury_votes_no"]
+        if "ctx_max_pairwise_sim" in X.columns and "ctx_min_pairwise_sim" in X.columns:
+            X["ix_ctx_sim_spread"] = X["ctx_max_pairwise_sim"] - X["ctx_min_pairwise_sim"]
+        if "mean_vector_score" in X.columns and "ctx_contradiction_count" in X.columns:
+            X["ix_vector_x_contradiction"] = (
+                X["mean_vector_score"] * X["ctx_contradiction_count"]
+            )
+        if "av_fired" in X.columns and "ie_fired" in X.columns:
+            X["ix_av_no_ie"] = X["av_fired"] * (1 - X["ie_fired"])
+        if "av_strong_denial" in X.columns and "ie_fired" in X.columns:
+            X["ix_av_strong_no_ie"] = X["av_strong_denial"] * (1 - X["ie_fired"])
+        if "num_constraints_fired" in X.columns:
+            X["ix_multi_denial"] = (X["num_constraints_fired"] >= 2).astype(int)
+        if "has_any_denial" in X.columns and "mean_vector_score" in X.columns:
+            X["ix_denial_low_vector"] = X["has_any_denial"] * (1 - X["mean_vector_score"])
+        if "av_jury_votes_no" in X.columns and "has_abstain_signal" in X.columns:
+            X["ix_av_x_abstain"] = X["av_jury_votes_no"] * X["has_abstain_signal"]
+        if "has_cross_chunk_divergence" in X.columns and "ca_fired" in X.columns:
+            X["ix_divergence_no_ca"] = X["has_cross_chunk_divergence"] * (1 - X["ca_fired"])
+        if "has_within_chunk_divergence" in X.columns and "ca_fired" in X.columns:
+            X["ix_any_divergence_no_ca"] = (
+                (X.get("has_cross_chunk_divergence", 0) | X["has_within_chunk_divergence"])
+                * (1 - X["ca_fired"])
+            )
+
+        # Q3-specific features: distinguish data-rich trustworthy from genuine disputes
+        if "ctx_number_count" in X.columns and "num_chunks" in X.columns:
+            X["numerical_richness_per_chunk"] = X["ctx_number_count"] / X["num_chunks"].clip(
+                lower=1
+            )
+        if "within_chunk_num_conflicts" in X.columns and "cross_chunk_num_conflicts" in X.columns:
+            total_conf = X["cross_chunk_num_conflicts"] + X["within_chunk_num_conflicts"]
+            X["conflict_internality_ratio"] = X["within_chunk_num_conflicts"] / total_conf.clip(
+                lower=1
+            )
+        if "ctx_total_chars" in X.columns and "num_chunks" in X.columns:
+            X["chars_per_chunk"] = X["ctx_total_chars"] / X["num_chunks"].clip(lower=1)
+        if "ctx_contradiction_count" in X.columns and "ctx_total_chars" in X.columns:
+            X["contradiction_per_char"] = X["ctx_contradiction_count"] / X["ctx_total_chars"].clip(
+                lower=1
+            )
+
         # Align columns to model's expected feature set
         missing = [c for c in self._feature_names if c not in X.columns]
         for col in missing:
