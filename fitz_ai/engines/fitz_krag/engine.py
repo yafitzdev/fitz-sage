@@ -167,9 +167,8 @@ class FitzKragEngine:
         _t1 = _t.perf_counter()
         logger.debug(f"[init] providers+pg: {(_t1-_t0)*1000:.0f}ms")
 
-        # embed.dimensions calls self.embed("test") internally — triggers
-        # embedding model cold start (~2s). Fire it in a background thread
-        # so it overlaps with store object creation below.
+        # Cold-start warmup: resolve embedding dimensions in background
+        # so it overlaps with store creation below.
         dim_result: dict[str, int | None] = {"value": None}
         dim_error: list[Exception] = []
 
@@ -181,6 +180,7 @@ class FitzKragEngine:
 
         dim_thread = threading.Thread(target=_resolve_dimensions, daemon=True)
         dim_thread.start()
+
 
         # Ingestion stores (created while embed.dimensions resolves)
         from fitz_ai.engines.fitz_krag.ingestion.import_graph_store import ImportGraphStore
@@ -253,6 +253,17 @@ class FitzKragEngine:
 
         self._chat_factory = get_chat_factory(self._config.chat)
 
+        # Pre-load fast chat model (ollama loads on first call, ~3s cold start).
+        # Fast tier is used by guardrails and detection — first to run on query.
+        def _warmup_chat():
+            try:
+                self._chat_factory("fast").chat(
+                    [{"role": "user", "content": "hi"}], max_tokens=1,
+                )
+            except Exception:
+                pass
+        threading.Thread(target=_warmup_chat, daemon=True).start()
+
         # Query Analysis
         from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalyzer
 
@@ -273,7 +284,7 @@ class FitzKragEngine:
             from fitz_ai.governance.decider import GovernanceDecider
 
             self._constraints = create_default_constraints(
-                chat=self._chat,
+                chat=self._chat_factory("fast"),
                 chat_balanced=self._chat_factory("balanced"),
                 embedder=self._embedder,
             )
@@ -396,10 +407,7 @@ class FitzKragEngine:
             f"total: {(_t5-_t0)*1000:.0f}ms"
         )
 
-        # Pre-warm LLM in background.
-        # By the time answer() is called (after file registration), model is loaded.
-        self._warmup_thread: Any = None
-        self._warmup_llm()
+        # Chat models already warming up from init (background threads above).
 
     # Keywords that signal the query may have temporal/comparison/aggregation intent.
     # If none match, the detection LLM call can be skipped safely.
@@ -478,25 +486,6 @@ class FitzKragEngine:
             entities=entities,
             refined_query=query,
         )
-
-    def _warmup_llm(self) -> None:
-        """Fire a lightweight LLM call to pre-load the model.
-
-        Runs in a background thread so model loading overlaps with file
-        registration and other CLI setup. The embedding model is already
-        warmed by the embed.dimensions call during init.
-        """
-        import threading
-
-        def _warmup():
-            try:
-                chat = self._chat_factory("fast")
-                chat.chat([{"role": "user", "content": "hi"}])
-            except Exception:
-                pass  # Best-effort — cold start just means slower first query
-
-        self._warmup_thread = threading.Thread(target=_warmup, daemon=True)
-        self._warmup_thread.start()
 
     def answer(
         self, query: Query, *, progress: Callable[[str], None] | None = None
