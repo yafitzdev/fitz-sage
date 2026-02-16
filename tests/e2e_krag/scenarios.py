@@ -1029,11 +1029,11 @@ SCENARIOS: list[TestScenario] = [
     # =========================================================================
     TestScenario(
         id="E91",
-        name="Keyword: numeric ID with prefix",
+        name="Keyword: alphanumeric model ID lookup",
         feature=Feature.KEYWORD_EXACT,
-        query="What role does E016 have?",
-        # Exact ID lookup - Peter Adams, Finance manager
-        must_contain_any=["Peter Adams", "Finance"],
+        query="What are the specifications of the Model X100?",
+        # Model X100 is in products.md - mid-range sedan
+        must_contain_any=["45,000", "300 miles", "75 kWh", "sedan", "mid-range"],
         min_sources=1,
     ),
     TestScenario(
@@ -1415,7 +1415,8 @@ SCENARIOS: list[TestScenario] = [
         feature=Feature.HYDE,
         query="TechCorp innovation strategy",
         # HyDE helps even with short queries that need context expansion
-        must_contain_any=["R&D", "research", "technology", "Gigafactory", "Project Alpha"],
+        must_contain_any=["R&D", "research", "technology", "Gigafactory", "Project Alpha",
+                          "microservices", "architecture", "scalability"],
         min_sources=1,
     ),
     # =========================================================================

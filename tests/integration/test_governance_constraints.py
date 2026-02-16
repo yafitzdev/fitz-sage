@@ -158,7 +158,7 @@ class TestRelevanceFiltering:
 
         try:
             embedder = get_embedder("ollama", config={"model": "nomic-embed-text:latest"})
-            constraint = InsufficientEvidenceConstraint(embedder=embedder.embed)
+            constraint = InsufficientEvidenceConstraint(embedder=embedder)
 
             query = "What was the revenue last quarter?"
             chunks = [
@@ -231,7 +231,7 @@ class TestCausalQueryDetection:
 
         try:
             embedder = get_embedder("ollama", config={"model": "nomic-embed-text:latest"})
-            constraint = InsufficientEvidenceConstraint(embedder=embedder.embed)
+            constraint = InsufficientEvidenceConstraint(embedder=embedder)
 
             query = "Why did the server crash?"
             chunks = [
@@ -298,7 +298,7 @@ class TestConflictDetection:
             fast_chat = chat_factory("fast")
 
             # Use new constraint interfaces
-            ie_constraint = InsufficientEvidenceConstraint(embedder=embedder.embed)
+            ie_constraint = InsufficientEvidenceConstraint(embedder=embedder)
             ca_constraint = ConflictAwareConstraint(chat=fast_chat, adaptive=True)
 
             query = "Was the migration successful?"

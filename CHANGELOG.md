@@ -9,6 +9,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🎉 Highlights
+
+**Progressive KRAG with Agentic Search** — Query any file or folder instantly without pre-ingestion. `fitz query --source ./docs "question"` parses documents on-demand, indexes in the background, and serves answers immediately. Agentic search discovers relevant files from a manifest, parses only what's needed, and retrieves with full KRAG intelligence.
+
+**4-Question Cascade Governance Classifier** — Replaced the two-stage ML classifier with a 4-question cascade architecture: Q1 (evidence sufficient? ML) → Q2 (conflict? rule: ca_fired) → Q3 (conflict resolved? ML) → Q4 (evidence solid? ML). Achieves 79.1% accuracy with 90.0% abstain recall and 76.2% disputed recall. Model now ships with `pip install fitz-ai`.
+
+**40% Pipeline Speedup** — Smart retrieval gating skips unnecessary LLM calls for simple queries, overlapped embedding fetches dimensions during component init, parallel strategy execution, and pre-warmed LLM/embedding models eliminate cold-start latency.
+
+**CLI Simplification** — Slimmed CLI from 14 commands to 7. Consolidated `fitz point` and `fitz quickstart` into `fitz query --source`. Cleaner, more discoverable command surface.
+
+### 🚀 Added
+
+#### Progressive KRAG & Agentic Search
+- `fitz query --source <path>` — Query files/folders without pre-ingestion
+- On-demand PDF/DOCX/PPTX parsing with background indexing
+- Agentic search: manifest-based file discovery, selective parsing, KRAG retrieval
+- Pipeline timing breakdown in query output (parse, retrieve, generate times)
+- Cached parsed PDF text to avoid redundant parsing
+- Heading structure cache for rich documents (eliminates double parsing)
+
+#### Governance Classifier Improvements
+- 4-question cascade classifier (Q1→Q2→Q3→Q4) replacing two-stage architecture
+- Text answer features: `query_subject_partial`, `entity_substantive_score`, `best_sentence_coverage`, `best_span_length`, `answer_span_coverage`
+- Conflict quality features: `conflict_to_number_ratio`, `opposing_conclusion_count`, `negation_per_char`, `short_ctx_with_overlap`
+- Interaction features: `ix_av_fires_good_overlap`, `ix_max_div_per_conflict`, `ix_single_chunk_denial`, `ix_ie_no_ca`, `ix_ca_no_ie`
+- ~21 missing governance features added, InsufficientEvidence constraint re-enabled
+- Numerical divergence features for cross-chunk analysis
+- Safety-focused threshold calibration with vectorized sweep
+- Model artifact shipped with package (`fitz_ai/governance/data/model_v6_cascade.joblib`)
+
+#### Retrieval Intelligence
+- Retrieval intelligence fully wired through KRAG pipeline
+- Task-type embedding prefixes for improved retrieval quality
+- Rewritten AV jury constraint: 3-fast + balanced confirmation
+
+#### Performance Optimizations
+- Smart retrieval gating: skip detection/analysis for simple queries
+- Overlapped embedding: fetch `embed.dimensions` during component init (-1s startup)
+- Parallel strategy execution with shared embeddings and pgserver sharing
+- Pre-warm LLM and embedding models during engine init
+- Skip analysis LLM call for simple queries (heuristic classification)
+- Run query rewrite in parallel with analysis+detection
+- Skip LLM selection for small manifests
+- Warm smart tier sequentially after fast tier during init
+
+#### Code Extraction Robustness
+- Regex fallback for Python files with syntax errors (AST parse fails gracefully)
+- Regex fallback for TypeScript/Java/Go when tree-sitter is unavailable
+
+### 🔄 Changed
+
+- **CLI surface**: Slimmed from 14 commands to 7 — removed `point`, `quickstart`, `chunk`, `db`, `engine`, `plugin`, `collections`
+- **`fitz query --source`**: Consolidates `fitz point` and `fitz quickstart` into single command
+- **Governance classifier**: Two-stage RF→ET replaced by 4-question cascade (Q1=0.62, Q3=0.56, Q4=0.51)
+- **Governance data**: 199 "trustworthy-with-gap" cases relabeled to abstain in fitz-gov benchmark (context genuinely doesn't answer the question)
+- **GovernanceDecider**: Model loaded exclusively from package directory (`fitz_ai/governance/data/`)
+
+### 🔧 Fixed
+
+- **InsufficientEvidence constraint**: Embedder was always `None` — now correctly passed at init
+- **IE embedder API**: Fixed to use `.embed()` method instead of calling embedder directly
+- **IE false ABSTAIN**: Fixed false abstain for lowercase proper nouns
+- **Agentic search over-retrieval**: Fixed excessive chunk retrieval in single-chunk scenarios
+- **Single-file source handling**: Fixed stale manifest accumulation
+- **PDF content reading**: Fixed content extraction and suppressed noisy Docling/RapidOCR logs
+- **Manifest management**: Re-add unchanged files to manifest after clear
+- **Parsed text cache**: Always ensure cache exists during registration
+- **RICH_DOC_EXTENSIONS**: Fixed undefined reference in agentic search
+- **PostgreSQL crash recovery**: Hardened recovery with better stale lock handling
+- **pgserver pool exhaustion**: Prevent pgserver restart on `PoolTimeout`
+- **GovernanceDecider wiring**: Fixed ML classifier integration, punctuation bug, and defaults
+- **Guardrails tier**: Use fast tier for guardrails, fix cold start warmup
+- **Calibration safety**: Vectorized sweep with safe abstain fallback
+- **Null chat response**: Handle gracefully instead of crashing
+
+### 🧪 Testing
+
+- Test suite overhaul: deleted stale tests, added E2E format coverage, added unit tests
+- Fixed 26 test failures from PostgreSQL crash recovery hardening
+
+### 🧹 Housekeeping
+
+- Removed old governance models (v1-v7), eval results, and analysis scripts (~100MB freed)
+- `*.joblib` added to package-data for model shipping
+
 ---
 
 ## [0.9.0] - 2026-02-12

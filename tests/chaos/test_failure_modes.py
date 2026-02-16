@@ -37,22 +37,24 @@ class TestLLMFailures:
         timeout at the first pipeline step. The engine's answer() catches the
         exception and wraps it as KnowledgeError.
 
-        Note: We mock analyze() directly rather than the underlying chat client
-        because QueryAnalyzer internally catches LLM exceptions and returns
-        degraded results. Mocking at this level tests the engine's own error
-        handling in answer() (lines 514-521).
+        Note: Uses a >8-word query to bypass _fast_analyze (which handles short
+        queries without LLM). We mock analyze() directly rather than the
+        underlying chat client because QueryAnalyzer internally catches LLM
+        exceptions and returns degraded results.
         """
         import asyncio
 
         from fitz_ai.core.exceptions import GenerationError, KnowledgeError
 
+        # Use >8 words to bypass _fast_analyze and force LLM analysis path
+        long_query = "What is the detailed history and background of TechCorp Industries?"
         with patch.object(
             self.runner.engine._query_analyzer,
             "analyze",
             side_effect=asyncio.TimeoutError("LLM timeout"),
         ):
             with pytest.raises((GenerationError, KnowledgeError)):
-                self.runner.engine.answer(Query(text="What is TechCorp?"))
+                self.runner.engine.answer(Query(text=long_query))
 
     def test_llm_rate_limit_handling(self):
         """Rate limit errors should be handled.
@@ -61,20 +63,22 @@ class TestLLMFailures:
         an LLM rate limit at the first pipeline step. The engine's answer()
         catches the exception and wraps it as KnowledgeError.
 
-        Note: We mock analyze() directly rather than the underlying chat client
-        because QueryAnalyzer internally catches LLM exceptions and returns
-        degraded results. Mocking at this level tests the engine's own error
-        handling in answer() (lines 514-521).
+        Note: Uses a >8-word query to bypass _fast_analyze (which handles short
+        queries without LLM). We mock analyze() directly rather than the
+        underlying chat client because QueryAnalyzer internally catches LLM
+        exceptions and returns degraded results.
         """
         from fitz_ai.core.exceptions import GenerationError, KnowledgeError
 
+        # Use >8 words to bypass _fast_analyze and force LLM analysis path
+        long_query = "What is the detailed history and background of TechCorp Industries?"
         with patch.object(
             self.runner.engine._query_analyzer,
             "analyze",
             side_effect=Exception("Rate limit exceeded. Retry after 60 seconds."),
         ):
             with pytest.raises((GenerationError, KnowledgeError)):
-                self.runner.engine.answer(Query(text="What is TechCorp?"))
+                self.runner.engine.answer(Query(text=long_query))
 
 
 class TestRetrievalFailures:

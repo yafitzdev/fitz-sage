@@ -310,7 +310,7 @@ class FitzGovBenchmark:
                 fast_chat = engine._chat_factory("fast")
                 balanced_chat = engine._chat_factory("balanced")
             # Get embedder from engine for semantic relevance checking
-            embedder = engine._embedder.embed
+            embedder = engine._embedder
             constraints = [
                 InsufficientEvidenceConstraint(embedder=embedder, chat=fast_chat),
                 SpecificInfoTypeConstraint(),

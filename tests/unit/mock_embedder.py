@@ -12,10 +12,24 @@ import math
 from typing import Callable
 
 
-def create_deterministic_embedder(dimension: int = 384) -> Callable[[str], list[float]]:
+class MockEmbedder:
+    """Wraps a bare embed function to match both Embedder interface (.embed()) and callable."""
+
+    def __init__(self, embed_fn: Callable[[str], list[float]]):
+        self._fn = embed_fn
+
+    def embed(self, text: str, **kwargs) -> list[float]:
+        return self._fn(text)
+
+    def __call__(self, text: str) -> list[float]:
+        return self._fn(text)
+
+
+def create_deterministic_embedder(dimension: int = 384) -> MockEmbedder:
     """
     Create a deterministic mock embedder for testing.
 
+    Returns a MockEmbedder object with .embed() method matching the Embedder interface.
     This uses a simple approach: texts that should be "similar" for our tests
     are mapped to specific vector clusters.
     """
@@ -216,4 +230,4 @@ def create_deterministic_embedder(dimension: int = 384) -> Callable[[str], list[
         # Use slightly higher noise for neutral to ensure it doesn't accidentally match other clusters
         return _add_noise(NEUTRAL_CLUSTER, text, noise_level=0.01)
 
-    return embed
+    return MockEmbedder(embed)

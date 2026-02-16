@@ -101,10 +101,10 @@ DEFAULT_PATTERNS: list[DetectorPattern] = [
     ),
     # Internal IDs (generic pattern for uppercase prefix + numbers)
     DetectorPattern(
-        pattern=r"\b([A-Z]{2,4}\d{4,})\b",
+        pattern=r"\b([A-Z]{1,4}\d{3,})\b",
         category="internal_id",
-        description="Internal IDs (ORD12345, USR98765)",
-        min_occurrences=2,
+        description="Internal IDs (E016, ORD12345, USR98765)",
+        min_occurrences=1,
     ),
 ]
 

@@ -109,7 +109,7 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture
-def mock_embedder() -> Callable[[str], list[float]]:
+def mock_embedder():
     """Fixture providing a deterministic mock embedder."""
     return create_deterministic_embedder()
 

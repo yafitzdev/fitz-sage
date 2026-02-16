@@ -48,6 +48,15 @@ _SIMPLE_QUESTION = re.compile(
     re.IGNORECASE,
 )
 
+# Filler words and noise that suggest a messy query needing cleanup
+_FILLER_WORDS = re.compile(
+    r"\b(uhm|umm|uh+|hmm+|like|basically|actually|literally|ok so|so like)\b",
+    re.IGNORECASE,
+)
+
+# Repeated punctuation (e.g., "??", "!!", "...") suggesting informal/messy query
+_NOISY_PUNCTUATION = re.compile(r"[?!]{2,}|\.{3,}")
+
 
 def _load_prompt(name: str) -> str:
     """Load a prompt template by name."""
@@ -118,6 +127,10 @@ class QueryRewriter:
             return True, "long_query"
         if len(query) > self.max_simple_query_chars:
             return True, "long_query"
+
+        # Filler words or noisy punctuation suggest messy/informal queries needing cleanup
+        if _FILLER_WORDS.search(query) or _NOISY_PUNCTUATION.search(query):
+            return True, "noisy_query"
 
         # Simple question forms typically don't need rewriting
         if _SIMPLE_QUESTION.match(query) and word_count <= self.max_simple_query_words:
