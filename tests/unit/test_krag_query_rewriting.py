@@ -110,7 +110,7 @@ class TestQueryRewriting:
     """Tests for query rewriting integration in the answer() pipeline."""
 
     def test_rewrite_called_and_rewritten_query_used(self):
-        """When rewriter returns a different query, it's used for analysis and retrieval."""
+        """Rewrite runs in parallel with analysis; rewritten query used for retrieval."""
         engine = _make_engine()
         query = _make_query("How does the authentication system handle user login sessions securely?")
 
@@ -128,12 +128,10 @@ class TestQueryRewriting:
         # Rewriter called with original query
         rewriter.rewrite.assert_called_once_with(query.text)
 
-        # Analyzer receives the rewritten query
-        engine._query_analyzer.analyze.assert_called_once_with(
-            rewrite_result.rewritten_query,
-        )
+        # Analyzer receives original query (runs in parallel with rewrite)
+        engine._query_analyzer.analyze.assert_called_once_with(query.text)
 
-        # Router receives the rewritten query
+        # Router receives the rewritten query for retrieval
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
         assert call_args[0] == (rewrite_result.rewritten_query, engine._query_analyzer.analyze.return_value)

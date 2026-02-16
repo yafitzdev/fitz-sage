@@ -538,62 +538,69 @@ class FitzKragEngine:
             timings: list[tuple[str, float]] = []
             pipeline_start = time.perf_counter()
 
-            # 0.5. Rewrite query for retrieval optimization
-            retrieval_query = sanitized
-            rewrite_result = None
-            if self._query_rewriter:
-                t0 = time.perf_counter()
-                try:
-                    rewrite_result = self._query_rewriter.rewrite(sanitized)
-                    if rewrite_result.rewritten_query != sanitized:
-                        retrieval_query = rewrite_result.rewritten_query
-                        logger.debug(
-                            f"Query rewritten: '{sanitized[:50]}' -> '{retrieval_query[:50]}'"
-                        )
-                except Exception as e:
-                    logger.warning(f"Query rewriting failed, using original: {e}")
-                timings.append(("Rewrite", time.perf_counter() - t0))
-
-            # 1. Analyze query intent + detection in parallel
+            # 1. Rewrite + Analyze + Detect — all in parallel
+            #
+            # Analysis and detection classify intent from the original query
+            # (rewriting doesn't change intent). Rewriting optimizes the query
+            # for retrieval. All three are independent LLM calls.
             _progress("Analyzing query...")
             t0 = time.perf_counter()
             from concurrent.futures import ThreadPoolExecutor
 
-            # Short, simple queries can be classified heuristically — skip
-            # the analysis LLM call entirely (~2.5s saved).
-            fast_analysis = self._fast_analyze(retrieval_query)
+            fast_analysis = self._fast_analyze(sanitized)
             need_llm_analysis = fast_analysis is None
-
             need_detection = (
                 self._detection_orchestrator
-                and self._needs_detection(retrieval_query)
+                and self._needs_detection(sanitized)
             )
+            need_rewrite = self._query_rewriter is not None
 
-            # Only spin up thread pool if we have LLM work to do
-            if need_llm_analysis or need_detection:
-                with ThreadPoolExecutor(max_workers=3) as pool:
+            retrieval_query = sanitized
+            rewrite_result = None
+
+            if need_llm_analysis or need_detection or need_rewrite:
+                with ThreadPoolExecutor(max_workers=4) as pool:
                     analysis_future = (
-                        pool.submit(self._query_analyzer.analyze, retrieval_query)
+                        pool.submit(self._query_analyzer.analyze, sanitized)
                         if need_llm_analysis
                         else None
                     )
                     detection_future = (
                         pool.submit(
-                            self._detection_orchestrator.detect_for_retrieval, retrieval_query
+                            self._detection_orchestrator.detect_for_retrieval, sanitized
                         )
                         if need_detection
                         else None
                     )
-                    embed_future = pool.submit(self._embedder.embed_batch, [retrieval_query])
+                    rewrite_future = (
+                        pool.submit(self._query_rewriter.rewrite, sanitized)
+                        if need_rewrite
+                        else None
+                    )
+                    embed_future = pool.submit(self._embedder.embed_batch, [sanitized])
 
                     analysis = (
                         analysis_future.result() if analysis_future else fast_analysis
                     )
                     detection = detection_future.result() if detection_future else None
+
+                    # Collect rewrite result
+                    if rewrite_future:
+                        try:
+                            rewrite_result = rewrite_future.result()
+                            if rewrite_result.rewritten_query != sanitized:
+                                retrieval_query = rewrite_result.rewritten_query
+                                logger.debug(
+                                    f"Query rewritten: '{sanitized[:50]}' -> "
+                                    f"'{retrieval_query[:50]}'"
+                                )
+                        except Exception as e:
+                            logger.warning(f"Query rewriting failed, using original: {e}")
+
                     try:
                         precomputed_vectors = embed_future.result()
                         precomputed_query_vector = (
-                            dict(zip([retrieval_query], precomputed_vectors))
+                            dict(zip([sanitized], precomputed_vectors))
                         )
                     except Exception:
                         precomputed_query_vector = None
@@ -602,9 +609,9 @@ class FitzKragEngine:
                 analysis = fast_analysis
                 detection = None
                 try:
-                    precomputed_vectors = self._embedder.embed_batch([retrieval_query])
+                    precomputed_vectors = self._embedder.embed_batch([sanitized])
                     precomputed_query_vector = (
-                        dict(zip([retrieval_query], precomputed_vectors))
+                        dict(zip([sanitized], precomputed_vectors))
                     )
                 except Exception:
                     precomputed_query_vector = None
