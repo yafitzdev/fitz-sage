@@ -382,6 +382,35 @@ class GovernanceDecider:
                 lower=1
             )
 
+        # Conflict quality features (Q3/FT-disputed)
+        if "cross_chunk_num_conflicts" in X.columns and "ctx_number_count" in X.columns:
+            X["conflict_to_number_ratio"] = X["cross_chunk_num_conflicts"] / X[
+                "ctx_number_count"
+            ].clip(lower=1)
+        if "ctx_negation_count" in X.columns and "ctx_total_chars" in X.columns:
+            X["negation_per_char"] = X["ctx_negation_count"] / X["ctx_total_chars"].clip(lower=1)
+
+        # Q1 recovery: partial-answer detection
+        if "ctx_total_chars" in X.columns and "vocab_overlap_ratio" in X.columns:
+            X["short_ctx_with_overlap"] = (
+                (X["ctx_total_chars"] < 500) & (X["vocab_overlap_ratio"] > 0.3)
+            ).astype(int)
+
+        # New interaction features
+        if "av_fired" in X.columns and "vocab_overlap_ratio" in X.columns:
+            X["ix_av_fires_good_overlap"] = X["av_fired"] * X["vocab_overlap_ratio"]
+        if "cross_chunk_max_divergence" in X.columns and "cross_chunk_num_conflicts" in X.columns:
+            X["ix_max_div_per_conflict"] = X["cross_chunk_max_divergence"] / (
+                X["cross_chunk_num_conflicts"].clip(lower=1)
+            )
+        if "num_chunks" in X.columns and "has_any_denial" in X.columns:
+            X["ix_single_chunk_denial"] = (
+                (X["num_chunks"] == 1) & (X["has_any_denial"] == 1)
+            ).astype(int)
+        if "ie_fired" in X.columns and "ca_fired" in X.columns:
+            X["ix_ie_no_ca"] = X["ie_fired"] * (1 - X["ca_fired"])
+            X["ix_ca_no_ie"] = X["ca_fired"] * (1 - X["ie_fired"])
+
         # Align columns to model's expected feature set
         missing = [c for c in self._feature_names if c not in X.columns]
         for col in missing:

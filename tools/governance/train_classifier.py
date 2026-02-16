@@ -174,6 +174,26 @@ _NEGATION_WORDS = {
     "couldn't",
     "shouldn't",
 }
+# Stronger markers that signal opposing conclusions (not just hedging)
+_OPPOSING_MARKERS = [
+    "contradicts",
+    "inconsistent",
+    "conflicts with",
+    "disagree",
+    "disputed",
+    "refuted",
+    "disproven",
+    "challenged by",
+    "rejected by",
+    "opposes",
+    "incompatible",
+    "at odds with",
+    "mutually exclusive",
+    "cannot both be true",
+    "conflicting evidence",
+    "conflicting data",
+    "conflicting reports",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +237,10 @@ def compute_context_features(query: str, contexts: list[str]) -> dict[str, float
     )
     words = all_text_lower.split()
     features["ctx_negation_count"] = float(sum(1 for w in words if w in _NEGATION_WORDS))
+    # Opposing conclusion markers (stronger than contradiction markers)
+    features["opposing_conclusion_count"] = float(
+        sum(1 for m in _OPPOSING_MARKERS if m in all_text_lower)
+    )
 
     # Numerical features
     numbers = [float(x) for x in re.findall(r"\b\d+\.?\d*\b", all_text_lower)]
@@ -274,6 +298,60 @@ def compute_context_features(query: str, contexts: list[str]) -> dict[str, float
     else:
         features["query_ctx_content_overlap"] = 0.0
 
+    # --- Text answer features (query-context alignment) ---
+    _question_words = {"what", "how", "why", "when", "where", "who", "which", "is", "are",
+                       "was", "were", "does", "do", "did", "can", "could", "should", "will", "would"}
+    q_content = {w.strip("?.,!;:()[]\"'") for w in query.lower().split()} - stopwords - _question_words - {""}
+    if q_content and contexts:
+        # query_subject_partial: fraction of query subject words in context
+        found = sum(1 for w in q_content if w in all_text_lower)
+        features["query_subject_partial"] = found / len(q_content)
+
+        # entity_substantive_score: query words mentioned 2+ times
+        substantive = sum(1 for w in q_content if all_text_lower.count(w) >= 2)
+        features["entity_substantive_score"] = substantive / len(q_content)
+
+        # Sentence-level features
+        best_coverage = 0.0
+        best_span_len = 0
+        best_span_cov = 0.0
+        q_all = q_content | (query_words - _question_words - {""})
+
+        for ctx in contexts:
+            for sent in re.split(r"[.!?]+", ctx):
+                sent = sent.strip()
+                if not sent:
+                    continue
+                sent_words = [w.strip("?.,!;:()[]\"'-").lower() for w in sent.split()]
+                sent_set = set(sent_words) - stopwords - {""}
+                overlap = q_all & sent_set
+                cov = len(overlap) / len(q_all) if q_all else 0
+                if cov > best_coverage:
+                    best_coverage = cov
+
+                # Span search
+                for start in range(len(sent_words)):
+                    span_covered: set[str] = set()
+                    for end in range(start, min(start + 30, len(sent_words))):
+                        w = sent_words[end].strip("?.,!;:()[]\"'-")
+                        if w in q_all:
+                            span_covered.add(w)
+                        if len(span_covered) >= 2:
+                            sc = len(span_covered) / len(q_all)
+                            if sc > best_span_cov:
+                                best_span_cov = sc
+                                best_span_len = end - start + 1
+
+        features["best_sentence_coverage"] = best_coverage
+        features["best_span_length"] = float(best_span_len)
+        features["answer_span_coverage"] = best_span_cov
+    else:
+        features["query_subject_partial"] = 0.0
+        features["entity_substantive_score"] = 0.0
+        features["best_sentence_coverage"] = 0.0
+        features["best_span_length"] = 0.0
+        features["answer_span_coverage"] = 0.0
+
     return features
 
 
@@ -283,14 +361,7 @@ def enrich_with_context_features(df: pd.DataFrame, data_dir: Path) -> pd.DataFra
     Skips features that are already present in the DataFrame (e.g. when
     feature_extractor.py already computed them during eval_pipeline extraction).
     """
-    # Check if ctx_* features are already in the CSV (from feature_extractor.py)
-    ctx_cols = [c for c in df.columns if c.startswith("ctx_")]
-    if ctx_cols:
-        print(
-            f"  Context features already present in CSV ({len(ctx_cols)} cols), skipping enrichment"
-        )
-        return df
-
+    # Compute context features and merge (only filling missing columns)
     print(f"Computing context features from {data_dir}...")
     cases = load_cases_by_id(data_dir)
 
@@ -301,9 +372,14 @@ def enrich_with_context_features(df: pd.DataFrame, data_dir: Path) -> pd.DataFra
         new_features.append(feats)
 
     ctx_df = pd.DataFrame(new_features)
-    n_new = len(ctx_df.columns)
-    print(f"  Added {n_new} context features: {list(ctx_df.columns)}")
-    return pd.concat([df, ctx_df], axis=1)
+    # Only add columns not already present in df
+    existing = set(df.columns)
+    new_cols = [c for c in ctx_df.columns if c not in existing]
+    if not new_cols:
+        print(f"  All {len(ctx_df.columns)} context features already present, skipping")
+        return df
+    print(f"  Added {len(new_cols)} context features: {new_cols}")
+    return pd.concat([df, ctx_df[new_cols]], axis=1)
 
 
 # ---------------------------------------------------------------------------
@@ -413,6 +489,38 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
         X["contradiction_per_char"] = X["ctx_contradiction_count"] / X["ctx_total_chars"].clip(
             lower=1
         )
+
+    # Conflict quality features (Q3/FT-disputed): nature of conflict, not just quantity
+    if "cross_chunk_num_conflicts" in X.columns and "ctx_number_count" in X.columns:
+        X["conflict_to_number_ratio"] = X["cross_chunk_num_conflicts"] / X[
+            "ctx_number_count"
+        ].clip(lower=1)
+    if "ctx_negation_count" in X.columns and "ctx_total_chars" in X.columns:
+        X["negation_per_char"] = X["ctx_negation_count"] / X["ctx_total_chars"].clip(lower=1)
+
+    # Q1 recovery: partial-answer detection
+    if "ctx_total_chars" in X.columns and "vocab_overlap_ratio" in X.columns:
+        X["short_ctx_with_overlap"] = (
+            (X["ctx_total_chars"] < 500) & (X["vocab_overlap_ratio"] > 0.3)
+        ).astype(int)
+
+    # Interaction: Q1 recovery — AV fires but retrieval is decent
+    if "av_fired" in X.columns and "vocab_overlap_ratio" in X.columns:
+        X["ix_av_fires_good_overlap"] = X["av_fired"] * X["vocab_overlap_ratio"]
+    # Interaction: Q3 — conflict concentrated vs spread (high = real concentrated conflict)
+    if "cross_chunk_max_divergence" in X.columns and "cross_chunk_num_conflicts" in X.columns:
+        X["ix_max_div_per_conflict"] = X["cross_chunk_max_divergence"] / (
+            X["cross_chunk_num_conflicts"].clip(lower=1)
+        )
+    # Interaction: single chunk with denial — common Q1 false-abstain pattern
+    if "num_chunks" in X.columns and "has_any_denial" in X.columns:
+        X["ix_single_chunk_denial"] = ((X["num_chunks"] == 1) & (X["has_any_denial"] == 1)).astype(
+            int
+        )
+    # Interaction: constraint disagreement — IE and CA disagree (IE=insufficient but CA=conflict)
+    if "ie_fired" in X.columns and "ca_fired" in X.columns:
+        X["ix_ie_no_ca"] = X["ie_fired"] * (1 - X["ca_fired"])
+        X["ix_ca_no_ie"] = X["ca_fired"] * (1 - X["ie_fired"])
 
     return X, encoders
 

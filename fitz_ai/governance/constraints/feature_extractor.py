@@ -237,6 +237,12 @@ def _extract_chunk_features(
         features["has_within_chunk_divergence"] = False
         features["year_count"] = 0
         features["has_distinct_years"] = False
+        # Text answer feature defaults
+        features["query_subject_partial"] = 0.0
+        features["best_span_length"] = 0.0
+        features["best_sentence_coverage"] = 0.0
+        features["entity_substantive_score"] = 0.0
+        features["answer_span_coverage"] = 0.0
         return
 
     # Source diversity
@@ -285,6 +291,9 @@ def _extract_chunk_features(
 
     # Inter-chunk text features (Tier 2b — deterministic, no LLM)
     _extract_interchunk_features(features, chunks)
+
+    # Text-level answer features (Tier 2c — query+context text analysis)
+    _extract_text_answer_features(features, query, chunks)
 
 
 _STOP_WORDS = {
@@ -414,6 +423,26 @@ _CONTRADICTION_MARKERS = [
     "conflicts with",
     "differs from",
 ]
+# Stronger markers that signal opposing conclusions (not just hedging)
+_OPPOSING_MARKERS = [
+    "contradicts",
+    "inconsistent",
+    "conflicts with",
+    "disagree",
+    "disputed",
+    "refuted",
+    "disproven",
+    "challenged by",
+    "rejected by",
+    "opposes",
+    "incompatible",
+    "at odds with",
+    "mutually exclusive",
+    "cannot both be true",
+    "conflicting evidence",
+    "conflicting data",
+    "conflicting reports",
+]
 _NEGATION_WORDS = {
     "not",
     "no",
@@ -469,6 +498,10 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
         "has_distinct_years": False,
         "has_cross_chunk_divergence": False,
         "has_within_chunk_divergence": False,
+        "conflict_to_number_ratio": 0.0,
+        "opposing_conclusion_count": 0.0,
+        "negation_per_char": 0.0,
+        "short_ctx_with_overlap": 0.0,
     }
     if len(chunks) < 2:
         features.update(_defaults)
@@ -490,6 +523,25 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
             features["has_distinct_years"] = len(years) > 1
             # Within-chunk divergence works on single chunks too
             _compute_within_chunk_numerical_divergence(features, [text])
+            # Single-chunk versions of new features
+            text_lower = text.lower()
+            features["ctx_negation_count"] = float(
+                sum(1 for w in words if w in _NEGATION_WORDS)
+            )
+            features["ctx_contradiction_count"] = float(
+                sum(1 for m in _CONTRADICTION_MARKERS if m in text_lower)
+            )
+            features["ctx_number_count"] = float(len(_PLAIN_NUMBER_RE.findall(text)))
+            features["opposing_conclusion_count"] = float(
+                sum(1 for m in _OPPOSING_MARKERS if m in text_lower)
+            )
+            features["negation_per_char"] = (
+                features["ctx_negation_count"] / max(len(text), 1)
+            )
+            features["conflict_to_number_ratio"] = 0.0  # no cross-chunk conflicts with 1 chunk
+            features["short_ctx_with_overlap"] = float(
+                len(text) < 500 and features.get("vocab_overlap_ratio", 0) > 0.3
+            )
         return
 
     # Precompute per-chunk data
@@ -626,6 +678,28 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
         features["ctx_total_chars"], 1
     )
 
+    # --- Conflict quality features (Q3/FT-disputed) ---
+    # Real disputes have conflicts as large fraction of total numbers;
+    # data-rich docs have many numbers with few conflicts proportionally
+    features["conflict_to_number_ratio"] = (
+        features["cross_chunk_num_conflicts"]
+        / max(features["ctx_number_count"], 1)
+    )
+    # Opposing language: stronger contradiction markers beyond simple "however/but"
+    features["opposing_conclusion_count"] = float(
+        sum(1 for m in _OPPOSING_MARKERS if m in all_text_lower)
+    )
+    # Negation density: disputes tend to have more negations per unit of text
+    features["negation_per_char"] = (
+        features["ctx_negation_count"] / max(features["ctx_total_chars"], 1)
+    )
+
+    # --- Q1 recovery features (partial-answer trustworthy) ---
+    # Short context but some content overlap = partial answer, not absence
+    features["short_ctx_with_overlap"] = float(
+        features["ctx_total_chars"] < 500 and features.get("vocab_overlap_ratio", 0) > 0.3
+    )
+
 
 def _extract_numbers_from_text(text: str) -> list[float]:
     """Extract significant numbers from text, excluding years and trivial values."""
@@ -717,6 +791,81 @@ def _compute_within_chunk_numerical_divergence(
     features["within_chunk_num_conflicts"] = total_conflicts
     features["within_chunk_max_divergence"] = max_ratio
     features["has_within_chunk_divergence"] = total_conflicts > 0
+
+
+_SENTENCE_SPLIT_RE = re.compile(r"[.!?]+")
+
+
+def _extract_text_answer_features(
+    features: dict[str, Any], query: str, chunks: Sequence[EvidenceItem]
+) -> None:
+    """Extract text-level features measuring how well context answers the query.
+
+    These features capture whether the retrieved context actually contains an answer
+    to the question, beyond simple word overlap. They are cheap (regex/set ops, no LLM).
+    """
+    query_words = {w.strip("?.,!;:()[]\"'") for w in query.lower().split()}
+    q_content = query_words - _STOP_WORDS - {""}
+    # Strip question words from subject extraction
+    _question_words = {"what", "how", "why", "when", "where", "who", "which", "is", "are",
+                       "was", "were", "does", "do", "did", "can", "could", "should", "will", "would"}
+    q_subject_words = q_content - _question_words
+
+    if not q_subject_words or not chunks:
+        features["query_subject_partial"] = 0.0
+        features["best_span_length"] = 0.0
+        features["best_sentence_coverage"] = 0.0
+        features["entity_substantive_score"] = 0.0
+        features["answer_span_coverage"] = 0.0
+        return
+
+    ctx_texts = [c.content for c in chunks]
+    ctx_joined_lower = " ".join(t.lower() for t in ctx_texts)
+
+    # 1. query_subject_partial: fraction of query subject words found in context
+    found = sum(1 for w in q_subject_words if w in ctx_joined_lower)
+    features["query_subject_partial"] = found / len(q_subject_words)
+
+    # 2. entity_substantive_score: query words mentioned 2+ times (discussed, not just mentioned)
+    substantive = sum(1 for w in q_subject_words if ctx_joined_lower.count(w) >= 2)
+    features["entity_substantive_score"] = substantive / len(q_subject_words)
+
+    # 3-5. Sentence-level features
+    best_coverage = 0.0
+    best_span_len = 0
+    best_span_coverage = 0.0
+
+    for text in ctx_texts:
+        for sent in _SENTENCE_SPLIT_RE.split(text):
+            sent = sent.strip()
+            if not sent:
+                continue
+            sent_words = [w.strip("?.,!;:()[]\"'-").lower() for w in sent.split()]
+            sent_word_set = set(sent_words) - _STOP_WORDS - {""}
+
+            # best_sentence_coverage
+            overlap = q_content & sent_word_set
+            coverage = len(overlap) / len(q_content)
+            if coverage > best_coverage:
+                best_coverage = coverage
+
+            # best_span_length / answer_span_coverage: longest contiguous span with 2+ query words
+            covered_in_span: set[str] = set()
+            for start in range(len(sent_words)):
+                span_covered: set[str] = set()
+                for end in range(start, min(start + 30, len(sent_words))):
+                    w = sent_words[end].strip("?.,!;:()[]\"'-")
+                    if w in q_content:
+                        span_covered.add(w)
+                    if len(span_covered) >= 2:
+                        span_cov = len(span_covered) / len(q_content)
+                        if span_cov > best_span_coverage:
+                            best_span_coverage = span_cov
+                            best_span_len = end - start + 1
+
+    features["best_sentence_coverage"] = best_coverage
+    features["best_span_length"] = float(best_span_len)
+    features["answer_span_coverage"] = best_span_coverage
 
 
 def _extract_detection_features(features: dict[str, Any], detection_summary: Any | None) -> None:
