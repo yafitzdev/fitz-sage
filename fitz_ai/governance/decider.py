@@ -56,6 +56,8 @@ _BOOL_FEATURES = {
     "has_distinct_years",
     "av_strong_denial",
     "has_any_denial",
+    "has_cross_chunk_divergence",
+    "has_within_chunk_divergence",
 }
 
 # Default model search paths (relative to package root)

@@ -130,6 +130,8 @@ _BOOL_FEATURES = {
     "detection_boost_recency",
     "detection_boost_authority",
     "detection_needs_rewriting",
+    "has_cross_chunk_divergence",
+    "has_within_chunk_divergence",
 }
 
 # Markers for context feature extraction
@@ -386,6 +388,15 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
     # New: AV jury votes * abstain signal — reinforced abstain
     if "av_jury_votes_no" in X.columns and "has_abstain_signal" in X.columns:
         X["ix_av_x_abstain"] = X["av_jury_votes_no"] * X["has_abstain_signal"]
+    # New: cross-chunk divergence * no CA fire — numeric conflict CA missed
+    if "has_cross_chunk_divergence" in X.columns and "ca_fired" in X.columns:
+        X["ix_divergence_no_ca"] = X["has_cross_chunk_divergence"] * (1 - X["ca_fired"])
+    # New: any numerical divergence (within or across) * no CA fire
+    if "has_within_chunk_divergence" in X.columns and "ca_fired" in X.columns:
+        X["ix_any_divergence_no_ca"] = (
+            (X.get("has_cross_chunk_divergence", 0) | X["has_within_chunk_divergence"])
+            * (1 - X["ca_fired"])
+        )
 
     return X, encoders
 

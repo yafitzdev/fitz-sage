@@ -227,8 +227,14 @@ def _extract_chunk_features(
             "ctx_max_pairwise_sim",
             "ctx_mean_pairwise_sim",
             "ctx_min_pairwise_sim",
+            "cross_chunk_num_conflicts",
+            "cross_chunk_max_divergence",
+            "within_chunk_num_conflicts",
+            "within_chunk_max_divergence",
         ):
             features[k] = 0.0
+        features["has_cross_chunk_divergence"] = False
+        features["has_within_chunk_divergence"] = False
         features["year_count"] = 0
         features["has_distinct_years"] = False
         return
@@ -388,6 +394,8 @@ _ASSERTION_WORDS = {
 _NUMBER_RE = re.compile(r"\b\d+(?:\.\d+)?(?:%|st|nd|rd|th)?\b")
 _PLAIN_NUMBER_RE = re.compile(r"\b\d+\.?\d*\b")
 _YEAR_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")
+# Matches dollar amounts, percentages, and plain numbers (for cross-chunk divergence)
+_SIGNIFICANT_NUMBER_RE = re.compile(r"[\$]?\d[\d,]*\.?\d*[%]?")
 
 _CONTRADICTION_MARKERS = [
     "however",
@@ -453,8 +461,14 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
         "ctx_max_pairwise_sim": 0.0,
         "ctx_mean_pairwise_sim": 0.0,
         "ctx_min_pairwise_sim": 0.0,
+        "cross_chunk_num_conflicts": 0.0,
+        "cross_chunk_max_divergence": 0.0,
+        "within_chunk_num_conflicts": 0.0,
+        "within_chunk_max_divergence": 0.0,
         "year_count": 0,
         "has_distinct_years": False,
+        "has_cross_chunk_divergence": False,
+        "has_within_chunk_divergence": False,
     }
     if len(chunks) < 2:
         features.update(_defaults)
@@ -474,6 +488,8 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
             years = set(_YEAR_RE.findall(text))
             features["year_count"] = len(years)
             features["has_distinct_years"] = len(years) > 1
+            # Within-chunk divergence works on single chunks too
+            _compute_within_chunk_numerical_divergence(features, [text])
         return
 
     # Precompute per-chunk data
@@ -587,6 +603,103 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
     # --- Temporal features ---
     features["year_count"] = len(all_years)
     features["has_distinct_years"] = len(all_years) > 1
+
+    # --- Cross-chunk numerical divergence ---
+    # Numerical divergence detection (both across and within chunks)
+    _compute_cross_chunk_numerical_divergence(features, texts)
+    _compute_within_chunk_numerical_divergence(features, texts)
+
+
+def _extract_numbers_from_text(text: str) -> list[float]:
+    """Extract significant numbers from text, excluding years and trivial values."""
+    nums = []
+    for m in _SIGNIFICANT_NUMBER_RE.finditer(text):
+        clean = m.group(0).replace(",", "").replace("$", "").replace("%", "")
+        try:
+            n = float(clean)
+            if n < 2 or (1900 <= n <= 2099):
+                continue
+            nums.append(n)
+        except ValueError:
+            pass
+    return nums
+
+
+def _count_divergent_pairs(
+    nums_a: list[float], nums_b: list[float]
+) -> tuple[int, float]:
+    """Count conflicting number pairs and max divergence ratio between two sets."""
+    conflict_count = 0
+    max_ratio = 0.0
+    for ni in nums_a:
+        for nj in nums_b:
+            if min(ni, nj) <= 0:
+                continue
+            ratio = max(ni, nj) / min(ni, nj)
+            if 1.02 < ratio < 2.0:
+                conflict_count += 1
+                if ratio > max_ratio:
+                    max_ratio = ratio
+    return conflict_count, max_ratio
+
+
+def _compute_cross_chunk_numerical_divergence(
+    features: dict[str, Any], texts: list[str]
+) -> None:
+    """Detect numerical disagreement across chunks.
+
+    Extracts significant numbers from each chunk, then finds cross-chunk pairs
+    where two numbers are close in magnitude (ratio < 2.0) but not equal
+    (ratio > 1.02). This catches conflicts like $485k vs $520k, 27.78 vs 27.44 mph.
+    Years (1900-2099) are excluded.
+    """
+    per_chunk_nums = [_extract_numbers_from_text(text) for text in texts]
+
+    conflict_count = 0
+    max_divergence_ratio = 0.0
+
+    for i in range(len(per_chunk_nums)):
+        for j in range(i + 1, len(per_chunk_nums)):
+            c, r = _count_divergent_pairs(per_chunk_nums[i], per_chunk_nums[j])
+            conflict_count += c
+            max_divergence_ratio = max(max_divergence_ratio, r)
+
+    features["cross_chunk_num_conflicts"] = conflict_count
+    features["cross_chunk_max_divergence"] = max_divergence_ratio
+    features["has_cross_chunk_divergence"] = conflict_count > 0
+
+
+def _compute_within_chunk_numerical_divergence(
+    features: dict[str, Any], texts: list[str]
+) -> None:
+    """Detect numerical disagreement within individual chunks.
+
+    A single chunk can contain contradictory numbers for the same quantity,
+    e.g. "speed limit reduced from 55 to 45 mph" or "revenue was $5M...
+    adjusted to $3.2M". This is common in production when chunks contain
+    updates, revisions, or multi-source summaries.
+    """
+    total_conflicts = 0
+    max_ratio = 0.0
+
+    for text in texts:
+        nums = _extract_numbers_from_text(text)
+        if len(nums) < 2:
+            continue
+        # Compare all pairs within this single chunk
+        for i in range(len(nums)):
+            for j in range(i + 1, len(nums)):
+                ni, nj = nums[i], nums[j]
+                if min(ni, nj) <= 0:
+                    continue
+                ratio = max(ni, nj) / min(ni, nj)
+                if 1.02 < ratio < 2.0:
+                    total_conflicts += 1
+                    max_ratio = max(max_ratio, ratio)
+
+    features["within_chunk_num_conflicts"] = total_conflicts
+    features["within_chunk_max_divergence"] = max_ratio
+    features["has_within_chunk_divergence"] = total_conflicts > 0
 
 
 def _extract_detection_features(features: dict[str, Any], detection_summary: Any | None) -> None:

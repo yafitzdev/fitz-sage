@@ -86,6 +86,8 @@ _BOOL_FEATURES = {
     "detection_boost_recency",
     "detection_boost_authority",
     "detection_needs_rewriting",
+    "has_cross_chunk_divergence",
+    "has_within_chunk_divergence",
 }
 
 _NUMERIC_FEATURES = {
@@ -106,6 +108,10 @@ _NUMERIC_FEATURES = {
     "vocab_overlap_ratio",
     "hedge_density",
     "year_count",
+    "cross_chunk_num_conflicts",
+    "cross_chunk_max_divergence",
+    "within_chunk_num_conflicts",
+    "within_chunk_max_divergence",
 }
 
 _STRING_FEATURES = {
