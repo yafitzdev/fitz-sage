@@ -253,11 +253,17 @@ class FitzKragEngine:
 
         self._chat_factory = get_chat_factory(self._config.chat)
 
-        # Pre-load fast chat model (ollama loads on first call, ~3s cold start).
-        # Fast tier is used by guardrails and detection — first to run on query.
+        # Pre-load chat models sequentially: fast first (guardrails/detection),
+        # then smart (generation). Sequential avoids VRAM contention on ollama.
         def _warmup_chat():
             try:
                 self._chat_factory("fast").chat(
+                    [{"role": "user", "content": "hi"}], max_tokens=1,
+                )
+            except Exception:
+                pass
+            try:
+                self._chat.chat(
                     [{"role": "user", "content": "hi"}], max_tokens=1,
                 )
             except Exception:
