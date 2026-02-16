@@ -7,8 +7,8 @@ that predicts governance mode from constraint features. Falls back to
 AnswerGovernor on any error (fail-open).
 
 Two-stage prediction:
-  Stage 1: answerable vs abstain (RF)
-  Stage 2: trustworthy vs disputed (ET), only for answerable cases
+  Stage 1: answerable vs abstain
+  Stage 2: trustworthy vs disputed
 
 3-class output mapped to AnswerMode:
   abstain → ABSTAIN

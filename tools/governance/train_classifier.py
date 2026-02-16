@@ -1205,8 +1205,14 @@ def calibrate_thresholds(
     print(f"Running Stage 2 CV predictions on {len(X_answerable)} answerable samples...")
     s2_cv_proba = cross_val_predict(s2_model, X_answerable, y_answerable, cv=cv, method="predict_proba")
 
-    # Build full-dataset index mapping: answerable_indices[i] -> position in s2_cv_proba
+    # Build full-dataset S2 probability array
     answerable_indices = np.where(answerable_mask)[0]
+    s2_p_trust_full = np.full(len(y_3class), 0.0)
+    for i, idx in enumerate(answerable_indices):
+        s2_p_trust_full[idx] = s2_cv_proba[i, 1]
+    # Abstain cases that leak through S1 get p=0.0 (always maps to disputed = safe)
+    print(f"Precomputed S2 p(trustworthy) for {len(answerable_indices)} answerable samples "
+          f"({sum(~answerable_mask)} abstain cases default to disputed)")
 
     # Sweep both thresholds jointly
     print("\n" + "=" * 60)
@@ -1216,37 +1222,21 @@ def calibrate_thresholds(
     # For each (s1_thresh, s2_thresh), simulate two-stage prediction on all data
     best_result = None
     results = []
+    p_ans = s1_cv_proba[:, 1]
 
     for s1_t in np.arange(0.40, 0.75, 0.005):
         for s2_t in np.arange(0.40, 0.80, 0.005):
-            # Stage 1: predict abstain vs answerable
-            s1_pred = (s1_cv_proba[:, 1] >= s1_t).astype(int)  # 1=answerable
-
-            # Stage 2: for those predicted answerable, predict disputed vs trustworthy
-            final_pred = np.full(len(y_3class), "abstain", dtype=object)
-            for i in range(len(y_3class)):
-                if s1_pred[i] == 1:  # predicted answerable
-                    # Find this sample in s2_cv_proba
-                    pos = np.searchsorted(answerable_indices, i)
-                    if pos < len(answerable_indices) and answerable_indices[pos] == i:
-                        p_trust = s2_cv_proba[pos, 1]
-                        final_pred[i] = "trustworthy" if p_trust >= s2_t else "disputed"
-                    else:
-                        # Abstain case predicted answerable by S1 — S2 wasn't trained on it
-                        # Use S1's probability to decide (will be marked as disputed for safety)
-                        final_pred[i] = "disputed"
+            # Vectorized two-stage prediction
+            final_pred = np.where(
+                p_ans < s1_t, "abstain",
+                np.where(s2_p_trust_full >= s2_t, "trustworthy", "disputed")
+            )
 
             # Count dangerous misfires: predicted trustworthy but actually abstain or disputed
-            false_trustworthy = 0
-            false_trust_abstain = 0
-            false_trust_disputed = 0
-            for i in range(len(y_3class)):
-                if final_pred[i] == "trustworthy" and y_3class[i] != "trustworthy":
-                    false_trustworthy += 1
-                    if y_3class[i] == "abstain":
-                        false_trust_abstain += 1
-                    else:
-                        false_trust_disputed += 1
+            ft_mask = (final_pred == "trustworthy") & (y_3class != "trustworthy")
+            false_trust_abstain = int(((final_pred == "trustworthy") & (y_3class == "abstain")).sum())
+            false_trust_disputed = int(((final_pred == "trustworthy") & (y_3class == "disputed")).sum())
+            false_trustworthy = false_trust_abstain + false_trust_disputed
 
             accuracy = (final_pred == y_3class).mean()
             # Per-class recalls
