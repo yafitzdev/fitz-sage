@@ -286,17 +286,19 @@ enrichment:
 
 ## Incremental Ingestion
 
-Fitz only processes what's changed:
+Fitz only processes what's changed. When you point Fitz at a source directory, ingestion happens automatically in the background:
 
 ```bash
-$ fitz ingest ./docs
+$ fitz query --source ./docs "What is quantum computing?"
 
-Scanning... 847 files
+Pointing at ./docs...
+  Scanning... 847 files
   → 12 new files
   → 3 modified files
   → 832 unchanged (skipped)
+  Ingesting 15 files in background...
 
-Ingesting 15 files...
+Answer: Quantum computing uses qubits...
 ```
 
 ### What triggers re-ingestion?
@@ -308,12 +310,6 @@ Ingesting 15 files...
 | Embedding model changed | No | Vectors regenerated |
 | New file added | Yes | Not in state |
 | File deleted | Mark deleted | Clean up vectors |
-
-### Force re-ingestion
-
-```bash
-fitz ingest ./docs --force  # Re-ingest everything
-```
 
 ---
 
@@ -346,23 +342,16 @@ fitz ingest ./docs --force  # Re-ingest everything
 
 ---
 
-## CLI Commands
+## CLI Usage
+
+Ingestion is triggered automatically when you point Fitz at a source directory. There is no separate `ingest` command.
 
 ```bash
-# Basic ingestion
-fitz ingest ./docs
+# Point at docs and query (ingestion happens in background)
+fitz query --source ./docs "What is quantum computing?"
 
-# Specify collection
-fitz ingest ./docs --collection my_project
-
-# Force re-ingest
-fitz ingest ./docs --force
-
-# Enable hierarchy summaries
-fitz ingest ./docs --hierarchy
-
-# Non-interactive mode
-fitz ingest ./docs -y
+# Subsequent queries reuse the already-ingested data
+fitz query "Explain entanglement"
 ```
 
 ---
@@ -372,15 +361,11 @@ fitz ingest ./docs -y
 ```python
 import fitz_ai
 
-# Simple ingestion
-fitz_ai.ingest("./docs")
+# Point at a source directory (ingestion happens in background)
+fitz_ai.point("./docs")
 
-# With options
-fitz_ai.ingest(
-    "./docs",
-    collection="my_project",
-    force=True,
-)
+# Query after pointing
+answer = fitz_ai.query("What is quantum computing?")
 ```
 
 ### Advanced usage
@@ -423,7 +408,7 @@ print(f"Ingested {summary.ingested} files")
 | `fitz_ai/ingestion/chunking/router.py` | Chunker selection |
 | `fitz_ai/ingestion/state/manager.py` | State persistence |
 | `fitz_ai/ingestion/enrichment/pipeline.py` | Enrichment orchestrator |
-| `fitz_ai/cli/commands/ingest.py` | CLI command |
+| `fitz_ai/cli/commands/query.py` | CLI command (--source triggers ingestion) |
 
 ---
 

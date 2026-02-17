@@ -1,8 +1,9 @@
+<!-- docs/CLI.md -->
 # Fitz AI - CLI Documentation
 
 ## Overview
 
-Fitz provides a clean, minimal command-line interface for local-first RAG.
+Fitz provides a clean, minimal command-line interface for local-first RAG. Version 0.10.0 consolidates the workflow into a single `fitz query` command that handles both document registration and querying.
 
 ---
 
@@ -10,34 +11,45 @@ Fitz provides a clean, minimal command-line interface for local-first RAG.
 
 ```bash
 # Zero-config RAG in one command
-fitz quickstart ./docs "What are the main topics?"
+fitz query "What are the main topics?" --source ./docs
 
 # Or step by step
-fitz init                    # Setup wizard
-fitz ingest ./docs           # Ingest documents
-fitz query "Your question"   # Query knowledge base
+fitz init                                        # Setup wizard
+fitz query "What's in my docs?" --source ./docs  # Register docs + query
+fitz query "Follow-up question"                  # Query existing collection
 ```
 
 ---
 
 ## Commands
 
-### `fitz quickstart`
+### `fitz query`
 
-One-command RAG: ingest docs and ask a question.
+The main entry point. Point at documents and ask questions. Combines document registration and querying into one command.
 
 ```bash
-fitz quickstart [SOURCE] [QUESTION]
-fitz quickstart ./docs "What is this about?"
-fitz quickstart ./docs "Summarize the key points" -c my_collection
+fitz query "Your question"
+fitz query "What is this about?" --source ./docs
+fitz query "Summarize the key points" -c my_collection --source ./docs
+fitz query --chat                                # Interactive multi-turn mode
+fitz query --chat -c my_collection               # Chat with specific collection
 ```
 
+**Arguments:**
+- `QUESTION` - Question to ask (optional when using `--chat`)
+
 **Options:**
-- `SOURCE` - Path to documents (file or directory)
-- `QUESTION` - Question to ask
-- `-c, --collection` - Collection name (default: "quickstart")
-- `-e, --engine` - Engine to use
-- `-v, --verbose` - Show detailed progress
+- `-s, --source PATH` - Path to documents (file or directory). Registers documents before querying.
+- `-c, --collection NAME` - Collection name
+- `-e, --engine NAME` - Engine to use
+- `--chat` - Interactive multi-turn chat mode
+
+**How `--source` works:**
+When you pass `--source`, Fitz registers (ingests) the documents into the collection, then runs your query against them. On subsequent queries without `--source`, Fitz uses the already-registered collection.
+
+**Chat mode:**
+- Type questions naturally
+- Exit with `exit`, `quit`, or Ctrl+C
 
 ---
 
@@ -57,72 +69,6 @@ fitz init --show       # Preview config without saving
 
 ---
 
-### `fitz ingest`
-
-Ingest documents into the knowledge base. Uses the default engine (set via `fitz engine`).
-
-```bash
-fitz ingest [SOURCE]
-fitz ingest ./docs -c my_collection
-fitz ingest ./docs -y                    # Non-interactive
-fitz ingest ./docs -H                    # With hierarchical summaries
-fitz ingest ./docs --artifacts all       # Generate all artifacts
-fitz ingest ./docs -f                    # Force re-ingest all files
-fitz ingest ./docs -e my_engine          # Override engine for this command
-```
-
-**Options:**
-- `SOURCE` - Path to documents (file or directory)
-- `-c, --collection` - Collection name
-- `-e, --engine` - Engine to use (overrides default)
-- `-y, --yes` - Non-interactive mode
-- `-f, --force` - Force re-ingest all files
-- `-a, --artifacts` - Artifacts to generate (e.g., "all", "architecture_narrative")
-
-**Hierarchical Summaries (always on):**
-Every ingestion automatically generates multi-level summaries:
-- L0: Original chunks (for specific queries)
-- L1: Document/group summaries
-- L2: Corpus summary (for "what are the trends?" queries)
-
----
-
-### `fitz query`
-
-Query the knowledge base. Uses the default engine (set via `fitz engine`).
-
-```bash
-fitz query "Your question"
-fitz query "What is RAG?" -c my_collection
-fitz query "Question" -e my_engine       # Override engine for this query
-```
-
-**Options:**
-- `QUESTION` - Your query text
-- `-c, --collection` - Collection name
-- `-e, --engine` - Engine to use (overrides default)
-
----
-
-### `fitz chat`
-
-Interactive multi-turn conversation with your knowledge base.
-
-```bash
-fitz chat
-fitz chat -c my_collection
-```
-
-**Options:**
-- `-c, --collection` - Collection to chat with
-- `-e, --engine` - Engine to use
-
-**In chat:**
-- Type questions naturally
-- Exit with `exit`, `quit`, or Ctrl+C
-
----
-
 ### `fitz collections`
 
 Manage collections (list, info, delete).
@@ -138,38 +84,27 @@ Interactive menu to:
 
 ---
 
-### `fitz keywords`
+### `fitz config`
 
-Manage keyword vocabulary for exact matching. Keywords are auto-detected during ingestion and used to pre-filter chunks before semantic search.
+View or edit configuration, and run system diagnostics.
 
 ```bash
-fitz keywords list                      # List all keywords
-fitz keywords list -c my_collection     # For specific collection
-fitz keywords add "CUSTOM-ID"           # Add custom keyword
-fitz keywords add "MyTerm" --category custom  # With category
-fitz keywords remove "TC-1001"          # Remove a keyword
-fitz keywords clear                     # Clear all keywords
+fitz config              # Show config summary
+fitz config --raw        # Show raw YAML
+fitz config --json       # Output as JSON
+fitz config --path       # Show config file path
+fitz config --edit       # Open in editor
+fitz config --doctor     # Run system diagnostics
+fitz config --test       # Test actual LLM connections
 ```
 
 **Options:**
-- `-c, --collection` - Collection name (uses default if not specified)
-- `--category` - Category for new keywords (e.g., testcase, ticket, custom)
-
-**Auto-detected patterns:**
-- Test cases: TC-1001, testcase_42
-- Tickets: JIRA-4521, BUG-789
-- Versions: v2.0.1, 1.0.0-beta
-- Pull requests: PR #123, PR-456
-- People: John Smith (when mentioned multiple times)
-- Files: config.yaml, report.pdf
-
-**How it works:**
-1. During ingestion, Fitz scans chunks for identifier patterns
-2. Detected keywords are stored in PostgreSQL (`keywords` table per collection)
-3. At query time, keywords in your question pre-filter chunks
-4. Semantic search runs only on chunks containing the keyword
-
-This ensures queries like "What happened with TC-1001?" only return chunks mentioning TC-1001, not similar IDs like TC-1002.
+- `-p, --path` - Show config file path
+- `--json` - Output as JSON
+- `--raw` - Show raw YAML
+- `-e, --edit` - Open config in editor
+- `-d, --doctor` - Run system diagnostics (Python version, dependencies, PostgreSQL status, API keys)
+- `-t, --test` - Test actual LLM connections
 
 ---
 
@@ -179,7 +114,7 @@ Start the REST API server.
 
 ```bash
 fitz serve
-fitz serve -h 0.0.0.0 -p 8080
+fitz serve --host 0.0.0.0 -p 8080
 fitz serve --reload              # Auto-reload for development
 ```
 
@@ -190,75 +125,40 @@ fitz serve --reload              # Auto-reload for development
 
 **API Endpoints:**
 - `POST /query` - Query the knowledge base
-- `POST /ingest` - Ingest documents
+- `POST /chat` - Multi-turn conversation
+- `POST /point` - Register (index) documents
 - `GET /collections` - List collections
+- `GET /collections/{name}` - Collection details
+- `DELETE /collections/{name}` - Delete a collection
 - `GET /health` - Health check
 
 ---
 
-### `fitz config`
+### `fitz reset`
 
-View or edit configuration.
+Reset the pgserver database. Use when pgserver hangs or gets corrupted.
 
 ```bash
-fitz config              # Show config summary
-fitz config --raw        # Show raw YAML
-fitz config --json       # Output as JSON
-fitz config --path       # Show config file path
-fitz config --edit       # Open in editor
+fitz reset
+fitz reset --force       # Skip confirmation prompt
 ```
 
 **Options:**
-- `-p, --path` - Show config file path
-- `--json` - Output as JSON
-- `--raw` - Show raw YAML
-- `-e, --edit` - Open config in editor
+- `-f, --force` - Skip confirmation prompt
 
 ---
 
-### `fitz doctor`
+### `fitz eval`
 
-System diagnostics and health check.
-
-```bash
-fitz doctor              # Quick check
-fitz doctor -v           # Verbose output
-fitz doctor --test       # Test actual connections
-```
-
-**Options:**
-- `-v, --verbose` - Show detailed output
-- `-t, --test` - Run connectivity tests
-
-**Checks:**
-- Python version
-- Configuration files
-- Required dependencies
-- PostgreSQL/pgserver status
-- Available services (Ollama, pgvector)
-- API key configuration
-
----
-
-### `fitz engine`
-
-View or set the default engine for all commands.
+Evaluation and benchmarking tools.
 
 ```bash
-fitz engine              # Interactive engine selection
-fitz engine --list       # List available engines
-fitz engine fitz_krag    # Set default to fitz_krag
-```
-
-**Options:**
-- `NAME` - Engine name to set as default
-- `-l, --list` - List available engines
-
-All other commands (`ingest`, `query`, `chat`, etc.) will use the default engine.
-Override for a single command with `--engine`:
-
-```bash
-fitz query "question" -e my_engine   # Use custom engine for this query
+fitz eval governance-stats    # Show governance decision statistics
+fitz eval beir                # Run BEIR retrieval benchmark
+fitz eval rgb                 # Run RGB robustness tests
+fitz eval fitz-gov            # Run fitz-gov governance benchmark
+fitz eval dashboard           # Display benchmark results dashboard
+fitz eval all                 # Run all benchmarks
 ```
 
 ---
@@ -333,26 +233,25 @@ ollama pull llama3.2
 
 # Initialize and use (PostgreSQL starts automatically via pgserver)
 fitz init
-fitz ingest ./docs -y
-fitz query "What's in my docs?"
+fitz query "What's in my docs?" --source ./docs
 ```
 
-### With Hierarchical Summaries
+### Multi-Turn Exploration
 
 ```bash
-# Ingest with hierarchy for analytical queries
-fitz ingest ./docs -H -c my_kb
+# Register docs and enter chat mode
+fitz query --chat --source ./docs -c my_project
 
-# Ask trend/summary questions
-fitz query "What are the main themes?" -c my_kb
+# Or chat with an existing collection
+fitz query --chat -c my_project
 ```
 
 ### Development Workflow
 
 ```bash
-fitz doctor --test           # Verify setup
-fitz ingest ./project -H     # Ingest with summaries
-fitz chat -c project         # Interactive exploration
+fitz config --doctor --test      # Verify setup and test connections
+fitz query "Summarize the architecture" --source ./project -c project
+fitz query --chat -c project     # Interactive exploration
 ```
 
 ---
@@ -362,4 +261,5 @@ fitz chat -c project         # Interactive exploration
 ```bash
 fitz --help
 fitz <command> --help
+fitz eval --help
 ```

@@ -252,19 +252,13 @@ enrichment:
 
 ## CLI Usage
 
-Enrichment runs automatically on every ingestion. No flags needed:
+Enrichment runs automatically when you point at a folder. No flags needed:
 
 ```bash
-fitz ingest ./docs
+fitz query "your question" --source ./docs
 ```
 
-### Force re-enrichment
-
-To regenerate enrichments for already-ingested files:
-
-```bash
-fitz ingest ./docs --force
-```
+The background worker handles enrichment automatically during indexing.
 
 ---
 

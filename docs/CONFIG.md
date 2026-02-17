@@ -352,17 +352,10 @@ Some config values can be overridden via CLI flags:
 
 ```bash
 # Override collection
-fitz ingest ./docs --collection my_docs
-fitz query "question" --collection my_docs
+fitz query "question" --source ./docs --collection my_docs
 
 # Override top_k
 fitz query "question" --top-k 10
-
-# Enable hierarchy at ingest time
-fitz ingest ./docs --hierarchy
-
-# Force re-ingestion
-fitz ingest ./docs --force
 ```
 
 ---

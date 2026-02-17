@@ -89,7 +89,7 @@ Vectors, metadata, and tables are in one transaction. No eventual consistency is
 
 ```bash
 pip install fitz-ai  # Includes pgserver
-fitz quickstart ./docs "What is our refund policy?"
+fitz query "What is our refund policy?" --source ./docs
 # PostgreSQL starts automatically, invisibly
 ```
 

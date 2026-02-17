@@ -38,8 +38,7 @@ Three guardrails run automatically on every answer:
 
 Every answer includes a **mode** indicating confidence level:
 
-- `CONFIDENT` — Strong evidence supports the answer across multiple sources
-- `QUALIFIED` — Answer given with noted limitations or caveats
+- `TRUSTWORTHY` — Strong evidence supports the answer across multiple sources
 - `DISPUTED` — Sources conflict; both views are presented
 - `ABSTAIN` — Insufficient evidence; refuses to answer
 
@@ -53,7 +52,7 @@ Every answer includes a **mode** indicating confidence level:
 
 4. **Fail-safe defaults** - When in doubt, ABSTAIN. Better to say "I don't know" than to hallucinate.
 
-5. **Transparent reasoning** - When abstaining or qualifying, the system explains why.
+5. **Transparent reasoning** - When abstaining or disputing, the system explains why.
 
 ## Configuration
 
@@ -68,7 +67,7 @@ constraints:
 
 ## Files
 
-- **Constraint plugins:** `fitz_ai/core/guardrails/plugins/`
+- **Constraint plugins:** `fitz_ai/governance/constraints/plugins/`
   - `conflict_aware.py` - Detects contradictions across sources
   - `insufficient_evidence.py` - Blocks confident answers without evidence
   - `causal_attribution.py` - Prevents hallucinated causality
@@ -93,7 +92,7 @@ constraints:
 Answer: The Q4 sales decline was primarily caused by increased competition
 and seasonal factors.
 
-Mode: CONFIDENT
+Mode: TRUSTWORTHY
 ```
 
 **With constraints (CausalAttribution):**
@@ -102,7 +101,7 @@ Answer: Q4 sales declined by 15% compared to Q3. However, I cannot determine
 the causal factors from the available data. The documents mention increased
 competition and seasonal patterns, but these are correlations, not confirmed causes.
 
-Mode: QUALIFIED
+Mode: TRUSTWORTHY
 ```
 
 ## Dependencies

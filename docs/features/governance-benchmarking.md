@@ -207,12 +207,13 @@ python -m tools.governance.train_classifier --mode twostage --time-budget 200
 | File | Purpose |
 |------|---------|
 | **Test cases** | [fitz-gov](https://github.com/yafitzdev/fitz-gov) (1,100+ cases) |
-| **Constraints** | `fitz_ai/core/guardrails/plugins/` (IE, CA, CAA, SIT, AV) |
-| **Feature extraction** | `fitz_ai/core/guardrails/feature_extractor.py` (50 features) |
-| **GovernanceDecider** | `fitz_ai/core/guardrails/governance_decider.py` (two-stage ML) |
+| **Constraints** | `fitz_ai/governance/constraints/plugins/` (IE, CA, CAA, SIT, AV) |
+| **Feature extraction** | `fitz_ai/governance/constraints/feature_extractor.py` (50 features) |
+| **GovernanceDecider** | `fitz_ai/governance/decider.py` (two-stage ML) |
+| **Governor fallback** | `fitz_ai/governance/governor.py` (AnswerGovernor rule-based) |
 | **Training pipeline** | `tools/governance/train_classifier.py` |
 | **Evaluation pipeline** | `tools/governance/eval_pipeline.py` |
-| **Model artifact** | `tools/governance/data/model_v5_calibrated.joblib` |
+| **Model artifact** | `fitz_ai/governance/data/model_v6_cascade.joblib` |
 
 ## Technical Specification
 

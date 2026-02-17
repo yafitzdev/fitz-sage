@@ -1,3 +1,4 @@
+# docs/API.md
 # REST API Reference
 
 Complete reference for the Fitz REST API.
@@ -51,7 +52,7 @@ fitz serve --reload
 |--------|----------|-------------|
 | POST | `/query` | Query knowledge base |
 | POST | `/chat` | Multi-turn chat |
-| POST | `/ingest` | Ingest documents |
+| POST | `/point` | Point at source for indexing |
 | GET | `/collections` | List collections |
 | GET | `/collections/{name}` | Get collection stats |
 | DELETE | `/collections/{name}` | Delete collection |
@@ -84,7 +85,7 @@ Query the knowledge base with a single question.
 ```json
 {
   "text": "The refund policy allows returns within 30 days...",
-  "mode": "confident",
+  "mode": "TRUSTWORTHY",
   "provenance": [
     {
       "source_id": "policies/refund.md",
@@ -101,7 +102,7 @@ Query the knowledge base with a single question.
 | Field | Type | Description |
 |-------|------|-------------|
 | `text` | string | The answer text |
-| `mode` | string | `confident`, `qualified`, `disputed`, or `abstain` |
+| `mode` | string | `TRUSTWORTHY`, `DISPUTED`, or `ABSTAIN` |
 | `provenance` | array | Source attribution for the answer |
 
 ### Example
@@ -154,7 +155,7 @@ Same as `/query`:
 ```json
 {
   "text": "For returns, you need to...",
-  "mode": "confident",
+  "mode": "TRUSTWORTHY",
   "provenance": [...]
 }
 ```
@@ -175,17 +176,19 @@ curl -X POST http://localhost:8000/chat \
 
 ---
 
-## POST /ingest
+## POST /point
 
-Ingest documents into a collection.
+Point at a source directory for progressive querying.
+
+Queries work immediately via agentic search. Background indexing runs silently
+and queries get progressively faster over time. The endpoint is non-blocking.
 
 ### Request
 
 ```json
 {
   "source": "./docs",
-  "collection": "default",
-  "clear_existing": false
+  "collection": "default"
 }
 ```
 
@@ -193,28 +196,25 @@ Ingest documents into a collection.
 |-------|------|----------|---------|-------------|
 | `source` | string | Yes | - | Path to file or directory |
 | `collection` | string | No | `"default"` | Target collection |
-| `clear_existing` | boolean | No | `false` | Clear collection first |
 
 ### Response
 
 ```json
 {
-  "documents": 15,
-  "chunks": 234,
-  "collection": "default"
+  "collection": "default",
+  "files": 15
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `documents` | integer | Documents ingested |
-| `chunks` | integer | Chunks created |
 | `collection` | string | Target collection name |
+| `files` | integer | Number of files registered |
 
 ### Example
 
 ```bash
-curl -X POST http://localhost:8000/ingest \
+curl -X POST http://localhost:8000/point \
   -H "Content-Type: application/json" \
   -d '{"source": "./docs", "collection": "mydata"}'
 ```
@@ -298,7 +298,7 @@ Health check endpoint.
 ```json
 {
   "status": "healthy",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "config_exists": true
 }
 ```
@@ -338,10 +338,9 @@ The `mode` field in responses indicates answer confidence:
 
 | Mode | Description | Typical Cause |
 |------|-------------|---------------|
-| `confident` | Strong evidence supports answer | Clear, unambiguous sources |
-| `qualified` | Answer with limitations | Missing some context |
-| `disputed` | Conflicting sources | Sources disagree |
-| `abstain` | Cannot answer | Insufficient evidence |
+| `TRUSTWORTHY` | Strong evidence supports answer | Clear, unambiguous sources |
+| `DISPUTED` | Conflicting sources | Sources disagree |
+| `ABSTAIN` | Cannot answer | Insufficient evidence |
 
 ---
 

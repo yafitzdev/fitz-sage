@@ -139,9 +139,8 @@ The `provenance` field provides attribution and allows users to verify the answe
 
 **Answer Mode:**
 
-Indicates how certain the answer should be interpreted:
-- `CONFIDENT`: Evidence clearly supports this answer
-- `QUALIFIED`: Answer has noted uncertainty or limitations
+Indicates how certain the answer should be interpreted (3-class system):
+- `TRUSTWORTHY`: Evidence clearly supports this answer
 - `DISPUTED`: Sources disagree; answer presents multiple perspectives
 - `ABSTAIN`: Insufficient evidence to answer definitively
 

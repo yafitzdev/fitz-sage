@@ -30,7 +30,7 @@ Most RAG systems confidently answer even when they shouldn't. Fitz uses **episte
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Generate Answer with Appropriate Mode                          │
-│  CONFIDENT | QUALIFIED | DISPUTED | ABSTAIN                     │
+│  TRUSTWORTHY | DISPUTED | ABSTAIN                               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -38,12 +38,11 @@ Most RAG systems confidently answer even when they shouldn't. Fitz uses **episte
 
 ## Answer Modes
 
-Constraints determine the answer mode:
+Constraints determine the answer mode (3-class system):
 
 | Mode | Signal | User sees |
 |------|--------|-----------|
-| **CONFIDENT** | No constraints triggered | Direct answer |
-| **QUALIFIED** | Some limitations | Answer with caveats |
+| **TRUSTWORTHY** | No constraints triggered | Direct answer |
 | **DISPUTED** | Sources conflict | "Sources disagree..." |
 | **ABSTAIN** | Insufficient evidence | "I cannot find..." |
 
@@ -133,7 +132,7 @@ Q: "Why did the deployment fail?"
 Chunks: [Deployment failed at 3pm. Logs show timeout errors. System was restored at 5pm.]
 
 Constraint: Triggered - no explicit "because" or causal language
-Mode: QUALIFIED
+Mode: ABSTAIN
 Answer: "I can describe what happened but cannot determine the cause from
          the available documents. The deployment failed at 3pm with timeout
          errors. The documents don't explain why this occurred."
@@ -178,8 +177,9 @@ Constraint signals are used as **features** for a two-stage ML classifier (Gover
 |-------------------|------------|-----------|
 | abstain | ABSTAIN | P(answerable) < threshold |
 | disputed | DISPUTED | P(trustworthy) < threshold |
-| trustworthy | CONFIDENT | No constraints fired |
-| trustworthy | QUALIFIED | Any constraint fired |
+| trustworthy | TRUSTWORTHY | Evidence supports answer |
+
+The AnswerGovernor still exists as a fallback when the GovernanceDecider model is not available, but GovernanceDecider is the primary decision path.
 
 See [governance benchmarking](features/governance-benchmarking.md) for details on the two-stage classifier.
 

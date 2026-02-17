@@ -9,9 +9,9 @@ Common issues and solutions for Fitz.
 Run the built-in diagnostic tool:
 
 ```bash
-fitz doctor           # Run all checks
-fitz doctor --verbose # More details
-fitz doctor --test    # Test actual connections
+fitz config --doctor           # Run all checks
+fitz config --doctor --verbose # More details
+fitz config --doctor --test    # Test actual connections
 ```
 
 ---
@@ -201,7 +201,7 @@ os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
 Or set before running:
 ```cmd
 set HF_HUB_DISABLE_SYMLINKS=1
-fitz ingest ./docs
+fitz query --source ./docs "test query"
 ```
 
 ---
@@ -244,7 +244,7 @@ ValueError: No chunks created from documents
 1. Check document contents manually
 2. Try with verbose logging:
    ```bash
-   fitz ingest ./docs --verbose
+   fitz query --source ./docs --verbose "test query"
    ```
 3. Check supported formats in [INGESTION.md](INGESTION.md)
 
@@ -264,12 +264,12 @@ ValueError: Vector dimension mismatch: expected 1024, got 768
 Clear the collection and re-ingest:
 ```bash
 fitz collections delete my_collection
-fitz ingest ./docs --collection my_collection
+fitz query --source ./docs "test query"
 ```
 
 Or in Python:
 ```python
-fitz_ai.ingest("./docs", clear_existing=True)
+fitz_ai.point("./docs")
 ```
 
 ---
@@ -297,7 +297,7 @@ ValueError: No documents found in ./path
 
 3. Try with a specific file:
    ```bash
-   fitz ingest ./path/specific_file.pdf
+   fitz query --source ./path/specific_file.pdf "test query"
    ```
 
 ---
@@ -335,7 +335,7 @@ logging:
 
 Or via environment:
 ```bash
-FITZ_LOG_LEVEL=DEBUG fitz ingest ./docs
+FITZ_LOG_LEVEL=DEBUG fitz query --source ./docs "test query"
 ```
 
 ### Inspect State File
@@ -407,7 +407,7 @@ ConfigError
 
 ## Getting Help
 
-1. **Run diagnostics:** `fitz doctor --verbose`
+1. **Run diagnostics:** `fitz config --doctor --verbose`
 2. **Check logs:** Enable DEBUG level
 3. **Report issues:** [GitHub Issues](https://github.com/yafitzdev/fitz-ai/issues)
 
@@ -416,7 +416,7 @@ When reporting issues, include:
 - Python version: `python --version`
 - OS: Windows/macOS/Linux
 - Full error traceback
-- Output of `fitz doctor`
+- Output of `fitz config --doctor`
 
 ---
 

@@ -1,6 +1,6 @@
-# Python SDK Reference
+# docs/SDK.md
 
-Complete reference for the Fitz Python SDK.
+Complete reference for the Fitz Python SDK (v0.10.0).
 
 ---
 
@@ -9,8 +9,8 @@ Complete reference for the Fitz Python SDK.
 ```python
 import fitz_ai
 
-# Ingest documents
-fitz_ai.ingest("./docs")
+# Point to documents (starts background indexing)
+fitz_ai.point("./docs")
 
 # Ask questions
 answer = fitz_ai.query("What is the refund policy?")
@@ -23,31 +23,27 @@ print(answer.text)
 
 The simplest way to use Fitz - matches CLI behavior.
 
-### fitz_ai.ingest()
+### fitz_ai.point()
 
-Ingest documents into the knowledge base.
+Point Fitz at a document source. Starts background indexing.
 
 ```python
-fitz_ai.ingest(
+fitz_ai.point(
     source,                    # Path to file or directory
     collection: str = None,    # Collection name (uses default)
-    clear_existing: bool = False  # Clear collection first
-) -> IngestStats
+) -> None
 ```
 
-**Returns:** `IngestStats` with `documents`, `chunks`, `collection`
+**Returns:** None (background indexing begins immediately)
 
 **Examples:**
 
 ```python
-# Basic ingestion
-fitz_ai.ingest("./docs")
+# Basic indexing
+fitz_ai.point("./docs")
 
 # With collection name
-fitz_ai.ingest("./physics_papers", collection="physics")
-
-# Clear and re-ingest
-fitz_ai.ingest("./docs", clear_existing=True)
+fitz_ai.point("./physics_papers", collection="physics")
 ```
 
 ### fitz_ai.query()
@@ -68,7 +64,7 @@ fitz_ai.query(
 ```python
 answer = fitz_ai.query("What is the refund policy?")
 print(answer.text)
-print(answer.mode)  # CONFIDENT, QUALIFIED, DISPUTED, or ABSTAIN
+print(answer.mode)  # TRUSTWORTHY, DISPUTED, or ABSTAIN
 
 # Access sources
 for source in answer.provenance:
@@ -104,25 +100,25 @@ f = fitz(
 
 ### Methods
 
-#### ingest()
+#### point()
+
+Point Fitz at a document source. Starts background indexing.
 
 ```python
-f.ingest(
+f.point(
     source: str | Path,
-    clear_existing: bool = False
-) -> IngestStats
+) -> None
 ```
 
-#### ask() / query()
+#### query() / ask()
 
 ```python
-f.ask(
+f.query(
     question: str,
-    top_k: int = None
 ) -> Answer
 ```
 
-Note: `query()` is an alias for `ask()`.
+Note: `ask()` is an alias for `query()`.
 
 ### Properties
 
@@ -138,12 +134,15 @@ from fitz_ai import fitz
 
 # Multiple collections
 physics = fitz(collection="physics")
-physics.ingest("./physics_papers")
-physics_answer = physics.ask("Explain entanglement")
+physics.point("./physics_papers")
+physics_answer = physics.query("Explain entanglement")
 
 legal = fitz(collection="legal")
-legal.ingest("./contracts")
-legal_answer = legal.ask("What are the payment terms?")
+legal.point("./contracts")
+legal_answer = legal.query("What are the payment terms?")
+
+# ask() is an alias for query()
+answer = legal.ask("What are the payment terms?")
 
 # Custom config
 f = fitz(config_path="./my_config.yaml")
@@ -174,8 +173,7 @@ class Answer:
 
 | Mode | Description |
 |------|-------------|
-| `CONFIDENT` | Strong evidence supports the answer |
-| `QUALIFIED` | Answer with caveats/limitations |
+| `TRUSTWORTHY` | Strong evidence supports the answer |
 | `DISPUTED` | Conflicting sources detected |
 | `ABSTAIN` | Insufficient evidence to answer |
 
@@ -190,19 +188,6 @@ class Provenance:
     source_id: str    # Unique source identifier
     excerpt: str      # Relevant excerpt
     metadata: dict    # Additional source info
-```
-
-### IngestStats
-
-Statistics from ingestion.
-
-```python
-from fitz_ai import IngestStats
-
-class IngestStats:
-    documents: int   # Number of documents ingested
-    chunks: int      # Number of chunks created
-    collection: str  # Target collection name
 ```
 
 ### Query

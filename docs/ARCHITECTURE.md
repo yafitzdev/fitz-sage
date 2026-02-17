@@ -10,10 +10,10 @@ High-level system design of Fitz.
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  User Interface Layer                                                       │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
-│  │  CLI        │  │  Python SDK │  │  REST API   │  │  fitz() Quickstart  │ │
-│  │  fitz ...   │  │  import ... │  │  /query     │  │  One-liner RAG      │ │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                          │
+│  │  CLI        │  │  Python SDK │  │  REST API   │                          │
+│  │  fitz ...   │  │  import ... │  │  /query     │                          │
+│  └─────────────┘  └─────────────┘  └─────────────┘                          │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -134,10 +134,10 @@ Verify with: `python -m tools.contract_map --fail-on-errors`
                      │                   │                  │
                      ▼                   ▼                  ▼
               ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-              │ Vector DB   │    │ CONFIDENT   │    │  Answer +   │
-              │ Similarity  │    │ QUALIFIED   │    │  Provenance │
-              │ Search      │    │ DISPUTED    │    │  Sources    │
-              │             │    │ ABSTAIN     │    │             │
+              │ Vector DB   │    │ TRUSTWORTHY │    │  Answer +   │
+              │ Similarity  │    │ DISPUTED    │    │  Provenance │
+              │ Search      │    │ ABSTAIN     │    │  Sources    │
+              │             │    │             │    │             │
               └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
@@ -274,7 +274,7 @@ class Query:
 @dataclass
 class Answer:
     text: str                      # The response
-    mode: AnswerMode               # CONFIDENT, QUALIFIED, DISPUTED, ABSTAIN
+    mode: AnswerMode               # TRUSTWORTHY, DISPUTED, ABSTAIN
     provenance: list[Provenance]   # Source attribution chain
     metadata: dict                 # Additional info
 ```
