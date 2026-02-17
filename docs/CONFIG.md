@@ -152,7 +152,7 @@ LLM provider for answering questions.
 
 **Available plugins:** `cohere`, `openai`, `anthropic`, `azure_openai`, `local_ollama`, `enterprise`
 
-> **Enterprise deployments:** Use `plugin_name: enterprise` with OAuth2 M2M authentication, custom CA certificates, and mTLS support. See [Enterprise Gateway](features/enterprise-gateway.md).
+> **Enterprise deployments:** Use `plugin_name: enterprise` with OAuth2 M2M authentication, custom CA certificates, and mTLS support. See [Enterprise Gateway](features/platform/enterprise-gateway.md).
 
 ---
 
@@ -180,7 +180,7 @@ Reranking provider for improving retrieval quality.
 
 **Available plugins:** `cohere`
 
-**Note:** Reranking is automatically enabled when a rerank provider is configured. See [Feature Control](FEATURE_CONTROL.md) and [Reranking Feature](features/reranking.md).
+**Note:** Reranking is automatically enabled when a rerank provider is configured. See [Feature Control](FEATURE_CONTROL.md) and [Reranking Feature](features/retrieval/reranking.md).
 
 ---
 
@@ -233,7 +233,7 @@ vector_db_kwargs:
   connection_string: postgresql://user:pass@localhost:5432/mydb
 ```
 
-See [Unified Storage](features/unified-storage.md) for architecture details.
+See [Unified Storage](features/platform/unified-storage.md) for architecture details.
 
 ---
 

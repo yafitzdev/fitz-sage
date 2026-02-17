@@ -424,7 +424,7 @@ fitz_ai/
 
 ## See Also
 
-- [Unified Storage](features/unified-storage.md) - Why PostgreSQL + pgvector
+- [Unified Storage](features/platform/unified-storage.md) - Why PostgreSQL + pgvector
 - [PLUGINS.md](PLUGINS.md) - Plugin development guide
 - [CONFIG.md](CONFIG.md) - Configuration reference
 - [FEATURE_CONTROL.md](FEATURE_CONTROL.md) - Feature control architecture

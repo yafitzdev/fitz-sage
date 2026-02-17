@@ -137,10 +137,10 @@ You can—but you'll hit walls fast.
 
 ### Why Fitz?
 
-**Zero-wait querying 🐆** → [Progressive KRAG](docs/features/progressive-krag-agentic-search.md)
+**Zero-wait querying 🐆** → [Progressive KRAG](docs/features/platform/progressive-krag-agentic-search.md)
 > Point at a folder. Ask a question immediately — no ingestion step required. Fitz serves answers instantly via agentic search while a background worker indexes your files. Queries get faster over time as indexing completes, but they work from second one.
 
-**Honest answers ✅** → [Governance Benchmark](docs/features/governance-benchmarking.md)
+**Honest answers ✅** → [Governance Benchmark](docs/features/governance/governance-benchmarking.md)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."
 > 
 > → Fitz detects disputes at **79.1% recall** on [fitz-gov 5.0](https://github.com/yafitzdev/fitz-gov), a 2,900+ case benchmark for epistemic honesty (92% hard difficulty).
@@ -148,16 +148,16 @@ You can—but you'll hit walls fast.
 **Queries that actually work 📊**
 > Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, address-based code retrieval with import graph traversal, and SQL execution for tabular data. No configuration—it just works.
 
-**Tabular data that is actually searchable 📈** → [Unified Storage](docs/features/unified-storage.md)
+**Tabular data that is actually searchable 📈** → [Unified Storage](docs/features/platform/unified-storage.md)
 > CSV and table data is a nightmare in most RAG systems—chunked arbitrarily, structure lost, queries fail. Fitz stores tables natively in PostgreSQL alongside your vectors—same database, no sync issues. Auto-detects schema and runs real SQL. Ask "What's the average price by region?" and get an actual computed answer, not fragmented rows.
 
 **Other Features at a Glance 🃏**
 >1. [x] **Fully local execution possible.** Embedded PostgreSQL + Ollama, no API keys required to start.
 >2. [x] **Plugin-based architecture.** Swap LLMs, rerankers, and retrieval pipelines via YAML config.
->3. [x] **[KRAG (Knowledge Routing Augmented Generation)](docs/features/krag.md).** Asymmetric indexing — documents are parsed into typed retrieval units (symbols, sections, tables) with structural metadata, not flat chunks. Queries are routed to the right strategy per content type.
+>3. [x] **[KRAG (Knowledge Routing Augmented Generation)](docs/features/platform/krag.md).** Asymmetric indexing — documents are parsed into typed retrieval units (symbols, sections, tables) with structural metadata, not flat chunks. Queries are routed to the right strategy per content type.
 >4. [x] **Full provenance.** Every answer traces back to the exact source symbol, section, or document.
 >5. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
->6. [x] **[Enterprise gateway support](docs/features/enterprise-gateway.md).** OAuth2 M2M, custom CA certs, mTLS, and corporate proxy/gateway integration.
+>6. [x] **[Enterprise gateway support](docs/features/platform/enterprise-gateway.md).** OAuth2 M2M, custom CA certs, mTLS, and corporate proxy/gateway integration.
 
 ####
 
@@ -174,15 +174,15 @@ You can—but you'll hit walls fast.
 
 ### What You Can Search
 
-You feed Fitz documents — code files, PDFs, markdown, CSVs. FitzKRAG extracts structured retrieval units from them, each with its own storage and search strategy.
+Traditional RAG chops every document into flat text blocks and searches them the same way. [FitzKRAG](docs/features/platform/krag.md) parses each document by type — tree-sitter for code, heading hierarchy for docs, schema detection for CSVs — and produces typed retrieval units, each with its own storage format and search strategy.
 
 <br>
 
 | Retrieval Unit              | Extracted From | How It Works |
 |-----------------------------|----------------|-------------|
-| [**Symbols 🖌️**](docs/features/code-aware-chunking.md) | Code files | Tree-sitter parses functions, classes, and methods into addressable units with qualified names, references, and import graphs. Cross-file dependencies are graph traversals, not text searches. |
+| [**Symbols 🖌️**](docs/features/ingestion/code-symbol-extraction.md) | Code files | Tree-sitter parses functions, classes, and methods into addressable units with qualified names, references, and import graphs. Cross-file dependencies are graph traversals, not text searches. |
 | **Sections 📑** | Documents (PDF, markdown, text) | Headings and paragraphs are extracted with parent/child hierarchy. Deeply nested sections include parent context; top-level headings include child summaries. |
-| [**Tables 📅**](docs/features/tabular-data-routing.md) | CSV files or tables within documents | Native PostgreSQL storage with auto-detected schema. Real SQL execution from natural language — not chunked text. |
+| [**Tables 📅**](docs/features/ingestion/tabular-data-routing.md) | CSV files or tables within documents | Native PostgreSQL storage with auto-detected schema. Real SQL execution from natural language — not chunked text. |
 | **Images 🖼️** | Figures and diagrams within documents | VLM-powered figure extraction and visual understanding. *(Coming soon)* |
 | **Chunks 🧩** | Any content as fallback | Traditional chunk-based retrieval when structured extraction doesn't apply. Automatic fallback — no configuration needed. |
 
@@ -195,29 +195,29 @@ You feed Fitz documents — code files, PDFs, markdown, CSVs. FitzKRAG extracts 
 
 ### Retrieval Intelligence
 
-Most RAG implementations are naive vector search—they fail silently on real-world queries. Fitz has **built-in intelligence** that handles edge cases automatically:
+Most RAG implementations are naive vector search—they fail silently on real-world queries. Fitz has [built-in intelligence](docs/features/retrieval) that handles edge cases automatically:
 
 <br>
 
 | Feature | Query | Naive RAG Problem | Fitz Solution |
 |---------|-------|-------------------|------------------|
-| [**epistemic-honesty**](docs/features/epistemic-honesty.md) | "What was our Q4 revenue?" | ❌ Hallucinated number — Info doesn't exist, but LLM won't admit it | ✅ "I don't know" |
-| [**keyword-vocabulary**](docs/features/keyword-vocabulary.md) | "Find TC_1000" | ❌ Wrong test case — Embeddings see TC_1000 ≈ TC_2000 (semantically similar) | ✅ Exact keyword matching |
-| [**hybrid-search**](docs/features/hybrid-search.md) | "X100 battery specs" | ❌ Returns Y200 docs — Semantic search misses exact model numbers | ✅ Hybrid search (dense + sparse) |
-| [**sparse-search**](docs/features/sparse-search.md) | "error code E_AUTH_401" | ❌ No exact match — Embeddings miss precise error codes | ✅ PostgreSQL full-text search |
-| [**multi-hop**](docs/features/multi-hop-reasoning.md) | "Who wrote the paper cited by the 2023 review?" | ❌ Returns the review only — Single-step search can't traverse references | ✅ Iterative retrieval |
-| [**hierarchical-rag**](docs/features/hierarchical-rag.md) | "What are the design principles?" | ❌ Random fragments — Answer is spread across docs; no single chunk contains it | ✅ Hierarchical summaries |
-| [**multi-query**](docs/features/multi-query-rag.md) | *[User pastes 500-char test report]* "What failed and why?" | ❌ Vaguely related chunks — Long input → averaged embedding → matches nothing specifically | ✅ Multi-query decomposition |
-| [**comparison-queries**](docs/features/comparison-queries.md) | "Compare React vs Vue performance" | ❌ Incomplete comparison — Only retrieves one entity, missing the other | ✅ Multi-entity retrieval |
-| [**entity-graph**](docs/features/entity-graph.md) | "What else mentions AuthService?" | ❌ Isolated chunks — No awareness of shared entities across docs | ✅ Entity-based linking across sources |
-| [**temporal-queries**](docs/features/temporal-queries.md) | "What changed between Q1 and Q2?" | ❌ Random chunks — No awareness of time periods in query | ✅ Temporal query handling |
-| [**aggregation-queries**](docs/features/aggregation-queries.md) | "List all the test cases that failed" | ❌ Partial list — No mechanism for comprehensive retrieval | ✅ Aggregation query handling |
-| [**freshness-authority**](docs/features/freshness-authority.md) | "What does the official spec say?" | ❌ Returns notes — Can't distinguish authoritative vs informal sources | ✅ Freshness/authority boosting |
-| [**query-expansion**](docs/features/query-expansion.md) | "How do I fetch the db config?" | ❌ No matches — User says "fetch", docs say "retrieve"; "db" vs "database" | ✅ Query expansion |
-| [**query-rewriting**](docs/features/query-rewriting.md) | "Tell me more about it" *(after discussing TechCorp)* | ❌ Lost context — Pronouns like "it" reference nothing, retrieval fails | ✅ Conversational context resolution |
-| [**hyde**](docs/features/hyde.md) | "What's TechCorp's approach to sustainability?" | ❌ Poor recall — Abstract queries don't embed close to concrete documents | ✅ Hypothetical document generation |
-| [**contextual-embeddings**](docs/features/contextual-embeddings.md) | "When does it expire?" | ❌ Ambiguous chunk — "It expires in 24h" embedded without context; "it" = ? | ✅ Summary-prefixed symbol/section embeddings |
-| [**reranking**](docs/features/reranking.md) | "What's the battery warranty?" | ❌ Imprecise ranking — Vector similarity ≠ true relevance; best answer buried | ✅ Cross-encoder precision |
+| [**epistemic-honesty**](docs/features/governance/epistemic-honesty.md) | "What was our Q4 revenue?" | ❌ Hallucinated number — Info doesn't exist, but LLM won't admit it | ✅ "I don't know" |
+| [**keyword-vocabulary**](docs/features/retrieval/keyword-vocabulary.md) | "Find TC_1000" | ❌ Wrong test case — Embeddings see TC_1000 ≈ TC_2000 (semantically similar) | ✅ Exact keyword matching |
+| [**hybrid-search**](docs/features/retrieval/hybrid-search.md) | "X100 battery specs" | ❌ Returns Y200 docs — Semantic search misses exact model numbers | ✅ Hybrid search (dense + sparse) |
+| [**sparse-search**](docs/features/retrieval/sparse-search.md) | "error code E_AUTH_401" | ❌ No exact match — Embeddings miss precise error codes | ✅ PostgreSQL full-text search |
+| [**multi-hop**](docs/features/retrieval/multi-hop-reasoning.md) | "Who wrote the paper cited by the 2023 review?" | ❌ Returns the review only — Single-step search can't traverse references | ✅ Iterative retrieval |
+| [**hierarchical-rag**](docs/features/ingestion/hierarchical-rag.md) | "What are the design principles?" | ❌ Random fragments — Answer is spread across docs; no single chunk contains it | ✅ Hierarchical summaries |
+| [**multi-query**](docs/features/retrieval/multi-query-rag.md) | *[User pastes 500-char test report]* "What failed and why?" | ❌ Vaguely related chunks — Long input → averaged embedding → matches nothing specifically | ✅ Multi-query decomposition |
+| [**comparison-queries**](docs/features/retrieval/comparison-queries.md) | "Compare React vs Vue performance" | ❌ Incomplete comparison — Only retrieves one entity, missing the other | ✅ Multi-entity retrieval |
+| [**entity-graph**](docs/features/retrieval/entity-graph.md) | "What else mentions AuthService?" | ❌ Isolated chunks — No awareness of shared entities across docs | ✅ Entity-based linking across sources |
+| [**temporal-queries**](docs/features/retrieval/temporal-queries.md) | "What changed between Q1 and Q2?" | ❌ Random chunks — No awareness of time periods in query | ✅ Temporal query handling |
+| [**aggregation-queries**](docs/features/retrieval/aggregation-queries.md) | "List all the test cases that failed" | ❌ Partial list — No mechanism for comprehensive retrieval | ✅ Aggregation query handling |
+| [**freshness-authority**](docs/features/retrieval/freshness-authority.md) | "What does the official spec say?" | ❌ Returns notes — Can't distinguish authoritative vs informal sources | ✅ Freshness/authority boosting |
+| [**query-expansion**](docs/features/retrieval/query-expansion.md) | "How do I fetch the db config?" | ❌ No matches — User says "fetch", docs say "retrieve"; "db" vs "database" | ✅ Query expansion |
+| [**query-rewriting**](docs/features/retrieval/query-rewriting.md) | "Tell me more about it" *(after discussing TechCorp)* | ❌ Lost context — Pronouns like "it" reference nothing, retrieval fails | ✅ Conversational context resolution |
+| [**hyde**](docs/features/retrieval/hyde.md) | "What's TechCorp's approach to sustainability?" | ❌ Poor recall — Abstract queries don't embed close to concrete documents | ✅ Hypothetical document generation |
+| [**contextual-embeddings**](docs/features/retrieval/contextual-embeddings.md) | "When does it expire?" | ❌ Ambiguous chunk — "It expires in 24h" embedded without context; "it" = ? | ✅ Summary-prefixed symbol/section embeddings |
+| [**reranking**](docs/features/retrieval/reranking.md) | "What's the battery warranty?" | ❌ Imprecise ranking — Vector similarity ≠ true relevance; best answer buried | ✅ Cross-encoder precision |
 
 <br>
 
@@ -228,9 +228,9 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 
 ### Governance — Know What You Don't Know
 
-[Feature docs](docs/features/governance-benchmarking.md) • [fitz-gov benchmark](https://github.com/yafitzdev/fitz-gov)
+[Feature docs](docs/features/governance/governance-benchmarking.md) • [fitz-gov benchmark](https://github.com/yafitzdev/fitz-gov)
 
-Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty using a 4-question cascade ML classifier trained on 1,100+ labeled cases from [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty.
+Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty using a 4-question cascade ML classifier trained on 2,900+ labeled cases from [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty.
 
 <br>
 
@@ -407,7 +407,7 @@ Fitz is a foundation. It handles document indexing and grounded retrieval—you 
 
 <br>
 
-<strong>Codebase Search 🐍</strong> → [Code-Aware Chunking](docs/features/code-aware-chunking.md) • [KRAG](docs/features/krag.md)
+<strong>Codebase Search 🐍</strong> → [Code Symbol Extraction](docs/features/ingestion/code-symbol-extraction.md) • [KRAG](docs/features/platform/krag.md)
 
 > FitzKRAG uses address-based retrieval for code: tree-sitter parses your codebase into symbols (functions, classes, methods) with qualified names, references, and import graphs. No chunking—each symbol is a precise, addressable unit. Cross-file dependencies are tracked, so "what calls this function?" is a graph traversal, not a text search.
 >
@@ -598,18 +598,18 @@ MIT
 - [REST API](docs/API.md)
 - [Configuration Guide](docs/CONFIG.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [Unified Storage (PostgreSQL + pgvector)](docs/features/unified-storage.md)
-- [Progressive KRAG & Agentic Search](docs/features/progressive-krag-agentic-search.md)
+- [Unified Storage (PostgreSQL + pgvector)](docs/features/platform/unified-storage.md)
+- [Progressive KRAG & Agentic Search](docs/features/platform/progressive-krag-agentic-search.md)
 - [Ingestion Pipeline](docs/INGESTION.md)
 - [Enrichment (Hierarchies, Entities)](docs/ENRICHMENT.md)
 - [Epistemic Constraints](docs/CONSTRAINTS.md)
-- [Governance Benchmarking (fitz-gov)](docs/features/governance-benchmarking.md)
+- [Governance Benchmarking (fitz-gov)](docs/features/governance/governance-benchmarking.md)
 - [Plugin Development](docs/PLUGINS.md)
 - [Feature Control](docs/FEATURE_CONTROL.md)
-- [KRAG — Knowledge Routing Augmented Generation](docs/features/krag.md)
-- [Code-Aware Chunking](docs/features/code-aware-chunking.md)
-- [Tabular Data Routing](docs/features/tabular-data-routing.md)
-- [Enterprise Gateway](docs/features/enterprise-gateway.md)
+- [KRAG — Knowledge Routing Augmented Generation](docs/features/platform/krag.md)
+- [Code Symbol Extraction](docs/features/ingestion/code-symbol-extraction.md)
+- [Tabular Data Routing](docs/features/ingestion/tabular-data-routing.md)
+- [Enterprise Gateway](docs/features/platform/enterprise-gateway.md)
 - [Engines](docs/ENGINES.md)
 - [Configuration Examples](docs/CONFIG_EXAMPLES.md)
 - [Custom Engines](docs/CUSTOM_ENGINES.md)

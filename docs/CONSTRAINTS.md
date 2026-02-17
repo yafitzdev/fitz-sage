@@ -181,7 +181,7 @@ Constraint signals are used as **features** for a two-stage ML classifier (Gover
 
 The AnswerGovernor still exists as a fallback when the GovernanceDecider model is not available, but GovernanceDecider is the primary decision path.
 
-See [governance benchmarking](features/governance-benchmarking.md) for details on the two-stage classifier.
+See [governance benchmarking](features/governance/governance-benchmarking.md) for details on the two-stage classifier.
 
 ---
 

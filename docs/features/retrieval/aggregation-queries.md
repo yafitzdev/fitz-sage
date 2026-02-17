@@ -98,4 +98,4 @@ Each aggregation type triggers expanded retrieval:
 
 - [**Comparison Queries**](comparison-queries.md) - Multi-entity retrieval (another detection module)
 - [**Temporal Queries**](temporal-queries.md) - Time-based retrieval (another detection module)
-- [**Hierarchical RAG**](hierarchical-rag.md) - L2 summaries help with "list all themes" queries
+- [**Hierarchical RAG**](../ingestion/hierarchical-rag.md) - L2 summaries help with "list all themes" queries

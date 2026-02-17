@@ -201,6 +201,6 @@ summarizer: cohere              # Presence enables the feature
 
 ## See Also
 
-- [Reranking Feature](features/reranking.md) - Detailed reranking documentation
+- [Reranking Feature](features/retrieval/reranking.md) - Detailed reranking documentation
 - [PLUGINS.md](PLUGINS.md) - Plugin development guide
 - [CLI.md](CLI.md) - CLI reference

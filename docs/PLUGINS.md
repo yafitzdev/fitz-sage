@@ -63,7 +63,7 @@ Fitz uses two types of plugins:
 | Parser | Python | `fitz_ai/ingestion/parser/plugins/` | Document parsing |
 | Guardrail | Python | `fitz_ai/core/guardrails/plugins/` | Epistemic safety |
 
-**Note:** Vector storage uses PostgreSQL + pgvector (built-in, not pluggable). See [Unified Storage](features/unified-storage.md).
+**Note:** Vector storage uses PostgreSQL + pgvector (built-in, not pluggable). See [Unified Storage](features/platform/unified-storage.md).
 
 ---
 
@@ -297,7 +297,7 @@ Fitz uses PostgreSQL + pgvector instead of dedicated vector databases for:
 - **Zero friction** - `pip install` includes embedded PostgreSQL (pgserver)
 - **One code path** - Same behavior locally and in production
 
-See [Unified Storage](features/unified-storage.md) for the full rationale.
+See [Unified Storage](features/platform/unified-storage.md) for the full rationale.
 
 ### HNSW Index Settings
 
@@ -417,7 +417,7 @@ chat = get_llm_plugin(plugin_name="cohere", plugin_type="chat", tier="fast")
 
 ### Vector DB
 
-Fitz uses PostgreSQL + pgvector exclusively for unified storage. See [Unified Storage](features/unified-storage.md).
+Fitz uses PostgreSQL + pgvector exclusively for unified storage. See [Unified Storage](features/platform/unified-storage.md).
 
 | Plugin | Description |
 |--------|-------------|

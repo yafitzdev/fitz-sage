@@ -178,9 +178,9 @@ The pattern: use the LLM for *classification* and *generation*, but use *structu
 
 ## Related Features
 
-- [**Hybrid Search**](hybrid-search.md) — Dense + sparse fusion used within KRAG's symbol and section search
-- [**Multi-Hop Reasoning**](multi-hop-reasoning.md) — Iterative retrieval for complex questions
-- [**HyDE**](hyde.md) — Hypothetical document generation for abstract queries
-- [**Entity Graph**](entity-graph.md) — Entity-based linking across retrieval units
-- [**Hierarchical RAG**](hierarchical-rag.md) — L1/L2 summaries for corpus-level context
-- [**Contextual Embeddings**](contextual-embeddings.md) — Summary-prefixed embeddings for disambiguation
+- [**Hybrid Search**](../retrieval/hybrid-search.md) — Dense + sparse fusion used within KRAG's symbol and section search
+- [**Multi-Hop Reasoning**](../retrieval/multi-hop-reasoning.md) — Iterative retrieval for complex questions
+- [**HyDE**](../retrieval/hyde.md) — Hypothetical document generation for abstract queries
+- [**Entity Graph**](../retrieval/entity-graph.md) — Entity-based linking across retrieval units
+- [**Hierarchical RAG**](../ingestion/hierarchical-rag.md) — L1/L2 summaries for corpus-level context
+- [**Contextual Embeddings**](../retrieval/contextual-embeddings.md) — Summary-prefixed embeddings for disambiguation

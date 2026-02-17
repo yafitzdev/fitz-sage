@@ -161,7 +161,7 @@ Extracts named entities and domain concepts.
 
 **Stored in:** `chunk.metadata["entities"]`
 
-**Used by:** [Entity Graph](features/entity-graph.md) for discovering related chunks via shared entities at query time.
+**Used by:** [Entity Graph](features/retrieval/entity-graph.md) for discovering related chunks via shared entities at query time.
 
 ---
 
