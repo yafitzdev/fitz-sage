@@ -18,7 +18,6 @@ from fitz_ai.engines.fitz_krag.retrieval.strategies.section_search import (
 )
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

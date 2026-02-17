@@ -493,9 +493,7 @@ class PostgresConnectionManager:
             logger.debug(f"{STORAGE} No existing server to connect to: {e}")
             return None
 
-    def _wait_for_existing_server(
-        self, data_dir: Path, timeout: int = 15
-    ) -> str | None:
+    def _wait_for_existing_server(self, data_dir: Path, timeout: int = 15) -> str | None:
         """Wait for another process to finish starting PostgreSQL.
 
         When pgserver lock acquisition fails, it usually means another process
@@ -700,9 +698,7 @@ class PostgresConnectionManager:
             if is_pool_timeout:
                 # Pool exhaustion: all connections in use, NOT a PostgreSQL failure.
                 # Do NOT restart pgserver — just wait briefly and retry once.
-                logger.warning(
-                    f"{STORAGE} Pool exhausted ({e}), retrying after brief wait..."
-                )
+                logger.warning(f"{STORAGE} Pool exhausted ({e}), retrying after brief wait...")
                 import time as _time
 
                 _time.sleep(1.0)
@@ -711,15 +707,11 @@ class PostgresConnectionManager:
                     with pool.connection() as conn:
                         yield conn
                 except Exception as retry_error:
-                    raise RuntimeError(
-                        f"Pool still exhausted after retry: {retry_error}"
-                    ) from e
+                    raise RuntimeError(f"Pool still exhausted after retry: {retry_error}") from e
 
             elif isinstance(e, (psycopg.OperationalError, psycopg.errors.ConnectionTimeout)):
                 # Real connection failure — try pgserver restart as last resort
-                logger.warning(
-                    f"{STORAGE} Connection failed ({e}), attempting recovery..."
-                )
+                logger.warning(f"{STORAGE} Connection failed ({e}), attempting recovery...")
 
                 # Clear this pool
                 if collection in self._pools:

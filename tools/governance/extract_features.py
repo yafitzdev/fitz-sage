@@ -382,9 +382,9 @@ def main():
     else:
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
             futures = {
-                executor.submit(process_case, case, chat, chat_balanced, embedder, detection_orchestrator): case[
-                    "id"
-                ]
+                executor.submit(
+                    process_case, case, chat, chat_balanced, embedder, detection_orchestrator
+                ): case["id"]
                 for case in cases
             }
             for future in tqdm(

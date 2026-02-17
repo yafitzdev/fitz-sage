@@ -299,9 +299,33 @@ def compute_context_features(query: str, contexts: list[str]) -> dict[str, float
         features["query_ctx_content_overlap"] = 0.0
 
     # --- Text answer features (query-context alignment) ---
-    _question_words = {"what", "how", "why", "when", "where", "who", "which", "is", "are",
-                       "was", "were", "does", "do", "did", "can", "could", "should", "will", "would"}
-    q_content = {w.strip("?.,!;:()[]\"'") for w in query.lower().split()} - stopwords - _question_words - {""}
+    _question_words = {
+        "what",
+        "how",
+        "why",
+        "when",
+        "where",
+        "who",
+        "which",
+        "is",
+        "are",
+        "was",
+        "were",
+        "does",
+        "do",
+        "did",
+        "can",
+        "could",
+        "should",
+        "will",
+        "would",
+    }
+    q_content = (
+        {w.strip("?.,!;:()[]\"'") for w in query.lower().split()}
+        - stopwords
+        - _question_words
+        - {""}
+    )
     if q_content and contexts:
         # query_subject_partial: fraction of query subject words in context
         found = sum(1 for w in q_content if w in all_text_lower)
@@ -424,9 +448,7 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
     if "ca_fired" in X.columns and "mean_vector_score" in X.columns:
         X["ix_ca_x_vector"] = X["ca_fired"] * X["mean_vector_score"]
     if "ctx_contradiction_count" in X.columns and "ctx_total_chars" in X.columns:
-        X["ix_contradiction_density"] = X["ctx_contradiction_count"] / (
-            X["ctx_total_chars"] + 1
-        )
+        X["ix_contradiction_density"] = X["ctx_contradiction_count"] / (X["ctx_total_chars"] + 1)
     if "ctx_negation_count" in X.columns and "ctx_total_chars" in X.columns:
         X["ix_negation_density"] = X["ctx_negation_count"] / (X["ctx_total_chars"] + 1)
     if "mean_vector_score" in X.columns and "score_spread" in X.columns:
@@ -447,9 +469,7 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
         X["ix_ctx_sim_spread"] = X["ctx_max_pairwise_sim"] - X["ctx_min_pairwise_sim"]
     # New: vector score * contradiction count — disputed cases with high vector match
     if "mean_vector_score" in X.columns and "ctx_contradiction_count" in X.columns:
-        X["ix_vector_x_contradiction"] = (
-            X["mean_vector_score"] * X["ctx_contradiction_count"]
-        )
+        X["ix_vector_x_contradiction"] = X["mean_vector_score"] * X["ctx_contradiction_count"]
     # New: AV fires but IE doesn't — abstain signal missed by IE (helps Stage 1)
     if "av_fired" in X.columns and "ie_fired" in X.columns:
         X["ix_av_no_ie"] = X["av_fired"] * (1 - X["ie_fired"])
@@ -471,9 +491,8 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
     # New: any numerical divergence (within or across) * no CA fire
     if "has_within_chunk_divergence" in X.columns and "ca_fired" in X.columns:
         X["ix_any_divergence_no_ca"] = (
-            (X.get("has_cross_chunk_divergence", 0) | X["has_within_chunk_divergence"])
-            * (1 - X["ca_fired"])
-        )
+            X.get("has_cross_chunk_divergence", 0) | X["has_within_chunk_divergence"]
+        ) * (1 - X["ca_fired"])
 
     # Q3-specific features: distinguish data-rich trustworthy from genuine disputes
     if "ctx_number_count" in X.columns and "num_chunks" in X.columns:
@@ -492,9 +511,9 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
 
     # Conflict quality features (Q3/FT-disputed): nature of conflict, not just quantity
     if "cross_chunk_num_conflicts" in X.columns and "ctx_number_count" in X.columns:
-        X["conflict_to_number_ratio"] = X["cross_chunk_num_conflicts"] / X[
-            "ctx_number_count"
-        ].clip(lower=1)
+        X["conflict_to_number_ratio"] = X["cross_chunk_num_conflicts"] / X["ctx_number_count"].clip(
+            lower=1
+        )
     if "ctx_negation_count" in X.columns and "ctx_total_chars" in X.columns:
         X["negation_per_char"] = X["ctx_negation_count"] / X["ctx_total_chars"].clip(lower=1)
 
@@ -822,12 +841,8 @@ def train_twostage(
     print(f"\n{'='*60}")
     print("STAGE 1: answerable vs abstain")
     print(f"{'='*60}")
-    print(
-        f"Train: {sum(y_s1_train == 1)} answerable, {sum(y_s1_train == 0)} abstain"
-    )
-    print(
-        f"Test:  {sum(y_s1_test == 1)} answerable, {sum(y_s1_test == 0)} abstain"
-    )
+    print(f"Train: {sum(y_s1_train == 1)} answerable, {sum(y_s1_train == 0)} abstain")
+    print(f"Test:  {sum(y_s1_test == 1)} answerable, {sum(y_s1_test == 0)} abstain")
 
     s1_models = {
         "RF": RandomForestClassifier(
@@ -902,16 +917,16 @@ def train_twostage(
     # Stage 1's job is to CATCH abstain cases — overall accuracy favors majority class
     _MIN_ANS_RECALL = 0.80
     s1_eligible = [
-        (name, info)
-        for name, info in s1_results.items()
-        if info["ans_recall"] >= _MIN_ANS_RECALL
+        (name, info) for name, info in s1_results.items() if info["ans_recall"] >= _MIN_ANS_RECALL
     ]
     if not s1_eligible:
         s1_eligible = list(s1_results.items())  # fallback: all models
     s1_ranked = sorted(s1_eligible, key=lambda x: x[1]["abs_recall"], reverse=True)
     s1_best_name = s1_ranked[0][0]
-    print(f"\n  Selected: {s1_best_name} (abstain={s1_results[s1_best_name]['abs_recall']:.3f},"
-          f" answerable={s1_results[s1_best_name]['ans_recall']:.3f})")
+    print(
+        f"\n  Selected: {s1_best_name} (abstain={s1_results[s1_best_name]['abs_recall']:.3f},"
+        f" answerable={s1_results[s1_best_name]['ans_recall']:.3f})"
+    )
     print(f"\n--- Stage 1: Tuning {s1_best_name} ({time_per_stage}s budget) ---")
 
     s1_param_grids = {
@@ -1044,13 +1059,9 @@ def train_twostage(
     X_train_s2 = X_train[answerable_train]
     y_train_s2_str = y3_train[answerable_train]
     # Encode: disputed=0, trustworthy=1
-    y_train_s2 = np.array(
-        [0 if lbl == "disputed" else 1 for lbl in y_train_s2_str], dtype=int
-    )
+    y_train_s2 = np.array([0 if lbl == "disputed" else 1 for lbl in y_train_s2_str], dtype=int)
     _s2_label_map = {0: "disputed", 1: "trustworthy"}
-    print(
-        f"Train: {sum(y_train_s2 == 1)} trustworthy, {sum(y_train_s2 == 0)} disputed"
-    )
+    print(f"Train: {sum(y_train_s2 == 1)} trustworthy, {sum(y_train_s2 == 0)} disputed")
 
     # Full answerable data for CV
     answerable_all = np.array(
@@ -1189,9 +1200,7 @@ def train_twostage(
                 best_thresh, _, _ = max(phase2, key=lambda x: x[1])
             else:
                 # Phase 3: best balance (weighted)
-                best_thresh, _, _ = max(
-                    candidates, key=lambda x: x[1] * 0.6 + x[2] * 0.4
-                )
+                best_thresh, _, _ = max(candidates, key=lambda x: x[1] * 0.6 + x[2] * 0.4)
         s2_threshold = best_thresh
         # Show effect of chosen threshold
         preds_at_thresh = (s2_cv_proba[:, 1] >= s2_threshold).astype(int)
@@ -1318,20 +1327,33 @@ def _train_binary_stage(
         n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1
     )
     models["GBT"] = GradientBoostingClassifier(
-        n_estimators=200, max_depth=4, learning_rate=0.1,
-        min_samples_leaf=5, random_state=seed,
+        n_estimators=200,
+        max_depth=4,
+        learning_rate=0.1,
+        min_samples_leaf=5,
+        random_state=seed,
     )
     if _HAS_XGB:
         n0, n1 = sum(y_train == 0), sum(y_train == 1)
         models["XGB"] = XGBClassifier(
-            n_estimators=300, max_depth=4, learning_rate=0.1,
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.1,
             scale_pos_weight=n0 / n1 if n1 > 0 else 1,
-            random_state=seed, n_jobs=-1, eval_metric="logloss", verbosity=0,
+            random_state=seed,
+            n_jobs=-1,
+            eval_metric="logloss",
+            verbosity=0,
         )
     if _HAS_LGBM:
         models["LGBM"] = LGBMClassifier(
-            n_estimators=300, max_depth=4, learning_rate=0.1,
-            class_weight="balanced", random_state=seed, n_jobs=-1, verbose=-1,
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.1,
+            class_weight="balanced",
+            random_state=seed,
+            n_jobs=-1,
+            verbose=-1,
         )
 
     # Quick comparison
@@ -1346,11 +1368,17 @@ def _train_binary_stage(
         r0 = cm[0, 0] / cm[0].sum() if cm[0].sum() > 0 else 0
         r1 = cm[1, 1] / cm[1].sum() if cm[1].sum() > 0 else 0
         results[mname] = {
-            "model": model, "acc": acc, "cv": cv_scores.mean(),
-            "cv_std": cv_scores.std(), "r0": r0, "r1": r1,
+            "model": model,
+            "acc": acc,
+            "cv": cv_scores.mean(),
+            "cv_std": cv_scores.std(),
+            "r0": r0,
+            "r1": r1,
         }
-        print(f"    {mname:6s}: CV={cv_scores.mean():.4f} (+/-{cv_scores.std():.4f})"
-              f"  {class_labels[0]}={r0:.3f} {class_labels[1]}={r1:.3f}")
+        print(
+            f"    {mname:6s}: CV={cv_scores.mean():.4f} (+/-{cv_scores.std():.4f})"
+            f"  {class_labels[0]}={r0:.3f} {class_labels[1]}={r1:.3f}"
+        )
 
     # Select best by recall of target class (with other class >= 0.80)
     other_class = 1 - optimize_recall_class
@@ -1364,19 +1392,42 @@ def _train_binary_stage(
 
     # Tune
     param_grids = {
-        "RF": {"n_estimators": randint(100, 600), "max_depth": [None, 10, 20, 30],
-               "min_samples_leaf": randint(1, 15), "max_features": ["sqrt", "log2", 0.3, 0.5, 0.7]},
-        "ET": {"n_estimators": randint(100, 600), "max_depth": [None, 10, 20, 30],
-               "min_samples_leaf": randint(1, 15), "max_features": ["sqrt", "log2", 0.3, 0.5, 0.7]},
-        "GBT": {"n_estimators": randint(100, 500), "max_depth": randint(2, 8),
-                "learning_rate": uniform(0.01, 0.3), "subsample": uniform(0.6, 0.4)},
-        "XGB": {"n_estimators": randint(100, 600), "max_depth": randint(2, 10),
-                "learning_rate": uniform(0.01, 0.3), "subsample": uniform(0.6, 0.4),
-                "colsample_bytree": uniform(0.3, 0.7), "reg_alpha": uniform(0, 1),
-                "reg_lambda": uniform(0.5, 2), "min_child_weight": randint(1, 10)},
-        "LGBM": {"n_estimators": randint(100, 600), "max_depth": [-1, 5, 10, 15, 20],
-                 "learning_rate": uniform(0.01, 0.3), "subsample": uniform(0.6, 0.4),
-                 "colsample_bytree": uniform(0.3, 0.7), "num_leaves": randint(15, 63)},
+        "RF": {
+            "n_estimators": randint(100, 600),
+            "max_depth": [None, 10, 20, 30],
+            "min_samples_leaf": randint(1, 15),
+            "max_features": ["sqrt", "log2", 0.3, 0.5, 0.7],
+        },
+        "ET": {
+            "n_estimators": randint(100, 600),
+            "max_depth": [None, 10, 20, 30],
+            "min_samples_leaf": randint(1, 15),
+            "max_features": ["sqrt", "log2", 0.3, 0.5, 0.7],
+        },
+        "GBT": {
+            "n_estimators": randint(100, 500),
+            "max_depth": randint(2, 8),
+            "learning_rate": uniform(0.01, 0.3),
+            "subsample": uniform(0.6, 0.4),
+        },
+        "XGB": {
+            "n_estimators": randint(100, 600),
+            "max_depth": randint(2, 10),
+            "learning_rate": uniform(0.01, 0.3),
+            "subsample": uniform(0.6, 0.4),
+            "colsample_bytree": uniform(0.3, 0.7),
+            "reg_alpha": uniform(0, 1),
+            "reg_lambda": uniform(0.5, 2),
+            "min_child_weight": randint(1, 10),
+        },
+        "LGBM": {
+            "n_estimators": randint(100, 600),
+            "max_depth": [-1, 5, 10, 15, 20],
+            "learning_rate": uniform(0.01, 0.3),
+            "subsample": uniform(0.6, 0.4),
+            "colsample_bytree": uniform(0.3, 0.7),
+            "num_leaves": randint(15, 63),
+        },
     }
     base_models = {
         "RF": RandomForestClassifier(class_weight="balanced", random_state=seed, n_jobs=-1),
@@ -1385,15 +1436,21 @@ def _train_binary_stage(
     }
     if _HAS_XGB:
         base_models["XGB"] = XGBClassifier(
-            random_state=seed, n_jobs=-1, eval_metric="logloss", verbosity=0)
+            random_state=seed, n_jobs=-1, eval_metric="logloss", verbosity=0
+        )
     if _HAS_LGBM:
         base_models["LGBM"] = LGBMClassifier(
-            class_weight="balanced", random_state=seed, n_jobs=-1, verbose=-1)
+            class_weight="balanced", random_state=seed, n_jobs=-1, verbose=-1
+        )
 
     n_iter = max(10, int(time_budget / 3))
     search = RandomizedSearchCV(
-        base_models[best_name], param_grids[best_name], n_iter=n_iter,
-        cv=cv, scoring="recall_macro", random_state=seed,
+        base_models[best_name],
+        param_grids[best_name],
+        n_iter=n_iter,
+        cv=cv,
+        scoring="recall_macro",
+        random_state=seed,
         n_jobs=-1 if best_name not in ("GBT", "XGB", "LGBM") else 1,
     )
     search.fit(X_train, y_train)
@@ -1414,7 +1471,6 @@ def _train_binary_stage(
             candidates.append((t, r0, r1))
         # Maximize target recall with other recall >= 0.85
         target_idx = 1 + optimize_recall_class  # r0 or r1
-        other_idx = 1 + other_class
         elig = [(t, r0, r1) for t, r0, r1 in candidates if (r0, r1)[other_class] >= 0.85]
         if elig:
             threshold = max(elig, key=lambda x: x[target_idx])[0]
@@ -1425,13 +1481,15 @@ def _train_binary_stage(
         preds_at = (cv_proba[:, 1] >= threshold).astype(int)
         r0_at = (preds_at[mask0] == 0).mean()
         r1_at = (preds_at[mask1] == 1).mean()
-        print(f"    Threshold: {threshold:.3f} — {class_labels[0]}={r0_at:.3f} {class_labels[1]}={r1_at:.3f}")
+        print(
+            f"    Threshold: {threshold:.3f} — {class_labels[0]}={r0_at:.3f} {class_labels[1]}={r1_at:.3f}"
+        )
 
     # Feature importance
     if hasattr(model, "feature_importances_"):
         imp = model.feature_importances_
         order = np.argsort(imp)[::-1]
-        print(f"    Top 5 features:")
+        print("    Top 5 features:")
         for rank, idx in enumerate(order[:5], 1):
             fname = feature_names[idx] if idx < len(feature_names) else f"feature_{idx}"
             print(f"      {rank}. {fname:40s} {imp[idx]:.4f}")
@@ -1461,7 +1519,11 @@ def train_cascade(
 
     # Stratified split
     X_train, X_test, y3_train, y3_test = train_test_split(
-        X, y_3class, test_size=test_size, random_state=seed, stratify=y_3class,
+        X,
+        y_3class,
+        test_size=test_size,
+        random_state=seed,
+        stratify=y_3class,
     )
 
     time_per_q = time_budget // 3  # Q1, Q3, Q4 each get a share
@@ -1479,8 +1541,15 @@ def train_cascade(
     print(f"  Test:  {sum(y_q1_test == 1)} answerable, {sum(y_q1_test == 0)} abstain")
 
     q1_model, q1_threshold, q1_name = _train_binary_stage(
-        "Q1", X_train, y_q1_train, X_test, y_q1_test, feature_names,
-        time_per_q, seed, class_labels=("abstain", "answerable"),
+        "Q1",
+        X_train,
+        y_q1_train,
+        X_test,
+        y_q1_test,
+        feature_names,
+        time_per_q,
+        seed,
+        class_labels=("abstain", "answerable"),
         optimize_recall_class=0,  # optimize abstain recall
     )
 
@@ -1524,13 +1593,22 @@ def train_cascade(
     X_q3_test = X_test[q3_test_mask]
 
     n_abstain_removed = conflict_train.sum() - q3_train_mask.sum()
-    print(f"  Train: {sum(y_q3_train == 1)} resolved (trustworthy), {sum(y_q3_train == 0)} unresolved (disputed)")
+    print(
+        f"  Train: {sum(y_q3_train == 1)} resolved (trustworthy), {sum(y_q3_train == 0)} unresolved (disputed)"
+    )
     print(f"  Removed {n_abstain_removed} abstain cases from Q3 training (noise)")
     print(f"  Test:  {sum(y_q3_test == 1)} resolved, {sum(y_q3_test == 0)} unresolved")
 
     q3_model, q3_threshold, q3_name = _train_binary_stage(
-        "Q3", X_q3_train, y_q3_train, X_q3_test, y_q3_test, feature_names,
-        time_per_q, seed, class_labels=("unresolved", "resolved"),
+        "Q3",
+        X_q3_train,
+        y_q3_train,
+        X_q3_test,
+        y_q3_test,
+        feature_names,
+        time_per_q,
+        seed,
+        class_labels=("unresolved", "resolved"),
         optimize_recall_class=1,  # optimize resolved (trustworthy) recall
     )
 
@@ -1551,12 +1629,21 @@ def train_cascade(
     X_q4_train = X_train[q4_train_mask]
     X_q4_test = X_test[q4_test_mask]
 
-    print(f"  Train: {sum(y_q4_train == 1)} solid (trustworthy), {sum(y_q4_train == 0)} insufficient (abstain+disputed)")
+    print(
+        f"  Train: {sum(y_q4_train == 1)} solid (trustworthy), {sum(y_q4_train == 0)} insufficient (abstain+disputed)"
+    )
     print(f"  Test:  {sum(y_q4_test == 1)} solid, {sum(y_q4_test == 0)} insufficient")
 
     q4_model, q4_threshold, q4_name = _train_binary_stage(
-        "Q4", X_q4_train, y_q4_train, X_q4_test, y_q4_test, feature_names,
-        time_per_q, seed, class_labels=("insufficient", "solid"),
+        "Q4",
+        X_q4_train,
+        y_q4_train,
+        X_q4_test,
+        y_q4_test,
+        feature_names,
+        time_per_q,
+        seed,
+        class_labels=("insufficient", "solid"),
         optimize_recall_class=0,  # optimize insufficient (abstain) recall
     )
 
@@ -1600,7 +1687,9 @@ def train_cascade(
         return result
 
     # Test set evaluation
-    final_pred = cascade_predict(X_test, q1_model, q1_threshold, q3_model, q3_threshold, q4_model, q4_threshold)
+    final_pred = cascade_predict(
+        X_test, q1_model, q1_threshold, q3_model, q3_threshold, q4_model, q4_threshold
+    )
 
     combined_acc = accuracy_score(y3_test, final_pred)
     print(f"\nCombined accuracy: {combined_acc:.4f} ({sum(y3_test == final_pred)}/{len(y3_test)})")
@@ -1716,7 +1805,9 @@ def calibrate_thresholds(
         [0 if lbl == "disputed" else 1 for lbl in y_3class[answerable_mask]], dtype=int
     )
     print(f"Running Stage 2 CV predictions on {len(X_answerable)} answerable samples...")
-    s2_cv_proba = cross_val_predict(s2_model, X_answerable, y_answerable, cv=cv, method="predict_proba")
+    s2_cv_proba = cross_val_predict(
+        s2_model, X_answerable, y_answerable, cv=cv, method="predict_proba"
+    )
 
     # Build full-dataset S2 probability array
     answerable_indices = np.where(answerable_mask)[0]
@@ -1724,8 +1815,10 @@ def calibrate_thresholds(
     for i, idx in enumerate(answerable_indices):
         s2_p_trust_full[idx] = s2_cv_proba[i, 1]
     # Abstain cases that leak through S1 get p=0.0 (always maps to disputed = safe)
-    print(f"Precomputed S2 p(trustworthy) for {len(answerable_indices)} answerable samples "
-          f"({sum(~answerable_mask)} abstain cases default to disputed)")
+    print(
+        f"Precomputed S2 p(trustworthy) for {len(answerable_indices)} answerable samples "
+        f"({sum(~answerable_mask)} abstain cases default to disputed)"
+    )
 
     # Sweep both thresholds jointly
     print("\n" + "=" * 60)
@@ -1733,7 +1826,6 @@ def calibrate_thresholds(
     print("=" * 60)
 
     # For each (s1_thresh, s2_thresh), simulate two-stage prediction on all data
-    best_result = None
     results = []
     p_ans = s1_cv_proba[:, 1]
 
@@ -1741,14 +1833,18 @@ def calibrate_thresholds(
         for s2_t in np.arange(0.40, 0.80, 0.005):
             # Vectorized two-stage prediction
             final_pred = np.where(
-                p_ans < s1_t, "abstain",
-                np.where(s2_p_trust_full >= s2_t, "trustworthy", "disputed")
+                p_ans < s1_t,
+                "abstain",
+                np.where(s2_p_trust_full >= s2_t, "trustworthy", "disputed"),
             )
 
             # Count dangerous misfires: predicted trustworthy but actually abstain or disputed
-            ft_mask = (final_pred == "trustworthy") & (y_3class != "trustworthy")
-            false_trust_abstain = int(((final_pred == "trustworthy") & (y_3class == "abstain")).sum())
-            false_trust_disputed = int(((final_pred == "trustworthy") & (y_3class == "disputed")).sum())
+            false_trust_abstain = int(
+                ((final_pred == "trustworthy") & (y_3class == "abstain")).sum()
+            )
+            false_trust_disputed = int(
+                ((final_pred == "trustworthy") & (y_3class == "disputed")).sum()
+            )
             false_trustworthy = false_trust_abstain + false_trust_disputed
 
             accuracy = (final_pred == y_3class).mean()
@@ -1756,20 +1852,35 @@ def calibrate_thresholds(
             abs_total = (y_3class == "abstain").sum()
             disp_total = (y_3class == "disputed").sum()
             trust_total = (y_3class == "trustworthy").sum()
-            abs_recall = ((final_pred[y_3class == "abstain"] == "abstain").sum() / abs_total) if abs_total else 0
-            disp_recall = ((final_pred[y_3class == "disputed"] == "disputed").sum() / disp_total) if disp_total else 0
-            trust_recall = ((final_pred[y_3class == "trustworthy"] == "trustworthy").sum() / trust_total) if trust_total else 0
+            abs_recall = (
+                ((final_pred[y_3class == "abstain"] == "abstain").sum() / abs_total)
+                if abs_total
+                else 0
+            )
+            disp_recall = (
+                ((final_pred[y_3class == "disputed"] == "disputed").sum() / disp_total)
+                if disp_total
+                else 0
+            )
+            trust_recall = (
+                ((final_pred[y_3class == "trustworthy"] == "trustworthy").sum() / trust_total)
+                if trust_total
+                else 0
+            )
 
-            results.append({
-                "s1_t": s1_t, "s2_t": s2_t,
-                "accuracy": accuracy,
-                "false_trustworthy": false_trustworthy,
-                "false_trust_abstain": false_trust_abstain,
-                "false_trust_disputed": false_trust_disputed,
-                "abs_recall": abs_recall,
-                "disp_recall": disp_recall,
-                "trust_recall": trust_recall,
-            })
+            results.append(
+                {
+                    "s1_t": s1_t,
+                    "s2_t": s2_t,
+                    "accuracy": accuracy,
+                    "false_trustworthy": false_trustworthy,
+                    "false_trust_abstain": false_trust_abstain,
+                    "false_trust_disputed": false_trust_disputed,
+                    "abs_recall": abs_recall,
+                    "disp_recall": disp_recall,
+                    "trust_recall": trust_recall,
+                }
+            )
 
     # Strategy: minimize false_trustworthy, with accuracy >= 0.78 and trust_recall >= 0.70
     eligible = [r for r in results if r["accuracy"] >= 0.78 and r["trust_recall"] >= 0.70]
@@ -1783,17 +1894,24 @@ def calibrate_thresholds(
     best = min(eligible, key=lambda r: (r["false_trustworthy"], -r["accuracy"]))
 
     print(f"\nBefore calibration (s1={old_s1_thresh:.3f}, s2={old_s2_thresh:.3f}):")
-    old = next(r for r in results
-               if abs(r["s1_t"] - old_s1_thresh) < 0.003 and abs(r["s2_t"] - old_s2_thresh) < 0.003)
+    old = next(
+        r
+        for r in results
+        if abs(r["s1_t"] - old_s1_thresh) < 0.003 and abs(r["s2_t"] - old_s2_thresh) < 0.003
+    )
     print(f"  Accuracy:           {old['accuracy']:.4f}")
-    print(f"  False trustworthy:  {old['false_trustworthy']} ({old['false_trust_abstain']} abstain, {old['false_trust_disputed']} disputed)")
+    print(
+        f"  False trustworthy:  {old['false_trustworthy']} ({old['false_trust_abstain']} abstain, {old['false_trust_disputed']} disputed)"
+    )
     print(f"  Abstain recall:     {old['abs_recall']:.4f}")
     print(f"  Disputed recall:    {old['disp_recall']:.4f}")
     print(f"  Trustworthy recall: {old['trust_recall']:.4f}")
 
     print(f"\nAfter calibration (s1={best['s1_t']:.3f}, s2={best['s2_t']:.3f}):")
     print(f"  Accuracy:           {best['accuracy']:.4f}")
-    print(f"  False trustworthy:  {best['false_trustworthy']} ({best['false_trust_abstain']} abstain, {best['false_trust_disputed']} disputed)")
+    print(
+        f"  False trustworthy:  {best['false_trustworthy']} ({best['false_trust_abstain']} abstain, {best['false_trust_disputed']} disputed)"
+    )
     print(f"  Abstain recall:     {best['abs_recall']:.4f}")
     print(f"  Disputed recall:    {best['disp_recall']:.4f}")
     print(f"  Trustworthy recall: {best['trust_recall']:.4f}")
@@ -1805,12 +1923,16 @@ def calibrate_thresholds(
 
     # Show top 5 alternatives for comparison
     eligible_sorted = sorted(eligible, key=lambda r: (r["false_trustworthy"], -r["accuracy"]))
-    print(f"\nTop 5 operating points (sorted by fewest false trustworthy):")
-    print(f"  {'s1':>6s}  {'s2':>6s}  {'acc':>6s}  {'FT':>4s}  {'abs_r':>6s}  {'dis_r':>6s}  {'tru_r':>6s}")
+    print("\nTop 5 operating points (sorted by fewest false trustworthy):")
+    print(
+        f"  {'s1':>6s}  {'s2':>6s}  {'acc':>6s}  {'FT':>4s}  {'abs_r':>6s}  {'dis_r':>6s}  {'tru_r':>6s}"
+    )
     for r in eligible_sorted[:5]:
         marker = " <-- selected" if r is best else ""
-        print(f"  {r['s1_t']:6.3f}  {r['s2_t']:6.3f}  {r['accuracy']:6.4f}  {r['false_trustworthy']:4d}  "
-              f"{r['abs_recall']:6.4f}  {r['disp_recall']:6.4f}  {r['trust_recall']:6.4f}{marker}")
+        print(
+            f"  {r['s1_t']:6.3f}  {r['s2_t']:6.3f}  {r['accuracy']:6.4f}  {r['false_trustworthy']:4d}  "
+            f"{r['abs_recall']:6.4f}  {r['disp_recall']:6.4f}  {r['trust_recall']:6.4f}{marker}"
+        )
 
     # Save calibrated artifact
     calibrated = dict(artifact)
@@ -1898,7 +2020,10 @@ def main():
         feature_names = list(X.columns)
         y_4class = df["expected_mode"].values
         calibrate_thresholds(
-            X, y_4class, feature_names, encoders,
+            X,
+            y_4class,
+            feature_names,
+            encoders,
             model_path=_DEFAULT_TWOSTAGE_OUTPUT,
             output_path=args.output,
             seed=args.seed,

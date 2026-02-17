@@ -57,9 +57,7 @@ class RetrievalRouter:
         self._keyword_matcher: Any = None  # Set by engine for vocabulary filtering
 
     @staticmethod
-    def _should_run_hyde(
-        analysis: "QueryAnalysis | None", detection: "Any | None"
-    ) -> bool:
+    def _should_run_hyde(analysis: "QueryAnalysis | None", detection: "Any | None") -> bool:
         """Decide whether HyDE is likely to improve retrieval for this query.
 
         HyDE helps abstract/conceptual queries where user words don't match
@@ -182,9 +180,7 @@ class RetrievalRouter:
                     tagged_queries.append((f"{query} {entity}", None))
 
         # Multi-query expansion: prefer rewriter's decomposed queries over separate LLM call
-        rewrite_variations = (
-            rewrite_result.all_query_variations if rewrite_result else []
-        )
+        rewrite_variations = rewrite_result.all_query_variations if rewrite_result else []
         if len(rewrite_variations) > 1:
             # Rewriter already decomposed — use its variations (skip [0] = original)
             for var in rewrite_variations[1:]:
@@ -366,8 +362,11 @@ class RetrievalRouter:
         """Run a single strategy with pre-computed vectors."""
         try:
             return strategy.retrieve(
-                query, limit, detection=detection,
-                query_vector=query_vector, hyde_vectors=hyde_vectors,
+                query,
+                limit,
+                detection=detection,
+                query_vector=query_vector,
+                hyde_vectors=hyde_vectors,
             )
         except Exception as e:
             logger.warning(f"{type(strategy).__name__} failed for '{query[:50]}': {e}")
@@ -384,7 +383,9 @@ class RetrievalRouter:
         """Run table strategy with pre-computed query vector (no HyDE)."""
         try:
             return strategy.retrieve(
-                query, limit, detection=detection,
+                query,
+                limit,
+                detection=detection,
                 query_vector=query_vector,
             )
         except Exception as e:

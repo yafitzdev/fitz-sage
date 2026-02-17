@@ -480,9 +480,7 @@ class KragIngestPipeline:
 
         if is_binary:
             # For binary formats, store parsed text instead of garbled read_text()
-            content = "\n\n".join(
-                el.content for el in parsed_doc.elements if el.content
-            )
+            content = "\n\n".join(el.content for el in parsed_doc.elements if el.content)
         else:
             try:
                 content = abs_path.read_text(encoding="utf-8", errors="replace")

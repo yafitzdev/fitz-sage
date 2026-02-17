@@ -107,9 +107,7 @@ class AgenticSearchStrategy:
             if not selected_paths:
                 return []
 
-            selected_entries = [
-                entries_map[p] for p in selected_paths if p in entries_map
-            ]
+            selected_entries = [entries_map[p] for p in selected_paths if p in entries_map]
 
         # Create addresses from selected files
         addresses: list[Address] = []
@@ -123,9 +121,7 @@ class AgenticSearchStrategy:
 
         return addresses
 
-    def _bm25_prefilter(
-        self, entries: list["ManifestEntry"], query: str
-    ) -> list["ManifestEntry"]:
+    def _bm25_prefilter(self, entries: list["ManifestEntry"], query: str) -> list["ManifestEntry"]:
         """In-memory token overlap scoring (pure Python, no deps).
 
         Tokenize query + manifest text, score by term frequency, return top 50.
@@ -173,7 +169,7 @@ class AgenticSearchStrategy:
                 f"- Select up to {_LLM_MAX_FILES} files most likely to contain the answer\n"
                 "- Prefer files with relevant symbols, headings, or paths\n"
                 "- Return ONLY a JSON array of file paths: "
-                '[\"path/to/file1.py\", \"path/to/file2.md\"]\n'
+                '["path/to/file1.py", "path/to/file2.md"]\n'
                 "- If no files seem relevant, return an empty array: []"
             )
             response = chat.chat([{"role": "user", "content": prompt}])
@@ -186,23 +182,45 @@ class AgenticSearchStrategy:
                 parsed = json.loads(text[start:end])
                 if isinstance(parsed, list):
                     return [
-                        str(p) for p in parsed[:_LLM_MAX_FILES]
-                        if isinstance(p, str) and p.strip()
+                        str(p) for p in parsed[:_LLM_MAX_FILES] if isinstance(p, str) and p.strip()
                     ]
         except Exception as e:
             logger.warning(f"Agentic file selection failed: {e}")
 
         return []
 
-    def _path_match_files(
-        self, entries: list["ManifestEntry"], query: str
-    ) -> list[str]:
+    def _path_match_files(self, entries: list["ManifestEntry"], query: str) -> list[str]:
         """Return rel_paths of files whose path contains meaningful query terms."""
         # Extract non-stopword tokens from query
         tokens = _tokenize(query)
-        stopwords = {"what", "is", "the", "how", "does", "do", "are", "was", "were",
-                      "can", "will", "about", "where", "when", "which", "who", "why",
-                      "show", "me", "tell", "find", "get", "all", "this", "that", "it"}
+        stopwords = {
+            "what",
+            "is",
+            "the",
+            "how",
+            "does",
+            "do",
+            "are",
+            "was",
+            "were",
+            "can",
+            "will",
+            "about",
+            "where",
+            "when",
+            "which",
+            "who",
+            "why",
+            "show",
+            "me",
+            "tell",
+            "find",
+            "get",
+            "all",
+            "this",
+            "that",
+            "it",
+        }
         terms = [t for t in tokens if t not in stopwords and len(t) > 2]
         if not terms:
             return []
@@ -245,9 +263,7 @@ class AgenticSearchStrategy:
             logger.debug(f"Cannot read {entry.rel_path} from disk: {e}")
             return None
 
-    def _create_addresses(
-        self, entry: "ManifestEntry", content: str
-    ) -> list[Address]:
+    def _create_addresses(self, entry: "ManifestEntry", content: str) -> list[Address]:
         """Create Address objects from a manifest entry.
 
         For code files: one SYMBOL address per symbol from manifest.

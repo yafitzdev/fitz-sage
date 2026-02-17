@@ -202,9 +202,7 @@ class FileManifest:
     def save(self) -> None:
         """Persist manifest to JSON."""
         with self._lock:
-            data = {
-                rp: _entry_to_dict(entry) for rp, entry in self._entries.items()
-            }
+            data = {rp: _entry_to_dict(entry) for rp, entry in self._entries.items()}
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
@@ -214,9 +212,7 @@ class FileManifest:
             text = self._path.read_text(encoding="utf-8")
             raw = json.loads(text)
             with self._lock:
-                self._entries = {
-                    rp: _dict_to_entry(d) for rp, d in raw.items()
-                }
+                self._entries = {rp: _dict_to_entry(d) for rp, d in raw.items()}
         except Exception as e:
             logger.warning(f"Failed to load manifest from {self._path}: {e}")
             with self._lock:

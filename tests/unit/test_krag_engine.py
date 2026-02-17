@@ -8,7 +8,6 @@ exercise the real __init__ with patched imports.
 """
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -221,7 +220,9 @@ class TestAnswer:
     def test_answer_full_flow(self):
         """Happy path: every stage returns valid data."""
         engine = _make_engine()
-        query = _make_query("What does the login function do when the user provides invalid credentials?")
+        query = _make_query(
+            "What does the login function do when the user provides invalid credentials?"
+        )
 
         # Wire up the pipeline stages
         analysis = MagicMock(name="analysis")

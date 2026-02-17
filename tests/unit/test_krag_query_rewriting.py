@@ -112,12 +112,16 @@ class TestQueryRewriting:
     def test_rewrite_called_and_rewritten_query_used(self):
         """Rewrite runs in parallel with analysis; rewritten query used for retrieval."""
         engine = _make_engine()
-        query = _make_query("How does the authentication system handle user login sessions securely?")
+        query = _make_query(
+            "How does the authentication system handle user login sessions securely?"
+        )
 
         # Set up rewriter
         rewriter = MagicMock(name="rewriter")
         rewrite_result = MagicMock()
-        rewrite_result.rewritten_query = "authentication module implementation for secure user login session handling"
+        rewrite_result.rewritten_query = (
+            "authentication module implementation for secure user login session handling"
+        )
         rewriter.rewrite.return_value = rewrite_result
         engine._query_rewriter = rewriter
 
@@ -134,7 +138,10 @@ class TestQueryRewriting:
         # Router receives the rewritten query for retrieval
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[0] == (rewrite_result.rewritten_query, engine._query_analyzer.analyze.return_value)
+        assert call_args[0] == (
+            rewrite_result.rewritten_query,
+            engine._query_analyzer.analyze.return_value,
+        )
         assert call_args[1]["rewrite_result"] is rewrite_result
 
         assert result is expected
@@ -168,7 +175,9 @@ class TestQueryRewriting:
     def test_fallback_to_original_on_rewrite_error(self):
         """When rewriter raises an exception, the original query is used."""
         engine = _make_engine()
-        query = _make_query("How does the authentication system work when handling multiple sessions?")
+        query = _make_query(
+            "How does the authentication system work when handling multiple sessions?"
+        )
 
         rewriter = MagicMock(name="rewriter")
         rewriter.rewrite.side_effect = RuntimeError("LLM timeout")
@@ -192,7 +201,9 @@ class TestQueryRewriting:
     def test_rewriting_skipped_when_rewriter_is_none(self):
         """When _query_rewriter is None, the original query flows through directly."""
         engine = _make_engine()
-        query = _make_query("Where is the UserService class defined and what methods does it expose?")
+        query = _make_query(
+            "Where is the UserService class defined and what methods does it expose?"
+        )
         assert engine._query_rewriter is None
 
         expected = _wire_happy_path(engine, query.text)

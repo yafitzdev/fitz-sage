@@ -10,22 +10,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from fitz_ai.engines.fitz_krag.retrieval.strategies.agentic_search import (
-    AgenticSearchStrategy,
     _BM25_PREFILTER_THRESHOLD,
+    AgenticSearchStrategy,
     _entry_to_text,
     _tokenize,
 )
 from fitz_ai.engines.fitz_krag.types import AddressKind
 
-
 # ---------------------------------------------------------------------------
 # Helpers: lightweight stand-ins for ManifestEntry, ManifestSymbol, ManifestHeading
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class _FakeSymbol:
@@ -170,12 +168,18 @@ class TestBM25Prefilter:
         """Entries with query-matching tokens should score higher."""
         strategy = self._make_strategy()
 
-        relevant = _code_entry("src/auth.py", symbols=[
-            _FakeSymbol("login", "auth.login", "function", "def login(user)", 1, 10),
-        ])
-        irrelevant = _code_entry("src/math_utils.py", symbols=[
-            _FakeSymbol("add", "math_utils.add", "function", "def add(a, b)", 1, 5),
-        ])
+        relevant = _code_entry(
+            "src/auth.py",
+            symbols=[
+                _FakeSymbol("login", "auth.login", "function", "def login(user)", 1, 10),
+            ],
+        )
+        irrelevant = _code_entry(
+            "src/math_utils.py",
+            symbols=[
+                _FakeSymbol("add", "math_utils.add", "function", "def add(a, b)", 1, 5),
+            ],
+        )
 
         result = strategy._bm25_prefilter([irrelevant, relevant], "authentication login")
         # Relevant entry should come first
@@ -331,9 +335,9 @@ class TestLLMSelectionParsing:
         strategy = self._make_strategy()
         chat_mock = MagicMock()
         chat_mock.chat.return_value = (
-            'Based on the query, here are the relevant files:\n'
+            "Based on the query, here are the relevant files:\n"
             '["src/auth.py", "src/models/user.py"]\n'
-            'These files contain authentication logic.'
+            "These files contain authentication logic."
         )
         strategy._chat_factory = MagicMock(return_value=chat_mock)
 

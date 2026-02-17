@@ -284,12 +284,20 @@ def _run_doctor(test: bool = False) -> None:
         issues.append("Python 3.10+ required")
 
     workspace = FitzPaths.workspace()
-    ui.status("Workspace", workspace.exists(), str(workspace) if workspace.exists() else "Not found (run 'fitz init')")
+    ui.status(
+        "Workspace",
+        workspace.exists(),
+        str(workspace) if workspace.exists() else "Not found (run 'fitz init')",
+    )
     if not workspace.exists():
         warnings.append("Run 'fitz init' to create workspace")
 
     ctx = CLIContext.load()
-    ui.status("Config", ctx.has_user_config, "Valid" if ctx.has_user_config else "Using defaults (run 'fitz init')")
+    ui.status(
+        "Config",
+        ctx.has_user_config,
+        "Valid" if ctx.has_user_config else "Using defaults (run 'fitz init')",
+    )
     if not ctx.has_user_config:
         warnings.append("Run 'fitz init' to create config")
 
@@ -355,7 +363,9 @@ def _run_doctor(test: bool = False) -> None:
             if ctx.vector_db_plugin:
                 client = ctx.get_vector_db_client()
                 collections = client.list_collections()
-                ui.status("Vector DB", True, f"{ctx.vector_db_plugin} ({len(collections)} collections)")
+                ui.status(
+                    "Vector DB", True, f"{ctx.vector_db_plugin} ({len(collections)} collections)"
+                )
             else:
                 ui.status("Vector DB", False, "Not configured")
                 issues.append("Vector DB not configured")

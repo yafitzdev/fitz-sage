@@ -168,9 +168,7 @@ class AnswerVerificationConstraint:
             word = response.strip().upper()
             return word.startswith("NO")
         except Exception as e:
-            logger.warning(
-                f"{PIPELINE} AnswerVerificationConstraint: balanced confirm failed: {e}"
-            )
+            logger.warning(f"{PIPELINE} AnswerVerificationConstraint: balanced confirm failed: {e}")
             return False  # On error, don't fire (conservative)
 
     def apply(self, query: str, chunks: Sequence[EvidenceItem]) -> ConstraintResult:

@@ -6,8 +6,6 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-import pytest
-
 from fitz_ai.engines.fitz_krag.progressive.manifest import (
     FileManifest,
     FileState,

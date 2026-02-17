@@ -189,9 +189,7 @@ class SectionSearchStrategy:
             timestamps = self._raw_store.get_updated_timestamps(file_ids)
             if not timestamps:
                 return results
-            sorted_files = sorted(
-                timestamps, key=lambda fid: timestamps[fid] or "", reverse=True
-            )
+            sorted_files = sorted(timestamps, key=lambda fid: timestamps[fid] or "", reverse=True)
             top_quarter = set(sorted_files[: max(1, len(sorted_files) // 4)])
             top_half = set(sorted_files[: max(1, len(sorted_files) // 2)])
             for r in results:
@@ -231,11 +229,7 @@ class SectionSearchStrategy:
         This enables breadcrumb-style location (e.g. "Model X100 > Specifications")
         so that the ranker's entity match bonus considers parent context.
         """
-        parent_ids = {
-            r["parent_section_id"]
-            for r in results
-            if r.get("parent_section_id")
-        }
+        parent_ids = {r["parent_section_id"] for r in results if r.get("parent_section_id")}
         if not parent_ids:
             return
 

@@ -118,9 +118,7 @@ def _show_documents_required_message(engine_name: str, caps) -> None:
         ui.warning(caps.cli_query_message)
     else:
         ui.warning(f"Engine '{engine_name}' requires documents to be loaded first.")
-        ui.info(
-            f"Use 'fitz query \"question\" --source <folder> --engine {engine_name}' instead."
-        )
+        ui.info(f"Use 'fitz query \"question\" --source <folder> --engine {engine_name}' instead.")
     print()
     ui.info("Or use the Python API:")
     print()
@@ -150,7 +148,9 @@ def _select_collection(service: FitzService, requested: Optional[str]) -> str:
             print()
             ui.warning(f"Collection '{requested}' not found.")
             ui.info(f"Available collections: {', '.join(collection_names)}")
-            ui.info("Use -c <collection> to specify another, or use --source to register documents.")
+            ui.info(
+                "Use -c <collection> to specify another, or use --source to register documents."
+            )
             raise typer.Exit(0)
         return requested
 
@@ -327,9 +327,7 @@ def _chat_loop(engine: Any, collection: str) -> None:
         console.print(
             f"\n[bold green]Chat started[/bold green] with collection: [cyan]{collection}[/cyan]"
         )
-        console.print(
-            "[dim]Type 'exit' or 'quit' to end. Press Ctrl+C to interrupt.[/dim]\n"
-        )
+        console.print("[dim]Type 'exit' or 'quit' to end. Press Ctrl+C to interrupt.[/dim]\n")
     else:
         print(f"\nChat started with collection: {collection}")
         print("Type 'exit' or 'quit' to end. Press Ctrl+C to interrupt.\n")

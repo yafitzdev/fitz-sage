@@ -208,9 +208,7 @@ class CodeSearchStrategy:
             timestamps = self._raw_store.get_updated_timestamps(file_ids)
             if not timestamps:
                 return results
-            sorted_files = sorted(
-                timestamps, key=lambda fid: timestamps[fid] or "", reverse=True
-            )
+            sorted_files = sorted(timestamps, key=lambda fid: timestamps[fid] or "", reverse=True)
             top_quarter = set(sorted_files[: max(1, len(sorted_files) // 4)])
             top_half = set(sorted_files[: max(1, len(sorted_files) // 2)])
             for r in results:

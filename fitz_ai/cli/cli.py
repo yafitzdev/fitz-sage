@@ -22,7 +22,7 @@ import logging
 logging.basicConfig(level=logging.WARNING)
 
 # Platform configuration - must run before any HuggingFace imports
-from fitz_ai.core.platform import configure_huggingface_windows
+from fitz_ai.core.platform import configure_huggingface_windows  # noqa: E402
 
 configure_huggingface_windows()
 
@@ -49,7 +49,9 @@ app = typer.Typer(
 @app.command("query")
 def query(
     question: Optional[str] = typer.Argument(None, help="Question to ask."),
-    source: Optional[Path] = typer.Option(None, "--source", "-s", help="Path to documents (registers before querying)."),
+    source: Optional[Path] = typer.Option(
+        None, "--source", "-s", help="Path to documents (registers before querying)."
+    ),
     collection: Optional[str] = typer.Option(None, "--collection", "-c", help="Collection name."),
     engine: Optional[str] = typer.Option(None, "--engine", "-e", help="Engine to use."),
     chat: bool = typer.Option(False, "--chat", help="Interactive chat mode."),

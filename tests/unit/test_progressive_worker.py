@@ -5,9 +5,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from fitz_ai.engines.fitz_krag.progressive.manifest import FileState, ManifestEntry
 from fitz_ai.engines.fitz_krag.progressive.worker import BackgroundIngestWorker

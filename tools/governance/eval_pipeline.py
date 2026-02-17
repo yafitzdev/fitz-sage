@@ -602,7 +602,14 @@ def main():
         # Single-threaded (simpler for debugging)
         for case in tqdm(cases, desc="Evaluating"):
             try:
-                row = process_case(case, chat, embedder, detection_orchestrator, classifier, chat_balanced=chat_balanced)
+                row = process_case(
+                    case,
+                    chat,
+                    embedder,
+                    detection_orchestrator,
+                    classifier,
+                    chat_balanced=chat_balanced,
+                )
                 if row:
                     all_rows.append(row)
             except Exception as e:
@@ -614,7 +621,12 @@ def main():
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
             futures = {
                 executor.submit(
-                    process_case, case, chat, embedder, detection_orchestrator, classifier,
+                    process_case,
+                    case,
+                    chat,
+                    embedder,
+                    detection_orchestrator,
+                    classifier,
                     chat_balanced=chat_balanced,
                 ): case["id"]
                 for case in cases

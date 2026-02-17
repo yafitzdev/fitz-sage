@@ -91,7 +91,8 @@ def _extract_constraint_features(
     # Composite features: help Stage 1 detect abstain without relying solely on IE
     features["has_any_denial"] = num_denials > 0
     features["num_strong_denials"] = sum(
-        1 for r in constraint_results.values()
+        1
+        for r in constraint_results.values()
         if not r.allow_decisive_answer and r.signal in ("abstain", "disputed")
     )
 
@@ -164,7 +165,10 @@ def _extract_constraint_features(
 
 
 _COMPARISON_WORDS = {"vs", "versus", "compare", "compared", "differ", "difference", "between"}
-_QUESTION_TYPE_RE = re.compile(r"^(what|how|why|when|where|who|which|is|are|was|were|do|does|did|can|could|should|will|would)\b", re.IGNORECASE)
+_QUESTION_TYPE_RE = re.compile(
+    r"^(what|how|why|when|where|who|which|is|are|was|were|do|does|did|can|could|should|will|would)\b",
+    re.IGNORECASE,
+)
 
 
 def _extract_query_features(features: dict[str, Any], query: str) -> None:
@@ -525,9 +529,7 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
             _compute_within_chunk_numerical_divergence(features, [text])
             # Single-chunk versions of new features
             text_lower = text.lower()
-            features["ctx_negation_count"] = float(
-                sum(1 for w in words if w in _NEGATION_WORDS)
-            )
+            features["ctx_negation_count"] = float(sum(1 for w in words if w in _NEGATION_WORDS))
             features["ctx_contradiction_count"] = float(
                 sum(1 for m in _CONTRADICTION_MARKERS if m in text_lower)
             )
@@ -535,9 +537,7 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
             features["opposing_conclusion_count"] = float(
                 sum(1 for m in _OPPOSING_MARKERS if m in text_lower)
             )
-            features["negation_per_char"] = (
-                features["ctx_negation_count"] / max(len(text), 1)
-            )
+            features["negation_per_char"] = features["ctx_negation_count"] / max(len(text), 1)
             features["conflict_to_number_ratio"] = 0.0  # no cross-chunk conflicts with 1 chunk
             features["short_ctx_with_overlap"] = float(
                 len(text) < 500 and features.get("vocab_overlap_ratio", 0) > 0.3
@@ -662,16 +662,10 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
     _compute_within_chunk_numerical_divergence(features, texts)
 
     # --- Q3-specific features: distinguish data-rich documents from real conflicts ---
-    features["numerical_richness_per_chunk"] = (
-        features["ctx_number_count"] / max(len(chunks), 1)
-    )
-    features["conflict_internality_ratio"] = (
-        features["within_chunk_num_conflicts"]
-        / max(
-            features["cross_chunk_num_conflicts"]
-            + features["within_chunk_num_conflicts"],
-            1,
-        )
+    features["numerical_richness_per_chunk"] = features["ctx_number_count"] / max(len(chunks), 1)
+    features["conflict_internality_ratio"] = features["within_chunk_num_conflicts"] / max(
+        features["cross_chunk_num_conflicts"] + features["within_chunk_num_conflicts"],
+        1,
     )
     features["chars_per_chunk"] = features["ctx_total_chars"] / max(len(chunks), 1)
     features["contradiction_per_char"] = features["ctx_contradiction_count"] / max(
@@ -681,17 +675,16 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
     # --- Conflict quality features (Q3/FT-disputed) ---
     # Real disputes have conflicts as large fraction of total numbers;
     # data-rich docs have many numbers with few conflicts proportionally
-    features["conflict_to_number_ratio"] = (
-        features["cross_chunk_num_conflicts"]
-        / max(features["ctx_number_count"], 1)
+    features["conflict_to_number_ratio"] = features["cross_chunk_num_conflicts"] / max(
+        features["ctx_number_count"], 1
     )
     # Opposing language: stronger contradiction markers beyond simple "however/but"
     features["opposing_conclusion_count"] = float(
         sum(1 for m in _OPPOSING_MARKERS if m in all_text_lower)
     )
     # Negation density: disputes tend to have more negations per unit of text
-    features["negation_per_char"] = (
-        features["ctx_negation_count"] / max(features["ctx_total_chars"], 1)
+    features["negation_per_char"] = features["ctx_negation_count"] / max(
+        features["ctx_total_chars"], 1
     )
 
     # --- Q1 recovery features (partial-answer trustworthy) ---
@@ -716,9 +709,7 @@ def _extract_numbers_from_text(text: str) -> list[float]:
     return nums
 
 
-def _count_divergent_pairs(
-    nums_a: list[float], nums_b: list[float]
-) -> tuple[int, float]:
+def _count_divergent_pairs(nums_a: list[float], nums_b: list[float]) -> tuple[int, float]:
     """Count conflicting number pairs and max divergence ratio between two sets."""
     conflict_count = 0
     max_ratio = 0.0
@@ -734,9 +725,7 @@ def _count_divergent_pairs(
     return conflict_count, max_ratio
 
 
-def _compute_cross_chunk_numerical_divergence(
-    features: dict[str, Any], texts: list[str]
-) -> None:
+def _compute_cross_chunk_numerical_divergence(features: dict[str, Any], texts: list[str]) -> None:
     """Detect numerical disagreement across chunks.
 
     Extracts significant numbers from each chunk, then finds cross-chunk pairs
@@ -760,9 +749,7 @@ def _compute_cross_chunk_numerical_divergence(
     features["has_cross_chunk_divergence"] = conflict_count > 0
 
 
-def _compute_within_chunk_numerical_divergence(
-    features: dict[str, Any], texts: list[str]
-) -> None:
+def _compute_within_chunk_numerical_divergence(features: dict[str, Any], texts: list[str]) -> None:
     """Detect numerical disagreement within individual chunks.
 
     A single chunk can contain contradictory numbers for the same quantity,
@@ -807,8 +794,27 @@ def _extract_text_answer_features(
     query_words = {w.strip("?.,!;:()[]\"'") for w in query.lower().split()}
     q_content = query_words - _STOP_WORDS - {""}
     # Strip question words from subject extraction
-    _question_words = {"what", "how", "why", "when", "where", "who", "which", "is", "are",
-                       "was", "were", "does", "do", "did", "can", "could", "should", "will", "would"}
+    _question_words = {
+        "what",
+        "how",
+        "why",
+        "when",
+        "where",
+        "who",
+        "which",
+        "is",
+        "are",
+        "was",
+        "were",
+        "does",
+        "do",
+        "did",
+        "can",
+        "could",
+        "should",
+        "will",
+        "would",
+    }
     q_subject_words = q_content - _question_words
 
     if not q_subject_words or not chunks:
@@ -850,7 +856,6 @@ def _extract_text_answer_features(
                 best_coverage = coverage
 
             # best_span_length / answer_span_coverage: longest contiguous span with 2+ query words
-            covered_in_span: set[str] = set()
             for start in range(len(sent_words)):
                 span_covered: set[str] = set()
                 for end in range(start, min(start + 30, len(sent_words))):

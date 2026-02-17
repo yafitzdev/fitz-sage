@@ -353,7 +353,9 @@ class TestEngineAnswerDetectionFlow:
         engine._detection_orchestrator = mock_orchestrator
 
         # Wire up pipeline stages (query must trigger detection + LLM analysis — >8 words)
-        query = _make_query("compare the latest authentication changes between the different modules in the system")
+        query = _make_query(
+            "compare the latest authentication changes between the different modules in the system"
+        )
         analysis = MagicMock(name="analysis")
         engine._query_analyzer.analyze.return_value = analysis
         engine._retrieval_router.retrieve.return_value = [MagicMock()]
@@ -381,7 +383,9 @@ class TestEngineAnswerDetectionFlow:
         assert engine._detection_orchestrator is None
 
         # Wire up pipeline stages (query must be >8 words to trigger LLM analysis)
-        query = _make_query("How does the authentication system work when handling multiple concurrent user sessions?")
+        query = _make_query(
+            "How does the authentication system work when handling multiple concurrent user sessions?"
+        )
         analysis = MagicMock(name="analysis")
         engine._query_analyzer.analyze.return_value = analysis
         engine._retrieval_router.retrieve.return_value = [MagicMock()]

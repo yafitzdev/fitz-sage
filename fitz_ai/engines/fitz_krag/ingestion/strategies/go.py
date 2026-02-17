@@ -151,56 +151,64 @@ def _regex_fallback(source: str, file_path: str) -> IngestResult:
     for m in _FUNC_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
         block, end_line = _regex_extract_block(lines, line_no)
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="function",
-            start_line=line_no,
-            end_line=end_line,
-            signature=f"func {m.group(1)}()",
-            source=block,
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="function",
+                start_line=line_no,
+                end_line=end_line,
+                signature=f"func {m.group(1)}()",
+                source=block,
+            )
+        )
 
     for m in _METHOD_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
         block, end_line = _regex_extract_block(lines, line_no)
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="method",
-            start_line=line_no,
-            end_line=end_line,
-            signature=f"func (...) {m.group(1)}()",
-            source=block,
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="method",
+                start_line=line_no,
+                end_line=end_line,
+                signature=f"func (...) {m.group(1)}()",
+                source=block,
+            )
+        )
 
     for m in _STRUCT_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
         block, end_line = _regex_extract_block(lines, line_no)
         seen_type_names.add(m.group(1))
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="struct",
-            start_line=line_no,
-            end_line=end_line,
-            signature=f"type {m.group(1)} struct",
-            source=block,
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="struct",
+                start_line=line_no,
+                end_line=end_line,
+                signature=f"type {m.group(1)} struct",
+                source=block,
+            )
+        )
 
     for m in _IFACE_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
         block, end_line = _regex_extract_block(lines, line_no)
         seen_type_names.add(m.group(1))
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="interface",
-            start_line=line_no,
-            end_line=end_line,
-            signature=f"type {m.group(1)} interface",
-            source=block,
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="interface",
+                start_line=line_no,
+                end_line=end_line,
+                signature=f"type {m.group(1)} interface",
+                source=block,
+            )
+        )
 
     # Generic type aliases (exclude already-captured structs/interfaces)
     for m in _TYPE_RE.finditer(source):
@@ -209,15 +217,17 @@ def _regex_fallback(source: str, file_path: str) -> IngestResult:
             continue
         line_no = source[: m.start()].count("\n") + 1
         block, end_line = _regex_extract_block(lines, line_no)
-        symbols.append(SymbolEntry(
-            name=name,
-            qualified_name=f"{module_name}.{name}",
-            kind="type",
-            start_line=line_no,
-            end_line=end_line,
-            signature=f"type {name}",
-            source=block,
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=name,
+                qualified_name=f"{module_name}.{name}",
+                kind="type",
+                start_line=line_no,
+                end_line=end_line,
+                signature=f"type {name}",
+                source=block,
+            )
+        )
 
     # Extract import paths from import blocks
     import_block = re.search(r"^import\s*\((.*?)\)", source, re.MULTILINE | re.DOTALL)

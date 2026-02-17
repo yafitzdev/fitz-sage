@@ -102,35 +102,41 @@ def _regex_fallback(source: str, file_path: str) -> IngestResult:
 
     for m in _RX_FUNC.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="function",
-            start_line=line_no,
-            end_line=line_no,
-            signature=f"def {m.group(1)}()",
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="function",
+                start_line=line_no,
+                end_line=line_no,
+                signature=f"def {m.group(1)}()",
+            )
+        )
 
     for m in _RX_CLASS.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="class",
-            start_line=line_no,
-            end_line=line_no,
-            signature=f"class {m.group(1)}",
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="class",
+                start_line=line_no,
+                end_line=line_no,
+                signature=f"class {m.group(1)}",
+            )
+        )
 
     for m in _RX_CONST.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="constant",
-            start_line=line_no,
-            end_line=line_no,
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="constant",
+                start_line=line_no,
+                end_line=line_no,
+            )
+        )
 
     for m in _RX_IMPORT.finditer(source):
         if m.group(1):  # "from X import Y"

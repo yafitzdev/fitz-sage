@@ -205,10 +205,7 @@ class SymbolStore:
         """
         with self._cm.connection(self._collection) as conn:
             rows = conn.execute(sql, (raw_file_id,)).fetchall()
-        return [
-            {"id": row[0], "name": row[1], "kind": row[2], "summary": row[3]}
-            for row in rows
-        ]
+        return [{"id": row[0], "name": row[1], "kind": row[2], "summary": row[3]} for row in rows]
 
     def update_summaries_by_file(self, raw_file_id: str, summaries: list[str]) -> None:
         """Update summaries for all symbols in a file, in start_line order."""

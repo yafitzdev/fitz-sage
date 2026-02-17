@@ -12,7 +12,7 @@ import logging
 import re
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fitz_ai.engines.fitz_krag.progressive.manifest import (
     FileManifest,
@@ -127,8 +127,7 @@ class ManifestBuilder:
 
                 heading_dicts = get_parsed_headings(content_hash, cache_dir)
                 headings = [
-                    ManifestHeading(title=h["title"], level=h["level"])
-                    for h in heading_dicts
+                    ManifestHeading(title=h["title"], level=h["level"]) for h in heading_dicts
                 ]
 
                 file_id = existing_entry.file_id if existing_entry else str(uuid.uuid4())
@@ -210,10 +209,7 @@ class ManifestBuilder:
             if f.is_file() and not f.suffix and _is_text_file(f):
                 files.append(f)
 
-        return sorted(
-            f for f in files
-            if not any(part in _SKIP_DIRS for part in f.parts)
-        )
+        return sorted(f for f in files if not any(part in _SKIP_DIRS for part in f.parts))
 
     def _relative_path(self, abs_path: Path, source: Path) -> str:
         """Get relative path string with forward slashes."""
@@ -222,9 +218,7 @@ class ManifestBuilder:
         except ValueError:
             return str(abs_path).replace("\\", "/")
 
-    def _extract_python_symbols(
-        self, content: str, file_path: str
-    ) -> list[ManifestSymbol]:
+    def _extract_python_symbols(self, content: str, file_path: str) -> list[ManifestSymbol]:
         """Extract symbols from Python source using PythonCodeIngestStrategy."""
         try:
             from fitz_ai.engines.fitz_krag.ingestion.strategies.python_code import (
@@ -249,9 +243,7 @@ class ManifestBuilder:
             logger.debug(f"Python symbol extraction failed for {file_path}: {e}")
             return []
 
-    def _extract_ts_symbols(
-        self, content: str, file_path: str
-    ) -> list[ManifestSymbol]:
+    def _extract_ts_symbols(self, content: str, file_path: str) -> list[ManifestSymbol]:
         """Extract symbols from TypeScript/JavaScript using TypeScriptIngestStrategy."""
         try:
             from fitz_ai.engines.fitz_krag.ingestion.strategies.typescript import (
@@ -276,9 +268,7 @@ class ManifestBuilder:
             logger.warning(f"TypeScript symbol extraction failed for {file_path}: {e}")
             return []
 
-    def _extract_java_symbols(
-        self, content: str, file_path: str
-    ) -> list[ManifestSymbol]:
+    def _extract_java_symbols(self, content: str, file_path: str) -> list[ManifestSymbol]:
         """Extract symbols from Java source using JavaIngestStrategy."""
         try:
             from fitz_ai.engines.fitz_krag.ingestion.strategies.java import (
@@ -303,9 +293,7 @@ class ManifestBuilder:
             logger.warning(f"Java symbol extraction failed for {file_path}: {e}")
             return []
 
-    def _extract_go_symbols(
-        self, content: str, file_path: str
-    ) -> list[ManifestSymbol]:
+    def _extract_go_symbols(self, content: str, file_path: str) -> list[ManifestSymbol]:
         """Extract symbols from Go source using GoIngestStrategy."""
         try:
             from fitz_ai.engines.fitz_krag.ingestion.strategies.go import (

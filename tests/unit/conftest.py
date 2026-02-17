@@ -11,7 +11,6 @@ from __future__ import annotations
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable
 
 import pytest
 from cryptography import x509

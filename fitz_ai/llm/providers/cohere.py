@@ -155,7 +155,9 @@ class CohereEmbedding:
         if not texts:
             return []
 
-        input_type = self._TASK_TYPE_MAP.get(task_type, self._input_type) if task_type else self._input_type
+        input_type = (
+            self._TASK_TYPE_MAP.get(task_type, self._input_type) if task_type else self._input_type
+        )
 
         all_embeddings: list[list[float]] = []
         batch_size = 96  # Cohere's limit
@@ -167,7 +169,9 @@ class CohereEmbedding:
 
         return all_embeddings
 
-    def _embed_single_batch(self, texts: list[str], input_type: str | None = None) -> list[list[float]]:
+    def _embed_single_batch(
+        self, texts: list[str], input_type: str | None = None
+    ) -> list[list[float]]:
         """Embed a single batch."""
         kwargs: dict[str, Any] = {
             "model": self._model,

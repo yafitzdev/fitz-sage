@@ -131,7 +131,10 @@ class TestCloudClientInit:
         patches = [
             patch("fitz_ai.llm.client.get_chat", return_value=MagicMock()),
             patch("fitz_ai.llm.client.get_embedder", return_value=MagicMock(dimensions=1024)),
-            patch("fitz_ai.storage.postgres.PostgresConnectionManager.get_instance", return_value=MagicMock()),
+            patch(
+                "fitz_ai.storage.postgres.PostgresConnectionManager.get_instance",
+                return_value=MagicMock(),
+            ),
             patch("fitz_ai.engines.fitz_krag.ingestion.raw_file_store.RawFileStore"),
             patch("fitz_ai.engines.fitz_krag.ingestion.symbol_store.SymbolStore"),
             patch("fitz_ai.engines.fitz_krag.ingestion.import_graph_store.ImportGraphStore"),
@@ -139,8 +142,12 @@ class TestCloudClientInit:
             patch("fitz_ai.engines.fitz_krag.ingestion.table_store.TableStore"),
             patch("fitz_ai.engines.fitz_krag.ingestion.schema.ensure_schema"),
             patch("fitz_ai.engines.fitz_krag.retrieval.strategies.code_search.CodeSearchStrategy"),
-            patch("fitz_ai.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy"),
-            patch("fitz_ai.engines.fitz_krag.retrieval.strategies.table_search.TableSearchStrategy"),
+            patch(
+                "fitz_ai.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy"
+            ),
+            patch(
+                "fitz_ai.engines.fitz_krag.retrieval.strategies.table_search.TableSearchStrategy"
+            ),
             patch("fitz_ai.engines.fitz_krag.retrieval.router.RetrievalRouter"),
             patch("fitz_ai.engines.fitz_krag.retrieval.reader.ContentReader"),
             patch("fitz_ai.engines.fitz_krag.retrieval.expander.CodeExpander"),

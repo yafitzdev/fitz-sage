@@ -334,9 +334,7 @@ class GovernanceDecider:
         if "ctx_max_pairwise_sim" in X.columns and "ctx_min_pairwise_sim" in X.columns:
             X["ix_ctx_sim_spread"] = X["ctx_max_pairwise_sim"] - X["ctx_min_pairwise_sim"]
         if "mean_vector_score" in X.columns and "ctx_contradiction_count" in X.columns:
-            X["ix_vector_x_contradiction"] = (
-                X["mean_vector_score"] * X["ctx_contradiction_count"]
-            )
+            X["ix_vector_x_contradiction"] = X["mean_vector_score"] * X["ctx_contradiction_count"]
         if "av_fired" in X.columns and "ie_fired" in X.columns:
             X["ix_av_no_ie"] = X["av_fired"] * (1 - X["ie_fired"])
         if "av_strong_denial" in X.columns and "ie_fired" in X.columns:
@@ -351,9 +349,8 @@ class GovernanceDecider:
             X["ix_divergence_no_ca"] = X["has_cross_chunk_divergence"] * (1 - X["ca_fired"])
         if "has_within_chunk_divergence" in X.columns and "ca_fired" in X.columns:
             X["ix_any_divergence_no_ca"] = (
-                (X.get("has_cross_chunk_divergence", 0) | X["has_within_chunk_divergence"])
-                * (1 - X["ca_fired"])
-            )
+                X.get("has_cross_chunk_divergence", 0) | X["has_within_chunk_divergence"]
+            ) * (1 - X["ca_fired"])
 
         # Q3-specific features: distinguish data-rich trustworthy from genuine disputes
         if "ctx_number_count" in X.columns and "num_chunks" in X.columns:

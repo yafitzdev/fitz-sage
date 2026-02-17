@@ -170,7 +170,7 @@ def main() -> int:
                 else:
                     errors.append(f"Missing dep: {mod}")
                     print(f"  FAIL: '{mod}' not installed AND not in CI deps")
-                    print(f"        → Add 'pip install {mod}' to .github/workflows/ci.yml")
+                    print(f"        >> Add 'pip install {mod}' to .github/workflows/ci.yml")
         else:
             errors.append("Tests failed")
             print("  FAIL: Some tests failed")

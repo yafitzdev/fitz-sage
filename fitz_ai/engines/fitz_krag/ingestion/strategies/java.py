@@ -37,23 +37,15 @@ _CLASS_RE = re.compile(
     r"^\s*(?:public|private|protected)?\s*(?:abstract\s+)?(?:final\s+)?class\s+(\w+)",
     re.MULTILINE,
 )
-_INTERFACE_RE = re.compile(
-    r"^\s*(?:public|private|protected)?\s*interface\s+(\w+)", re.MULTILINE
-)
-_ENUM_RE = re.compile(
-    r"^\s*(?:public|private|protected)?\s*enum\s+(\w+)", re.MULTILINE
-)
-_RECORD_RE = re.compile(
-    r"^\s*(?:public|private|protected)?\s*record\s+(\w+)", re.MULTILINE
-)
+_INTERFACE_RE = re.compile(r"^\s*(?:public|private|protected)?\s*interface\s+(\w+)", re.MULTILINE)
+_ENUM_RE = re.compile(r"^\s*(?:public|private|protected)?\s*enum\s+(\w+)", re.MULTILINE)
+_RECORD_RE = re.compile(r"^\s*(?:public|private|protected)?\s*record\s+(\w+)", re.MULTILINE)
 _METHOD_RE = re.compile(
     r"^\s*(?:public|private|protected)?\s*(?:static\s+)?(?:final\s+)?"
     r"(?:abstract\s+)?(?:synchronized\s+)?(?:\w+(?:<[^>]+>)?(?:\[\])*)\s+(\w+)\s*\(",
     re.MULTILINE,
 )
-_IMPORT_RE = re.compile(
-    r"^\s*import\s+(?:static\s+)?([a-zA-Z_][\w.]*(?:\.\*)?)\s*;", re.MULTILINE
-)
+_IMPORT_RE = re.compile(r"^\s*import\s+(?:static\s+)?([a-zA-Z_][\w.]*(?:\.\*)?)\s*;", re.MULTILINE)
 _PACKAGE_RE = re.compile(r"^\s*package\s+([\w.]+)\s*;", re.MULTILINE)
 
 
@@ -104,47 +96,55 @@ def _regex_fallback(source: str, file_path: str) -> IngestResult:
 
     for m in _CLASS_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="class",
-            start_line=line_no,
-            end_line=line_no,
-            signature=f"class {m.group(1)}",
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="class",
+                start_line=line_no,
+                end_line=line_no,
+                signature=f"class {m.group(1)}",
+            )
+        )
 
     for m in _INTERFACE_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="interface",
-            start_line=line_no,
-            end_line=line_no,
-            signature=f"interface {m.group(1)}",
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="interface",
+                start_line=line_no,
+                end_line=line_no,
+                signature=f"interface {m.group(1)}",
+            )
+        )
 
     for m in _ENUM_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="enum",
-            start_line=line_no,
-            end_line=line_no,
-            signature=f"enum {m.group(1)}",
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="enum",
+                start_line=line_no,
+                end_line=line_no,
+                signature=f"enum {m.group(1)}",
+            )
+        )
 
     for m in _RECORD_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="record",
-            start_line=line_no,
-            end_line=line_no,
-            signature=f"record {m.group(1)}",
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="record",
+                start_line=line_no,
+                end_line=line_no,
+                signature=f"record {m.group(1)}",
+            )
+        )
 
     for m in _METHOD_RE.finditer(source):
         name = m.group(1)
@@ -152,24 +152,28 @@ def _regex_fallback(source: str, file_path: str) -> IngestResult:
         if name in ("if", "else", "for", "while", "switch", "return", "new", "class"):
             continue
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=name,
-            qualified_name=f"{module_name}.{name}",
-            kind="method",
-            start_line=line_no,
-            end_line=line_no,
-            signature=f"{name}()",
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=name,
+                qualified_name=f"{module_name}.{name}",
+                kind="method",
+                start_line=line_no,
+                end_line=line_no,
+                signature=f"{name}()",
+            )
+        )
 
     for m in _IMPORT_RE.finditer(source):
         full_import = m.group(1)
         parts = full_import.rsplit(".", 1)
         if len(parts) == 2:
             module, name = parts
-            imports.append(ImportEdge(
-                target_module=module,
-                import_names=[name] if name != "*" else [],
-            ))
+            imports.append(
+                ImportEdge(
+                    target_module=module,
+                    import_names=[name] if name != "*" else [],
+                )
+            )
         else:
             imports.append(ImportEdge(target_module=full_import, import_names=[]))
 

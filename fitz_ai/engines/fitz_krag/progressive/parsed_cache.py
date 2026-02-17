@@ -202,8 +202,7 @@ def _suppress_parser_logs() -> None:
     """Suppress noisy third-party logs from PDF/doc parsers permanently."""
     import logging as _logging
 
-    for name in ("rapidocr", "docling", "RapidOCR",
-                 "fitz_ai.ingestion.parser"):
+    for name in ("rapidocr", "docling", "RapidOCR", "fitz_ai.ingestion.parser"):
         _logger = _logging.getLogger(name)
         _logger.setLevel(_logging.WARNING)
         _logger.handlers.clear()

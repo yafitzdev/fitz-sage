@@ -10,7 +10,7 @@ content is read on demand after ranking.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from fitz_ai.core import (
     Answer,
@@ -23,6 +23,9 @@ from fitz_ai.core import (
 from fitz_ai.core.answer_mode import AnswerMode
 from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 from fitz_ai.logging.logger import get_logger
+
+if TYPE_CHECKING:
+    from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis
 
 logger = get_logger(__name__)
 
@@ -128,15 +131,16 @@ class FitzKragEngine:
             self._manifest = FileManifest(manifest_path)
             self._source_dir = source_dir
             self._wire_agentic_strategy()
-            logger.info(f"Loaded manifest for collection '{collection}' ({len(self._manifest.entries())} files)")
+            logger.info(
+                f"Loaded manifest for collection '{collection}' ({len(self._manifest.entries())} files)"
+            )
         except Exception as e:
             logger.debug(f"Failed to load persisted manifest: {e}")
 
     def _init_components(self) -> None:
         """Initialize engine components lazily."""
-        import time as _t
-
         import threading
+        import time as _t
         from concurrent.futures import ThreadPoolExecutor
 
         from fitz_ai.llm.client import get_chat, get_embedder
@@ -180,7 +184,6 @@ class FitzKragEngine:
 
         dim_thread = threading.Thread(target=_resolve_dimensions, daemon=True)
         dim_thread.start()
-
 
         # Ingestion stores (created while embed.dimensions resolves)
         from fitz_ai.engines.fitz_krag.ingestion.import_graph_store import ImportGraphStore
@@ -258,16 +261,19 @@ class FitzKragEngine:
         def _warmup_chat():
             try:
                 self._chat_factory("fast").chat(
-                    [{"role": "user", "content": "hi"}], max_tokens=1,
+                    [{"role": "user", "content": "hi"}],
+                    max_tokens=1,
                 )
             except Exception:
                 pass
             try:
                 self._chat.chat(
-                    [{"role": "user", "content": "hi"}], max_tokens=1,
+                    [{"role": "user", "content": "hi"}],
+                    max_tokens=1,
                 )
             except Exception:
                 pass
+
         threading.Thread(target=_warmup_chat, daemon=True).start()
 
         # Query Analysis
@@ -417,19 +423,49 @@ class FitzKragEngine:
 
     # Keywords that signal the query may have temporal/comparison/aggregation intent.
     # If none match, the detection LLM call can be skipped safely.
-    _DETECTION_KEYWORDS = frozenset([
-        # Temporal
-        "latest", "recent", "last", "before", "after", "since", "until",
-        "new", "old", "updated", "changed", "history", "previous",
-        # Comparison
-        "vs", "versus", "compare", "differ", "difference", "between",
-        "better", "worse", "advantage", "disadvantage",
-        # Aggregation
-        "how many", "count", "list", "all", "every", "enumerate", "total",
-        "summarize", "overview",
-        # Freshness
-        "current", "now", "today",
-    ])
+    _DETECTION_KEYWORDS = frozenset(
+        [
+            # Temporal
+            "latest",
+            "recent",
+            "last",
+            "before",
+            "after",
+            "since",
+            "until",
+            "new",
+            "old",
+            "updated",
+            "changed",
+            "history",
+            "previous",
+            # Comparison
+            "vs",
+            "versus",
+            "compare",
+            "differ",
+            "difference",
+            "between",
+            "better",
+            "worse",
+            "advantage",
+            "disadvantage",
+            # Aggregation
+            "how many",
+            "count",
+            "list",
+            "all",
+            "every",
+            "enumerate",
+            "total",
+            "summarize",
+            "overview",
+            # Freshness
+            "current",
+            "now",
+            "today",
+        ]
+    )
 
     @staticmethod
     def _needs_detection(query: str) -> bool:
@@ -482,8 +518,7 @@ class FitzKragEngine:
         entities = tuple(
             w.rstrip("?.,!;:")
             for w in words
-            if w.lower().rstrip("?.,!;:") not in FitzKragEngine._STOP_WORDS
-            and len(w) > 1
+            if w.lower().rstrip("?.,!;:") not in FitzKragEngine._STOP_WORDS and len(w) > 1
         )
 
         return QueryAnalysis(
@@ -493,9 +528,7 @@ class FitzKragEngine:
             refined_query=query,
         )
 
-    def answer(
-        self, query: Query, *, progress: Callable[[str], None] | None = None
-    ) -> Answer:
+    def answer(self, query: Query, *, progress: Callable[[str], None] | None = None) -> Answer:
         """
         Execute a query using KRAG approach.
 
@@ -515,10 +548,9 @@ class FitzKragEngine:
         if self._bg_worker:
             self._bg_worker.signal_query_start()
         try:
-            import time
-
             # 0. Sanitize and normalize query
             import re
+            import time
 
             sanitized = re.sub(r"<[^>]+>", "", query.text).strip()
             if not sanitized:
@@ -545,10 +577,7 @@ class FitzKragEngine:
 
             fast_analysis = self._fast_analyze(sanitized)
             need_llm_analysis = fast_analysis is None
-            need_detection = (
-                self._detection_orchestrator
-                and self._needs_detection(sanitized)
-            )
+            need_detection = self._detection_orchestrator and self._needs_detection(sanitized)
             need_rewrite = self._query_rewriter is not None
 
             retrieval_query = sanitized
@@ -562,9 +591,7 @@ class FitzKragEngine:
                         else None
                     )
                     detection_future = (
-                        pool.submit(
-                            self._detection_orchestrator.detect_for_retrieval, sanitized
-                        )
+                        pool.submit(self._detection_orchestrator.detect_for_retrieval, sanitized)
                         if need_detection
                         else None
                     )
@@ -575,9 +602,7 @@ class FitzKragEngine:
                     )
                     embed_future = pool.submit(self._embedder.embed_batch, [sanitized])
 
-                    analysis = (
-                        analysis_future.result() if analysis_future else fast_analysis
-                    )
+                    analysis = analysis_future.result() if analysis_future else fast_analysis
                     detection = detection_future.result() if detection_future else None
 
                     # Collect rewrite result
@@ -595,9 +620,7 @@ class FitzKragEngine:
 
                     try:
                         precomputed_vectors = embed_future.result()
-                        precomputed_query_vector = (
-                            dict(zip([sanitized], precomputed_vectors))
-                        )
+                        precomputed_query_vector = dict(zip([sanitized], precomputed_vectors))
                     except Exception:
                         precomputed_query_vector = None
             else:
@@ -606,9 +629,7 @@ class FitzKragEngine:
                 detection = None
                 try:
                     precomputed_vectors = self._embedder.embed_batch([sanitized], task_type="query")
-                    precomputed_query_vector = (
-                        dict(zip([sanitized], precomputed_vectors))
-                    )
+                    precomputed_query_vector = dict(zip([sanitized], precomputed_vectors))
                 except Exception:
                     precomputed_query_vector = None
             timings.append(("Analysis + Detection", time.perf_counter() - t0))
@@ -655,7 +676,9 @@ class FitzKragEngine:
             if self._hop_controller:
                 pass  # read_results already populated by hop controller
             else:
-                _progress(f"Reading content from {min(len(addresses), self._config.top_read)} sources...")
+                _progress(
+                    f"Reading content from {min(len(addresses), self._config.top_read)} sources..."
+                )
                 t0 = time.perf_counter()
                 read_results = self._reader.read(addresses, self._config.top_read)
                 timings.append(("Read content", time.perf_counter() - t0))
@@ -726,9 +749,7 @@ class FitzKragEngine:
             # 7.6. Boost queried files for background worker priority
             if self._bg_worker:
                 queried_paths = [
-                    a.metadata.get("disk_path")
-                    for a in addresses
-                    if a.metadata.get("disk_path")
+                    a.metadata.get("disk_path") for a in addresses if a.metadata.get("disk_path")
                 ]
                 if queried_paths:
                     self._bg_worker.boost_files(queried_paths)

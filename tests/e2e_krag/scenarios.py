@@ -1415,8 +1415,16 @@ SCENARIOS: list[TestScenario] = [
         feature=Feature.HYDE,
         query="TechCorp innovation strategy",
         # HyDE helps even with short queries that need context expansion
-        must_contain_any=["R&D", "research", "technology", "Gigafactory", "Project Alpha",
-                          "microservices", "architecture", "scalability"],
+        must_contain_any=[
+            "R&D",
+            "research",
+            "technology",
+            "Gigafactory",
+            "Project Alpha",
+            "microservices",
+            "architecture",
+            "scalability",
+        ],
         min_sources=1,
     ),
     # =========================================================================

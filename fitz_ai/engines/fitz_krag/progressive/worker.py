@@ -75,7 +75,7 @@ class BackgroundIngestWorker:
 
         # Parsed text cache dir — same location builder uses
         # Access manifest's private _path (same package, internal use)
-        self._cache_dir = manifest._path.parent / "parsed" if hasattr(manifest, '_path') else None
+        self._cache_dir = manifest._path.parent / "parsed" if hasattr(manifest, "_path") else None
 
         self._stop_event = threading.Event()
         self._query_active = threading.Event()  # Set = query is running
@@ -200,6 +200,7 @@ class BackgroundIngestWorker:
                             from fitz_ai.engines.fitz_krag.ingestion.strategies.typescript import (
                                 TypeScriptIngestStrategy,
                             )
+
                             ts_strategy = TypeScriptIngestStrategy()
                         result = ts_strategy.extract(content, entry.rel_path)
                     except Exception as e:
@@ -211,6 +212,7 @@ class BackgroundIngestWorker:
                             from fitz_ai.engines.fitz_krag.ingestion.strategies.java import (
                                 JavaIngestStrategy,
                             )
+
                             java_strategy = JavaIngestStrategy()
                         result = java_strategy.extract(content, entry.rel_path)
                     except Exception as e:
@@ -222,6 +224,7 @@ class BackgroundIngestWorker:
                             from fitz_ai.engines.fitz_krag.ingestion.strategies.go import (
                                 GoIngestStrategy,
                             )
+
                             go_strategy = GoIngestStrategy()
                         result = go_strategy.extract(content, entry.rel_path)
                     except Exception as e:
@@ -238,32 +241,37 @@ class BackgroundIngestWorker:
                     if result.symbols:
                         symbol_dicts = []
                         for sym in result.symbols:
-                            symbol_dicts.append({
-                                "id": str(uuid.uuid4()),
-                                "name": sym.name,
-                                "qualified_name": sym.qualified_name,
-                                "kind": sym.kind,
-                                "raw_file_id": entry.file_id,
-                                "start_line": sym.start_line,
-                                "end_line": sym.end_line,
-                                "signature": sym.signature,
-                                "summary": None,
-                                "summary_vector": None,
-                                "imports": sym.imports,
-                                "references": sym.references,
-                                "keywords": [],
-                                "entities": [],
-                                "metadata": {},
-                            })
+                            symbol_dicts.append(
+                                {
+                                    "id": str(uuid.uuid4()),
+                                    "name": sym.name,
+                                    "qualified_name": sym.qualified_name,
+                                    "kind": sym.kind,
+                                    "raw_file_id": entry.file_id,
+                                    "start_line": sym.start_line,
+                                    "end_line": sym.end_line,
+                                    "signature": sym.signature,
+                                    "summary": None,
+                                    "summary_vector": None,
+                                    "imports": sym.imports,
+                                    "references": sym.references,
+                                    "keywords": [],
+                                    "entities": [],
+                                    "metadata": {},
+                                }
+                            )
                         self._symbol_store.upsert_batch(symbol_dicts)
 
                     if result.imports:
-                        import_edges = [{
-                            "source_file_id": entry.file_id,
-                            "target_module": imp.target_module,
-                            "target_file_id": None,
-                            "import_names": imp.import_names,
-                        } for imp in result.imports]
+                        import_edges = [
+                            {
+                                "source_file_id": entry.file_id,
+                                "target_module": imp.target_module,
+                                "target_file_id": None,
+                                "import_names": imp.import_names,
+                            }
+                            for imp in result.imports
+                        ]
                         self._import_store.upsert_batch(import_edges)
 
                 self._manifest.update_state(entry.rel_path, FileState.PARSED)
@@ -294,30 +302,30 @@ class BackgroundIngestWorker:
 
             section_dicts = []
             for sec in result.sections:
-                section_dicts.append({
-                    "id": str(uuid.uuid4()),
-                    "raw_file_id": entry.file_id,
-                    "title": sec.title,
-                    "level": sec.level,
-                    "page_start": sec.page_start,
-                    "page_end": sec.page_end,
-                    "content": sec.content,
-                    "summary": None,
-                    "summary_vector": None,
-                    "parent_section_id": None,
-                    "position": sec.position,
-                    "keywords": [],
-                    "entities": [],
-                    "metadata": sec.metadata,
-                })
+                section_dicts.append(
+                    {
+                        "id": str(uuid.uuid4()),
+                        "raw_file_id": entry.file_id,
+                        "title": sec.title,
+                        "level": sec.level,
+                        "page_start": sec.page_start,
+                        "page_end": sec.page_end,
+                        "content": sec.content,
+                        "summary": None,
+                        "summary_vector": None,
+                        "parent_section_id": None,
+                        "position": sec.position,
+                        "keywords": [],
+                        "entities": [],
+                        "metadata": sec.metadata,
+                    }
+                )
             self._section_store.upsert_batch(section_dicts)
 
         except Exception as e:
             logger.debug(f"Doc section extraction failed for {entry.rel_path}: {e}")
 
-    def _process_table_file(
-        self, entry: "ManifestEntry", content: str, content_hash: str
-    ) -> None:
+    def _process_table_file(self, entry: "ManifestEntry", content: str, content_hash: str) -> None:
         """Parse CSV, store rows in PostgresTableStore, store metadata in TableStore."""
         from fitz_ai.tabular.parser.csv_parser import get_sample_rows, parse_csv
 
@@ -366,17 +374,21 @@ class BackgroundIngestWorker:
             samples = []
 
         # Store metadata in krag_table_index
-        self._table_store.upsert_batch([{
-            "id": str(uuid.uuid4()),
-            "raw_file_id": entry.file_id,
-            "table_id": parsed.table_id,
-            "name": name,
-            "columns": parsed.columns,
-            "row_count": parsed.row_count,
-            "summary": None,
-            "summary_vector": None,
-            "metadata": {"source_file": entry.rel_path, "sample_rows": samples},
-        }])
+        self._table_store.upsert_batch(
+            [
+                {
+                    "id": str(uuid.uuid4()),
+                    "raw_file_id": entry.file_id,
+                    "table_id": parsed.table_id,
+                    "name": name,
+                    "columns": parsed.columns,
+                    "row_count": parsed.row_count,
+                    "summary": None,
+                    "summary_vector": None,
+                    "metadata": {"source_file": entry.rel_path, "sample_rows": samples},
+                }
+            ]
+        )
 
     def _summarize_table(self, entry: "ManifestEntry") -> None:
         """Generate LLM summary for table schema."""
@@ -391,11 +403,7 @@ class BackgroundIngestWorker:
             if samples:
                 sample_lines = []
                 for row in samples[:2]:
-                    pairs = [
-                        f"{col}={val}"
-                        for col, val in zip(record["columns"], row)
-                        if val
-                    ]
+                    pairs = [f"{col}={val}" for col, val in zip(record["columns"], row) if val]
                     sample_lines.append(" | ".join(pairs[:8]))
                 sample_str = "\nSample rows:\n" + "\n".join(sample_lines)
 
@@ -407,17 +415,19 @@ class BackgroundIngestWorker:
             )
 
             try:
-                response = self._chat.chat([
-                    {
-                        "role": "system",
-                        "content": (
-                            "You describe table schemas. Write a concise 1-2 sentence "
-                            "description of what data this table contains and what "
-                            "questions it could answer. Return ONLY the description text."
-                        ),
-                    },
-                    {"role": "user", "content": prompt},
-                ])
+                response = self._chat.chat(
+                    [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You describe table schemas. Write a concise 1-2 sentence "
+                                "description of what data this table contains and what "
+                                "questions it could answer. Return ONLY the description text."
+                            ),
+                        },
+                        {"role": "user", "content": prompt},
+                    ]
+                )
                 summary = response.strip()
             except Exception as e:
                 logger.warning(f"Table summary generation failed for {entry.rel_path}: {e}")
@@ -491,16 +501,18 @@ class BackgroundIngestWorker:
         # Build SymbolEntry objects with source code
         symbols = []
         for sym in entry.symbols:
-            source = "\n".join(lines[max(0, sym.start_line - 1):sym.end_line])
-            symbols.append(SymbolEntry(
-                name=sym.name,
-                qualified_name=sym.qualified_name,
-                kind=sym.kind,
-                start_line=sym.start_line,
-                end_line=sym.end_line,
-                signature=sym.signature,
-                source=source[:500],
-            ))
+            source = "\n".join(lines[max(0, sym.start_line - 1) : sym.end_line])
+            symbols.append(
+                SymbolEntry(
+                    name=sym.name,
+                    qualified_name=sym.qualified_name,
+                    kind=sym.kind,
+                    start_line=sym.start_line,
+                    end_line=sym.end_line,
+                    signature=sym.signature,
+                    source=source[:500],
+                )
+            )
 
         if not symbols:
             return
@@ -521,11 +533,13 @@ class BackgroundIngestWorker:
         batch: list[dict[str, str]] = []
         for sec in sections:
             content_preview = (sec.get("content") or "")[:800]
-            batch.append({
-                "title": sec.get("title", ""),
-                "level": sec.get("level", 1),
-                "content": content_preview,
-            })
+            batch.append(
+                {
+                    "title": sec.get("title", ""),
+                    "level": sec.get("level", 1),
+                    "content": content_preview,
+                }
+            )
 
         summaries = self._batch_summarize_sections(batch)
 
@@ -545,17 +559,19 @@ class BackgroundIngestWorker:
         prompt = "\n\n".join(parts)
 
         try:
-            response = self._chat.chat([
-                {
-                    "role": "system",
-                    "content": (
-                        "You summarize code symbols. For each symbol, write a concise "
-                        "1-2 sentence description of what it does. Return a JSON array "
-                        "of strings, one per symbol, in the same order."
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ])
+            response = self._chat.chat(
+                [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You summarize code symbols. For each symbol, write a concise "
+                            "1-2 sentence description of what it does. Return a JSON array "
+                            "of strings, one per symbol, in the same order."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ]
+            )
             return self._parse_summary_response(response, len(symbols))
         except Exception as e:
             logger.warning(f"Summary generation failed: {e}")
@@ -567,23 +583,24 @@ class BackgroundIngestWorker:
         for i, sec in enumerate(sections):
             content = sec.get("content", "")[:800]
             parts.append(
-                f"Section {i + 1}: '{sec['title']}' (level {sec['level']})\n"
-                f"Content:\n{content}"
+                f"Section {i + 1}: '{sec['title']}' (level {sec['level']})\n" f"Content:\n{content}"
             )
         prompt = "\n\n".join(parts)
 
         try:
-            response = self._chat.chat([
-                {
-                    "role": "system",
-                    "content": (
-                        "You summarize document sections. For each section, write a "
-                        "concise 1-2 sentence description of its content. Return a "
-                        "JSON array of strings, one per section, in the same order."
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ])
+            response = self._chat.chat(
+                [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You summarize document sections. For each section, write a "
+                            "concise 1-2 sentence description of its content. Return a "
+                            "JSON array of strings, one per section, in the same order."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ]
+            )
             return self._parse_summary_response(response, len(sections))
         except Exception as e:
             logger.warning(f"Section summary generation failed: {e}")
@@ -648,10 +665,7 @@ class BackgroundIngestWorker:
         if not sections:
             return
 
-        texts = [
-            s.get("summary") or s.get("title", "(untitled)")
-            for s in sections
-        ]
+        texts = [s.get("summary") or s.get("title", "(untitled)") for s in sections]
         try:
             vectors = self._embedder.embed_batch(texts, task_type="document")
             self._section_store.update_vectors_by_file(entry.file_id, vectors)

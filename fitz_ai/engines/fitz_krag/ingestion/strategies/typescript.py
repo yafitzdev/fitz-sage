@@ -41,12 +41,8 @@ _CLASS_RE = re.compile(
     r"^\s*(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+(\w+)",
     re.MULTILINE,
 )
-_INTERFACE_RE = re.compile(
-    r"^\s*(?:export\s+)?interface\s+(\w+)", re.MULTILINE
-)
-_TYPE_RE = re.compile(
-    r"^\s*(?:export\s+)?type\s+(\w+)\s*=", re.MULTILINE
-)
+_INTERFACE_RE = re.compile(r"^\s*(?:export\s+)?interface\s+(\w+)", re.MULTILINE)
+_TYPE_RE = re.compile(r"^\s*(?:export\s+)?type\s+(\w+)\s*=", re.MULTILINE)
 _ARROW_RE = re.compile(
     r"^\s*(?:export\s+)?const\s+(\w+)\s*=\s*(?:\([^)]*\)|[a-zA-Z_]\w*)\s*=>",
     re.MULTILINE,
@@ -96,64 +92,73 @@ def _regex_fallback(source: str, file_path: str) -> IngestResult:
         _warned_no_tree_sitter = True
 
     module_name = _path_to_module(file_path)
-    lines = source.splitlines()
     symbols: list[SymbolEntry] = []
     imports: list[ImportEdge] = []
 
     for m in _FUNC_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="function",
-            start_line=line_no,
-            end_line=line_no,
-            signature=f"function {m.group(1)}()",
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="function",
+                start_line=line_no,
+                end_line=line_no,
+                signature=f"function {m.group(1)}()",
+            )
+        )
 
     for m in _CLASS_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="class",
-            start_line=line_no,
-            end_line=line_no,
-            signature=f"class {m.group(1)}",
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="class",
+                start_line=line_no,
+                end_line=line_no,
+                signature=f"class {m.group(1)}",
+            )
+        )
 
     for m in _INTERFACE_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="interface",
-            start_line=line_no,
-            end_line=line_no,
-            signature=f"interface {m.group(1)}",
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="interface",
+                start_line=line_no,
+                end_line=line_no,
+                signature=f"interface {m.group(1)}",
+            )
+        )
 
     for m in _TYPE_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="type",
-            start_line=line_no,
-            end_line=line_no,
-            signature=f"type {m.group(1)}",
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="type",
+                start_line=line_no,
+                end_line=line_no,
+                signature=f"type {m.group(1)}",
+            )
+        )
 
     for m in _ARROW_RE.finditer(source):
         line_no = source[: m.start()].count("\n") + 1
-        symbols.append(SymbolEntry(
-            name=m.group(1),
-            qualified_name=f"{module_name}.{m.group(1)}",
-            kind="function",
-            start_line=line_no,
-            end_line=line_no,
-            signature=f"const {m.group(1)} = () => ...",
-        ))
+        symbols.append(
+            SymbolEntry(
+                name=m.group(1),
+                qualified_name=f"{module_name}.{m.group(1)}",
+                kind="function",
+                start_line=line_no,
+                end_line=line_no,
+                signature=f"const {m.group(1)} = () => ...",
+            )
+        )
 
     for m in _IMPORT_RE.finditer(source):
         imports.append(ImportEdge(target_module=m.group(1), import_names=[]))
