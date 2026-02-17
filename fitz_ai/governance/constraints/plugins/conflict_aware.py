@@ -25,7 +25,7 @@ from fitz_ai.governance.protocol import EvidenceItem
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
-from ..base import ConstraintResult
+from ..base import ConstraintResult, FeatureSpec
 from ..numerical_detector import NumericalConflictDetector
 
 if TYPE_CHECKING:
@@ -292,6 +292,19 @@ class ConflictAwareConstraint:
     @property
     def name(self) -> str:
         return "conflict_aware"
+
+    @staticmethod
+    def feature_schema() -> list[FeatureSpec]:
+        return [
+            FeatureSpec("ca_fired", "bool", default=None),
+            FeatureSpec("ca_signal", "categorical", default=None),
+            FeatureSpec("ca_numerical_variance_detected", "bool", default=None),
+            FeatureSpec("ca_pairs_checked", "float", default=0),
+            FeatureSpec("ca_first_evidence_char", "categorical", default=None),
+            FeatureSpec("ca_evidence_characters", "categorical", default=None),
+            FeatureSpec("ca_is_uncertainty_query", "bool", default=None),
+            FeatureSpec("ca_relevance_filtered_count", "float", default=0),
+        ]
 
     def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
         """Compute cosine similarity between two vectors."""

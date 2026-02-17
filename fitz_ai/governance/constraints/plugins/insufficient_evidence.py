@@ -25,7 +25,7 @@ from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
 from ..aspect_classifier import AspectClassifier, QueryAspect
-from ..base import ConstraintResult
+from ..base import ConstraintResult, FeatureSpec
 
 logger = get_logger(__name__)
 
@@ -872,6 +872,22 @@ class InsufficientEvidenceConstraint:
     def name(self) -> str:
         return "insufficient_evidence"
 
+    @staticmethod
+    def feature_schema() -> list[FeatureSpec]:
+        return [
+            FeatureSpec("ie_fired", "bool", default=None),
+            FeatureSpec("ie_signal", "categorical", default=None),
+            FeatureSpec("ie_max_similarity", "float", default=None),
+            FeatureSpec("ie_entity_match_found", "bool", default=None),
+            FeatureSpec("ie_primary_match_found", "bool", default=None),
+            FeatureSpec("ie_critical_match_found", "bool", default=None),
+            FeatureSpec("ie_query_aspect", "categorical", default=None),
+            FeatureSpec("ie_summary_overlap", "bool", default=None),
+            FeatureSpec("ie_has_matching_aspect", "bool", default=None),
+            FeatureSpec("ie_has_conflicting_aspect", "bool", default=None),
+            FeatureSpec("ie_detection_reason", "categorical", default=None),
+        ]
+
     def _get_embedding(self, text: str, *, task_type: str = "query") -> list[float] | None:
         """Get embedding with caching."""
         if not self.embedder:
@@ -1089,8 +1105,8 @@ class InsufficientEvidenceConstraint:
                         reason=f"Context lacks primary subject: {reason} (similarity={max_sim:.3f})",
                         signal="abstain",
                         evidence_count=len(chunks),
-                        max_similarity=max_sim,
-                        detection_reason=reason,
+                        ie_max_similarity=max_sim,
+                        ie_detection_reason=reason,
                         **ie_diag,
                     )
 
@@ -1101,8 +1117,8 @@ class InsufficientEvidenceConstraint:
                         reason=f"Context is related but lacks specific information: {reason} (similarity={max_sim:.3f})",
                         signal="qualified",
                         evidence_count=len(chunks),
-                        max_similarity=max_sim,
-                        detection_reason=reason,
+                        ie_max_similarity=max_sim,
+                        ie_detection_reason=reason,
                         **ie_diag,
                     )
 
@@ -1120,7 +1136,7 @@ class InsufficientEvidenceConstraint:
             )
             return ConstraintResult.allow(
                 evidence_count=len(chunks),
-                max_similarity=max_sim,
+                ie_max_similarity=max_sim,
                 **ie_diag,
             )
 

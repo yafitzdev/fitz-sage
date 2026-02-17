@@ -16,6 +16,15 @@ from fitz_ai.governance.protocol import EvidenceItem
 
 
 @dataclass(frozen=True)
+class FeatureSpec:
+    """Declaration of a feature a constraint contributes to the classifier."""
+
+    name: str  # Feature name (must match metadata key in ConstraintResult)
+    type: str  # "bool", "float", "categorical"
+    default: Any = None  # Value when constraint doesn't run
+
+
+@dataclass(frozen=True)
 class ConstraintResult:
     """
     Result of applying a constraint to retrieved context.
@@ -84,5 +93,14 @@ class ConstraintPlugin(Protocol):
         """
         ...
 
+    @staticmethod
+    def feature_schema() -> list[FeatureSpec]:
+        """Declare features this constraint contributes to the classifier.
 
-__all__ = ["ConstraintResult", "ConstraintPlugin"]
+        Returns an empty list by default. Override in plugins that emit
+        classifier features via ConstraintResult metadata.
+        """
+        return []
+
+
+__all__ = ["FeatureSpec", "ConstraintResult", "ConstraintPlugin"]

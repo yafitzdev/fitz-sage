@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
 from fitz_ai.core.answer_mode import AnswerMode
+from fitz_ai.governance.constraints.feature_extractor import get_feature_type_sets
 from fitz_ai.governance.governor import AnswerGovernor, GovernanceDecision
 
 if TYPE_CHECKING:
@@ -32,52 +33,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Feature type sets (must match train_classifier.py exactly)
-_CATEGORICAL_FEATURES = {
-    "ie_signal",
-    "ie_query_aspect",
-    "ie_detection_reason",
-    "ca_signal",
-    "ca_first_evidence_char",
-    "ca_evidence_characters",
-    "caa_query_type",
-    "sit_info_type_requested",
-    "query_question_type",
-}
-
-_BOOL_FEATURES = {
-    "ie_fired",
-    "ie_entity_match_found",
-    "ie_primary_match_found",
-    "ie_critical_match_found",
-    "ie_has_matching_aspect",
-    "ie_has_conflicting_aspect",
-    "ca_fired",
-    "ca_numerical_variance_detected",
-    "ca_is_uncertainty_query",
-    "caa_fired",
-    "caa_has_causal_evidence",
-    "caa_has_predictive_evidence",
-    "sit_fired",
-    "sit_entity_mismatch",
-    "sit_has_specific_info",
-    "av_fired",
-    "av_strong_denial",
-    "has_abstain_signal",
-    "has_disputed_signal",
-    "has_qualified_signal",
-    "has_any_denial",
-    "query_has_comparison_words",
-    "has_distinct_years",
-    "detection_temporal",
-    "detection_comparison",
-    "detection_aggregation",
-    "detection_boost_recency",
-    "detection_boost_authority",
-    "detection_needs_rewriting",
-    "has_cross_chunk_divergence",
-    "has_within_chunk_divergence",
-}
+# Feature type sets derived from constraint schemas (single source of truth)
+_CATEGORICAL_FEATURES, _BOOL_FEATURES = get_feature_type_sets()
 
 # Default model search paths (relative to package root)
 _MODEL_FILENAME = "model_v6_cascade.joblib"

@@ -22,7 +22,7 @@ from typing import Sequence
 from fitz_ai.governance.protocol import EvidenceItem
 from fitz_ai.logging.logger import get_logger
 
-from ..base import ConstraintResult
+from ..base import ConstraintResult, FeatureSpec
 
 logger = get_logger(__name__)
 
@@ -42,6 +42,15 @@ class SpecificInfoTypeConstraint:
         """Initialize the constraint."""
         self.enabled = enabled
         self.name = "specific_info_type"
+
+    @staticmethod
+    def feature_schema() -> list[FeatureSpec]:
+        return [
+            FeatureSpec("sit_fired", "bool", default=None),
+            FeatureSpec("sit_entity_mismatch", "bool", default=None),
+            FeatureSpec("sit_info_type_requested", "categorical", default=None),
+            FeatureSpec("sit_has_specific_info", "bool", default=None),
+        ]
 
     def apply(self, query: str, chunks: Sequence[EvidenceItem]) -> ConstraintResult:
         """

@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import time
@@ -80,60 +81,16 @@ _META_COLS = {
     "subcategory",
 }
 
-# Categorical features that need label encoding
-_CATEGORICAL_FEATURES = {
-    "ie_signal",
-    "ie_query_aspect",
-    "ie_detection_reason",
-    "ca_signal",
-    "ca_first_evidence_char",
-    "ca_evidence_characters",
-    "caa_query_type",
-    "sit_info_type_requested",
-    "query_question_type",
-}
+# Feature type sets derived from constraint schemas (single source of truth)
+from fitz_ai.governance.constraints.feature_extractor import get_feature_type_sets
+
+_CATEGORICAL_FEATURES, _BOOL_FEATURES = get_feature_type_sets()
 
 # Dead features: constant zero/single-value across all cases — adds noise
 # num_unique_sources: always 1 in fitz-gov (single doc_id per case)
 # ie_max_similarity: 100% identical to max_vector_score (redundant)
 # ie_summary_overlap: always False (fitz-gov chunks lack enrichment metadata)
 _DEAD_FEATURES = {"num_unique_sources", "ie_max_similarity", "ie_summary_overlap"}
-
-# Boolean features to convert to int
-_BOOL_FEATURES = {
-    "ie_fired",
-    "ie_entity_match_found",
-    "ie_primary_match_found",
-    "ie_critical_match_found",
-    "ie_has_matching_aspect",
-    "ie_has_conflicting_aspect",
-    "ie_summary_overlap",
-    "ca_fired",
-    "ca_numerical_variance_detected",
-    "ca_is_uncertainty_query",
-    "caa_fired",
-    "caa_has_causal_evidence",
-    "caa_has_predictive_evidence",
-    "sit_fired",
-    "sit_entity_mismatch",
-    "sit_has_specific_info",
-    "av_fired",
-    "av_strong_denial",
-    "has_abstain_signal",
-    "has_disputed_signal",
-    "has_qualified_signal",
-    "has_any_denial",
-    "query_has_comparison_words",
-    "has_distinct_years",
-    "detection_temporal",
-    "detection_comparison",
-    "detection_aggregation",
-    "detection_boost_recency",
-    "detection_boost_authority",
-    "detection_needs_rewriting",
-    "has_cross_chunk_divergence",
-    "has_within_chunk_divergence",
-}
 
 # Markers for context feature extraction
 _CONTRADICTION_MARKERS = [
@@ -811,6 +768,7 @@ def train_twostage(
     seed: int,
     output_path: Path,
     governor_preds: np.ndarray | None = None,
+    case_ids: pd.Series | None = None,
 ):
     """Train a two-stage binary classifier: Stage 1 (answerable vs abstain) → Stage 2 (trustworthy vs disputed)."""
 
@@ -1260,6 +1218,10 @@ def train_twostage(
         print(f"\nGovernor baseline (3-class): {gov_acc:.4f}")
         print(f"Delta vs governor: +{combined_acc - gov_acc:.4f}")
 
+    # ---- Build test split metadata ----
+    test_ids = list(case_ids.iloc[X_test.index].values) if case_ids is not None else []
+    test_split_hash = hashlib.sha256(",".join(sorted(str(i) for i in test_ids)).encode()).hexdigest()[:16] if test_ids else ""
+
     # ---- Save artifact ----
     artifact = {
         "mode": "twostage",
@@ -1276,6 +1238,8 @@ def train_twostage(
         "encoders": encoders,
         "feature_names": feature_names,
         "labels": _3CLASS_LABELS,
+        "test_case_ids": test_ids,
+        "test_split_hash": test_split_hash,
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(artifact, output_path)
@@ -1283,6 +1247,8 @@ def train_twostage(
     print(f"  Stage 1: {s1_best_name} (tuned) — answerable vs abstain")
     print(f"  Stage 2: {s2_best_name} (tuned) — trustworthy vs disputed")
     print(f"  Combined: {combined_acc:.4f}")
+    if test_ids:
+        print(f"  Test split: {len(test_ids)} cases (hash={test_split_hash})")
 
     return artifact
 
@@ -1507,6 +1473,7 @@ def train_cascade(
     seed: int,
     output_path: Path,
     governor_preds: np.ndarray | None = None,
+    case_ids: pd.Series | None = None,
 ):
     """Train 4-question atomic cascade classifier.
 
@@ -1725,6 +1692,10 @@ def train_cascade(
         print(f"\nGovernor baseline (3-class): {gov_acc:.4f}")
         print(f"Delta vs governor: +{combined_acc - gov_acc:.4f}")
 
+    # ---- Build test split metadata ----
+    test_ids = list(case_ids.iloc[X_test.index].values) if case_ids is not None else []
+    test_split_hash = hashlib.sha256(",".join(sorted(str(i) for i in test_ids)).encode()).hexdigest()[:16] if test_ids else ""
+
     # ---- Save artifact ----
     artifact = {
         "mode": "cascade",
@@ -1743,6 +1714,8 @@ def train_cascade(
         "encoders": encoders,
         "feature_names": feature_names,
         "labels": _3CLASS_LABELS,
+        "test_case_ids": test_ids,
+        "test_split_hash": test_split_hash,
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(artifact, output_path)
@@ -1752,6 +1725,8 @@ def train_cascade(
     print(f"  Q3: {q3_name} (t={q3_threshold:.3f}) — conflict resolved?")
     print(f"  Q4: {q4_name} (t={q4_threshold:.3f}) — evidence solid?")
     print(f"  Combined: {combined_acc:.4f}")
+    if test_ids:
+        print(f"  Test split: {len(test_ids)} cases (hash={test_split_hash})")
 
     return artifact
 
@@ -2048,6 +2023,7 @@ def main():
             args.seed,
             args.output,
             governor_preds,
+            case_ids=df["case_id"],
         )
         return
 
@@ -2069,6 +2045,7 @@ def main():
             args.seed,
             args.output,
             governor_preds,
+            case_ids=df["case_id"],
         )
         return
 

@@ -23,7 +23,7 @@ from fitz_ai.governance.protocol import EvidenceItem
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
-from ..base import ConstraintResult
+from ..base import ConstraintResult, FeatureSpec
 
 logger = get_logger(__name__)
 
@@ -284,6 +284,15 @@ class CausalAttributionConstraint:
     @property
     def name(self) -> str:
         return "causal_attribution"
+
+    @staticmethod
+    def feature_schema() -> list[FeatureSpec]:
+        return [
+            FeatureSpec("caa_fired", "bool", default=None),
+            FeatureSpec("caa_query_type", "categorical", default="none"),
+            FeatureSpec("caa_has_causal_evidence", "bool", default=None),
+            FeatureSpec("caa_has_predictive_evidence", "bool", default=None),
+        ]
 
     def apply(
         self,

@@ -315,7 +315,7 @@ class AnswerGovernor:
             # only loosely related (disputes are noise).
             if ie_signal == "qualified":
                 ie_meta = constraint_metadata.get("insufficient_evidence", {})
-                ie_similarity = ie_meta.get("max_similarity", 1.0)
+                ie_similarity = ie_meta.get("ie_max_similarity", 1.0)
                 if ie_similarity < self._IE_LOW_RELEVANCE_THRESHOLD:
                     # Low similarity + IE qualified = content loosely related.
                     # Disputes in loosely-related content are noise.

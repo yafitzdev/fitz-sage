@@ -25,6 +25,31 @@ from fitz_ai.governance.protocol import EvidenceItem
 if TYPE_CHECKING:
     from fitz_ai.governance.constraints.base import ConstraintResult
 
+from fitz_ai.governance.constraints.plugins.answer_verification import AnswerVerificationConstraint
+from fitz_ai.governance.constraints.plugins.causal_attribution import CausalAttributionConstraint
+from fitz_ai.governance.constraints.plugins.conflict_aware import ConflictAwareConstraint
+from fitz_ai.governance.constraints.plugins.insufficient_evidence import (
+    InsufficientEvidenceConstraint,
+)
+from fitz_ai.governance.constraints.plugins.specific_info_type import SpecificInfoTypeConstraint
+
+_CONSTRAINT_CLASSES: list[type] = [
+    InsufficientEvidenceConstraint,
+    ConflictAwareConstraint,
+    CausalAttributionConstraint,
+    SpecificInfoTypeConstraint,
+    AnswerVerificationConstraint,
+]
+
+# Constraint name → class mapping for result lookup
+_CONSTRAINT_NAME_MAP: dict[str, type] = {
+    "insufficient_evidence": InsufficientEvidenceConstraint,
+    "conflict_aware": ConflictAwareConstraint,
+    "causal_attribution": CausalAttributionConstraint,
+    "specific_info_type": SpecificInfoTypeConstraint,
+    "answer_verification": AnswerVerificationConstraint,
+}
+
 
 def extract_features(
     query: str,
@@ -63,105 +88,49 @@ def _extract_constraint_features(
     features: dict[str, Any],
     constraint_results: dict[str, "ConstraintResult"],
 ) -> None:
-    """Extract features from constraint result metadata."""
-    # Aggregate constraint signals
+    """Extract features from constraint result metadata (schema-driven)."""
+    # Aggregate cross-constraint signals (not owned by any single constraint)
+    _extract_aggregate_signals(features, constraint_results)
+
+    # Schema-driven per-constraint extraction
+    for name, cls in _CONSTRAINT_NAME_MAP.items():
+        schema = cls.feature_schema()
+        result = constraint_results.get(name)
+
+        for spec in schema:
+            if spec.name.endswith("_fired"):
+                # Derived from result, not metadata
+                features[spec.name] = (not result.allow_decisive_answer) if result else spec.default
+            elif spec.name.endswith("_signal"):
+                features[spec.name] = result.signal if result else spec.default
+            else:
+                features[spec.name] = (
+                    result.metadata.get(spec.name, spec.default) if result else spec.default
+                )
+
+    # AV-specific derived feature: strong denial (2+ jury votes)
+    av_votes = features.get("av_jury_votes_no")
+    features["av_strong_denial"] = (av_votes or 0) >= 2
+
+
+def _extract_aggregate_signals(
+    features: dict[str, Any],
+    constraint_results: dict[str, "ConstraintResult"],
+) -> None:
+    """Extract cross-constraint aggregate features."""
     num_denials = sum(1 for r in constraint_results.values() if not r.allow_decisive_answer)
     features["num_constraints_fired"] = num_denials
 
     signals = [r.signal for r in constraint_results.values() if r.signal]
     features["has_qualified_signal"] = "qualified" in signals
-
-    # Aggregate signal features (any constraint emitting these signals)
     features["has_abstain_signal"] = "abstain" in signals
     features["has_disputed_signal"] = "disputed" in signals
-
-    # AV constraint: also track av_fired
-    av = constraint_results.get("answer_verification")
-    if av:
-        features["av_fired"] = not av.allow_decisive_answer
-        jury_votes = av.metadata.get("jury_votes")
-        features["av_jury_votes_no"] = jury_votes
-        # Strong AV denial: 2+ jury votes means multiple jurors agree answer is wrong
-        features["av_strong_denial"] = (jury_votes or 0) >= 2
-    else:
-        features["av_fired"] = None
-        features["av_jury_votes_no"] = None
-        features["av_strong_denial"] = False
-
-    # Composite features: help Stage 1 detect abstain without relying solely on IE
     features["has_any_denial"] = num_denials > 0
     features["num_strong_denials"] = sum(
         1
         for r in constraint_results.values()
         if not r.allow_decisive_answer and r.signal in ("abstain", "disputed")
     )
-
-    # IE constraint features
-    ie = constraint_results.get("insufficient_evidence")
-    if ie:
-        m = ie.metadata
-        features["ie_fired"] = not ie.allow_decisive_answer
-        features["ie_signal"] = ie.signal
-        features["ie_max_similarity"] = m.get("max_similarity")
-        features["ie_entity_match_found"] = m.get("ie_entity_match_found")
-        features["ie_primary_match_found"] = m.get("ie_primary_match_found")
-        features["ie_critical_match_found"] = m.get("ie_critical_match_found")
-        features["ie_query_aspect"] = m.get("ie_query_aspect")
-        features["ie_summary_overlap"] = m.get("ie_summary_overlap")
-        features["ie_has_matching_aspect"] = m.get("ie_has_matching_aspect")
-        features["ie_has_conflicting_aspect"] = m.get("ie_has_conflicting_aspect")
-        features["ie_detection_reason"] = m.get("detection_reason")
-    else:
-        features["ie_fired"] = None
-        features["ie_signal"] = None
-        features["ie_max_similarity"] = None
-        features["ie_entity_match_found"] = None
-        features["ie_primary_match_found"] = None
-        features["ie_critical_match_found"] = None
-        features["ie_query_aspect"] = None
-        features["ie_summary_overlap"] = None
-        features["ie_has_matching_aspect"] = None
-        features["ie_has_conflicting_aspect"] = None
-        features["ie_detection_reason"] = None
-
-    # ConflictAware features
-    ca = constraint_results.get("conflict_aware")
-    if ca:
-        m = ca.metadata
-        features["ca_fired"] = not ca.allow_decisive_answer
-        features["ca_signal"] = ca.signal
-        features["ca_numerical_variance_detected"] = m.get("ca_numerical_variance_detected")
-        features["ca_pairs_checked"] = m.get("ca_pairs_checked")
-        features["ca_first_evidence_char"] = m.get("ca_first_evidence_char")
-        features["ca_evidence_characters"] = m.get("ca_evidence_characters")
-        features["ca_is_uncertainty_query"] = m.get("ca_is_uncertainty_query")
-        features["ca_relevance_filtered_count"] = m.get("ca_relevance_filtered_count")
-    else:
-        features["ca_fired"] = None
-
-    # CausalAttribution features
-    caa = constraint_results.get("causal_attribution")
-    if caa:
-        m = caa.metadata
-        features["caa_fired"] = not caa.allow_decisive_answer
-        features["caa_query_type"] = m.get("caa_query_type")
-        features["caa_has_causal_evidence"] = m.get("caa_has_causal_evidence")
-        features["caa_has_predictive_evidence"] = m.get("caa_has_predictive_evidence")
-    else:
-        features["caa_fired"] = None
-
-    # SpecificInfoType features
-    sit = constraint_results.get("specific_info_type")
-    if sit:
-        m = sit.metadata
-        features["sit_fired"] = not sit.allow_decisive_answer
-        features["sit_entity_mismatch"] = m.get("sit_entity_mismatch")
-        features["sit_info_type_requested"] = m.get("sit_info_type_requested")
-        features["sit_has_specific_info"] = m.get("sit_has_specific_info")
-    else:
-        features["sit_fired"] = None
-
-    # (AV constraint features extracted above with aggregate signals)
 
 
 _COMPARISON_WORDS = {"vs", "versus", "compare", "compared", "differ", "difference", "between"}
@@ -892,4 +861,45 @@ def _extract_detection_features(features: dict[str, Any], detection_summary: Any
     features["detection_needs_rewriting"] = getattr(detection_summary, "needs_rewriting", None)
 
 
-__all__ = ["extract_features"]
+# ── Feature type sets (derived from constraint schemas + static Tier 2/3) ──
+
+# Tier 2/3 bool features not owned by constraints
+_TIER2_BOOL_FEATURES = {
+    "query_has_comparison_words",
+    "has_distinct_years",
+    "has_cross_chunk_divergence",
+    "has_within_chunk_divergence",
+}
+_TIER3_BOOL_FEATURES = {
+    "detection_temporal",
+    "detection_comparison",
+    "detection_aggregation",
+    "detection_boost_recency",
+    "detection_boost_authority",
+    "detection_needs_rewriting",
+}
+# Aggregate cross-constraint bool features
+_AGGREGATE_BOOL_FEATURES = {
+    "has_abstain_signal",
+    "has_disputed_signal",
+    "has_qualified_signal",
+    "has_any_denial",
+    "av_strong_denial",
+}
+_TIER2_CATEGORICAL_FEATURES = {"query_question_type"}
+
+
+def get_feature_type_sets() -> tuple[set[str], set[str]]:
+    """Return (categorical_features, bool_features) derived from constraint schemas + static Tier 2/3."""
+    categorical: set[str] = set(_TIER2_CATEGORICAL_FEATURES)
+    bools: set[str] = set(_TIER2_BOOL_FEATURES | _TIER3_BOOL_FEATURES | _AGGREGATE_BOOL_FEATURES)
+    for cls in _CONSTRAINT_CLASSES:
+        for spec in cls.feature_schema():
+            if spec.type == "categorical":
+                categorical.add(spec.name)
+            elif spec.type == "bool":
+                bools.add(spec.name)
+    return categorical, bools
+
+
+__all__ = ["extract_features", "get_feature_type_sets"]

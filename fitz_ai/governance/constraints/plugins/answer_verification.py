@@ -23,7 +23,7 @@ from fitz_ai.governance.protocol import EvidenceItem
 from fitz_ai.logging.logger import get_logger
 from fitz_ai.logging.tags import PIPELINE
 
-from ..base import ConstraintResult
+from ..base import ConstraintResult, FeatureSpec
 
 if TYPE_CHECKING:
     from fitz_ai.llm.providers.base import ChatProvider
@@ -108,6 +108,14 @@ class AnswerVerificationConstraint:
     enabled: bool = True
     max_context_chars: int = 1000
     _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+
+    @staticmethod
+    def feature_schema() -> list[FeatureSpec]:
+        return [
+            FeatureSpec("av_fired", "bool", default=None),
+            FeatureSpec("av_jury_votes_no", "float", default=None),
+            FeatureSpec("av_strong_denial", "bool", default=False),
+        ]
 
     def _run_jury(self, query: str, context: str) -> tuple[int, list[str]]:
         """
@@ -230,9 +238,9 @@ class AnswerVerificationConstraint:
                 return ConstraintResult.deny(
                     reason="Retrieved content may not directly answer the question",
                     signal="qualified",
-                    jury_votes=no_votes,
-                    jury_responses=responses,
-                    balanced_confirmed=True,
+                    av_jury_votes_no=no_votes,
+                    av_jury_responses=responses,
+                    av_balanced_confirmed=True,
                 )
             else:
                 logger.debug(
@@ -240,15 +248,15 @@ class AnswerVerificationConstraint:
                     f"balanced rejected -> allowing"
                 )
                 return ConstraintResult.allow(
-                    jury_votes=no_votes,
-                    jury_responses=responses,
-                    balanced_confirmed=False,
+                    av_jury_votes_no=no_votes,
+                    av_jury_responses=responses,
+                    av_balanced_confirmed=False,
                 )
 
         # Less than 2/3 fast NO -> allow
         return ConstraintResult.allow(
-            jury_votes=no_votes,
-            jury_responses=responses,
+            av_jury_votes_no=no_votes,
+            av_jury_responses=responses,
         )
 
 

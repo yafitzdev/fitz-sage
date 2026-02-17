@@ -223,7 +223,7 @@ class StagedConstraintPipeline:
                 if not r.allow_decisive_answer:
                     context.relevance_confirmed = False
                     context.relevance_signal = r.signal
-                    context.max_similarity = r.metadata.get("max_similarity", 0.0)
+                    context.max_similarity = r.metadata.get("ie_max_similarity", 0.0)
                     break
 
         elif stage.name == STAGE_SUFFICIENCY:
