@@ -9,11 +9,11 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.9.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.10.0-green.svg)](CHANGELOG.md)
 [![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
 
 
-[Quick Start](#quick-start) • [Installation](#installation) • [Documentation](docs/) • [GitHub](https://github.com/yafitzdev/fitz-ai)
+[Why Fitz?](#why-fitz) • [Retrieval Intelligence](#retrieval-intelligence) • [Governance](#governance--know-what-you-dont-know) • [Documentation](docs/) • [GitHub](https://github.com/yafitzdev/fitz-ai)
 
 </div>
 
@@ -24,7 +24,7 @@
 ```bash
 pip install fitz-ai
 
-fitz quickstart ./docs "What is our refund policy?"
+fitz query "What is our refund policy?" --source ./docs
 ```
 
 That's it. Your documents are now searchable with AI.
@@ -43,7 +43,7 @@ That's it. Your documents are now searchable with AI.
 ```python
 import fitz_ai
 
-fitz_ai.ingest("./docs")
+fitz_ai.point("./docs")
 answer = fitz_ai.query("What is our refund policy?")
 ```
 
@@ -88,7 +88,7 @@ fitz serve  # http://localhost:8000/docs for interactive API
 RAG is how ChatGPT's "file search," Notion AI, and enterprise knowledge tools actually work under the hood.
 Instead of sending all your documents to an AI, RAG:
 
-1. [X] **Indexes your documents once** — Splits them into chunks, converts to vectors, stores in a database
+1. [X] **Indexes your documents** — Splits them into chunks, converts to vectors, stores in a database
 2. [X] **Retrieves only what's relevant** — When you ask a question, finds the 5-10 most relevant chunks
 3. [X] **Sends just those chunks to the LLM** — The AI answers based on focused, relevant context
 
@@ -137,13 +137,13 @@ You can—but you'll hit walls fast.
 
 ### Why Fitz?
 
-**Super fast setup 🐆**
-> Point at a folder. Ask a question. Get an answer with sources. Even for tables! Everything else is handled by Fitz.
+**Zero-wait querying 🐆** → [Progressive KRAG](docs/features/progressive-krag-agentic-search.md)
+> Point at a folder. Ask a question immediately — no ingestion step required. Fitz serves answers instantly via agentic search while a background worker indexes your files. Queries get faster over time as indexing completes, but they work from second one.
 
 **Honest answers ✅** → [Governance Benchmark](docs/features/governance-benchmarking.md)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."
 > 
-> → Fitz detects disputes at **94.4% recall** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 1,100+ case benchmark for epistemic honesty.
+> → Fitz detects disputes at **79.1% recall** on [fitz-gov 5.0](https://github.com/yafitzdev/fitz-gov), a 2,900+ case benchmark for epistemic honesty (92% hard difficulty).
 
 **Queries that actually work 📊**
 > Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, address-based code retrieval with import graph traversal, and SQL execution for tabular data. No configuration—it just works.
@@ -154,11 +154,10 @@ You can—but you'll hit walls fast.
 **Other Features at a Glance 🃏**
 >1. [x] **Fully local execution possible.** Embedded PostgreSQL + Ollama, no API keys required to start.
 >2. [x] **Plugin-based architecture.** Swap LLMs, rerankers, and retrieval pipelines via YAML config.
->3. [x] **[KRAG (Knowledge Routing Augmented Generation)](docs/features/krag.md).** Address-based retrieval.
->4. [X] **Incremental ingestion.** Only reprocesses changed files, even with new chunking settings.
->5. [x] **Full provenance.** Every answer traces back to the exact source symbol, section, or document.
->6. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
->7. [x] **[Enterprise gateway support](docs/features/enterprise-gateway.md).** OAuth2 M2M, custom CA certs, mTLS, and corporate proxy/gateway integration.
+>3. [x] **[KRAG (Knowledge Routing Augmented Generation)](docs/features/krag.md).** Asymmetric indexing — documents are parsed into typed retrieval units (symbols, sections, tables) with structural metadata, not flat chunks. Queries are routed to the right strategy per content type.
+>4. [x] **Full provenance.** Every answer traces back to the exact source symbol, section, or document.
+>5. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
+>6. [x] **[Enterprise gateway support](docs/features/enterprise-gateway.md).** OAuth2 M2M, custom CA certs, mTLS, and corporate proxy/gateway integration.
 
 ####
 
@@ -166,7 +165,7 @@ You can—but you'll hit walls fast.
 > Any questions left? Try fitz on itself:
 > 
 > ```bash
-> fitz quickstart ./fitz_ai "How does the ingestion pipeline work?"
+> fitz query "How does the retrieval pipeline work?" --source ./fitz_ai
 > ```
 >
 > The codebase speaks for itself.
@@ -229,9 +228,9 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 
 ### Governance — Know What You Don't Know
 
-[Feature docs](docs/features/governance-benchmarking.md) • [Benchmark results](docs/evaluation/fitz-gov-3.0-results.md)
+[Feature docs](docs/features/governance-benchmarking.md) • [fitz-gov benchmark](https://github.com/yafitzdev/fitz-gov)
 
-Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty using a two-stage ML classifier trained on 1,100+ labeled cases from [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty.
+Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty using a 4-question cascade ML classifier trained on 1,100+ labeled cases from [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty.
 
 <br>
 
@@ -243,30 +242,42 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
   │ 5 Constraints       │     Contradiction detection, evidence sufficiency,
   │ (epistemic sensors) │     causal attribution, answer verification, specific info type
   └──────────┬──────────┘
-             │ 50 features extracted
+             │ 109 features extracted
              ▼
   ┌─────────────────────┐
-  │ Stage 1: ET         │     Can the evidence answer this query?
-  │ Answerability       ├───► NO ──► ABSTAIN
+  │ Q1: Evidence        │     Is the evidence sufficient?
+  │ sufficient? (ML)    ├───► NO ──► ABSTAIN
   └──────────┬──────────┘
              │ YES
              ▼
-  ┌─────────────────────┐     Do the sources conflict?
-  │ Stage 2: RF         ├───► YES ──► DISPUTED
-  │ Conflict Detection  │
+  ┌─────────────────────┐
+  │ Q2: Conflict?       │     Did conflict-aware constraint fire?
+  │ (rule: ca_fired)    ├───► YES ──┐
+  └──────────┬──────────┘           │
+             │ NO                   ▼
+             │            ┌─────────────────────┐
+             │            │ Q3: Conflict        │
+             │            │ resolved? (ML)      ├───► NO ──► DISPUTED
+             │            └──────────┬──────────┘
+             │                       └ YES ────────────────► TRUSTWORTHY
+             ▼
+  ┌─────────────────────┐
+  │ Q4: Evidence truly  │     Is the evidence solid enough?
+  │ solid? (ML)         ├───► NO ──► ABSTAIN
   └──────────┬──────────┘
-             │                Consistent evidence found
-             └──────────────► NO ──► TRUSTWORTHY          
-              
+             └ YES ────────────────► TRUSTWORTHY
+             
 ```
 
 <br>
 
-| Decision | Meaning                              | Recall |
-|----------|--------------------------------------|--------|
-| **ABSTAIN** | Evidence doesn't answer the question | **93.7%** |
-| **DISPUTED** | Sources contradict each other        | **94.4%** |
-| **TRUSTWORTHY** | Consistent, sufficient evidence      | **89.0%** |
+| Decision | Meaning                              | Recall    |
+|----------|--------------------------------------|-----------|
+| **ABSTAIN** | Evidence doesn't answer the question | **90.0%** |
+| **DISPUTED** | Sources contradict each other        | **76.2%** |
+| **TRUSTWORTHY** | Consistent, sufficient evidence      | **73.4%** |
+
+**Overall accuracy: 79.1%** on fitz-gov 5.0 (2,900+ cases, 92% hard difficulty)
 
 <br>
 
@@ -274,83 +285,13 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 > Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. 92% of our test cases are rated "hard."
 
 <strong>The system fails safe 🛡️</strong>
-> The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence ("trustworthy" instead of "disputed") is the rarest error mode: only 15 cases in 1,100+ (all hard difficulty).
+> The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence ("trustworthy" instead of "disputed") is the rarest error mode.
 
 <strong>These scores are a floor, not a ceiling 👣</strong>
 > All benchmarks were measured using `qwen2.5:3b` — a 3B parameter local model. The governance constraints run on the fast-tier LLM to keep latency low. Stronger models produce better constraint signals, which feed better features into the classifier. Upgrading your chat provider should improve governance accuracy for free.
 
 <strong>Zero extra latency ⏱️</strong>
 > The constraints already run as part of the pipeline. The ML classifier just replaces hand-coded rules with a local sklearn model — inference takes microseconds, no additional API calls.
-
----
-
-<details>
-
-<summary><strong>📦 Plugin Generator</strong> → <a href="docs/PLUGINS.md">Plugin Development Guide</a></summary>
-
-<br>
-
-#### Generate plugins with AI 🤖
-
->Fitz can generate fully working plugins from natural language descriptions. Describe what you want, and fitz creates, validates, and saves the plugin automatically.
->
->```bash
->fitz plugin
->? Plugin type: constraint
->? Description: flags answers that cite a single source when multiple exist
->
->Generating...
->✓ Syntax valid
->✓ Schema valid
->✓ Plugin loads correctly
->✓ Functional test passed
->
->Created: ~/.fitz/plugins/constraints/single_source_warning.py
->```
->
->The generated plugin is immediately usable—no manual editing required.
-
-<br>
-
-#### Supported plugin types
-
->| Type | Format | Description |
->|------|--------|-------------|
->| `llm-chat` | YAML | Connect to a chat LLM provider |
->| `llm-embedding` | YAML | Connect to an embedding provider |
->| `llm-rerank` | YAML | Connect to a reranking provider |
->| `retrieval` | YAML | Define a retrieval strategy |
->| `constraint` | Python | Epistemic safety guardrail |
->| `reader` | Python | Custom file format reader |
->| `chunker` | Python | Custom chunking logic (fallback strategy) |
-
-<br>
-
-#### How it works
-
->1. **Prompt building**: Fitz loads existing plugin examples and schema definitions
->2. **Generation**: Your configured LLM generates the plugin code
->3. **Multi-level validation**: Syntax → Schema → Integration → Functional tests
->4. **Auto-retry**: If validation fails, fitz feeds the error back and retries (up to 3 attempts)
->5. **Save**: Working plugins are saved to `~/.fitz/plugins/`
->
->Generated plugins are auto-discovered by fitz on next run—no registration needed.
-
-<br>
-
-#### Example: Custom constraint
-
->```bash
->fitz plugin
->? Plugin type: constraint
->? Description: detects when sources use different time frames
->
-># Creates ~/.fitz/plugins/constraints/temporal_mismatch.py
->```
->
->Generated plugins are auto-discovered — no registration needed.
-
-</details>
 
 ---
 
@@ -365,7 +306,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >```bash
 >pip install fitz-ai
 >
->fitz quickstart ./docs "Your question here"
+>fitz query "Your question here" --source ./docs
 >```
 >
 >Fitz auto-detects your LLM provider:
@@ -382,7 +323,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >```python
 >import fitz_ai
 >
->fitz_ai.ingest("./docs")
+>fitz_ai.point("./docs")
 >answer = fitz_ai.query("Your question here")
 >
 >print(answer.text)
@@ -391,7 +332,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >```
 >
 >The SDK provides:
->- Module-level functions matching CLI (`ingest`, `query`)
+>- Module-level functions matching CLI (`point`, `query`)
 >- Auto-config creation (no setup required)
 >- Full provenance tracking
 >- Same honest retrieval as the CLI
@@ -401,7 +342,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >from fitz_ai import fitz
 >
 >physics = fitz(collection="physics")
->physics.ingest("./physics_papers")
+>physics.point("./physics_papers")
 >answer = physics.query("Explain entanglement")
 >```
 
@@ -415,7 +356,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >ollama pull llama3.2
 >ollama pull nomic-embed-text
 >
->fitz quickstart ./docs "Your question here"
+>fitz query "Your question here" --source ./docs
 >```
 >
 >Fitz auto-detects Ollama when running. No API keys needed—no data leaves your machine.
@@ -430,7 +371,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 
 <br>
 
-Fitz is a foundation. It handles document ingestion and grounded retrieval—you build whatever sits on top: chatbots, dashboards, alerts, or automation.
+Fitz is a foundation. It handles document indexing and grounded retrieval—you build whatever sits on top: chatbots, dashboards, alerts, or automation.
 
 <br>
 
@@ -446,23 +387,23 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 
 > Point fitz at your company's wiki, policies, and runbooks. Employees ask natural language questions instead of hunting through folders or pinging colleagues on Slack.
 >
-> *Example:* A 200-person startup ingests their Notion workspace and compliance docs. New hires find answers to "How do I request PTO?" on day one—no more waiting for someone in HR to respond.
+> *Example:* A 200-person startup points fitz at their Notion workspace and compliance docs. New hires find answers to "How do I request PTO?" on day one—no more waiting for someone in HR to respond.
 
 <br>
 
 <strong>Continuous Intelligence & Alerting (Watchdog) 🐶</strong>
 
-> Pair fitz with cron, Airflow, or Lambda. Ingest data on a schedule, run queries automatically, trigger alerts when conditions match. Fitz provides the retrieval primitive; you wire the automation.
+> Pair fitz with cron, Airflow, or Lambda. Point at data on a schedule, run queries automatically, trigger alerts when conditions match. Fitz provides the retrieval primitive; you wire the automation.
 >
-> *Example:* A security team ingests SIEM logs nightly. Every morning, a scheduled job asks "Were there failed logins from unusual locations?" If fitz finds evidence, an alert fires to the on-call channel before anyone checks email.
+> *Example:* A security team points fitz at SIEM logs nightly. Every morning, a scheduled job asks "Were there failed logins from unusual locations?" If fitz finds evidence, an alert fires to the on-call channel before anyone checks email.
 
 <br>
 
 <strong>Web Knowledge Base 🌎</strong>
 
-> Scrape the web with Scrapy, BeautifulSoup, or Playwright. Save to disk, ingest with fitz. The web becomes a queryable knowledge base.
+> Scrape the web with Scrapy, BeautifulSoup, or Playwright. Save to disk, point fitz at it. The web becomes a queryable knowledge base.
 >
-> *Example:* A football analytics hobbyist scrapes Premier League match reports. After ingesting, they ask "How did Arsenal perform against top 6 teams?" or "What tactics did Liverpool use in away games?"—insights that would take hours to compile manually.
+> *Example:* A football analytics hobbyist scrapes Premier League match reports. They point fitz at the folder and ask "How did Arsenal perform against top 6 teams?" or "What tactics did Liverpool use in away games?"—insights that would take hours to compile manually.
 
 <br>
 
@@ -470,7 +411,7 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 
 > FitzKRAG uses address-based retrieval for code: tree-sitter parses your codebase into symbols (functions, classes, methods) with qualified names, references, and import graphs. No chunking—each symbol is a precise, addressable unit. Cross-file dependencies are tracked, so "what calls this function?" is a graph traversal, not a text search.
 >
-> *Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They ingest the codebase and ask "Where is user authentication handled?" or "What depends on the billing module?" FitzKRAG returns specific functions with their callers and dependencies. New developers onboard in days instead of weeks.
+> *Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They point fitz at the codebase and ask "Where is user authentication handled?" or "What depends on the billing module?" FitzKRAG returns specific functions with their callers and dependencies. New developers onboard in days instead of weeks.
 
 </details>
 
@@ -487,9 +428,9 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 │                         fitz-ai                               │
 ├───────────────────────────────────────────────────────────────┤
 │  User Interfaces                                              │
-│  CLI: quickstart | init | ingest | query | chat | serve       │
-│  SDK: fitz_ai.fitz() → ingest() → ask()                       │
-│  API: /query | /chat | /ingest | /collections | /health       │
+│  CLI: query (--source) | init | collections | config | serve  │
+│  SDK: fitz_ai.point() → fitz_ai.query()                       │
+│  API: /query | /chat | /point | /collections | /health        │
 ├───────────────────────────────────────────────────────────────┤
 │  Engines                                                      │
 │  ┌────────────┐  ┌────────────┐                               │
@@ -527,17 +468,16 @@ Fitz is a foundation. It handles document ingestion and grounded retrieval—you
 <br>
 
 ```bash
-fitz quickstart [PATH] [QUESTION]    # Zero-config RAG (start here)
-fitz init                            # Interactive setup wizard
-fitz ingest                          # Interactive ingestion
-fitz query                           # Single question with sources
-fitz chat                            # Multi-turn conversation with your knowledge base
-fitz collections                     # List and delete knowledge collections
-fitz keywords                        # Manage keyword vocabulary for exact matching
-fitz plugin                          # Generate plugins with AI
-fitz serve                           # Start REST API server
-fitz config                          # View/edit configuration
-fitz doctor                          # System diagnostics
+fitz query "question" --source ./docs  # Point at docs and query (start here)
+fitz query "question"                  # Query existing collection
+fitz query --chat                      # Multi-turn conversation mode
+fitz init                              # Interactive setup wizard
+fitz collections                       # List and delete knowledge collections
+fitz config                            # View/edit configuration
+fitz serve                             # Start REST API server
+fitz reset                             # Reset pgserver database (when stuck/corrupted)
+fitz eval                              # Evaluation tools
+fitz config --doctor                   # System diagnostics
 ```
 
 </details>
@@ -554,7 +494,7 @@ fitz doctor                          # System diagnostics
 ```python
 import fitz_ai
 
-fitz_ai.ingest("./docs")
+fitz_ai.point("./docs")
 answer = fitz_ai.query("What is the refund policy?")
 print(answer.text)
 ```
@@ -567,10 +507,10 @@ from fitz_ai import fitz
 
 # Create separate instances for different collections
 physics = fitz(collection="physics")
-physics.ingest("./physics_papers")
+physics.point("./physics_papers")
 
 legal = fitz(collection="legal")
-legal.ingest("./contracts")
+legal.point("./contracts")
 
 # Query each collection
 physics_answer = physics.query("Explain entanglement")
@@ -584,7 +524,7 @@ legal_answer = legal.query("What are the payment terms?")
 answer = fitz_ai.query("What is the refund policy?")
 
 print(answer.text)
-print(answer.mode)  # CONFIDENT, QUALIFIED, DISPUTED, or ABSTAIN
+print(answer.mode)  # TRUSTWORTHY, DISPUTED, or ABSTAIN
 
 for source in answer.provenance:
     print(f"Source: {source.source_id}")
@@ -620,7 +560,7 @@ fitz serve --host 0.0.0.0     # all interfaces
 |--------|----------|-------------|
 | POST | `/query` | Query knowledge base |
 | POST | `/chat` | Multi-turn chat (stateless) |
-| POST | `/ingest` | Ingest documents from path |
+| POST | `/point` | Point at folder for indexing |
 | GET | `/collections` | List all collections |
 | GET | `/collections/{name}` | Get collection stats |
 | DELETE | `/collections/{name}` | Delete a collection |
@@ -659,6 +599,7 @@ MIT
 - [Configuration Guide](docs/CONFIG.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Unified Storage (PostgreSQL + pgvector)](docs/features/unified-storage.md)
+- [Progressive KRAG & Agentic Search](docs/features/progressive-krag-agentic-search.md)
 - [Ingestion Pipeline](docs/INGESTION.md)
 - [Enrichment (Hierarchies, Entities)](docs/ENRICHMENT.md)
 - [Epistemic Constraints](docs/CONSTRAINTS.md)
