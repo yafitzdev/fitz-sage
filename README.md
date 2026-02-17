@@ -13,7 +13,7 @@
 [![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
 
 
-[Why Fitz?](#why-fitz) • [Retrieval Intelligence](#retrieval-intelligence) • [Governance](#governance--know-what-you-dont-know) • [Documentation](docs/) • [GitHub](https://github.com/yafitzdev/fitz-ai)
+[Why Fitz?](#why-fitz) • [Retrieval Intelligence](#retrieval-intelligence) • [Governance](#governance--know-what-you-dont-know) • [Documentation](#links) • [GitHub](https://github.com/yafitzdev/fitz-ai)
 
 </div>
 
@@ -180,11 +180,11 @@ You feed Fitz documents — code files, PDFs, markdown, CSVs. FitzKRAG extracts 
 
 | Retrieval Unit              | Extracted From | How It Works |
 |-----------------------------|----------------|-------------|
-| **Symbols 🖌️**             | Code files | Tree-sitter parses functions, classes, and methods into addressable units with qualified names, references, and import graphs. Cross-file dependencies are graph traversals, not text searches. |
-| **Sections 📑**             | Documents (PDF, markdown, text) | Headings and paragraphs are extracted with parent/child hierarchy. Deeply nested sections include parent context; top-level headings include child summaries. |
-| **Tables 📅**               | CSV files or tables within documents | Native PostgreSQL storage with auto-detected schema. Real SQL execution from natural language — not chunked text. |
-| **Images 🖼️**              | Figures and diagrams within documents | VLM-powered figure extraction and visual understanding. *(Coming soon)* |
-| **Chunks 🧩**               | Any content as fallback | Traditional chunk-based retrieval when structured extraction doesn't apply. Automatic fallback — no configuration needed. |
+| [**Symbols 🖌️**](docs/features/code-aware-chunking.md) | Code files | Tree-sitter parses functions, classes, and methods into addressable units with qualified names, references, and import graphs. Cross-file dependencies are graph traversals, not text searches. |
+| **Sections 📑** | Documents (PDF, markdown, text) | Headings and paragraphs are extracted with parent/child hierarchy. Deeply nested sections include parent context; top-level headings include child summaries. |
+| [**Tables 📅**](docs/features/tabular-data-routing.md) | CSV files or tables within documents | Native PostgreSQL storage with auto-detected schema. Real SQL execution from natural language — not chunked text. |
+| **Images 🖼️** | Figures and diagrams within documents | VLM-powered figure extraction and visual understanding. *(Coming soon)* |
+| **Chunks 🧩** | Any content as fallback | Traditional chunk-based retrieval when structured extraction doesn't apply. Automatic fallback — no configuration needed. |
 
 <br>
 
@@ -407,7 +407,7 @@ Fitz is a foundation. It handles document indexing and grounded retrieval—you 
 
 <br>
 
-<strong>Codebase Search 🐍</strong>
+<strong>Codebase Search 🐍</strong> → [Code-Aware Chunking](docs/features/code-aware-chunking.md) • [KRAG](docs/features/krag.md)
 
 > FitzKRAG uses address-based retrieval for code: tree-sitter parses your codebase into symbols (functions, classes, methods) with qualified names, references, and import graphs. No chunking—each symbol is a precise, addressable unit. Cross-file dependencies are tracked, so "what calls this function?" is a graph traversal, not a text search.
 >
@@ -607,5 +607,10 @@ MIT
 - [Plugin Development](docs/PLUGINS.md)
 - [Feature Control](docs/FEATURE_CONTROL.md)
 - [KRAG — Knowledge Routing Augmented Generation](docs/features/krag.md)
+- [Code-Aware Chunking](docs/features/code-aware-chunking.md)
+- [Tabular Data Routing](docs/features/tabular-data-routing.md)
+- [Enterprise Gateway](docs/features/enterprise-gateway.md)
+- [Engines](docs/ENGINES.md)
+- [Configuration Examples](docs/CONFIG_EXAMPLES.md)
 - [Custom Engines](docs/CUSTOM_ENGINES.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
