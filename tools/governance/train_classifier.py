@@ -1463,19 +1463,221 @@ def _train_binary_stage(
     return model, threshold, best_name
 
 
+def _train_binary_stage_cv(
+    name: str,
+    X: pd.DataFrame,
+    y: np.ndarray,
+    feature_names: list[str],
+    time_budget: int,
+    seed: int,
+    class_labels: tuple[str, str],
+    optimize_recall_class: int = 0,
+) -> tuple:
+    """Train a binary stage with 5-fold CV, returning OOF predictions and final model on all data.
+
+    Returns (model, threshold, best_name, oof_proba) where oof_proba is an (N, 2) array
+    of out-of-fold predicted probabilities for every sample.
+    """
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
+
+    # Model zoo
+    models = {}
+    models["RF"] = RandomForestClassifier(
+        n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1
+    )
+    models["ET"] = ExtraTreesClassifier(
+        n_estimators=300, class_weight="balanced", random_state=seed, n_jobs=-1
+    )
+    models["GBT"] = GradientBoostingClassifier(
+        n_estimators=200,
+        max_depth=4,
+        learning_rate=0.1,
+        min_samples_leaf=5,
+        random_state=seed,
+    )
+    if _HAS_XGB:
+        n0, n1 = sum(y == 0), sum(y == 1)
+        models["XGB"] = XGBClassifier(
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.1,
+            scale_pos_weight=n0 / n1 if n1 > 0 else 1,
+            random_state=seed,
+            n_jobs=-1,
+            eval_metric="logloss",
+            verbosity=0,
+        )
+    if _HAS_LGBM:
+        models["LGBM"] = LGBMClassifier(
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.1,
+            class_weight="balanced",
+            random_state=seed,
+            n_jobs=-1,
+            verbose=-1,
+        )
+
+    # Quick comparison using CV on all data
+    print(f"\n  --- {name}: Quick comparison (5-fold CV) ---")
+    results = {}
+    for mname, model in models.items():
+        cv_scores = cross_val_score(model, X, y, cv=cv, scoring="recall_macro")
+        # Get OOF predictions for evaluation
+        oof_pred = cross_val_predict(model, X, y, cv=cv)
+        acc = accuracy_score(y, oof_pred)
+        cm = confusion_matrix(y, oof_pred, labels=[0, 1])
+        r0 = cm[0, 0] / cm[0].sum() if cm[0].sum() > 0 else 0
+        r1 = cm[1, 1] / cm[1].sum() if cm[1].sum() > 0 else 0
+        results[mname] = {
+            "model": model,
+            "acc": acc,
+            "cv": cv_scores.mean(),
+            "cv_std": cv_scores.std(),
+            "r0": r0,
+            "r1": r1,
+        }
+        print(
+            f"    {mname:6s}: CV={cv_scores.mean():.4f} (+/-{cv_scores.std():.4f})"
+            f"  {class_labels[0]}={r0:.3f} {class_labels[1]}={r1:.3f}"
+        )
+
+    # Select best by recall of target class (with other class >= 0.80)
+    other_class = 1 - optimize_recall_class
+    target_key = f"r{optimize_recall_class}"
+    other_key = f"r{other_class}"
+    eligible = [(n, r) for n, r in results.items() if r[other_key] >= 0.80]
+    if not eligible:
+        eligible = list(results.items())
+    best_name = max(eligible, key=lambda x: x[1][target_key])[0]
+    print(f"    Selected: {best_name}")
+
+    # Tune with RandomizedSearchCV on all data
+    param_grids = {
+        "RF": {
+            "n_estimators": randint(100, 600),
+            "max_depth": [None, 10, 20, 30],
+            "min_samples_leaf": randint(1, 15),
+            "max_features": ["sqrt", "log2", 0.3, 0.5, 0.7],
+        },
+        "ET": {
+            "n_estimators": randint(100, 600),
+            "max_depth": [None, 10, 20, 30],
+            "min_samples_leaf": randint(1, 15),
+            "max_features": ["sqrt", "log2", 0.3, 0.5, 0.7],
+        },
+        "GBT": {
+            "n_estimators": randint(100, 500),
+            "max_depth": randint(2, 8),
+            "learning_rate": uniform(0.01, 0.3),
+            "subsample": uniform(0.6, 0.4),
+        },
+        "XGB": {
+            "n_estimators": randint(100, 600),
+            "max_depth": randint(2, 10),
+            "learning_rate": uniform(0.01, 0.3),
+            "subsample": uniform(0.6, 0.4),
+            "colsample_bytree": uniform(0.3, 0.7),
+            "reg_alpha": uniform(0, 1),
+            "reg_lambda": uniform(0.5, 2),
+            "min_child_weight": randint(1, 10),
+        },
+        "LGBM": {
+            "n_estimators": randint(100, 600),
+            "max_depth": [-1, 5, 10, 15, 20],
+            "learning_rate": uniform(0.01, 0.3),
+            "subsample": uniform(0.6, 0.4),
+            "colsample_bytree": uniform(0.3, 0.7),
+            "num_leaves": randint(15, 63),
+        },
+    }
+    base_models = {
+        "RF": RandomForestClassifier(class_weight="balanced", random_state=seed, n_jobs=-1),
+        "ET": ExtraTreesClassifier(class_weight="balanced", random_state=seed, n_jobs=-1),
+        "GBT": GradientBoostingClassifier(random_state=seed),
+    }
+    if _HAS_XGB:
+        base_models["XGB"] = XGBClassifier(
+            random_state=seed, n_jobs=-1, eval_metric="logloss", verbosity=0
+        )
+    if _HAS_LGBM:
+        base_models["LGBM"] = LGBMClassifier(
+            class_weight="balanced", random_state=seed, n_jobs=-1, verbose=-1
+        )
+
+    n_iter = max(10, int(time_budget / 3))
+    search = RandomizedSearchCV(
+        base_models[best_name],
+        param_grids[best_name],
+        n_iter=n_iter,
+        cv=cv,
+        scoring="recall_macro",
+        random_state=seed,
+        n_jobs=-1 if best_name not in ("GBT", "XGB", "LGBM") else 1,
+    )
+    search.fit(X, y)
+    model = search.best_estimator_
+    print(f"    Tuned {best_name}: CV={search.best_score_:.4f}")
+
+    # OOF predictions from tuned model for threshold tuning and evaluation
+    oof_proba = cross_val_predict(model, X, y, cv=cv, method="predict_proba")
+
+    # Threshold tuning on OOF predictions
+    threshold = 0.5
+    mask0 = y == 0
+    mask1 = y == 1
+    candidates = []
+    for t in np.arange(0.30, 0.70, 0.005):
+        preds = (oof_proba[:, 1] >= t).astype(int)
+        r0 = (preds[mask0] == 0).mean() if mask0.any() else 0
+        r1 = (preds[mask1] == 1).mean() if mask1.any() else 0
+        candidates.append((t, r0, r1))
+    # Maximize target recall with other recall >= 0.85
+    target_idx = 1 + optimize_recall_class  # r0 or r1
+    elig = [(t, r0, r1) for t, r0, r1 in candidates if (r0, r1)[other_class] >= 0.85]
+    if elig:
+        threshold = max(elig, key=lambda x: x[target_idx])[0]
+    else:
+        elig = [(t, r0, r1) for t, r0, r1 in candidates if (r0, r1)[other_class] >= 0.80]
+        if elig:
+            threshold = max(elig, key=lambda x: x[target_idx])[0]
+    preds_at = (oof_proba[:, 1] >= threshold).astype(int)
+    r0_at = (preds_at[mask0] == 0).mean()
+    r1_at = (preds_at[mask1] == 1).mean()
+    print(
+        f"    Threshold: {threshold:.3f} — {class_labels[0]}={r0_at:.3f} {class_labels[1]}={r1_at:.3f}"
+    )
+
+    # Train final model on ALL data
+    model.fit(X, y)
+
+    # Feature importance
+    if hasattr(model, "feature_importances_"):
+        imp = model.feature_importances_
+        order = np.argsort(imp)[::-1]
+        print("    Top 5 features:")
+        for rank, idx in enumerate(order[:5], 1):
+            fname = feature_names[idx] if idx < len(feature_names) else f"feature_{idx}"
+            print(f"      {rank}. {fname:40s} {imp[idx]:.4f}")
+
+    return model, threshold, best_name, oof_proba
+
+
 def train_cascade(
     X: pd.DataFrame,
     y_4class: np.ndarray,
     feature_names: list[str],
     encoders: dict[str, LabelEncoder],
-    test_size: float,
     time_budget: int,
     seed: int,
     output_path: Path,
     governor_preds: np.ndarray | None = None,
     case_ids: pd.Series | None = None,
 ):
-    """Train 4-question atomic cascade classifier.
+    """Train 4-question atomic cascade classifier using 5-fold cross-validation.
+
+    Every case serves as both train and test via out-of-fold predictions.
+    Final models are trained on ALL data.
 
     Q1: Is evidence sufficient?      → No = ABSTAIN  (ML)
     Q2: Is there material conflict?  → routes Q3/Q4  (rule: ca_fired)
@@ -1483,15 +1685,6 @@ def train_cascade(
     Q4: Is evidence truly solid?     → Yes=TRUSTWORTHY, No=ABSTAIN  (ML, clean cases only)
     """
     y_3class = _collapse_to_3class(y_4class)
-
-    # Stratified split
-    X_train, X_test, y3_train, y3_test = train_test_split(
-        X,
-        y_3class,
-        test_size=test_size,
-        random_state=seed,
-        stratify=y_3class,
-    )
 
     time_per_q = time_budget // 3  # Q1, Q3, Q4 each get a share
 
@@ -1502,17 +1695,13 @@ def train_cascade(
     print("Q1: Is evidence sufficient? (abstain vs answerable)")
     print(f"{'='*60}")
 
-    y_q1_train = np.where(y3_train == "abstain", 0, 1)
-    y_q1_test = np.where(y3_test == "abstain", 0, 1)
-    print(f"  Train: {sum(y_q1_train == 1)} answerable, {sum(y_q1_train == 0)} abstain")
-    print(f"  Test:  {sum(y_q1_test == 1)} answerable, {sum(y_q1_test == 0)} abstain")
+    y_q1 = np.where(y_3class == "abstain", 0, 1)
+    print(f"  Total: {sum(y_q1 == 1)} answerable, {sum(y_q1 == 0)} abstain")
 
-    q1_model, q1_threshold, q1_name = _train_binary_stage(
+    q1_model, q1_threshold, q1_name, q1_oof = _train_binary_stage_cv(
         "Q1",
-        X_train,
-        y_q1_train,
-        X_test,
-        y_q1_test,
+        X,
+        y_q1,
         feature_names,
         time_per_q,
         seed,
@@ -1527,20 +1716,14 @@ def train_cascade(
     print(f"Q2: Is there material conflict? (rule: {_CONFLICT_FEATURE})")
     print(f"{'='*60}")
 
-    conflict_train = X_train[_CONFLICT_FEATURE].astype(int).values == 1
-    conflict_test = X_test[_CONFLICT_FEATURE].astype(int).values == 1
+    has_conflict = X[_CONFLICT_FEATURE].astype(int).values == 1
 
-    print(f"  Train conflict: {conflict_train.sum()}, clean: {(~conflict_train).sum()}")
-    print(f"  Test  conflict: {conflict_test.sum()}, clean: {(~conflict_test).sum()}")
+    print(f"  Conflict: {has_conflict.sum()}, clean: {(~has_conflict).sum()}")
 
     # Show class distribution in each path
-    for path_name, mask_tr, mask_te in [
-        ("Conflict", conflict_train, conflict_test),
-        ("Clean", ~conflict_train, ~conflict_test),
-    ]:
-        tr_dist = {lbl: (y3_train[mask_tr] == lbl).sum() for lbl in _3CLASS_LABELS}
-        te_dist = {lbl: (y3_test[mask_te] == lbl).sum() for lbl in _3CLASS_LABELS}
-        print(f"  {path_name} path — train: {tr_dist}, test: {te_dist}")
+    for path_name, mask in [("Conflict", has_conflict), ("Clean", ~has_conflict)]:
+        dist = {lbl: (y_3class[mask] == lbl).sum() for lbl in _3CLASS_LABELS}
+        print(f"  {path_name} path — {dist}")
 
     # ================================================================
     # Q3: Is the conflict resolved? (trustworthy vs disputed, conflict path)
@@ -1549,29 +1732,22 @@ def train_cascade(
     print("Q3: Is the conflict resolved? (conflict path: trustworthy vs disputed)")
     print(f"{'='*60}")
 
-    # Q3 training: conflict cases, trustworthy=1 (resolved) vs disputed=0 (unresolved)
-    # Exclude abstain cases from Q3 training — they are noise (lack evidence, not unresolved conflicts)
-    q3_train_mask = conflict_train & (y3_train != "abstain")
-    q3_test_mask = conflict_test
+    # Q3: conflict cases, trustworthy=1 (resolved) vs disputed=0 (unresolved)
+    # Exclude abstain cases from Q3 — they are noise (lack evidence, not unresolved conflicts)
+    q3_mask = has_conflict & (y_3class != "abstain")
+    X_q3 = X[q3_mask]
+    y_q3 = np.where(y_3class[q3_mask] == "trustworthy", 1, 0)
 
-    y_q3_train = np.where(y3_train[q3_train_mask] == "trustworthy", 1, 0)
-    y_q3_test = np.where(y3_test[q3_test_mask] == "trustworthy", 1, 0)
-    X_q3_train = X_train[q3_train_mask]
-    X_q3_test = X_test[q3_test_mask]
-
-    n_abstain_removed = conflict_train.sum() - q3_train_mask.sum()
+    n_abstain_removed = has_conflict.sum() - q3_mask.sum()
     print(
-        f"  Train: {sum(y_q3_train == 1)} resolved (trustworthy), {sum(y_q3_train == 0)} unresolved (disputed)"
+        f"  Total: {sum(y_q3 == 1)} resolved (trustworthy), {sum(y_q3 == 0)} unresolved (disputed)"
     )
-    print(f"  Removed {n_abstain_removed} abstain cases from Q3 training (noise)")
-    print(f"  Test:  {sum(y_q3_test == 1)} resolved, {sum(y_q3_test == 0)} unresolved")
+    print(f"  Removed {n_abstain_removed} abstain cases from Q3 (noise)")
 
-    q3_model, q3_threshold, q3_name = _train_binary_stage(
+    q3_model, q3_threshold, q3_name, q3_oof = _train_binary_stage_cv(
         "Q3",
-        X_q3_train,
-        y_q3_train,
-        X_q3_test,
-        y_q3_test,
+        X_q3,
+        y_q3,
         feature_names,
         time_per_q,
         seed,
@@ -1586,27 +1762,20 @@ def train_cascade(
     print("Q4: Is evidence truly solid? (clean path: trustworthy vs abstain)")
     print(f"{'='*60}")
 
-    # Q4 training: clean cases, label trustworthy=1 (solid), abstain=0 (insufficient)
+    # Q4: clean cases, label trustworthy=1 (solid), abstain=0 (insufficient)
     # Disputed cases in clean path get labeled 0 (insufficient → safe fallback to abstain)
-    q4_train_mask = ~conflict_train
-    q4_test_mask = ~conflict_test
-
-    y_q4_train = np.where(y3_train[q4_train_mask] == "trustworthy", 1, 0)
-    y_q4_test = np.where(y3_test[q4_test_mask] == "trustworthy", 1, 0)
-    X_q4_train = X_train[q4_train_mask]
-    X_q4_test = X_test[q4_test_mask]
+    q4_mask = ~has_conflict
+    X_q4 = X[q4_mask]
+    y_q4 = np.where(y_3class[q4_mask] == "trustworthy", 1, 0)
 
     print(
-        f"  Train: {sum(y_q4_train == 1)} solid (trustworthy), {sum(y_q4_train == 0)} insufficient (abstain+disputed)"
+        f"  Total: {sum(y_q4 == 1)} solid (trustworthy), {sum(y_q4 == 0)} insufficient (abstain+disputed)"
     )
-    print(f"  Test:  {sum(y_q4_test == 1)} solid, {sum(y_q4_test == 0)} insufficient")
 
-    q4_model, q4_threshold, q4_name = _train_binary_stage(
+    q4_model, q4_threshold, q4_name, q4_oof = _train_binary_stage_cv(
         "Q4",
-        X_q4_train,
-        y_q4_train,
-        X_q4_test,
-        y_q4_test,
+        X_q4,
+        y_q4,
         feature_names,
         time_per_q,
         seed,
@@ -1615,54 +1784,46 @@ def train_cascade(
     )
 
     # ================================================================
-    # Combined evaluation
+    # Combined evaluation using OOF predictions
     # ================================================================
     print(f"\n{'='*60}")
-    print("COMBINED CASCADE EVALUATION")
+    print("COMBINED CASCADE EVALUATION (out-of-fold)")
     print(f"{'='*60}")
 
-    def cascade_predict(X_data, q1_m, q1_t, q3_m, q3_t, q4_m, q4_t):
-        """Run full 4-question cascade."""
-        n = len(X_data)
-        result = np.full(n, "abstain", dtype=object)
+    # Build cascade predictions from OOF probabilities
+    n = len(X)
+    final_oof_pred = np.full(n, "abstain", dtype=object)
 
-        # Q1: sufficient evidence?
-        q1_proba = q1_m.predict_proba(X_data)
-        q1_answerable = q1_proba[:, 1] >= q1_t
+    # Q1 OOF: answerable?
+    q1_answerable = q1_oof[:, 1] >= q1_threshold
 
-        # Q2: conflict routing (rule)
-        has_conflict = X_data[_CONFLICT_FEATURE].astype(int).values == 1
+    # Q3 OOF: build full-size array, fill in conflict+non-abstain cases
+    q3_indices = np.where(q3_mask)[0]
+    q3_oof_full = np.full(n, 0.0)
+    for i, idx in enumerate(q3_indices):
+        q3_oof_full[idx] = q3_oof[i, 1]
 
-        # Q3: conflict path → resolved?
-        q3_mask = q1_answerable & has_conflict
-        if q3_mask.any():
-            q3_proba = q3_m.predict_proba(X_data[q3_mask])
-            q3_resolved = q3_proba[:, 1] >= q3_t
-            q3_indices = np.where(q3_mask)[0]
-            for i, idx in enumerate(q3_indices):
-                result[idx] = "trustworthy" if q3_resolved[i] else "disputed"
+    # Q4 OOF: build full-size array, fill in clean cases
+    q4_indices = np.where(q4_mask)[0]
+    q4_oof_full = np.full(n, 0.0)
+    for i, idx in enumerate(q4_indices):
+        q4_oof_full[idx] = q4_oof[i, 1]
 
-        # Q4: clean path → solid?
-        q4_mask = q1_answerable & ~has_conflict
-        if q4_mask.any():
-            q4_proba = q4_m.predict_proba(X_data[q4_mask])
-            q4_solid = q4_proba[:, 1] >= q4_t
-            q4_indices = np.where(q4_mask)[0]
-            for i, idx in enumerate(q4_indices):
-                result[idx] = "trustworthy" if q4_solid[i] else "abstain"
+    # Conflict path
+    conflict_answerable = q1_answerable & has_conflict
+    for idx in np.where(conflict_answerable)[0]:
+        final_oof_pred[idx] = "trustworthy" if q3_oof_full[idx] >= q3_threshold else "disputed"
 
-        return result
+    # Clean path
+    clean_answerable = q1_answerable & ~has_conflict
+    for idx in np.where(clean_answerable)[0]:
+        final_oof_pred[idx] = "trustworthy" if q4_oof_full[idx] >= q4_threshold else "abstain"
 
-    # Test set evaluation
-    final_pred = cascade_predict(
-        X_test, q1_model, q1_threshold, q3_model, q3_threshold, q4_model, q4_threshold
-    )
+    combined_acc = accuracy_score(y_3class, final_oof_pred)
+    print(f"\nCombined accuracy (OOF): {combined_acc:.4f} ({sum(y_3class == final_oof_pred)}/{len(y_3class)})")
+    print(classification_report(y_3class, final_oof_pred, labels=_3CLASS_LABELS, zero_division=0))
 
-    combined_acc = accuracy_score(y3_test, final_pred)
-    print(f"\nCombined accuracy: {combined_acc:.4f} ({sum(y3_test == final_pred)}/{len(y3_test)})")
-    print(classification_report(y3_test, final_pred, labels=_3CLASS_LABELS, zero_division=0))
-
-    cm = confusion_matrix(y3_test, final_pred, labels=_3CLASS_LABELS)
+    cm = confusion_matrix(y_3class, final_oof_pred, labels=_3CLASS_LABELS)
     header = "predicted ->".rjust(20) + "".join(f"{lbl:>15}" for lbl in _3CLASS_LABELS)
     print(header)
     print("-" * len(header))
@@ -1671,8 +1832,8 @@ def train_cascade(
         print(row)
 
     # Safety metrics
-    ft_abs = ((final_pred == "trustworthy") & (y3_test == "abstain")).sum()
-    ft_dis = ((final_pred == "trustworthy") & (y3_test == "disputed")).sum()
+    ft_abs = ((final_oof_pred == "trustworthy") & (y_3class == "abstain")).sum()
+    ft_dis = ((final_oof_pred == "trustworthy") & (y_3class == "disputed")).sum()
     print(f"\nFalse Trustworthy: {ft_abs + ft_dis} ({ft_abs} abstain + {ft_dis} disputed)")
 
     # Per-class recall
@@ -1685,16 +1846,18 @@ def train_cascade(
         recalls[label] = recall
         print(f"  {label:15s}: {recall:.4f} ({correct}/{total})")
 
-    # Governor comparison
+    # Governor comparison (full dataset)
     if governor_preds is not None:
-        gov_3class = _collapse_to_3class(governor_preds[X_test.index])
-        gov_acc = accuracy_score(y3_test, gov_3class)
+        gov_3class = _collapse_to_3class(governor_preds)
+        gov_acc = accuracy_score(y_3class, gov_3class)
         print(f"\nGovernor baseline (3-class): {gov_acc:.4f}")
         print(f"Delta vs governor: +{combined_acc - gov_acc:.4f}")
 
-    # ---- Build test split metadata ----
-    test_ids = list(case_ids.iloc[X_test.index].values) if case_ids is not None else []
-    test_split_hash = hashlib.sha256(",".join(sorted(str(i) for i in test_ids)).encode()).hexdigest()[:16] if test_ids else ""
+    # ---- Build CV prediction map ----
+    cv_predictions = {}
+    if case_ids is not None:
+        for i, cid in enumerate(case_ids.values):
+            cv_predictions[cid] = final_oof_pred[i]
 
     # ---- Save artifact ----
     artifact = {
@@ -1714,8 +1877,8 @@ def train_cascade(
         "encoders": encoders,
         "feature_names": feature_names,
         "labels": _3CLASS_LABELS,
-        "test_case_ids": test_ids,
-        "test_split_hash": test_split_hash,
+        "cv_predictions": cv_predictions,
+        "cv_folds": 5,
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(artifact, output_path)
@@ -1724,9 +1887,9 @@ def train_cascade(
     print(f"  Q2: rule ({_CONFLICT_FEATURE}) — material conflict?")
     print(f"  Q3: {q3_name} (t={q3_threshold:.3f}) — conflict resolved?")
     print(f"  Q4: {q4_name} (t={q4_threshold:.3f}) — evidence solid?")
-    print(f"  Combined: {combined_acc:.4f}")
-    if test_ids:
-        print(f"  Test split: {len(test_ids)} cases (hash={test_split_hash})")
+    print(f"  Combined (OOF): {combined_acc:.4f}")
+    if cv_predictions:
+        print(f"  CV predictions: {len(cv_predictions)} cases (5-fold OOF)")
 
     return artifact
 
@@ -2040,7 +2203,6 @@ def main():
             y_4class,
             feature_names,
             encoders,
-            args.test_size,
             args.time_budget,
             args.seed,
             args.output,

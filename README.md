@@ -273,11 +273,11 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 
 | Decision | Meaning                              | Recall    |
 |----------|--------------------------------------|-----------|
-| **ABSTAIN** | Evidence doesn't answer the question | **90.0%** |
-| **DISPUTED** | Sources contradict each other        | **76.2%** |
-| **TRUSTWORTHY** | Consistent, sufficient evidence      | **73.4%** |
+| **ABSTAIN** | Evidence doesn't answer the question | **90.2%** |
+| **DISPUTED** | Sources contradict each other        | **74.9%** |
+| **TRUSTWORTHY** | Consistent, sufficient evidence      | **78.6%** |
 
-**Overall accuracy: 79.1%** on fitz-gov 5.0 (2,900+ cases, 92% hard difficulty)
+**Overall accuracy: 81.3%** on fitz-gov 5.0 (2,910 cases, 5-fold cross-validated, 92% hard difficulty)
 
 <br>
 
