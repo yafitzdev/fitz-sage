@@ -157,24 +157,26 @@ class SectionSearchStrategy:
         bm25_weight: float,
         semantic_weight: float,
     ) -> list[dict[str, Any]]:
-        """Merge BM25 and semantic results with weighted scoring."""
+        """Merge BM25 and semantic results using Reciprocal Rank Fusion (RRF).
+
+        Both legs use RRF with k=60 so they are on the same scale before
+        weighting. This avoids the asymmetry of mixing raw cosine scores with
+        rank-reciprocal BM25 scores.
+        """
+        _RRF_K = 60
         scores: dict[str, float] = {}
         by_id: dict[str, dict[str, Any]] = {}
 
-        # Use rank-based scoring for BM25 (ts_rank raw values are too small
-        # to combine meaningfully with cosine similarity; rank position gives
-        # a 0-1 normalized signal that merges well with semantic scores).
         for rank, r in enumerate(bm25_results):
             sid = r["id"]
-            rank_score = 1.0 / (rank + 1)
-            scores[sid] = scores.get(sid, 0) + bm25_weight * rank_score
+            rrf_score = 1.0 / (_RRF_K + rank)
+            scores[sid] = scores.get(sid, 0) + bm25_weight * rrf_score
             by_id[sid] = r
 
-        # Use cosine scores directly for semantic
         for rank, r in enumerate(semantic_results):
             sid = r["id"]
-            cosine_score = r.get("score", 1.0 / (rank + 1))
-            scores[sid] = scores.get(sid, 0) + semantic_weight * cosine_score
+            rrf_score = 1.0 / (_RRF_K + rank)
+            scores[sid] = scores.get(sid, 0) + semantic_weight * rrf_score
             by_id[sid] = r
 
         sorted_ids = sorted(scores, key=lambda x: scores[x], reverse=True)
