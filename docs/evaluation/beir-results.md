@@ -8,11 +8,11 @@
 
 ## Summary Table
 
-| Dataset  | nomic-embed-text | bge-m3    | BM25 baseline | SOTA (dense) |
-|----------|:----------------:|:---------:|:-------------:|:------------:|
-| scifact  | 0.6103           | **0.6261**| 0.6647        | ~0.77        |
-| scidocs  | 0.0799           | **0.1320**| 0.1490        | ~0.17        |
-| fiqa     | 0.2251           | ~0.28–0.32| 0.2361        | ~0.45        |
+| Dataset  | nomic-embed-text | bge-m3         | BM25 baseline | SOTA (dense) |
+|----------|:----------------:|:--------------:|:-------------:|:------------:|
+| scifact  | 0.6103           | **0.6262**     | 0.6647        | ~0.77        |
+| scidocs  | 0.0799           | **0.1319**     | 0.1490        | ~0.17        |
+| fiqa     | 0.2251           | **0.2702** ✓   | 0.2361        | ~0.45        |
 
 Metric: **nDCG@10** (higher is better, max 1.0)
 
@@ -34,9 +34,7 @@ Metric: **nDCG@10** (higher is better, max 1.0)
 |----------|--------:|-----------:|-------:|--------:|-------:|
 | scifact  | 0.6261  | 0.9017     | 0.5651 | 300     | 5,183  |
 | scidocs  | 0.1320  | 0.3253     | 0.0727 | 1,000   | 25,657 |
-| fiqa     | ~0.28–0.32 | —       | —      | 648     | 57,638 |
-
-> fiqa with bge-m3 completes but takes ~90 minutes on CPU. Exact score not yet recorded.
+| fiqa     | 0.2702  | 0.6099     | 0.1816 | 648     | 57,638 |
 
 ### Dense-only baseline (nomic, before hybrid) — 2026-02-19
 
@@ -84,7 +82,7 @@ Scientific claim verification. Text similarity works well here. Our bge-m3 score
 **Structurally unfavorable for any text-similarity system.** Relevance labels are based on citation graph membership (did paper A cite paper B?), not semantic similarity. Even SOTA dense retrievers only reach ~0.17. Our 0.1320 with bge-m3 is respectable for a local model. Don't chase this one.
 
 ### fiqa (57,638 docs, 648 queries)
-Financial Q&A from Reddit and investment forums. Rewards exact keyword matching (ticker symbols, numbers, product names) where BM25 has a natural edge. Large corpus makes it slow to index with local models (~90 min with bge-m3 on CPU).
+Financial Q&A from Reddit and investment forums. bge-m3 scores **0.2702**, beating BM25 baseline (0.2361) — the hybrid semantic search genuinely adds value here. Large corpus makes it slow to index with local models (~90 min with bge-m3 on CPU).
 
 ---
 
