@@ -114,7 +114,12 @@ class SectionStore:
         return results
 
     def search_by_vector(self, vector: list[float], limit: int = 20) -> list[dict[str, Any]]:
-        """Semantic search using cosine distance on summary_vector."""
+        """Semantic search using cosine distance on summary_vector.
+
+        Sets hnsw.ef_search=200 for the duration of the query to improve ANN
+        recall on large corpora. The default of 40 misses relevant neighbours;
+        200 recovers near-exact recall with acceptable latency overhead.
+        """
         vector_str = _vector_to_pg(vector)
         if not vector_str:
             return []
@@ -129,6 +134,7 @@ class SectionStore:
             LIMIT %s
         """
         with self._cm.connection(self._collection) as conn:
+            conn.execute("SET LOCAL hnsw.ef_search = 200")
             rows = conn.execute(sql, (vector_str, vector_str, limit)).fetchall()
         results = []
         for row in rows:
