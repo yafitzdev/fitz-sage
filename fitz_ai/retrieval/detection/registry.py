@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from fitz_ai.llm.factory import ChatFactory
 from fitz_ai.logging.logger import get_logger
 
+from .classifier import DetectionClassifier
 from .llm_classifier import LLMClassifier
 from .modules import AggregationType, TemporalIntent
 from .protocol import DetectionCategory, DetectionResult
@@ -142,12 +143,21 @@ class DetectionOrchestrator:
     # Lazy-loaded classifier and expansion detector
     _classifier: LLMClassifier | None = field(default=None, init=False, repr=False)
     _expansion_detector: Any = field(default=None, init=False, repr=False)
+    _ml_classifier: DetectionClassifier | None = field(default=None, init=False, repr=False)
 
     def _ensure_classifier(self) -> LLMClassifier | None:
         """Lazy-load LLM classifier with all modules."""
         if self._classifier is None and self.chat_factory is not None:
             self._classifier = LLMClassifier(chat_factory=self.chat_factory)
         return self._classifier
+
+    def _ensure_ml_classifier(self) -> DetectionClassifier | None:
+        """Lazy-load ML classifier; returns None if unavailable."""
+        if self._ml_classifier is None:
+            self._ml_classifier = DetectionClassifier()
+        if self._ml_classifier.available:
+            return self._ml_classifier
+        return None
 
     def _get_expansion_detector(self) -> Any:
         """Lazy-load expansion detector (dict-based, not LLM)."""
@@ -173,8 +183,22 @@ class DetectionOrchestrator:
         classifier = self._ensure_classifier()
 
         if classifier:
-            # Single LLM call, results distributed to modules
-            results = classifier.classify(query)
+            ml_classifier = self._ensure_ml_classifier()
+            if ml_classifier is not None:
+                flagged = ml_classifier.predict(query)
+                if flagged is None:
+                    # ML error or unavailable — run all modules
+                    results = classifier.classify(query, limit_to=None)
+                elif len(flagged) == 0:
+                    # No categories flagged — skip LLM entirely
+                    results = {}
+                    logger.debug("ML classifier flagged no categories; skipping LLM")
+                else:
+                    # Run only flagged modules
+                    results = classifier.classify(query, limit_to=flagged)
+            else:
+                # No ML model — run all modules unchanged
+                results = classifier.classify(query, limit_to=None)
         else:
             results = {}
             logger.debug("No chat factory available, skipping LLM classification")

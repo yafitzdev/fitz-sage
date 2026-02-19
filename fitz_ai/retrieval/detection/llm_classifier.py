@@ -57,30 +57,43 @@ class LLMClassifier:
 
             self.modules = list(DEFAULT_MODULES)
 
-    def classify(self, query: str) -> dict["DetectionCategory", "DetectionResult[Any]"]:
+    def classify(
+        self,
+        query: str,
+        limit_to: "set[DetectionCategory] | None" = None,
+    ) -> dict["DetectionCategory", "DetectionResult[Any]"]:
         """
-        Classify query using all modules in one LLM call.
+        Classify query using all modules (or a filtered subset) in one LLM call.
 
         Args:
             query: User's query string
+            limit_to: If provided, only run modules whose category is in this set.
+                If the filtered list is empty, returns empty results without calling LLM.
 
         Returns:
             Dict mapping DetectionCategory to DetectionResult
         """
-        prompt = self._build_prompt(query)
+        active_modules = self.modules
+        if limit_to is not None:
+            active_modules = [m for m in self.modules if m.category in limit_to]
+            if not active_modules:
+                return self._empty_results()
+
+        prompt = self._build_prompt(query, active_modules)
 
         try:
             chat = self.chat_factory(self.TIER_CLASSIFY)
             response = chat.chat([{"role": "user", "content": prompt}])
             raw_results = self._parse_response(response)
-            return self._distribute_to_modules(raw_results)
+            return self._distribute_to_modules(raw_results, active_modules)
         except Exception as e:
             logger.warning(f"LLM classification failed: {e}")
-            return self._empty_results()
+            return self._empty_results(active_modules)
 
-    def _build_prompt(self, query: str) -> str:
-        """Build combined prompt from all module fragments."""
-        fragments = [m.prompt_fragment() for m in self.modules]
+    def _build_prompt(self, query: str, modules: "list[DetectionModule] | None" = None) -> str:
+        """Build combined prompt from the given modules (defaults to self.modules)."""
+        active = modules if modules is not None else self.modules
+        fragments = [m.prompt_fragment() for m in active]
         combined = ",\n  ".join(fragments)
         return PROMPT_HEADER.format(query=query, module_fragments=combined)
 
@@ -126,17 +139,23 @@ class LLMClassifier:
         return {}
 
     def _distribute_to_modules(
-        self, raw_results: dict[str, Any]
+        self,
+        raw_results: dict[str, Any],
+        modules: "list[DetectionModule] | None" = None,
     ) -> dict["DetectionCategory", "DetectionResult[Any]"]:
-        """Distribute parsed results to each module."""
+        """Distribute parsed results to each module (defaults to self.modules)."""
+        active = modules if modules is not None else self.modules
         results = {}
-        for module in self.modules:
+        for module in active:
             module_data = raw_results.get(module.json_key, {})
             if not isinstance(module_data, dict):
                 module_data = {}
             results[module.category] = module.parse_result(module_data)
         return results
 
-    def _empty_results(self) -> dict["DetectionCategory", "DetectionResult[Any]"]:
-        """Return empty results for all modules."""
-        return {module.category: module.not_detected() for module in self.modules}
+    def _empty_results(
+        self, modules: "list[DetectionModule] | None" = None
+    ) -> dict["DetectionCategory", "DetectionResult[Any]"]:
+        """Return not-detected results for the given modules (defaults to self.modules)."""
+        active = modules if modules is not None else self.modules
+        return {module.category: module.not_detected() for module in active}
