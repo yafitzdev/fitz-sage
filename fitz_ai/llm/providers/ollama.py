@@ -154,11 +154,13 @@ class OllamaEmbedding:
         self,
         model: str | None = None,
         base_url: str | None = None,
+        num_ctx: int | None = None,
     ) -> None:
         self._base_url = base_url or DEFAULT_BASE_URL
         self._model = model or EMBEDDING_MODEL
         self._client = httpx.Client(base_url=self._base_url, timeout=60.0)
         self._dimensions: int | None = None
+        self._num_ctx = num_ctx
         self._prefix_map = self._resolve_prefixes()
 
     def _resolve_prefixes(self) -> dict[str, str]:
@@ -183,6 +185,8 @@ class OllamaEmbedding:
             "model": self._model,
             "input": self._apply_prefix(text, task_type),
         }
+        if self._num_ctx is not None:
+            payload["options"] = {"num_ctx": self._num_ctx}
 
         response = self._client.post("/api/embed", json=payload)
         response.raise_for_status()
@@ -206,6 +210,8 @@ class OllamaEmbedding:
             "model": self._model,
             "input": prefixed,
         }
+        if self._num_ctx is not None:
+            payload["options"] = {"num_ctx": self._num_ctx}
 
         response = self._client.post("/api/embed", json=payload)
         response.raise_for_status()

@@ -220,6 +220,10 @@ def _get_provider_kwargs(config: dict[str, Any] | None) -> dict[str, Any]:
     if "model" in config:
         kwargs["model"] = config["model"]
 
+    # Pass through context window override (e.g. num_ctx for Ollama)
+    if "num_ctx" in config:
+        kwargs["num_ctx"] = config["num_ctx"]
+
     return kwargs
 
 
