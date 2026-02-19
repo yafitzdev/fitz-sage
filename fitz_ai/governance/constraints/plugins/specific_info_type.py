@@ -16,13 +16,16 @@ flag it (false positive). Only fire when we are VERY confident the
 specific info is genuinely absent from the context.
 """
 
-import re
-from typing import Sequence
+import re  # used only for structural version/identifier matching in _has_entity_mismatch
+from typing import TYPE_CHECKING, Any, Sequence
 
 from fitz_ai.governance.protocol import EvidenceItem
 from fitz_ai.logging.logger import get_logger
 
 from ..base import ConstraintResult, FeatureSpec
+
+if TYPE_CHECKING:
+    from fitz_ai.governance.constraints.semantic import SemanticMatcher
 
 logger = get_logger(__name__)
 
@@ -38,10 +41,24 @@ class SpecificInfoTypeConstraint:
     Conservative by design: only fires on high-confidence detections.
     """
 
-    def __init__(self, enabled: bool = True):
-        """Initialize the constraint."""
+    def __init__(self, enabled: bool = True, embedder: Any = None):
+        """Initialize the constraint.
+
+        Args:
+            enabled: Whether this constraint is active.
+            embedder: Optional embedding provider. When supplied, info type
+                detection uses SemanticMatcher instead of regex, capturing
+                paraphrase variations and non-English queries.
+        """
         self.enabled = enabled
         self.name = "specific_info_type"
+        self._semantic_matcher: SemanticMatcher | None = None
+        if embedder is not None:
+            from fitz_ai.governance.constraints.semantic import SemanticMatcher
+
+            self._semantic_matcher = SemanticMatcher(
+                embedder=lambda text: embedder.embed(text, task_type="query")
+            )
 
     @staticmethod
     def feature_schema() -> list[FeatureSpec]:
@@ -157,105 +174,13 @@ class SpecificInfoTypeConstraint:
         return False
 
     def _identify_info_type(self, query: str) -> str | None:
+        """Identify what specific information type the query requests.
+
+        Delegates to SemanticMatcher. Returns None (no detection) when no
+        embedder is configured — the constraint simply does not fire.
         """
-        Identify what type of specific information is being requested.
-
-        CONSERVATIVE: Only returns an info type when the query structure
-        clearly and unambiguously asks for a specific category of information.
-        Generic questions ("What is X?", "How does X work?") should NOT trigger.
-
-        Returns the info type or None if query doesn't ask for specific info.
-        """
-        query_lower = query.lower().strip()
-
-        # PRICING: Only when explicitly asking about price/cost with clear intent
-        # "how much does X cost" or "what is the price of X"
-        if re.search(
-            r"\b(price|pricing|cost|fee|charge|tariff)\b.*\b(of|for|to)\b",
-            query_lower,
-        ) or re.search(r"\bhow much\b.*\b(cost|charge|pay)\b", query_lower):
-            return "pricing"
-
-        # QUANTITY: Only "how many X" pattern - very specific
-        if re.search(r"\bhow many\b", query_lower):
-            return "quantity"
-
-        # TEMPORAL: Only when asking for a specific date/deadline/schedule
-        # NOT "when" in general - only "when is/was/will the deadline/date/etc."
-        if re.search(
-            r"\b(when is|when was|when will|when does|when did)\b.*"
-            r"\b(deadline|due date|release|launch|expire|expiration|completion|delivery)\b",
-            query_lower,
-        ):
-            return "temporal"
-        # "what is the deadline/date for X"
-        if re.search(
-            r"\bwhat\b.*\b(deadline|due date|release date|launch date|expiration date)\b",
-            query_lower,
-        ):
-            return "temporal"
-
-        # SPECIFICATION: Only when asking for specific numeric specs/limits/requirements
-        # "what is the maximum/minimum X" or "what are the requirements for X"
-        if re.search(
-            r"\bwhat\b.*\b(maximum|minimum|max|min|limit|capacity)\b.*\b(of|for)\b",
-            query_lower,
-        ):
-            return "specification"
-        if re.search(
-            r"\b(maximum|minimum|max|min)\b.*\b(load|weight|capacity|size|speed)\b",
-            query_lower,
-        ):
-            return "specification"
-
-        # MEASUREMENT: Only when explicitly asking for a dose/dimension/size with clear intent
-        if re.search(
-            r"\bwhat\b.*\b(dosage|dose|dimension|size|weight|height|length|width)\b.*\b(of|for)\b",
-            query_lower,
-        ):
-            return "measurement"
-        if re.search(
-            r"\b(recommended|maximum|correct|proper)\b.*\b(dosage|dose)\b",
-            query_lower,
-        ):
-            return "measurement"
-
-        # WARRANTY: Only when explicitly asking about warranty/coverage terms
-        if re.search(
-            r"\b(what|does|is)\b.*\b(warranty|guarantee|coverage)\b.*\b(cover|include|last|length|duration|period)\b",
-            query_lower,
-        ):
-            return "warranty"
-        if re.search(
-            r"\b(warranty|guarantee)\b.*\b(for|on|of)\b",
-            query_lower,
-        ):
-            return "warranty"
-
-        # RATE: Only when explicitly asking for a rate, percentage, salary, or average
-        # "what is the X rate" or "what is the rate of/for X"
-        if re.search(
-            r"\bwhat\b.*\b(rate|percentage|percent|ratio)\b",
-            query_lower,
-        ):
-            return "rate"
-        if re.search(
-            r"\b(average|median|mean)\b.*\b(salary|wage|income|pay|compensation)\b",
-            query_lower,
-        ):
-            return "rate"
-
-        # DECISION: Only very explicit decision-seeking patterns
-        if re.search(
-            r"\b(should we|should i|is it worth|worth the risk|should we proceed)\b",
-            query_lower,
-        ):
-            return "decision"
-
-        # Everything else: DO NOT detect. Common question patterns like
-        # "What is X?", "How does X work?", "Why did X happen?",
-        # "What programming language...", "Where is X located?" are
-        # all generic factual questions that should NOT trigger this constraint.
+        if self._semantic_matcher is not None:
+            return self._semantic_matcher.identify_info_type(query)
         return None
 
     def _check_for_info_type(

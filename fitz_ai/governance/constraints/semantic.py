@@ -97,6 +97,241 @@ RESOLUTION_QUERY_CONCEPTS: tuple[str, ...] = (
 
 
 # =============================================================================
+# Aspect Classification Concepts
+# =============================================================================
+# Anchor phrases representing each query aspect intent.
+# Used to classify what a query is asking for (e.g. cause vs definition vs pricing).
+
+ASPECT_QUERY_CONCEPTS: dict[str, tuple[str, ...]] = {
+    "cause": (
+        "why did this happen",
+        "what caused this",
+        "what is the root cause",
+        "what led to this",
+        "explain the reason for",
+    ),
+    "effect": (
+        "what are the effects of this",
+        "what are the consequences",
+        "what happened as a result",
+        "what is the impact of this",
+        "what did this lead to",
+    ),
+    "symptom": (
+        "what are the symptoms",
+        "signs of this condition",
+        "how does it manifest",
+        "what are the indicators",
+        "what does it look like",
+    ),
+    "treatment": (
+        "how do I fix this",
+        "what is the solution",
+        "how do I resolve this problem",
+        "how to cure or treat this",
+        "what intervention is recommended",
+    ),
+    "definition": (
+        "what is this concept",
+        "define this term",
+        "what does this mean",
+        "explain what this is",
+        "what is the meaning of",
+    ),
+    "process": (
+        "how does this work",
+        "how is this done step by step",
+        "what is the mechanism",
+        "how is it made or produced",
+        "walk me through the procedure",
+    ),
+    "application": (
+        "what is this used for",
+        "what are the use cases",
+        "how is it applied in practice",
+        "when would you use this",
+        "what problems does it solve",
+    ),
+    "pricing": (
+        "how much does this cost",
+        "what is the price",
+        "what are the fees",
+        "what does it cost to use",
+        "what is the subscription fee",
+    ),
+    "comparison": (
+        "compare these two options",
+        "what is the difference between",
+        "which one is better",
+        "how do they differ",
+        "contrast these alternatives",
+    ),
+    "timeline": (
+        "when did this happen",
+        "history of this",
+        "what is the chronological sequence",
+        "when was this created or founded",
+        "in what order did these events occur",
+    ),
+    "proof": (
+        "prove this theorem",
+        "show the mathematical proof",
+        "provide evidence for this claim",
+        "how is this verified or validated",
+        "what is the formal derivation",
+    ),
+}
+
+# Anchor phrases for detecting what a chunk of content is ABOUT.
+# Used to determine whether a retrieved chunk addresses the query aspect.
+ASPECT_CHUNK_CONCEPTS: dict[str, tuple[str, ...]] = {
+    "cause": (
+        "this was caused by",
+        "the reason for this is",
+        "due to this factor",
+        "this led to the outcome",
+        "the contributing factor was",
+    ),
+    "effect": (
+        "as a result of this",
+        "the consequences were",
+        "this resulted in",
+        "the outcome of this was",
+        "the downstream effect was",
+    ),
+    "symptom": (
+        "symptoms include the following",
+        "signs of this condition are",
+        "patients commonly experience",
+        "observable indicators of this",
+        "manifestations include",
+    ),
+    "treatment": (
+        "the treatment involves",
+        "the recommended solution is",
+        "this can be fixed by",
+        "the intervention is",
+        "to resolve this issue",
+    ),
+    "definition": (
+        "is defined as",
+        "this term refers to",
+        "by this we mean",
+        "is a type of",
+        "is the concept of",
+    ),
+    "process": (
+        "the mechanism works by",
+        "the steps involved are",
+        "is manufactured through",
+        "the workflow consists of",
+        "the procedure is as follows",
+    ),
+    "application": (
+        "is commonly used for",
+        "typical use cases include",
+        "can be applied to",
+        "is deployed in contexts where",
+        "practical applications include",
+    ),
+    "pricing": (
+        "the price is",
+        "costs per month",
+        "the fee for this is",
+        "is priced at",
+        "the subscription costs",
+    ),
+    "comparison": (
+        "compared to other options",
+        "unlike the alternative",
+        "in contrast to",
+        "outperforms in this regard",
+        "differs from the other by",
+    ),
+    "timeline": (
+        "was founded in the year",
+        "the history of this shows",
+        "chronologically this occurred",
+        "dates back to",
+        "was released or launched in",
+    ),
+    "proof": (
+        "is mathematically proven by",
+        "the formal proof shows",
+        "evidence demonstrates that",
+        "it can be verified that",
+        "by induction or contradiction",
+    ),
+}
+
+
+# =============================================================================
+# Info Type Detection Concepts
+# =============================================================================
+# Anchor phrases for identifying what specific information type a query requests.
+# Used by SpecificInfoTypeConstraint to detect missing info in context.
+
+INFO_TYPE_CONCEPTS: dict[str, tuple[str, ...]] = {
+    "pricing": (
+        "how much does this cost",
+        "what is the price of this",
+        "what are the fees for this",
+        "what does it cost to subscribe",
+        "is this service free or paid",
+    ),
+    "quantity": (
+        "how many of these are there",
+        "what is the total count",
+        "how many instances exist",
+        "number of items in this",
+        "total quantity available",
+    ),
+    "temporal": (
+        "when is the deadline for this",
+        "what is the due date",
+        "when will this be released",
+        "what is the expiration date",
+        "when does this expire or end",
+    ),
+    "specification": (
+        "what is the maximum capacity",
+        "minimum technical requirements",
+        "what are the system limits",
+        "upper bound or lower bound for",
+        "what are the technical specs",
+    ),
+    "measurement": (
+        "what is the recommended dosage",
+        "dimensions of this object",
+        "proper dose amount to take",
+        "physical size or weight of",
+        "how large or heavy is this",
+    ),
+    "warranty": (
+        "what does the warranty cover",
+        "what is the guarantee period",
+        "how long is the warranty",
+        "what is covered under warranty",
+        "warranty terms and conditions",
+    ),
+    "rate": (
+        "what is the success rate",
+        "percentage of cases affected",
+        "average salary or compensation",
+        "rate at which this occurs",
+        "what percentage qualifies",
+    ),
+    "decision": (
+        "should we proceed with this",
+        "is this worth the investment",
+        "recommend a course of action",
+        "should I choose this option",
+        "advise on whether to do this",
+    ),
+}
+
+
+# =============================================================================
 # Semantic Matcher
 # =============================================================================
 
@@ -124,6 +359,8 @@ class SemanticMatcher:
     assertion_threshold: float = 0.60
     query_threshold: float = 0.60  # Balance causal detection vs false positives
     relevance_threshold: float = 0.62  # Balanced - between 0.55 and 0.65
+    chunk_aspect_threshold: float = 0.55  # Permissive — chunks have varied language
+    info_type_threshold: float = 0.63  # Conservative — only fire on clear intent
 
     # Internal caches (not part of dataclass comparison)
     _concept_cache: dict[str, list[list[float]]] = field(
@@ -294,6 +531,73 @@ class SemanticMatcher:
         """Filter chunks to only those relevant to the query."""
         return [chunk for chunk in chunks if self.is_relevant_to_query(query, chunk.content)]
 
+    # -------------------------------------------------------------------------
+    # Aspect Classification (replaces AspectClassifier regex)
+    # -------------------------------------------------------------------------
+
+    def classify_query_aspect(self, query: str) -> "QueryAspect":
+        """
+        Classify query into aspect category using embedding similarity.
+
+        Computes similarity to each aspect's centroid and returns the
+        best-matching aspect above query_threshold, or GENERAL.
+        """
+        from fitz_ai.governance.constraints.aspect_classifier import QueryAspect
+
+        best_aspect = QueryAspect.GENERAL
+        best_score = self.query_threshold
+
+        for aspect_val, concepts in ASPECT_QUERY_CONCEPTS.items():
+            key = f"aspect_query_{aspect_val}"
+            score = self.similarity_to_centroid(query, key, concepts)
+            if score > best_score:
+                best_score = score
+                best_aspect = QueryAspect(aspect_val)
+
+        return best_aspect
+
+    def classify_chunk_aspects(self, text: str) -> "list[QueryAspect]":
+        """
+        Extract all aspects present in chunk content using embedding similarity.
+
+        Uses a lower threshold than query classification — chunks have more
+        varied language, so permissive matching reduces false negatives.
+        Returns [GENERAL] when no specific aspect is detected.
+        """
+        from fitz_ai.governance.constraints.aspect_classifier import QueryAspect
+
+        aspects = []
+        for aspect_val, concepts in ASPECT_CHUNK_CONCEPTS.items():
+            key = f"aspect_chunk_{aspect_val}"
+            score = self.similarity_to_centroid(text, key, concepts)
+            if score >= self.chunk_aspect_threshold:
+                aspects.append(QueryAspect(aspect_val))
+
+        return aspects if aspects else [QueryAspect.GENERAL]
+
+    # -------------------------------------------------------------------------
+    # Info Type Detection (replaces SpecificInfoTypeConstraint regex)
+    # -------------------------------------------------------------------------
+
+    def identify_info_type(self, query: str) -> str | None:
+        """
+        Identify what specific information type the query requests.
+
+        Conservative: only returns a type when similarity clearly exceeds
+        info_type_threshold. Returns None for generic questions.
+        """
+        best_type = None
+        best_score = self.info_type_threshold
+
+        for info_type, concepts in INFO_TYPE_CONCEPTS.items():
+            key = f"info_type_{info_type}"
+            score = self.similarity_to_centroid(query, key, concepts)
+            if score > best_score:
+                best_score = score
+                best_type = info_type
+
+        return best_type
+
 
 __all__ = [
     "SemanticMatcher",
@@ -305,4 +609,7 @@ __all__ = [
     "CAUSAL_QUERY_CONCEPTS",
     "FACT_QUERY_CONCEPTS",
     "RESOLUTION_QUERY_CONCEPTS",
+    "ASPECT_QUERY_CONCEPTS",
+    "ASPECT_CHUNK_CONCEPTS",
+    "INFO_TYPE_CONCEPTS",
 ]

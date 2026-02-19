@@ -868,6 +868,16 @@ class InsufficientEvidenceConstraint:
         default_factory=AspectClassifier, repr=False, compare=False
     )
 
+    def __post_init__(self) -> None:
+        """Wire SemanticMatcher into AspectClassifier when embedder is available."""
+        if self.embedder is not None:
+            from fitz_ai.governance.constraints.semantic import SemanticMatcher
+
+            matcher = SemanticMatcher(
+                embedder=lambda text: self.embedder.embed(text, task_type="query")
+            )
+            self._aspect_classifier = AspectClassifier(semantic_matcher=matcher)
+
     @property
     def name(self) -> str:
         return "insufficient_evidence"

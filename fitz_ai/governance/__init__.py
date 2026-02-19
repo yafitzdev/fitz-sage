@@ -60,7 +60,7 @@ def create_default_constraints(
         List of constraint plugins
     """
     return [
-        # Embedding similarity + entity matching for relevance detection
+        # Embedding similarity + entity matching + semantic aspect classification
         InsufficientEvidenceConstraint(chat=chat, embedder=embedder),
         # Keywords: "why" query + no "because" evidence
         CausalAttributionConstraint(),
@@ -68,6 +68,8 @@ def create_default_constraints(
         ConflictAwareConstraint(chat=chat),
         # LLM jury + balanced confirmation: verify chunks answer the query
         AnswerVerificationConstraint(chat=chat, chat_balanced=chat_balanced),
+        # Specific info type detection (semantic when embedder available, regex fallback)
+        SpecificInfoTypeConstraint(embedder=embedder),
     ]
 
 
