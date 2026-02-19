@@ -62,13 +62,13 @@ def create_default_constraints(
     return [
         # Embedding similarity + entity matching + semantic aspect classification
         InsufficientEvidenceConstraint(chat=chat, embedder=embedder),
-        # Keywords: "why" query + no "because" evidence
-        CausalAttributionConstraint(),
-        # LLM pairwise comparison: detect contradictions
-        ConflictAwareConstraint(chat=chat),
+        # Semantic: causal/predictive/opinion/speculative query + evidence matching
+        CausalAttributionConstraint(embedder=embedder),
+        # LLM pairwise comparison: detect contradictions + semantic evidence character
+        ConflictAwareConstraint(chat=chat, embedder=embedder),
         # LLM jury + balanced confirmation: verify chunks answer the query
         AnswerVerificationConstraint(chat=chat, chat_balanced=chat_balanced),
-        # Specific info type detection (semantic when embedder available, regex fallback)
+        # Specific info type detection (semantic when embedder available)
         SpecificInfoTypeConstraint(embedder=embedder),
     ]
 

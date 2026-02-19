@@ -95,6 +95,48 @@ RESOLUTION_QUERY_CONCEPTS: tuple[str, ...] = (
     "why do these disagree",
 )
 
+PREDICTIVE_QUERY_CONCEPTS: tuple[str, ...] = (
+    "what will happen in the future",
+    "what is the forecast for next year",
+    "predict the future outcome of this",
+    "what will the results be going forward",
+    "what are the projections for this",
+)
+
+OPINION_QUERY_CONCEPTS: tuple[str, ...] = (
+    "should I choose this option",
+    "what is the best approach to take",
+    "recommend a course of action for this",
+    "is this worth doing or investing in",
+    "which is better for my situation",
+)
+
+SPECULATIVE_QUERY_CONCEPTS: tuple[str, ...] = (
+    "will this succeed or fail",
+    "what are the chances of success here",
+    "will this become widely adopted",
+    "is this likely to be approved",
+    "how likely is this outcome to occur",
+)
+
+PREDICTIVE_EVIDENCE_CONCEPTS: tuple[str, ...] = (
+    "the forecast shows growth of",
+    "projected to reach by next year",
+    "expected to increase significantly",
+    "analysts estimate future value at",
+    "anticipated to grow in coming years",
+)
+
+HEDGE_EVIDENCE_CONCEPTS: tuple[str, ...] = (
+    "this may indicate preliminary findings",
+    "limited evidence suggests this could",
+    "more research is needed to confirm",
+    "results are inconclusive at this stage",
+    "it remains unclear whether this applies",
+    "early trials show tentative results",
+    "this is potentially associated with",
+)
+
 
 # =============================================================================
 # Aspect Classification Concepts
@@ -361,6 +403,7 @@ class SemanticMatcher:
     relevance_threshold: float = 0.62  # Balanced - between 0.55 and 0.65
     chunk_aspect_threshold: float = 0.55  # Permissive — chunks have varied language
     info_type_threshold: float = 0.63  # Conservative — only fire on clear intent
+    hedge_threshold: float = 0.60  # Threshold for hedging language in evidence
 
     # Internal caches (not part of dataclass comparison)
     _concept_cache: dict[str, list[list[float]]] = field(
@@ -462,6 +505,43 @@ class SemanticMatcher:
         )
         return similarity >= self.query_threshold
 
+    def is_predictive_query(self, query: str) -> bool:
+        """Detect if query asks about future outcomes, forecasts, or projections."""
+        similarity = self.max_similarity_to_concepts(
+            query, "predictive_query", PREDICTIVE_QUERY_CONCEPTS
+        )
+        return similarity >= self.query_threshold
+
+    def is_opinion_query(self, query: str) -> bool:
+        """Detect if query asks for recommendations, judgments, or opinions."""
+        similarity = self.max_similarity_to_concepts(
+            query, "opinion_query", OPINION_QUERY_CONCEPTS
+        )
+        return similarity >= self.query_threshold
+
+    def is_speculative_query(self, query: str) -> bool:
+        """Detect if query requires speculation beyond available facts."""
+        similarity = self.max_similarity_to_concepts(
+            query, "speculative_query", SPECULATIVE_QUERY_CONCEPTS
+        )
+        return similarity >= self.query_threshold
+
+    def is_uncertainty_query(self, query: str) -> tuple[bool, str]:
+        """Check if query requires epistemic qualification.
+
+        Returns (is_uncertainty, query_type) where query_type is one of
+        'causal', 'predictive', 'opinion', 'speculative', 'none'.
+        """
+        if self.is_causal_query(query):
+            return True, "causal"
+        if self.is_predictive_query(query):
+            return True, "predictive"
+        if self.is_opinion_query(query):
+            return True, "opinion"
+        if self.is_speculative_query(query):
+            return True, "speculative"
+        return False, "none"
+
     # -------------------------------------------------------------------------
     # Evidence Detection
     # -------------------------------------------------------------------------
@@ -491,6 +571,36 @@ class SemanticMatcher:
     def count_assertion_chunks(self, chunks: Sequence[EvidenceItem]) -> int:
         """Count chunks containing assertions."""
         return sum(1 for chunk in chunks if self.has_assertion(chunk.content))
+
+    def has_predictive_language(self, text: str) -> bool:
+        """Check if text contains forward-looking / predictive language."""
+        similarity = self.max_similarity_to_concepts(
+            text, "predictive_evidence", PREDICTIVE_EVIDENCE_CONCEPTS
+        )
+        return similarity >= self.causal_threshold
+
+    def has_hedged_language(self, text: str) -> bool:
+        """Check if text contains uncertainty / hedging language."""
+        similarity = self.max_similarity_to_concepts(
+            text, "hedge_evidence", HEDGE_EVIDENCE_CONCEPTS
+        )
+        return similarity >= self.hedge_threshold
+
+    def classify_evidence_character(self, text: str) -> str:
+        """Classify evidence as 'hedged', 'assertive', or 'mixed'.
+
+        Returns:
+            'hedged'    — uncertainty / tentative language dominates
+            'mixed'     — both hedging and assertive language present
+            'assertive' — firm claims, established facts, or neutral factual statements
+        """
+        is_hedged = self.has_hedged_language(text)
+        is_assertive = self.has_assertion(text)
+        if is_hedged and not is_assertive:
+            return "hedged"
+        if is_hedged and is_assertive:
+            return "mixed"
+        return "assertive"
 
     # -------------------------------------------------------------------------
     # Query-Context Relevance
@@ -609,6 +719,11 @@ __all__ = [
     "CAUSAL_QUERY_CONCEPTS",
     "FACT_QUERY_CONCEPTS",
     "RESOLUTION_QUERY_CONCEPTS",
+    "PREDICTIVE_QUERY_CONCEPTS",
+    "OPINION_QUERY_CONCEPTS",
+    "SPECULATIVE_QUERY_CONCEPTS",
+    "PREDICTIVE_EVIDENCE_CONCEPTS",
+    "HEDGE_EVIDENCE_CONCEPTS",
     "ASPECT_QUERY_CONCEPTS",
     "ASPECT_CHUNK_CONCEPTS",
     "INFO_TYPE_CONCEPTS",

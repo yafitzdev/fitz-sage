@@ -17,9 +17,8 @@ This uses a simple per-chunk stance classification:
 from __future__ import annotations
 
 import math
-import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 from fitz_ai.governance.protocol import EvidenceItem
 from fitz_ai.logging.logger import get_logger
@@ -29,6 +28,7 @@ from ..base import ConstraintResult, FeatureSpec
 from ..numerical_detector import NumericalConflictDetector
 
 if TYPE_CHECKING:
+    from fitz_ai.governance.constraints.semantic import SemanticMatcher
     from fitz_ai.llm.providers.base import ChatProvider
 
 logger = get_logger(__name__)
@@ -97,151 +97,6 @@ Reply with ONE word: YES, NO, or UNCLEAR""",
 ]
 
 
-# Keywords that indicate user is asking for conflict resolution
-RESOLUTION_KEYWORDS = (
-    "authoritative",
-    "which source",
-    "trust",
-    "resolve",
-    "reconcile",
-    "correct version",
-    "which is right",
-    "which is correct",
-)
-
-# Keywords that indicate uncertainty/causal/opinion queries (use conservative detection)
-# These query types often have legitimately mixed evidence that should NOT trigger
-# dispute mode. Routing them through fusion (3-prompt majority vote) reduces false
-# disputes while preserving true contradiction detection for factual queries.
-UNCERTAINTY_QUERY_PATTERNS = (
-    # Causal/explanatory
-    "why ",
-    "why?",
-    "what caused",
-    "what led to",
-    "how come",
-    "what made",
-    # Uncertainty language
-    "might",
-    "could",
-    "possibly",
-    "potentially",
-    "likely",
-    "unlikely",
-    # Impact/effect queries (often have legitimately varied evidence)
-    "what impact",
-    "what effect",
-    "how does",
-    "how do ",
-    # Prediction phrases (specific, not just "will")
-    "will be in ",
-    "predict",
-    "forecast",
-    # Subjective evaluation
-    "is it worth",
-    "do you think",
-    "should we",
-    "should i",
-)
-
-
-# ---------------------------------------------------------------------------
-# Evidence character classification (deterministic, no LLM)
-# ---------------------------------------------------------------------------
-# Hedging markers: language indicating uncertainty, preliminary findings, tentative claims
-_HEDGE_PATTERNS = [
-    r"\bmay\b",
-    r"\bmight\b",
-    r"\bcould\b",
-    r"\bsuggests?\b",
-    r"\bpreliminary\b",
-    r"\blimited evidence\b",
-    r"\bmore research\b",
-    r"\bcannot conclude\b",
-    r"\binconclusive\b",
-    r"\bassociated with\b",
-    r"\bcorrelated\b",
-    r"\bobservational\b",
-    r"\btentative\b",
-    r"\bappears? to\b",
-    r"\bseems? to\b",
-    r"\bpossibly\b",
-    r"\bpotentially\b",
-    r"\bunclear\b",
-    r"\bnot (yet |fully )?established\b",
-    r"\bearly\b.{0,20}\b(results?|findings?|data|studies?|evidence|trial)\b",
-    r"\bwarrants? further\b",
-    r"\bnot definitive\b",
-    r"\bcannot\b.{0,20}\b(definitive|conclusive|confirm|conclude)\b",
-    r"\brequires? (more|further|additional)\b",
-    r"\blikely\b",
-    r"\buncertain\b",
-    r"\bevolve[ds]?\b",
-]
-
-# Assertive markers: language indicating firm claims, established facts, confirmed findings
-_ASSERT_PATTERNS = [
-    r"\bconfirmed?\b",
-    r"\bproven\b",
-    r"\bestablished\b",
-    r"\bdefinitely\b",
-    r"\bclearly\b",
-    r"\bFDA approved\b",
-    r"\bbanned\b",
-    r"\brequires?\b",
-    r"\bmust\b",
-    r"\bcauses?\b",
-    r"\bproves?\b",
-    r"\b\d+(\.\d+)?%\b",  # Specific percentages
-    r"\bn\s*=\s*\d+\b",  # Sample sizes
-    r"\bp\s*[<>=]\s*0?\.\d+\b",  # p-values
-]
-
-_HEDGE_RE = [re.compile(p, re.IGNORECASE) for p in _HEDGE_PATTERNS]
-_ASSERT_RE = [re.compile(p, re.IGNORECASE) for p in _ASSERT_PATTERNS]
-
-
-def _classify_evidence_character(text: str) -> str:
-    """
-    Classify a chunk's evidence character as 'assertive', 'hedged', or 'mixed'.
-
-    Uses weighted regex pattern matching. No LLM call.
-    Default is 'assertive' — hedged classification requires positive evidence
-    of uncertainty language. This prevents short factual statements from being
-    classified as 'mixed' due to lack of explicit assertive markers.
-
-    Returns:
-        'assertive' - firm claims, established facts, or neutral factual statements
-        'hedged' - preliminary, uncertain, tentative language dominates
-        'mixed' - both assertive and hedged language present in significant amounts
-    """
-    hedge_count = sum(1 for pat in _HEDGE_RE if pat.search(text))
-    assert_count = sum(1 for pat in _ASSERT_RE if pat.search(text))
-
-    # Hedged: multiple hedge markers and few/no assertive markers
-    if hedge_count >= 3 and assert_count <= 1:
-        return "hedged"
-
-    # Mixed: significant presence of both hedge and assertive language
-    if hedge_count >= 2 and assert_count >= 2:
-        return "mixed"
-
-    # Default: assertive. Factual statements without hedge language are assertive
-    # even if they lack explicit assertive markers (e.g., "Revenue was $5M").
-    return "assertive"
-
-
-def _is_resolution_query(query: str) -> bool:
-    """Check if query is asking to resolve conflicts (keyword-based)."""
-    q = query.lower()
-    return any(kw in q for kw in RESOLUTION_KEYWORDS)
-
-
-def _is_uncertainty_query(query: str) -> bool:
-    """Check if query involves uncertainty/causality (use conservative detection)."""
-    q = query.lower().strip()
-    return any(pattern in q for pattern in UNCERTAINTY_QUERY_PATTERNS)
-
 
 @dataclass
 class ConflictAwareConstraint:
@@ -282,12 +137,23 @@ class ConflictAwareConstraint:
     enabled: bool = True
     use_fusion: bool = False
     adaptive: bool = False
-    embedder: Callable[[str], list[float]] | None = None
+    embedder: Any = field(default=None, repr=False, compare=False)
     relevance_threshold: float = 0.45
     _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
     _numerical_detector: NumericalConflictDetector = field(
         default_factory=NumericalConflictDetector, repr=False, compare=False
     )
+    _semantic_matcher: "SemanticMatcher | None" = field(
+        default=None, init=False, repr=False, compare=False
+    )
+
+    def __post_init__(self) -> None:
+        if self.embedder is not None:
+            from fitz_ai.governance.constraints.semantic import SemanticMatcher
+
+            self._semantic_matcher = SemanticMatcher(
+                embedder=lambda text: self.embedder.embed(text, task_type="query")
+            )
 
     @property
     def name(self) -> str:
@@ -321,7 +187,7 @@ class ConflictAwareConstraint:
             return True  # No embedder = assume relevant
 
         try:
-            chunk_embedding = self.embedder(chunk.content[:500])
+            chunk_embedding = self.embedder.embed(chunk.content[:500], task_type="query")
             sim = self._cosine_similarity(query_embedding, chunk_embedding)
             return sim >= self.relevance_threshold
         except Exception as e:
@@ -499,7 +365,7 @@ class ConflictAwareConstraint:
             return ConstraintResult.allow()
 
         # If query explicitly asks for resolution, allow decisive answer
-        if _is_resolution_query(query):
+        if self._semantic_matcher is not None and self._semantic_matcher.is_resolution_query(query):
             logger.debug(f"{PIPELINE} ConflictAwareConstraint: resolution query detected, allowing")
             return ConstraintResult.allow()
 
@@ -525,7 +391,7 @@ class ConflictAwareConstraint:
         chunks_to_check = list(chunks[:5])
         if self.embedder:
             try:
-                query_embedding = self.embedder(query)
+                query_embedding = self.embedder.embed(query, task_type="query")
                 relevant_chunks = [
                     c for c in chunks_to_check if self._is_chunk_relevant(query_embedding, c)
                 ]
@@ -546,12 +412,20 @@ class ConflictAwareConstraint:
         first_chunk = chunks_to_check[0]
 
         # Classify evidence character for the first chunk (reused across pairs)
-        first_char = _classify_evidence_character(first_chunk.content)
+        first_char = (
+            self._semantic_matcher.classify_evidence_character(first_chunk.content)
+            if self._semantic_matcher is not None
+            else "assertive"
+        )
         ca_diag["ca_first_evidence_char"] = first_char
 
         # Choose base detection method based on settings
         if self.adaptive:
-            use_fusion_for_query = _is_uncertainty_query(query)
+            use_fusion_for_query = (
+                self._semantic_matcher.is_uncertainty_query(query)[0]
+                if self._semantic_matcher is not None
+                else False
+            )
             ca_diag["ca_is_uncertainty_query"] = use_fusion_for_query
             base_method = (
                 self._check_pairwise_fusion
@@ -574,14 +448,22 @@ class ConflictAwareConstraint:
         evidence_chars_seen = []
 
         for other_chunk in chunks_to_check[1:]:
-            other_char = _classify_evidence_character(other_chunk.content)
+            other_char = (
+                self._semantic_matcher.classify_evidence_character(other_chunk.content)
+                if self._semantic_matcher is not None
+                else "assertive"
+            )
             evidence_chars_seen.append(f"{first_char}_vs_{other_char}")
 
             # Pair-level evidence character: combine both chunks' text
             # to catch hedging distributed across chunks (e.g., "may" in
             # chunk A + "preliminary" in chunk B = hedged pair)
-            pair_char = _classify_evidence_character(
-                first_chunk.content + " " + other_chunk.content
+            pair_char = (
+                self._semantic_matcher.classify_evidence_character(
+                    first_chunk.content + " " + other_chunk.content
+                )
+                if self._semantic_matcher is not None
+                else "assertive"
             )
 
             # Evidence character gating (pair-conditioned truth table):
