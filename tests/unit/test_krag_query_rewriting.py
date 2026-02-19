@@ -80,6 +80,7 @@ def _make_query(text: str = "How does auth work?") -> MagicMock:
 def _wire_happy_path(engine: FitzKragEngine, query_text: str) -> Answer:
     """Wire up all pipeline stages to return valid data for a full flow."""
     analysis = MagicMock(name="analysis")
+    analysis.confidence = 0.8
     engine._query_analyzer.analyze.return_value = analysis
 
     address = MagicMock(name="addr")

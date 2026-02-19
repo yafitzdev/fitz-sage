@@ -226,6 +226,7 @@ class TestAnswer:
 
         # Wire up the pipeline stages
         analysis = MagicMock(name="analysis")
+        analysis.confidence = 0.8
         engine._query_analyzer.analyze.return_value = analysis
 
         address_1 = MagicMock(name="addr1")
@@ -269,7 +270,7 @@ class TestAnswer:
             [address_1, address_2],
             engine._config.top_read,
         )
-        engine._expander.expand.assert_called_once_with([read_1])
+        engine._expander.expand.assert_called_once_with([read_1], entity_expansion_limit=3)
         engine._table_handler.process.assert_called_once_with(query.text, expanded)
         engine._assembler.assemble.assert_called_once_with(
             query.text,

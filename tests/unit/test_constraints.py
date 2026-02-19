@@ -12,6 +12,7 @@ Uses mock chat provider for stance detection.
 
 from __future__ import annotations
 
+import hashlib
 from unittest.mock import MagicMock
 
 import pytest
@@ -28,6 +29,43 @@ from fitz_ai.governance import (
     ConstraintResult,
     run_constraints,
 )
+from fitz_ai.governance.constraints.semantic import RESOLUTION_QUERY_CONCEPTS
+
+# =============================================================================
+# Mock Embedder (for resolution query detection)
+# =============================================================================
+
+_DIM = 32
+
+
+def _resolution_category_vector() -> list[float]:
+    """Return the unit vector for the 'resolution_query' category."""
+    idx = int(hashlib.md5(b"resolution_query").hexdigest(), 16) % _DIM
+    vec = [0.0] * _DIM
+    vec[idx] = 1.0
+    return vec
+
+
+# Anchor lookup: map each RESOLUTION_QUERY_CONCEPT to the resolution_query vector.
+_RESOLUTION_ANCHORS: frozenset[str] = frozenset(RESOLUTION_QUERY_CONCEPTS)
+
+# Keywords that flag a text as a resolution query.
+_RESOLUTION_KEYWORDS = ("authoritative", "which source", "trust", "resolve", "reconcile")
+
+
+def _resolution_mock_embed(text: str) -> list[float]:
+    """Embed text: anchor phrases → resolution_query; keywords → resolution_query; else zeros."""
+    if text in _RESOLUTION_ANCHORS or any(kw in text.lower() for kw in _RESOLUTION_KEYWORDS):
+        return _resolution_category_vector()
+    return [0.0] * _DIM
+
+
+class MockEmbedder:
+    """Minimal embedder that enables resolution query detection for ConflictAwareConstraint."""
+
+    def embed(self, text: str, task_type: str = "query") -> list[float]:
+        return _resolution_mock_embed(text)
+
 
 # =============================================================================
 # Test Data
@@ -176,7 +214,9 @@ class TestConflictAwareConstraint:
 
     def test_resolution_query_allows_despite_conflict(self, mock_chat_with_conflict):
         """Should allow decisive answer when query asks for resolution."""
-        constraint = ConflictAwareConstraint(chat=mock_chat_with_conflict)
+        constraint = ConflictAwareConstraint(
+            chat=mock_chat_with_conflict, embedder=MockEmbedder()
+        )
 
         chunks = [
             make_chunk("1", "Source A says: security incident."),
@@ -405,8 +445,11 @@ class TestAcceptanceCriteria:
         Even with conflicting docs, this query explicitly asks for resolution,
         so the constraint should allow a decisive answer.
         """
-        # Note: resolution query bypasses stance check entirely
-        constraint = ConflictAwareConstraint(chat=mock_chat_with_conflict)
+        # Resolution detection requires an embedder (SemanticMatcher); without
+        # one the constraint cannot recognise resolution queries.
+        constraint = ConflictAwareConstraint(
+            chat=mock_chat_with_conflict, embedder=MockEmbedder()
+        )
 
         chunks = [
             make_chunk(

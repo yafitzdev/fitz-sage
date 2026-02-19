@@ -258,7 +258,7 @@ class TestStageContext:
             "insufficient_evidence",
             allow=False,
             signal="qualified",
-            metadata={"max_similarity": 0.55},
+            metadata={"ie_max_similarity": 0.55},
         )
 
         pipeline = StagedConstraintPipeline(

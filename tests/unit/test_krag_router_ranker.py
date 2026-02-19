@@ -97,7 +97,7 @@ def _custom_weight_analysis(
     }
     analysis.entities = entities
     analysis.primary_type = QueryType.GENERAL
-    analysis.confidence = 0.5
+    analysis.confidence = 0.8
     return analysis
 
 
