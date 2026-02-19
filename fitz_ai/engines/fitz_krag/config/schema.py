@@ -147,13 +147,6 @@ class FitzKragConfig(BasePluginConfig):
         description="Fall back to chunk-based search when code search returns few results",
     )
 
-    min_relevance_score: float = Field(
-        default=0.35,
-        ge=0.0,
-        le=1.0,
-        description="Minimum address score after ranking to keep. Filters out irrelevant results.",
-    )
-
     section_bm25_weight: float = Field(
         default=0.6,
         ge=0.0,

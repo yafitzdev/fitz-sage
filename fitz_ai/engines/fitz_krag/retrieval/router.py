@@ -364,17 +364,6 @@ class RetrievalRouter:
             deduped.sort(key=lambda a: a.score, reverse=True)
             result = deduped[: self._config.top_addresses]
 
-        # Filter out addresses below minimum relevance threshold
-        min_score = getattr(self._config, "min_relevance_score", 0)
-        if isinstance(min_score, (int, float)) and min_score > 0:
-            filtered = [a for a in result if a.score >= min_score]
-            if len(filtered) < len(result):
-                logger.debug(
-                    f"Relevance filter: {len(result)} -> {len(filtered)} addresses "
-                    f"(min_score={min_score})"
-                )
-            result = filtered
-
         return result
 
     def _run_strategy(
