@@ -1,6 +1,6 @@
 # BEIR Benchmark Results
 
-**Last updated:** 2026-02-19
+**Last updated:** 2026-02-20
 **Datasets run:** scifact, scidocs, fiqa (Tier 1)
 **Retrieval:** Hybrid BM25 (0.6) + Semantic (0.4) via `SectionSearchStrategy`
 
@@ -8,13 +8,15 @@
 
 ## Summary Table
 
-| Dataset  | nomic-embed-text | bge-m3         | BM25 baseline | SOTA (dense) |
-|----------|:----------------:|:--------------:|:-------------:|:------------:|
-| scifact  | 0.6103           | **0.6262**     | 0.6647        | ~0.77        |
-| scidocs  | 0.0799           | **0.1319**     | 0.1490        | ~0.17        |
-| fiqa     | 0.2251           | **0.2702** ✓   | 0.2361        | ~0.45        |
+| Dataset  | nomic-embed-text | bge-m3 (before fixes) | bge-m3 (after fixes) | BM25 baseline | SOTA (dense) |
+|----------|:----------------:|:---------------------:|:--------------------:|:-------------:|:------------:|
+| scifact  | 0.6103           | 0.6262                | **0.6735** ✓         | 0.6647        | ~0.77        |
+| scidocs  | 0.0799           | 0.1319                | **0.1436**           | 0.1490        | ~0.17        |
+| fiqa     | 0.2251           | 0.2702 ✓              | (not re-run)         | 0.2361        | ~0.45        |
 
 Metric: **nDCG@10** (higher is better, max 1.0)
+
+**Fixes applied 2026-02-20**: RRF merge (k=60) for both retrieval legs, removed `min_relevance_score` filter, raised HNSW `ef_search` to 200.
 
 ---
 
@@ -27,6 +29,16 @@ Metric: **nDCG@10** (higher is better, max 1.0)
 | scifact  | 0.6103  | 0.8817     | 0.5578 | 300     | 5,183  |
 | scidocs  | 0.0799  | 0.2699     | 0.0454 | 1,000   | 25,657 |
 | fiqa     | 0.2251  | 0.5173     | 0.1587 | 648     | 57,638 |
+
+### bge-m3 + RRF + no threshold + ef_search=200 — 2026-02-20
+
+| Dataset  | nDCG@10 | Recall@100 | MAP@10 | Queries | Docs   |
+|----------|--------:|-----------:|-------:|--------:|-------:|
+| scifact  | **0.6735** ✓ | 0.9072  | 0.6310 | 300     | 5,183  |
+| scidocs  | **0.1436** | 0.3290   | 0.0824 | 1,000   | 25,657 |
+| fiqa     | (not re-run) | —      | —      | 648     | 57,638 |
+
+scifact beats BM25 baseline (0.6647). scidocs within 4% of BM25 baseline (0.1490).
 
 ### bge-m3 (ollama, 1.2GB, 1024d, num_ctx=8192) — 2026-02-19
 
@@ -168,8 +180,9 @@ print(f"nDCG@10: {result.ndcg_at_10:.4f}")
 
 ## Next Steps / Ideas
 
-- Record exact fiqa score for bge-m3
+- Re-run fiqa with post-fix pipeline (skipped — 90 min with bge-m3 on CPU)
 - Test `mxbai-embed-large` as a speed/quality middle ground
 - Test Cohere `embed-v4.0` for cloud-speed baseline
 - Add reranker (Cohere or bge-reranker-v2-m3) and measure lift on scifact
 - Run Tier 2 datasets once bge-m3 is confirmed stable
+- Investigate scidocs gap (0.1436 vs 0.1490) — likely citation-graph relevance labels that text similarity can't close
