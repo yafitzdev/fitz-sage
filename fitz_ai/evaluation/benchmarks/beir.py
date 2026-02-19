@@ -18,6 +18,7 @@ Requires: pip install fitz-ai[benchmarks]
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -163,20 +164,125 @@ class FitzBEIRRetriever:
     """
     Adapter that makes Fitz engine compatible with BEIR's retriever interface.
 
+    Indexes the BEIR corpus into a dedicated Fitz collection using vector
+    embeddings, then uses vector similarity search to retrieve relevant
+    documents for each query.
+
     BEIR expects a retriever with a `search` method that takes queries and
     returns ranked document IDs with scores.
     """
 
-    def __init__(self, engine: FitzKragEngine, k: int = 100):
+    def __init__(self, engine: "FitzKragEngine", beir_collection: str, k: int = 100):
         """
         Initialize the adapter.
 
         Args:
-            engine: Fitz RAG engine to wrap
+            engine: Fitz RAG engine to use for embedding and search
+            beir_collection: Name of the dedicated collection to index the BEIR corpus into
             k: Number of documents to retrieve per query
         """
         self._engine = engine
+        self._beir_collection = beir_collection
         self._k = k
+
+    def index_corpus(
+        self,
+        corpus: dict[str, dict[str, str]],
+        batch_size: int = 64,
+    ) -> None:
+        """
+        Index BEIR corpus documents into the dedicated BEIR collection.
+
+        Embeds each document (title + text) and stores it as a section with
+        its vector in the BEIR collection. The BEIR doc_id is stored in
+        section metadata for retrieval mapping.
+
+        Args:
+            corpus: BEIR corpus {doc_id: {"title": ..., "text": ...}}
+            batch_size: Number of documents to embed per batch
+        """
+        from fitz_ai.engines.fitz_krag.ingestion.raw_file_store import RawFileStore
+        from fitz_ai.engines.fitz_krag.ingestion.schema import ensure_schema
+        from fitz_ai.engines.fitz_krag.ingestion.section_store import SectionStore
+
+        embedder = self._engine._embedder
+        conn_manager = self._engine._connection_manager
+
+        ensure_schema(conn_manager, self._beir_collection, embedder.dimensions)
+
+        raw_store = RawFileStore(conn_manager, self._beir_collection)
+        section_store = SectionStore(conn_manager, self._beir_collection)
+
+        doc_ids = list(corpus.keys())
+        logger.info(f"Indexing {len(doc_ids)} BEIR documents into '{self._beir_collection}'")
+
+        for i in range(0, len(doc_ids), batch_size):
+            batch_ids = doc_ids[i : i + batch_size]
+            texts = []
+            for doc_id in batch_ids:
+                doc = corpus[doc_id]
+                title = doc.get("title", "")
+                text = doc.get("text", "")
+                combined = f"{title}\n\n{text}".strip() if title else text
+                # Ensure non-empty text — embed APIs reject empty strings.
+                # Truncate to 8000 chars (~2000 tokens) to stay within model context limits.
+                safe = (combined if combined.strip() else title or doc_id)[:8000]
+                texts.append(safe)
+
+            try:
+                vectors = embedder.embed_batch(texts)
+            except Exception:
+                # Batch failed — fall back to per-document embedding, skipping any that error
+                vectors = []
+                good_ids: list[str] = []
+                good_texts: list[str] = []
+                for doc_id, text in zip(batch_ids, texts):
+                    try:
+                        vectors.append(embedder.embed(text))
+                        good_ids.append(doc_id)
+                        good_texts.append(text)
+                    except Exception as embed_err:
+                        logger.warning(f"Skipping doc {doc_id}: embed failed ({embed_err})")
+                batch_ids = good_ids
+                texts = good_texts
+                if not vectors:
+                    continue
+
+            # Insert raw files first — SectionStore has FK on raw_file_id
+            for doc_id, text in zip(batch_ids, texts):
+                raw_store.upsert(
+                    file_id=doc_id,
+                    path=f"beir/{doc_id}",
+                    content=text,
+                    content_hash=hashlib.sha256(text.encode()).hexdigest(),
+                    file_type="beir_doc",
+                    size_bytes=len(text.encode()),
+                    metadata={"beir_doc_id": doc_id},
+                )
+
+            sections = []
+            for j, (doc_id, text, vector) in enumerate(zip(batch_ids, texts, vectors)):
+                sections.append(
+                    {
+                        "id": f"sec_{doc_id}",
+                        "raw_file_id": doc_id,
+                        "title": corpus[doc_id].get("title", ""),
+                        "level": 1,
+                        "page_start": None,
+                        "page_end": None,
+                        "content": text,
+                        "summary": text[:2000],
+                        "summary_vector": vector,
+                        "parent_section_id": None,
+                        "position": i + j,
+                        "keywords": [],
+                        "entities": [],
+                        "metadata": {"doc_id": doc_id},
+                    }
+                )
+            section_store.upsert_batch(sections)
+
+        logger.info(f"Indexed {len(doc_ids)} BEIR documents")
 
     def search(
         self,
@@ -186,31 +292,44 @@ class FitzBEIRRetriever:
         **kwargs,
     ) -> dict[str, dict[str, float]]:
         """
-        Search for relevant documents.
+        Search for relevant documents using BM25 + semantic hybrid retrieval.
+
+        Uses SectionSearchStrategy which combines PostgreSQL BM25 full-text
+        search (0.6 weight) with dense vector cosine similarity (0.4 weight),
+        matching Fitz's production retrieval behaviour.
 
         Args:
-            corpus: Document corpus {doc_id: {"title": ..., "text": ...}}
+            corpus: Document corpus (unused; already indexed via index_corpus)
             queries: Query corpus {query_id: query_text}
             top_k: Number of results to return per query
 
         Returns:
             Results as {query_id: {doc_id: score}}
         """
+        from fitz_ai.engines.fitz_krag.ingestion.section_store import SectionStore
+        from fitz_ai.engines.fitz_krag.retrieval.strategies.section_search import (
+            SectionSearchStrategy,
+        )
+
+        section_store = SectionStore(self._engine._connection_manager, self._beir_collection)
+        strategy = SectionSearchStrategy(section_store, self._engine._embedder, self._engine._config)
+
         results: dict[str, dict[str, float]] = {}
 
         for query_id, query_text in queries.items():
-            # Use Fitz's retrieval (not full pipeline - just embedding + search)
-            # This gives us ranked chunks with scores
+            if not query_text or not query_text.strip():
+                results[query_id] = {}
+                continue
             try:
-                chunks = self._retrieve_chunks(query_text, top_k)
+                # hyde_vectors=[] tells the strategy to skip HyDE generation
+                addresses = strategy.retrieve(query_text, top_k, hyde_vectors=[])
 
-                # Map chunk results to BEIR format
+                # Address.source_id == raw_file_id == BEIR doc_id (set in index_corpus)
                 query_results: dict[str, float] = {}
-                for chunk, score in chunks:
-                    # Extract doc_id from chunk metadata or source_file
-                    doc_id = self._get_doc_id(chunk)
+                for addr in addresses:
+                    doc_id = addr.source_id
                     if doc_id and doc_id not in query_results:
-                        query_results[doc_id] = float(score)
+                        query_results[doc_id] = addr.score
 
                 results[query_id] = query_results
 
@@ -220,48 +339,26 @@ class FitzBEIRRetriever:
 
         return results
 
-    def _retrieve_chunks(self, query: str, top_k: int) -> list[tuple[Any, float]]:
-        """Retrieve chunks using Fitz engine's vector search."""
-        # Access the pipeline's vector search directly
-        pipeline = self._engine._pipeline
-
-        # Get embedder and vector_db from pipeline
-        embedder = pipeline._embedder
-        vector_db = pipeline._vector_db
-
-        # Embed query
-        query_embedding = embedder.embed([query])[0]
-
-        # Search vector DB
-        results = vector_db.search(
-            query_vector=query_embedding,
-            top_k=top_k,
-        )
-
-        return results
-
-    def _get_doc_id(self, chunk: Any) -> str | None:
-        """Extract document ID from chunk."""
-        # Try metadata first (for BEIR-indexed docs)
-        if hasattr(chunk, "metadata"):
-            if "doc_id" in chunk.metadata:
-                return chunk.metadata["doc_id"]
-            if "beir_id" in chunk.metadata:
-                return chunk.metadata["beir_id"]
-
-        # Fall back to source_file
-        if hasattr(chunk, "source_file"):
-            return chunk.source_file
-
-        return None
+    def cleanup(self) -> None:
+        """Remove all indexed documents from the BEIR collection."""
+        try:
+            conn_manager = self._engine._connection_manager
+            with conn_manager.connection(self._beir_collection) as conn:
+                conn.execute("DELETE FROM krag_section_index")
+                conn.execute("DELETE FROM krag_raw_files")
+                conn.commit()
+            logger.info(f"Cleaned up BEIR collection '{self._beir_collection}'")
+        except Exception as e:
+            logger.warning(f"BEIR cleanup failed for '{self._beir_collection}': {e}")
 
 
 class BEIRBenchmark:
     """
     BEIR benchmark runner for Fitz.
 
-    Downloads and caches BEIR datasets, indexes them with Fitz,
-    and evaluates retrieval quality.
+    Downloads and caches BEIR datasets, indexes them into a dedicated
+    collection, and evaluates retrieval quality using nDCG, Recall, MAP,
+    MRR, and Precision metrics.
 
     Example:
         benchmark = BEIRBenchmark()
@@ -288,7 +385,7 @@ class BEIRBenchmark:
 
     def evaluate(
         self,
-        engine: FitzKragEngine,
+        engine: "FitzKragEngine",
         dataset: str,
         split: str = "test",
         k_values: list[int] | None = None,
@@ -296,6 +393,9 @@ class BEIRBenchmark:
     ) -> BEIRResult:
         """
         Evaluate retrieval quality on a BEIR dataset.
+
+        Downloads the dataset if not cached, indexes the corpus into a
+        dedicated collection, runs all queries, then cleans up.
 
         Args:
             engine: Fitz RAG engine to evaluate
@@ -319,10 +419,11 @@ class BEIRBenchmark:
                 "Install with: pip install fitz-ai[benchmarks]"
             ) from e
 
+        import time
+        import uuid
+
         if k_values is None:
             k_values = [10, 100]
-
-        import time
 
         start_time = time.time()
 
@@ -339,12 +440,20 @@ class BEIRBenchmark:
         logger.info(f"Loading BEIR dataset: {dataset}")
         corpus, queries, qrels = GenericDataLoader(str(dataset_path)).load(split=split)
 
-        # Create retriever adapter
-        retriever = FitzBEIRRetriever(engine, k=max(k_values))
+        # Use a unique collection name to avoid conflicts across concurrent evaluations
+        beir_collection = f"beir_{dataset}_{uuid.uuid4().hex[:8]}"
+        retriever = FitzBEIRRetriever(engine, beir_collection, k=max(k_values))
 
-        # Run retrieval
-        logger.info(f"Running retrieval on {len(queries)} queries")
-        results = retriever.search(corpus, queries, max(k_values))
+        try:
+            # Index corpus before running queries
+            logger.info(f"Indexing {len(corpus)} documents for BEIR evaluation")
+            retriever.index_corpus(corpus)
+
+            # Run retrieval
+            logger.info(f"Running retrieval on {len(queries)} queries")
+            results = retriever.search(corpus, queries, max(k_values))
+        finally:
+            retriever.cleanup()
 
         # Evaluate
         evaluator = EvaluateRetrieval()
@@ -377,7 +486,7 @@ class BEIRBenchmark:
 
     def evaluate_suite(
         self,
-        engine: FitzKragEngine,
+        engine: "FitzKragEngine",
         datasets: list[str] | None = None,
         split: str = "test",
     ) -> BEIRSuiteResult:
@@ -410,7 +519,6 @@ class BEIRBenchmark:
 
         total_time = time.time() - start_time
 
-        # Calculate averages
         if results:
             avg_ndcg = sum(r.ndcg_at_10 for r in results) / len(results)
             avg_recall = sum(r.recall_at_100 for r in results) / len(results)

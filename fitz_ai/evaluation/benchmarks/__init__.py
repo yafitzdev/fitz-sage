@@ -26,6 +26,7 @@ Usage:
 __all__ = [
     # BEIR
     "BEIRResult",
+    "BEIRSuiteResult",
     "BEIRBenchmark",
     # RGB
     "RGBTestType",
@@ -49,10 +50,14 @@ __all__ = [
 def __getattr__(name: str):
     """Lazy import benchmark classes."""
     # BEIR
-    if name in ("BEIRResult", "BEIRBenchmark"):
-        from .beir import BEIRBenchmark, BEIRResult
+    if name in ("BEIRResult", "BEIRSuiteResult", "BEIRBenchmark"):
+        from .beir import BEIRBenchmark, BEIRResult, BEIRSuiteResult
 
-        return BEIRResult if name == "BEIRResult" else BEIRBenchmark
+        if name == "BEIRResult":
+            return BEIRResult
+        if name == "BEIRSuiteResult":
+            return BEIRSuiteResult
+        return BEIRBenchmark
 
     # RGB
     if name in ("RGBTestType", "RGBCase", "RGBResult", "RGBEvaluator"):
