@@ -693,7 +693,15 @@ class FitzKragEngine:
 
             # 4. Expand with context
             t0 = time.perf_counter()
-            expanded = self._expander.expand(read_results)
+            # Broad/thematic queries benefit from wider entity graph traversal
+            _is_thematic = (
+                analysis is not None
+                and analysis.primary_type.value not in ("code", "data")
+                and analysis.confidence < 0.6
+            )
+            expanded = self._expander.expand(
+                read_results, entity_expansion_limit=12 if _is_thematic else 3
+            )
             timings.append(("Expand context", time.perf_counter() - t0))
 
             # 4.5. Execute table queries (SQL generation + execution)

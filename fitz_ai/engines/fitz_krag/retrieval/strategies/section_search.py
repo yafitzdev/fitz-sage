@@ -44,6 +44,7 @@ class SectionSearchStrategy:
         *,
         query_vector: list[float] | None = None,
         hyde_vectors: list[list[float]] | None = None,
+        inject_corpus_summaries: bool = False,
     ) -> list[Address]:
         """
         Retrieve section addresses matching the query.
@@ -56,7 +57,11 @@ class SectionSearchStrategy:
         Args:
             query_vector: Pre-computed query embedding (skips internal embed call).
             hyde_vectors: Pre-computed HyDE hypothesis embeddings (skips HyDE generate + embed).
+            inject_corpus_summaries: When True, skip normal search and return L2 corpus
+                summary chunks only. Used by the router for thematic query enrichment.
         """
+        if inject_corpus_summaries:
+            return [self._to_address(s) for s in self._section_store.get_corpus_summaries()]
         fetch_limit = limit * 2
 
         # 1. BM25 search

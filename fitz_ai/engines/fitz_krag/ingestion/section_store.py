@@ -263,6 +263,18 @@ class SectionStore:
                     conn.execute(update_sql, (vector_str, row[0]))
             conn.commit()
 
+    def get_corpus_summaries(self) -> list[dict[str, Any]]:
+        """Fetch all L2 corpus-level summary chunks for this collection."""
+        sql = f"""
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata"
+            FROM {TABLE}
+            WHERE "metadata"->>'is_corpus_summary' = 'true'
+        """
+        with self._cm.connection(self._collection) as conn:
+            cursor = conn.execute(sql)
+            return [_row_to_dict(row) for row in cursor.fetchall()]
+
     def delete_by_file(self, raw_file_id: str) -> None:
         """Delete all sections for a file."""
         sql = f'DELETE FROM {TABLE} WHERE "raw_file_id" = %s'

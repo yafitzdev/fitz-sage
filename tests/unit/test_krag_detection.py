@@ -357,6 +357,8 @@ class TestEngineAnswerDetectionFlow:
             "compare the latest authentication changes between the different modules in the system"
         )
         analysis = MagicMock(name="analysis")
+        analysis.confidence = 0.85
+        analysis.primary_type.value = "general"
         engine._query_analyzer.analyze.return_value = analysis
         engine._retrieval_router.retrieve.return_value = [MagicMock()]
         engine._reader.read.return_value = [MagicMock()]
@@ -387,6 +389,8 @@ class TestEngineAnswerDetectionFlow:
             "How does the authentication system work when handling multiple concurrent user sessions?"
         )
         analysis = MagicMock(name="analysis")
+        analysis.confidence = 0.85
+        analysis.primary_type.value = "general"
         engine._query_analyzer.analyze.return_value = analysis
         engine._retrieval_router.retrieve.return_value = [MagicMock()]
         engine._reader.read.return_value = [MagicMock()]

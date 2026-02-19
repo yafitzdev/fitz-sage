@@ -38,7 +38,9 @@ class CodeExpander:
         self._config = config
         self._entity_graph_store: Any = None  # Set by engine if enrichment enabled
 
-    def expand(self, read_results: list[ReadResult]) -> list[ReadResult]:
+    def expand(
+        self, read_results: list[ReadResult], entity_expansion_limit: int = 3
+    ) -> list[ReadResult]:
         """
         Expand read results with context.
 
@@ -47,6 +49,10 @@ class CodeExpander:
         2. If method, add class signature + __init__
         3. Add same-file referenced symbols
         4. Add import-followed summaries
+
+        Args:
+            entity_expansion_limit: Max related chunks to pull via entity graph.
+                Increase for broad/thematic queries to improve cross-document coverage.
         """
         if self._config.max_expansion_depth == 0:
             return read_results
@@ -74,7 +80,7 @@ class CodeExpander:
 
         # 5. Entity graph expansion (for all result types)
         if self._entity_graph_store:
-            expanded = self._add_entity_related(expanded, read_results)
+            expanded = self._add_entity_related(expanded, read_results, entity_expansion_limit)
 
         return self._deduplicate(expanded)
 
@@ -330,7 +336,10 @@ class CodeExpander:
         return expanded
 
     def _add_entity_related(
-        self, expanded: list[ReadResult], original_results: list[ReadResult]
+        self,
+        expanded: list[ReadResult],
+        original_results: list[ReadResult],
+        max_total: int = 3,
     ) -> list[ReadResult]:
         """Find other symbols/sections sharing entities with current results."""
         try:
@@ -344,7 +353,7 @@ class CodeExpander:
             if not chunk_ids:
                 return expanded
 
-            related_ids = self._entity_graph_store.get_related_chunks(chunk_ids, max_total=3)
+            related_ids = self._entity_graph_store.get_related_chunks(chunk_ids, max_total=max_total)
             if not related_ids:
                 return expanded
 

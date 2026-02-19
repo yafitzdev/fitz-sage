@@ -108,6 +108,22 @@ class RetrievalRouter:
         return True
 
     @staticmethod
+    def _should_inject_corpus_summaries(
+        analysis: "QueryAnalysis | None",
+    ) -> bool:
+        """Decide whether to inject L2 corpus summary chunks for thematic coverage.
+
+        Broad, low-confidence queries benefit from corpus-level summaries that
+        capture themes across documents — analogous to LightRAG's high-level retrieval.
+        Code and data queries are already routed precisely and don't benefit.
+        """
+        if not analysis:
+            return False
+        if analysis.primary_type.value in ("code", "data"):
+            return False
+        return analysis.confidence < 0.6
+
+    @staticmethod
     def _should_run_agentic(
         analysis: "QueryAnalysis | None",
     ) -> bool:
@@ -305,6 +321,17 @@ class RetrievalRouter:
 
         _strategies_ms = (_time.perf_counter() - _t_strategies) * 1000
         logger.debug(f"Retrieval breakdown: strategies={_strategies_ms:.0f}ms")
+
+        # Corpus summary injection for broad/thematic queries
+        if self._section_strategy and self._should_inject_corpus_summaries(analysis):
+            try:
+                corpus_addresses = self._section_strategy.retrieve(
+                    query, limit=limit, detection=detection, inject_corpus_summaries=True
+                )
+                all_addresses.extend(corpus_addresses)
+                logger.debug(f"Injected {len(corpus_addresses)} corpus summary chunk(s)")
+            except Exception as e:
+                logger.debug(f"Corpus summary injection skipped: {e}")
 
         # Chunk fallback when other results are insufficient
         if (
