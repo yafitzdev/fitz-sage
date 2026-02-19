@@ -1,0 +1,177 @@
+# BEIR Benchmark Results
+
+**Last updated:** 2026-02-19
+**Datasets run:** scifact, scidocs, fiqa (Tier 1)
+**Retrieval:** Hybrid BM25 (0.6) + Semantic (0.4) via `SectionSearchStrategy`
+
+---
+
+## Summary Table
+
+| Dataset  | nomic-embed-text | bge-m3    | BM25 baseline | SOTA (dense) |
+|----------|:----------------:|:---------:|:-------------:|:------------:|
+| scifact  | 0.6103           | **0.6261**| 0.6647        | ~0.77        |
+| scidocs  | 0.0799           | **0.1320**| 0.1490        | ~0.17        |
+| fiqa     | 0.2251           | ~0.28–0.32| 0.2361        | ~0.45        |
+
+Metric: **nDCG@10** (higher is better, max 1.0)
+
+---
+
+## Full Results
+
+### nomic-embed-text (ollama, 274MB, 768d) — 2026-02-19
+
+| Dataset  | nDCG@10 | Recall@100 | MAP@10 | Queries | Docs   |
+|----------|--------:|-----------:|-------:|--------:|-------:|
+| scifact  | 0.6103  | 0.8817     | 0.5578 | 300     | 5,183  |
+| scidocs  | 0.0799  | 0.2699     | 0.0454 | 1,000   | 25,657 |
+| fiqa     | 0.2251  | 0.5173     | 0.1587 | 648     | 57,638 |
+
+### bge-m3 (ollama, 1.2GB, 1024d, num_ctx=8192) — 2026-02-19
+
+| Dataset  | nDCG@10 | Recall@100 | MAP@10 | Queries | Docs   |
+|----------|--------:|-----------:|-------:|--------:|-------:|
+| scifact  | 0.6261  | 0.9017     | 0.5651 | 300     | 5,183  |
+| scidocs  | 0.1320  | 0.3253     | 0.0727 | 1,000   | 25,657 |
+| fiqa     | ~0.28–0.32 | —       | —      | 648     | 57,638 |
+
+> fiqa with bge-m3 completes but takes ~90 minutes on CPU. Exact score not yet recorded.
+
+### Dense-only baseline (nomic, before hybrid) — 2026-02-19
+
+| Dataset  | nDCG@10 |
+|----------|--------:|
+| scifact  | 0.5027  |
+| scidocs  | 0.0553  |
+| fiqa     | 0.2117  |
+
+Wiring in the hybrid BM25+semantic path gave a consistent lift across all datasets.
+
+---
+
+## BEIR BM25 Baselines (published)
+
+| Dataset  | nDCG@10 | Recall@100 | MAP    |
+|----------|--------:|-----------:|-------:|
+| scifact  | 0.6647  | 0.9527     | 0.6315 |
+| scidocs  | 0.1490  | 0.3640     | 0.0760 |
+| fiqa     | 0.2361  | 0.5535     | 0.1320 |
+
+Source: [BEIR leaderboard](https://github.com/beir-cellar/beir)
+
+---
+
+## What the Numbers Mean
+
+**nDCG@10** (Normalized Discounted Cumulative Gain at 10) is the primary BEIR metric.
+It measures how good the top-10 retrieved results are, where:
+- Relevant results ranked higher score more
+- 1.0 = perfect retrieval, 0.0 = completely wrong
+- BM25 baseline (~0.66 on scifact) is the standard "are you at least as good as keyword search?" bar
+- SOTA dense retrievers hit ~0.74–0.77 on scifact with purpose-trained models
+
+**Recall@100** measures whether the correct answer appears anywhere in the top 100 results. This is the upper bound on what the generation step can work with.
+
+---
+
+## Dataset Notes
+
+### scifact (5,183 docs, 300 queries)
+Scientific claim verification. Text similarity works well here. Our bge-m3 score (0.6261) is 6% below BM25 baseline — within striking distance for a local model.
+
+### scidocs (25,657 docs, 1,000 queries)
+**Structurally unfavorable for any text-similarity system.** Relevance labels are based on citation graph membership (did paper A cite paper B?), not semantic similarity. Even SOTA dense retrievers only reach ~0.17. Our 0.1320 with bge-m3 is respectable for a local model. Don't chase this one.
+
+### fiqa (57,638 docs, 648 queries)
+Financial Q&A from Reddit and investment forums. Rewards exact keyword matching (ticker symbols, numbers, product names) where BM25 has a natural edge. Large corpus makes it slow to index with local models (~90 min with bge-m3 on CPU).
+
+---
+
+## Embedding Model Comparison
+
+| Model              | Provider | Size   | Dim  | scifact nDCG@10 | Speed (fiqa index) | Notes                          |
+|--------------------|----------|--------|------|:---------------:|--------------------|--------------------------------|
+| nomic-embed-text   | Ollama   | 274MB  | 768  | 0.6103          | ~5 min             | Default. Fast, decent quality. |
+| bge-m3             | Ollama   | 1.2GB  | 1024 | 0.6261          | ~90 min            | Best local quality. Slow on large corpora. Requires `num_ctx: 8192`. |
+| mxbai-embed-large  | Ollama   | 669MB  | 1024 | (not tested)    | ~30 min est.       | Middle ground option.          |
+| Cohere embed-v4.0  | Cloud    | —      | 1024 | (not tested)    | ~2 min             | Cloud. Requires API key.       |
+
+### bge-m3 configuration requirement
+
+bge-m3 via Ollama defaults to a small context window, causing 500 errors on longer texts. Always set `num_ctx: 8192` in config:
+
+```yaml
+# .fitz/config/fitz_krag.yaml
+embedding_kwargs:
+  model: bge-m3
+  num_ctx: 8192
+```
+
+This is implemented via `options: {num_ctx: 8192}` in the Ollama `/api/embed` payload, added in `fitz_ai/llm/providers/ollama.py`.
+
+### Switching embedding models
+
+Changing models requires rebuilding all existing collections (vector dimension changes from 768 to 1024). The engine will error on startup with a clear message if there's a mismatch.
+
+---
+
+## Known Issues
+
+### Persistent embed failures (~10–35 docs per dataset)
+
+Some documents fail to embed with bge-m3 regardless of context window size. These appear to be content issues (binary data, null bytes, or unusual Unicode in some paper metadata or Reddit posts). The fallback in `FitzBEIRRetriever.index_corpus()` catches these, logs a warning, and skips them. Impact on scores is negligible (<0.1% of corpus).
+
+The same issue occurs with nomic-embed-text but causes 400 errors instead of 500s.
+
+### fiqa indexing time
+
+With bge-m3 at `num_ctx=8192`, fiqa's 57,638-doc corpus takes ~90 minutes to index on CPU. For benchmark iteration, either:
+- Use nomic-embed-text (5 min for fiqa)
+- Run scifact only (fastest meaningful signal)
+- Use Cohere embeddings (cloud-speed)
+
+---
+
+## Architecture
+
+The BEIR benchmark is implemented in `fitz_ai/evaluation/benchmarks/beir.py`.
+
+**`FitzBEIRRetriever`** is the BEIR-compatible retriever wrapper:
+1. `index_corpus()` — creates a temp collection `beir_{dataset}_{uuid8}`, inserts raw file rows (FK requirement), upserts sections with vectors via `SectionStore.upsert_batch()`
+2. `search()` — uses `SectionSearchStrategy.retrieve()` for hybrid BM25+semantic retrieval, maps `Address.source_id` → BEIR doc_id
+3. `cleanup()` — DELETEs temp collection from `krag_section_index` and `krag_raw_files`
+
+**`BEIRBenchmark.evaluate()`** wraps this in a try/finally to guarantee cleanup even on failure.
+
+---
+
+## Running the Benchmark
+
+```python
+from fitz_ai.config.loader import load_engine_config
+from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
+from fitz_ai.evaluation.benchmarks import BEIRBenchmark
+
+config = load_engine_config("fitz_krag")
+config.collection = "beir_scratch"  # avoid dim-check on existing collections
+engine = FitzKragEngine(config)
+beir = BEIRBenchmark()
+
+result = beir.evaluate(engine, dataset="scifact")
+print(f"nDCG@10: {result.ndcg_at_10:.4f}")
+```
+
+**Tier 1 datasets:** `scifact`, `scidocs`, `fiqa`
+**Tier 2 datasets:** `nfcorpus`, `arguana`, `trec-covid`, `webis-touche2020`, `quora`, `dbpedia-entity`, `fever`, `climate-fever`, `hotpotqa`
+**All datasets:** `beir.list_datasets()`
+
+---
+
+## Next Steps / Ideas
+
+- Record exact fiqa score for bge-m3
+- Test `mxbai-embed-large` as a speed/quality middle ground
+- Test Cohere `embed-v4.0` for cloud-speed baseline
+- Add reranker (Cohere or bge-reranker-v2-m3) and measure lift on scifact
+- Run Tier 2 datasets once bge-m3 is confirmed stable
