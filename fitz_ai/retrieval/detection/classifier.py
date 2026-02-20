@@ -12,19 +12,33 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+
+import numpy as np
+import scipy.sparse as sp
 
 from fitz_ai.logging.logger import get_logger
-
-if TYPE_CHECKING:
-    pass
 
 logger = get_logger(__name__)
 
 _DATA_DIR = Path(__file__).parent / "data"
 _MODEL_PATH = _DATA_DIR / "model_v1_detection.joblib"
 
-# Keyword patterns for ungated categories
+# ML training keyword patterns — must match train_classifier.py exactly
+_TEMPORAL_KW_RE = re.compile(
+    r"\b(when|before|after|since|until|between|during|last|first|previous|next|recent|"
+    r"quarter|q1|q2|q3|q4|annually|monthly|weekly|yearly|decade|century|era|period|"
+    r"timeline|history|trend|over time|change.+over|compare.+year|from \d{4}|in \d{4}|"
+    r"as of|by \d{4}|prior to|following|subsequent)\b",
+    re.IGNORECASE,
+)
+_COMPARISON_KW_RE = re.compile(
+    r"\b(vs|versus|compare|comparison|difference|differ|better|worse|than|"
+    r"contrast|distinguish|similarities|alike|both|either|which is|how does.+compare|"
+    r"pros and cons|advantages|disadvantages|trade.?off|relative to|over)\b",
+    re.IGNORECASE,
+)
+
+# Keyword patterns for ungated categories (not in ML model)
 _AGGREGATION_RE = re.compile(
     r"\b(list all|list every|show all|how many|count of|enumerate|what are all|every)\b",
     re.IGNORECASE,
@@ -112,7 +126,20 @@ class DetectionClassifier:
             flagged: set = set()
 
             # ML predictions for temporal and comparison
-            vec = self._vectorizer.transform([query])
+            # Features must match training: TF-IDF + 2 keyword indicator columns
+            tfidf_vec = self._vectorizer.transform([query])
+            kw_features = sp.csr_matrix(
+                np.array(
+                    [
+                        [
+                            1.0 if _TEMPORAL_KW_RE.search(query) else 0.0,
+                            1.0 if _COMPARISON_KW_RE.search(query) else 0.0,
+                        ]
+                    ],
+                    dtype=np.float32,
+                )
+            )
+            vec = sp.hstack([tfidf_vec, kw_features], format="csr")
             # predict_proba returns shape (n_samples, n_classes) per label
             probas = self._model.predict_proba(vec)
 

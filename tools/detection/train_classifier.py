@@ -15,14 +15,16 @@ Usage:
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import joblib
 import numpy as np
 import pandas as pd
+import scipy.sparse as sp
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import StratifiedKFold, cross_val_predict
+from sklearn.model_selection import StratifiedKFold
 from sklearn.multioutput import MultiOutputClassifier
 
 # ---------------------------------------------------------------------------
@@ -36,6 +38,30 @@ _OUTPUT_PATH = (
 ).resolve()
 
 _TIER1_GLOB = "*.json"
+
+# Keyword patterns — high signal for short queries
+_TEMPORAL_RE = re.compile(
+    r"\b(when|before|after|since|until|between|during|last|first|previous|next|recent|"
+    r"quarter|q1|q2|q3|q4|annually|monthly|weekly|yearly|decade|century|era|period|"
+    r"timeline|history|trend|over time|change.+over|compare.+year|from \d{4}|in \d{4}|"
+    r"as of|by \d{4}|prior to|following|subsequent)\b",
+    re.IGNORECASE,
+)
+_COMPARISON_RE = re.compile(
+    r"\b(vs|versus|compare|comparison|difference|differ|better|worse|than|"
+    r"contrast|distinguish|similarities|alike|both|either|which is|how does.+compare|"
+    r"pros and cons|advantages|disadvantages|trade.?off|relative to|over)\b",
+    re.IGNORECASE,
+)
+
+
+def keyword_features(queries: list[str]) -> sp.csr_matrix:
+    """Return (n, 2) sparse matrix of keyword indicator features."""
+    temporal = np.array([1 if _TEMPORAL_RE.search(q) else 0 for q in queries], dtype=np.float32)
+    comparison = np.array(
+        [1 if _COMPARISON_RE.search(q) else 0 for q in queries], dtype=np.float32
+    )
+    return sp.csr_matrix(np.column_stack([temporal, comparison]))
 
 # ---------------------------------------------------------------------------
 # Data loading
@@ -89,9 +115,9 @@ def derive_labels(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def calibrate_threshold(y_true: np.ndarray, y_proba: np.ndarray, target_recall: float = 0.90) -> float:
-    """Find the lowest threshold where recall >= target_recall."""
-    thresholds = np.linspace(0.0, 1.0, 201)
-    best = 0.5  # default fallback
+    """Find the highest threshold where recall is still >= target_recall."""
+    thresholds = np.linspace(1.0, 0.0, 201)  # sweep high → low
+    best = 0.0  # fallback: predict everything positive
     for t in thresholds:
         preds = (y_proba >= t).astype(int)
         tp = int(np.sum((preds == 1) & (y_true == 1)))
@@ -131,10 +157,16 @@ def _binary_metrics(
 
 
 def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fitzgov-dir", type=Path, default=_DATA_DIR)
+    args = parser.parse_args()
+
     labels = ["temporal", "comparison"]
 
     # Load data
-    df = load_cases(_DATA_DIR)
+    df = load_cases(args.fitzgov_dir)
     df = derive_labels(df)
 
     # Print label distribution
@@ -149,13 +181,11 @@ def main() -> None:
     # Stratify target: temporal OR comparison
     stratify_col = (df["temporal"] | df["comparison"]).astype(int).values
 
-    # Vectorizer
+    # Features: TF-IDF + keyword indicators
     vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=500, sublinear_tf=True)
-    X = vectorizer.fit_transform(X_text)
-
-    # Model
-    base_clf = LogisticRegression(class_weight="balanced", max_iter=1000, C=1.0)
-    model = MultiOutputClassifier(base_clf)
+    X_tfidf = vectorizer.fit_transform(X_text)
+    X_kw = keyword_features(X_text)
+    X = sp.hstack([X_tfidf, X_kw], format="csr")
 
     # 5-fold stratified CV for metrics + probability calibration
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
@@ -168,14 +198,21 @@ def main() -> None:
         X_train, X_val = X[train_idx], X[val_idx]
         Y_train, Y_val = Y[train_idx], Y[val_idx]
 
+        # Re-fit vectorizer on train split only (keyword features are fit-free)
+        fold_vec = TfidfVectorizer(ngram_range=(1, 2), max_features=500, sublinear_tf=True)
+        X_train_tfidf = fold_vec.fit_transform([X_text[i] for i in train_idx])
+        X_val_tfidf = fold_vec.transform([X_text[i] for i in val_idx])
+        X_train_fold = sp.hstack([X_train_tfidf, X_kw[train_idx]], format="csr")
+        X_val_fold = sp.hstack([X_val_tfidf, X_kw[val_idx]], format="csr")
+
         fold_model = MultiOutputClassifier(
             LogisticRegression(class_weight="balanced", max_iter=1000, C=1.0)
         )
-        fold_model.fit(X_train, Y_train)
+        fold_model.fit(X_train_fold, Y_train)
 
         # Collect OOF probabilities: shape (n_val, 2) — P(positive) per label
         fold_probas = np.column_stack(
-            [est.predict_proba(X_val)[:, 1] for est in fold_model.estimators_]
+            [est.predict_proba(X_val_fold)[:, 1] for est in fold_model.estimators_]
         )
         oof_probas.append(fold_probas)
         oof_y.append(Y_val)
@@ -207,7 +244,8 @@ def main() -> None:
     # Train final model on all data
     print("\n--- Training final model on all data ---")
     final_vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=500, sublinear_tf=True)
-    X_final = final_vectorizer.fit_transform(X_text)
+    X_final_tfidf = final_vectorizer.fit_transform(X_text)
+    X_final = sp.hstack([X_final_tfidf, X_kw], format="csr")
     final_model = MultiOutputClassifier(
         LogisticRegression(class_weight="balanced", max_iter=1000, C=1.0)
     )
