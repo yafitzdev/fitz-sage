@@ -186,3 +186,13 @@ print(f"nDCG@10: {result.ndcg_at_10:.4f}")
 - Add reranker (Cohere or bge-reranker-v2-m3) and measure lift on scifact
 - Run Tier 2 datasets once bge-m3 is confirmed stable
 - Investigate scidocs gap (0.1436 vs 0.1490) — likely citation-graph relevance labels that text similarity can't close
+
+## Detection Classifier (Future Work)
+
+BEIR exposed that the real retrieval risk is not document recall but **query misclassification**: the `DetectionOrchestrator` uses the fast-tier LLM (qwen2.5:3b) to detect temporal, comparison, causal, aggregation, and freshness signals. If it misses, all downstream routing is wrong — silently.
+
+The fix is an ML classifier (like the governance cascade) trained on fitz-gov `reasoning_type` labels:
+- `temporal` (256 cases), `comparative` (205), `causal` (239) already exist in fitz-gov tier1
+- `aggregation` and `freshness` are not yet represented — cases need to be added to fitz-gov before training
+
+Once trained, the classifier gates LLM calls: only queries flagged as temporal trigger the LLM temporal extraction, etc. Most queries would hit zero LLM detection calls.
