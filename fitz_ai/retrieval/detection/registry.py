@@ -9,7 +9,7 @@ prompt fragment and parsing logic, but all are combined into one LLM call.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from fitz_ai.llm.factory import ChatFactory
 from fitz_ai.logging.logger import get_logger
@@ -139,11 +139,13 @@ class DetectionOrchestrator:
     """
 
     chat_factory: ChatFactory | None = None
+    embedder: Callable[[str], list[float]] | None = None
 
-    # Lazy-loaded classifier and expansion detector
+    # Lazy-loaded classifiers and expansion detector
     _classifier: LLMClassifier | None = field(default=None, init=False, repr=False)
     _expansion_detector: Any = field(default=None, init=False, repr=False)
     _ml_classifier: DetectionClassifier | None = field(default=None, init=False, repr=False)
+    _concept_detector: Any = field(default=None, init=False, repr=False)
 
     def _ensure_classifier(self) -> LLMClassifier | None:
         """Lazy-load LLM classifier with all modules."""
@@ -158,6 +160,16 @@ class DetectionOrchestrator:
         if self._ml_classifier.available:
             return self._ml_classifier
         return None
+
+    def _ensure_concept_detector(self) -> Any:
+        """Lazy-load ConceptDetector if embedder is available; returns None otherwise."""
+        if self.embedder is None:
+            return None
+        if self._concept_detector is None:
+            from .concept_detector import ConceptDetector
+
+            self._concept_detector = ConceptDetector(self.embedder)
+        return self._concept_detector
 
     def _get_expansion_detector(self) -> Any:
         """Lazy-load expansion detector (dict-based, not LLM)."""
@@ -183,21 +195,23 @@ class DetectionOrchestrator:
         classifier = self._ensure_classifier()
 
         if classifier:
-            ml_classifier = self._ensure_ml_classifier()
-            if ml_classifier is not None:
-                flagged = ml_classifier.predict(query)
+            # ConceptDetector (semantic) takes priority when embedder available;
+            # falls back to TF-IDF DetectionClassifier when not
+            gate = self._ensure_concept_detector() or self._ensure_ml_classifier()
+            if gate is not None:
+                flagged = gate.predict(query)
                 if flagged is None:
-                    # ML error or unavailable — run all modules
+                    # Gate error or unavailable — run all modules
                     results = classifier.classify(query, limit_to=None)
                 elif len(flagged) == 0:
                     # No categories flagged — skip LLM entirely
                     results = {}
-                    logger.debug("ML classifier flagged no categories; skipping LLM")
+                    logger.debug("Detection gate flagged no categories; skipping LLM")
                 else:
                     # Run only flagged modules
                     results = classifier.classify(query, limit_to=flagged)
             else:
-                # No ML model — run all modules unchanged
+                # No gate available — run all modules unchanged
                 results = classifier.classify(query, limit_to=None)
         else:
             results = {}

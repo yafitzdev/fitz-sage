@@ -44,7 +44,8 @@ _AGGREGATION_RE = re.compile(
     re.IGNORECASE,
 )
 _FRESHNESS_RE = re.compile(
-    r"\b(latest|most recent|current|right now|today|newest|recently|new version)\b",
+    r"\b(latest|most recent|current|right now|today|newest|recently|new version|"
+    r"official|best practice|recommended|standard|proper way|authoritative)\b",
     re.IGNORECASE,
 )
 _REWRITER_RE = re.compile(
@@ -125,8 +126,8 @@ class DetectionClassifier:
         try:
             flagged: set = set()
 
-            # ML predictions for temporal and comparison
-            # Features must match training: TF-IDF + 2 keyword indicator columns
+            # ML predictions — features must match training exactly:
+            # TF-IDF (500) + 4 keyword indicator columns
             tfidf_vec = self._vectorizer.transform([query])
             kw_features = sp.csr_matrix(
                 np.array(
@@ -134,6 +135,8 @@ class DetectionClassifier:
                         [
                             1.0 if _TEMPORAL_KW_RE.search(query) else 0.0,
                             1.0 if _COMPARISON_KW_RE.search(query) else 0.0,
+                            1.0 if _AGGREGATION_RE.search(query) else 0.0,
+                            1.0 if _FRESHNESS_RE.search(query) else 0.0,
                         ]
                     ],
                     dtype=np.float32,
@@ -146,6 +149,8 @@ class DetectionClassifier:
             _label_to_category = {
                 "temporal": DetectionCategory.TEMPORAL,
                 "comparison": DetectionCategory.COMPARISON,
+                "aggregation": DetectionCategory.AGGREGATION,
+                "freshness": DetectionCategory.FRESHNESS,
             }
 
             for idx, label in enumerate(self._labels):

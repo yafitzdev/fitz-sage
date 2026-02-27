@@ -3,9 +3,9 @@
 Training script for the fitz-ai ML detection classifier.
 
 Loads tier1_core JSON files from fitz-gov, derives binary labels for
-temporal and comparison query types, trains a MultiOutputClassifier backed
-by LogisticRegression, calibrates per-label recall thresholds to >= 0.90,
-and saves the final artifact to:
+temporal, comparison, aggregation, and freshness query types, trains a
+MultiOutputClassifier backed by LogisticRegression, calibrates per-label
+recall thresholds to >= 0.90, and saves the final artifact to:
     fitz_ai/retrieval/detection/data/model_v1_detection.joblib
 
 Usage:
@@ -53,15 +53,31 @@ _COMPARISON_RE = re.compile(
     r"pros and cons|advantages|disadvantages|trade.?off|relative to|over)\b",
     re.IGNORECASE,
 )
+_AGGREGATION_RE = re.compile(
+    r"\b(list all|list every|show all|how many|count of|enumerate|what are all|every)\b",
+    re.IGNORECASE,
+)
+_FRESHNESS_RE = re.compile(
+    r"\b(latest|most recent|current|right now|today|newest|recently|new version|"
+    r"official|best practice|recommended|standard|proper way|authoritative)\b",
+    re.IGNORECASE,
+)
 
 
 def keyword_features(queries: list[str]) -> sp.csr_matrix:
-    """Return (n, 2) sparse matrix of keyword indicator features."""
+    """Return (n, 4) sparse matrix of keyword indicator features."""
     temporal = np.array([1 if _TEMPORAL_RE.search(q) else 0 for q in queries], dtype=np.float32)
     comparison = np.array(
         [1 if _COMPARISON_RE.search(q) else 0 for q in queries], dtype=np.float32
     )
-    return sp.csr_matrix(np.column_stack([temporal, comparison]))
+    aggregation = np.array(
+        [1 if _AGGREGATION_RE.search(q) else 0 for q in queries], dtype=np.float32
+    )
+    freshness = np.array(
+        [1 if _FRESHNESS_RE.search(q) else 0 for q in queries], dtype=np.float32
+    )
+    return sp.csr_matrix(np.column_stack([temporal, comparison, aggregation, freshness]))
+
 
 # ---------------------------------------------------------------------------
 # Data loading
@@ -85,6 +101,7 @@ def load_cases(data_dir: Path) -> pd.DataFrame:
                     "query": case.get("query", ""),
                     "reasoning_type": case.get("reasoning_type", ""),
                     "query_type": case.get("query_type", ""),
+                    "detection_labels": case.get("detection_labels", []),
                 }
             )
     df = pd.DataFrame(rows)
@@ -98,14 +115,20 @@ def load_cases(data_dir: Path) -> pd.DataFrame:
 
 
 def derive_labels(df: pd.DataFrame) -> pd.DataFrame:
-    """Add binary label columns: temporal, comparison."""
+    """Add binary label columns: temporal, comparison, aggregation, freshness."""
     df = df.copy()
     df["temporal"] = (
-        (df["reasoning_type"] == "temporal") | (df["query_type"] == "when")
+        (df["reasoning_type"] == "temporal")
+        | (df["query_type"] == "when")
+        | df["detection_labels"].apply(lambda x: "temporal" in x)
     ).astype(int)
     df["comparison"] = (
-        (df["reasoning_type"] == "comparative") | (df["query_type"] == "compare")
+        (df["reasoning_type"] == "comparative")
+        | (df["query_type"] == "compare")
+        | df["detection_labels"].apply(lambda x: "comparison" in x)
     ).astype(int)
+    df["aggregation"] = df["detection_labels"].apply(lambda x: int("aggregation" in x))
+    df["freshness"] = df["detection_labels"].apply(lambda x: int("freshness" in x))
     return df
 
 
@@ -163,7 +186,7 @@ def main() -> None:
     parser.add_argument("--fitzgov-dir", type=Path, default=_DATA_DIR)
     args = parser.parse_args()
 
-    labels = ["temporal", "comparison"]
+    labels = ["temporal", "comparison", "aggregation", "freshness"]
 
     # Load data
     df = load_cases(args.fitzgov_dir)
@@ -176,10 +199,12 @@ def main() -> None:
         print(f"  {label}: {pos} positive / {len(df) - pos} negative")
 
     X_text = df["query"].tolist()
-    Y = df[labels].values  # shape (n, 2)
+    Y = df[labels].values  # shape (n, 4)
 
-    # Stratify target: temporal OR comparison
-    stratify_col = (df["temporal"] | df["comparison"]).astype(int).values
+    # Stratify target: any positive label
+    stratify_col = (
+        df["temporal"] | df["comparison"] | df["aggregation"] | df["freshness"]
+    ).astype(int).values
 
     # Features: TF-IDF + keyword indicators
     vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=500, sublinear_tf=True)
@@ -210,7 +235,7 @@ def main() -> None:
         )
         fold_model.fit(X_train_fold, Y_train)
 
-        # Collect OOF probabilities: shape (n_val, 2) — P(positive) per label
+        # Collect OOF probabilities: shape (n_val, 4) — P(positive) per label
         fold_probas = np.column_stack(
             [est.predict_proba(X_val_fold)[:, 1] for est in fold_model.estimators_]
         )
