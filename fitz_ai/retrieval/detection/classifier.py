@@ -13,9 +13,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import numpy as np
-import scipy.sparse as sp
-
 from fitz_ai.logging.logger import get_logger
 
 logger = get_logger(__name__)
@@ -130,6 +127,9 @@ class DetectionClassifier:
 
             # ML predictions — features must match training exactly:
             # TF-IDF (500) + 4 keyword indicator columns
+            import numpy as np
+            import scipy.sparse as sp
+
             tfidf_vec = self._vectorizer.transform([query])
             kw_features = sp.csr_matrix(
                 np.array(
