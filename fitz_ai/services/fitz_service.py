@@ -206,6 +206,12 @@ class FitzService:
         from fitz_ai.runtime import create_engine
 
         source_path = Path(source)
+        # Resolve to absolute path to prevent path traversal
+        try:
+            source_path = source_path.resolve(strict=True)
+        except (OSError, RuntimeError) as e:
+            raise ValueError(f"Invalid source path: {source}") from e
+
         if not source_path.exists():
             raise ValueError(f"Source path does not exist: {source_path}")
 
@@ -224,6 +230,7 @@ class FitzService:
         Returns:
             List of CollectionInfo with names and stats
         """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         from fitz_ai.vector_db.registry import get_vector_db_plugin
 
         vdb = get_vector_db_plugin()
@@ -232,26 +239,79 @@ class FitzService:
             return []
 
         names = vdb.list_collections()
-        result = []
+        if not names:
+            return []
 
-        for name in names:
+        # Check if vector DB supports batch stats (most efficient)
+        if hasattr(vdb, "batch_get_collection_stats"):
+            try:
+                # Best case: single query for all stats
+                all_stats = vdb.batch_get_collection_stats(names)
+                result = []
+                for name in names:
+                    stats = all_stats.get(name, {})
+                    result.append(
+                        CollectionInfo(
+                            name=name,
+                            chunk_count=stats.get("chunk_count", 0),
+                            vector_dimensions=stats.get("vector_size"),
+                            metadata=stats,
+                        )
+                    )
+                return result
+            except Exception as e:
+                logger.warning(f"Batch stats failed, falling back to parallel fetch: {e}")
+                # Fall through to parallel fetching
+
+        # Fallback: Use parallel fetching to avoid N+1 performance issue
+        # For 100 collections: sequential = ~10s, parallel = ~0.5s
+        def fetch_collection_info(name: str) -> CollectionInfo:
+            """Fetch info for a single collection."""
             info = CollectionInfo(name=name, chunk_count=0)
 
             if hasattr(vdb, "count"):
                 try:
                     info.chunk_count = vdb.count(name)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to get chunk count for collection '{name}': {e}")
+                    # Continue with default count of 0
 
             if hasattr(vdb, "get_collection_stats"):
                 try:
                     stats = vdb.get_collection_stats(name)
                     info.vector_dimensions = stats.get("vector_size")
                     info.metadata = stats
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to get collection stats for '{name}': {e}")
+                    # Continue with default stats
 
-            result.append(info)
+            return info
+
+        # Fetch all collection info in parallel
+        # Limit workers to avoid overwhelming the database
+        max_workers = min(10, len(names))
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            future_to_name = {
+                executor.submit(fetch_collection_info, name): name
+                for name in names
+            }
+
+            # Collect results maintaining order
+            result = []
+            for future in as_completed(future_to_name):
+                try:
+                    info = future.result()
+                    result.append(info)
+                except Exception as e:
+                    name = future_to_name[future]
+                    logger.error(f"Failed to get info for collection '{name}': {e}")
+                    # Add minimal info on failure
+                    result.append(CollectionInfo(name=name, chunk_count=0))
+
+        # Sort by name for consistent ordering
+        result.sort(key=lambda x: x.name)
 
         return result
 
@@ -325,7 +385,8 @@ class FitzService:
             try:
                 vdb.count(name)
                 return True
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Collection '{name}' does not exist (count check failed): {e}")
                 return False
 
         return True  # Assume exists if we can't check
@@ -365,6 +426,7 @@ class FitzService:
 
             ctx = CLIContext.load()
         except Exception as e:
+            logger.error(f"Failed to load config from {config_path}: {e}")
             issues.append(f"Config parse error: {e}")
             return ConfigValidationResult(valid=False, issues=issues)
 
@@ -374,6 +436,7 @@ class FitzService:
 
             get_chat_factory(ctx.chat_plugin)
         except Exception as e:
+            logger.warning(f"Chat plugin '{ctx.chat_plugin}' validation failed: {e}")
             issues.append(f"Chat plugin '{ctx.chat_plugin}' not available: {e}")
 
         try:
@@ -381,6 +444,7 @@ class FitzService:
 
             get_embedder(ctx.embedding_plugin)
         except Exception as e:
+            logger.warning(f"Embedding plugin '{ctx.embedding_plugin}' validation failed: {e}")
             issues.append(f"Embedding plugin '{ctx.embedding_plugin}' not available: {e}")
 
         # Check vector DB
@@ -389,6 +453,7 @@ class FitzService:
 
             get_vector_db_plugin(ctx.vector_db_plugin)
         except Exception as e:
+            logger.warning(f"Vector DB '{ctx.vector_db_plugin}' validation failed: {e}")
             issues.append(f"Vector DB '{ctx.vector_db_plugin}' not available: {e}")
 
         return ConfigValidationResult(
@@ -423,6 +488,7 @@ class FitzService:
                 "chunk_overlap": ctx.chunk_overlap,
             }
         except Exception as e:
+            logger.error(f"Failed to get config summary: {e}", exc_info=True)
             return {"error": str(e)}
 
     # =========================================================================
@@ -452,6 +518,7 @@ class FitzService:
                 vdb.list_collections()
             components["vector_db"] = True
         except Exception as e:
+            logger.warning(f"Vector DB health check failed: {e}")
             components["vector_db"] = False
             issues.append(f"Vector DB: {e}")
 
@@ -464,6 +531,7 @@ class FitzService:
             get_chat_factory(ctx.chat_plugin)  # Verify factory works
             components["chat"] = True
         except Exception as e:
+            logger.warning(f"Chat provider health check failed: {e}")
             components["chat"] = False
             issues.append(f"Chat provider: {e}")
 
@@ -474,6 +542,7 @@ class FitzService:
             get_embedder()
             components["embedding"] = True
         except Exception as e:
+            logger.warning(f"Embedding provider health check failed: {e}")
             components["embedding"] = False
             issues.append(f"Embedding provider: {e}")
 

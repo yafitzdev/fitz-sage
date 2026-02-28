@@ -18,6 +18,8 @@ from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.parser.base import ParseError
 from fitz_ai.ingestion.source.base import SourceFile
 
+from .base_parser import BaseParser
+
 logger = logging.getLogger(__name__)
 
 # Supported extensions - plain text and code files
@@ -109,7 +111,7 @@ PLAINTEXT_EXTENSIONS: Set[str] = {
 
 
 @dataclass
-class PlainTextParser:
+class PlainTextParser(BaseParser):
     """
     Parser for plain text and markdown files.
 
@@ -121,13 +123,10 @@ class PlainTextParser:
         doc = parser.parse(source_file)
     """
 
-    plugin_name: str = field(default="plaintext", repr=False)
+    plugin_name: str = field(default="plaintext")
     supported_extensions: Set[str] = field(default_factory=lambda: PLAINTEXT_EXTENSIONS)
     parse_markdown_structure: bool = True
-
-    def can_parse(self, file: SourceFile) -> bool:
-        """Check if this parser can handle the file."""
-        return file.extension in self.supported_extensions
+    encoding: str = "utf-8"
 
     def parse(self, file: SourceFile) -> ParsedDocument:
         """
@@ -142,24 +141,8 @@ class PlainTextParser:
         Raises:
             ParseError: If the file cannot be read.
         """
-        try:
-            content = file.local_path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            # Try with latin-1 as fallback
-            try:
-                content = file.local_path.read_text(encoding="latin-1")
-            except Exception as e:
-                raise ParseError(
-                    f"Failed to read file: {e}",
-                    source=file.uri,
-                    cause=e,
-                ) from e
-        except Exception as e:
-            raise ParseError(
-                f"Failed to read file: {e}",
-                source=file.uri,
-                cause=e,
-            ) from e
+        # Read file content using base class helper
+        content = self._read_file_text(file, encoding=self.encoding)
 
         # Parse based on file type
         if file.extension in {".md", ".markdown"} and self.parse_markdown_structure:
@@ -170,10 +153,7 @@ class PlainTextParser:
         return ParsedDocument(
             source=file.uri,
             elements=elements,
-            metadata={
-                "parser": self.plugin_name,
-                "source_extension": file.extension,
-            },
+            metadata=self._build_metadata(file),
         )
 
     def _parse_plain_text(self, content: str) -> List[DocumentElement]:

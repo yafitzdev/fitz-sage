@@ -44,6 +44,8 @@ from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.ingestion.parser.base import ParseError
 from fitz_ai.ingestion.source.base import SourceFile
 
+from .base_parser import BaseParser
+
 logger = logging.getLogger(__name__)
 
 # Silence verbose third-party loggers
@@ -80,7 +82,7 @@ DOCLING_EXTENSIONS: Set[str] = {
 
 
 @dataclass
-class DoclingParser:
+class DoclingParser(BaseParser):
     """
     Parser using Docling for document understanding.
 
@@ -104,7 +106,7 @@ class DoclingParser:
         doc = parser.parse(source_file)  # Figures will have descriptions!
     """
 
-    plugin_name: str = field(default="docling", repr=False)
+    plugin_name: str = field(default="docling")
     supported_extensions: Set[str] = field(default_factory=lambda: DOCLING_EXTENSIONS)
 
     # Optional VLM client for describing figures/images
@@ -138,10 +140,6 @@ class DoclingParser:
                     "Docling is required for this parser. Install it with: pip install docling"
                 ) from e
         return self._converter
-
-    def can_parse(self, file: SourceFile) -> bool:
-        """Check if this parser can handle the file."""
-        return file.extension in self.supported_extensions
 
     def parse(self, file: SourceFile) -> ParsedDocument:
         """

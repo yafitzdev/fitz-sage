@@ -213,9 +213,10 @@ class FitzRAGChain(Runnable):
         input: dict[str, Any],
         config: Optional[RunnableConfig] = None,
     ) -> dict[str, Any]:
-        """Async invoke - delegates to sync for now."""
-        # TODO: Add async cloud client support
-        return self.invoke(input, config)
+        """Async invoke - runs sync method in thread pool to avoid blocking."""
+        # TODO: Add native async cloud client support
+        import asyncio
+        return await asyncio.to_thread(self.invoke, input, config)
 
     def _run_without_cache(
         self,

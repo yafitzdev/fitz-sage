@@ -17,6 +17,9 @@ from typing import Any
 
 from fitz_ai.retrieval.detection.protocol import DetectionCategory, DetectionResult
 
+# Default confidence for detection results when not computed from scores
+DEFAULT_CONFIDENCE = 0.9
+
 
 class DetectionModule(ABC):
     """

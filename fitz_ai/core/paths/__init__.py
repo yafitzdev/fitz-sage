@@ -22,7 +22,6 @@ from typing import Optional
 
 from . import cache as _cache
 from . import config as _config
-from . import indices as _indices
 from . import ingestion as _ingestion
 from . import plugins as _plugins
 from . import storage as _storage
@@ -100,32 +99,6 @@ class FitzPaths:
     def ensure_pgdata(cls, collection: Optional[str] = None) -> Path:
         """Get pgdata path and create it if it doesn't exist."""
         return _storage.ensure_pgdata(collection)
-
-    # Indices
-    @classmethod
-    def vocabulary(cls, collection: Optional[str] = None) -> Path:
-        """Auto-detected keyword vocabulary file."""
-        return _indices.vocabulary(collection)
-
-    @classmethod
-    def sparse_index(cls, collection: str) -> Path:
-        """Sparse (TF-IDF) index for hybrid search."""
-        return _indices.sparse_index(collection)
-
-    @classmethod
-    def ensure_sparse_index_dir(cls) -> Path:
-        """Get sparse index directory and create it if it doesn't exist."""
-        return _indices.ensure_sparse_index_dir()
-
-    @classmethod
-    def entity_graph(cls, collection: str) -> Path:
-        """Entity graph database for a collection."""
-        return _indices.entity_graph(collection)
-
-    @classmethod
-    def ensure_entity_graph_dir(cls) -> Path:
-        """Get entity graph directory and create it if it doesn't exist."""
-        return _indices.ensure_entity_graph_dir()
 
     # Ingestion
     @classmethod

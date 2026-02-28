@@ -192,14 +192,6 @@ def vlm_krag_engine(set_workspace):
     except Exception:
         pass
 
-    for path_fn in [FitzPaths.vocabulary, FitzPaths.entity_graph]:
-        try:
-            path = path_fn(collection)
-            if path.exists():
-                path.unlink()
-        except Exception:
-            pass
-
 
 @pytest.mark.parametrize(
     "scenario",

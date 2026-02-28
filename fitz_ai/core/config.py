@@ -11,12 +11,12 @@ Usage:
     # Load raw YAML
     data = load_yaml("config.yaml")
 
-    # Load and validate with a schema
-    from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-    config = load_config("config.yaml", FitzKragConfig)
+    # Load and validate with a schema (schema defined elsewhere)
+    # Engine-specific schemas should be loaded at the engine layer
+    config = load_config("config.yaml", MyConfigSchema)
 
-    # For engine-specific loading, use the engine's loader:
-    from fitz_ai.config.loader import load_engine_config
+    # For engine-specific loading, use the config loader at runtime layer:
+    # See fitz_ai.config.loader for engine-specific loading
 
 Design principles:
     - Generic utilities only - no engine imports
@@ -211,9 +211,9 @@ def load_config(
         ConfigValidationError: If config doesn't match schema
 
     Examples:
-        # Load KRAG config with explicit schema
-        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-        config = load_config("config.yaml", FitzKragConfig)
+        # Load config with explicit schema (schema defined at appropriate layer)
+        # Engine schemas should be imported at engine/runtime layer, not core
+        config = load_config("config.yaml", MyConfigSchema)
     """
     resolved_path = Path(path)
 

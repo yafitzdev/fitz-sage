@@ -18,11 +18,13 @@ from fitz_ai.ingestion.parser.base import ParseError
 from fitz_ai.ingestion.source.base import SourceFile
 from fitz_ai.logging.logger import get_logger
 
+from .base_parser import BaseParser
+
 logger = get_logger(__name__)
 
 
 @dataclass
-class CSVParser:
+class CSVParser(BaseParser):
     """
     Parser for CSV and TSV files.
 
@@ -36,14 +38,10 @@ class CSVParser:
         doc.tables[0].columns  # ['employee_id', 'name', 'department', 'salary']
     """
 
-    plugin_name: str = field(default="csv", repr=False)
-    supported_extensions: Set[str] = field(default_factory=lambda: {".csv", ".tsv"}, repr=False)
+    plugin_name: str = field(default="csv")
+    supported_extensions: Set[str] = field(default_factory=lambda: {".csv", ".tsv"})
     max_rows: int = 100000  # Safety limit for very large CSV files
     encoding: str = "utf-8"
-
-    def can_parse(self, file: SourceFile) -> bool:
-        """Check if this parser can handle the file."""
-        return file.extension in self.supported_extensions
 
     def parse(self, file: SourceFile) -> ParsedDocument:
         """
@@ -146,13 +144,14 @@ class CSVParser:
             source=file.uri,
             elements=[schema_element],
             tables=[table],
-            metadata={
-                "is_tabular": True,  # Flag for executor to store in TableStore
-                "table_id": table_id,
-                "column_count": len(columns),
-                "row_count": len(normalized_rows),
-                "file_type": "csv" if delimiter == "," else "tsv",
-            },
+            metadata=self._build_metadata(
+                file,
+                is_tabular=True,  # Flag for executor to store in TableStore
+                table_id=table_id,
+                column_count=len(columns),
+                row_count=len(normalized_rows),
+                file_type="csv" if delimiter == "," else "tsv",
+            ),
         )
 
 

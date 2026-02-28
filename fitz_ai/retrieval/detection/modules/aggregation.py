@@ -8,7 +8,7 @@ from typing import Any
 
 from fitz_ai.retrieval.detection.protocol import DetectionCategory, DetectionResult
 
-from .base import DetectionModule
+from .base import DEFAULT_CONFIDENCE, DetectionModule
 
 
 class AggregationType(Enum):
@@ -63,7 +63,7 @@ class AggregationModule(DetectionModule):
         return DetectionResult(
             detected=True,
             category=self.category,
-            confidence=0.9,
+            confidence=DEFAULT_CONFIDENCE,
             intent=agg_type,
             matches=[],
             metadata={

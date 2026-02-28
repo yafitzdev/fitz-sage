@@ -385,17 +385,6 @@ class KragE2ERunner:
         except Exception as e:
             logger.debug(f"PostgreSQL cleanup failed (non-fatal): {e}")
 
-        # Also clean up vocabulary, entity graph, table store files
-        from fitz_ai.core.paths import FitzPaths
-
-        for path_fn in [FitzPaths.vocabulary, FitzPaths.entity_graph]:
-            try:
-                path = path_fn(collection)
-                if path.exists():
-                    path.unlink()
-            except Exception:
-                pass
-
     def run_scenario(self, scenario: TestScenario, use_cache: bool = True) -> ScenarioResult:
         """Run a single test scenario."""
         if not self._setup_complete:
