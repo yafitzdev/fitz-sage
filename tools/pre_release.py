@@ -147,6 +147,7 @@ def main() -> int:
             "-m",
             "not postgres and not slow and not integration",
             "--ignore=tests/unit/llm/test_auth_adapters.py",  # Skip slow/complex tests
+            "--ignore=tests/unit/integrations/test_langchain.py",  # Requires langchain_core + langsmith
         ],
         check=False,
     )

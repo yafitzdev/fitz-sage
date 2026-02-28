@@ -353,7 +353,9 @@ class CodeExpander:
             if not chunk_ids:
                 return expanded
 
-            related_ids = self._entity_graph_store.get_related_chunks(chunk_ids, max_total=max_total)
+            related_ids = self._entity_graph_store.get_related_chunks(
+                chunk_ids, max_total=max_total
+            )
             if not related_ids:
                 return expanded
 

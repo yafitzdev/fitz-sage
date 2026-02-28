@@ -16,6 +16,8 @@ flag it (false positive). Only fire when we are VERY confident the
 specific info is genuinely absent from the context.
 """
 
+from __future__ import annotations
+
 import re  # used only for structural version/identifier matching in _has_entity_mismatch
 from typing import TYPE_CHECKING, Any, Sequence
 

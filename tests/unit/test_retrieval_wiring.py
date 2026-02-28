@@ -296,10 +296,10 @@ class TestSectionKeywordBoostIncreasesScore:
 
         # Score should include the 0.1 keyword boost on top of BM25 contribution
         assert len(results) == 1
-        # BM25 uses rank-based scoring: 1/(rank+1) = 1.0 for rank 0
-        # section_bm25_weight * 1.0 = 0.6 * 1.0 = 0.6
-        # With keyword boost: 0.6 + 0.1 = 0.7
-        assert results[0].score == pytest.approx(0.7, abs=0.01)
+        # RRF with k=60: BM25 only at rank 0 → 1/(60+0) = 1/60
+        # section_bm25_weight * (1/60) = 0.6/60 = 0.01
+        # With keyword boost: 0.01 + 0.1 = 0.11
+        assert results[0].score == pytest.approx(0.6 / 60 + 0.1, abs=0.01)
 
 
 # ===========================================================================
@@ -429,16 +429,16 @@ class TestSectionFreshnessBoostWithRecency:
         # With 4 files: top_quarter = f0, top_half = f0,f1
         # f0 gets +0.1, f1 gets +0.05, f2 and f3 get nothing
         scores = {r.source_id: r.score for r in results}
-        # BM25 uses rank-based scoring: rank 0->1.0, rank 1->0.5, rank 2->0.33, rank 3->0.25
-        # base scores: f0=0.6*1.0=0.6, f1=0.6*0.5=0.3, f2=0.6*0.33=0.2, f3=0.6*0.25=0.15
+        # RRF with k=60: BM25 only at ranks 0,1,2,3 → 1/(60+rank)
+        # base scores: f0=0.6*(1/60), f1=0.6*(1/61), f2=0.6*(1/62), f3=0.6*(1/63)
         assert scores["f0"] > scores["f2"]
         assert scores["f0"] > scores["f3"]
-        # f0 should have base 0.6 + 0.1 boost = 0.7
-        assert scores["f0"] == pytest.approx(0.7, abs=0.01)
-        # f1 should have base 0.3 + 0.05 boost = 0.35
-        assert scores["f1"] == pytest.approx(0.35, abs=0.01)
-        # f2 should have base only = 0.2
-        assert scores["f2"] == pytest.approx(0.2, abs=0.01)
+        # f0 should have base 0.6*(1/60) + 0.1 boost = 0.11
+        assert scores["f0"] == pytest.approx(0.6 / 60 + 0.1, abs=0.01)
+        # f1 should have base 0.6*(1/61) + 0.05 boost ≈ 0.0598
+        assert scores["f1"] == pytest.approx(0.6 / 61 + 0.05, abs=0.01)
+        # f2 should have base only = 0.6*(1/62) ≈ 0.00968
+        assert scores["f2"] == pytest.approx(0.6 / 62, abs=0.001)
 
 
 class TestFreshnessNoBoostWithoutFlag:

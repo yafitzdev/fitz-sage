@@ -24,11 +24,6 @@ pytestmark = pytest.mark.tier1
 
 from fitz_ai.core.chunk import Chunk
 from fitz_ai.governance import CausalAttributionConstraint
-
-# =============================================================================
-# Mock Embedder
-# =============================================================================
-
 from fitz_ai.governance.constraints.semantic import (
     CAUSAL_CONCEPTS,
     CAUSAL_QUERY_CONCEPTS,
@@ -38,6 +33,11 @@ from fitz_ai.governance.constraints.semantic import (
     PREDICTIVE_QUERY_CONCEPTS,
     SPECULATIVE_QUERY_CONCEPTS,
 )
+
+# =============================================================================
+# Mock Embedder
+# =============================================================================
+
 
 # Direct lookup for SemanticMatcher anchor phrases → canonical category bucket.
 # This avoids false bucket collisions when an anchor phrase happens to contain

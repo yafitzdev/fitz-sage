@@ -11,7 +11,6 @@ Covers:
 """
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,7 +18,6 @@ import pytest
 from fitz_ai.retrieval.detection.classifier import DetectionClassifier
 from fitz_ai.retrieval.detection.protocol import DetectionCategory, DetectionResult
 from fitz_ai.retrieval.detection.registry import DetectionOrchestrator
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -51,7 +49,7 @@ def _make_classifier_available(
         predict_positive: Labels whose mock model outputs p=0.9 (rest p=0.1).
     """
     labels = labels or ["temporal", "comparison"]
-    thresholds = thresholds or {l: 0.5 for l in labels}
+    thresholds = thresholds or {lbl: 0.5 for lbl in labels}
     predict_positive = predict_positive or []
 
     # Build mock estimators: one per label
@@ -67,11 +65,10 @@ def _make_classifier_available(
     mock_model.estimators_ = estimators
 
     # predict_proba on MultiOutputClassifier returns list of (n,2) arrays
-    import numpy as np
 
     mock_model.predict_proba.return_value = [
-        [[1 - (0.9 if l in predict_positive else 0.1), (0.9 if l in predict_positive else 0.1)]]
-        for l in labels
+        [[1 - (0.9 if lbl in predict_positive else 0.1), (0.9 if lbl in predict_positive else 0.1)]]
+        for lbl in labels
     ]
 
     mock_vec = MagicMock()
@@ -280,9 +277,11 @@ class TestDetectionOrchestratorGating:
 
         orch = DetectionOrchestrator.__new__(DetectionOrchestrator)
         orch.chat_factory = MagicMock()
+        orch.embedder = None
         orch._classifier = mock_llm
         orch._ml_classifier = mock_clf
         orch._expansion_detector = mock_expansion
+        orch._concept_detector = None
 
         return orch, mock_llm
 
@@ -294,9 +293,7 @@ class TestDetectionOrchestratorGating:
 
     def test_llm_called_with_subset_when_flagged(self):
         """Non-empty set from ML classifier → LLM called with limit_to."""
-        orch, mock_llm = self._make_orchestrator(
-            ml_result={DetectionCategory.TEMPORAL}
-        )
+        orch, mock_llm = self._make_orchestrator(ml_result={DetectionCategory.TEMPORAL})
         orch.detect_for_retrieval("When did the project launch?")
         mock_llm.classify.assert_called_once()
         _, kwargs = mock_llm.classify.call_args

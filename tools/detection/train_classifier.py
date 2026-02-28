@@ -67,15 +67,11 @@ _FRESHNESS_RE = re.compile(
 def keyword_features(queries: list[str]) -> sp.csr_matrix:
     """Return (n, 4) sparse matrix of keyword indicator features."""
     temporal = np.array([1 if _TEMPORAL_RE.search(q) else 0 for q in queries], dtype=np.float32)
-    comparison = np.array(
-        [1 if _COMPARISON_RE.search(q) else 0 for q in queries], dtype=np.float32
-    )
+    comparison = np.array([1 if _COMPARISON_RE.search(q) else 0 for q in queries], dtype=np.float32)
     aggregation = np.array(
         [1 if _AGGREGATION_RE.search(q) else 0 for q in queries], dtype=np.float32
     )
-    freshness = np.array(
-        [1 if _FRESHNESS_RE.search(q) else 0 for q in queries], dtype=np.float32
-    )
+    freshness = np.array([1 if _FRESHNESS_RE.search(q) else 0 for q in queries], dtype=np.float32)
     return sp.csr_matrix(np.column_stack([temporal, comparison, aggregation, freshness]))
 
 
@@ -137,7 +133,9 @@ def derive_labels(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def calibrate_threshold(y_true: np.ndarray, y_proba: np.ndarray, target_recall: float = 0.90) -> float:
+def calibrate_threshold(
+    y_true: np.ndarray, y_proba: np.ndarray, target_recall: float = 0.90
+) -> float:
     """Find the highest threshold where recall is still >= target_recall."""
     thresholds = np.linspace(1.0, 0.0, 201)  # sweep high → low
     best = 0.0  # fallback: predict everything positive
@@ -157,20 +155,14 @@ def calibrate_threshold(y_true: np.ndarray, y_proba: np.ndarray, target_recall: 
 # ---------------------------------------------------------------------------
 
 
-def _binary_metrics(
-    y_true: np.ndarray, y_pred: np.ndarray
-) -> tuple[float, float, float]:
+def _binary_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[float, float, float]:
     """Return (recall, precision, f1) for binary arrays."""
     tp = int(np.sum((y_pred == 1) & (y_true == 1)))
     fp = int(np.sum((y_pred == 1) & (y_true == 0)))
     fn = int(np.sum((y_pred == 0) & (y_true == 1)))
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    f1 = (
-        2 * precision * recall / (precision + recall)
-        if (precision + recall) > 0
-        else 0.0
-    )
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
     return recall, precision, f1
 
 
@@ -203,8 +195,8 @@ def main() -> None:
 
     # Stratify target: any positive label
     stratify_col = (
-        df["temporal"] | df["comparison"] | df["aggregation"] | df["freshness"]
-    ).astype(int).values
+        (df["temporal"] | df["comparison"] | df["aggregation"] | df["freshness"]).astype(int).values
+    )
 
     # Features: TF-IDF + keyword indicators
     vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=500, sublinear_tf=True)
@@ -220,7 +212,6 @@ def main() -> None:
     oof_y: list[np.ndarray] = []
 
     for fold, (train_idx, val_idx) in enumerate(cv.split(X, stratify_col), 1):
-        X_train, X_val = X[train_idx], X[val_idx]
         Y_train, Y_val = Y[train_idx], Y[val_idx]
 
         # Re-fit vectorizer on train split only (keyword features are fit-free)

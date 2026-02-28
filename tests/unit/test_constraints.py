@@ -214,9 +214,7 @@ class TestConflictAwareConstraint:
 
     def test_resolution_query_allows_despite_conflict(self, mock_chat_with_conflict):
         """Should allow decisive answer when query asks for resolution."""
-        constraint = ConflictAwareConstraint(
-            chat=mock_chat_with_conflict, embedder=MockEmbedder()
-        )
+        constraint = ConflictAwareConstraint(chat=mock_chat_with_conflict, embedder=MockEmbedder())
 
         chunks = [
             make_chunk("1", "Source A says: security incident."),
@@ -447,9 +445,7 @@ class TestAcceptanceCriteria:
         """
         # Resolution detection requires an embedder (SemanticMatcher); without
         # one the constraint cannot recognise resolution queries.
-        constraint = ConflictAwareConstraint(
-            chat=mock_chat_with_conflict, embedder=MockEmbedder()
-        )
+        constraint = ConflictAwareConstraint(chat=mock_chat_with_conflict, embedder=MockEmbedder())
 
         chunks = [
             make_chunk(

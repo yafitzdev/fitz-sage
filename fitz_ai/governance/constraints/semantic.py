@@ -20,7 +20,10 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Sequence
+from typing import TYPE_CHECKING, Callable, Sequence
+
+if TYPE_CHECKING:
+    from fitz_ai.governance.constraints.aspect_classifier import QueryAspect
 
 from fitz_ai.core.math import cosine_similarity, mean_vector
 from fitz_ai.governance.protocol import EvidenceItem
@@ -514,9 +517,7 @@ class SemanticMatcher:
 
     def is_opinion_query(self, query: str) -> bool:
         """Detect if query asks for recommendations, judgments, or opinions."""
-        similarity = self.max_similarity_to_concepts(
-            query, "opinion_query", OPINION_QUERY_CONCEPTS
-        )
+        similarity = self.max_similarity_to_concepts(query, "opinion_query", OPINION_QUERY_CONCEPTS)
         return similarity >= self.query_threshold
 
     def is_speculative_query(self, query: str) -> bool:

@@ -10,10 +10,7 @@ Tests:
 - BEIRBenchmark.evaluate: ImportError when beir package missing
 """
 
-import json
-import tempfile
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -28,7 +25,6 @@ from fitz_ai.evaluation.benchmarks.beir import (
     BEIRSuiteResult,
     FitzBEIRRetriever,
 )
-
 
 # =============================================================================
 # BEIRResult Tests
@@ -422,7 +418,7 @@ class TestFitzBEIRRetriever:
         retriever = FitzBEIRRetriever(engine, "beir_test_col")
 
         mock_addresses = [
-            self._make_address("", 0.95),    # empty source_id → skipped
+            self._make_address("", 0.95),  # empty source_id → skipped
             self._make_address("doc2", 0.87),
         ]
 

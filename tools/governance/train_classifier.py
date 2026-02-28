@@ -82,7 +82,7 @@ _META_COLS = {
 }
 
 # Feature type sets derived from constraint schemas (single source of truth)
-from fitz_ai.governance.constraints.feature_extractor import get_feature_type_sets
+from fitz_ai.governance.constraints.feature_extractor import get_feature_type_sets  # noqa: E402
 
 _CATEGORICAL_FEATURES, _BOOL_FEATURES = get_feature_type_sets()
 
@@ -1220,7 +1220,11 @@ def train_twostage(
 
     # ---- Build test split metadata ----
     test_ids = list(case_ids.iloc[X_test.index].values) if case_ids is not None else []
-    test_split_hash = hashlib.sha256(",".join(sorted(str(i) for i in test_ids)).encode()).hexdigest()[:16] if test_ids else ""
+    test_split_hash = (
+        hashlib.sha256(",".join(sorted(str(i) for i in test_ids)).encode()).hexdigest()[:16]
+        if test_ids
+        else ""
+    )
 
     # ---- Save artifact ----
     artifact = {
@@ -1820,7 +1824,9 @@ def train_cascade(
         final_oof_pred[idx] = "trustworthy" if q4_oof_full[idx] >= q4_threshold else "abstain"
 
     combined_acc = accuracy_score(y_3class, final_oof_pred)
-    print(f"\nCombined accuracy (OOF): {combined_acc:.4f} ({sum(y_3class == final_oof_pred)}/{len(y_3class)})")
+    print(
+        f"\nCombined accuracy (OOF): {combined_acc:.4f} ({sum(y_3class == final_oof_pred)}/{len(y_3class)})"
+    )
     print(classification_report(y_3class, final_oof_pred, labels=_3CLASS_LABELS, zero_division=0))
 
     cm = confusion_matrix(y_3class, final_oof_pred, labels=_3CLASS_LABELS)

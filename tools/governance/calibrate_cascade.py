@@ -12,13 +12,18 @@ from sklearn.model_selection import StratifiedKFold, cross_val_predict
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tools.governance.train_classifier import (
     _CONFLICT_FEATURE,
-    _3CLASS_LABELS,
     _collapse_to_3class,
     prepare_features,
 )
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
-MODEL_PATH = Path(__file__).resolve().parents[2] / "fitz_ai" / "governance" / "data" / "model_v6_cascade.joblib"
+MODEL_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "fitz_ai"
+    / "governance"
+    / "data"
+    / "model_v6_cascade.joblib"
+)
 SEED = 42
 
 
@@ -77,7 +82,6 @@ def main():
     n = len(y_3class)
     p_q1 = q1_oof[:, 1]
 
-    best = None
     results = []
 
     for q1_t in np.arange(0.40, 0.80, 0.01):
@@ -105,18 +109,29 @@ def main():
 
                 # Filter: keep accuracy >= 78% and trustworthy recall >= 65%
                 if acc >= 0.78 and r_tru >= 0.65:
-                    results.append({
-                        "q1_t": q1_t, "q3_t": q3_t, "q4_t": q4_t,
-                        "ft": ft, "ft_abs": ft_abs, "ft_dis": ft_dis,
-                        "acc": acc, "r_abs": r_abs, "r_dis": r_dis, "r_tru": r_tru,
-                    })
+                    results.append(
+                        {
+                            "q1_t": q1_t,
+                            "q3_t": q3_t,
+                            "q4_t": q4_t,
+                            "ft": ft,
+                            "ft_abs": ft_abs,
+                            "ft_dis": ft_dis,
+                            "acc": acc,
+                            "r_abs": r_abs,
+                            "r_dis": r_dis,
+                            "r_tru": r_tru,
+                        }
+                    )
 
     # Sort by false-trustworthy (primary), then accuracy (secondary, descending)
     results.sort(key=lambda r: (r["ft"], -r["acc"]))
 
     print(f"\nFound {len(results)} viable configurations (acc >= 78%, trustworthy recall >= 65%)")
-    print(f"\nTop 10 (lowest false-trustworthy):\n")
-    print(f"  {'Q1':>6s}  {'Q3':>6s}  {'Q4':>6s}  {'FT':>4s}  {'Acc':>6s}  {'Abs':>6s}  {'Dis':>6s}  {'Tru':>6s}")
+    print("\nTop 10 (lowest false-trustworthy):\n")
+    print(
+        f"  {'Q1':>6s}  {'Q3':>6s}  {'Q4':>6s}  {'FT':>4s}  {'Acc':>6s}  {'Abs':>6s}  {'Dis':>6s}  {'Tru':>6s}"
+    )
     print(f"  {'-'*6}  {'-'*6}  {'-'*6}  {'-'*4}  {'-'*6}  {'-'*6}  {'-'*6}  {'-'*6}")
 
     for r in results[:10]:
@@ -140,7 +155,9 @@ def main():
                 ft_abs = int(((pred == "trustworthy") & (y_3class == "abstain")).sum())
                 ft_dis = int(((pred == "trustworthy") & (y_3class == "disputed")).sum())
                 cur = {
-                    "ft": ft_abs + ft_dis, "ft_abs": ft_abs, "ft_dis": ft_dis,
+                    "ft": ft_abs + ft_dis,
+                    "ft_abs": ft_abs,
+                    "ft_dis": ft_dis,
                     "acc": (pred == y_3class).mean(),
                     "r_abs": (pred[y_3class == "abstain"] == "abstain").mean(),
                     "r_dis": (pred[y_3class == "disputed"] == "disputed").mean(),
@@ -155,7 +172,9 @@ def main():
 
     if results:
         pick = results[0]
-        print(f"\n  Best safe point (Q1={pick['q1_t']:.3f} Q3={pick['q3_t']:.3f} Q4={pick['q4_t']:.3f}):")
+        print(
+            f"\n  Best safe point (Q1={pick['q1_t']:.3f} Q3={pick['q3_t']:.3f} Q4={pick['q4_t']:.3f}):"
+        )
         print(
             f"  FT={pick['ft']}  Acc={pick['acc']*100:.1f}%"
             f"  Abs={pick['r_abs']*100:.1f}%  Dis={pick['r_dis']*100:.1f}%  Tru={pick['r_tru']*100:.1f}%"
@@ -164,7 +183,7 @@ def main():
         delta_acc = (pick["acc"] - cur["acc"]) * 100
         print(f"\n  Delta: FT {'-' if delta_ft > 0 else '+'}{abs(delta_ft)}, Acc {delta_acc:+.1f}%")
 
-        ans = input(f"\nApply best safe thresholds? [y/N] ")
+        ans = input("\nApply best safe thresholds? [y/N] ")
         if ans.strip().lower() == "y":
             artifact["q1_threshold"] = pick["q1_t"]
             artifact["q3_threshold"] = pick["q3_t"]

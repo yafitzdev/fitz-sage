@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.10.1] - 2026-02-28
+
+### 🎉 Highlights
+
+**ML Detection Classifier** — New `DetectionClassifier` combines lightweight ML models with keyword heuristics to gate expensive LLM detection calls. Temporal detection at 90.6% recall, comparison at 90.2% recall. Integrated into `DetectionOrchestrator` with full training pipeline.
+
+**Retrieval Quality Overhaul** — Replaced asymmetric merge with proper Reciprocal Rank Fusion (k=60), removed min_relevance_score filter that was killing recall, and tuned HNSW ef_search=200 for better vector search accuracy.
+
+**SemanticMatcher Unification** — Consolidated semantic classification under a single `SemanticMatcher` abstraction. Migrated `CausalAttribution` and `ConflictAware` detectors to use it.
+
+### 🚀 Added
+
+- ML+keyword `DetectionClassifier` with training script and model artifacts (`981b6e9`, `cc9b8c6`)
+- `DetectionClassifier` integrated into `DetectionOrchestrator` for smart gating (`2909e07`, `debacfa`)
+- 32 unit tests for DetectionClassifier and orchestrator gating (`521905c`)
+- Hybrid BM25+semantic retrieval wired into BEIR benchmark (`5fba5e3`)
+- Widened entity graph expansion with corpus summary injection for thematic queries (`f1df503`)
+- BEIR benchmark results and methodology docs (`ef0ec73`, `aedfc21`)
+- Confirmed fiqa score for bge-m3: 0.2702 (`4a94ca1`)
+
+### ⚡ Performance
+
+- Proper Reciprocal Rank Fusion (k=60) replacing asymmetric merge (`6c8f988`)
+- Removed `min_relevance_score` filter that was killing recall (`d3ae3b0`)
+- Set `hnsw.ef_search=200` for vector search queries (`c4924a9`)
+
+### 🔄 Changed
+
+- Unified semantic classification under `SemanticMatcher` (`0821132`)
+- Migrated `CausalAttribution` and `ConflictAware` to `SemanticMatcher` (`9c7c081`)
+- Schema-driven feature extraction for governance classifier (`7abbcfe`)
+- 5-fold CV for cascade classifier with safety-calibrated thresholds (`71ae026`)
+
+### 🔧 Fixed
+
+- Added `num_ctx` support to `OllamaEmbedding` for context window control (`65da2eb`)
+- Updated tests for SemanticMatcher-backed constraint detection (`b94383f`)
+
+---
+
 ## [0.10.0] - 2026-02-17
 
 ### 🎉 Highlights
@@ -1658,7 +1698,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.8.0...v0.8.1

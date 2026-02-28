@@ -94,7 +94,9 @@ class DetectionClassifier:
                 "running in unavailable mode (all LLM modules will run)"
             )
         except Exception as exc:
-            logger.warning(f"DetectionClassifier failed to load: {exc}; running in unavailable mode")
+            logger.warning(
+                f"DetectionClassifier failed to load: {exc}; running in unavailable mode"
+            )
 
     @property
     def available(self) -> bool:

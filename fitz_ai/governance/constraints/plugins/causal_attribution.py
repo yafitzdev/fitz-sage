@@ -164,9 +164,7 @@ class CausalAttributionConstraint:
         )
 
     @staticmethod
-    def _has_appropriate_evidence(
-        query_type: str, has_causal: bool, has_predictive: bool
-    ) -> bool:
+    def _has_appropriate_evidence(query_type: str, has_causal: bool, has_predictive: bool) -> bool:
         """Check if evidence matches the query type."""
         if query_type == "causal":
             return has_causal

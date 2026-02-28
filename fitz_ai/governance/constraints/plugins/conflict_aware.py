@@ -97,7 +97,6 @@ Reply with ONE word: YES, NO, or UNCLEAR""",
 ]
 
 
-
 @dataclass
 class ConflictAwareConstraint:
     """

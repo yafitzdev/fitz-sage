@@ -144,8 +144,10 @@ class TestHybridMerge:
 
         results = strategy.retrieve("query", limit=5)
         assert len(results) == 1
-        # Combined score should be bm25_weight * 1.0 + semantic_weight * 1.0 = 1.0
-        assert results[0].score == pytest.approx(1.0)
+        # RRF with k=60: both legs at rank 0 → 1/(60+0) = 1/60
+        # Combined: bm25_weight * (1/60) + semantic_weight * (1/60)
+        #         = (0.6 + 0.4) * (1/60) = 1/60 ≈ 0.01667
+        assert results[0].score == pytest.approx(1 / 60, abs=1e-4)
 
     def test_disjoint_results_merged(self, strategy, mock_section_store, mock_embedder):
         mock_section_store.search_bm25.return_value = [
@@ -166,9 +168,9 @@ class TestHybridMerge:
 
         results = strategy.retrieve("query", limit=5)
         assert len(results) == 1
-        # BM25 uses rank-based scoring: rank 0 -> 1/(0+1) = 1.0
-        # Score = bm25_weight * 1.0 = 0.6 * 1.0 = 0.6
-        assert results[0].score == pytest.approx(0.6)
+        # RRF with k=60: BM25 only at rank 0 → 1/(60+0) = 1/60
+        # Score = bm25_weight * (1/60) = 0.6 * (1/60) = 0.6/60 = 0.01
+        assert results[0].score == pytest.approx(0.6 / 60, abs=1e-4)
 
 
 class TestToAddress:
