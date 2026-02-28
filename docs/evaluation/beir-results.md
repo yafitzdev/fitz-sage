@@ -187,12 +187,12 @@ print(f"nDCG@10: {result.ndcg_at_10:.4f}")
 - Run Tier 2 datasets once bge-m3 is confirmed stable
 - Investigate scidocs gap (0.1436 vs 0.1490) — likely citation-graph relevance labels that text similarity can't close
 
-## Detection Classifier (Future Work)
+## Detection Classifier (Shipped in v0.10.1)
 
 BEIR exposed that the real retrieval risk is not document recall but **query misclassification**: the `DetectionOrchestrator` uses the fast-tier LLM (qwen2.5:3b) to detect temporal, comparison, causal, aggregation, and freshness signals. If it misses, all downstream routing is wrong — silently.
 
-The fix is an ML classifier (like the governance cascade) trained on fitz-gov `reasoning_type` labels:
-- `temporal` (256 cases), `comparative` (205), `causal` (239) already exist in fitz-gov tier1
-- `aggregation` and `freshness` are not yet represented — cases need to be added to fitz-gov before training
-
-Once trained, the classifier gates LLM calls: only queries flagged as temporal trigger the LLM temporal extraction, etc. Most queries would hit zero LLM detection calls.
+**Implemented:** `DetectionClassifier` (`retrieval/detection/classifier.py`) — an ML + keyword classifier that gates LLM detection calls:
+- **ML model** (logistic regression + TF-IDF): temporal 90.6% recall, comparison 90.2% recall
+- **Keyword regex**: aggregation, freshness, rewriter (no ML needed)
+- **Fail-open**: if the model artifact is missing or prediction fails, all LLM modules run as before
+- Queries flagged by the classifier trigger only the relevant LLM modules; unflagged queries skip LLM detection entirely

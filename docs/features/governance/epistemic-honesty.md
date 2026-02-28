@@ -26,7 +26,7 @@ A: "I cannot find Q4 revenue figures in the provided documents.
 
 ### Constraint Plugins
 
-Three guardrails run automatically on every answer:
+Three guardrails run automatically on every answer. ConflictAware and CausalAttribution use a unified `SemanticMatcher` layer internally for semantic classification:
 
 | Constraint | What It Catches | Example |
 |------------|-----------------|---------|

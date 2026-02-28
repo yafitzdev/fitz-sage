@@ -76,6 +76,8 @@ final_chunks = merge_and_dedupe(initial_chunks, related_chunks)
 
 5. **Configurable expansion** - `min_shared_entities` controls how related chunks must be (default: 1).
 
+6. **Corpus summary injection** - For thematic queries, entity graph expansion also injects corpus-level summaries to provide broader context beyond individual chunk matches.
+
 ## Entity Types
 
 The EntityModule extracts these entity types:
