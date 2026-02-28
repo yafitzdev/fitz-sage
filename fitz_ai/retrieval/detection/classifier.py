@@ -127,44 +127,9 @@ class DetectionClassifier:
 
             # ML predictions — features must match training exactly:
             # TF-IDF (500) + 4 keyword indicator columns
-            import numpy as np
-            import scipy.sparse as sp
+            self._predict_ml(query, flagged, DetectionCategory)
 
-            tfidf_vec = self._vectorizer.transform([query])
-            kw_features = sp.csr_matrix(
-                np.array(
-                    [
-                        [
-                            1.0 if _TEMPORAL_KW_RE.search(query) else 0.0,
-                            1.0 if _COMPARISON_KW_RE.search(query) else 0.0,
-                            1.0 if _AGGREGATION_RE.search(query) else 0.0,
-                            1.0 if _FRESHNESS_RE.search(query) else 0.0,
-                        ]
-                    ],
-                    dtype=np.float32,
-                )
-            )
-            vec = sp.hstack([tfidf_vec, kw_features], format="csr")
-            # predict_proba returns shape (n_samples, n_classes) per label
-            probas = self._model.predict_proba(vec)
-
-            _label_to_category = {
-                "temporal": DetectionCategory.TEMPORAL,
-                "comparison": DetectionCategory.COMPARISON,
-                "aggregation": DetectionCategory.AGGREGATION,
-                "freshness": DetectionCategory.FRESHNESS,
-            }
-
-            for idx, label in enumerate(self._labels):
-                # probas[idx] is (n_samples, 2); column 1 is P(positive)
-                prob_positive = probas[idx][0][1]
-                threshold = self._thresholds.get(label, 0.5)
-                if prob_positive >= threshold:
-                    category = _label_to_category.get(label)
-                    if category is not None:
-                        flagged.add(category)
-
-            # Keyword rules for ungated categories
+            # Keyword rules for ungated categories (no ML deps needed)
             if _AGGREGATION_RE.search(query):
                 flagged.add(DetectionCategory.AGGREGATION)
             if _FRESHNESS_RE.search(query):
@@ -177,6 +142,47 @@ class DetectionClassifier:
         except Exception as exc:
             logger.warning(f"DetectionClassifier.predict failed: {exc}; returning None (fail-open)")
             return None
+
+    def _predict_ml(self, query: str, flagged: set, DetectionCategory) -> None:
+        """Run ML model predictions, adding flagged categories to the set."""
+        try:
+            import numpy as np
+            import scipy.sparse as sp
+        except ImportError:
+            logger.debug("scipy/numpy not installed; skipping ML predictions")
+            return
+
+        tfidf_vec = self._vectorizer.transform([query])
+        kw_features = sp.csr_matrix(
+            np.array(
+                [
+                    [
+                        1.0 if _TEMPORAL_KW_RE.search(query) else 0.0,
+                        1.0 if _COMPARISON_KW_RE.search(query) else 0.0,
+                        1.0 if _AGGREGATION_RE.search(query) else 0.0,
+                        1.0 if _FRESHNESS_RE.search(query) else 0.0,
+                    ]
+                ],
+                dtype=np.float32,
+            )
+        )
+        vec = sp.hstack([tfidf_vec, kw_features], format="csr")
+        probas = self._model.predict_proba(vec)
+
+        _label_to_category = {
+            "temporal": DetectionCategory.TEMPORAL,
+            "comparison": DetectionCategory.COMPARISON,
+            "aggregation": DetectionCategory.AGGREGATION,
+            "freshness": DetectionCategory.FRESHNESS,
+        }
+
+        for idx, label in enumerate(self._labels):
+            prob_positive = probas[idx][0][1]
+            threshold = self._thresholds.get(label, 0.5)
+            if prob_positive >= threshold:
+                category = _label_to_category.get(label)
+                if category is not None:
+                    flagged.add(category)
 
 
 __all__ = ["DetectionClassifier"]
