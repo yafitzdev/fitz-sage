@@ -7,7 +7,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from fitz_ai.core.config_base import DatabaseConfig
 
 
 class StorageMode(str, Enum):
@@ -17,9 +19,11 @@ class StorageMode(str, Enum):
     EXTERNAL = "external"  # External PostgreSQL connection string
 
 
-class StorageConfig(BaseModel):
+class StorageConfig(DatabaseConfig):
     """
     Configuration for unified PostgreSQL storage.
+
+    Inherits from DatabaseConfig for connection pooling and timeouts.
 
     Supports two modes:
     - LOCAL: Uses pgserver for embedded PostgreSQL (zero-friction local dev)
@@ -37,26 +41,7 @@ class StorageConfig(BaseModel):
         description="Data directory for pgserver. None = use FitzPaths.pgdata()",
     )
 
-    # External mode settings
-    connection_string: Optional[str] = Field(
-        default=None,
-        description="PostgreSQL connection string for external mode (e.g., postgresql://user:pass@host:5432/db)",
-    )
-
-    # Connection pool settings
-    pool_min_size: int = Field(
-        default=1,
-        ge=1,
-        le=100,
-        description="Minimum connections in pool",
-    )
-
-    pool_max_size: int = Field(
-        default=10,
-        ge=1,
-        le=100,
-        description="Maximum connections in pool",
-    )
+    # Note: connection_string and pool settings inherited from DatabaseConfig
 
     # HNSW index settings
     hnsw_m: int = Field(

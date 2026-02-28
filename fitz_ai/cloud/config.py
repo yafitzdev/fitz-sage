@@ -5,12 +5,17 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from fitz_ai.core.config_base import ApiServiceConfig, FeatureToggleMixin
 
 
-class CloudConfig(BaseModel):
+class CloudConfig(ApiServiceConfig, FeatureToggleMixin):
     """
     Fitz Cloud configuration.
+
+    Inherits from ApiServiceConfig for API settings and timeouts,
+    and FeatureToggleMixin for enable/disable functionality.
 
     Example YAML:
         cloud:
@@ -19,18 +24,16 @@ class CloudConfig(BaseModel):
           org_id: "your-org-uuid"  # Can also use FITZ_ORG_ID env var
           org_key: "64-char-hex-string"
           base_url: "https://api.fitz-ai.cloud/v1"
+          timeout: 30
     """
 
-    enabled: bool = Field(
-        default=False,
-        description="Enable Fitz Cloud features (cache, routing)",
+    # Override base_url default for Fitz Cloud
+    base_url: str = Field(
+        default="https://api.fitz-ai.cloud/v1",
+        description="Fitz Cloud API base URL",
     )
 
-    api_key: Optional[str] = Field(
-        default=None,
-        description="Fitz Cloud API key (fitz_xxx format)",
-    )
-
+    # Cloud-specific fields
     org_id: Optional[str] = Field(
         default=None,
         description="Organization ID (UUID). Can also be set via FITZ_ORG_ID env var.",
@@ -39,16 +42,6 @@ class CloudConfig(BaseModel):
     org_key: Optional[str] = Field(
         default=None,
         description="Organization encryption key (NEVER sent to server)",
-    )
-
-    base_url: str = Field(
-        default="https://api.fitz-ai.cloud/v1",
-        description="Fitz Cloud API base URL",
-    )
-
-    timeout: int = Field(
-        default=30,
-        description="HTTP request timeout in seconds",
     )
 
     def validate_config(self) -> None:
