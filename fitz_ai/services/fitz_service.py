@@ -172,7 +172,7 @@ class FitzService:
             return engine_instance.answer(query_obj)
 
         except Exception as e:
-            logger.error(f"Query failed: {e}")
+            logger.error("Query failed", error=str(e), collection=collection, exc_info=True)
             raise QueryError(f"Query failed: {e}") from e
 
     # =========================================================================
@@ -260,7 +260,7 @@ class FitzService:
                     )
                 return result
             except Exception as e:
-                logger.warning(f"Batch stats failed, falling back to parallel fetch: {e}")
+                logger.warning("Batch stats failed, falling back to parallel fetch", error=str(e))
                 # Fall through to parallel fetching
 
         # Fallback: Use parallel fetching to avoid N+1 performance issue
@@ -273,7 +273,7 @@ class FitzService:
                 try:
                     info.chunk_count = vdb.count(name)
                 except Exception as e:
-                    logger.warning(f"Failed to get chunk count for collection '{name}': {e}")
+                    logger.warning("Failed to get chunk count", collection=name, error=str(e))
                     # Continue with default count of 0
 
             if hasattr(vdb, "get_collection_stats"):
@@ -282,7 +282,7 @@ class FitzService:
                     info.vector_dimensions = stats.get("vector_size")
                     info.metadata = stats
                 except Exception as e:
-                    logger.warning(f"Failed to get collection stats for '{name}': {e}")
+                    logger.warning("Failed to get collection stats", collection=name, error=str(e))
                     # Continue with default stats
 
             return info
@@ -368,7 +368,7 @@ class FitzService:
             return False
 
         vdb.delete_collection(name)
-        logger.info(f"Deleted collection: {name}")
+        logger.info("Deleted collection", collection=name)
         return True
 
     def _collection_exists(self, name: str) -> bool:

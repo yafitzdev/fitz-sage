@@ -1,19 +1,30 @@
-# fitz_stack/logging.py
+# fitz_ai/logging/logger.py
 """
 Unified logging setup for the entire Fitz project.
 
 All modules in fitz_ai use:
-    from fitz_stack.logging import get_logger
+    from fitz_ai.logging import get_logger
     logger = get_logger(__name__)
 
 Why this works:
 - ONE place for configuration (format, level, handlers)
 - Log namespaces follow module paths automatically
 - No duplicate setup between packages
+- Structured context automatically added to all messages
+
+For legacy compatibility, this module re-exports the structured logger.
 """
 
 import logging
 import sys
+
+# Import our new structured logging
+from fitz_ai.utils.logging import (
+    StructuredLogger,
+    clear_query_context,
+    get_logger as get_structured_logger,
+    set_query_context,
+)
 
 DEFAULT_FORMAT = "[%(levelname)s] %(name)s — %(message)s"
 
@@ -38,13 +49,32 @@ def configure_logging(
     root.setLevel(level)
 
 
-def get_logger(name: str) -> logging.Logger:
+def get_logger(name: str) -> StructuredLogger:
     """
-    Modules call this to get a logger.
+    Get a structured logger instance.
 
     Example:
         logger = get_logger(__name__)
 
-    Do NOT configure logging here — configuration happens in configure_logging().
+        # Use structured context
+        with logger.context(query_id="q123"):
+            logger.info("Processing query")  # Includes query_id
+
+        # Track operations
+        with logger.operation("vector_search"):
+            results = search()  # Logs timing automatically
+
+    Returns:
+        StructuredLogger with context capabilities
     """
-    return logging.getLogger(name)
+    return get_structured_logger(name)
+
+
+# Re-export for convenience
+__all__ = [
+    "configure_logging",
+    "get_logger",
+    "set_query_context",
+    "clear_query_context",
+    "StructuredLogger",
+]

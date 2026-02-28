@@ -542,11 +542,22 @@ class FitzKragEngine:
         Returns:
             Answer with file:line provenance
         """
-        if not query.text or not query.text.strip():
-            raise QueryError("Query text cannot be empty")
+        import uuid
+        from fitz_ai.logging import set_query_context, clear_query_context
 
-        if self._bg_worker:
-            self._bg_worker.signal_query_start()
+        # Generate query ID for tracing
+        query_id = f"q-{uuid.uuid4().hex[:8]}"
+
+        try:
+            # Set query context for all logging in this request
+            set_query_context(query_id=query_id)
+            logger.info("Starting query processing", query_length=len(query.text) if query.text else 0)
+
+            if not query.text or not query.text.strip():
+                raise QueryError("Query text cannot be empty")
+
+            if self._bg_worker:
+                self._bg_worker.signal_query_start()
         try:
             # 0. Sanitize and normalize query
             import re
@@ -559,8 +570,9 @@ class FitzKragEngine:
             # Truncate excessively long queries
             MAX_QUERY_LENGTH = 500
             if len(sanitized) > MAX_QUERY_LENGTH:
+                original_length = len(sanitized)
                 sanitized = sanitized[:MAX_QUERY_LENGTH]
-                logger.debug(f"Query truncated to {MAX_QUERY_LENGTH} chars")
+                logger.debug("Query truncated", original_length=original_length, new_length=MAX_QUERY_LENGTH)
 
             _progress = progress or (lambda _: None)
             timings: list[tuple[str, float]] = []
@@ -612,11 +624,12 @@ class FitzKragEngine:
                             if rewrite_result.rewritten_query != sanitized:
                                 retrieval_query = rewrite_result.rewritten_query
                                 logger.debug(
-                                    f"Query rewritten: '{sanitized[:50]}' -> "
-                                    f"'{retrieval_query[:50]}'"
+                                    "Query rewritten",
+                                    original_preview=sanitized[:50],
+                                    rewritten_preview=retrieval_query[:50]
                                 )
                         except Exception as e:
-                            logger.warning(f"Query rewriting failed, using original: {e}")
+                            logger.warning("Query rewriting failed, using original", error=str(e))
 
                     try:
                         precomputed_vectors = embed_future.result()
@@ -775,6 +788,8 @@ class FitzKragEngine:
         finally:
             if self._bg_worker:
                 self._bg_worker.signal_query_end()
+            # Clear query context
+            clear_query_context()
 
     def _check_cloud_cache(self, query_text: str, addresses: list) -> Answer | None:
         """Check cloud cache for a previously cached answer."""
