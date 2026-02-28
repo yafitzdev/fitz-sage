@@ -120,9 +120,7 @@ class TestDetectionClassifierLoading:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(
-    not _has_scipy, reason="scipy not installed; ML predictions unavailable"
-)
+@pytest.mark.skipif(not _has_scipy, reason="scipy not installed; ML predictions unavailable")
 class TestDetectionClassifierML:
     def test_temporal_query_flagged(self):
         """Temporal query above threshold returns TEMPORAL in flagged set."""
@@ -245,9 +243,7 @@ class TestDetectionClassifierKeywords:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(
-    not _has_scipy, reason="scipy not installed; ML error paths untestable"
-)
+@pytest.mark.skipif(not _has_scipy, reason="scipy not installed; ML error paths untestable")
 class TestDetectionClassifierFailOpen:
     def test_returns_none_on_vectorizer_error(self):
         """Prediction error returns None (fail-open → caller runs all modules)."""
