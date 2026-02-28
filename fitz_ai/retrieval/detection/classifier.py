@@ -144,7 +144,11 @@ class DetectionClassifier:
             return None
 
     def _predict_ml(self, query: str, flagged: set, DetectionCategory) -> None:
-        """Run ML model predictions, adding flagged categories to the set."""
+        """Run ML model predictions, adding flagged categories to the set.
+
+        Raises on model/vectorizer errors (caller catches for fail-open).
+        Silently returns if scipy/numpy are not installed.
+        """
         try:
             import numpy as np
             import scipy.sparse as sp
