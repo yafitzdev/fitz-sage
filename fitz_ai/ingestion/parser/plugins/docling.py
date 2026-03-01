@@ -100,8 +100,8 @@ class DoclingParser(BaseParser):
             print(element.type, element.content[:50])
 
     With VLM for figure description:
-        from fitz_ai.llm.runtime import create_yaml_client
-        vision_client = create_yaml_client("vision", "openai")
+        from fitz_ai.llm import get_vision
+        vision_client = get_vision("openai")
         parser = DoclingParser(vision_client=vision_client)
         doc = parser.parse(source_file)  # Figures will have descriptions!
     """

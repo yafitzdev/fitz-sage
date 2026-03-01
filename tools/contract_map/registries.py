@@ -98,8 +98,8 @@ def extract_llm_registry(
     """
     Extract LLM registry with multiple plugin types.
 
-    NOTE: LLM registry now uses YAML-based discovery.
-    We call available_llm_plugins() to get the real plugin list.
+    LLM registry uses Python providers with hardcoded capability map.
+    We call available_llm_plugins() to get the provider list.
     """
     out: List[RegistryContract] = []
     mod = safe_import(cm, module_name, verbose=verbose)
@@ -121,7 +121,7 @@ def extract_llm_registry(
                         module=module_name,
                         name=f"LLM_REGISTRY[{plugin_type!r}]",
                         plugins=sorted(str(p) for p in plugins),
-                        note="YAML-based discovery (auto-discovered)",
+                        note="Python providers (hardcoded capability map)",
                     )
                 )
         except Exception as exc:
@@ -145,7 +145,7 @@ def extract_llm_registry(
                 module=module_name,
                 name="LLM_REGISTRY",
                 plugins=sorted(set(flat)),
-                note="Central LLM plugin registry (flattened view, YAML-based)",
+                note="Central LLM provider registry (flattened view)",
             )
         )
 
@@ -158,8 +158,8 @@ def extract_vector_db_registry(
     """
     Extract Vector DB registry.
 
-    NOTE: Vector DB registry now uses YAML-based discovery.
-    We call available_vector_db_plugins() to get the real plugin list.
+    Vector DB registry uses YAML-based discovery.
+    We call available_vector_db_plugins() to get the plugin list.
     """
     mod = safe_import(cm, module_name, verbose=verbose)
     if mod is None:
@@ -177,7 +177,7 @@ def extract_vector_db_registry(
                 module=module_name,
                 name="VECTOR_DB_REGISTRY",
                 plugins=sorted(str(p) for p in plugins),
-                note="YAML-based discovery (auto-discovered)",
+                note="Python providers (hardcoded capability map)",
             )
     except Exception as exc:
         tb = traceback.format_exc() if verbose else None

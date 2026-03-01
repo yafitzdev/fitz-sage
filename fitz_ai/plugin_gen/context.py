@@ -65,7 +65,7 @@ def load_example_plugin(plugin_type: PluginType) -> Optional[str]:
 
 
 def get_yaml_schema_info(plugin_type: PluginType) -> str:
-    """Get schema requirements for YAML plugins."""
+    """Get schema requirements for YAML-based plugins (vector DB, retrieval)."""
     schemas = {
         PluginType.LLM_CHAT: """
 Required fields:

@@ -7,7 +7,7 @@ Single implementation of plugin registry logic used by all plugin types:
 - Chunking
 - Retriever
 - Pipeline
-- LLM (YAML-based, via fitz_ai.llm.registry)
+- LLM (Python providers, via fitz_ai.llm)
 - Vector DB (YAML-based, via fitz_ai.vector_db.registry)
 
 This module is the SINGLE SOURCE OF TRUTH for all registry access.

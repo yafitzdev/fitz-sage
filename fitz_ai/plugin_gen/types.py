@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 class PluginType(Enum):
     """Supported plugin types for generation."""
 
-    # YAML-based plugins
+    # LLM providers (Python-based)
     LLM_CHAT = "llm-chat"
     LLM_EMBEDDING = "llm-embedding"
     LLM_RERANK = "llm-rerank"

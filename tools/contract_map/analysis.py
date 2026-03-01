@@ -132,7 +132,7 @@ def compute_hotspots(root: Path, *, excludes: set[str]) -> List[Hotspot]:
     impl: Dict[str, List[str]] = {}
     consumers: Dict[str, List[str]] = {}
 
-    # Scan for YAML-based plugins from registries
+    # Scan for plugins from registries
     for reg_module in PKG.registry_modules:
         try:
             mod = importlib.import_module(reg_module)
@@ -143,7 +143,7 @@ def compute_hotspots(root: Path, *, excludes: set[str]) -> List[Hotspot]:
                 for ptype in ("chat", "embedding", "rerank"):
                     iface = f"{ptype.title()}Plugin"
                     try:
-                        impl[iface] = [f"{p} (YAML)" for p in available_fn(ptype)]
+                        impl[iface] = [f"{p} (provider)" for p in available_fn(ptype)]
                     except Exception:
                         impl[iface] = []
 

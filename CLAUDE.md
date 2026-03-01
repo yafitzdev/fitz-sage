@@ -25,7 +25,7 @@ fitz_ai/
 ├── engines/fitz_krag/   # KRAG: retrieval/, generation/, pipeline/
 ├── retrieval/     # SHARED intelligence (detection, sparse, entity_graph, hyde, rewriter)
 ├── ingestion/     # Parser → Chunking → Enrichment
-├── llm/           # Chat, Embedding, Rerank, Vision providers (YAML plugins)
+├── llm/           # Chat, Embedding, Rerank, Vision providers (Python, protocol-based)
 ├── storage/       # PostgreSQL connection manager
 ├── vector_db/     # Vector DB abstraction + pgvector plugin
 ├── cloud/         # Encrypted cache API (AES-256-GCM, org_key never leaves local)

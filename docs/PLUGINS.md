@@ -1,6 +1,6 @@
 # Plugin Development Guide
 
-Fitz uses a YAML-based plugin system for LLM providers and vector databases. This guide explains how to create custom plugins.
+Fitz uses Python providers for LLM services and a plugin system for other components. This guide explains the provider architecture and how to create custom plugins.
 
 ---
 
@@ -47,17 +47,17 @@ Fitz uses a YAML-based plugin system for LLM providers and vector databases. Thi
 
 Fitz uses two types of plugins:
 
-- **YAML plugins** - For external service integrations (LLM providers). Declarative, no code required.
-- **Python plugins** - For logic-based components (chunking, parsing, constraints). Require Python code.
+- **Python providers** - For LLM service integrations (chat, embedding, rerank, vision). Protocol-based with pluggable auth.
+- **Python plugins** - For logic-based components (chunking, parsing, constraints).
 
 **Plugin Types:**
 
 | Type | Format | Location | Purpose |
 |------|--------|----------|---------|
-| Chat | YAML | `fitz_ai/llm/chat/` | LLM chat/completion |
-| Embedding | YAML | `fitz_ai/llm/embedding/` | Text embeddings |
-| Rerank | YAML | `fitz_ai/llm/rerank/` | Document reranking |
-| Vision | YAML | `fitz_ai/llm/vision/` | VLM for image description |
+| Chat | Python | `fitz_ai/llm/providers/` | LLM chat/completion |
+| Embedding | Python | `fitz_ai/llm/providers/` | Text embeddings |
+| Rerank | Python | `fitz_ai/llm/providers/` | Document reranking |
+| Vision | Python | `fitz_ai/llm/providers/` | VLM for image description |
 | Retrieval | YAML | `fitz_ai/engines/fitz_krag/retrieval/plugins/` | Retrieval strategies |
 | Chunking | Python | `fitz_ai/ingestion/chunking/plugins/` | Document chunking |
 | Parser | Python | `fitz_ai/ingestion/parser/plugins/` | Document parsing |
@@ -67,203 +67,108 @@ Fitz uses two types of plugins:
 
 ---
 
-## LLM Plugins
+## LLM Providers
 
-### Chat Plugin
+LLM providers are Python classes that implement protocol interfaces (`ChatProvider`, `EmbeddingProvider`, `RerankProvider`, `VisionProvider`). Each provider wraps a vendor SDK or HTTP client with pluggable authentication.
 
-Creates a chat/completion provider.
+### Built-in Providers
 
-**File:** `fitz_ai/llm/chat/my_provider.yaml`
+| Provider | Chat | Embedding | Rerank | Vision |
+|----------|------|-----------|--------|--------|
+| `cohere` | Yes | Yes | Yes | - |
+| `openai` | Yes | Yes | - | Yes |
+| `anthropic` | Yes | - | - | Yes |
+| `azure_openai` | Yes | Yes | - | Yes |
+| `ollama` | Yes | Yes | Yes | Yes |
+| `enterprise` | Yes | Yes | - | - |
 
-```yaml
-# =============================================================================
-# IDENTITY
-# =============================================================================
-plugin_name: "my_provider"
-plugin_type: "chat"
-version: "1.0"
+### Provider Spec Format
 
-# =============================================================================
-# PROVIDER
-# =============================================================================
-provider:
-  name: "my_provider"
-  base_url: "https://api.myprovider.com/v1"
+Providers are selected using a `provider/model` string:
 
-# =============================================================================
-# AUTHENTICATION
-# =============================================================================
-auth:
-  type: "bearer"                    # bearer, header, query, none
-  header_name: "Authorization"
-  header_format: "Bearer {key}"
-  env_vars:
-    - "MY_PROVIDER_API_KEY"
+```python
+from fitz_ai.llm import get_chat, get_embedder, get_reranker, get_vision
 
-# =============================================================================
-# ENDPOINT
-# =============================================================================
-endpoint:
-  path: "/chat/completions"
-  method: "POST"
-  timeout: 120
+# Provider only (uses default model for tier)
+chat = get_chat("cohere")
+chat = get_chat("cohere", tier="fast")
 
-# =============================================================================
-# DEFAULTS
-# =============================================================================
-# Model tiers for different use cases:
-#   smart: Best quality (user-facing queries)
-#   fast: Best speed (background tasks, enrichment)
-#   balanced: Cost-effective (bulk operations)
-defaults:
-  models:
-    smart: "my-model-large"
-    fast: "my-model-small"
-    balanced: "my-model-medium"
-  temperature: 0.2
-  max_tokens: null
-
-# =============================================================================
-# REQUEST CONFIGURATION
-# =============================================================================
-request:
-  # Message format transformation
-  messages_transform: "openai_chat"   # openai_chat, cohere_chat, anthropic_chat, ollama_chat
-
-  # Static fields added to every request
-  static_fields:
-    stream: false
-
-  # Map our params to API params
-  param_map:
-    model: "model"
-    temperature: "temperature"
-    max_tokens: "max_tokens"
-
-# =============================================================================
-# RESPONSE CONFIGURATION
-# =============================================================================
-response:
-  # Path to extract response text (dot notation, array indexing supported)
-  content_path: "choices[0].message.content"
-  is_array: false
-  array_index: 0
-
-  # Optional metadata extraction
-  metadata_paths:
-    finish_reason: "choices[0].finish_reason"
-    tokens_input: "usage.prompt_tokens"
-    tokens_output: "usage.completion_tokens"
+# Provider with explicit model
+chat = get_chat("openai/gpt-4o")
+embedder = get_embedder("cohere/embed-multilingual-v3.0")
+reranker = get_reranker("cohere")
+vision = get_vision("openai/gpt-4o")
 ```
 
-**Message Transforms:**
+### Provider Protocols
 
-| Transform | Format |
-|-----------|--------|
-| `openai_chat` | `{"messages": [{"role": "user", "content": "..."}]}` |
-| `cohere_chat` | Cohere v2 format |
-| `anthropic_chat` | Anthropic format |
-| `ollama_chat` | Ollama format |
+All providers implement `@runtime_checkable` protocols:
 
----
+```python
+class ChatProvider(Protocol):
+    def chat(self, messages: list[dict[str, Any]], **kwargs) -> str: ...
 
-### Embedding Plugin
+class EmbeddingProvider(Protocol):
+    def embed(self, text: str, *, task_type: str | None = None) -> list[float]: ...
+    def embed_batch(self, texts: list[str], *, task_type: str | None = None) -> list[list[float]]: ...
+    @property
+    def dimensions(self) -> int: ...
 
-Creates an embedding provider.
+class RerankProvider(Protocol):
+    def rerank(self, query: str, documents: list[str], top_n: int | None = None) -> list[RerankResult]: ...
 
-**File:** `fitz_ai/llm/embedding/my_provider.yaml`
-
-```yaml
-plugin_name: "my_provider"
-plugin_type: "embedding"
-version: "1.0"
-
-provider:
-  name: "my_provider"
-  base_url: "https://api.myprovider.com/v1"
-
-auth:
-  type: "bearer"
-  header_name: "Authorization"
-  header_format: "Bearer {key}"
-  env_vars:
-    - "MY_PROVIDER_API_KEY"
-
-endpoint:
-  path: "/embeddings"
-  method: "POST"
-  timeout: 30
-
-defaults:
-  model: "my-embed-model"
-
-request:
-  # Field name for input text
-  input_field: "input"
-
-  # How to wrap input: list, string, object
-  input_wrap: "list"
-
-  static_fields: {}
-
-  param_map:
-    model: "model"
-
-response:
-  # Path to embedding vector(s)
-  embeddings_path: "data[0].embedding"
-  is_array: true
-  array_index: 0
+class VisionProvider(Protocol):
+    def describe_image(self, image_base64: str, prompt: str | None = None) -> str: ...
 ```
 
----
+### Authentication
 
-### Rerank Plugin
+| Type | Class | Use Case |
+|------|-------|----------|
+| API Key | `ApiKeyAuth` | Standard providers (OpenAI, Cohere, Anthropic) |
+| M2M OAuth2 | `M2MAuth` | Enterprise deployments with client credentials |
+| Composite | `CompositeAuth` | Enterprise gateways (M2M + API key combined) |
 
-Creates a reranking provider.
+Auth is resolved automatically from environment variables:
 
-**File:** `fitz_ai/llm/rerank/my_provider.yaml`
+| Provider | Environment Variable |
+|----------|---------------------|
+| `cohere` | `COHERE_API_KEY` |
+| `openai` | `OPENAI_API_KEY` |
+| `anthropic` | `ANTHROPIC_API_KEY` |
+| `azure_openai` | `AZURE_OPENAI_API_KEY` |
+| `ollama` | None (no auth) |
+| `enterprise` | Configured via auth block |
+
+### Model Tiers
+
+Chat providers support three model tiers for cost optimization:
+
+| Tier | Use Case | Example |
+|------|----------|---------|
+| `smart` | User-facing queries | `gpt-4o`, `command-a-03-2025` |
+| `fast` | Background tasks, enrichment | `gpt-4o-mini`, `command-r7b` |
+| `balanced` | Bulk operations, evaluation | Middle-ground models |
+
+### Enterprise Authentication
+
+For enterprise deployments with M2M OAuth2:
 
 ```yaml
-plugin_name: "my_provider"
-plugin_type: "rerank"
-version: "1.0"
-
-provider:
-  name: "my_provider"
-  base_url: "https://api.myprovider.com/v1"
-
+# In engine config
 auth:
-  type: "bearer"
-  header_name: "Authorization"
-  header_format: "Bearer {key}"
-  env_vars:
-    - "MY_PROVIDER_API_KEY"
-
-endpoint:
-  path: "/rerank"
-  method: "POST"
-  timeout: 30
-
-defaults:
-  model: "my-rerank-model"
-  top_n: 5
-
-request:
-  query_field: "query"
-  documents_field: "documents"
-
-  static_fields: {}
-
-  param_map:
-    model: "model"
-    top_n: "top_n"
-
-response:
-  results_path: "results"
-  result_index_path: "index"
-  result_score_path: "relevance_score"
+  type: enterprise
+  token_url: https://auth.example.com/oauth/token
+  client_id: ${CLIENT_ID}
+  client_secret: ${CLIENT_SECRET}
+  llm_api_key_env: LLM_API_KEY
+  # Optional mTLS
+  cert_path: /path/to/ca.pem
+  client_cert_path: /path/to/client.pem
+  client_key_path: /path/to/client-key.pem
 ```
+
+Features: automatic token refresh, exponential backoff, circuit breaker, mTLS support.
 
 ---
 
@@ -311,35 +216,24 @@ Higher values = better recall but slower indexing.
 
 ---
 
-## Using Your Plugin
-
-Once created, LLM plugins are auto-discovered:
-
-```python
-from fitz_ai.llm.registry import get_llm_plugin, available_llm_plugins
-
-# List available plugins
-print(available_llm_plugins("chat"))      # ['cohere', 'openai', 'my_provider', ...]
-
-# Use your plugin
-chat = get_llm_plugin(plugin_name="my_provider", plugin_type="chat")
-response = chat.chat([{"role": "user", "content": "Hello"}])
-
-embedder = get_llm_plugin(plugin_name="my_provider", plugin_type="embedding")
-vector = embedder.embed("Some text")
-```
+## Using LLM Providers
 
 In configuration:
 
 ```yaml
 # .fitz/config/fitz_krag.yaml
 chat:
-  plugin_name: my_provider
+  plugin_name: cohere
   kwargs:
-    model: my-model-large
+    model: command-a-03-2025
 
 embedding:
-  plugin_name: my_provider
+  plugin_name: cohere
+
+rerank:
+  plugin_name: cohere
+  kwargs:
+    model: rerank-v3.5
 
 # Vector storage (pgvector is the default)
 vector_db: pgvector
@@ -347,114 +241,36 @@ vector_db_kwargs:
   mode: local
 ```
 
----
-
-## Path Notation
-
-Response paths use dot notation with array indexing:
-
-| Path | Accesses |
-|------|----------|
-| `data` | `response["data"]` |
-| `data.text` | `response["data"]["text"]` |
-| `data[0]` | `response["data"][0]` |
-| `data[0].text` | `response["data"][0]["text"]` |
-| `choices[0].message.content` | `response["choices"][0]["message"]["content"]` |
-
----
-
-## Authentication Types
-
-| Type | Description |
-|------|-------------|
-| `bearer` | `Authorization: Bearer {key}` |
-| `header` | Custom header with key |
-| `query` | API key as query parameter |
-| `none` | No authentication |
-
----
-
-## Model Tiers
-
-Chat plugins support three model tiers for cost optimization:
-
-| Tier | Use Case | Example |
-|------|----------|---------|
-| `smart` | User-facing queries | `gpt-4`, `command-a-03-2025` |
-| `fast` | Background tasks, enrichment | `gpt-4o-mini`, `command-r7b` |
-| `balanced` | Bulk operations, evaluation | Middle-ground models |
+In code:
 
 ```python
-# Use smart tier for queries (default)
-chat = get_llm_plugin(plugin_name="cohere", plugin_type="chat", tier="smart")
+from fitz_ai.llm import get_chat, get_embedder, get_reranker, get_vision
 
-# Use fast tier for background enrichment
-chat = get_llm_plugin(plugin_name="cohere", plugin_type="chat", tier="fast")
+chat = get_chat("cohere", tier="smart")
+response = chat.chat([{"role": "user", "content": "Hello"}])
+
+embedder = get_embedder("cohere")
+vector = embedder.embed("Some text")
+
+reranker = get_reranker("cohere")
+results = reranker.rerank("query", ["doc1", "doc2"])
 ```
-
----
-
-## Existing Plugins
-
-### Chat Plugins
-
-| Plugin | Provider | Models |
-|--------|----------|--------|
-| `cohere` | Cohere | command-a-03-2025, command-r-plus |
-| `openai` | OpenAI | gpt-4o, gpt-4o-mini |
-| `anthropic` | Anthropic | claude-3-opus, claude-3-sonnet |
-| `azure_openai` | Azure | Deployed OpenAI models |
-| `local_ollama` | Ollama | llama3.2, mistral, etc. |
-
-### Embedding Plugins
-
-| Plugin | Provider | Models |
-|--------|----------|--------|
-| `cohere` | Cohere | embed-english-v3.0 |
-| `openai` | OpenAI | text-embedding-3-small |
-| `azure_openai` | Azure | Deployed embedding models |
-| `local_ollama` | Ollama | nomic-embed-text, etc. |
-
-### Vector DB
-
-Fitz uses PostgreSQL + pgvector exclusively for unified storage. See [Unified Storage](features/platform/unified-storage.md).
-
-| Plugin | Description |
-|--------|-------------|
-| `pgvector` | PostgreSQL + pgvector (local via pgserver or external) |
 
 ---
 
 ## Troubleshooting
 
-### Plugin Not Found
+### Unknown Provider
 
 ```
-LLMRegistryError: Unknown chat plugin: 'my_provider'
+ValueError: Unknown chat provider: 'my_provider'
 ```
 
-- Check file is in correct directory (`fitz_ai/llm/chat/my_provider.yaml`)
-- Check `plugin_name` matches filename (without `.yaml`)
-
-### Validation Error
-
-```
-YAMLPluginValidationError: Invalid YAML plugin
-  - provider -> base_url: must start with http://
-```
-
-- Check YAML syntax
-- Validate against schema requirements
-- Use existing plugins as templates
+- Check the provider name is one of: `cohere`, `openai`, `anthropic`, `azure_openai`, `ollama`, `enterprise`
+- Check the `provider/model` format is correct (e.g., `openai/gpt-4o`)
 
 ### Authentication Failed
 
-- Verify environment variable is set: `echo $MY_PROVIDER_API_KEY`
-- Check `auth.env_vars` lists the correct variable name
-- Verify `auth.header_format` matches provider requirements
-
-### Response Extraction Failed
-
-- Test API manually to see actual response structure
-- Update `response.content_path` to match actual path
-- Use array notation `[0]` if response is wrapped in array
+- Verify environment variable is set: `echo $COHERE_API_KEY`
+- Check the correct env var for your provider (see Authentication section above)
+- For enterprise auth, verify M2M config fields are complete

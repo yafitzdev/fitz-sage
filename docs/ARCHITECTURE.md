@@ -181,30 +181,29 @@ Verify with: `python -m tools.contract_map --fail-on-errors`
 │  Configuration (.fitz/config/fitz_krag.yaml)                                │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  chat:                                                                      │
-│    plugin_name: cohere    ◀─── Selects which plugin to use                  │
+│    plugin_name: cohere    ◀─── Selects which provider to use                │
 │    kwargs:                                                                  │
-│      model: command-r     ◀─── Passed to plugin constructor                 │
+│      model: command-r     ◀─── Passed to provider constructor               │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  Registry                                                                   │
+│  Factory (fitz_ai/llm/config.py)                                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  get_llm_plugin(plugin_type="chat", plugin_name="cohere", **kwargs)         │
+│  create_chat_provider(spec="cohere", config=config, tier="smart")           │
 │                                                                             │
-│  Auto-discovers plugins from:                                               │
-│  - fitz_ai/llm/chat/*.yaml                                                  │
-│  - fitz_ai/llm/embedding/*.yaml                                             │
-│  - etc.                                                                     │
+│  Parses provider/model spec, resolves auth, instantiates provider:          │
+│  - cohere → CohereChat + ApiKeyAuth(COHERE_API_KEY)                         │
+│  - enterprise → EnterpriseChat + CompositeAuth(M2MAuth + ApiKeyAuth)        │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  Plugin Instance                                                            │
+│  Provider Instance                                                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  CohereChatPlugin(model="command-r")                                        │
+│  CohereChat(model="command-r", auth=ApiKeyAuth(...))                        │
 │  - chat(messages) -> str                                                    │
-│  - Handles API calls, retries, rate limits                                  │
+│  - Implements ChatProvider protocol                                         │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -212,10 +211,10 @@ Verify with: `python -m tools.contract_map --fail-on-errors`
 
 | Type | Format | Purpose | Examples |
 |------|--------|---------|----------|
-| Chat | YAML | LLM completion | Cohere, OpenAI, Anthropic, Ollama |
-| Embedding | YAML | Vector embeddings | Cohere, OpenAI, Ollama |
-| Rerank | YAML | Result reranking | Cohere |
-| Vision | YAML | Image understanding | Cohere, OpenAI |
+| Chat | Python | LLM completion | Cohere, OpenAI, Anthropic, Ollama, Enterprise |
+| Embedding | Python | Vector embeddings | Cohere, OpenAI, Ollama |
+| Rerank | Python | Result reranking | Cohere, Ollama |
+| Vision | Python | Image understanding | OpenAI, Anthropic, Ollama |
 | Vector DB | YAML | Vector storage | pgvector (PostgreSQL) |
 | Retrieval | YAML | Search strategy | Dense, Dense+Rerank |
 | Chunking | Python | Text splitting | Semantic, Fixed |
@@ -307,7 +306,7 @@ class Chunk:
 # Engine selection
 engine: fitz_krag
 
-# LLM services (YAML plugins)
+# LLM services (Python providers)
 chat:
   plugin_name: cohere
   kwargs: { model: command-r-plus }
@@ -373,10 +372,10 @@ fitz_ai/
 │   └── rewriter/                # LLM-based query rewriting
 │
 ├── llm/                         # LLM service layer
-│   ├── chat/                    # Chat plugins (YAML)
-│   ├── embedding/               # Embedding plugins (YAML)
-│   ├── rerank/                  # Rerank plugins (YAML)
-│   └── vision/                  # Vision plugins (YAML)
+│   ├── providers/               # Python providers (Cohere, OpenAI, Anthropic, Ollama, Enterprise)
+│   ├── auth/                    # Auth system (ApiKeyAuth, M2MAuth, CompositeAuth)
+│   ├── config.py                # Factory dispatch (provider/model → instance)
+│   └── client.py                # Public API (get_chat, get_embedder, ...)
 │
 ├── storage/                     # PostgreSQL connection manager
 │

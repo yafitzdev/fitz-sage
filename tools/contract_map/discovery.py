@@ -24,13 +24,13 @@ def _simple_plugin_id(cls) -> str:
 
 
 # ---------------------------------------------------------------------------
-# YAML Plugin Discovery
+# YAML Plugin Discovery (Vector DB and retrieval strategies)
 # ---------------------------------------------------------------------------
 
 
 def scan_yaml_plugins(plugin_dir: str, plugin_type: str) -> DiscoveryReport:
     """
-    Scan for YAML-based plugins (LLM and Vector DB).
+    Scan for YAML-based plugins (Vector DB and retrieval strategies).
 
     Args:
         plugin_dir: Directory path relative to repo root (e.g., PKG.llm_chat_dir)
