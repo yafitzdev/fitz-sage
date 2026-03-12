@@ -9,7 +9,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.10.1-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.10.2-green.svg)](CHANGELOG.md)
 [![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
 
 
@@ -409,7 +409,11 @@ Fitz is a foundation. It handles document indexing and grounded retrieval—you 
 
 <strong>Codebase Search 🐍</strong> → [Code Symbol Extraction](docs/features/ingestion/code-symbol-extraction.md) • [KRAG](docs/features/platform/krag.md)
 
-> FitzKRAG uses address-based retrieval for code: tree-sitter parses your codebase into symbols (functions, classes, methods) with qualified names, references, and import graphs. No chunking—each symbol is a precise, addressable unit. Cross-file dependencies are tracked, so "what calls this function?" is a graph traversal, not a text search.
+> **Two modes of code retrieval:**
+>
+> **Full KRAG** — tree-sitter parses your codebase into symbols (functions, classes, methods) with qualified names, references, and import graphs. No chunking—each symbol is a precise, addressable unit. Cross-file dependencies are tracked, so "what calls this function?" is a graph traversal, not a text search.
+>
+> **Standalone (`pip install fitz-ai[code]`)** — Zero-dependency code retrieval via `CodeRetriever`. Builds an AST structural index, uses an LLM to select relevant files, expands via import graph and neighbor directories, and returns compressed results. No PostgreSQL, no pgvector, no docling—just point at a directory and ask.
 >
 > *Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They point fitz at the codebase and ask "Where is user authentication handled?" or "What depends on the billing module?" FitzKRAG returns specific functions with their callers and dependencies. New developers onboard in days instead of weeks.
 

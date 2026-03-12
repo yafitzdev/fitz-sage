@@ -158,6 +158,23 @@ Each symbol gets summarized by the enrichment pipeline, embedded, and stored in 
 | Import graph store | `fitz_ai/engines/fitz_krag/ingestion/import_graph_store.py` |
 | DB schema | `fitz_ai/engines/fitz_krag/ingestion/schema.py` |
 
+## Standalone Code Retrieval
+
+For use cases that don't need the full KRAG pipeline (no PostgreSQL, no pgvector, no docling), see the standalone `CodeRetriever` in `fitz_ai/code/`:
+
+```bash
+pip install fitz-ai[code]
+```
+
+```python
+from fitz_ai.code import CodeRetriever
+
+retriever = CodeRetriever(source_dir="./myproject", chat_factory=my_factory)
+results = retriever.retrieve("How does auth work?")
+```
+
+Uses AST-based structural indexing and LLM file selection — same algorithm as KRAG's `LlmCodeSearchStrategy`, but reads from disk instead of PostgreSQL.
+
 ## Related Features
 
 - [**KRAG**](../platform/krag.md) — The engine architecture that symbols plug into

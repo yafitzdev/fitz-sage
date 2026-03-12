@@ -172,6 +172,33 @@ EngineRegistry.get_global().register("my_engine", lambda c: MyEngine())
 
 ---
 
+## Standalone Code Retrieval
+
+For code-only retrieval without the full KRAG stack, fitz-ai provides a lightweight `CodeRetriever`:
+
+```bash
+pip install fitz-ai[code]
+```
+
+```python
+from fitz_ai.code import CodeRetriever
+
+retriever = CodeRetriever(source_dir="./myproject", chat_factory=my_factory)
+results = retriever.retrieve("How does authentication work?")
+```
+
+**Pipeline:** AST structural index → LLM file selection → import graph expansion → neighbor expansion → compression.
+
+No PostgreSQL, no pgvector, no docling. See [KRAG docs](features/platform/krag.md#standalone-code-retrieval) for details.
+
+| Component | Path |
+|-----------|------|
+| CodeRetriever | `fitz_ai/code/retriever.py` |
+| Indexer (file list, AST index, import graph) | `fitz_ai/code/indexer.py` |
+| LLM prompts | `fitz_ai/code/prompts.py` |
+
+---
+
 ## Architecture Principles
 
 1. **Protocol-Based**: Engines implement protocols, not inherit from base classes

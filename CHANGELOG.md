@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.10.2] - 2026-03-12
+
+### 🎉 Highlights
+
+**Standalone Code Retrieval (`fitz-ai[code]`)** — New `fitz_ai/code/` module provides LLM-powered code retrieval without PostgreSQL, pgvector, or docling. Point at a directory, ask a question — CodeRetriever builds a structural index from AST, selects relevant files via LLM, expands via import graph and neighbor directories, and returns compressed results. Zero heavy dependencies.
+
+**LlmCodeSearchStrategy Overhaul** — Rewrote the DB-backed code search strategy: FILE-level addresses instead of per-symbol, combined query expansion + file selection in one LLM call (better targeting), import graph expansion, neighbor directory expansion, and flat origin-based scoring (1.0/0.9/0.8). The combined prompt produces more targeted file selections by letting the LLM reason about expansion terms and files holistically.
+
+**LM Studio Provider** — New `lmstudio` chat provider with multi-tier model support. Configure different models for fast/balanced/smart tiers via YAML.
+
+### 🚀 Added
+
+- `fitz_ai/code/` standalone module: `CodeRetriever`, `indexer`, `prompts` (`f4ec70b`)
+- `CodeRetriever` class: index → LLM select → import expand → neighbor expand → read → compress pipeline (`f4ec70b`)
+- `build_file_list()`, `build_structural_index()`, `build_import_graph()` in `fitz_ai/code/indexer.py` (`f4ec70b`)
+- `get_file_paths()` and `get_structural_index()` public accessors on `CodeRetriever` (`1ab902c`)
+- Configurable `llm_tier` parameter on `CodeRetriever` — consumers choose which model tier does file selection (`010de5a`)
+- `[code]` extras group in pyproject.toml for dependency documentation (`f4ec70b`)
+- LM Studio chat provider with tier-based model selection (`d3ff5ce`)
+- 20 unit tests for code retrieval (indexer, retriever, import graph, no-heavy-imports) (`f4ec70b`)
+
+### 🔄 Changed
+
+- `LlmCodeSearchStrategy` rewritten: FILE-level addresses, combined expand+select prompt, neighbor expansion, flat scoring (`3e7e827`)
+- All YAML plugin references updated to Python provider terminology (`8fb0758`)
+- Configuration schemas unified with base classes (`b655466`)
+- Structured logging with context tracking throughout codebase (`6418339`)
+
+### ⚡ Performance
+
+- Combined query expansion + file selection in one LLM call (was two separate calls) — better targeting with fewer API calls (`3e7e827`)
+- AST-based structural index with connection-weighted truncation — important files keep detail under budget (`f4ec70b`)
+- Python compression via `compress_python()` reduces context size before LLM processing (`f4ec70b`)
+
+### 🔧 Fixed
+
+- Major technical debt cleanup across codebase (`8d42a57`)
+
+### 📝 Docs
+
+- Updated all plugin references from YAML to Python providers (`8fb0758`)
+- Synced documentation with v0.10.1 changes (`e8d8f97`)
+
+---
+
 ## [0.10.1] - 2026-02-28
 
 ### 🎉 Highlights
@@ -1698,7 +1743,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.8.1...v0.9.0
