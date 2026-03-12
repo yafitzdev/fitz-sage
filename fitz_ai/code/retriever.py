@@ -44,6 +44,7 @@ class CodeRetriever:
     Args:
         source_dir: Root directory of the codebase.
         chat_factory: Factory returning ChatProvider instances per tier.
+        llm_tier: Tier name passed to chat_factory for all LLM calls.
         max_manifest_chars: Max structural index size in characters.
         neighbor_screen_threshold: Max new sibling files before LLM screening.
         max_file_bytes: Max bytes to read per file for indexing.
@@ -55,6 +56,7 @@ class CodeRetriever:
         source_dir: str | Path,
         chat_factory: "ChatFactory",
         *,
+        llm_tier: str = "fast",
         max_manifest_chars: int = 120_000,
         neighbor_screen_threshold: int = 10,
         max_file_bytes: int = 50_000,
@@ -62,6 +64,7 @@ class CodeRetriever:
     ) -> None:
         self._source_dir = Path(source_dir).resolve()
         self._chat_factory = chat_factory
+        self._llm_tier = llm_tier
         self._max_manifest_chars = max_manifest_chars
         self._neighbor_screen_threshold = neighbor_screen_threshold
         self._max_file_bytes = max_file_bytes
@@ -191,7 +194,7 @@ class CodeRetriever:
         prompt = EXPAND_AND_SELECT_PROMPT.format(
             query=query, structural_index=index
         )
-        chat = self._chat_factory("fast")
+        chat = self._chat_factory(self._llm_tier)
         response = chat.chat([{"role": "user", "content": prompt}])
         text = response.strip()
 
@@ -307,7 +310,7 @@ class CodeRetriever:
             sibling_index=sibling_index,
         )
         try:
-            chat = self._chat_factory("fast")
+            chat = self._chat_factory(self._llm_tier)
             response = chat.chat([{"role": "user", "content": prompt}])
             text = response.strip()
             start = text.find("[")
