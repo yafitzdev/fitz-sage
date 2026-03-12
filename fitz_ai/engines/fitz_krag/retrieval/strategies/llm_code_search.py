@@ -29,15 +29,17 @@ _SYSTEM_PROMPT = (
     "Below is the structural index of every indexed file. Each entry shows "
     "file path, classes, functions, and imports.\n\n"
     "{structural_index}\n\n"
-    "Select 5-10 relevant files for answering the question. Include files that:\n"
+    "First, generate 3-5 search terms, synonyms, and related concepts for the "
+    "question. Then, using those terms, select 5-15 relevant files.\n\n"
+    "Include files that:\n"
     "- Contain the code being asked about\n"
     "- Define protocols, base classes, or types used by relevant code\n"
-    "- Contain configuration or factory patterns that affect the relevant code\n"
-    "- Are in the same directory or package as the most relevant files\n\n"
+    "- Contain configuration or factory patterns that affect the relevant code\n\n"
     "Err on the side of including MORE files — missing a relevant file is worse "
     "than including an extra one.\n\n"
-    "Return ONLY a JSON array of file paths:\n"
-    '```json\n["path/to/file1.py", "path/to/file2.py", ...]\n```'
+    "Return JSON:\n"
+    '```json\n{{"search_terms": ["term1", "term2"], '
+    '"files": ["path/to/file1.py", "path/to/file2.py"]}}\n```'
 )
 
 
@@ -264,7 +266,9 @@ class LlmCodeSearchStrategy:
         if not manifest_text.strip():
             raise ValueError("Empty manifest — no indexed symbols")
 
-        selected_paths = self._llm_select_files(manifest_text, query)
+        search_terms, selected_paths = self._llm_expand_and_select(manifest_text, query)
+        if search_terms:
+            logger.debug(f"LLM search terms: {search_terms}")
         if not selected_paths:
             raise ValueError("LLM returned no file selections")
 
@@ -275,31 +279,60 @@ class LlmCodeSearchStrategy:
         if not selected_ids:
             raise ValueError("No selected paths matched indexed files")
 
-        # Expand imports (depth 1, forward only)
-        expanded_ids = self._expand_imports(selected_ids)
-        all_ids = list(dict.fromkeys(selected_ids + expanded_ids))
+        # Track origin for scoring
+        origin: dict[str, str] = {fid: "selected" for fid in selected_ids}
 
-        # Convert to Address objects
-        return self._files_to_addresses(all_ids, file_data, limit)
+        # Import expansion (depth 1, forward only)
+        import_ids = self._expand_imports(selected_ids)
+        for fid in import_ids:
+            origin[fid] = "import"
 
-    def _llm_select_files(self, manifest: str, query: str) -> list[str]:
-        """Ask the LLM which files are relevant."""
+        # Neighbor expansion (same-directory siblings)
+        all_so_far = list(dict.fromkeys(selected_ids + import_ids))
+        neighbor_ids = self._neighbor_expand(all_so_far, file_data)
+        for fid in neighbor_ids:
+            origin[fid] = "neighbor"
+
+        all_ids = list(dict.fromkeys(selected_ids + import_ids + neighbor_ids))
+        return self._files_to_addresses(all_ids, file_data, limit, origin)
+
+    def _llm_expand_and_select(
+        self, manifest: str, query: str
+    ) -> tuple[list[str], list[str]]:
+        """Combined query expansion + file selection in one LLM call."""
         prompt = _SYSTEM_PROMPT.format(query=query, structural_index=manifest)
         chat = self._chat_factory("fast")
         response = chat.chat([{"role": "user", "content": prompt}])
 
-        # Parse JSON array from response
         text = response.strip()
+
+        # Try parsing as combined JSON object first
+        brace_start = text.find("{")
+        brace_end = text.rfind("}") + 1
+        if brace_start >= 0 and brace_end > brace_start:
+            try:
+                parsed = json.loads(text[brace_start:brace_end])
+                if isinstance(parsed, dict):
+                    terms = parsed.get("search_terms", [])
+                    files = parsed.get("files", [])
+                    return (
+                        [str(t) for t in terms if isinstance(t, str)],
+                        [str(f) for f in files if isinstance(f, str) and f.strip()],
+                    )
+            except json.JSONDecodeError:
+                pass
+
+        # Fallback: parse as plain JSON array (backward compat)
         start = text.find("[")
         end = text.rfind("]") + 1
         if start < 0 or end <= start:
-            raise ValueError(f"No JSON array in LLM response: {text[:200]}")
+            raise ValueError(f"No JSON in LLM response: {text[:200]}")
 
-        parsed = json.loads(text[start:end])
-        if not isinstance(parsed, list):
-            raise ValueError(f"LLM returned non-list: {type(parsed)}")
+        parsed_list = json.loads(text[start:end])
+        if not isinstance(parsed_list, list):
+            raise ValueError(f"LLM returned non-list: {type(parsed_list)}")
 
-        return [str(p) for p in parsed if isinstance(p, str) and p.strip()]
+        return [], [str(p) for p in parsed_list if isinstance(p, str) and p.strip()]
 
     def _expand_imports(self, file_ids: list[str]) -> list[str]:
         """Forward-only depth-1 import expansion."""
@@ -314,49 +347,84 @@ class LlmCodeSearchStrategy:
                     seen.add(target)
         return expanded
 
-    def _files_to_addresses(
-        self, file_ids: list[str], file_data: dict[str, dict], limit: int
-    ) -> list[Address]:
-        """Convert file IDs to symbol Address objects.
+    def _neighbor_expand(
+        self, file_ids: list[str], file_data: dict[str, dict]
+    ) -> list[str]:
+        """Add sibling files from the same directories as selected files."""
+        # Build id -> path and path -> id mappings
+        id_to_path = {data["raw_file_id"]: path for path, data in file_data.items()}
+        path_to_id = {path: data["raw_file_id"] for path, data in file_data.items()}
+        seen = set(file_ids)
 
-        Scores decrease by file position (first file = most relevant) so that
-        diverse files survive ranking. Caps symbols per file to prevent one
-        large file from monopolizing all read slots.
+        # Find directories of selected files
+        trigger_dirs: set[str] = set()
+        for fid in file_ids:
+            path = id_to_path.get(fid, "")
+            if "/" in path:
+                trigger_dirs.add(path.rsplit("/", 1)[0])
+
+        # Group all indexed files by directory
+        dir_files: dict[str, list[str]] = {}
+        for path in file_data:
+            if "/" in path:
+                parent = path.rsplit("/", 1)[0]
+                dir_files.setdefault(parent, []).append(path)
+
+        # Add siblings from triggered directories
+        neighbors: list[str] = []
+        for d in trigger_dirs:
+            siblings = dir_files.get(d, [])
+            new_siblings = [
+                path_to_id[p]
+                for p in siblings
+                if path_to_id[p] not in seen
+            ]
+            # Skip directories with too many new siblings (avoid noise)
+            if len(new_siblings) > 10:
+                continue
+            for fid in new_siblings:
+                if fid not in seen:
+                    neighbors.append(fid)
+                    seen.add(fid)
+
+        return neighbors
+
+    def _files_to_addresses(
+        self,
+        file_ids: list[str],
+        file_data: dict[str, dict],
+        limit: int,
+        origin: dict[str, str],
+    ) -> list[Address]:
+        """Convert file IDs to FILE-level Address objects.
+
+        One Address per file. Score is flat by origin tier:
+        selected=1.0, import=0.9, neighbor=0.8.
         """
-        # Build reverse mapping: file_id -> path
         id_to_path = {data["raw_file_id"]: path for path, data in file_data.items()}
 
-        max_symbols_per_file = max(3, limit // max(1, len(file_ids)))
+        _ORIGIN_SCORES = {"selected": 1.0, "import": 0.9, "neighbor": 0.8}
+
         addresses: list[Address] = []
-        for file_rank, fid in enumerate(file_ids):
+        for fid in file_ids:
             path = id_to_path.get(fid)
-            if not path or path not in file_data:
+            if not path:
                 continue
-            # Score decreases with file rank: 0.80, 0.77, 0.74, ...
-            # Moderate base — LLM file selection is a fast heuristic, not a
-            # precision signal, so scores must stay competitive with agentic
-            # results rather than dominating them.
-            file_score = max(0.5, 0.80 - file_rank * 0.03)
-            file_symbols = file_data[path]["symbols"][:max_symbols_per_file]
-            for sym_rank, sym in enumerate(file_symbols):
-                # Within a file, minor decrease so class > methods in ranking
-                score = file_score - sym_rank * 0.001
-                addresses.append(
-                    Address(
-                        kind=AddressKind.SYMBOL,
-                        source_id=fid,
-                        location=sym["qualified_name"],
-                        summary=f"{sym['kind']} {sym['name']}",
-                        score=score,
-                        metadata={
-                            "symbol_id": "",
-                            "name": sym["name"],
-                            "qualified_name": sym["qualified_name"],
-                            "kind": sym["kind"],
-                            "start_line": sym["start_line"],
-                            "end_line": sym["end_line"],
-                            "signature": sym.get("signature"),
-                        },
-                    )
+            score = _ORIGIN_SCORES.get(origin.get(fid, "neighbor"), 0.8)
+            symbols = file_data[path].get("symbols", [])
+            summary_parts = []
+            for sym in symbols[:5]:
+                summary_parts.append(f"{sym['kind']} {sym['name']}")
+            summary = ", ".join(summary_parts) if summary_parts else path
+
+            addresses.append(
+                Address(
+                    kind=AddressKind.FILE,
+                    source_id=fid,
+                    location=path,
+                    summary=summary,
+                    score=score,
+                    metadata={"origin": origin.get(fid, "neighbor")},
                 )
+            )
         return addresses[:limit]

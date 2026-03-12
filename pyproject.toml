@@ -79,6 +79,9 @@ faiss = [
     "faiss-cpu>=1.7.0",
 ]
 
+# Standalone code retrieval (no PostgreSQL, no pgvector, no docling)
+code = []
+
 # Local LLM capabilities (Ollama)
 local = [
     "ollama>=0.1.0",

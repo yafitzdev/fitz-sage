@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
-import pytest
+import json
+from unittest.mock import MagicMock
 
 from fitz_ai.engines.fitz_krag.retrieval.strategies.llm_code_search import (
     LlmCodeSearchStrategy,
@@ -58,6 +57,36 @@ MANIFEST_DATA = [
             },
         ],
     },
+    {
+        "raw_file_id": "f3",
+        "path": "app/serializers.py",
+        "symbols": [
+            {
+                "name": "UserSerializer",
+                "qualified_name": "app.serializers.UserSerializer",
+                "kind": "class",
+                "signature": "class UserSerializer:",
+                "start_line": 1,
+                "end_line": 20,
+                "imports": ["app.models"],
+            },
+        ],
+    },
+    {
+        "raw_file_id": "f4",
+        "path": "lib/utils.py",
+        "symbols": [
+            {
+                "name": "slugify",
+                "qualified_name": "lib.utils.slugify",
+                "kind": "function",
+                "signature": "def slugify(text: str) -> str",
+                "start_line": 1,
+                "end_line": 5,
+                "imports": [],
+            },
+        ],
+    },
 ]
 
 
@@ -79,7 +108,17 @@ def _make_import_store(reverse_counts=None, imports_by_file=None):
     return store
 
 
-def _make_chat_factory(response='["app/models.py"]'):
+def _make_chat_response(search_terms=None, files=None):
+    """Build a combined JSON response matching the new prompt format."""
+    if files is None:
+        files = ["app/models.py"]
+    obj = {"search_terms": search_terms or [], "files": files}
+    return json.dumps(obj)
+
+
+def _make_chat_factory(response=None):
+    if response is None:
+        response = _make_chat_response()
     chat = MagicMock()
     chat.chat.return_value = response
     factory = MagicMock(return_value=chat)
@@ -158,8 +197,6 @@ class TestManifestBuilder:
         text2, _ = builder.build()
 
         assert text1 == text2
-        # get_structural_manifest called twice (first to build, second to check count)
-        # but the manifest text is reused from cache on second call
         assert symbol_store.get_structural_manifest.call_count == 2
 
     def test_truncation_strips_imports_first(self):
@@ -169,8 +206,6 @@ class TestManifestBuilder:
 
         text, _ = builder.build()
 
-        # With max_chars=100, truncation should kick in
-        # f2 (least connected) should lose imports first
         assert "## app/models.py" in text
         assert "## app/views.py" in text
 
@@ -200,141 +235,193 @@ class TestManifestBuilder:
 
 
 class TestLlmCodeSearchStrategy:
-    def test_retrieve_returns_addresses(self):
-        symbol_store = _make_symbol_store()
-        import_store = _make_import_store()
-        chat_factory = _make_chat_factory('["app/models.py"]')
-        config = _make_config()
-        fallback = _make_fallback()
-
+    def test_retrieve_returns_file_addresses(self):
+        response = _make_chat_response(
+            search_terms=["User", "model"],
+            files=["app/models.py"],
+        )
         strategy = LlmCodeSearchStrategy(
-            symbol_store, import_store, chat_factory, config, fallback
+            _make_symbol_store(),
+            _make_import_store(),
+            _make_chat_factory(response),
+            _make_config(),
+            _make_fallback(),
         )
         addresses = strategy.retrieve("What is User?", limit=10)
 
         assert len(addresses) > 0
-        assert all(a.kind == AddressKind.SYMBOL for a in addresses)
-        assert any("User" in a.location for a in addresses)
+        assert all(a.kind == AddressKind.FILE for a in addresses)
 
-    def test_scores_decrease_by_file_order(self):
-        symbol_store = _make_symbol_store()
-        import_store = _make_import_store()
-        chat_factory = _make_chat_factory('["app/models.py", "app/views.py"]')
-        config = _make_config()
-        fallback = _make_fallback()
-
+    def test_selected_files_score_1_0(self):
+        response = _make_chat_response(files=["app/models.py", "app/views.py"])
         strategy = LlmCodeSearchStrategy(
-            symbol_store, import_store, chat_factory, config, fallback
+            _make_symbol_store(),
+            _make_import_store(),
+            _make_chat_factory(response),
+            _make_config(),
+            _make_fallback(),
         )
         addresses = strategy.retrieve("How does the app work?", limit=20)
 
-        # First file's symbols should have higher scores than second file's
-        f1_scores = [a.score for a in addresses if a.source_id == "f1"]
-        f2_scores = [a.score for a in addresses if a.source_id == "f2"]
-        assert f1_scores and f2_scores
-        assert max(f1_scores) > max(f2_scores)
+        selected = [a for a in addresses if a.metadata.get("origin") == "selected"]
+        assert len(selected) == 2
+        assert all(a.score == 1.0 for a in selected)
 
-    def test_retrieve_expands_imports(self):
-        symbol_store = _make_symbol_store()
-        import_store = _make_import_store(
-            imports_by_file={
-                "f1": [{"target_file_id": "f2", "target_module": "app.views", "import_names": []}]
-            }
-        )
-        chat_factory = _make_chat_factory('["app/models.py"]')
-        config = _make_config()
-        fallback = _make_fallback()
-
+    def test_import_expanded_files_score_0_9(self):
+        response = _make_chat_response(files=["app/models.py"])
         strategy = LlmCodeSearchStrategy(
-            symbol_store, import_store, chat_factory, config, fallback
+            _make_symbol_store(),
+            _make_import_store(imports_by_file={
+                "f1": [{"target_file_id": "f2", "target_module": "app.views"}]
+            }),
+            _make_chat_factory(response),
+            _make_config(),
+            _make_fallback(),
         )
         addresses = strategy.retrieve("What is User?", limit=20)
 
-        # Should include symbols from both f1 (selected) and f2 (import-expanded)
+        import_addrs = [a for a in addresses if a.metadata.get("origin") == "import"]
+        assert len(import_addrs) >= 1
+        assert all(a.score == 0.9 for a in import_addrs)
+
+    def test_neighbor_expanded_files_score_0_8(self):
+        """Files in the same directory as selected files get neighbor score."""
+        response = _make_chat_response(files=["app/models.py"])
+        strategy = LlmCodeSearchStrategy(
+            _make_symbol_store(),
+            _make_import_store(),
+            _make_chat_factory(response),
+            _make_config(),
+            _make_fallback(),
+        )
+        addresses = strategy.retrieve("What is User?", limit=20)
+
+        # app/views.py and app/serializers.py are neighbors of app/models.py
+        neighbor_addrs = [a for a in addresses if a.metadata.get("origin") == "neighbor"]
+        assert len(neighbor_addrs) >= 1
+        assert all(a.score == 0.8 for a in neighbor_addrs)
+
+    def test_neighbor_expansion_skips_large_directories(self):
+        """Directories with >10 new siblings are skipped."""
+        # Create manifest with 12 files in same directory
+        many_files = [
+            {
+                "raw_file_id": f"f{i}",
+                "path": f"bigpkg/mod{i}.py",
+                "symbols": [
+                    {
+                        "name": f"func{i}",
+                        "qualified_name": f"bigpkg.mod{i}.func{i}",
+                        "kind": "function",
+                        "signature": f"def func{i}() -> None",
+                        "start_line": 1,
+                        "end_line": 5,
+                        "imports": [],
+                    }
+                ],
+            }
+            for i in range(12)
+        ]
+        response = _make_chat_response(files=["bigpkg/mod0.py"])
+        strategy = LlmCodeSearchStrategy(
+            _make_symbol_store(many_files),
+            _make_import_store(),
+            _make_chat_factory(response),
+            _make_config(),
+            _make_fallback(),
+        )
+        addresses = strategy.retrieve("What does func0 do?", limit=20)
+
+        # Only the selected file — neighbors skipped because >10 siblings
+        assert len(addresses) == 1
+        assert addresses[0].metadata["origin"] == "selected"
+
+    def test_retrieve_expands_imports(self):
+        response = _make_chat_response(files=["app/models.py"])
+        strategy = LlmCodeSearchStrategy(
+            _make_symbol_store(),
+            _make_import_store(imports_by_file={
+                "f1": [{"target_file_id": "f2", "target_module": "app.views"}]
+            }),
+            _make_chat_factory(response),
+            _make_config(),
+            _make_fallback(),
+        )
+        addresses = strategy.retrieve("What is User?", limit=20)
+
         source_ids = {a.source_id for a in addresses}
         assert "f1" in source_ids
         assert "f2" in source_ids
 
     def test_fallback_on_llm_failure(self):
-        symbol_store = _make_symbol_store()
-        import_store = _make_import_store()
-
-        # LLM raises an error
         chat = MagicMock()
         chat.chat.side_effect = RuntimeError("LLM unavailable")
         chat_factory = MagicMock(return_value=chat)
 
-        config = _make_config()
         fallback = _make_fallback()
-
         strategy = LlmCodeSearchStrategy(
-            symbol_store, import_store, chat_factory, config, fallback
+            _make_symbol_store(),
+            _make_import_store(),
+            chat_factory,
+            _make_config(),
+            fallback,
         )
         addresses = strategy.retrieve("What is User?", limit=10)
 
-        # Should get fallback results
         assert len(addresses) == 1
         assert addresses[0].source_id == "f1"
         fallback.retrieve.assert_called_once()
 
     def test_fallback_on_empty_response(self):
-        symbol_store = _make_symbol_store()
-        import_store = _make_import_store()
-        chat_factory = _make_chat_factory("[]")  # Empty selection
-        config = _make_config()
+        response = _make_chat_response(files=[])
         fallback = _make_fallback()
-
         strategy = LlmCodeSearchStrategy(
-            symbol_store, import_store, chat_factory, config, fallback
+            _make_symbol_store(),
+            _make_import_store(),
+            _make_chat_factory(response),
+            _make_config(),
+            fallback,
         )
         addresses = strategy.retrieve("What is User?", limit=10)
 
-        # Empty LLM response should trigger fallback
         assert len(addresses) == 1
         fallback.retrieve.assert_called_once()
 
     def test_fallback_on_invalid_json(self):
-        symbol_store = _make_symbol_store()
-        import_store = _make_import_store()
-        chat_factory = _make_chat_factory("not json at all")
-        config = _make_config()
         fallback = _make_fallback()
-
         strategy = LlmCodeSearchStrategy(
-            symbol_store, import_store, chat_factory, config, fallback
+            _make_symbol_store(),
+            _make_import_store(),
+            _make_chat_factory("not json at all"),
+            _make_config(),
+            fallback,
         )
         addresses = strategy.retrieve("What is User?", limit=10)
 
-        # Invalid JSON should trigger fallback
         assert len(addresses) == 1
         fallback.retrieve.assert_called_once()
 
     def test_retrieve_respects_limit(self):
-        symbol_store = _make_symbol_store()
-        import_store = _make_import_store()
-        chat_factory = _make_chat_factory('["app/models.py", "app/views.py"]')
-        config = _make_config()
-        fallback = _make_fallback()
-
+        response = _make_chat_response(files=["app/models.py", "app/views.py"])
         strategy = LlmCodeSearchStrategy(
-            symbol_store, import_store, chat_factory, config, fallback
+            _make_symbol_store(),
+            _make_import_store(),
+            _make_chat_factory(response),
+            _make_config(),
+            _make_fallback(),
         )
         addresses = strategy.retrieve("What is User?", limit=1)
 
         assert len(addresses) <= 1
 
     def test_forwards_hyde_and_raw_store(self):
-        symbol_store = _make_symbol_store()
-        import_store = _make_import_store()
-        chat_factory = _make_chat_factory()
-        config = _make_config()
-        fallback = _make_fallback()
-
         strategy = LlmCodeSearchStrategy(
-            symbol_store, import_store, chat_factory, config, fallback
+            _make_symbol_store(),
+            _make_import_store(),
+            _make_chat_factory(),
+            _make_config(),
+            _make_fallback(),
         )
-
-        # Simulate engine wiring
         strategy._hyde_generator = "hyde_gen"
         strategy._raw_store = "raw_store"
 
@@ -342,49 +429,75 @@ class TestLlmCodeSearchStrategy:
         assert strategy._raw_store == "raw_store"
 
     def test_fallback_receives_all_kwargs(self):
-        symbol_store = _make_symbol_store()
-        import_store = _make_import_store()
-
         chat = MagicMock()
         chat.chat.side_effect = RuntimeError("fail")
         chat_factory = MagicMock(return_value=chat)
 
-        config = _make_config()
         fallback = _make_fallback()
-
         strategy = LlmCodeSearchStrategy(
-            symbol_store, import_store, chat_factory, config, fallback
+            _make_symbol_store(),
+            _make_import_store(),
+            chat_factory,
+            _make_config(),
+            fallback,
         )
 
         qv = [0.1, 0.2, 0.3]
         hv = [[0.4, 0.5, 0.6]]
         detection = MagicMock()
 
-        strategy.retrieve("query", limit=5, detection=detection, query_vector=qv, hyde_vectors=hv)
+        strategy.retrieve(
+            "query", limit=5, detection=detection, query_vector=qv, hyde_vectors=hv
+        )
 
         fallback.retrieve.assert_called_once_with(
-            "query",
-            5,
-            detection=detection,
-            query_vector=qv,
-            hyde_vectors=hv,
+            "query", 5, detection=detection, query_vector=qv, hyde_vectors=hv
         )
 
-    def test_llm_select_files_parses_json_in_markdown(self):
-        """LLM may wrap JSON in markdown code blocks."""
-        symbol_store = _make_symbol_store()
-        import_store = _make_import_store()
-        chat_factory = _make_chat_factory(
-            '```json\n["app/models.py", "app/views.py"]\n```'
-        )
-        config = _make_config()
-        fallback = _make_fallback()
-
+    def test_parses_combined_json_response(self):
+        """New format: LLM returns {search_terms, files}."""
+        response = json.dumps({
+            "search_terms": ["user", "model", "ORM"],
+            "files": ["app/models.py", "app/views.py"],
+        })
         strategy = LlmCodeSearchStrategy(
-            symbol_store, import_store, chat_factory, config, fallback
+            _make_symbol_store(),
+            _make_import_store(),
+            _make_chat_factory(response),
+            _make_config(),
+            _make_fallback(),
+        )
+        addresses = strategy.retrieve("How does User model work?", limit=20)
+
+        source_ids = {a.source_id for a in addresses}
+        assert "f1" in source_ids
+        assert "f2" in source_ids
+
+    def test_parses_plain_array_fallback(self):
+        """Backward compat: LLM returns plain JSON array."""
+        strategy = LlmCodeSearchStrategy(
+            _make_symbol_store(),
+            _make_import_store(),
+            _make_chat_factory('["app/models.py", "app/views.py"]'),
+            _make_config(),
+            _make_fallback(),
         )
         addresses = strategy.retrieve("How does get_users work?", limit=20)
 
         source_ids = {a.source_id for a in addresses}
         assert "f1" in source_ids
         assert "f2" in source_ids
+
+    def test_parses_json_in_markdown_code_block(self):
+        """LLM may wrap JSON in markdown code blocks."""
+        response = '```json\n{"search_terms": ["user"], "files": ["app/models.py"]}\n```'
+        strategy = LlmCodeSearchStrategy(
+            _make_symbol_store(),
+            _make_import_store(),
+            _make_chat_factory(response),
+            _make_config(),
+            _make_fallback(),
+        )
+        addresses = strategy.retrieve("What is User?", limit=20)
+
+        assert any(a.source_id == "f1" for a in addresses)
