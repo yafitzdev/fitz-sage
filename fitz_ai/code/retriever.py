@@ -140,6 +140,10 @@ class CodeRetriever:
         """Return the structural index text (for inspection/debugging)."""
         return self._get_structural_index()
 
+    def get_file_paths(self) -> list[str]:
+        """Return the indexed file paths (triggers lazy build if needed)."""
+        return self._get_file_paths()
+
     # ------------------------------------------------------------------
     # Lazy initialization
     # ------------------------------------------------------------------
