@@ -11,7 +11,7 @@ fitz_krag:
   # Core Plugins (shared infrastructure)
   # ===========================================================================
 
-  chat: ollama
+  chat: lmstudio
   embedding: ollama
   vector_db: pgvector
   rerank: null

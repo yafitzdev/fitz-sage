@@ -31,7 +31,7 @@ class FitzKragConfig(BasePluginConfig):
     # ==========================================================================
 
     chat: str = Field(
-        default="ollama",
+        default="lmstudio",
         description="Chat plugin: 'provider' or 'provider/model'",
     )
 

@@ -35,20 +35,22 @@ class EnterpriseChat:
 
     def __init__(
         self,
-        auth: AuthProvider,
+        auth: AuthProvider | None,
         base_url: str,
         model: str,
         **kwargs: Any,
     ) -> None:
-        request_kwargs = auth.get_request_kwargs()
+        client_kwargs: dict[str, Any] = {
+            "base_url": base_url,
+            "timeout": httpx.Timeout(600.0, connect=5.0),
+        }
+        if auth is not None:
+            request_kwargs = auth.get_request_kwargs()
+            client_kwargs["auth"] = DynamicHttpxAuth(auth)
+            client_kwargs["verify"] = request_kwargs.get("verify", True)
+            client_kwargs["cert"] = request_kwargs.get("cert")
 
-        self._client = httpx.Client(
-            base_url=base_url,
-            auth=DynamicHttpxAuth(auth),
-            verify=request_kwargs.get("verify", True),
-            cert=request_kwargs.get("cert"),
-            timeout=httpx.Timeout(600.0, connect=5.0),
-        )
+        self._client = httpx.Client(**client_kwargs)
         self._model = model
         self._defaults = kwargs
 
@@ -115,21 +117,23 @@ class EnterpriseEmbedding:
 
     def __init__(
         self,
-        auth: AuthProvider,
+        auth: AuthProvider | None,
         base_url: str,
         model: str,
         dimensions: int | None = None,
         **kwargs: Any,
     ) -> None:
-        request_kwargs = auth.get_request_kwargs()
+        client_kwargs: dict[str, Any] = {
+            "base_url": base_url,
+            "timeout": httpx.Timeout(300.0, connect=5.0),
+        }
+        if auth is not None:
+            request_kwargs = auth.get_request_kwargs()
+            client_kwargs["auth"] = DynamicHttpxAuth(auth)
+            client_kwargs["verify"] = request_kwargs.get("verify", True)
+            client_kwargs["cert"] = request_kwargs.get("cert")
 
-        self._client = httpx.Client(
-            base_url=base_url,
-            auth=DynamicHttpxAuth(auth),
-            verify=request_kwargs.get("verify", True),
-            cert=request_kwargs.get("cert"),
-            timeout=httpx.Timeout(300.0, connect=5.0),
-        )
+        self._client = httpx.Client(**client_kwargs)
         self._model = model
         self._dimensions = dimensions
 

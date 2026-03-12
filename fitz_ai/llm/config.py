@@ -26,7 +26,15 @@ ENV_VAR_MAP: dict[str, str | None] = {
     "anthropic": "ANTHROPIC_API_KEY",
     "azure_openai": "AZURE_OPENAI_API_KEY",
     "ollama": None,  # No auth required
+    "lmstudio": None,  # No auth required (local)
     "enterprise": None,  # Auth configured explicitly via auth block
+}
+
+# LM Studio default models by tier
+LMSTUDIO_CHAT_MODELS: dict[str, str] = {
+    "smart": "qwen3-coder-30b",
+    "balanced": "qwen3.5-9b",
+    "fast": "qwen3.5-4b",
 }
 
 # Provider name → default header format
@@ -294,6 +302,24 @@ def create_chat_provider(
 
         return AnthropicChat(auth, tier=tier, **kwargs)  # type: ignore[arg-type]
 
+    elif provider == "lmstudio":
+        from fitz_ai.llm.providers.enterprise import EnterpriseChat
+
+        base_url = kwargs.pop("base_url", "http://localhost:1234/v1")
+        model = kwargs.pop("model", None)
+        if not model:
+            model = LMSTUDIO_CHAT_MODELS.get(tier)
+        if not model:
+            raise ValueError(
+                "LM Studio requires a model name.\n"
+                "Example:\n"
+                "  chat: lmstudio/qwen3-coder-30b\n"
+                "Or set model in chat_kwargs:\n"
+                "  chat_kwargs:\n"
+                "    model: qwen3-coder-30b"
+            )
+        return EnterpriseChat(None, base_url=base_url, model=model, **kwargs)
+
     elif provider == "ollama":
         from fitz_ai.llm.providers.ollama import OllamaChat
 
@@ -366,6 +392,22 @@ def create_embedding_provider(
         from fitz_ai.llm.providers.openai import OpenAIEmbedding
 
         return OpenAIEmbedding(auth, **kwargs)  # type: ignore[arg-type]
+
+    elif provider == "lmstudio":
+        from fitz_ai.llm.providers.enterprise import EnterpriseEmbedding
+
+        base_url = kwargs.pop("base_url", "http://localhost:1234/v1")
+        model = kwargs.pop("model", None)
+        if not model:
+            raise ValueError(
+                "LM Studio requires a model name.\n"
+                "Example:\n"
+                "  embedding: lmstudio/text-embedding-nomic-embed-text-v1.5\n"
+                "Or set model in embedding_kwargs:\n"
+                "  embedding_kwargs:\n"
+                "    model: text-embedding-nomic-embed-text-v1.5"
+            )
+        return EnterpriseEmbedding(None, base_url=base_url, model=model, **kwargs)
 
     elif provider == "ollama":
         from fitz_ai.llm.providers.ollama import OllamaEmbedding
