@@ -20,6 +20,9 @@ if TYPE_CHECKING:
     from fitz_ai.engines.fitz_krag.retrieval.strategies.code_search import (
         CodeSearchStrategy,
     )
+    from fitz_ai.engines.fitz_krag.retrieval.strategies.llm_code_search import (
+        LlmCodeSearchStrategy,
+    )
     from fitz_ai.engines.fitz_krag.retrieval.strategies.section_search import (
         SectionSearchStrategy,
     )
@@ -35,7 +38,7 @@ class RetrievalRouter:
 
     def __init__(
         self,
-        code_strategy: "CodeSearchStrategy",
+        code_strategy: "CodeSearchStrategy | LlmCodeSearchStrategy",
         chunk_strategy: "ChunkFallbackStrategy | None",
         config: "FitzKragConfig",
         section_strategy: "SectionSearchStrategy | None" = None,
@@ -358,13 +361,14 @@ class RetrievalRouter:
         if analysis:
             ranker = CrossStrategyRanker()
             ranked = ranker.rank(deduped, analysis)
-            result = ranked[: self._config.top_addresses]
         else:
             # Fallback: sort by score
             deduped.sort(key=lambda a: a.score, reverse=True)
-            result = deduped[: self._config.top_addresses]
+            ranked = deduped
 
-        return result
+        # File diversity: prevent one file from monopolizing all read slots
+        ranked = self._enforce_file_diversity(ranked)
+        return ranked[: self._config.top_addresses]
 
     def _run_strategy(
         self,
@@ -568,3 +572,27 @@ class RetrievalRouter:
                         )
 
         return result
+
+    @staticmethod
+    def _enforce_file_diversity(
+        addresses: list[Address], max_per_file: int = 3
+    ) -> list[Address]:
+        """Reorder addresses so no single file monopolizes the top slots.
+
+        Preserves ranking order but defers excess addresses from any one file
+        to the end of the list. With max_per_file=3 and top_addresses=5,
+        at least 2 different files appear in the top results.
+        """
+        file_counts: dict[str, int] = {}
+        promoted: list[Address] = []
+        deferred: list[Address] = []
+
+        for addr in addresses:
+            count = file_counts.get(addr.source_id, 0)
+            if count < max_per_file:
+                promoted.append(addr)
+                file_counts[addr.source_id] = count + 1
+            else:
+                deferred.append(addr)
+
+        return promoted + deferred

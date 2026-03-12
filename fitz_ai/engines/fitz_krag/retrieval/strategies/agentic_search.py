@@ -281,7 +281,7 @@ class AgenticSearchStrategy:
                         source_id=entry.file_id,
                         location=f"{entry.rel_path}:{sym.start_line}",
                         summary=f"{sym.kind} {sym.qualified_name}",
-                        score=0.5,  # Neutral score; LLM already selected this file
+                        score=0.7,  # LLM-validated relevance
                         metadata={
                             "start_line": sym.start_line,
                             "end_line": sym.end_line,
@@ -302,7 +302,7 @@ class AgenticSearchStrategy:
                     source_id=entry.file_id,
                     location=entry.rel_path,
                     summary=f"Document: {heading_list}",
-                    score=0.5,
+                    score=0.7,
                     metadata={
                         "disk_path": entry.rel_path,
                         "agentic": True,
@@ -318,7 +318,7 @@ class AgenticSearchStrategy:
                     source_id=entry.file_id,
                     location=entry.rel_path,
                     summary=f"File: {entry.rel_path}",
-                    score=0.5,
+                    score=0.7,
                     metadata={
                         "disk_path": entry.rel_path,
                         "agentic": True,

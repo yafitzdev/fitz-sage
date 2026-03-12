@@ -195,6 +195,46 @@ class SymbolStore:
             rows = conn.execute(sql, (terms, limit)).fetchall()
         return [_row_to_dict(row) for row in rows]
 
+    def get_structural_manifest(self) -> list[dict]:
+        """Get a compact structural manifest of all symbols grouped by file.
+
+        Returns a list of per-file dicts:
+        {
+            "raw_file_id": str,
+            "path": str,
+            "symbols": [{"name", "qualified_name", "kind", "signature",
+                         "start_line", "end_line", "imports"}]
+        }
+        """
+        sql = f"""
+            SELECT s."raw_file_id", r."path",
+                   s."name", s."qualified_name", s."kind", s."signature",
+                   s."start_line", s."end_line", s."imports"
+            FROM {TABLE} s
+            JOIN {TABLE_PREFIX}raw_files r ON s."raw_file_id" = r."id"
+            ORDER BY r."path", s."start_line"
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql).fetchall()
+
+        files: dict[str, dict] = {}
+        for row in rows:
+            fid = row[0]
+            if fid not in files:
+                files[fid] = {"raw_file_id": fid, "path": row[1], "symbols": []}
+            files[fid]["symbols"].append(
+                {
+                    "name": row[2],
+                    "qualified_name": row[3],
+                    "kind": row[4],
+                    "signature": row[5],
+                    "start_line": row[6],
+                    "end_line": row[7],
+                    "imports": list(row[8]) if row[8] else [],
+                }
+            )
+        return list(files.values())
+
     def get_summaries_by_file(self, raw_file_id: str) -> list[dict[str, Any]]:
         """Get symbol IDs, names, kinds, and summaries for a file."""
         sql = f"""

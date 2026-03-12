@@ -232,7 +232,13 @@ class GovernanceDecider:
 
     def _prepare_features(self, features: dict[str, Any]):
         """Convert raw feature dict to a model-ready single-row DataFrame."""
+        import warnings
+
         import pandas as pd
+
+        # Suppress PerformanceWarning from repeated column inserts on a
+        # single-row DataFrame — not a real performance issue at this scale.
+        warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
         X = pd.DataFrame([features])
 

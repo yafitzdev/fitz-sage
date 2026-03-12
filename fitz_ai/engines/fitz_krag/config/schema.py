@@ -73,6 +73,14 @@ class FitzKragConfig(BasePluginConfig):
     # Code Strategy
     # ==========================================================================
 
+    code_search_mode: str = Field(
+        default="auto",
+        description=(
+            "Code search mode: 'auto' = LLM structural search when chat "
+            "available with hybrid fallback, 'hybrid' = BM25 + semantic only"
+        ),
+    )
+
     code_languages: list[str] = Field(
         default=["python", "typescript", "java", "go"],
         description="Enabled code languages for ingestion",
@@ -117,13 +125,13 @@ class FitzKragConfig(BasePluginConfig):
     # ==========================================================================
 
     top_addresses: int = Field(
-        default=10,
+        default=50,
         ge=1,
         description="Number of addresses to retrieve before reading",
     )
 
     top_read: int = Field(
-        default=5,
+        default=50,
         ge=1,
         description="Number of top addresses to read content for",
     )
@@ -200,7 +208,7 @@ class FitzKragConfig(BasePluginConfig):
     # ==========================================================================
 
     max_context_tokens: int = Field(
-        default=8000,
+        default=48000,
         ge=100,
         description="Max tokens in assembled context for LLM",
     )

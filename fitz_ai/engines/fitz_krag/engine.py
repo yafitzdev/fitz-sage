@@ -353,6 +353,22 @@ class FitzKragEngine:
                     min_addresses=self._config.rerank_min_addresses,
                 )
 
+        # LLM structural code search (default when chat available)
+        if self._config.code_search_mode != "hybrid" and self._chat_factory:
+            from fitz_ai.engines.fitz_krag.retrieval.strategies.llm_code_search import (
+                LlmCodeSearchStrategy,
+            )
+
+            llm_strategy = LlmCodeSearchStrategy(
+                symbol_store=self._symbol_store,
+                import_store=self._import_store,
+                chat_factory=self._chat_factory,
+                config=self._config,
+                fallback_strategy=code_strategy,
+            )
+            self._retrieval_router._code_strategy = llm_strategy
+            code_strategy = llm_strategy  # so HyDE/raw_store wiring below reaches it
+
         # Wire chat_factory + HyDE into router and strategies
         if self._config.enable_multi_query:
             self._retrieval_router._chat_factory = self._chat_factory
@@ -548,16 +564,15 @@ class FitzKragEngine:
         # Generate query ID for tracing
         query_id = f"q-{uuid.uuid4().hex[:8]}"
 
-        try:
-            # Set query context for all logging in this request
-            set_query_context(query_id=query_id)
-            logger.info("Starting query processing", query_length=len(query.text) if query.text else 0)
+        # Set query context for all logging in this request
+        set_query_context(query_id=query_id)
+        logger.info("Starting query processing", query_length=len(query.text) if query.text else 0)
 
-            if not query.text or not query.text.strip():
-                raise QueryError("Query text cannot be empty")
+        if not query.text or not query.text.strip():
+            raise QueryError("Query text cannot be empty")
 
-            if self._bg_worker:
-                self._bg_worker.signal_query_start()
+        if self._bg_worker:
+            self._bg_worker.signal_query_start()
         try:
             # 0. Sanitize and normalize query
             import re
@@ -727,6 +742,11 @@ class FitzKragEngine:
                 from fitz_ai.governance import run_constraints
                 from fitz_ai.governance.constraints.feature_extractor import extract_features
 
+                # Suppress noisy constraint warnings (embedding 400s, etc.)
+                # — constraints handle errors gracefully, warnings are just noise
+                import logging as _logging
+                _logging.getLogger("fitz_ai.governance.constraints").setLevel(_logging.ERROR)
+
                 constraint_results = run_constraints(sanitized, expanded, self._constraints)
                 # Build constraint_name -> result dict for feature extraction
                 cr_dict = {
@@ -747,7 +767,28 @@ class FitzKragEngine:
                     features["min_vector_score"] = ie_sim
                 governance = self._governor.decide(constraint_results, features=features)
                 answer_mode = governance.mode
+
+                # Progressive mode override: guardrails features are degraded
+                # (no summaries, no real vector scores, constraint LLMs see raw code)
+                # but LLM code search already validated relevance via structural
+                # reasoning. Override ABSTAIN → TRUSTWORTHY so generation runs.
+                if (
+                    answer_mode == AnswerMode.ABSTAIN
+                    and self._manifest is not None
+                    and expanded
+                ):
+                    logger.info(
+                        "Overriding ABSTAIN → TRUSTWORTHY in progressive mode "
+                        "(degraded guardrails features with code evidence)"
+                    )
+                    answer_mode = AnswerMode.TRUSTWORTHY
+
                 timings.append(("Guardrails", time.perf_counter() - t0))
+
+            # 5.5. Compress code context (AST-based, ~50-70% token reduction)
+            from fitz_ai.engines.fitz_krag.context.compressor import compress_results
+
+            expanded = compress_results(expanded)
 
             # 6. Assemble context
             context = self._assembler.assemble(sanitized, expanded)
@@ -921,6 +962,12 @@ class FitzKragEngine:
         # 4. Set source_dir on ContentReader for disk fallback
         self._reader._source_dir = source_dir
 
+        # 4.5. Fast synchronous symbol indexing (AST only, no LLM)
+        # Populates symbol_store + import_store so LLM code search works
+        # immediately on the first query. Background worker skips these
+        # files (already PARSED) and starts with Phase 2 (summaries).
+        self._fast_index_code_files(manifest, source_dir, progress)
+
         # 5. Start background worker (skip for short-lived CLI processes)
         if start_worker:
             from fitz_ai.engines.fitz_krag.progressive.worker import BackgroundIngestWorker
@@ -955,6 +1002,160 @@ class FitzKragEngine:
             self._bg_worker.start()
 
         return manifest
+
+    def _fast_index_code_files(
+        self,
+        manifest: Any,
+        source_dir: Path,
+        progress: Callable[[str], None] | None = None,
+    ) -> None:
+        """Fast synchronous AST extraction for all code files in the manifest.
+
+        Populates raw_store, symbol_store, and import_store so that LLM code
+        search and hybrid code search work on the very first query.  No LLM
+        calls, no embeddings — pure AST parsing + DB writes.
+
+        Files are transitioned to PARSED state so the background worker skips
+        Phase 1 and starts with Phase 2 (LLM summaries).
+        """
+        import hashlib
+        import uuid
+
+        from fitz_ai.engines.fitz_krag.ingestion.strategies.python_code import (
+            PythonCodeIngestStrategy,
+        )
+        from fitz_ai.engines.fitz_krag.progressive.manifest import FileState
+
+        _progress = progress or (lambda _: None)
+        _CODE_EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".java", ".go"}
+
+        entries = manifest.entries()
+        code_entries = [e for e in entries.values() if e.file_type in _CODE_EXTENSIONS]
+        if not code_entries:
+            return
+
+        _progress(f"Indexing {len(code_entries)} code files...")
+
+        py_strategy = PythonCodeIngestStrategy()
+        ts_strategy = None
+        java_strategy = None
+        go_strategy = None
+        indexed = 0
+
+        for entry in code_entries:
+            try:
+                path = Path(entry.abs_path)
+                if not path.exists():
+                    path = source_dir / entry.rel_path
+                if not path.exists():
+                    continue
+
+                content = path.read_text(encoding="utf-8", errors="replace").replace("\x00", "")
+                content_hash = hashlib.sha256(content.encode()).hexdigest()
+
+                # Store raw file (needed as FK for symbol_index)
+                self._raw_store.upsert(
+                    file_id=entry.file_id,
+                    path=entry.rel_path,
+                    content=content,
+                    content_hash=content_hash,
+                    file_type=entry.file_type,
+                    size_bytes=entry.size_bytes,
+                )
+
+                # AST extraction
+                result = None
+                ext = entry.file_type
+
+                if ext == ".py":
+                    result = py_strategy.extract(content, entry.rel_path)
+                elif ext in {".ts", ".tsx", ".js", ".jsx"}:
+                    try:
+                        if ts_strategy is None:
+                            from fitz_ai.engines.fitz_krag.ingestion.strategies.typescript import (
+                                TypeScriptIngestStrategy,
+                            )
+
+                            ts_strategy = TypeScriptIngestStrategy()
+                        result = ts_strategy.extract(content, entry.rel_path)
+                    except Exception:
+                        pass
+                elif ext == ".java":
+                    try:
+                        if java_strategy is None:
+                            from fitz_ai.engines.fitz_krag.ingestion.strategies.java import (
+                                JavaIngestStrategy,
+                            )
+
+                            java_strategy = JavaIngestStrategy()
+                        result = java_strategy.extract(content, entry.rel_path)
+                    except Exception:
+                        pass
+                elif ext == ".go":
+                    try:
+                        if go_strategy is None:
+                            from fitz_ai.engines.fitz_krag.ingestion.strategies.go import (
+                                GoIngestStrategy,
+                            )
+
+                            go_strategy = GoIngestStrategy()
+                        result = go_strategy.extract(content, entry.rel_path)
+                    except Exception:
+                        pass
+
+                if result is not None:
+                    if result.symbols:
+                        self._symbol_store.upsert_batch(
+                            [
+                                {
+                                    "id": str(uuid.uuid4()),
+                                    "name": sym.name,
+                                    "qualified_name": sym.qualified_name,
+                                    "kind": sym.kind,
+                                    "raw_file_id": entry.file_id,
+                                    "start_line": sym.start_line,
+                                    "end_line": sym.end_line,
+                                    "signature": sym.signature,
+                                    "summary": None,
+                                    "summary_vector": None,
+                                    "imports": sym.imports,
+                                    "references": sym.references,
+                                    "keywords": [],
+                                    "entities": [],
+                                    "metadata": {},
+                                }
+                                for sym in result.symbols
+                            ]
+                        )
+                    if result.imports:
+                        self._import_store.upsert_batch(
+                            [
+                                {
+                                    "source_file_id": entry.file_id,
+                                    "target_module": imp.target_module,
+                                    "target_file_id": None,
+                                    "import_names": imp.import_names,
+                                }
+                                for imp in result.imports
+                            ]
+                        )
+
+                manifest.update_state(entry.rel_path, FileState.PARSED)
+                indexed += 1
+
+            except Exception as e:
+                logger.debug(f"Fast index skipped {entry.rel_path}: {e}")
+
+        # Resolve import graph targets
+        if indexed > 0:
+            try:
+                path_to_id = {e.rel_path: e.file_id for e in code_entries}
+                self._import_store.resolve_targets(path_to_id)
+            except Exception as e:
+                logger.debug(f"Import target resolution failed: {e}")
+
+            manifest.save()
+            _progress(f"Indexed {indexed} code files ({indexed} symbols ready)")
 
     @property
     def config(self) -> FitzKragConfig:

@@ -36,8 +36,8 @@ fitz_krag:
   # Retrieval
   # ===========================================================================
 
-  top_addresses: 10
-  top_read: 5
+  top_addresses: 50
+  top_read: 50
   keyword_weight: 0.4
   semantic_weight: 0.6
   fallback_to_chunks: true
@@ -48,7 +48,7 @@ fitz_krag:
   # Context Assembly
   # ===========================================================================
 
-  max_context_tokens: 8000
+  max_context_tokens: 48000
   include_file_header: true
 
   # ===========================================================================

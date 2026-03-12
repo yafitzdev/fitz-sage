@@ -85,6 +85,21 @@ class ImportGraphStore:
             for row in rows
         ]
 
+    def get_reverse_counts(self) -> dict[str, int]:
+        """Get the number of files that import each file.
+
+        Returns ``{file_id: count}`` — useful for ranking files by connectivity.
+        """
+        sql = f"""
+            SELECT "target_file_id", COUNT(*)
+            FROM {TABLE}
+            WHERE "target_file_id" IS NOT NULL
+            GROUP BY "target_file_id"
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql).fetchall()
+        return {row[0]: int(row[1]) for row in rows}
+
     def delete_by_file(self, file_id: str) -> None:
         """Delete all import edges for a file (as source)."""
         sql = f'DELETE FROM {TABLE} WHERE "source_file_id" = %s'

@@ -54,16 +54,23 @@ class ContentReader:
     def _read_address(self, addr: Address) -> ReadResult | None:
         """Read content for a single address."""
         if addr.kind == AddressKind.SYMBOL:
-            return self._read_symbol(addr)
+            result = self._read_symbol(addr)
         elif addr.kind == AddressKind.FILE:
-            return self._read_file(addr)
+            result = self._read_file(addr)
         elif addr.kind == AddressKind.CHUNK:
-            return self._read_chunk(addr)
+            result = self._read_chunk(addr)
         elif addr.kind == AddressKind.SECTION:
-            return self._read_section(addr)
+            result = self._read_section(addr)
         elif addr.kind == AddressKind.TABLE:
-            return self._read_table(addr)
-        return None
+            result = self._read_table(addr)
+        else:
+            return None
+
+        # Propagate address score so guardrails feature extractor can see it
+        if result and addr.score and "score" not in result.metadata:
+            result.metadata["score"] = addr.score
+
+        return result
 
     def _read_symbol(self, addr: Address) -> ReadResult | None:
         """Read symbol content from raw file by line range."""
