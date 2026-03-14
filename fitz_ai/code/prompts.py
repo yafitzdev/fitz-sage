@@ -1,12 +1,19 @@
 # fitz_ai/code/prompts.py
 """LLM prompt templates for standalone code retrieval."""
 
+HUB_FILES_HINT = (
+    "--- ARCHITECTURAL HUBS (files importing many subsystems "
+    "— high likelihood of relevance for integration tasks) ---\n"
+    "{hub_files}\n\n"
+)
+
 EXPAND_AND_SELECT_PROMPT = (
     "You are selecting files from a codebase to answer a question.\n\n"
     "Question: {query}\n\n"
     "Below is the structural index of every file. Each entry shows "
     "file path, classes, functions, and imports.\n\n"
     "{structural_index}\n\n"
+    "{hub_files_hint}"
     "First, generate 3-5 search terms, synonyms, and related concepts for the "
     "question. Then, using those terms, select 5-15 relevant files.\n\n"
     "Include files that:\n"

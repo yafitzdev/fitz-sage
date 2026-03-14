@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fitz_ai.code.indexer import build_file_list, build_import_graph, build_structural_index
-from fitz_ai.code.prompts import EXPAND_AND_SELECT_PROMPT, NEIGHBOR_SCREEN_PROMPT
+from fitz_ai.code.prompts import EXPAND_AND_SELECT_PROMPT, HUB_FILES_HINT, NEIGHBOR_SCREEN_PROMPT
 from fitz_ai.engines.fitz_krag.context.compressor import compress_python
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
 
@@ -49,6 +49,7 @@ class CodeRetriever:
         neighbor_screen_threshold: Max new sibling files before LLM screening.
         max_file_bytes: Max bytes to read per file for indexing.
         max_files: Max files to index.
+        hub_import_threshold: Min forward imports to qualify as a hub file.
     """
 
     def __init__(
@@ -61,6 +62,7 @@ class CodeRetriever:
         neighbor_screen_threshold: int = 10,
         max_file_bytes: int = 50_000,
         max_files: int = 2000,
+        hub_import_threshold: int = 5,
     ) -> None:
         self._source_dir = Path(source_dir).resolve()
         self._chat_factory = chat_factory
@@ -69,11 +71,13 @@ class CodeRetriever:
         self._neighbor_screen_threshold = neighbor_screen_threshold
         self._max_file_bytes = max_file_bytes
         self._max_files = max_files
+        self._hub_import_threshold = hub_import_threshold
 
         # Lazy-built caches
         self._file_paths: list[str] | None = None
         self._structural_index: str | None = None
         self._import_graph: dict[str, set[str]] | None = None
+        self._hub_files: list[tuple[str, int]] | None = None
 
     def retrieve(self, query: str, limit: int = 30) -> list[ReadResult]:
         """Full pipeline: index -> LLM select -> expand -> read -> compress.
@@ -111,17 +115,56 @@ class CodeRetriever:
         import_expanded = self._expand_imports(selected, import_graph)
         logger.debug(f"Import expansion added {len(import_expanded)} files")
 
+        # Facade expansion: __init__.py re-exports point to the actual
+        # definitions. These are public API files and get priority over
+        # regular depth-1 imports.
+        facade_added: list[str] = []
+        seen_d1 = set(selected) | set(import_expanded)
+        for path in import_expanded:
+            if path.endswith("__init__.py"):
+                for dep in import_graph.get(path, set()):
+                    if dep not in seen_d1:
+                        facade_added.append(dep)
+                        seen_d1.add(dep)
+        if facade_added:
+            logger.info(
+                f"Facade expansion through __init__.py added {len(facade_added)} files"
+            )
+
+        # Hub file auto-inclusion — architectural hubs are always included
+        seen_so_far = seen_d1
+        hub_added: list[str] = []
+        for path, _count in (self._hub_files or []):
+            if path not in seen_so_far and path in file_set:
+                hub_added.append(path)
+                seen_so_far.add(path)
+        if hub_added:
+            logger.info(f"Hub auto-inclusion added {len(hub_added)} files")
+
         # Neighbor expansion (same-directory siblings)
-        all_so_far = list(dict.fromkeys(selected + import_expanded))
+        all_so_far = list(dict.fromkeys(
+            selected + import_expanded + facade_added + hub_added
+        ))
         neighbors = self._neighbor_expand(
             all_so_far, file_paths, import_graph, query
         )
         logger.debug(f"Neighbor expansion added {len(neighbors)} files")
 
-        # Final file list with origin tracking
+        # Final file list — priority order:
+        #   1. selected (LLM scan hits)
+        #   2. hub (architectural orchestrators)
+        #   3. facade (re-exported public API definitions)
+        #   4. import (direct dependencies)
+        #   5. neighbor (directory siblings)
         origin: dict[str, str] = {}
         for p in selected:
             origin[p] = "selected"
+        for p in hub_added:
+            if p not in origin:
+                origin[p] = "hub"
+        for p in facade_added:
+            if p not in origin:
+                origin[p] = "facade"
         for p in import_expanded:
             if p not in origin:
                 origin[p] = "import"
@@ -129,10 +172,13 @@ class CodeRetriever:
             if p not in origin:
                 origin[p] = "neighbor"
 
-        all_files = list(dict.fromkeys(selected + import_expanded + neighbors))[:limit]
+        all_files = list(dict.fromkeys(
+            selected + hub_added + facade_added + import_expanded + neighbors
+        ))[:limit]
         logger.info(
             f"Reading {len(all_files)} files "
-            f"({len(selected)} selected, {len(import_expanded)} import, "
+            f"({len(selected)} selected, {len(hub_added)} hub, "
+            f"{len(facade_added)} facade, {len(import_expanded)} import, "
             f"{len(neighbors)} neighbor)"
         )
 
@@ -146,6 +192,15 @@ class CodeRetriever:
     def get_file_paths(self) -> list[str]:
         """Return the indexed file paths (triggers lazy build if needed)."""
         return self._get_file_paths()
+
+    def get_hub_files(self) -> list[tuple[str, int]]:
+        """Return hub files (triggers lazy build if needed).
+
+        Returns:
+            List of (path, import_count) sorted by import count descending.
+        """
+        self._get_structural_index()  # ensures _hub_files is populated
+        return self._hub_files or []
 
     # ------------------------------------------------------------------
     # Lazy initialization
@@ -173,6 +228,20 @@ class CodeRetriever:
                 max_chars=self._max_manifest_chars,
                 connection_counts=conn_counts,
             )
+            # Compute hub files: files importing many other intra-project files
+            hubs = [
+                (path, len(targets))
+                for path, targets in import_graph.items()
+                if len(targets) > self._hub_import_threshold
+            ]
+            hubs.sort(key=lambda x: x[1], reverse=True)
+            self._hub_files = hubs[:10]
+            if self._hub_files:
+                logger.info(
+                    f"Found {len(hubs)} hub files "
+                    f"(>{self._hub_import_threshold} imports), "
+                    f"keeping top {len(self._hub_files)}"
+                )
         return self._structural_index
 
     def _get_import_graph(self) -> dict[str, set[str]]:
@@ -191,8 +260,17 @@ class CodeRetriever:
         self, index: str, query: str
     ) -> tuple[list[str], list[str]]:
         """Combined query expansion + file selection in one LLM call."""
+        hub_files = self._hub_files or []
+        if hub_files:
+            hub_lines = "\n".join(
+                f"  - {path} (imports {count} subsystems)"
+                for path, count in hub_files
+            )
+            hub_hint = HUB_FILES_HINT.format(hub_files=hub_lines)
+        else:
+            hub_hint = ""
         prompt = EXPAND_AND_SELECT_PROMPT.format(
-            query=query, structural_index=index
+            query=query, structural_index=index, hub_files_hint=hub_hint
         )
         chat = self._chat_factory(self._llm_tier)
         response = chat.chat([{"role": "user", "content": prompt}])
@@ -334,7 +412,7 @@ class CodeRetriever:
         self, file_paths: list[str], origin: dict[str, str]
     ) -> list[ReadResult]:
         """Read files from disk, compress Python, return ReadResults."""
-        _ORIGIN_SCORES = {"selected": 1.0, "import": 0.9, "neighbor": 0.8}
+        _ORIGIN_SCORES = {"selected": 1.0, "hub": 0.95, "facade": 0.92, "import": 0.9, "neighbor": 0.8}
         results: list[ReadResult] = []
 
         for path in file_paths:

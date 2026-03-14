@@ -134,7 +134,7 @@ def build_import_graph(
         except OSError:
             continue
 
-        full_imports = _extract_full_imports(content)
+        full_imports = _extract_full_imports(content, rel_path)
         resolved = set()
         for imp in full_imports:
             target = module_lookup.get(imp)
@@ -382,19 +382,37 @@ def _extract_generic_code(content: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _extract_full_imports(content: str) -> set[str]:
+def _extract_full_imports(content: str, file_path: str = "") -> set[str]:
     try:
         tree = ast.parse(content)
     except SyntaxError:
         return _extract_full_imports_regex(content)
+
+    # Derive package for resolving relative imports
+    _pkg_parts: list[str] = []
+    if file_path:
+        parts = file_path.replace("\\", "/").split("/")
+        if parts[-1] == "__init__.py":
+            _pkg_parts = parts[:-1]
+        else:
+            _pkg_parts = parts[:-1]
 
     imports: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 imports.add(alias.name)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imports.add(node.module)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module and node.level == 0:
+                imports.add(node.module)
+            elif node.level > 0 and _pkg_parts:
+                # Relative import: from .X import Y or from ..X import Y
+                base = _pkg_parts[: len(_pkg_parts) - (node.level - 1)]
+                if base:
+                    resolved = ".".join(base)
+                    if node.module:
+                        resolved += "." + node.module
+                    imports.add(resolved)
     return imports
 
 
