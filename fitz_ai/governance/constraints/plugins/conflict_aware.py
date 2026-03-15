@@ -503,11 +503,18 @@ class ConflictAwareConstraint:
                     f"{PIPELINE} ConflictAwareConstraint ({method_name}): contradiction detected "
                     f"between chunks (chars: {first_char} vs {other_char})"
                 )
+                # Store conflicting excerpts for actionable DISPUTED messages
+                source_a = getattr(first_chunk, "file_path", None) or "Source A"
+                source_b = getattr(other_chunk, "file_path", None) or "Source B"
                 return ConstraintResult.deny(
                     reason="Retrieved chunks contain contradictory information",
                     signal="disputed",
                     method=method_name,
                     ca_evidence_characters=f"{first_char}_vs_{other_char}",
+                    ca_conflict_source_a=source_a,
+                    ca_conflict_source_b=source_b,
+                    ca_conflict_excerpt_a=first_chunk.content[:300],
+                    ca_conflict_excerpt_b=other_chunk.content[:300],
                     **ca_diag,
                 )
 

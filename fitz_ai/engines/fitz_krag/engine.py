@@ -804,13 +804,17 @@ class FitzKragEngine:
             _progress("Generating answer...")
             t0 = time.perf_counter()
             gap_context = None
+            conflict_context = None
             if answer_mode == AnswerMode.ABSTAIN:
                 governance_reasons = governance.reasons if governance else ()
                 gap_context = self._build_gap_context(sanitized, governance_reasons)
+            elif answer_mode == AnswerMode.DISPUTED and constraint_results:
+                conflict_context = self._build_conflict_context(constraint_results)
             answer = self._synthesizer.generate(
                 sanitized, context, expanded,
                 answer_mode=answer_mode,
                 gap_context=gap_context,
+                conflict_context=conflict_context,
             )
             timings.append(("Generation", time.perf_counter() - t0))
 
@@ -844,6 +848,33 @@ class FitzKragEngine:
                 self._bg_worker.signal_query_end()
             # Clear query context
             clear_query_context()
+
+    def _build_conflict_context(
+        self,
+        constraint_results: list,
+    ) -> dict | None:
+        """
+        Extract conflict details from ConflictAware constraint results.
+
+        Returns dict with source names and excerpts of the conflicting
+        chunks so the synthesizer can tell the LLM WHAT specifically disagrees.
+        """
+        for result in constraint_results:
+            if result.signal != "disputed":
+                continue
+            meta = result.metadata
+            excerpt_a = meta.get("ca_conflict_excerpt_a")
+            excerpt_b = meta.get("ca_conflict_excerpt_b")
+            if not excerpt_a or not excerpt_b:
+                continue
+            return {
+                "source_a": meta.get("ca_conflict_source_a", "Source A"),
+                "source_b": meta.get("ca_conflict_source_b", "Source B"),
+                "excerpt_a": excerpt_a,
+                "excerpt_b": excerpt_b,
+                "reason": result.reason or "Sources contain conflicting information",
+            }
+        return None
 
     def _build_gap_context(
         self,

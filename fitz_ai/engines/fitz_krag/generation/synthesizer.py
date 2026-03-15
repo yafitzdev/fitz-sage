@@ -57,6 +57,7 @@ class CodeSynthesizer:
         results: list[ReadResult],
         answer_mode: AnswerMode = AnswerMode.TRUSTWORTHY,
         gap_context: dict | None = None,
+        conflict_context: dict | None = None,
     ) -> Answer:
         """
         Generate an answer grounded in the provided code context.
@@ -67,6 +68,7 @@ class CodeSynthesizer:
             results: ReadResults used to build provenance
             answer_mode: Epistemic posture controlling answer framing
             gap_context: Gap analysis for actionable ABSTAIN messages
+            conflict_context: Conflict details for actionable DISPUTED messages
 
         Returns:
             Answer with text, provenance, and metadata
@@ -91,8 +93,10 @@ class CodeSynthesizer:
             SYSTEM_PROMPT_GROUNDED if self._config.strict_grounding else SYSTEM_PROMPT_OPEN
         )
 
-        # Prepend mode instruction
+        # Prepend mode instruction, enriched with conflict details for DISPUTED
         mode_instruction = get_mode_instruction(answer_mode)
+        if answer_mode == AnswerMode.DISPUTED and conflict_context:
+            mode_instruction = self._build_disputed_instruction(conflict_context)
         system_prompt = f"{mode_instruction}\n\n{system_prompt}"
 
         user_prompt = f"Context:\n{context}\n\nQuestion: {query}"
@@ -110,16 +114,40 @@ class CodeSynthesizer:
 
         provenance = self._build_provenance(results)
 
+        metadata = {
+            "engine": "fitz_krag",
+            "query": query,
+            "sources_count": len(results),
+            "answer_mode": answer_mode.value,
+        }
+        if conflict_context:
+            metadata["conflict_context"] = conflict_context
+
         return Answer(
             text=raw_answer,
             provenance=provenance,
             mode=answer_mode,
-            metadata={
-                "engine": "fitz_krag",
-                "query": query,
-                "sources_count": len(results),
-                "answer_mode": answer_mode.value,
-            },
+            metadata=metadata,
+        )
+
+    def _build_disputed_instruction(self, conflict_context: dict) -> str:
+        """
+        Build an enriched DISPUTED mode instruction that tells the LLM
+        exactly WHAT conflicts so it can address the disagreement specifically.
+        """
+        source_a = conflict_context.get("source_a", "Source A")
+        source_b = conflict_context.get("source_b", "Source B")
+        excerpt_a = conflict_context.get("excerpt_a", "")[:200]
+        excerpt_b = conflict_context.get("excerpt_b", "")[:200]
+
+        return (
+            "Sources disagree on this topic. Present BOTH perspectives clearly "
+            "and do not assert one view as correct.\n\n"
+            f"Specifically, there is a conflict between:\n"
+            f"- {source_a}: \"{excerpt_a}...\"\n"
+            f"- {source_b}: \"{excerpt_b}...\"\n\n"
+            "Explain what each source says, where they disagree, "
+            "and note that the user should verify which is current/authoritative."
         )
 
     def _build_abstain_message(self, query: str, gap_context: dict | None) -> str:

@@ -285,6 +285,7 @@ class TestAnswer:
             expanded,
             answer_mode=AnswerMode.TRUSTWORTHY,
             gap_context=None,
+            conflict_context=None,
         )
 
         assert result is expected_answer
