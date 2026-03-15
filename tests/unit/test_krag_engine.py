@@ -20,6 +20,7 @@ from fitz_ai.core import (
     Provenance,
     QueryError,
 )
+from fitz_ai.core.answer_mode import AnswerMode
 from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
 
@@ -283,6 +284,7 @@ class TestAnswer:
             context,
             expanded,
             answer_mode=AnswerMode.TRUSTWORTHY,
+            gap_context=None,
         )
 
         assert result is expected_answer
@@ -297,7 +299,7 @@ class TestAnswer:
                 engine.answer(q)
 
     def test_answer_no_addresses_returns_fallback(self):
-        """Router returning [] yields a no-results fallback Answer."""
+        """Router returning [] yields an actionable ABSTAIN answer."""
         engine = _make_engine()
         query = _make_query()
 
@@ -306,10 +308,12 @@ class TestAnswer:
 
         result = engine.answer(query)
 
-        assert "No information found" in result.text
         assert result.provenance == []
+        assert result.mode == AnswerMode.ABSTAIN
         assert result.metadata["engine"] == "fitz_krag"
         assert result.metadata["query"] == query.text
+        assert result.metadata["answer_mode"] == "abstain"
+        assert "gap_context" in result.metadata
 
         # Reader should never be called
         engine._reader.read.assert_not_called()

@@ -339,6 +339,56 @@ class EntityGraphStore:
                 result[row[0]].append(row[1])
             return result
 
+    def find_related_topics(
+        self,
+        terms: list[str],
+        limit: int = 5,
+    ) -> list[dict]:
+        """
+        Find corpus entities related to search terms.
+
+        Used for actionable ABSTAIN: shows the user what topics DO exist
+        in the knowledge base when their query doesn't match.
+
+        Performs prefix and substring matching against the entity index
+        to surface related topics the user might not have searched for.
+
+        Args:
+            terms: Search terms from the query (lowercased)
+            limit: Maximum number of related entities to return
+
+        Returns:
+            List of dicts with name, display_name, type, mention_count
+        """
+        if not terms:
+            return []
+
+        self._ensure_schema()
+
+        normalized = [self._normalize(t) for t in terms if self._normalize(t)]
+        if not normalized:
+            return []
+
+        # Build LIKE conditions for substring matching
+        like_conditions = " OR ".join(["name LIKE %s"] * len(normalized))
+        like_params = [f"%{t}%" for t in normalized]
+
+        with self._manager.connection(self.collection) as conn:
+            cursor = conn.execute(
+                f"""
+                SELECT display_name, entity_type, mention_count
+                FROM entities
+                WHERE {like_conditions}
+                ORDER BY mention_count DESC
+                LIMIT %s
+                """,
+                (*like_params, limit),
+            )
+            return [
+                {"name": row[0], "type": row[1], "mentions": row[2]}
+                for row in cursor.fetchall()
+            ]
+
     # =========================================================================
     # Utilities
     # =========================================================================

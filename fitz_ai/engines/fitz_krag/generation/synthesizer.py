@@ -56,6 +56,7 @@ class CodeSynthesizer:
         context: str,
         results: list[ReadResult],
         answer_mode: AnswerMode = AnswerMode.TRUSTWORTHY,
+        gap_context: dict | None = None,
     ) -> Answer:
         """
         Generate an answer grounded in the provided code context.
@@ -65,15 +66,16 @@ class CodeSynthesizer:
             context: Assembled context string from ContextAssembler
             results: ReadResults used to build provenance
             answer_mode: Epistemic posture controlling answer framing
+            gap_context: Gap analysis for actionable ABSTAIN messages
 
         Returns:
             Answer with text, provenance, and metadata
         """
-        # ABSTAIN: skip LLM call entirely
+        # ABSTAIN: generate actionable diagnostic instead of generic refusal
         if answer_mode == AnswerMode.ABSTAIN:
             provenance = self._build_provenance(results)
             return Answer(
-                text="The available information does not allow a definitive answer.",
+                text=self._build_abstain_message(query, gap_context),
                 provenance=provenance,
                 mode=answer_mode,
                 metadata={
@@ -81,6 +83,7 @@ class CodeSynthesizer:
                     "query": query,
                     "sources_count": len(results),
                     "answer_mode": answer_mode.value,
+                    "gap_context": gap_context or {},
                 },
             )
 
@@ -118,6 +121,67 @@ class CodeSynthesizer:
                 "answer_mode": answer_mode.value,
             },
         )
+
+    def _build_abstain_message(self, query: str, gap_context: dict | None) -> str:
+        """
+        Build an actionable ABSTAIN message that explains WHY the system
+        can't answer and WHAT the user can do about it.
+
+        Instead of "I don't have enough information", tells the user:
+        1. What was searched for
+        2. What related topics exist in the corpus
+        3. What documents to add to fill the gap
+        """
+        if not gap_context:
+            return "The available information does not allow a definitive answer."
+
+        lines = ["I don't have enough information to answer this question."]
+
+        # Governance reasons (why constraints fired)
+        reasons = gap_context.get("governance_reasons", ())
+        if reasons:
+            lines.append("")
+            lines.append("Why:")
+            for reason in reasons[:3]:
+                lines.append(f"  - {reason}")
+
+        # Related topics that DO exist in the corpus
+        related = gap_context.get("related_topics", [])
+        if related:
+            lines.append("")
+            lines.append("Related topics in the knowledge base:")
+            for topic in related[:5]:
+                name = topic.get("name", "")
+                mentions = topic.get("mentions", 0)
+                topic_type = topic.get("type", "")
+                suffix = f" ({topic_type})" if topic_type else ""
+                lines.append(f"  - {name}{suffix} — {mentions} mentions")
+
+        # Top corpus entities (when no related topics found, show what IS available)
+        if not related:
+            top = gap_context.get("top_corpus_topics", [])
+            if top:
+                lines.append("")
+                lines.append("Topics available in the knowledge base:")
+                for topic in top[:5]:
+                    lines.append(f"  - {topic.get('name', '')} ({topic.get('mentions', 0)} mentions)")
+
+        # Suggestions for what to add
+        lines.append("")
+        lines.append("To answer this question, consider adding:")
+        corpus_size = gap_context.get("corpus_document_count", 0)
+        if corpus_size == 0:
+            lines.append("  - Documents or code files covering this topic")
+            lines.append("  - Use fitz_ai.point() to index a directory")
+        else:
+            lines.append(
+                f"  - Documents covering the specific topic of this question"
+            )
+            lines.append(
+                "  - More detailed documentation or examples on this subject"
+            )
+
+        return "\n".join(lines)
 
     def _build_provenance(self, results: list[ReadResult]) -> list[Provenance]:
         """Build provenance list from read results."""

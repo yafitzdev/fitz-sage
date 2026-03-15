@@ -682,10 +682,17 @@ class FitzKragEngine:
 
             if not addresses:
                 _report_timings(_progress, timings, pipeline_start)
+                gap_context = self._build_gap_context(sanitized)
                 return Answer(
-                    text="No information found. The available documents do not contain relevant content for this query.",
+                    text=self._synthesizer._build_abstain_message(sanitized, gap_context),
                     provenance=[],
-                    metadata={"engine": "fitz_krag", "query": query.text, "mode": "abstain"},
+                    mode=AnswerMode.ABSTAIN,
+                    metadata={
+                        "engine": "fitz_krag",
+                        "query": query.text,
+                        "answer_mode": "abstain",
+                        "gap_context": gap_context,
+                    },
                 )
 
             # 2.5. Rerank addresses (when reranker configured)
@@ -796,8 +803,14 @@ class FitzKragEngine:
             # 7. Generate answer with answer mode
             _progress("Generating answer...")
             t0 = time.perf_counter()
+            gap_context = None
+            if answer_mode == AnswerMode.ABSTAIN:
+                governance_reasons = governance.reasons if governance else ()
+                gap_context = self._build_gap_context(sanitized, governance_reasons)
             answer = self._synthesizer.generate(
-                sanitized, context, expanded, answer_mode=answer_mode
+                sanitized, context, expanded,
+                answer_mode=answer_mode,
+                gap_context=gap_context,
             )
             timings.append(("Generation", time.perf_counter() - t0))
 
@@ -831,6 +844,61 @@ class FitzKragEngine:
                 self._bg_worker.signal_query_end()
             # Clear query context
             clear_query_context()
+
+    def _build_gap_context(
+        self,
+        query: str,
+        governance_reasons: tuple[str, ...] = (),
+    ) -> dict:
+        """
+        Build gap analysis context for actionable ABSTAIN messages.
+
+        Assembles information about what the corpus DOES contain
+        so the ABSTAIN message can explain gaps and suggest additions.
+
+        Args:
+            query: The user's query text
+            governance_reasons: Reasons from governance constraints
+
+        Returns:
+            Dict with related_topics, top_corpus_topics, governance_reasons,
+            and corpus_document_count
+        """
+        gap: dict = {"governance_reasons": governance_reasons}
+
+        if not self._entity_graph_store:
+            return gap
+
+        try:
+            # Extract meaningful terms from query (skip stopwords, short terms)
+            _stop = {
+                "what", "how", "does", "the", "this", "that", "with", "from",
+                "have", "has", "are", "was", "were", "been", "being", "will",
+                "would", "could", "should", "about", "which", "where", "when",
+                "there", "their", "they", "them", "than", "then", "into",
+                "also", "just", "only", "very", "some", "more", "most", "each",
+                "other", "your", "our", "can", "not", "for", "and", "but",
+            }
+            terms = [
+                t for t in query.lower().split()
+                if len(t) > 2 and t not in _stop
+            ]
+
+            # Find related topics via entity graph substring match
+            if terms:
+                gap["related_topics"] = self._entity_graph_store.find_related_topics(
+                    terms, limit=5
+                )
+
+            # Always include top corpus topics for context
+            stats = self._entity_graph_store.stats()
+            gap["top_corpus_topics"] = stats.get("top_entities", [])[:5]
+            gap["corpus_document_count"] = stats.get("entities", 0)
+
+        except Exception as e:
+            logger.debug("Gap analysis failed", error=str(e))
+
+        return gap
 
     def _check_cloud_cache(self, query_text: str, addresses: list) -> Answer | None:
         """Check cloud cache for a previously cached answer."""

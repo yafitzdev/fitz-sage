@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### 🚀 Added
+
+- **Actionable ABSTAIN** — When the system abstains, the answer now explains WHY (governance constraint reasons), shows related topics that DO exist in the knowledge base (via entity graph), and suggests what documents to add. Replaces the generic "The available information does not allow a definitive answer" with a diagnostic message.
+- `EntityGraphStore.find_related_topics()` — substring search against entity index for gap analysis
+- `CodeSynthesizer._build_abstain_message()` — builds structured diagnostic from gap context
+- `FitzKragEngine._build_gap_context()` — assembles gap analysis from entity graph and governance metadata
+- Gap context stored in `Answer.metadata["gap_context"]` for programmatic access
+
+### 🔄 Changed
+
+- Both ABSTAIN paths (no addresses found + governance ABSTAIN) now produce actionable messages
+- `CodeSynthesizer.generate()` accepts optional `gap_context` parameter
+- Early "no addresses" ABSTAIN now sets `Answer.mode = AnswerMode.ABSTAIN` (was string in metadata)
+
+---
+
 ## [0.10.2] - 2026-03-12
 
 ### 🎉 Highlights
