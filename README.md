@@ -2,7 +2,7 @@
 
 <div align="center">
 
-# fitz-ai
+![fitz-ai quickstart demo](/docs/assets/logo.png)
 
 ### Intelligent, honest knowledge retrieval in 5 minutes. No infrastructure. No boilerplate.
 
@@ -71,8 +71,8 @@ fitz serve  # http://localhost:8000/docs for interactive API
 
   Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)).
 
-  - ~50k lines of Python
-  - 1500+ tests, 99% coverage
+  - ~55k lines of Python
+  - 2000+ tests, 99% coverage
   - Zero LangChain/LlamaIndex dependencies — built from scratch
 
 ![fitz-ai honest_rag](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/honest_rag.jpg)
@@ -441,11 +441,11 @@ Fitz is a foundation. It handles document indexing and grounded retrieval—you 
 │  │  FitzKRAG  │  │  Custom... │  (extensible registry)        │
 │  └────────────┘  └────────────┘                               │
 ├───────────────────────────────────────────────────────────────┤
-│  LLM Plugins (YAML-defined)                                   │
+│  LLM Providers (Python-based)                                  │
 │  ┌────────┐ ┌───────────┐ ┌────────┐                          │
 │  │  Chat  │ │ Embedding │ │ Rerank │                          │
 │  └────────┘ └───────────┘ └────────┘                          │
-│  openai, cohere, anthropic, ollama, azure...                  │
+│  openai, cohere, anthropic, ollama, lmstudio, azure...        │
 ├───────────────────────────────────────────────────────────────┤
 │  Storage (PostgreSQL + pgvector)                              │
 │  vectors | metadata | tables | keywords | full-text search    │
@@ -608,11 +608,13 @@ MIT
 - [Enrichment (Hierarchies, Entities)](docs/ENRICHMENT.md)
 - [Epistemic Constraints](docs/CONSTRAINTS.md)
 - [Governance Benchmarking (fitz-gov)](docs/features/governance/governance-benchmarking.md)
+- [BEIR Benchmark Results](docs/evaluation/beir-results.md)
 - [Plugin Development](docs/PLUGINS.md)
 - [Feature Control](docs/FEATURE_CONTROL.md)
 - [KRAG — Knowledge Routing Augmented Generation](docs/features/platform/krag.md)
 - [Code Symbol Extraction](docs/features/ingestion/code-symbol-extraction.md)
 - [Tabular Data Routing](docs/features/ingestion/tabular-data-routing.md)
+- [Standalone Code Retrieval](docs/features/code/standalone-code-retrieval.md)
 - [Enterprise Gateway](docs/features/platform/enterprise-gateway.md)
 - [Engines](docs/ENGINES.md)
 - [Configuration Examples](docs/CONFIG_EXAMPLES.md)
