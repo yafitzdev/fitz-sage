@@ -8,7 +8,7 @@ Examples:
     >>> from fitz_ai import fitz
     >>> f = fitz()
     >>> f.point("./docs")
-    >>> answer = f.ask("What is quantum computing?")
+    >>> answer = f.query("What is quantum computing?")
     >>> print(answer.text)
 """
 

@@ -11,7 +11,7 @@ This is a thin wrapper around FitzService that adds:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 from fitz_ai.core import Answer, ConfigurationError
 from fitz_ai.logging.logger import get_logger
@@ -29,7 +29,7 @@ class fitz:
 
     Provides a simple two-step workflow:
     1. Point at docs: fitz.point("./docs")
-    2. Ask questions: answer = fitz.ask("question?")
+    2. Query: answer = fitz.query("question?")
 
     Queries work immediately via agentic LLM-driven search.
     Background indexing runs silently — queries get progressively faster.
@@ -38,13 +38,13 @@ class fitz:
         Simple usage:
         >>> f = fitz()
         >>> f.point("./docs")
-        >>> answer = f.ask("What is the refund policy?")
+        >>> answer = f.query("What is the refund policy?")
         >>> print(answer.text)
 
         With collection name:
         >>> f = fitz(collection="physics")
         >>> f.point("./physics_papers")
-        >>> answer = f.ask("Explain entanglement")
+        >>> answer = f.query("Explain entanglement")
 
         With custom config:
         >>> f = fitz(config_path="my_config.yaml")
@@ -105,14 +105,14 @@ class fitz:
         self._ensure_config()
         self._service.point(source=source, collection=self._collection)
 
-    def ask(
+    def query(
         self,
         question: str,
         top_k: Optional[int] = None,
         conversation_context: Optional["ConversationContext"] = None,
     ) -> Answer:
         """
-        Ask a question about the ingested documents.
+        Query the knowledge base about the ingested documents.
 
         Args:
             question: The question to ask.
@@ -127,25 +127,14 @@ class fitz:
             ConfigurationError: If not configured.
             QueryError: If query fails or question is empty.
         """
-        # Ensure config exists
         self._ensure_config()
 
-        # Delegate to service
         return self._service.query(
             question=question,
             collection=self._collection,
             top_k=top_k,
             conversation_context=conversation_context,
         )
-
-    def query(
-        self,
-        question: str,
-        conversation_context: Optional["ConversationContext"] = None,
-        **kwargs: Any,
-    ) -> Answer:
-        """Alias for ask(). Provided for API consistency."""
-        return self.ask(question, conversation_context=conversation_context, **kwargs)
 
     def _ensure_config(self) -> None:
         """Ensure configuration file exists, creating if needed."""

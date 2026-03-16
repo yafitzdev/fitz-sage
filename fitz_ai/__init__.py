@@ -58,7 +58,7 @@ Examples:
     >>> answer = engine.answer(query)
 """
 
-__version__ = "0.10.1"
+__version__ = "0.10.2"
 
 # =============================================================================
 # LAZY IMPORTS
@@ -170,7 +170,7 @@ def query(question: str, top_k: int = None):
         >>> print(answer.text)
     """
     f = _get_default_fitz()
-    return f.ask(question, top_k=top_k)
+    return f.query(question, top_k=top_k)
 
 
 # =============================================================================

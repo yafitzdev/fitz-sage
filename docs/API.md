@@ -86,7 +86,7 @@ Query the knowledge base with a single question.
 {
   "text": "The refund policy allows returns within 30 days...",
   "mode": "TRUSTWORTHY",
-  "provenance": [
+  "sources": [
     {
       "source_id": "policies/refund.md",
       "excerpt": "Returns are accepted within 30 days of purchase...",
@@ -103,7 +103,7 @@ Query the knowledge base with a single question.
 |-------|------|-------------|
 | `text` | string | The answer text |
 | `mode` | string | `TRUSTWORTHY`, `DISPUTED`, or `ABSTAIN` |
-| `provenance` | array | Source attribution for the answer |
+| `sources` | array | Source attribution for the answer |
 
 ### Example
 
@@ -156,7 +156,7 @@ Same as `/query`:
 {
   "text": "For returns, you need to...",
   "mode": "TRUSTWORTHY",
-  "provenance": [...]
+  "sources": [...]
 }
 ```
 

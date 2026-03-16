@@ -141,8 +141,8 @@ legal = fitz(collection="legal")
 legal.point("./contracts")
 legal_answer = legal.query("What are the payment terms?")
 
-# ask() is an alias for query()
-answer = legal.ask("What are the payment terms?")
+# With different collection
+answer = legal.query("What are the payment terms?")
 
 # Custom config
 f = fitz(config_path="./my_config.yaml")

@@ -107,8 +107,8 @@ class TestFitzConfigCreation:
             f._ensure_config()
 
 
-class TestFitzAsk:
-    """Tests for fitz.ask() method."""
+class TestFitzQuery:
+    """Tests for fitz.query() method."""
 
     def test_raises_on_empty_question(self, tmp_path):
         """Test that QueryError is raised for empty question."""
@@ -120,7 +120,7 @@ class TestFitzAsk:
         f._create_default_config(config_path)
 
         with pytest.raises(QueryError, match="cannot be empty"):
-            f.ask("")
+            f.query("")
 
     def test_raises_on_whitespace_question(self, tmp_path):
         """Test that QueryError is raised for whitespace-only question."""
@@ -132,24 +132,7 @@ class TestFitzAsk:
         f._create_default_config(config_path)
 
         with pytest.raises(QueryError, match="cannot be empty"):
-            f.ask("   ")
-
-
-class TestFitzQuery:
-    """Tests for fitz.query() alias."""
-
-    def test_query_is_alias_for_ask(self, tmp_path):
-        """Test that query() is an alias for ask()."""
-        from fitz_ai.sdk import fitz
-        from fitz_ai.services.fitz_service import QueryError
-
-        config_path = tmp_path / "config.yaml"
-        f = fitz(config_path=config_path)
-        f._create_default_config(config_path)
-
-        # Both should raise the same error
-        with pytest.raises(QueryError, match="cannot be empty"):
-            f.query("")
+            f.query("   ")
 
 
 class TestFitzExports:

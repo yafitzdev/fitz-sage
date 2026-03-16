@@ -29,7 +29,7 @@ from fitz_ai.sdk import Fitz
 
 fitz = Fitz()
 fitz.point("./docs")                          # instant
-answer = fitz.ask("how does X work?")         # works immediately
+answer = fitz.query("how does X work?")         # works immediately
 ```
 
 ### API

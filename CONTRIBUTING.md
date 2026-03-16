@@ -47,7 +47,7 @@ python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install in development mode with all extras
-pip install -e ".[dev,local,ingest]"
+pip install -e ".[dev]"
 
 # Verify setup
 pytest

@@ -109,12 +109,9 @@ chunking:
     .md:
       plugin_name: markdown
 
-# Enrichment (always on when chat client available)
-enrichment:
-  enabled: true                  # Master switch
-  hierarchy:
-    grouping_strategy: metadata  # metadata, semantic
-    group_by: source_file
+# Enrichment (keyword/entity extraction during ingestion)
+enable_enrichment: true          # Enable keyword, entity, summary extraction
+enable_hierarchy: true           # Enable L1/L2 hierarchical summaries
 
 # =============================================================================
 # Query Settings
