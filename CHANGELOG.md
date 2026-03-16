@@ -7,24 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
-
-### 🚀 Added
-
-- **Actionable ABSTAIN** — When the system abstains, the answer now explains WHY (governance constraint reasons), shows related topics that DO exist in the knowledge base (via entity graph), and suggests what documents to add. Replaces the generic "The available information does not allow a definitive answer" with a diagnostic message.
-- `EntityGraphStore.find_related_topics()` — substring search against entity index for gap analysis
-- `CodeSynthesizer._build_abstain_message()` — builds structured diagnostic from gap context
-- `FitzKragEngine._build_gap_context()` — assembles gap analysis from entity graph and governance metadata
-- Gap context stored in `Answer.metadata["gap_context"]` for programmatic access
-
-### 🔄 Changed
-
-- Both ABSTAIN paths (no addresses found + governance ABSTAIN) now produce actionable messages
-- `CodeSynthesizer.generate()` accepts optional `gap_context` parameter
-- Early "no addresses" ABSTAIN now sets `Answer.mode = AnswerMode.ABSTAIN` (was string in metadata)
-
----
-
 ## [0.10.2] - 2026-03-12
 
 ### 🎉 Highlights
@@ -34,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **LlmCodeSearchStrategy Overhaul** — Rewrote the DB-backed code search strategy: FILE-level addresses instead of per-symbol, combined query expansion + file selection in one LLM call (better targeting), import graph expansion, neighbor directory expansion, and flat origin-based scoring (1.0/0.9/0.8). The combined prompt produces more targeted file selections by letting the LLM reason about expansion terms and files holistically.
 
 **LM Studio Provider** — New `lmstudio` chat provider with multi-tier model support. Configure different models for fast/balanced/smart tiers via YAML.
+
+**Actionable Governance Modes** — ABSTAIN and DISPUTED answers are now informative and solution-oriented instead of generic refusals. ABSTAIN explains what was searched, shows related topics that DO exist, and suggests documents to add. DISPUTED tells the LLM exactly which sources conflict so it can explain both perspectives specifically.
 
 ### 🚀 Added
 
@@ -45,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `[code]` extras group in pyproject.toml for dependency documentation (`f4ec70b`)
 - LM Studio chat provider with tier-based model selection (`d3ff5ce`)
 - 20 unit tests for code retrieval (indexer, retriever, import graph, no-heavy-imports) (`f4ec70b`)
+- **Actionable ABSTAIN** — ABSTAIN answers now explain why (governance reasons), show related corpus topics (via entity graph), and suggest what documents to add (`2196861`)
+- **Actionable DISPUTED** — DISPUTED mode injects specific conflicting excerpts and source names into the LLM prompt so it explains both perspectives (`0ae9dc5`)
+- `EntityGraphStore.find_related_topics()` for corpus gap analysis (`2196861`)
+- `FitzKragEngine._build_gap_context()` and `_build_conflict_context()` for governance intelligence surfacing (`2196861`, `0ae9dc5`)
+- Corpus Intelligence and KRAG Agent roadmap documents (`2196861`)
 
 ### 🔄 Changed
 
@@ -52,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All YAML plugin references updated to Python provider terminology (`8fb0758`)
 - Configuration schemas unified with base classes (`b655466`)
 - Structured logging with context tracking throughout codebase (`6418339`)
+- `CodeSynthesizer.generate()` accepts `gap_context` and `conflict_context` for actionable governance messages (`2196861`, `0ae9dc5`)
+- Early "no addresses" ABSTAIN now sets `Answer.mode = AnswerMode.ABSTAIN` properly (`2196861`)
+- `ConflictAwareConstraint` stores conflicting chunk excerpts in constraint metadata (`0ae9dc5`)
 
 ### ⚡ Performance
 
