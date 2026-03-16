@@ -139,6 +139,31 @@ class CodeRetriever:
                 hub_added.append(path)
                 seen_so_far.add(path)
         if hub_added:
+            # Expand hub imports — hubs orchestrate subsystems, their
+            # imports are the components being wired together
+            hub_imports: list[str] = []
+            for path in hub_added:
+                for dep in import_graph.get(path, set()):
+                    if dep not in seen_so_far:
+                        hub_imports.append(dep)
+                        seen_so_far.add(dep)
+            # Facade-expand any __init__.py from hub imports
+            hub_facades: list[str] = []
+            for path in hub_imports:
+                if path.endswith("__init__.py"):
+                    for dep in import_graph.get(path, set()):
+                        if dep not in seen_so_far:
+                            hub_facades.append(dep)
+                            seen_so_far.add(dep)
+            if hub_facades:
+                hub_imports.extend(hub_facades)
+
+            hub_added.extend(hub_imports)
+            logger.info(
+                f"Hub auto-inclusion added {len(hub_added)} files "
+                f"({len(hub_imports)} via hub import+facade expansion)"
+            )
+        else:
             logger.info(f"Hub auto-inclusion added {len(hub_added)} files")
 
         # Neighbor expansion (same-directory siblings)
@@ -175,6 +200,40 @@ class CodeRetriever:
         all_files = list(dict.fromkeys(
             selected + hub_added + facade_added + import_expanded + neighbors
         ))[:limit]
+
+        # Post-limit facade swap: replace __init__.py files with their
+        # actual implementations if the init just re-exports.  An init
+        # that only re-exports wastes a slot — the implementation files
+        # are more valuable for the LLM to see.
+        final_set = set(all_files)
+        swaps: list[tuple[str, list[str]]] = []
+        for path in all_files:
+            if not path.endswith("__init__.py"):
+                continue
+            deps = import_graph.get(path, set())
+            new_deps = [d for d in deps if d not in final_set]
+            if new_deps:
+                swaps.append((path, new_deps))
+
+        for init_path, new_deps in swaps:
+            # Remove the __init__.py, add its re-exports
+            idx = all_files.index(init_path)
+            all_files.pop(idx)
+            for dep in new_deps[:3]:  # max 3 swaps per init to avoid bloat
+                if dep not in final_set:
+                    all_files.append(dep)
+                    final_set.add(dep)
+                    origin[dep] = "facade"
+            # Trim back to limit
+            all_files = all_files[:limit]
+            final_set = set(all_files)
+
+        if swaps:
+            logger.info(
+                f"Facade swap: replaced {len(swaps)} __init__.py files "
+                f"with their implementations"
+            )
+
         logger.info(
             f"Reading {len(all_files)} files "
             f"({len(selected)} selected, {len(hub_added)} hub, "
