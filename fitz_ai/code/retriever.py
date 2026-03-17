@@ -134,12 +134,30 @@ class CodeRetriever:
                 f"Facade expansion through __init__.py added {len(facade_added)} files"
             )
 
+        # Build query term set and file section index for ranking
+        # (used by both hub import ranking and foundation ranking)
+        all_terms = set(t.lower() for t in search_terms)
+        for word in query.lower().split():
+            if len(word) > 2:
+                all_terms.add(word)
+        file_sections: dict[str, str] = {}
+        if index_text:
+            current_file = ""
+            for line in index_text.splitlines():
+                if line.startswith("## "):
+                    current_file = line[3:].strip()
+                    file_sections[current_file] = ""
+                elif current_file:
+                    file_sections[current_file] += line.lower() + "\n"
+
         # Hub file auto-inclusion — architectural hubs are always included
         seen_so_far = seen_d1
         hub_added: list[str] = []
+        hub_core: list[str] = []  # just the hub files themselves
         for path, _count in (self._hub_files or []):
             if path not in seen_so_far and path in file_set:
                 hub_added.append(path)
+                hub_core.append(path)
                 seen_so_far.add(path)
         if hub_added:
             # Expand hub imports — hubs orchestrate subsystems, their
@@ -164,23 +182,8 @@ class CodeRetriever:
             # Rank hub imports by query relevance — score each file's
             # structural index entry against search terms. Files with
             # more keyword matches get priority in the 30-file limit.
-            all_terms = set(t.lower() for t in search_terms)
-            # Also extract terms from the query itself
-            for word in query.lower().split():
-                if len(word) > 2:
-                    all_terms.add(word)
             if all_terms and index_text:
                 scored: list[tuple[str, int]] = []
-                # Find each file's section in the structural index
-                current_file = ""
-                file_sections: dict[str, str] = {}
-                for line in index_text.splitlines():
-                    if line.startswith("## "):
-                        current_file = line[3:].strip()
-                        file_sections[current_file] = ""
-                    elif current_file:
-                        file_sections[current_file] += line.lower() + "\n"
-
                 for path in hub_imports:
                     section = file_sections.get(path, "")
                     score = sum(1 for t in all_terms if t in section)
@@ -205,13 +208,25 @@ class CodeRetriever:
             logger.info(f"Hub auto-inclusion added {len(hub_added)} files")
 
         # Foundation file auto-inclusion — files imported by many others
-        # (protocols, data models, enums). These define contracts that
-        # implementations depend on.
+        # (protocols, data models, enums). Ranked by query relevance
+        # (same keyword scoring as hub imports) then capped at 10.
+        foundation_candidates = [
+            path for path, _count in (self._foundation_files or [])
+            if path not in seen_so_far and path in file_set
+        ]
+        if foundation_candidates and all_terms and index_text:
+            scored_f = []
+            for path in foundation_candidates:
+                section = file_sections.get(path, "") if file_sections else ""
+                s = sum(1 for t in all_terms if t in section)
+                scored_f.append((path, s))
+            scored_f.sort(key=lambda x: x[1], reverse=True)
+            foundation_candidates = [p for p, _ in scored_f]
+
         foundation_added: list[str] = []
-        for path, _count in (self._foundation_files or []):
-            if path not in seen_so_far and path in file_set:
-                foundation_added.append(path)
-                seen_so_far.add(path)
+        for path in foundation_candidates[:10]:
+            foundation_added.append(path)
+            seen_so_far.add(path)
         if foundation_added:
             logger.info(f"Foundation auto-inclusion added {len(foundation_added)} files")
 
@@ -252,11 +267,16 @@ class CodeRetriever:
 
         # Protected files: scan hits, hubs, and foundations can't be
         # displaced by post-limit operations (facade swap).
-        protected = set(selected) | set(hub_added[:10]) | set(foundation_added)
+        protected = set(selected) | set(hub_core) | set(foundation_added)
 
+        # Priority: scan hits > hub core (10 orchestrators) > foundation
+        # (protocols/data models) > hub imports (ranked) > facade > import
+        # > neighbor.  Foundation files go before hub imports so they aren't
+        # displaced by engine.py's 52 import expansions.
+        hub_expansion = [p for p in hub_added if p not in set(hub_core)]
         all_files = list(dict.fromkeys(
-            selected + hub_added + foundation_added + facade_added
-            + import_expanded + neighbors
+            selected + hub_core + foundation_added + hub_expansion
+            + facade_added + import_expanded + neighbors
         ))[:limit]
 
         # Post-limit facade swap: replace __init__.py files with their
@@ -375,7 +395,7 @@ class CodeRetriever:
                 and path in file_set_check
             ]
             foundations.sort(key=lambda x: x[1], reverse=True)
-            self._foundation_files = foundations[:10]
+            self._foundation_files = foundations  # all candidates, ranked per-query
             if self._foundation_files:
                 logger.info(
                     f"Found {len(foundations)} foundation files "
