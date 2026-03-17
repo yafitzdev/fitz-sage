@@ -2,7 +2,7 @@
 """Run retrieval eval with PyCharm's Run button. Edit settings below."""
 
 # --- SETTINGS ---
-SOURCE_DIR = "."              # fitz-ai root (run from project dir)
+SOURCE_DIR = "C:/Users/yanfi/PycharmProjects/fitz-ai"
 PROVIDER = "lmstudio"         # "lmstudio", "openai", "ollama", "cohere"
 MODEL = "qwen3.5-4b"          # model name for the scan call
 BASE_URL = "http://localhost:1234/v1"  # LM Studio default
