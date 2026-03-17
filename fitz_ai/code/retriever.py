@@ -158,6 +158,41 @@ class CodeRetriever:
             if hub_facades:
                 hub_imports.extend(hub_facades)
 
+            # Rank hub imports by query relevance — score each file's
+            # structural index entry against search terms. Files with
+            # more keyword matches get priority in the 30-file limit.
+            all_terms = set(t.lower() for t in search_terms)
+            # Also extract terms from the query itself
+            for word in query.lower().split():
+                if len(word) > 2:
+                    all_terms.add(word)
+            if all_terms and index_text:
+                scored: list[tuple[str, int]] = []
+                # Find each file's section in the structural index
+                current_file = ""
+                file_sections: dict[str, str] = {}
+                for line in index_text.splitlines():
+                    if line.startswith("## "):
+                        current_file = line[3:].strip()
+                        file_sections[current_file] = ""
+                    elif current_file:
+                        file_sections[current_file] += line.lower() + "\n"
+
+                for path in hub_imports:
+                    section = file_sections.get(path, "")
+                    score = sum(1 for t in all_terms if t in section)
+                    scored.append((path, score))
+
+                scored.sort(key=lambda x: x[1], reverse=True)
+                hub_imports = [path for path, _ in scored]
+
+                top_scored = [(p, s) for p, s in scored[:5] if s > 0]
+                if top_scored:
+                    logger.info(
+                        f"Hub import ranking (top 5): "
+                        + ", ".join(f"{p.rsplit('/', 1)[-1]}={s}" for p, s in top_scored)
+                    )
+
             hub_added.extend(hub_imports)
             logger.info(
                 f"Hub auto-inclusion added {len(hub_added)} files "
