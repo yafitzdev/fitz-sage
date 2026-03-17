@@ -2,9 +2,9 @@
 
 <div align="center">
 
-![fitz-ai quickstart demo](/docs/assets/logo.png)
+![fitz-ai logo](/docs/assets/logo.png)
 
-### Intelligent, honest knowledge retrieval in 5 minutes. No infrastructure. No boilerplate.
+### The RAG library that says "I don't know" instead of hallucinating.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
@@ -12,12 +12,38 @@
 [![Version](https://img.shields.io/badge/version-0.10.2-green.svg)](CHANGELOG.md)
 [![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
 
-
 [Why Fitz?](#why-fitz) • [Retrieval Intelligence](#retrieval-intelligence) • [Governance](#governance--know-what-you-dont-know) • [Documentation](#links) • [GitHub](https://github.com/yafitzdev/fitz-ai)
 
 </div>
 
 <br />
+
+---
+
+**Other RAG systems** ❌
+```
+  Q: "Who won the 2024 FIFA World Cup?"
+  A: "Germany won the 2024 FIFA World Cup, defeating Argentina
+      1-0 in the final."
+
+     ← There was no World Cup in 2024. But the RAG system
+        confidently made one up — and it sounds plausible.
+```
+
+**fitz-ai** 🛡️
+```
+  Q: "Who won the 2024 FIFA World Cup?"
+  A: "I don't have enough information to answer this question.
+
+      Related topics in the knowledge base:
+        - FIFA tournament history (4 mentions)
+        - 2022 World Cup coverage (7 mentions)
+
+      To answer this, consider adding:
+        - Documents covering 2024 FIFA events."
+```
+
+Most RAG tools hallucinate confidently when the answer isn't in your documents. Fitz refuses, explains why, and tells you what to add.
 
 ---
 
@@ -67,7 +93,7 @@ fitz serve  # http://localhost:8000/docs for interactive API
 
 ---
 
-### About 🧑‍🌾
+### About
 
   Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)).
 
@@ -119,7 +145,7 @@ RAG approach:
 
 You can—but you'll hit walls fast.
 
-**Context window limits 🚨** 
+**Context window limits 🚨**
 > GPT-4 accepts ~128k tokens. That's roughly 300 pages. Your company wiki, codebase, or document archive is likely 10x-100x larger. You physically cannot paste it all.
 
 **Cost explosion 💥**
@@ -135,6 +161,20 @@ You can—but you'll hit walls fast.
 
 ---
 
+<details>
+
+<summary><strong>📦 How is this different from LangChain / LlamaIndex?</strong></summary>
+
+<br>
+
+They're frameworks — you assemble the chunker, embedder, vector store, retriever, and prompt chain yourself. fitz-ai is a library — one function call that handles all of it with built-in intelligence.
+
+You trade flexibility for a pipeline that handles temporal queries, comparison queries, code symbol extraction, tabular SQL, and epistemic honesty out of the box — without configuration.
+
+</details>
+
+---
+
 ### Why Fitz?
 
 **Zero-wait querying 🐆** → [Progressive KRAG](docs/features/platform/progressive-krag-agentic-search.md)
@@ -142,8 +182,11 @@ You can—but you'll hit walls fast.
 
 **Honest answers ✅** → [Governance Benchmark](docs/features/governance/governance-benchmarking.md)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."
-> 
+>
 > → Fitz detects disputes at **79.1% recall** on [fitz-gov 5.0](https://github.com/yafitzdev/fitz-gov), a 2,900+ case benchmark for epistemic honesty (92% hard difficulty).
+
+**Actionable failures 🔍**
+> When Fitz can't answer, it doesn't just refuse — it explains what it searched for, shows related topics that *do* exist, and suggests what documents to add. When sources conflict, Fitz tells you exactly which sources disagree and what the disagreement is about. Every failure mode is a feedback signal, not a dead end.
 
 **Queries that actually work 📊**
 > Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, address-based code retrieval with import graph traversal, and SQL execution for tabular data. No configuration—it just works.
@@ -163,7 +206,7 @@ You can—but you'll hit walls fast.
 
 > [!TIP]
 > Any questions left? Try fitz on itself:
-> 
+>
 > ```bash
 > fitz query "How does the retrieval pipeline work?" --source ./fitz_ai
 > ```
@@ -266,7 +309,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
   │ solid? (ML)         ├───► NO ──► ABSTAIN
   └──────────┬──────────┘
              └ YES ────────────────► TRUSTWORTHY
-             
+
 ```
 
 <br>

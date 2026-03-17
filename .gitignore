@@ -141,6 +141,6 @@ tags
 
 # GSD planning docs (local-only)
 .planning/
-.planning/
 
 .fitz-graveyard
+tools/retrieval_eval/results
