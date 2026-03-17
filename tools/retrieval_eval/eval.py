@@ -28,14 +28,18 @@ GROUND_TRUTH = Path(__file__).parent / "ground_truth.json"
 RESULTS_DIR = Path(__file__).parent / "results"
 
 
-def run_retrieval(source_dir: str, query: str, provider: str, model: str, base_url: str) -> list[str]:
+def run_retrieval(
+    source_dir: str, query: str, provider: str, model: str, base_url: str,
+    max_manifest_chars: int = 120_000,
+    limit: int = 30,
+) -> list[str]:
     """Run retrieval pipeline and return selected file paths."""
     from fitz_ai.code import CodeRetriever
     from fitz_ai.llm.factory import get_chat_factory
 
     # Provider spec format: "lmstudio/model-name" or just "lmstudio"
     spec = f"{provider}/{model}" if model else provider
-    config = {}
+    config = {"timeout": 300}
     if base_url:
         config["base_url"] = base_url
 
@@ -45,9 +49,10 @@ def run_retrieval(source_dir: str, query: str, provider: str, model: str, base_u
         source_dir=source_dir,
         chat_factory=chat_factory,
         llm_tier="smart",
+        max_manifest_chars=max_manifest_chars,
     )
 
-    results = retriever.retrieve(query)
+    results = retriever.retrieve(query, limit=limit)
     return [r.file_path for r in results]
 
 
@@ -73,6 +78,50 @@ def score(retrieved: list[str], critical: list[str], relevant: list[str]) -> dic
     }
 
 
+def _ensure_model_loaded(model: str, context_length: int = 65536) -> None:
+    """Load model in LM Studio if not already loaded."""
+    import shutil
+    import subprocess
+
+    lms = shutil.which("lms")
+    if not lms:
+        return
+
+    # Check what's loaded
+    try:
+        result = subprocess.run(
+            [lms, "ps"], capture_output=True, text=True, timeout=10,
+            encoding="utf-8", errors="replace",
+        )
+        output = result.stdout + result.stderr
+        if model in output:
+            return  # Already loaded
+        # Unload whatever is loaded
+        if "No models" not in output:
+            subprocess.run(
+                [lms, "unload", "--all"], capture_output=True, timeout=30,
+                encoding="utf-8", errors="replace",
+            )
+            time.sleep(3)
+    except Exception:
+        pass
+
+    # Load the model
+    print(f"Loading model {model} (context={context_length})...")
+    try:
+        result = subprocess.run(
+            [lms, "load", model, "-y", "-c", str(context_length), "--parallel", "1"],
+            capture_output=True, text=True, timeout=300,
+            encoding="utf-8", errors="replace",
+        )
+        if result.returncode == 0:
+            print(f"Model {model} loaded.")
+        else:
+            print(f"WARNING: lms load failed: {result.stderr[:200]}")
+    except Exception as e:
+        print(f"WARNING: Could not load model: {e}")
+
+
 def run_eval(
     source_dir: str,
     provider: str = "lmstudio",
@@ -81,8 +130,14 @@ def run_eval(
     category: str | None = None,
     ids: str | None = None,
     verbose: bool = True,
+    max_manifest_chars: int = 120_000,
+    limit: int = 30,
 ):
     """Run full evaluation."""
+    # Auto-load model in LM Studio
+    ctx = 65536 if max_manifest_chars > 80_000 else 32768
+    _ensure_model_loaded(model, ctx)
+
     queries = json.loads(GROUND_TRUTH.read_text())
 
     if category:
@@ -101,7 +156,7 @@ def run_eval(
     for q in queries:
         t0 = time.monotonic()
         try:
-            retrieved = run_retrieval(source_dir, q["query"], provider, model, base_url)
+            retrieved = run_retrieval(source_dir, q["query"], provider, model, base_url, max_manifest_chars, limit)
         except Exception as e:
             print(f"  [{q['id']:2d}] FAILED: {e}")
             results.append({"id": q["id"], "error": str(e)})
