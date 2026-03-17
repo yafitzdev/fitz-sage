@@ -47,6 +47,8 @@ Most RAG tools hallucinate confidently when the answer isn't in your documents. 
 
 ---
 
+**Quick start**
+
 ```bash
 pip install fitz-ai
 
@@ -100,6 +102,7 @@ fitz serve  # http://localhost:8000/docs for interactive API
   - ~55k lines of Python
   - 2000+ tests, 99% coverage
   - Zero LangChain/LlamaIndex dependencies — built from scratch
+  - Powers [fitz-graveyard](https://github.com/yafitzdev/fitz-graveyard) and one Fortune 500 internal deployment
 
 ![fitz-ai honest_rag](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/honest_rag.jpg)
 
