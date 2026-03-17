@@ -394,6 +394,19 @@ class CodeRetriever:
             except json.JSONDecodeError:
                 pass
 
+        # Last resort: extract file paths from markdown/plain text
+        # Catches cases where LLM outputs bullet lists instead of JSON
+        import re
+        file_paths = re.findall(
+            r'[`"\s\-\*]([a-zA-Z_][\w/]*\.(?:py|yaml|yml|json|toml|md|ts|js|go|rs))',
+            text,
+        )
+        if file_paths:
+            logger.info(
+                f"Extracted {len(file_paths)} file paths from non-JSON response"
+            )
+            return [], file_paths
+
         logger.warning(f"Could not parse LLM response: {text[:200]}")
         return [], []
 
