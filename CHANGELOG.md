@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EntityGraphStore.find_related_topics()` for corpus gap analysis (`2196861`)
 - `FitzKragEngine._build_gap_context()` and `_build_conflict_context()` for governance intelligence surfacing (`2196861`, `0ae9dc5`)
 - Corpus Intelligence and KRAG Agent roadmap documents (`2196861`)
+- Foundation file detection — auto-include files with >10 reverse imports (protocols, data models, enums) in code retrieval (`356b182`)
+- Hub protection — hub files, foundation files, and scan hits can't be displaced by post-limit facade swap (`356b182`)
+- Query-aware hub import ranking — hub imports ranked by keyword overlap with search terms instead of competing equally (`79232b9`)
+- Retrieval quality benchmark with 40-query ground truth across 10 categories (`2c6eaee`)
+- Eval tooling: auto-load LM Studio models, `limit`/`max_manifest_chars` params, A/B test scripts (`84a4406`)
 
 ### 🔄 Changed
 
@@ -44,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CodeSynthesizer.generate()` accepts `gap_context` and `conflict_context` for actionable governance messages (`2196861`, `0ae9dc5`)
 - Early "no addresses" ABSTAIN now sets `Answer.mode = AnswerMode.ABSTAIN` properly (`2196861`)
 - `ConflictAwareConstraint` stores conflicting chunk excerpts in constraint metadata (`0ae9dc5`)
+- Priority ordering updated: selected > hub core > foundation > hub imports > facade > import > neighbor (`caa4629`)
+- Foundation files ranked by query keyword overlap, same as hub imports (`caa4629`)
+- SDK: removed `ask()` alias — `query()` is the only method on the `fitz` class (`5de811b`)
 
 ### ⚡ Performance
 
@@ -54,11 +62,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🔧 Fixed
 
 - Major technical debt cleanup across codebase (`8d42a57`)
+- `__version__` synced to `0.10.2` (was stuck at `0.10.1`) (`5de811b`)
+- Markdown file path extraction fallback when LLM skips JSON format — fixed 5/40 eval queries (`28bd121`)
+- Eval uses `provider/model` spec format for chat factory (`9fcab3a`)
+- Eval uses absolute paths to avoid PyCharm working directory issues (`fb7ff33`)
 
 ### 📝 Docs
 
 - Updated all plugin references from YAML to Python providers (`8fb0758`)
 - Synced documentation with v0.10.1 changes (`e8d8f97`)
+- Doc audit: fixed API.md (`provenance` → `sources`), CONFIG.md (nested config → boolean flags), CONTRIBUTING.md (removed nonexistent `[ingest]` extra) (`5de811b`)
+- README rewritten: hallucination before/after hero, "How is this different from LangChain" section, actionable failures bullet (`2d30dd3`)
 
 ---
 
