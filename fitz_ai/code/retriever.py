@@ -63,6 +63,7 @@ class CodeRetriever:
         max_file_bytes: int = 50_000,
         max_files: int = 2000,
         hub_import_threshold: int = 5,
+        foundation_import_threshold: int = 10,
     ) -> None:
         self._source_dir = Path(source_dir).resolve()
         self._chat_factory = chat_factory
@@ -72,12 +73,14 @@ class CodeRetriever:
         self._max_file_bytes = max_file_bytes
         self._max_files = max_files
         self._hub_import_threshold = hub_import_threshold
+        self._foundation_import_threshold = foundation_import_threshold
 
         # Lazy-built caches
         self._file_paths: list[str] | None = None
         self._structural_index: str | None = None
         self._import_graph: dict[str, set[str]] | None = None
         self._hub_files: list[tuple[str, int]] | None = None
+        self._foundation_files: list[tuple[str, int]] | None = None
 
     def retrieve(self, query: str, limit: int = 30) -> list[ReadResult]:
         """Full pipeline: index -> LLM select -> expand -> read -> compress.
@@ -201,9 +204,20 @@ class CodeRetriever:
         else:
             logger.info(f"Hub auto-inclusion added {len(hub_added)} files")
 
+        # Foundation file auto-inclusion — files imported by many others
+        # (protocols, data models, enums). These define contracts that
+        # implementations depend on.
+        foundation_added: list[str] = []
+        for path, _count in (self._foundation_files or []):
+            if path not in seen_so_far and path in file_set:
+                foundation_added.append(path)
+                seen_so_far.add(path)
+        if foundation_added:
+            logger.info(f"Foundation auto-inclusion added {len(foundation_added)} files")
+
         # Neighbor expansion (same-directory siblings)
         all_so_far = list(dict.fromkeys(
-            selected + import_expanded + facade_added + hub_added
+            selected + import_expanded + facade_added + hub_added + foundation_added
         ))
         neighbors = self._neighbor_expand(
             all_so_far, file_paths, import_graph, query
@@ -213,15 +227,19 @@ class CodeRetriever:
         # Final file list — priority order:
         #   1. selected (LLM scan hits)
         #   2. hub (architectural orchestrators)
-        #   3. facade (re-exported public API definitions)
-        #   4. import (direct dependencies)
-        #   5. neighbor (directory siblings)
+        #   3. foundation (protocols/data models imported by many)
+        #   4. facade (re-exported public API definitions)
+        #   5. import (direct dependencies)
+        #   6. neighbor (directory siblings)
         origin: dict[str, str] = {}
         for p in selected:
             origin[p] = "selected"
         for p in hub_added:
             if p not in origin:
                 origin[p] = "hub"
+        for p in foundation_added:
+            if p not in origin:
+                origin[p] = "foundation"
         for p in facade_added:
             if p not in origin:
                 origin[p] = "facade"
@@ -232,18 +250,26 @@ class CodeRetriever:
             if p not in origin:
                 origin[p] = "neighbor"
 
+        # Protected files: scan hits, hubs, and foundations can't be
+        # displaced by post-limit operations (facade swap).
+        protected = set(selected) | set(hub_added[:10]) | set(foundation_added)
+
         all_files = list(dict.fromkeys(
-            selected + hub_added + facade_added + import_expanded + neighbors
+            selected + hub_added + foundation_added + facade_added
+            + import_expanded + neighbors
         ))[:limit]
 
         # Post-limit facade swap: replace __init__.py files with their
         # actual implementations if the init just re-exports.  An init
         # that only re-exports wastes a slot — the implementation files
         # are more valuable for the LLM to see.
+        # Never swap out protected files (scan hits, hubs, foundations).
         final_set = set(all_files)
         swaps: list[tuple[str, list[str]]] = []
         for path in all_files:
             if not path.endswith("__init__.py"):
+                continue
+            if path in protected:
                 continue
             deps = import_graph.get(path, set())
             new_deps = [d for d in deps if d not in final_set]
@@ -335,6 +361,26 @@ class CodeRetriever:
                     f"Found {len(hubs)} hub files "
                     f"(>{self._hub_import_threshold} imports), "
                     f"keeping top {len(self._hub_files)}"
+                )
+
+            # Foundation files: files imported by many others (protocols,
+            # data models, enums). The mirror of hubs — hubs orchestrate
+            # downward, foundations define contracts upward.
+            # conn_counts already has reverse import counts from above.
+            file_set_check = set(file_paths)
+            foundations = [
+                (path, count)
+                for path, count in conn_counts.items()
+                if count > self._foundation_import_threshold
+                and path in file_set_check
+            ]
+            foundations.sort(key=lambda x: x[1], reverse=True)
+            self._foundation_files = foundations[:10]
+            if self._foundation_files:
+                logger.info(
+                    f"Found {len(foundations)} foundation files "
+                    f"(>{self._foundation_import_threshold} reverse imports), "
+                    f"keeping top {len(self._foundation_files)}"
                 )
         return self._structural_index
 
@@ -519,7 +565,7 @@ class CodeRetriever:
         self, file_paths: list[str], origin: dict[str, str]
     ) -> list[ReadResult]:
         """Read files from disk, compress Python, return ReadResults."""
-        _ORIGIN_SCORES = {"selected": 1.0, "hub": 0.95, "facade": 0.92, "import": 0.9, "neighbor": 0.8}
+        _ORIGIN_SCORES = {"selected": 1.0, "hub": 0.95, "foundation": 0.93, "facade": 0.92, "import": 0.9, "neighbor": 0.8}
         results: list[ReadResult] = []
 
         for path in file_paths:
