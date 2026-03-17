@@ -1,0 +1,653 @@
+[
+  {
+    "id": 1,
+    "query": "Add token usage tracking so I can see how many LLM tokens each query costs",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/llm/providers/base.py",
+      "fitz_ai/llm/providers/openai.py",
+      "fitz_ai/engines/fitz_krag/engine.py",
+      "fitz_ai/core/answer.py",
+      "fitz_ai/core/instrumentation.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/llm/providers/anthropic.py",
+      "fitz_ai/llm/providers/ollama.py",
+      "fitz_ai/llm/providers/cohere.py",
+      "fitz_ai/services/fitz_service.py",
+      "fitz_ai/logging/logger.py"
+    ],
+    "category": "provider-layer"
+  },
+  {
+    "id": 2,
+    "query": "Add query result streaming so answers are delivered token-by-token instead of waiting for the full response",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/llm/providers/base.py",
+      "fitz_ai/engines/fitz_krag/generation/synthesizer.py",
+      "fitz_ai/engines/fitz_krag/engine.py",
+      "fitz_ai/core/engine.py",
+      "fitz_ai/core/answer.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/llm/providers/openai.py",
+      "fitz_ai/services/fitz_service.py",
+      "fitz_ai/sdk/fitz.py",
+      "fitz_ai/api/routes/query.py"
+    ],
+    "category": "engine-level"
+  },
+  {
+    "id": 3,
+    "query": "Add query result caching with automatic invalidation when source documents are re-ingested",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/cloud/client.py",
+      "fitz_ai/cloud/cache_key.py",
+      "fitz_ai/engines/fitz_krag/engine.py",
+      "fitz_ai/ingestion/diff/executor.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/ingestion/diff/differ.py",
+      "fitz_ai/ingestion/state/schema.py",
+      "fitz_ai/ingestion/state/manager.py"
+    ],
+    "category": "cross-cutting"
+  },
+  {
+    "id": 4,
+    "query": "Add a new Python code chunking strategy that splits on function boundaries instead of token count",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/ingestion/chunking/plugins/python_code.py",
+      "fitz_ai/ingestion/chunking/base.py",
+      "fitz_ai/ingestion/chunking/router.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/ingestion/chunking/config.py",
+      "fitz_ai/ingestion/chunking/registry.py",
+      "fitz_ai/core/chunk.py"
+    ],
+    "category": "ingestion"
+  },
+  {
+    "id": 5,
+    "query": "Add webhook notifications when governance constraints reject or modify an answer",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/governance/governor.py",
+      "fitz_ai/governance/decider.py",
+      "fitz_ai/engines/fitz_krag/engine.py",
+      "fitz_ai/core/answer_mode.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/governance/constraints/base.py",
+      "fitz_ai/governance/protocol.py",
+      "fitz_ai/services/fitz_service.py"
+    ],
+    "category": "governance"
+  },
+  {
+    "id": 6,
+    "query": "Add support for querying multiple collections simultaneously and merging results",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/engines/fitz_krag/engine.py",
+      "fitz_ai/services/fitz_service.py",
+      "fitz_ai/core/query.py",
+      "fitz_ai/engines/fitz_krag/retrieval/router.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/engines/fitz_krag/retrieval/ranker.py",
+      "fitz_ai/core/answer.py",
+      "fitz_ai/sdk/fitz.py"
+    ],
+    "category": "engine-level"
+  },
+  {
+    "id": 7,
+    "query": "Add a BM25 sparse retrieval strategy alongside the existing vector search",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/retrieval/sparse/index.py",
+      "fitz_ai/engines/fitz_krag/retrieval/router.py",
+      "fitz_ai/engines/fitz_krag/retrieval/strategies/section_search.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/retrieval/vocabulary/store.py",
+      "fitz_ai/engines/fitz_krag/retrieval/ranker.py",
+      "fitz_ai/engines/fitz_krag/types.py"
+    ],
+    "category": "retrieval"
+  },
+  {
+    "id": 8,
+    "query": "Add document-level access control so queries only return results from documents the user has permission to see",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/vector_db/base.py",
+      "fitz_ai/vector_db/writer.py",
+      "fitz_ai/engines/fitz_krag/retrieval/router.py",
+      "fitz_ai/core/query.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/ingestion/diff/executor.py",
+      "fitz_ai/core/chunk.py",
+      "fitz_ai/services/fitz_service.py",
+      "fitz_ai/api/routes/query.py"
+    ],
+    "category": "cross-cutting"
+  },
+  {
+    "id": 9,
+    "query": "Add conversation memory so follow-up questions can reference previous answers",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/retrieval/rewriter/rewriter.py",
+      "fitz_ai/retrieval/rewriter/types.py",
+      "fitz_ai/engines/fitz_krag/engine.py",
+      "fitz_ai/core/query.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/services/fitz_service.py",
+      "fitz_ai/api/routes/query.py",
+      "fitz_ai/sdk/fitz.py",
+      "fitz_ai/core/answer.py"
+    ],
+    "category": "engine-level"
+  },
+  {
+    "id": 10,
+    "query": "Add a new Qdrant vector database backend",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/vector_db/base.py",
+      "fitz_ai/vector_db/registry.py",
+      "fitz_ai/vector_db/loader.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/vector_db/writer.py",
+      "fitz_ai/vector_db/types.py",
+      "fitz_ai/vector_db/custom.py"
+    ],
+    "category": "infrastructure"
+  },
+  {
+    "id": 11,
+    "query": "Add HyDE (Hypothetical Document Embedding) to improve retrieval for abstract questions",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/retrieval/hyde/generator.py",
+      "fitz_ai/engines/fitz_krag/retrieval/router.py",
+      "fitz_ai/engines/fitz_krag/engine.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/llm/providers/base.py",
+      "fitz_ai/engines/fitz_krag/retrieval/strategies/section_search.py",
+      "fitz_ai/engines/fitz_krag/config/schema.py"
+    ],
+    "category": "retrieval"
+  },
+  {
+    "id": 12,
+    "query": "Add temporal awareness so queries like 'what changed last week' filter by document modification date",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/retrieval/detection/modules/temporal.py",
+      "fitz_ai/retrieval/detection/registry.py",
+      "fitz_ai/retrieval/detection/classifier.py",
+      "fitz_ai/engines/fitz_krag/engine.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/retrieval/detection/protocol.py",
+      "fitz_ai/ingestion/state/schema.py",
+      "fitz_ai/vector_db/base.py"
+    ],
+    "category": "retrieval"
+  },
+  {
+    "id": 13,
+    "query": "Add PDF parsing support with table extraction",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/ingestion/parser/plugins/docling.py",
+      "fitz_ai/ingestion/parser/router.py",
+      "fitz_ai/ingestion/parser/base.py",
+      "fitz_ai/core/document.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/tabular/extractor.py",
+      "fitz_ai/tabular/parser/csv_parser.py",
+      "fitz_ai/ingestion/chunking/plugins/pdf_sections.py"
+    ],
+    "category": "ingestion"
+  },
+  {
+    "id": 14,
+    "query": "Add a governance constraint that detects when the answer contradicts known facts in the knowledge base",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/governance/constraints/base.py",
+      "fitz_ai/governance/constraints/runner.py",
+      "fitz_ai/governance/governor.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/governance/decider.py",
+      "fitz_ai/governance/constraints/plugins/answer_verification.py",
+      "fitz_ai/governance/constraints/plugins/conflict_aware.py",
+      "fitz_ai/governance/constraints/feature_extractor.py"
+    ],
+    "category": "governance"
+  },
+  {
+    "id": 15,
+    "query": "Add SQL query generation for structured data so users can ask 'show me all orders above $100'",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/structured/sql_generator.py",
+      "fitz_ai/structured/executor.py",
+      "fitz_ai/structured/schema.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/structured/router.py",
+      "fitz_ai/structured/types.py",
+      "fitz_ai/structured/formatter.py",
+      "fitz_ai/tabular/store/base.py"
+    ],
+    "category": "structured"
+  },
+  {
+    "id": 16,
+    "query": "Add rate limiting per API key to prevent abuse",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/api/app.py",
+      "fitz_ai/api/dependencies.py",
+      "fitz_ai/api/routes/query.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/services/fitz_service.py",
+      "fitz_ai/api/error_handlers.py"
+    ],
+    "category": "api"
+  },
+  {
+    "id": 17,
+    "query": "Add multi-hop retrieval that follows references between documents",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/engines/fitz_krag/retrieval/multihop.py",
+      "fitz_ai/engines/fitz_krag/retrieval/router.py",
+      "fitz_ai/engines/fitz_krag/retrieval/reader.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/engines/fitz_krag/retrieval/expander.py",
+      "fitz_ai/engines/fitz_krag/engine.py",
+      "fitz_ai/engines/fitz_krag/types.py"
+    ],
+    "category": "retrieval"
+  },
+  {
+    "id": 18,
+    "query": "Add entity graph traversal so queries can find relationships between concepts",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/retrieval/entity_graph/store.py",
+      "fitz_ai/engines/fitz_krag/engine.py",
+      "fitz_ai/engines/fitz_krag/retrieval/router.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/ingestion/enrichment/modules/chunk/entities.py",
+      "fitz_ai/engines/fitz_krag/retrieval/expander.py"
+    ],
+    "category": "retrieval"
+  },
+  {
+    "id": 19,
+    "query": "Add LangChain integration so Fitz can be used as a retriever in LangChain chains",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/integrations/base.py",
+      "fitz_ai/integrations/langchain/runnable.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/core/engine.py",
+      "fitz_ai/core/answer.py",
+      "fitz_ai/sdk/fitz.py"
+    ],
+    "category": "integrations"
+  },
+  {
+    "id": 20,
+    "query": "Add incremental re-ingestion that only processes changed files",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/ingestion/diff/executor.py",
+      "fitz_ai/ingestion/diff/differ.py",
+      "fitz_ai/ingestion/diff/scanner.py",
+      "fitz_ai/ingestion/state/schema.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/ingestion/state/manager.py",
+      "fitz_ai/engines/fitz_krag/ingestion/pipeline.py"
+    ],
+    "category": "ingestion"
+  },
+  {
+    "id": 21,
+    "query": "Add support for Go source code ingestion with symbol extraction",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/engines/fitz_krag/ingestion/strategies/go.py",
+      "fitz_ai/engines/fitz_krag/ingestion/strategies/base.py",
+      "fitz_ai/engines/fitz_krag/ingestion/pipeline.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/engines/fitz_krag/ingestion/symbol_store.py",
+      "fitz_ai/engines/fitz_krag/ingestion/schema.py"
+    ],
+    "category": "ingestion"
+  },
+  {
+    "id": 22,
+    "query": "Add query rewriting for multi-turn conversations with pronoun resolution",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/retrieval/rewriter/rewriter.py",
+      "fitz_ai/retrieval/rewriter/types.py",
+      "fitz_ai/engines/fitz_krag/engine.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/llm/providers/base.py",
+      "fitz_ai/core/query.py",
+      "fitz_ai/api/routes/query.py"
+    ],
+    "category": "retrieval"
+  },
+  {
+    "id": 23,
+    "query": "Add collection snapshots so users can restore a collection to a previous state",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/ingestion/state/manager.py",
+      "fitz_ai/ingestion/state/schema.py",
+      "fitz_ai/ingestion/diff/executor.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/services/fitz_service.py",
+      "fitz_ai/vector_db/writer.py",
+      "fitz_ai/engines/fitz_krag/ingestion/pipeline.py"
+    ],
+    "category": "infrastructure"
+  },
+  {
+    "id": 24,
+    "query": "Add confidence scoring to answers so users know how reliable the response is",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/governance/decider.py",
+      "fitz_ai/governance/governor.py",
+      "fitz_ai/core/answer.py",
+      "fitz_ai/core/answer_mode.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/governance/constraints/feature_extractor.py",
+      "fitz_ai/engines/fitz_krag/engine.py"
+    ],
+    "category": "governance"
+  },
+  {
+    "id": 25,
+    "query": "Add a REST endpoint for batch querying multiple questions at once",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/api/routes/query.py",
+      "fitz_ai/api/models/schemas.py",
+      "fitz_ai/services/fitz_service.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/api/app.py",
+      "fitz_ai/api/error_handlers.py",
+      "fitz_ai/core/query.py"
+    ],
+    "category": "api"
+  },
+  {
+    "id": 26,
+    "query": "Add vocabulary detection to automatically extract domain-specific terms from ingested documents",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/retrieval/vocabulary/detector.py",
+      "fitz_ai/retrieval/vocabulary/store.py",
+      "fitz_ai/retrieval/vocabulary/models.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/retrieval/vocabulary/matcher.py",
+      "fitz_ai/retrieval/vocabulary/variations.py",
+      "fitz_ai/ingestion/enrichment/modules/chunk/keywords.py"
+    ],
+    "category": "retrieval"
+  },
+  {
+    "id": 27,
+    "query": "Add M2M (machine-to-machine) OAuth2 authentication for the API",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/llm/auth/m2m.py",
+      "fitz_ai/llm/auth/base.py",
+      "fitz_ai/llm/auth/__init__.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/llm/auth/certificates.py",
+      "fitz_ai/llm/auth/httpx_auth.py",
+      "fitz_ai/api/dependencies.py"
+    ],
+    "category": "infrastructure"
+  },
+  {
+    "id": 28,
+    "query": "Add progressive ingestion so users can query a codebase while it's still being indexed",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/engines/fitz_krag/progressive/builder.py",
+      "fitz_ai/engines/fitz_krag/progressive/worker.py",
+      "fitz_ai/engines/fitz_krag/progressive/manifest.py",
+      "fitz_ai/engines/fitz_krag/engine.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/engines/fitz_krag/progressive/parsed_cache.py",
+      "fitz_ai/engines/fitz_krag/retrieval/strategies/agentic_search.py"
+    ],
+    "category": "engine-level"
+  },
+  {
+    "id": 29,
+    "query": "Add chunk enrichment that extracts named entities and stores them for filtering",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/ingestion/enrichment/modules/chunk/entities.py",
+      "fitz_ai/ingestion/enrichment/bus.py",
+      "fitz_ai/ingestion/enrichment/pipeline.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/ingestion/enrichment/base.py",
+      "fitz_ai/ingestion/enrichment/registry.py",
+      "fitz_ai/core/chunk.py"
+    ],
+    "category": "ingestion"
+  },
+  {
+    "id": 30,
+    "query": "Add a code search strategy that finds functions by their signature and return type",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/engines/fitz_krag/retrieval/strategies/code_search.py",
+      "fitz_ai/engines/fitz_krag/ingestion/symbol_store.py",
+      "fitz_ai/engines/fitz_krag/ingestion/strategies/python_code.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/engines/fitz_krag/retrieval/strategies/llm_code_search.py",
+      "fitz_ai/engines/fitz_krag/retrieval/router.py",
+      "fitz_ai/engines/fitz_krag/types.py"
+    ],
+    "category": "retrieval"
+  },
+  {
+    "id": 31,
+    "query": "Add Markdown heading-aware chunking that preserves document structure",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/ingestion/chunking/plugins/markdown.py",
+      "fitz_ai/ingestion/chunking/base.py",
+      "fitz_ai/ingestion/chunking/router.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/ingestion/parser/plugins/plaintext.py",
+      "fitz_ai/core/document.py",
+      "fitz_ai/ingestion/chunking/config.py"
+    ],
+    "category": "ingestion"
+  },
+  {
+    "id": 32,
+    "query": "Add an artifact generator that creates API interface catalogs from ingested code",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/ingestion/enrichment/artifacts/base.py",
+      "fitz_ai/ingestion/enrichment/artifacts/orchestrator.py",
+      "fitz_ai/ingestion/enrichment/artifacts/generators.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/ingestion/enrichment/artifacts/analyzer.py",
+      "fitz_ai/ingestion/enrichment/pipeline.py"
+    ],
+    "category": "ingestion"
+  },
+  {
+    "id": 33,
+    "query": "Add comparison query support so users can ask 'what's the difference between X and Y'",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/retrieval/detection/modules/comparison.py",
+      "fitz_ai/retrieval/detection/classifier.py",
+      "fitz_ai/retrieval/detection/registry.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/retrieval/detection/protocol.py",
+      "fitz_ai/engines/fitz_krag/engine.py",
+      "fitz_ai/engines/fitz_krag/generation/synthesizer.py"
+    ],
+    "category": "retrieval"
+  },
+  {
+    "id": 34,
+    "query": "Add context compression to reduce token usage when the retrieved context exceeds the LLM window",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/engines/fitz_krag/context/compressor.py",
+      "fitz_ai/engines/fitz_krag/context/assembler.py",
+      "fitz_ai/engines/fitz_krag/engine.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/engines/fitz_krag/generation/synthesizer.py",
+      "fitz_ai/engines/fitz_krag/config/schema.py"
+    ],
+    "category": "engine-level"
+  },
+  {
+    "id": 35,
+    "query": "Add import graph traversal for code queries so related modules are included in context",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/engines/fitz_krag/ingestion/import_graph_store.py",
+      "fitz_ai/engines/fitz_krag/retrieval/expander.py",
+      "fitz_ai/engines/fitz_krag/retrieval/strategies/code_search.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/engines/fitz_krag/ingestion/strategies/python_code.py",
+      "fitz_ai/engines/fitz_krag/retrieval/strategies/llm_code_search.py"
+    ],
+    "category": "retrieval"
+  },
+  {
+    "id": 36,
+    "query": "Add a custom vector DB plugin system so users can bring their own vector store",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/vector_db/base.py",
+      "fitz_ai/vector_db/custom.py",
+      "fitz_ai/vector_db/loader.py",
+      "fitz_ai/vector_db/registry.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/vector_db/types.py",
+      "fitz_ai/vector_db/writer.py"
+    ],
+    "category": "infrastructure"
+  },
+  {
+    "id": 37,
+    "query": "Add LLM-driven code search that uses the model to find relevant symbols from natural language",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/engines/fitz_krag/retrieval/strategies/llm_code_search.py",
+      "fitz_ai/engines/fitz_krag/retrieval/strategies/code_search.py",
+      "fitz_ai/engines/fitz_krag/ingestion/symbol_store.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/engines/fitz_krag/retrieval/router.py",
+      "fitz_ai/llm/factory.py",
+      "fitz_ai/engines/fitz_krag/ingestion/import_graph_store.py"
+    ],
+    "category": "retrieval"
+  },
+  {
+    "id": 38,
+    "query": "Add table search support so users can query tabular data in their documents",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/engines/fitz_krag/retrieval/strategies/table_search.py",
+      "fitz_ai/engines/fitz_krag/retrieval/table_handler.py",
+      "fitz_ai/engines/fitz_krag/ingestion/table_store.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/tabular/store/base.py",
+      "fitz_ai/tabular/store/postgres.py",
+      "fitz_ai/structured/executor.py"
+    ],
+    "category": "structured"
+  },
+  {
+    "id": 39,
+    "query": "Add an agentic search strategy that lets the LLM iteratively explore the knowledge base",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/engines/fitz_krag/retrieval/strategies/agentic_search.py",
+      "fitz_ai/engines/fitz_krag/progressive/manifest.py",
+      "fitz_ai/engines/fitz_krag/progressive/parsed_cache.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/engines/fitz_krag/retrieval/router.py",
+      "fitz_ai/engines/fitz_krag/engine.py",
+      "fitz_ai/engines/fitz_krag/config/schema.py"
+    ],
+    "category": "retrieval"
+  },
+  {
+    "id": 40,
+    "query": "Add freshness detection so queries about recent changes prioritize newly ingested documents",
+    "codebase": "fitz-ai",
+    "critical_files": [
+      "fitz_ai/retrieval/detection/modules/freshness.py",
+      "fitz_ai/retrieval/detection/classifier.py",
+      "fitz_ai/retrieval/detection/registry.py"
+    ],
+    "relevant_files": [
+      "fitz_ai/ingestion/state/schema.py",
+      "fitz_ai/engines/fitz_krag/engine.py",
+      "fitz_ai/vector_db/base.py"
+    ],
+    "category": "retrieval"
+  }
+]
