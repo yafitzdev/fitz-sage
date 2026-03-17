@@ -33,13 +33,13 @@ def run_retrieval(source_dir: str, query: str, provider: str, model: str, base_u
     from fitz_ai.code import CodeRetriever
     from fitz_ai.llm.factory import get_chat_factory
 
+    # Provider spec format: "lmstudio/model-name" or just "lmstudio"
+    spec = f"{provider}/{model}" if model else provider
     config = {}
     if base_url:
         config["base_url"] = base_url
-    if model:
-        config["model"] = model
 
-    chat_factory = get_chat_factory(provider, config)
+    chat_factory = get_chat_factory(spec, config)
 
     retriever = CodeRetriever(
         source_dir=source_dir,
