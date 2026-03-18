@@ -47,7 +47,7 @@ Most RAG tools hallucinate confidently when the answer isn't in your documents. 
 
 ---
 
-**Quick start**
+### Where to start
 
 ```bash
 pip install fitz-ai
@@ -59,39 +59,6 @@ That's it. Your documents are now searchable with AI.
 
 
 ![fitz-ai quickstart demo](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/quickstart_demo.gif)
-
-<br>
-
-<details>
-
-<summary><strong>Python SDK</strong> → <a href="docs/SDK.md">Full SDK Reference</a></summary>
-
-<br>
-
-```python
-import fitz_ai
-
-fitz_ai.point("./docs")
-answer = fitz_ai.query("What is our refund policy?")
-```
-
-</details>
-
-<br>
-
-<details>
-
-<summary><strong>REST API</strong> → <a href="docs/API.md">Full API Reference</a></summary>
-
-<br>
-
-```bash
-pip install fitz-ai[api]
-
-fitz serve  # http://localhost:8000/docs for interactive API
-```
-
-</details>
 
 ---
 
