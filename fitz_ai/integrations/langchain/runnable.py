@@ -216,6 +216,7 @@ class FitzRAGChain(Runnable):
         """Async invoke - runs sync method in thread pool to avoid blocking."""
         # TODO: Add native async cloud client support
         import asyncio
+
         return await asyncio.to_thread(self.invoke, input, config)
 
     def _run_without_cache(

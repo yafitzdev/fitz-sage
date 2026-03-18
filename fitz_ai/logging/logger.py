@@ -22,7 +22,9 @@ import sys
 from fitz_ai.utils.logging import (
     StructuredLogger,
     clear_query_context,
-    get_logger as get_structured_logger,
+)
+from fitz_ai.utils.logging import get_logger as get_structured_logger
+from fitz_ai.utils.logging import (
     set_query_context,
 )
 

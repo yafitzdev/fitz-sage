@@ -66,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Markdown file path extraction fallback when LLM skips JSON format — fixed 5/40 eval queries (`28bd121`)
 - Eval uses `provider/model` spec format for chat factory (`9fcab3a`)
 - Eval uses absolute paths to avoid PyCharm working directory issues (`fb7ff33`)
+- Stale config test defaults updated to match schema evolution (lmstudio, top_addresses=50, top_read=50, max_context_tokens=48000)
+- Heavy imports test runs in subprocess to avoid `fitz_pgserver` contamination from other tests
 
 ### 📝 Docs
 

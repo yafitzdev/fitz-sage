@@ -69,10 +69,7 @@ class ManifestBuilder:
         manifest_data = self._symbol_store.get_structural_manifest()
         symbol_count = sum(len(f["symbols"]) for f in manifest_data)
 
-        if (
-            self._cached_manifest is not None
-            and self._cached_symbol_count == symbol_count
-        ):
+        if self._cached_manifest is not None and self._cached_symbol_count == symbol_count:
             return self._cached_manifest, self._cached_file_data  # type: ignore[return-value]
 
         file_data: dict[str, dict] = {}
@@ -163,9 +160,7 @@ class ManifestBuilder:
         for f in sorted_files:
             path = f["path"]
             lines = lines_by_path[path].split("\n")
-            lines_by_path[path] = "\n".join(
-                ln for ln in lines if not ln.startswith("imports:")
-            )
+            lines_by_path[path] = "\n".join(ln for ln in lines if not ln.startswith("imports:"))
             text = "\n".join(lines_by_path[p] for p in sorted(lines_by_path))
             if len(text) <= self._max_chars:
                 return text
@@ -296,9 +291,7 @@ class LlmCodeSearchStrategy:
         all_ids = list(dict.fromkeys(selected_ids + import_ids + neighbor_ids))
         return self._files_to_addresses(all_ids, file_data, limit, origin)
 
-    def _llm_expand_and_select(
-        self, manifest: str, query: str
-    ) -> tuple[list[str], list[str]]:
+    def _llm_expand_and_select(self, manifest: str, query: str) -> tuple[list[str], list[str]]:
         """Combined query expansion + file selection in one LLM call."""
         prompt = _SYSTEM_PROMPT.format(query=query, structural_index=manifest)
         chat = self._chat_factory("fast")
@@ -347,9 +340,7 @@ class LlmCodeSearchStrategy:
                     seen.add(target)
         return expanded
 
-    def _neighbor_expand(
-        self, file_ids: list[str], file_data: dict[str, dict]
-    ) -> list[str]:
+    def _neighbor_expand(self, file_ids: list[str], file_data: dict[str, dict]) -> list[str]:
         """Add sibling files from the same directories as selected files."""
         # Build id -> path and path -> id mappings
         id_to_path = {data["raw_file_id"]: path for path, data in file_data.items()}
@@ -374,11 +365,7 @@ class LlmCodeSearchStrategy:
         neighbors: list[str] = []
         for d in trigger_dirs:
             siblings = dir_files.get(d, [])
-            new_siblings = [
-                path_to_id[p]
-                for p in siblings
-                if path_to_id[p] not in seen
-            ]
+            new_siblings = [path_to_id[p] for p in siblings if path_to_id[p] not in seen]
             # Skip directories with too many new siblings (avoid noise)
             if len(new_siblings) > 10:
                 continue

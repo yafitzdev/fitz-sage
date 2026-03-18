@@ -28,12 +28,13 @@ def _build_data():
     """Build full index, manifest, and per-file structural entries."""
     sys.path.insert(0, str(SOURCE_DIR))
     sys.path.insert(0, "C:/Users/yanfi/PycharmProjects/fitz-graveyard")
-    from fitz_ai.code.indexer import build_file_list
     from fitz_graveyard.planning.agent.indexer import (
         build_structural_index,
         extract_interface_signatures,
         extract_library_signatures,
     )
+
+    from fitz_ai.code.indexer import build_file_list
 
     all_files = build_file_list(SOURCE_DIR, 2000)
     py_files = [f for f in all_files if f.endswith(".py")][:NUM_FILES]
@@ -50,7 +51,11 @@ def _build_data():
         if idx >= 0:
             entry_start = idx + len(marker)
             entry_end = full_index.find("\n## ", entry_start)
-            entry = full_index[entry_start:entry_end].strip() if entry_end > 0 else full_index[entry_start:].strip()
+            entry = (
+                full_index[entry_start:entry_end].strip()
+                if entry_end > 0
+                else full_index[entry_start:].strip()
+            )
             file_entries[path] = entry
 
     # Build one-liner manifest
@@ -58,7 +63,7 @@ def _build_data():
     for path in py_files:
         entry = file_entries.get(path, "")
         lines = entry.split("\n") if entry else []
-        doc_line = next((l.strip() for l in lines if l.strip().startswith("doc:")), "")
+        doc_line = next((line.strip() for line in lines if line.strip().startswith("doc:")), "")
         manifest_lines.append(f"  {path} — {doc_line}" if doc_line else f"  {path}")
     manifest = "\n".join(manifest_lines)
 
@@ -111,10 +116,7 @@ def _build_new_prompt(data: dict) -> list[dict]:
         parts.append(f"--- INTERFACE SIGNATURES ---\n{data['sigs']}")
     if data["lib_sigs"]:
         parts.append(f"--- LIBRARY API REFERENCE ---\n{data['lib_sigs']}")
-    parts.append(
-        f"--- FILE MANIFEST ({len(data['py_files'])} files) ---\n"
-        f"{data['manifest']}"
-    )
+    parts.append(f"--- FILE MANIFEST ({len(data['py_files'])} files) ---\n" f"{data['manifest']}")
     parts.append(TOOL_INSTRUCTIONS)
     krag = "\n\n".join(parts)
 
@@ -148,17 +150,24 @@ def call_llm_plain(messages: list[dict]) -> tuple[str, float]:
     """Single chat completion, no tools."""
     client = httpx.Client(base_url=BASE_URL, timeout=httpx.Timeout(600.0, connect=5.0))
     t0 = time.monotonic()
-    resp = client.post("/chat/completions", json={
-        "model": MODEL, "messages": messages,
-        "max_tokens": 4096, "temperature": 0,
-    })
+    resp = client.post(
+        "/chat/completions",
+        json={
+            "model": MODEL,
+            "messages": messages,
+            "max_tokens": 4096,
+            "temperature": 0,
+        },
+    )
     elapsed = time.monotonic() - t0
     resp.raise_for_status()
     data = resp.json()
     return data["choices"][0]["message"]["content"] if data.get("choices") else "", elapsed
 
 
-def call_llm_with_tools(messages: list[dict], file_entries: dict, max_rounds: int = 1) -> tuple[str, float, int, int]:
+def call_llm_with_tools(
+    messages: list[dict], file_entries: dict, max_rounds: int = 1
+) -> tuple[str, float, int, int]:
     """Chat completion with manual inspect_files tool loop.
 
     Returns (final_text, elapsed, tool_calls_made, files_inspected).
@@ -170,16 +179,23 @@ def call_llm_with_tools(messages: list[dict], file_entries: dict, max_rounds: in
     t0 = time.monotonic()
 
     for _round in range(max_rounds + 1):
-        resp = client.post("/chat/completions", json={
-            "model": MODEL, "messages": msgs,
-            "max_tokens": 4096, "temperature": 0,
-        })
+        resp = client.post(
+            "/chat/completions",
+            json={
+                "model": MODEL,
+                "messages": msgs,
+                "max_tokens": 4096,
+                "temperature": 0,
+            },
+        )
         resp.raise_for_status()
         data = resp.json()
         content = data["choices"][0]["message"]["content"] if data.get("choices") else ""
 
         # Check if the model wants to call inspect_files
-        tool_match = re.search(r'```json\s*\n?\s*\{[^}]*"tool"\s*:\s*"inspect_files"[^}]*\}', content, re.DOTALL)
+        tool_match = re.search(
+            r'```json\s*\n?\s*\{[^}]*"tool"\s*:\s*"inspect_files"[^}]*\}', content, re.DOTALL
+        )
         if not tool_match or _round == max_rounds:
             elapsed = time.monotonic() - t0
             return content, elapsed, total_tool_calls, total_files_inspected
@@ -206,7 +222,12 @@ def call_llm_with_tools(messages: list[dict], file_entries: dict, max_rounds: in
         tool_response = "\n\n".join(result_parts) if result_parts else "(no valid paths)"
 
         msgs.append({"role": "assistant", "content": content})
-        msgs.append({"role": "user", "content": f"<tool_response>\n{tool_response}\n</tool_response>\n\nNow continue with your architectural analysis."})
+        msgs.append(
+            {
+                "role": "user",
+                "content": f"<tool_response>\n{tool_response}\n</tool_response>\n\nNow continue with your architectural analysis.",
+            }
+        )
 
     elapsed = time.monotonic() - t0
     return content, elapsed, total_tool_calls, total_files_inspected
@@ -241,7 +262,9 @@ def summarize_runs(label: str, results: list[dict]):
     times = [r["time"] for r in results]
     lengths = [r["signals"]["length"] for r in results]
     print(f"  Time:   {min(times):.1f}s - {max(times):.1f}s (avg {sum(times)/len(times):.1f}s)")
-    print(f"  Length: {min(lengths):,} - {max(lengths):,} chars (avg {sum(lengths)//len(lengths):,})")
+    print(
+        f"  Length: {min(lengths):,} - {max(lengths):,} chars (avg {sum(lengths)//len(lengths):,})"
+    )
 
     if "tool_calls" in results[0]:
         tcs = [r["tool_calls"] for r in results]
@@ -287,15 +310,23 @@ def main():
     for i in range(RUNS):
         print(f"Run {i+1}/{RUNS}: old...", end=" ", flush=True)
         out, t = call_llm_plain(msgs_old)
-        old_results.append({"run": i+1, "time": t, "output": out, "signals": extract_signals(out)})
+        old_results.append(
+            {"run": i + 1, "time": t, "output": out, "signals": extract_signals(out)}
+        )
         print(f"{t:.1f}s ({len(out):,} chars)", end=" | ", flush=True)
 
         print("new (tool)...", end=" ", flush=True)
         out, t, tc, fi = call_llm_with_tools(msgs_new, data["file_entries"])
-        new_results.append({
-            "run": i+1, "time": t, "output": out, "signals": extract_signals(out),
-            "tool_calls": tc, "files_inspected": fi,
-        })
+        new_results.append(
+            {
+                "run": i + 1,
+                "time": t,
+                "output": out,
+                "signals": extract_signals(out),
+                "tool_calls": tc,
+                "files_inspected": fi,
+            }
+        )
         print(f"{t:.1f}s ({len(out):,} chars, {tc} calls, {fi} files)")
 
     summarize_runs("OLD (full structural index in prompt)", old_results)

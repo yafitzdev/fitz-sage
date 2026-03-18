@@ -12,21 +12,21 @@ class TestFitzKragConfig:
     def test_minimal_config(self):
         config = FitzKragConfig(collection="test")
         assert config.collection == "test"
-        assert config.chat == "ollama"
+        assert config.chat == "lmstudio"
         assert config.embedding == "ollama"
 
     def test_defaults(self):
         config = FitzKragConfig(collection="test")
         assert config.code_languages == ["python", "typescript", "java", "go"]
         assert config.summary_batch_size == 15
-        assert config.top_addresses == 10
-        assert config.top_read == 5
+        assert config.top_addresses == 50
+        assert config.top_read == 50
         assert config.keyword_weight == 0.4
         assert config.semantic_weight == 0.6
         assert config.fallback_to_chunks is True
         assert config.enable_citations is True
         assert config.strict_grounding is True
-        assert config.max_context_tokens == 8000
+        assert config.max_context_tokens == 48000
 
     def test_custom_values(self):
         config = FitzKragConfig(
@@ -69,7 +69,7 @@ class TestDefaultYaml:
         with path.open("r", encoding="utf-8") as f:
             raw = yaml.safe_load(f)
         assert "fitz_krag" in raw
-        assert raw["fitz_krag"]["chat"] == "ollama"
+        assert raw["fitz_krag"]["chat"] == "lmstudio"
         assert raw["fitz_krag"]["collection"] == "default"
 
     def test_default_yaml_creates_valid_config(self):

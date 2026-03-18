@@ -559,7 +559,8 @@ class FitzKragEngine:
             Answer with file:line provenance
         """
         import uuid
-        from fitz_ai.logging import set_query_context, clear_query_context
+
+        from fitz_ai.logging import clear_query_context, set_query_context
 
         # Generate query ID for tracing
         query_id = f"q-{uuid.uuid4().hex[:8]}"
@@ -587,7 +588,9 @@ class FitzKragEngine:
             if len(sanitized) > MAX_QUERY_LENGTH:
                 original_length = len(sanitized)
                 sanitized = sanitized[:MAX_QUERY_LENGTH]
-                logger.debug("Query truncated", original_length=original_length, new_length=MAX_QUERY_LENGTH)
+                logger.debug(
+                    "Query truncated", original_length=original_length, new_length=MAX_QUERY_LENGTH
+                )
 
             _progress = progress or (lambda _: None)
             timings: list[tuple[str, float]] = []
@@ -641,7 +644,7 @@ class FitzKragEngine:
                                 logger.debug(
                                     "Query rewritten",
                                     original_preview=sanitized[:50],
-                                    rewritten_preview=retrieval_query[:50]
+                                    rewritten_preview=retrieval_query[:50],
                                 )
                         except Exception as e:
                             logger.warning("Query rewriting failed, using original", error=str(e))
@@ -746,12 +749,13 @@ class FitzKragEngine:
             answer_mode = AnswerMode.TRUSTWORTHY
             if self._constraints and self._governor:
                 t0 = time.perf_counter()
-                from fitz_ai.governance import run_constraints
-                from fitz_ai.governance.constraints.feature_extractor import extract_features
-
                 # Suppress noisy constraint warnings (embedding 400s, etc.)
                 # — constraints handle errors gracefully, warnings are just noise
                 import logging as _logging
+
+                from fitz_ai.governance import run_constraints
+                from fitz_ai.governance.constraints.feature_extractor import extract_features
+
                 _logging.getLogger("fitz_ai.governance.constraints").setLevel(_logging.ERROR)
 
                 constraint_results = run_constraints(sanitized, expanded, self._constraints)
@@ -779,11 +783,7 @@ class FitzKragEngine:
                 # (no summaries, no real vector scores, constraint LLMs see raw code)
                 # but LLM code search already validated relevance via structural
                 # reasoning. Override ABSTAIN → TRUSTWORTHY so generation runs.
-                if (
-                    answer_mode == AnswerMode.ABSTAIN
-                    and self._manifest is not None
-                    and expanded
-                ):
+                if answer_mode == AnswerMode.ABSTAIN and self._manifest is not None and expanded:
                     logger.info(
                         "Overriding ABSTAIN → TRUSTWORTHY in progressive mode "
                         "(degraded guardrails features with code evidence)"
@@ -811,7 +811,9 @@ class FitzKragEngine:
             elif answer_mode == AnswerMode.DISPUTED and constraint_results:
                 conflict_context = self._build_conflict_context(constraint_results)
             answer = self._synthesizer.generate(
-                sanitized, context, expanded,
+                sanitized,
+                context,
+                expanded,
                 answer_mode=answer_mode,
                 gap_context=gap_context,
                 conflict_context=conflict_context,
@@ -903,23 +905,58 @@ class FitzKragEngine:
         try:
             # Extract meaningful terms from query (skip stopwords, short terms)
             _stop = {
-                "what", "how", "does", "the", "this", "that", "with", "from",
-                "have", "has", "are", "was", "were", "been", "being", "will",
-                "would", "could", "should", "about", "which", "where", "when",
-                "there", "their", "they", "them", "than", "then", "into",
-                "also", "just", "only", "very", "some", "more", "most", "each",
-                "other", "your", "our", "can", "not", "for", "and", "but",
+                "what",
+                "how",
+                "does",
+                "the",
+                "this",
+                "that",
+                "with",
+                "from",
+                "have",
+                "has",
+                "are",
+                "was",
+                "were",
+                "been",
+                "being",
+                "will",
+                "would",
+                "could",
+                "should",
+                "about",
+                "which",
+                "where",
+                "when",
+                "there",
+                "their",
+                "they",
+                "them",
+                "than",
+                "then",
+                "into",
+                "also",
+                "just",
+                "only",
+                "very",
+                "some",
+                "more",
+                "most",
+                "each",
+                "other",
+                "your",
+                "our",
+                "can",
+                "not",
+                "for",
+                "and",
+                "but",
             }
-            terms = [
-                t for t in query.lower().split()
-                if len(t) > 2 and t not in _stop
-            ]
+            terms = [t for t in query.lower().split() if len(t) > 2 and t not in _stop]
 
             # Find related topics via entity graph substring match
             if terms:
-                gap["related_topics"] = self._entity_graph_store.find_related_topics(
-                    terms, limit=5
-                )
+                gap["related_topics"] = self._entity_graph_store.find_related_topics(terms, limit=5)
 
             # Always include top corpus topics for context
             stats = self._entity_graph_store.stats()

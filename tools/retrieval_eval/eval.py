@@ -29,7 +29,11 @@ RESULTS_DIR = Path(__file__).parent / "results"
 
 
 def run_retrieval(
-    source_dir: str, query: str, provider: str, model: str, base_url: str,
+    source_dir: str,
+    query: str,
+    provider: str,
+    model: str,
+    base_url: str,
     max_manifest_chars: int = 120_000,
     limit: int = 30,
 ) -> list[str]:
@@ -67,7 +71,9 @@ def score(retrieved: list[str], critical: list[str], relevant: list[str]) -> dic
     all_found = all_gt & retrieved_set
 
     return {
-        "critical_recall": round(len(critical_found) / len(critical_set), 2) if critical_set else 1.0,
+        "critical_recall": (
+            round(len(critical_found) / len(critical_set), 2) if critical_set else 1.0
+        ),
         "critical_found": sorted(critical_found),
         "critical_missed": sorted(critical_set - retrieved_set),
         "total_recall": round(len(all_found) / len(all_gt), 2) if all_gt else 1.0,
@@ -90,8 +96,12 @@ def _ensure_model_loaded(model: str, context_length: int = 65536) -> None:
     # Check what's loaded
     try:
         result = subprocess.run(
-            [lms, "ps"], capture_output=True, text=True, timeout=10,
-            encoding="utf-8", errors="replace",
+            [lms, "ps"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            encoding="utf-8",
+            errors="replace",
         )
         output = result.stdout + result.stderr
         if model in output:
@@ -99,8 +109,11 @@ def _ensure_model_loaded(model: str, context_length: int = 65536) -> None:
         # Unload whatever is loaded
         if "No models" not in output:
             subprocess.run(
-                [lms, "unload", "--all"], capture_output=True, timeout=30,
-                encoding="utf-8", errors="replace",
+                [lms, "unload", "--all"],
+                capture_output=True,
+                timeout=30,
+                encoding="utf-8",
+                errors="replace",
             )
             time.sleep(3)
     except Exception:
@@ -111,8 +124,11 @@ def _ensure_model_loaded(model: str, context_length: int = 65536) -> None:
     try:
         result = subprocess.run(
             [lms, "load", model, "-y", "-c", str(context_length), "--parallel", "1"],
-            capture_output=True, text=True, timeout=300,
-            encoding="utf-8", errors="replace",
+            capture_output=True,
+            text=True,
+            timeout=300,
+            encoding="utf-8",
+            errors="replace",
         )
         if result.returncode == 0:
             print(f"Model {model} loaded.")
@@ -156,7 +172,9 @@ def run_eval(
     for q in queries:
         t0 = time.monotonic()
         try:
-            retrieved = run_retrieval(source_dir, q["query"], provider, model, base_url, max_manifest_chars, limit)
+            retrieved = run_retrieval(
+                source_dir, q["query"], provider, model, base_url, max_manifest_chars, limit
+            )
         except Exception as e:
             print(f"  [{q['id']:2d}] FAILED: {e}")
             results.append({"id": q["id"], "error": str(e)})
@@ -203,7 +221,7 @@ def run_eval(
     # By category
     categories = sorted(set(r["category"] for r in valid))
     if len(categories) > 1:
-        print(f"\nBy category:")
+        print("\nBy category:")
         for cat in categories:
             cat_results = [r for r in valid if r["category"] == cat]
             cat_crit = sum(r["critical_recall"] for r in cat_results) / len(cat_results)
@@ -216,7 +234,7 @@ def run_eval(
         for f in r.get("critical_missed", []):
             miss_count[f] = miss_count.get(f, 0) + 1
     if miss_count:
-        print(f"\nMost-missed critical files:")
+        print("\nMost-missed critical files:")
         for f, count in sorted(miss_count.items(), key=lambda x: -x[1])[:10]:
             print(f"  {count}x {f}")
 

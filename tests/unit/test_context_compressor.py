@@ -2,18 +2,16 @@
 """Tests for AST-based code compression."""
 
 from fitz_ai.engines.fitz_krag.context.compressor import (
+    _strip_comments_and_blanks,
     compress_python,
     compress_results,
-    _strip_comments_and_blanks,
 )
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
 
 
 def _make_result(content: str, kind=AddressKind.SYMBOL, path="foo.py") -> ReadResult:
     return ReadResult(
-        address=Address(
-            kind=kind, source_id="f1", location="test", summary="test", score=0.8
-        ),
+        address=Address(kind=kind, source_id="f1", location="test", summary="test", score=0.8),
         content=content,
         file_path=path,
     )

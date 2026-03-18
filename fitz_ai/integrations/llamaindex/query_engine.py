@@ -272,6 +272,7 @@ class FitzQueryEngine(BaseQueryEngine):
         """Async query - runs sync method in thread pool to avoid blocking."""
         # TODO: Add native async cloud client support
         import asyncio
+
         return await asyncio.to_thread(self._query, query_bundle)
 
     def _run_without_cache(self, query_bundle: QueryBundle) -> Response:

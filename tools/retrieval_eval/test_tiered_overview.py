@@ -5,7 +5,6 @@ no-seeds (structural index + signatures only, model uses read_file).
 
 10 calls each, temperature=0.
 """
-import json
 import re
 import sys
 import time
@@ -27,12 +26,13 @@ def build_indexes():
     """Build old (with seeds) and new (no seeds) raw_summaries."""
     sys.path.insert(0, str(SOURCE_DIR))
     sys.path.insert(0, "C:/Users/yanfi/PycharmProjects/fitz-graveyard")
-    from fitz_ai.code.indexer import build_file_list
     from fitz_graveyard.planning.agent.indexer import (
         build_structural_index,
         extract_interface_signatures,
         extract_library_signatures,
     )
+
+    from fitz_ai.code.indexer import build_file_list
 
     all_files = build_file_list(SOURCE_DIR, 2000)
     py_files = [f for f in all_files if f.endswith(".py")][:NUM_FILES]
@@ -56,12 +56,13 @@ def build_indexes():
     if sigs:
         old_parts.append(f"--- INTERFACE SIGNATURES (auto-extracted, ground truth) ---\n{sigs}")
     if lib_sigs:
-        old_parts.append(f"--- LIBRARY API REFERENCE (installed packages, ground truth) ---\n{lib_sigs}")
+        old_parts.append(
+            f"--- LIBRARY API REFERENCE (installed packages, ground truth) ---\n{lib_sigs}"
+        )
     old_parts.append(f"--- STRUCTURAL OVERVIEW (all selected files) ---\n{full_index}")
     old_parts.append(
         f"--- SEED FILES ({len(seed_files)}/{len(py_files)} — "
-        f"use read_file/read_files for the rest) ---\n\n"
-        + "\n\n".join(seed_blocks)
+        f"use read_file/read_files for the rest) ---\n\n" + "\n\n".join(seed_blocks)
     )
     old_raw = "\n\n".join(old_parts)
 
@@ -70,11 +71,11 @@ def build_indexes():
     if sigs:
         new_parts.append(f"--- INTERFACE SIGNATURES (auto-extracted, ground truth) ---\n{sigs}")
     if lib_sigs:
-        new_parts.append(f"--- LIBRARY API REFERENCE (installed packages, ground truth) ---\n{lib_sigs}")
+        new_parts.append(
+            f"--- LIBRARY API REFERENCE (installed packages, ground truth) ---\n{lib_sigs}"
+        )
     new_parts.append(f"--- STRUCTURAL OVERVIEW (all selected files) ---\n{full_index}")
-    new_parts.append(
-        f"--- {len(py_files)} files available via read_file(path) ---"
-    )
+    new_parts.append(f"--- {len(py_files)} files available via read_file(path) ---")
     new_raw = "\n\n".join(new_parts)
 
     return old_raw, new_raw
@@ -147,7 +148,9 @@ def summarize_runs(label: str, results: list[dict]):
     times = [r["time"] for r in results]
     lengths = [r["signals"]["length"] for r in results]
     print(f"  Time:   {min(times):.1f}s - {max(times):.1f}s (avg {sum(times)/len(times):.1f}s)")
-    print(f"  Length: {min(lengths):,} - {max(lengths):,} chars (avg {sum(lengths)//len(lengths):,})")
+    print(
+        f"  Length: {min(lengths):,} - {max(lengths):,} chars (avg {sum(lengths)//len(lengths):,})"
+    )
 
     bool_keys = [k for k in results[0]["signals"] if isinstance(results[0]["signals"][k], bool)]
     print(f"\n  Signal consistency (across {len(results)} runs):")
@@ -174,7 +177,9 @@ def main():
     old_raw, new_raw = build_indexes()
     print(f"Old raw_summaries (with seeds): {len(old_raw):,} chars (~{len(old_raw)//4:,} tok)")
     print(f"New raw_summaries (no seeds):   {len(new_raw):,} chars (~{len(new_raw)//4:,} tok)")
-    print(f"Savings: {len(old_raw) - len(new_raw):,} chars (~{(len(old_raw)-len(new_raw))//4:,} tok)\n")
+    print(
+        f"Savings: {len(old_raw) - len(new_raw):,} chars (~{(len(old_raw)-len(new_raw))//4:,} tok)\n"
+    )
 
     msgs_old = build_reasoning_prompt(old_raw)
     msgs_new = build_reasoning_prompt(new_raw)
@@ -187,12 +192,16 @@ def main():
     for i in range(RUNS):
         print(f"Run {i+1}/{RUNS}: old...", end=" ", flush=True)
         out, t = call_llm(msgs_old)
-        old_results.append({"run": i + 1, "time": t, "output": out, "signals": extract_signals(out)})
+        old_results.append(
+            {"run": i + 1, "time": t, "output": out, "signals": extract_signals(out)}
+        )
         print(f"{t:.1f}s ({len(out):,} chars)", end=" | ", flush=True)
 
         print("new...", end=" ", flush=True)
         out, t = call_llm(msgs_new)
-        new_results.append({"run": i + 1, "time": t, "output": out, "signals": extract_signals(out)})
+        new_results.append(
+            {"run": i + 1, "time": t, "output": out, "signals": extract_signals(out)}
+        )
         print(f"{t:.1f}s ({len(out):,} chars)")
 
     summarize_runs("OLD (full index + seeds inline)", old_results)

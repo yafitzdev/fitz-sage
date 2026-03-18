@@ -12,7 +12,6 @@ from fitz_ai.engines.fitz_krag.retrieval.strategies.llm_code_search import (
 )
 from fitz_ai.engines.fitz_krag.types import AddressKind
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -271,9 +270,9 @@ class TestLlmCodeSearchStrategy:
         response = _make_chat_response(files=["app/models.py"])
         strategy = LlmCodeSearchStrategy(
             _make_symbol_store(),
-            _make_import_store(imports_by_file={
-                "f1": [{"target_file_id": "f2", "target_module": "app.views"}]
-            }),
+            _make_import_store(
+                imports_by_file={"f1": [{"target_file_id": "f2", "target_module": "app.views"}]}
+            ),
             _make_chat_factory(response),
             _make_config(),
             _make_fallback(),
@@ -340,9 +339,9 @@ class TestLlmCodeSearchStrategy:
         response = _make_chat_response(files=["app/models.py"])
         strategy = LlmCodeSearchStrategy(
             _make_symbol_store(),
-            _make_import_store(imports_by_file={
-                "f1": [{"target_file_id": "f2", "target_module": "app.views"}]
-            }),
+            _make_import_store(
+                imports_by_file={"f1": [{"target_file_id": "f2", "target_module": "app.views"}]}
+            ),
             _make_chat_factory(response),
             _make_config(),
             _make_fallback(),
@@ -446,9 +445,7 @@ class TestLlmCodeSearchStrategy:
         hv = [[0.4, 0.5, 0.6]]
         detection = MagicMock()
 
-        strategy.retrieve(
-            "query", limit=5, detection=detection, query_vector=qv, hyde_vectors=hv
-        )
+        strategy.retrieve("query", limit=5, detection=detection, query_vector=qv, hyde_vectors=hv)
 
         fallback.retrieve.assert_called_once_with(
             "query", 5, detection=detection, query_vector=qv, hyde_vectors=hv
@@ -456,10 +453,12 @@ class TestLlmCodeSearchStrategy:
 
     def test_parses_combined_json_response(self):
         """New format: LLM returns {search_terms, files}."""
-        response = json.dumps({
-            "search_terms": ["user", "model", "ORM"],
-            "files": ["app/models.py", "app/views.py"],
-        })
+        response = json.dumps(
+            {
+                "search_terms": ["user", "model", "ORM"],
+                "files": ["app/models.py", "app/views.py"],
+            }
+        )
         strategy = LlmCodeSearchStrategy(
             _make_symbol_store(),
             _make_import_store(),

@@ -231,6 +231,7 @@ class FitzService:
             List of CollectionInfo with names and stats
         """
         from concurrent.futures import ThreadPoolExecutor, as_completed
+
         from fitz_ai.vector_db.registry import get_vector_db_plugin
 
         vdb = get_vector_db_plugin()
@@ -293,10 +294,7 @@ class FitzService:
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all tasks
-            future_to_name = {
-                executor.submit(fetch_collection_info, name): name
-                for name in names
-            }
+            future_to_name = {executor.submit(fetch_collection_info, name): name for name in names}
 
             # Collect results maintaining order
             result = []

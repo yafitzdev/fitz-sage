@@ -144,8 +144,8 @@ class CodeSynthesizer:
             "Sources disagree on this topic. Present BOTH perspectives clearly "
             "and do not assert one view as correct.\n\n"
             f"Specifically, there is a conflict between:\n"
-            f"- {source_a}: \"{excerpt_a}...\"\n"
-            f"- {source_b}: \"{excerpt_b}...\"\n\n"
+            f'- {source_a}: "{excerpt_a}..."\n'
+            f'- {source_b}: "{excerpt_b}..."\n\n'
             "Explain what each source says, where they disagree, "
             "and note that the user should verify which is current/authoritative."
         )
@@ -192,7 +192,9 @@ class CodeSynthesizer:
                 lines.append("")
                 lines.append("Topics available in the knowledge base:")
                 for topic in top[:5]:
-                    lines.append(f"  - {topic.get('name', '')} ({topic.get('mentions', 0)} mentions)")
+                    lines.append(
+                        f"  - {topic.get('name', '')} ({topic.get('mentions', 0)} mentions)"
+                    )
 
         # Suggestions for what to add
         lines.append("")
@@ -202,12 +204,8 @@ class CodeSynthesizer:
             lines.append("  - Documents or code files covering this topic")
             lines.append("  - Use fitz_ai.point() to index a directory")
         else:
-            lines.append(
-                f"  - Documents covering the specific topic of this question"
-            )
-            lines.append(
-                "  - More detailed documentation or examples on this subject"
-            )
+            lines.append("  - Documents covering the specific topic of this question")
+            lines.append("  - More detailed documentation or examples on this subject")
 
         return "\n".join(lines)
 

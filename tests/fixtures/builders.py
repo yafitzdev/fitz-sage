@@ -13,12 +13,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
 from fitz_ai.ingestion.source.base import SourceFile
-
 
 # =============================================================================
 # Common Test Data Builders
@@ -45,7 +44,6 @@ class SourceFileBuilder:
         """Set file extension (updates path)."""
         if not ext.startswith("."):
             ext = f".{ext}"
-        stem = self._local_path.stem
         self._local_path = self._local_path.with_suffix(ext)
         return self
 
@@ -304,18 +302,21 @@ class InMemorySymbolStore:
         end_line: int = 10,
     ) -> None:
         """Add a symbol to the store."""
-        self.symbols.append({
-            "qualified_name": qualified_name,
-            "kind": kind,
-            "file_id": file_id,
-            "start_line": start_line,
-            "end_line": end_line,
-        })
+        self.symbols.append(
+            {
+                "qualified_name": qualified_name,
+                "kind": kind,
+                "file_id": file_id,
+                "start_line": start_line,
+                "end_line": end_line,
+            }
+        )
 
     def get_class_symbols(self, file_id: str, class_name: str) -> List[Dict[str, Any]]:
         """Get symbols for a class."""
         return [
-            s for s in self.symbols
+            s
+            for s in self.symbols
             if s["file_id"] == file_id and s["qualified_name"].startswith(f"module.{class_name}.")
         ]
 
@@ -368,6 +369,7 @@ class CollectionInfoBuilder:
 
     def build(self):
         from fitz_ai.services.fitz_service import CollectionInfo
+
         return CollectionInfo(
             name=self._name,
             chunk_count=self._chunk_count,

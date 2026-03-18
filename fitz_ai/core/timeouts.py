@@ -36,7 +36,7 @@ class Timeouts:
     # LLM operation timeouts
     LLM_CHAT: ClassVar[int] = 300  # 5 minutes for chat
     LLM_EMBED: ClassVar[int] = 120  # 2 minutes for embedding
-    LLM_RERANK: ClassVar[int] = 60   # 1 minute for reranking
+    LLM_RERANK: ClassVar[int] = 60  # 1 minute for reranking
     LLM_VISION: ClassVar[int] = 180  # 3 minutes for vision
 
     # Database operation timeouts
@@ -79,31 +79,25 @@ class Timeouts:
             "api": cls.API_DEFAULT,
             "api_fast": cls.API_FAST,
             "api_slow": cls.API_SLOW,
-
             # LLM operations
             "chat": cls.LLM_CHAT,
             "embed": cls.LLM_EMBED,
             "rerank": cls.LLM_RERANK,
             "vision": cls.LLM_VISION,
-
             # Database
             "db": cls.DB_QUERY,
             "db_batch": cls.DB_BATCH,
             "db_init": cls.DB_INIT,
-
             # Files
             "file": cls.FILE_READ,
             "parse": cls.FILE_PARSE,
             "ingest": cls.FILE_INGEST,
-
             # Health checks
             "health": cls.HEALTH_CHECK,
             "ollama_health": cls.OLLAMA_HEALTH,
-
             # Connection
             "connect": cls.CONNECT,
             "connect_db": cls.CONNECT_DB,
-
             # Workers
             "worker_join": cls.WORKER_JOIN,
         }
@@ -115,7 +109,7 @@ TIMEOUTS = Timeouts()
 
 
 # Helper functions for common patterns
-def get_httpx_timeout(operation: str = "api") -> "httpx.Timeout":
+def get_httpx_timeout(operation: str = "api") -> "httpx.Timeout":  # noqa: F821
     """
     Get httpx.Timeout object for operation.
 

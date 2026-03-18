@@ -385,8 +385,7 @@ class EntityGraphStore:
                 (*like_params, limit),
             )
             return [
-                {"name": row[0], "type": row[1], "mentions": row[2]}
-                for row in cursor.fetchall()
+                {"name": row[0], "type": row[1], "mentions": row[2]} for row in cursor.fetchall()
             ]
 
     # =========================================================================

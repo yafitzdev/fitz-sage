@@ -118,7 +118,6 @@ def vlm_krag_engine(set_workspace):
     Creates a unique collection, ingests fixtures_parser/ with docling_vision
     parser and Ollama vision provider, then yields the engine for querying.
     """
-    from fitz_ai.core.paths import FitzPaths
     from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
     from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
     from fitz_ai.storage.postgres import PostgresConnectionManager

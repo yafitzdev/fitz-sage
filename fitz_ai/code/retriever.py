@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fitz_ai.code.indexer import build_file_list, build_import_graph, build_structural_index
 from fitz_ai.code.prompts import EXPAND_AND_SELECT_PROMPT, HUB_FILES_HINT, NEIGHBOR_SCREEN_PROMPT
@@ -130,9 +130,7 @@ class CodeRetriever:
                         facade_added.append(dep)
                         seen_d1.add(dep)
         if facade_added:
-            logger.info(
-                f"Facade expansion through __init__.py added {len(facade_added)} files"
-            )
+            logger.info(f"Facade expansion through __init__.py added {len(facade_added)} files")
 
         # Build query term set and file section index for ranking
         # (used by both hub import ranking and foundation ranking)
@@ -154,7 +152,7 @@ class CodeRetriever:
         seen_so_far = seen_d1
         hub_added: list[str] = []
         hub_core: list[str] = []  # just the hub files themselves
-        for path, _count in (self._hub_files or []):
+        for path, _count in self._hub_files or []:
             if path not in seen_so_far and path in file_set:
                 hub_added.append(path)
                 hub_core.append(path)
@@ -195,7 +193,7 @@ class CodeRetriever:
                 top_scored = [(p, s) for p, s in scored[:5] if s > 0]
                 if top_scored:
                     logger.info(
-                        f"Hub import ranking (top 5): "
+                        "Hub import ranking (top 5): "
                         + ", ".join(f"{p.rsplit('/', 1)[-1]}={s}" for p, s in top_scored)
                     )
 
@@ -211,7 +209,8 @@ class CodeRetriever:
         # (protocols, data models, enums). Ranked by query relevance
         # (same keyword scoring as hub imports) then capped at 10.
         foundation_candidates = [
-            path for path, _count in (self._foundation_files or [])
+            path
+            for path, _count in (self._foundation_files or [])
             if path not in seen_so_far and path in file_set
         ]
         if foundation_candidates and all_terms and index_text:
@@ -231,12 +230,10 @@ class CodeRetriever:
             logger.info(f"Foundation auto-inclusion added {len(foundation_added)} files")
 
         # Neighbor expansion (same-directory siblings)
-        all_so_far = list(dict.fromkeys(
-            selected + import_expanded + facade_added + hub_added + foundation_added
-        ))
-        neighbors = self._neighbor_expand(
-            all_so_far, file_paths, import_graph, query
+        all_so_far = list(
+            dict.fromkeys(selected + import_expanded + facade_added + hub_added + foundation_added)
         )
+        neighbors = self._neighbor_expand(all_so_far, file_paths, import_graph, query)
         logger.debug(f"Neighbor expansion added {len(neighbors)} files")
 
         # Final file list — priority order:
@@ -274,10 +271,17 @@ class CodeRetriever:
         # > neighbor.  Foundation files go before hub imports so they aren't
         # displaced by engine.py's 52 import expansions.
         hub_expansion = [p for p in hub_added if p not in set(hub_core)]
-        all_files = list(dict.fromkeys(
-            selected + hub_core + foundation_added + hub_expansion
-            + facade_added + import_expanded + neighbors
-        ))[:limit]
+        all_files = list(
+            dict.fromkeys(
+                selected
+                + hub_core
+                + foundation_added
+                + hub_expansion
+                + facade_added
+                + import_expanded
+                + neighbors
+            )
+        )[:limit]
 
         # Post-limit facade swap: replace __init__.py files with their
         # actual implementations if the init just re-exports.  An init
@@ -391,8 +395,7 @@ class CodeRetriever:
             foundations = [
                 (path, count)
                 for path, count in conn_counts.items()
-                if count > self._foundation_import_threshold
-                and path in file_set_check
+                if count > self._foundation_import_threshold and path in file_set_check
             ]
             foundations.sort(key=lambda x: x[1], reverse=True)
             self._foundation_files = foundations  # all candidates, ranked per-query
@@ -416,15 +419,12 @@ class CodeRetriever:
     # LLM interaction
     # ------------------------------------------------------------------
 
-    def _llm_expand_and_select(
-        self, index: str, query: str
-    ) -> tuple[list[str], list[str]]:
+    def _llm_expand_and_select(self, index: str, query: str) -> tuple[list[str], list[str]]:
         """Combined query expansion + file selection in one LLM call."""
         hub_files = self._hub_files or []
         if hub_files:
             hub_lines = "\n".join(
-                f"  - {path} (imports {count} subsystems)"
-                for path, count in hub_files
+                f"  - {path} (imports {count} subsystems)" for path, count in hub_files
             )
             hub_hint = HUB_FILES_HINT.format(hub_files=hub_lines)
         else:
@@ -463,14 +463,13 @@ class CodeRetriever:
         # Last resort: extract file paths from markdown/plain text
         # Catches cases where LLM outputs bullet lists instead of JSON
         import re
+
         file_paths = re.findall(
             r'[`"\s\-\*]([a-zA-Z_][\w/]*\.(?:py|yaml|yml|json|toml|md|ts|js|go|rs))',
             text,
         )
         if file_paths:
-            logger.info(
-                f"Extracted {len(file_paths)} file paths from non-JSON response"
-            )
+            logger.info(f"Extracted {len(file_paths)} file paths from non-JSON response")
             return [], file_paths
 
         logger.warning(f"Could not parse LLM response: {text[:200]}")
@@ -480,9 +479,7 @@ class CodeRetriever:
     # Expansion
     # ------------------------------------------------------------------
 
-    def _expand_imports(
-        self, selected: list[str], import_graph: dict[str, set[str]]
-    ) -> list[str]:
+    def _expand_imports(self, selected: list[str], import_graph: dict[str, set[str]]) -> list[str]:
         """Forward-only depth-1 import expansion."""
         seen = set(selected)
         expanded: list[str] = []
@@ -525,9 +522,7 @@ class CodeRetriever:
 
             if len(new_siblings) > self._neighbor_screen_threshold:
                 # LLM screening for large directories
-                screened = self._screen_neighbors(
-                    query, d, new_siblings, selected
-                )
+                screened = self._screen_neighbors(query, d, new_siblings, selected)
                 new_siblings = screened
 
             for p in new_siblings:
@@ -552,9 +547,7 @@ class CodeRetriever:
             max_file_bytes=self._max_file_bytes,
             max_chars=20_000,
         )
-        trigger_file = next(
-            (t for t in triggers if t.startswith(directory + "/")), directory
-        )
+        trigger_file = next((t for t in triggers if t.startswith(directory + "/")), directory)
         prompt = NEIGHBOR_SCREEN_PROMPT.format(
             query=query,
             trigger_file=trigger_file,
@@ -581,11 +574,16 @@ class CodeRetriever:
     # Read + compress
     # ------------------------------------------------------------------
 
-    def _read_and_compress(
-        self, file_paths: list[str], origin: dict[str, str]
-    ) -> list[ReadResult]:
+    def _read_and_compress(self, file_paths: list[str], origin: dict[str, str]) -> list[ReadResult]:
         """Read files from disk, compress Python, return ReadResults."""
-        _ORIGIN_SCORES = {"selected": 1.0, "hub": 0.95, "foundation": 0.93, "facade": 0.92, "import": 0.9, "neighbor": 0.8}
+        _ORIGIN_SCORES = {
+            "selected": 1.0,
+            "hub": 0.95,
+            "foundation": 0.93,
+            "facade": 0.92,
+            "import": 0.9,
+            "neighbor": 0.8,
+        }
         results: list[ReadResult] = []
 
         for path in file_paths:

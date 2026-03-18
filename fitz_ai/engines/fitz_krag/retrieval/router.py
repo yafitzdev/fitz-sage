@@ -574,9 +574,7 @@ class RetrievalRouter:
         return result
 
     @staticmethod
-    def _enforce_file_diversity(
-        addresses: list[Address], max_per_file: int = 3
-    ) -> list[Address]:
+    def _enforce_file_diversity(addresses: list[Address], max_per_file: int = 3) -> list[Address]:
         """Reorder addresses so no single file monopolizes the top slots.
 
         Preserves ranking order but defers excess addresses from any one file

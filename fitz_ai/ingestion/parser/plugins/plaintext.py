@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from typing import List, Set
 
 from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
-from fitz_ai.ingestion.parser.base import ParseError
 from fitz_ai.ingestion.source.base import SourceFile
 
 from .base_parser import BaseParser

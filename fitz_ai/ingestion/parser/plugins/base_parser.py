@@ -12,12 +12,11 @@ This reduces code duplication across parser implementations by providing:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 from typing import Any, Set
 
 from fitz_ai.core.document import ParsedDocument
-from fitz_ai.ingestion.parser.base import ParseError, Parser
+from fitz_ai.ingestion.parser.base import ParseError
 from fitz_ai.ingestion.source.base import SourceFile
 
 logger = logging.getLogger(__name__)
@@ -113,10 +112,7 @@ class BaseParser:
         return metadata
 
     def _read_file_text(
-        self,
-        file: SourceFile,
-        encoding: str = "utf-8",
-        fallback_encoding: str = "latin-1"
+        self, file: SourceFile, encoding: str = "utf-8", fallback_encoding: str = "latin-1"
     ) -> str:
         """
         Read text content from a file with encoding fallback.
@@ -135,10 +131,7 @@ class BaseParser:
             ParseError: If file cannot be read
         """
         if not file.local_path:
-            raise ParseError(
-                "No local path available for file",
-                source=file.uri
-            )
+            raise ParseError("No local path available for file", source=file.uri)
 
         try:
             # Try primary encoding
@@ -147,8 +140,7 @@ class BaseParser:
             except UnicodeDecodeError:
                 # Fallback to alternative encoding
                 logger.debug(
-                    f"Failed to decode {file.uri} with {encoding}, "
-                    f"trying {fallback_encoding}"
+                    f"Failed to decode {file.uri} with {encoding}, " f"trying {fallback_encoding}"
                 )
                 content = file.local_path.read_text(encoding=fallback_encoding)
 
@@ -177,10 +169,7 @@ class BaseParser:
             ParseError: If file cannot be read
         """
         if not file.local_path:
-            raise ParseError(
-                "No local path available for file",
-                source=file.uri
-            )
+            raise ParseError("No local path available for file", source=file.uri)
 
         try:
             return file.local_path.read_bytes()

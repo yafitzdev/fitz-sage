@@ -25,18 +25,10 @@ class TimeoutMixin(BaseModel):
     Used by: cloud, http clients, database connections, LLM providers.
     """
 
-    timeout: int = Field(
-        default=30,
-        ge=1,
-        le=600,
-        description="Request timeout in seconds"
-    )
+    timeout: int = Field(default=30, ge=1, le=600, description="Request timeout in seconds")
 
     connect_timeout: Optional[int] = Field(
-        default=5,
-        ge=1,
-        le=30,
-        description="Connection timeout in seconds"
+        default=5, ge=1, le=30, description="Connection timeout in seconds"
     )
 
 
@@ -47,19 +39,9 @@ class PoolConfigMixin(BaseModel):
     Used by: storage, vector_db, any pooled resource.
     """
 
-    pool_min_size: int = Field(
-        default=1,
-        ge=1,
-        le=100,
-        description="Minimum connections in pool"
-    )
+    pool_min_size: int = Field(default=1, ge=1, le=100, description="Minimum connections in pool")
 
-    pool_max_size: int = Field(
-        default=10,
-        ge=1,
-        le=100,
-        description="Maximum connections in pool"
-    )
+    pool_max_size: int = Field(default=10, ge=1, le=100, description="Maximum connections in pool")
 
     @field_validator("pool_max_size")
     def validate_pool_sizes(cls, v, info):
@@ -77,20 +59,11 @@ class ApiConfigMixin(BaseModel):
     Used by: cloud, LLM providers, external services.
     """
 
-    api_key: Optional[str] = Field(
-        default=None,
-        description="API key for authentication"
-    )
+    api_key: Optional[str] = Field(default=None, description="API key for authentication")
 
-    base_url: Optional[str] = Field(
-        default=None,
-        description="API base URL"
-    )
+    base_url: Optional[str] = Field(default=None, description="API base URL")
 
-    headers: dict[str, str] = Field(
-        default_factory=dict,
-        description="Additional HTTP headers"
-    )
+    headers: dict[str, str] = Field(default_factory=dict, description="Additional HTTP headers")
 
 
 class FeatureToggleMixin(BaseModel):
@@ -100,10 +73,7 @@ class FeatureToggleMixin(BaseModel):
     Used by: cloud, optional features, experimental flags.
     """
 
-    enabled: bool = Field(
-        default=False,
-        description="Enable this feature"
-    )
+    enabled: bool = Field(default=False, description="Enable this feature")
 
     def is_enabled(self) -> bool:
         """Check if feature is enabled (for consistent naming)."""
@@ -117,25 +87,14 @@ class RetryConfigMixin(BaseModel):
     Used by: HTTP clients, database operations, API calls.
     """
 
-    max_retries: int = Field(
-        default=3,
-        ge=0,
-        le=10,
-        description="Maximum retry attempts"
-    )
+    max_retries: int = Field(default=3, ge=0, le=10, description="Maximum retry attempts")
 
     retry_delay: float = Field(
-        default=1.0,
-        ge=0.1,
-        le=60.0,
-        description="Initial retry delay in seconds"
+        default=1.0, ge=0.1, le=60.0, description="Initial retry delay in seconds"
     )
 
     retry_backoff: float = Field(
-        default=2.0,
-        ge=1.0,
-        le=5.0,
-        description="Exponential backoff multiplier"
+        default=2.0, ge=1.0, le=5.0, description="Exponential backoff multiplier"
     )
 
 
@@ -162,6 +121,7 @@ class ValidationMixin(BaseModel):
 
 # Composite base classes for common combinations
 
+
 class ApiServiceConfig(ApiConfigMixin, TimeoutMixin, ValidationMixin):
     """
     Base for external API service configurations.
@@ -169,6 +129,7 @@ class ApiServiceConfig(ApiConfigMixin, TimeoutMixin, ValidationMixin):
     Combines API settings, timeouts, and validation.
     Example: cloud config, LLM provider configs.
     """
+
     pass
 
 
@@ -180,10 +141,7 @@ class DatabaseConfig(PoolConfigMixin, TimeoutMixin, ValidationMixin):
     Example: storage config, vector DB config.
     """
 
-    connection_string: Optional[str] = Field(
-        default=None,
-        description="Database connection string"
-    )
+    connection_string: Optional[str] = Field(default=None, description="Database connection string")
 
 
 class FeatureConfig(FeatureToggleMixin, ValidationMixin):
@@ -193,6 +151,7 @@ class FeatureConfig(FeatureToggleMixin, ValidationMixin):
     Combines enable/disable with validation.
     Example: experimental features, optional modules.
     """
+
     pass
 
 
@@ -200,11 +159,11 @@ class FeatureConfig(FeatureToggleMixin, ValidationMixin):
 class TimeoutDefaults(Enum):
     """Standard timeout values across the platform."""
 
-    FAST = 5      # Health checks, simple queries
-    NORMAL = 30   # Standard API calls
-    SLOW = 60     # File operations, complex queries
-    CHAT = 300    # LLM chat completions
-    EMBED = 120   # Embedding operations
+    FAST = 5  # Health checks, simple queries
+    NORMAL = 30  # Standard API calls
+    SLOW = 60  # File operations, complex queries
+    CHAT = 300  # LLM chat completions
+    EMBED = 120  # Embedding operations
 
     @classmethod
     def get(cls, operation: str) -> int:

@@ -24,27 +24,63 @@ _PYTHON_EXTS = {".py"}
 _CONFIG_EXTS = {".yaml", ".yml", ".json", ".toml"}
 _MARKDOWN_EXTS = {".md", ".rst"}
 _GENERIC_CODE_EXTS = {
-    ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs",
-    ".go", ".rs",
-    ".java", ".kt", ".scala",
-    ".c", ".h", ".cpp", ".hpp", ".cc", ".cxx",
-    ".rb", ".cs", ".swift", ".php",
-    ".lua", ".zig",
-    ".sh", ".bash", ".zsh",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".mjs",
+    ".cjs",
+    ".go",
+    ".rs",
+    ".java",
+    ".kt",
+    ".scala",
+    ".c",
+    ".h",
+    ".cpp",
+    ".hpp",
+    ".cc",
+    ".cxx",
+    ".rb",
+    ".cs",
+    ".swift",
+    ".php",
+    ".lua",
+    ".zig",
+    ".sh",
+    ".bash",
+    ".zsh",
 }
 
 INDEXABLE_EXTENSIONS = _PYTHON_EXTS | _CONFIG_EXTS | _MARKDOWN_EXTS | _GENERIC_CODE_EXTS
 
 SKIP_DIRS = {
-    ".git", "__pycache__", "node_modules", ".venv", "venv", ".env",
-    ".tox", ".mypy_cache", ".pytest_cache", ".ruff_cache",
-    "dist", "build", ".eggs", "*.egg-info",
+    ".git",
+    "__pycache__",
+    "node_modules",
+    ".venv",
+    "venv",
+    ".env",
+    ".tox",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    ".eggs",
+    "*.egg-info",
 }
 
-_KEY_DECORATORS = frozenset({
-    "dataclass", "abstractmethod", "property", "staticmethod",
-    "classmethod", "override",
-})
+_KEY_DECORATORS = frozenset(
+    {
+        "dataclass",
+        "abstractmethod",
+        "property",
+        "staticmethod",
+        "classmethod",
+        "override",
+    }
+)
 
 
 def build_file_list(source_dir: Path, max_files: int = 2000) -> list[str]:
@@ -237,7 +273,8 @@ def _extract_python(content: str) -> str:
                 if isinstance(target, ast.Name) and target.id == "__all__":
                     if isinstance(node.value, (ast.List, ast.Tuple)):
                         names = [
-                            elt.value for elt in node.value.elts
+                            elt.value
+                            for elt in node.value.elts
                             if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
                         ]
                         if names:
@@ -278,11 +315,11 @@ def _extract_key_decorators(decorator_list: list[ast.expr]) -> list[str]:
 
 def _extract_python_regex(content: str) -> str:
     lines: list[str] = []
-    classes = re.findall(r'^class\s+(\w+)(?:\(([^)]*)\))?:', content, re.MULTILINE)
+    classes = re.findall(r"^class\s+(\w+)(?:\(([^)]*)\))?:", content, re.MULTILINE)
     if classes:
         cls_strs = [f"{n}({b})" if b else n for n, b in classes]
         lines.append(f"classes: {'; '.join(cls_strs)}")
-    functions = re.findall(r'^(?:async\s+)?def\s+(\w+)\(([^)]*)\)', content, re.MULTILINE)
+    functions = re.findall(r"^(?:async\s+)?def\s+(\w+)\(([^)]*)\)", content, re.MULTILINE)
     if functions:
         lines.append(f"functions: {', '.join(f'{n}({p})' for n, p in functions)}")
     return "\n".join(lines)
@@ -297,11 +334,13 @@ def _extract_config(suffix: str, content: str) -> str:
     try:
         if suffix in (".yaml", ".yml"):
             import yaml
+
             data = yaml.safe_load(content)
         elif suffix == ".json":
             data = json.loads(content)
         elif suffix == ".toml":
             import tomllib
+
             data = tomllib.loads(content)
         else:
             return ""
@@ -314,11 +353,11 @@ def _extract_config(suffix: str, content: str) -> str:
 
 
 def _extract_markdown(content: str) -> str:
-    headings = re.findall(r'^(#{1,3})\s+(.+)', content, re.MULTILINE)
+    headings = re.findall(r"^(#{1,3})\s+(.+)", content, re.MULTILINE)
     if headings:
         items = [f"{'#' * len(h[0])} {h[1].strip()}" for h in headings[:15]]
         return f"headings: {'; '.join(items)}"
-    rst_headings = re.findall(r'^(.+)\n[=\-~^]+$', content, re.MULTILINE)
+    rst_headings = re.findall(r"^(.+)\n[=\-~^]+$", content, re.MULTILINE)
     if rst_headings:
         return f"headings: {'; '.join(h.strip() for h in rst_headings[:15])}"
     return ""
@@ -327,22 +366,23 @@ def _extract_markdown(content: str) -> str:
 def _extract_generic_code(content: str) -> str:
     lines: list[str] = []
     type_defs = re.findall(
-        r'^(?:export\s+)?(?:pub\s+)?(?:public\s+|private\s+|protected\s+|abstract\s+)?'
-        r'(?:class|struct|interface|trait|enum|type)\s+(\w+)',
-        content, re.MULTILINE,
+        r"^(?:export\s+)?(?:pub\s+)?(?:public\s+|private\s+|protected\s+|abstract\s+)?"
+        r"(?:class|struct|interface|trait|enum|type)\s+(\w+)",
+        content,
+        re.MULTILINE,
     )
     if type_defs:
         lines.append(f"types: {', '.join(dict.fromkeys(type_defs))}")
 
     func_patterns = [
-        r'^func\s+(?:\([^)]*\)\s+)?(\w+)\s*\(',
-        r'^(?:pub\s+)?(?:async\s+)?fn\s+(\w+)\s*[<(]',
-        r'^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*[<(]',
-        r'^(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:\([^)]*\)\s*=>|function)',
-        r'^\s+(?:public|private|protected|static|override|virtual|abstract|final|\s)*'
-        r'(?:fun|void|int|string|bool|float|double|var|val|Task|async)\s+(\w+)\s*[<(]',
-        r'^(?:\s+)?def\s+(\w+)',
-        r'^(?:static\s+)?(?:inline\s+)?(?:const\s+)?\w[\w:*&<> ]*\s+(\w+)\s*\([^;]*$',
+        r"^func\s+(?:\([^)]*\)\s+)?(\w+)\s*\(",
+        r"^(?:pub\s+)?(?:async\s+)?fn\s+(\w+)\s*[<(]",
+        r"^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*[<(]",
+        r"^(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:\([^)]*\)\s*=>|function)",
+        r"^\s+(?:public|private|protected|static|override|virtual|abstract|final|\s)*"
+        r"(?:fun|void|int|string|bool|float|double|var|val|Task|async)\s+(\w+)\s*[<(]",
+        r"^(?:\s+)?def\s+(\w+)",
+        r"^(?:static\s+)?(?:inline\s+)?(?:const\s+)?\w[\w:*&<> ]*\s+(\w+)\s*\([^;]*$",
     ]
     skip = {"if", "for", "while", "switch", "return", "main"}
     functions: list[str] = []
@@ -360,9 +400,9 @@ def _extract_generic_code(content: str) -> str:
         r'^import\s+.*\s+from\s+["\']([^"\']+)["\']',
         r'^(?:const|let|var)\s+.*=\s*require\(["\']([^"\']+)["\']\)',
         r'^import\s+"([^"]+)"',
-        r'^use\s+([\w:]+)',
-        r'^import\s+([\w.]+)',
-        r'^using\s+([\w.]+)',
+        r"^use\s+([\w:]+)",
+        r"^import\s+([\w.]+)",
+        r"^using\s+([\w.]+)",
         r'^require\s+["\']([^"\']+)["\']',
         r'^#include\s+[<"]([^>"]+)[>"]',
     ]
@@ -418,9 +458,9 @@ def _extract_full_imports(content: str, file_path: str = "") -> set[str]:
 
 def _extract_full_imports_regex(content: str) -> set[str]:
     imports: set[str] = set()
-    for m in re.finditer(r'^\s*from\s+(\S+)\s+import', content, re.MULTILINE):
+    for m in re.finditer(r"^\s*from\s+(\S+)\s+import", content, re.MULTILINE):
         imports.add(m.group(1))
-    for m in re.finditer(r'^\s*import\s+(\S+)', content, re.MULTILINE):
+    for m in re.finditer(r"^\s*import\s+(\S+)", content, re.MULTILINE):
         imports.add(m.group(1).split(",")[0].strip())
     return imports
 

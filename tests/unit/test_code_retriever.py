@@ -6,10 +6,7 @@ from __future__ import annotations
 import json
 import sys
 import textwrap
-from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
 
 from fitz_ai.code.indexer import (
     build_file_list,
@@ -18,7 +15,6 @@ from fitz_ai.code.indexer import (
 )
 from fitz_ai.code.retriever import CodeRetriever
 from fitz_ai.engines.fitz_krag.types import AddressKind
-
 
 # ---------------------------------------------------------------------------
 # Indexer tests
@@ -63,14 +59,18 @@ class TestBuildFileList:
 
 class TestBuildStructuralIndex:
     def test_extracts_python_classes(self, tmp_path):
-        (tmp_path / "models.py").write_text(textwrap.dedent("""\
+        (tmp_path / "models.py").write_text(
+            textwrap.dedent(
+                """\
             class User:
                 def __init__(self, name: str) -> None:
                     self.name = name
 
                 def greet(self) -> str:
                     return f"Hello {self.name}"
-        """))
+        """
+            )
+        )
 
         index = build_structural_index(tmp_path, ["models.py"])
         assert "## models.py" in index
@@ -78,10 +78,14 @@ class TestBuildStructuralIndex:
         assert "classes:" in index
 
     def test_extracts_python_functions(self, tmp_path):
-        (tmp_path / "utils.py").write_text(textwrap.dedent("""\
+        (tmp_path / "utils.py").write_text(
+            textwrap.dedent(
+                """\
             def slugify(text: str) -> str:
                 return text.lower().replace(" ", "-")
-        """))
+        """
+            )
+        )
 
         index = build_structural_index(tmp_path, ["utils.py"])
         assert "slugify" in index
@@ -156,22 +160,32 @@ def _make_chat_factory(response=None):
 class TestCodeRetriever:
     def test_retrieve_end_to_end(self, tmp_path):
         (tmp_path / "app").mkdir()
-        (tmp_path / "app" / "main.py").write_text(textwrap.dedent("""\
+        (tmp_path / "app" / "main.py").write_text(
+            textwrap.dedent(
+                """\
             from app.utils import helper
 
             def run():
                 return helper()
-        """))
-        (tmp_path / "app" / "utils.py").write_text(textwrap.dedent("""\
+        """
+            )
+        )
+        (tmp_path / "app" / "utils.py").write_text(
+            textwrap.dedent(
+                """\
             def helper():
                 return "hello"
-        """))
+        """
+            )
+        )
         (tmp_path / "app" / "__init__.py").write_text("")
 
-        response = json.dumps({
-            "search_terms": ["run", "helper"],
-            "files": ["app/main.py"],
-        })
+        response = json.dumps(
+            {
+                "search_terms": ["run", "helper"],
+                "files": ["app/main.py"],
+            }
+        )
         retriever = CodeRetriever(
             source_dir=tmp_path,
             chat_factory=_make_chat_factory(response),
@@ -195,12 +209,14 @@ class TestCodeRetriever:
         assert results[0].address.kind == AddressKind.FILE
 
     def test_compresses_python(self, tmp_path):
-        source = textwrap.dedent('''\
+        source = textwrap.dedent(
+            '''\
             def foo():
                 """Long docstring that should be stripped."""
                 x = 1
                 return x
-        ''')
+        '''
+        )
         (tmp_path / "mod.py").write_text(source)
         response = json.dumps({"search_terms": [], "files": ["mod.py"]})
 
@@ -260,7 +276,25 @@ class TestCodeRetriever:
 
 class TestNoHeavyImports:
     def test_code_module_does_not_import_heavy_deps(self):
-        """Verify fitz_ai.code doesn't transitively import psycopg/pgvector/docling."""
-        heavy = ["psycopg", "pgvector", "docling", "fitz_pgserver"]
-        loaded = [m for m in heavy if any(k.startswith(m) for k in sys.modules)]
-        assert not loaded, f"Heavy modules loaded: {loaded}"
+        """Verify fitz_ai.code doesn't transitively import psycopg/pgvector/docling.
+
+        Runs in a subprocess to avoid contamination from other tests that
+        load heavy modules earlier in the suite.
+        """
+        import subprocess
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import fitz_ai.code; import sys; "
+                    "heavy = ['psycopg', 'pgvector', 'docling', 'fitz_pgserver']; "
+                    "loaded = [m for m in heavy if any(k.startswith(m) for k in sys.modules)]; "
+                    "assert not loaded, f'Heavy modules loaded: {loaded}'"
+                ),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"Heavy deps imported by fitz_ai.code:\n{result.stderr}"

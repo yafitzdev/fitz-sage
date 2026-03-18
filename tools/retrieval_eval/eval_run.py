@@ -3,14 +3,14 @@
 
 # --- SETTINGS ---
 SOURCE_DIR = "C:/Users/yanfi/PycharmProjects/fitz-ai"
-PROVIDER = "lmstudio"         # "lmstudio", "openai", "ollama", "cohere"
+PROVIDER = "lmstudio"  # "lmstudio", "openai", "ollama", "cohere"
 MODEL = "qwen3-coder-30b-a3b-instruct"  # model name for the scan call
 BASE_URL = "http://localhost:1234/v1"  # LM Studio default
-CATEGORY = None               # e.g. "retrieval", "ingestion", None for all
-IDS = None                    # e.g. "1,2,3", None for all
+CATEGORY = None  # e.g. "retrieval", "ingestion", None for all
+IDS = None  # e.g. "1,2,3", None for all
 VERBOSE = True
-MAX_MANIFEST_CHARS = 80_000   # 80K chars ≈ 20K tokens, fits 32K context
-LIMIT = 50                    # files returned by retrieval
+MAX_MANIFEST_CHARS = 80_000  # 80K chars ≈ 20K tokens, fits 32K context
+LIMIT = 50  # files returned by retrieval
 # -----------------
 
 if __name__ == "__main__":

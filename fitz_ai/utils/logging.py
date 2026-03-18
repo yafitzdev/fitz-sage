@@ -15,7 +15,7 @@ import contextvars
 import logging
 import time
 from contextlib import contextmanager
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 # Context variables for request-scoped data
 _query_context: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar(
@@ -119,11 +119,7 @@ class StructuredLogger:
         try:
             yield
             duration = time.time() - start
-            self.info(
-                f"Completed {name}",
-                status="success",
-                duration_ms=round(duration * 1000, 2)
-            )
+            self.info(f"Completed {name}", status="success", duration_ms=round(duration * 1000, 2))
         except Exception as e:
             duration = time.time() - start
             self.error(
@@ -131,7 +127,7 @@ class StructuredLogger:
                 status="failed",
                 duration_ms=round(duration * 1000, 2),
                 error_type=type(e).__name__,
-                exc_info=True
+                exc_info=True,
             )
             raise
         finally:
