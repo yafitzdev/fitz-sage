@@ -1,3 +1,6 @@
+# Shell scripts (local dev)
+fitz.ps1
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
