@@ -20,30 +20,44 @@
 
 ---
 
-**Other RAG systems** ❌
-```
-  Q: "Who won the 2024 FIFA World Cup?"
-  A: "Germany won the 2024 FIFA World Cup, defeating Argentina
-      1-0 in the final."
+<div align="center">
+<table>
+  <tr>
+    <td align="center" colspan="2">
+      <pre><strong>Q: "Who won the 2024 FIFA World Cup?"</strong>
+(There was no World Cup in 2024.)</pre>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <strong>❌ Uncalibrated RAG systems</strong>
+<pre>
+A: "Germany won the 2024 FIFA World Cup,
+    defeating Argentina 1-0 in the final."
+</pre>
+    </td>
+    <td align="center" width="50%">
+      <strong>🛡️ fitz-ai</strong>
+<pre>
+A: "I don't have enough information
+    to answer this question.
+</pre><pre>
+    Related topics in the knowledge base:
+      - FIFA tournament history (4 mentions)
+      - 2022 World Cup coverage (7 mentions)
+</pre><pre>
+    To answer this, consider adding:
+      - Documents covering 2024 FIFA events."
+</pre>
+    </td>
+  </tr>
+</table>
+  → Uncalibrated RAG hallucinates confidently when the answer isn't in your documents. 
+  
+  Fitz refuses, explains why, and tells you what to add.
+</div>
 
-     ← There was no World Cup in 2024. But the RAG system
-        confidently made one up — and it sounds plausible.
-```
 
-**fitz-ai** 🛡️
-```
-  Q: "Who won the 2024 FIFA World Cup?"
-  A: "I don't have enough information to answer this question.
-
-      Related topics in the knowledge base:
-        - FIFA tournament history (4 mentions)
-        - 2022 World Cup coverage (7 mentions)
-
-      To answer this, consider adding:
-        - Documents covering 2024 FIFA events."
-```
-
-Most RAG tools hallucinate confidently when the answer isn't in your documents. Fitz refuses, explains why, and tells you what to add.
 
 ---
 
@@ -171,6 +185,39 @@ You trade flexibility for a pipeline that handles temporal queries, comparison q
 >4. [x] **Full provenance.** Every answer traces back to the exact source symbol, section, or document.
 >5. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
 >6. [x] **[Enterprise gateway support](docs/features/platform/enterprise-gateway.md).** OAuth2 M2M, custom CA certs, mTLS, and corporate proxy/gateway integration.
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <h3>🗺️ KRAG architecture</h3>
+      Address-based retrieval across code symbols, document sections, and native SQL on tabular data.
+    </td>
+    <td align="center" width="33%">
+      <h3>🛡️ Epistemic governance</h3>
+      ML classifier routes answers to ABSTAIN, DISPUTED, or TRUSTWORTHY — never fabricates.
+    </td>
+    <td align="center" width="33%">
+      <h3>⚡ Progressive indexing</h3>
+      Point at a folder, query instantly. Background worker indexes while you work.
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <h3>🔌 Plugin system</h3>
+      Swap any component — parsers, chunkers, LLMs, vector DBs — via YAML or Python.
+    </td>
+    <td align="center" width="33%">
+      <h3>🏠 Local-first</h3>
+      Zero-dependency local mode with embedded PostgreSQL and Ollama. Works fully offline.
+    </td>
+    <td align="center" width="33%">
+      <h3>🖥️ Three interfaces</h3>
+      CLI, Python SDK, and REST API over a single engine. Same behavior everywhere.
+    </td>
+  </tr>
+</table>
+
+
 
 ####
 
