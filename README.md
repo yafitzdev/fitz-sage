@@ -312,7 +312,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 <br>
 
 > [!NOTE]
-> Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on."
+> Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on.
 
 <strong>The system fails safe 🛡️</strong>
 > The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence ("trustworthy" instead of "disputed") is the rarest error mode.
