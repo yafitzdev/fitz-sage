@@ -186,39 +186,6 @@ You trade flexibility for a pipeline that handles temporal queries, comparison q
 >5. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
 >6. [x] **[Enterprise gateway support](docs/features/platform/enterprise-gateway.md).** OAuth2 M2M, custom CA certs, mTLS, and corporate proxy/gateway integration.
 
-<table>
-  <tr>
-    <td align="center" width="33%">
-      <h3>🗺️ KRAG architecture</h3>
-      Address-based retrieval across code symbols, document sections, and native SQL on tabular data.
-    </td>
-    <td align="center" width="33%">
-      <h3>🛡️ Epistemic governance</h3>
-      ML classifier routes answers to ABSTAIN, DISPUTED, or TRUSTWORTHY — never fabricates.
-    </td>
-    <td align="center" width="33%">
-      <h3>⚡ Progressive indexing</h3>
-      Point at a folder, query instantly. Background worker indexes while you work.
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="33%">
-      <h3>🔌 Plugin system</h3>
-      Swap any component — parsers, chunkers, LLMs, vector DBs — via YAML or Python.
-    </td>
-    <td align="center" width="33%">
-      <h3>🏠 Local-first</h3>
-      Zero-dependency local mode with embedded PostgreSQL and Ollama. Works fully offline.
-    </td>
-    <td align="center" width="33%">
-      <h3>🖥️ Three interfaces</h3>
-      CLI, Python SDK, and REST API over a single engine. Same behavior everywhere.
-    </td>
-  </tr>
-</table>
-
-
-
 ####
 
 > [!TIP]
