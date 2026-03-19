@@ -68,9 +68,11 @@ class AgenticSearchStrategy:
         if not unindexed:
             return []
 
+        # Single file: always use it — user pointed at exactly this file
+        if len(unindexed) == 1:
+            selected_entries = unindexed
         # Fast path: few files — skip LLM, use BM25 + path matching
-        _SKIP_LLM_THRESHOLD = 15
-        if len(unindexed) <= _SKIP_LLM_THRESHOLD:
+        elif len(unindexed) <= _SKIP_LLM_THRESHOLD:
             path_matched = set(self._path_match_files(unindexed, query))
             scored = self._bm25_prefilter(unindexed, query)
             top: list["ManifestEntry"] = []
