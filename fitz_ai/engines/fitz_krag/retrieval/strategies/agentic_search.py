@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Max unindexed files to send to LLM
+_SKIP_LLM_THRESHOLD = 15
 _BM25_PREFILTER_THRESHOLD = 50
 _LLM_MAX_FILES = 10
 
