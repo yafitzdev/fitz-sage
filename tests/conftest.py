@@ -46,28 +46,29 @@ import yaml
 
 
 def pytest_sessionstart(session):
-    """Kill stale postgres/pgserver processes before running tests."""
-    import subprocess
+    """Kill stale postgres/pgserver processes before running tests (Windows only).
+
+    On Linux/CI, skip this — pkill can interfere with GitHub Actions runners.
+    """
     import sys
 
     if sys.platform == "win32":
+        import subprocess
+
         for proc in ["postgres.exe", "pg_ctl.exe"]:
             subprocess.run(
                 ["taskkill", "/F", "/IM", proc],
                 capture_output=True,
             )
-    else:
-        subprocess.run(["pkill", "-f", "pgserver"], capture_output=True)
-        subprocess.run(["pkill", "-f", "postgres"], capture_output=True)
 
-    # Remove stale pgserver lock files
-    fitz_dir = Path.cwd() / ".fitz"
-    if fitz_dir.exists():
-        for lock_file in fitz_dir.rglob("postmaster.pid"):
-            try:
-                lock_file.unlink()
-            except OSError:
-                pass
+        # Remove stale pgserver lock files
+        fitz_dir = Path.cwd() / ".fitz"
+        if fitz_dir.exists():
+            for lock_file in fitz_dir.rglob("postmaster.pid"):
+                try:
+                    lock_file.unlink()
+                except OSError:
+                    pass
 
 
 # =============================================================================
