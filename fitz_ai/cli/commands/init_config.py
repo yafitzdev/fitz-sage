@@ -18,74 +18,6 @@ default_engine: {default_engine}
 """
 
 
-def _build_chat_kwargs_section(
-    chat_model_smart: str,
-    chat_model_fast: str,
-    chat_model_balanced: str,
-) -> str:
-    """Build the chat_kwargs YAML section."""
-    lines = []
-    if chat_model_smart or chat_model_fast or chat_model_balanced:
-        lines.append("  models:")
-        if chat_model_smart:
-            lines.append(f"    smart: {chat_model_smart}")
-        if chat_model_fast:
-            lines.append(f"    fast: {chat_model_fast}")
-        if chat_model_balanced:
-            lines.append(f"    balanced: {chat_model_balanced}")
-    lines.append("  temperature: 0.2")
-    return "\n".join(lines)
-
-
-def _build_embedding_kwargs_section(embedding_model: str) -> str:
-    """Build the embedding_kwargs YAML section."""
-    if embedding_model:
-        return f"  model: {embedding_model}"
-    return ""
-
-
-def _build_rerank_sections(rerank: str | None, rerank_model: str) -> tuple[str, str]:
-    """Build rerank line and kwargs section.
-
-    Returns:
-        Tuple of (rerank_line, rerank_kwargs_section).
-    """
-    if rerank:
-        rerank_line = f"rerank: {rerank}"
-        if rerank_model:
-            rerank_kwargs_section = f"""
-# Reranker kwargs
-rerank_kwargs:
-  model: {rerank_model}"""
-        else:
-            rerank_kwargs_section = ""
-    else:
-        rerank_line = "rerank: null  # No reranker configured"
-        rerank_kwargs_section = ""
-    return rerank_line, rerank_kwargs_section
-
-
-def _build_vision_sections(vision: str | None, vision_model: str) -> tuple[str, str]:
-    """Build vision line and kwargs section.
-
-    Returns:
-        Tuple of (vision_line, vision_kwargs_section).
-    """
-    if vision:
-        vision_line = f"vision: {vision}"
-        if vision_model:
-            vision_kwargs_section = f"""
-# Vision kwargs
-vision_kwargs:
-  model: {vision_model}"""
-        else:
-            vision_kwargs_section = ""
-    else:
-        vision_line = "vision: null  # Enable with: vision: openai or vision: anthropic"
-        vision_kwargs_section = ""
-    return vision_line, vision_kwargs_section
-
-
 def _build_vdb_kwargs_section(vector_db: str) -> str:
     """Build vector_db_kwargs YAML section."""
     if vector_db == "pgvector":
@@ -94,6 +26,48 @@ def _build_vdb_kwargs_section(vector_db: str) -> str:
 vector_db_kwargs:
   mode: local  # "local" (embedded) or "external" (connection_string)"""
     return ""
+
+
+def _build_chat_specs(
+    chat: str,
+    chat_model_smart: str,
+    chat_model_fast: str,
+    chat_model_balanced: str,
+) -> str:
+    """Build chat tier spec lines."""
+    def _spec(model: str) -> str:
+        if model:
+            return f"{chat}/{model}"
+        return chat
+
+    return f"""chat_fast: {_spec(chat_model_fast)}
+chat_balanced: {_spec(chat_model_balanced)}
+chat_smart: {_spec(chat_model_smart)}"""
+
+
+def _build_embedding_spec(embedding: str, embedding_model: str) -> str:
+    """Build embedding spec line."""
+    if embedding_model:
+        return f"embedding: {embedding}/{embedding_model}"
+    return f"embedding: {embedding}"
+
+
+def _build_rerank_line(rerank: str | None, rerank_model: str) -> str:
+    """Build rerank line."""
+    if rerank:
+        if rerank_model:
+            return f"rerank: {rerank}/{rerank_model}"
+        return f"rerank: {rerank}"
+    return "rerank: null  # No reranker configured"
+
+
+def _build_vision_line(vision: str | None, vision_model: str) -> str:
+    """Build vision line."""
+    if vision:
+        if vision_model:
+            return f"vision: {vision}/{vision_model}"
+        return f"vision: {vision}"
+    return "vision: null  # Enable with: vision: openai/gpt-4o or vision: ollama/llava"
 
 
 def generate_fitz_krag_config(
@@ -113,15 +87,12 @@ def generate_fitz_krag_config(
     """
     Generate the Fitz KRAG config YAML string.
 
-    Produces flat YAML (no fitz_krag: wrapper - loader handles unwrapping).
-    Includes user-selected plugins plus KRAG-specific defaults matching default.yaml.
+    Produces flat YAML with provider/model specs for each tier.
     """
-    chat_kwargs_section = _build_chat_kwargs_section(
-        chat_model_smart, chat_model_fast, chat_model_balanced
-    )
-    embedding_kwargs_section = _build_embedding_kwargs_section(embedding_model)
-    rerank_line, rerank_kwargs_section = _build_rerank_sections(rerank, rerank_model)
-    vision_line, vision_kwargs_section = _build_vision_sections(vision, vision_model)
+    chat_specs = _build_chat_specs(chat, chat_model_smart, chat_model_fast, chat_model_balanced)
+    embedding_spec = _build_embedding_spec(embedding, embedding_model)
+    rerank_line = _build_rerank_line(rerank, rerank_model)
+    vision_line = _build_vision_line(vision, vision_model)
     vdb_kwargs_section = _build_vdb_kwargs_section(vector_db)
 
     return f"""# Fitz KRAG Engine Configuration
@@ -131,26 +102,28 @@ def generate_fitz_krag_config(
 # Uses knowledge-type-aware strategies instead of uniform chunk retrieval.
 
 # ===========================================================================
-# Core Plugins
+# Chat models by tier (provider/model)
 # ===========================================================================
 
-# Chat LLM for answering questions
-chat: {chat}
+{chat_specs}
 
-# Embedding model for vectors
-embedding: {embedding}
+# ===========================================================================
+# Embedding model
+# ===========================================================================
 
+{embedding_spec}
+
+# ===========================================================================
 # Vector database
+# ===========================================================================
+
 vector_db: {vector_db}
 
 # ===========================================================================
 # Optional Features (null = disabled)
 # ===========================================================================
 
-# Reranker for improved retrieval quality
 {rerank_line}
-
-# Vision/VLM for image parsing
 {vision_line}
 
 # ===========================================================================
@@ -199,19 +172,7 @@ strict_grounding: true
 # ===========================================================================
 
 log_level: INFO
-
-# ===========================================================================
-# Plugin Kwargs (Advanced)
-# ===========================================================================
-
-# Chat model tiers (smart for queries, fast for background tasks)
-chat_kwargs:
-{chat_kwargs_section}
-
-# Embedding model override
-embedding_kwargs:
-{embedding_kwargs_section if embedding_kwargs_section else "  {}"}
-{rerank_kwargs_section}{vision_kwargs_section}{vdb_kwargs_section}
+{vdb_kwargs_section}
 """
 
 

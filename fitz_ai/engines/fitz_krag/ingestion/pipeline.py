@@ -537,7 +537,6 @@ class KragIngestPipeline:
 
             vision_client = get_vision(
                 self._config.vision,
-                config=(self._config.vision_kwargs.model_dump(exclude_none=True) or None),
             )
             if vision_client:
                 for parser in router._parsers.values():

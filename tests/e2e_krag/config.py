@@ -44,18 +44,17 @@ def get_tier_config(tier_name: str, base_config: dict[str, Any] | None = None) -
         raise ValueError(f"Unknown tier: {tier_name}. Available: {available}")
 
     # Build tier config matching the expected structure
-    # Use tier-specific embedding if defined, otherwise fall back to base config
     embedding_plugin = tier.get("embedding", base_config.get("embedding"))
-    embedding_kwargs = tier.get("embedding_kwargs", base_config.get("embedding_kwargs", {}))
+    embedding_model = tier.get("embedding_model", "")
 
     return {
         "chat": {
             "plugin_name": tier["chat"],
-            "kwargs": tier.get("chat_kwargs", {}),
+            "models": tier.get("chat_models", {}),
         },
         "embedding": {
             "plugin_name": embedding_plugin,
-            "kwargs": embedding_kwargs,
+            "model": embedding_model,
         },
         "vector_db": {
             "plugin_name": base_config["vector_db"],

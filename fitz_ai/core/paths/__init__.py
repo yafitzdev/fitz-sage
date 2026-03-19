@@ -63,21 +63,6 @@ class FitzPaths:
         """Default config file path: {workspace}/config.yaml"""
         return _config.config()
 
-    @classmethod
-    def config_dir(cls) -> Path:
-        """Config directory: {workspace}/config/"""
-        return _config.config_dir()
-
-    @classmethod
-    def engine_config(cls, engine_name: str) -> Path:
-        """Engine-specific config: {workspace}/config/{engine_name}.yaml"""
-        return _config.engine_config(engine_name)
-
-    @classmethod
-    def ensure_config_dir(cls) -> Path:
-        """Get config directory and create it if it doesn't exist."""
-        return _config.ensure_config_dir()
-
     # Vector DB / Storage
     @classmethod
     def vector_db(cls, collection: Optional[str] = None) -> Path:

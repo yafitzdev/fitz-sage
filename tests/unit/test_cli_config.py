@@ -99,7 +99,7 @@ class TestConfigPathOption:
 
     def test_config_path_missing_file(self, tmp_path):
         """Test --path with missing config shows error."""
-        nonexistent = tmp_path / "nonexistent" / "fitz_krag.yaml"
+        nonexistent = tmp_path / "nonexistent" / "config.yaml"
 
         mock_ctx = _make_mock_context(
             has_user_config=False,
@@ -109,12 +109,8 @@ class TestConfigPathOption:
         with (
             patch("fitz_ai.cli.commands.config.CLIContext.load", return_value=mock_ctx),
             patch(
-                "fitz_ai.cli.commands.config.FitzPaths.engine_config",
-                return_value=nonexistent,
-            ),
-            patch(
                 "fitz_ai.cli.commands.config.FitzPaths.config",
-                return_value=nonexistent.parent / "fitz.yaml",
+                return_value=nonexistent,
             ),
         ):
             result = runner.invoke(app, ["config", "--path"])
@@ -177,7 +173,7 @@ class TestConfigEditOption:
 
     def test_config_edit_missing_file(self, tmp_path):
         """Test --edit with missing config shows error."""
-        nonexistent = tmp_path / "nonexistent" / "fitz_krag.yaml"
+        nonexistent = tmp_path / "nonexistent" / "config.yaml"
 
         mock_ctx = _make_mock_context(
             has_user_config=False,
@@ -187,12 +183,8 @@ class TestConfigEditOption:
         with (
             patch("fitz_ai.cli.commands.config.CLIContext.load", return_value=mock_ctx),
             patch(
-                "fitz_ai.cli.commands.config.FitzPaths.engine_config",
-                return_value=nonexistent,
-            ),
-            patch(
                 "fitz_ai.cli.commands.config.FitzPaths.config",
-                return_value=nonexistent.parent / "fitz.yaml",
+                return_value=nonexistent,
             ),
         ):
             result = runner.invoke(app, ["config", "--edit"])

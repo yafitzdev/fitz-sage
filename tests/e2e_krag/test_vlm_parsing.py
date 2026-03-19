@@ -130,9 +130,21 @@ def vlm_krag_engine(set_workspace):
     tier_names = get_tier_names(e2e_config)
     tier_config = get_tier_config(tier_names[0], e2e_config)
 
+    chat_plugin = tier_config["chat"]["plugin_name"]
+    chat_models = tier_config["chat"].get("models", {})
+    embedding_plugin = tier_config["embedding"]["plugin_name"]
+    embedding_model = tier_config["embedding"].get("model", "")
+
+    chat_fast = f"{chat_plugin}/{chat_models['fast']}" if chat_models.get("fast") else chat_plugin
+    chat_balanced = f"{chat_plugin}/{chat_models['balanced']}" if chat_models.get("balanced") else chat_plugin
+    chat_smart = f"{chat_plugin}/{chat_models['smart']}" if chat_models.get("smart") else chat_plugin
+    embedding_spec = f"{embedding_plugin}/{embedding_model}" if embedding_model else embedding_plugin
+
     config_dict = {
-        "chat": tier_config["chat"]["plugin_name"],
-        "embedding": tier_config["embedding"]["plugin_name"],
+        "chat_fast": chat_fast,
+        "chat_balanced": chat_balanced,
+        "chat_smart": chat_smart,
+        "embedding": embedding_spec,
         "vector_db": tier_config["vector_db"]["plugin_name"],
         "collection": collection,
         # VLM config
@@ -143,9 +155,6 @@ def vlm_krag_engine(set_workspace):
         "strict_grounding": False,
         "top_addresses": 20,
         "top_read": 10,
-        # Plugin kwargs from tier config
-        "chat_kwargs": tier_config["chat"].get("kwargs", {}),
-        "embedding_kwargs": tier_config["embedding"].get("kwargs", {}),
         "vector_db_kwargs": tier_config["vector_db"].get("kwargs", {}),
     }
 

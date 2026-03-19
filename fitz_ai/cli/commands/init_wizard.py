@@ -195,22 +195,20 @@ def _save_configs(
     fitz_config = FitzPaths.config()
 
     # Confirm overwrite if exists
-    if engine_config_yaml:
-        engine_config_path = FitzPaths.engine_config(default_engine)
-        if (fitz_config.exists() or engine_config_path.exists()) and not non_interactive:
-            if not ui.prompt_confirm("Config exists. Overwrite?", default=False):
-                ui.warning("Aborted.")
-                raise typer.Exit(0)
+    if fitz_config.exists() and not non_interactive:
+        if not ui.prompt_confirm("Config exists. Overwrite?", default=False):
+            ui.warning("Aborted.")
+            raise typer.Exit(0)
 
     fitz_dir.mkdir(parents=True, exist_ok=True)
-    fitz_config.write_text(global_config_yaml)
-    ui.success(f"Saved global config to {fitz_config}")
 
+    # Write engine config as the main config.yaml (flat format)
     if engine_config_yaml:
-        engine_config_path = FitzPaths.engine_config(default_engine)
-        FitzPaths.ensure_config_dir()
-        engine_config_path.write_text(engine_config_yaml)
-        ui.success(f"Saved engine config to {engine_config_path}")
+        fitz_config.write_text(engine_config_yaml)
+        ui.success(f"Saved config to {fitz_config}")
+    else:
+        fitz_config.write_text(global_config_yaml)
+        ui.success(f"Saved global config to {fitz_config}")
 
 
 def _show_next_steps() -> None:
@@ -341,10 +339,7 @@ def command(
 
     # Show config
     ui.section("Generated Configuration")
-    ui.print("Global config (.fitz/config.yaml):", "bold")
-    ui.syntax(global_config_yaml, "yaml")
-    print()
-    ui.print(f"Engine config (.fitz/config/{default_engine}.yaml):", "bold")
+    ui.print("Config (.fitz/config.yaml):", "bold")
     ui.syntax(engine_config_yaml, "yaml")
 
     if show_config:

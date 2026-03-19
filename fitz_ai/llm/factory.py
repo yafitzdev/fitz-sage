@@ -8,8 +8,12 @@ Tier assignments are developer decisions, not user-configurable.
 Usage:
     from fitz_ai.llm.factory import ChatFactory, get_chat_factory
 
-    # Create factory once
-    chat_factory = get_chat_factory("cohere")
+    # Create factory once (flat config: one spec per tier)
+    chat_factory = get_chat_factory({
+        "fast": "ollama/qwen3.5:0.6b",
+        "balanced": "ollama/qwen2.5:7b",
+        "smart": "ollama/qwen2.5:14b",
+    })
 
     # Use different tiers per task
     fast_chat = chat_factory("fast")       # Simple tasks
@@ -33,27 +37,31 @@ ModelTier = Literal["fast", "balanced", "smart"]
 ChatFactory = Callable[[ModelTier], ChatProvider]
 
 
-def get_chat_factory(spec: str, config: dict[str, Any] | None = None) -> ChatFactory:
+def get_chat_factory(
+    tier_specs: dict[str, str],
+    config: dict[str, Any] | None = None,
+) -> ChatFactory:
     """
     Create a factory that returns cached chat clients per tier.
 
     Args:
-        spec: Provider spec (e.g., "cohere", "openai/gpt-4o").
+        tier_specs: Dict mapping tier name to provider spec
+                    (e.g., {"fast": "ollama/qwen3.5:0.6b", "smart": "ollama/qwen2.5:14b"}).
         config: Optional config with auth/base_url settings.
 
     Returns:
         Factory function: (tier) -> ChatProvider
 
     Example:
-        factory = get_chat_factory("cohere")
+        factory = get_chat_factory({"fast": "ollama/qwen3.5:0.6b", "smart": "ollama/qwen2.5:14b"})
         chat = factory("fast")  # Returns cached fast-tier client
         chat.chat([{"role": "user", "content": "Hello"}])
     """
-    # Cache clients per tier (lazy initialization)
     cache: dict[ModelTier, ChatProvider] = {}
 
     def factory(tier: ModelTier = "fast") -> ChatProvider:
         if tier not in cache:
+            spec = tier_specs.get(tier, tier_specs.get("fast"))
             cache[tier] = create_chat_provider(spec, config, tier)
         return cache[tier]
 

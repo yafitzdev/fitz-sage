@@ -566,17 +566,19 @@ def main():
     cfg = load_engine_config("fitz_krag")
 
     # Chat client
-    chat_spec = args.chat or cfg.chat
-    chat_config = {k: v for k, v in cfg.chat_kwargs.model_dump().items() if v is not None}
-    chat_factory = get_chat_factory(chat_spec, config=chat_config)
+    chat_spec = args.chat or cfg.chat_smart
+    chat_factory = get_chat_factory({
+        "fast": cfg.chat_fast,
+        "balanced": cfg.chat_balanced,
+        "smart": cfg.chat_smart,
+    })
     chat = chat_factory("fast")
     chat_balanced = chat_factory("balanced")
     print(f"Chat provider: {chat_spec}")
 
     # Embedding client
     embed_spec = args.embedding or cfg.embedding
-    embed_config = {k: v for k, v in cfg.embedding_kwargs.model_dump().items() if v is not None}
-    embedder = get_embedder(embed_spec, config=embed_config)
+    embedder = get_embedder(embed_spec)
     print(f"Embedding provider: {embed_spec}")
 
     # Detection orchestrator (uses chat_factory for LLM classification)

@@ -154,13 +154,11 @@ class FitzKragEngine:
         with ThreadPoolExecutor(max_workers=3) as pool:
             chat_future = pool.submit(
                 get_chat,
-                self._config.chat,
-                config=self._config.chat_kwargs.model_dump(exclude_none=True) or None,
+                self._config.chat_smart,
             )
             embed_future = pool.submit(
                 get_embedder,
                 self._config.embedding,
-                config=self._config.embedding_kwargs.model_dump(exclude_none=True) or None,
             )
             pg_future = pool.submit(PostgresConnectionManager.get_instance)
 
@@ -254,7 +252,11 @@ class FitzKragEngine:
         # Chat factory (shared by detection, rewriter, HyDE, multi-hop, enrichment)
         from fitz_ai.llm.factory import get_chat_factory
 
-        self._chat_factory = get_chat_factory(self._config.chat)
+        self._chat_factory = get_chat_factory({
+            "fast": self._config.chat_fast,
+            "balanced": self._config.chat_balanced,
+            "smart": self._config.chat_smart,
+        })
 
         # Pre-load chat models sequentially: fast first (guardrails/detection),
         # then smart (generation). Sequential avoids VRAM contention on ollama.
@@ -1026,7 +1028,7 @@ class FitzKragEngine:
             optimizer=CLOUD_OPTIMIZER_VERSION,
             engine=fitz_ai.__version__,
             collection=self._config.collection,
-            llm_model=self._config.chat,
+            llm_model=self._config.chat_smart,
             prompt_template="default",
         )
 

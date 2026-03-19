@@ -54,25 +54,25 @@ class TestQueryHelpers:
 
         from fitz_ai.cli.context import CLIContext
 
-        # Create engine-specific config file
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-        config_path = config_dir / "fitz_krag.yaml"
+        # Create flat config file
+        config_path = tmp_path / "config.yaml"
         config = {
-            "chat": "cohere",
-            "embedding": "cohere",
+            "chat_fast": "ollama/qwen3.5:0.6b",
+            "chat_balanced": "ollama/qwen2.5:7b",
+            "chat_smart": "cohere/command-a-03-2025",
+            "embedding": "cohere/embed-v4.0",
             "vector_db": "pgvector",
             "collection": "test",
         }
         config_path.write_text(yaml.dump(config))
 
         with patch(
-            "fitz_ai.cli.context.FitzPaths.engine_config",
+            "fitz_ai.cli.context.FitzPaths.config",
             return_value=config_path,
         ):
             ctx = CLIContext.load(engine="fitz_krag")
 
-        assert ctx.raw_config["chat"] == "cohere"
+        assert ctx.raw_config["chat_smart"] == "cohere/command-a-03-2025"
         assert ctx.typed_config.collection == "test"
 
     def test_get_collections_returns_list(self):

@@ -109,10 +109,11 @@ def get_test_embedder():
     config = load_test_config()
     # Get embedding config from first tier
     first_tier = config["tiers"][0]
-    return get_embedder(
-        first_tier["embedding"],
-        config=first_tier.get("embedding_kwargs", {}),
-    )
+    emb_spec = first_tier["embedding"]
+    emb_model = first_tier.get("embedding_model", "")
+    if emb_model and "/" not in emb_spec:
+        emb_spec = f"{emb_spec}/{emb_model}"
+    return get_embedder(emb_spec)
 
 
 def get_test_chat(tier: str = "smart"):
@@ -127,11 +128,11 @@ def get_test_chat(tier: str = "smart"):
     config = load_test_config()
     # Get chat config from first tier (local)
     first_tier = config["tiers"][0]
-    return get_chat(
-        first_tier["chat"],
-        tier=tier,  # type: ignore[arg-type]
-        config=first_tier.get("chat_kwargs", {}),
-    )
+    chat_spec = first_tier["chat"]
+    chat_models = first_tier.get("chat_models", {})
+    if chat_models.get(tier) and "/" not in chat_spec:
+        chat_spec = f"{chat_spec}/{chat_models[tier]}"
+    return get_chat(chat_spec, tier=tier)
 
 
 @pytest.fixture
