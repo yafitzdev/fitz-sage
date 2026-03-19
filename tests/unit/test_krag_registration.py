@@ -47,4 +47,4 @@ class TestKragRegistration:
         config = load_engine_config("fitz_krag")
         assert isinstance(config, FitzKragConfig)
         assert config.collection  # has a collection value
-        assert config.chat  # has a chat provider
+        assert config.chat_smart  # has a chat provider
