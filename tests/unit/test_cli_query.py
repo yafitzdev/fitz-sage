@@ -7,12 +7,20 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from fitz_ai.cli.cli import app
 from fitz_ai.core import Answer
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def _skip_firstrun():
+    """Skip first-run detection in all query CLI tests."""
+    with patch("fitz_ai.core.firstrun.needs_firstrun", return_value=False):
+        yield
 
 
 class TestQueryCommand:

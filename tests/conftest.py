@@ -41,6 +41,36 @@ import pytest
 import yaml
 
 # =============================================================================
+# Pre-session Cleanup (kill zombie processes from interrupted test runs)
+# =============================================================================
+
+
+def pytest_sessionstart(session):
+    """Kill stale postgres/pgserver processes before running tests."""
+    import subprocess
+    import sys
+
+    if sys.platform == "win32":
+        for proc in ["postgres.exe", "pg_ctl.exe"]:
+            subprocess.run(
+                ["taskkill", "/F", "/IM", proc],
+                capture_output=True,
+            )
+    else:
+        subprocess.run(["pkill", "-f", "pgserver"], capture_output=True)
+        subprocess.run(["pkill", "-f", "postgres"], capture_output=True)
+
+    # Remove stale pgserver lock files
+    fitz_dir = Path.cwd() / ".fitz"
+    if fitz_dir.exists():
+        for lock_file in fitz_dir.rglob("postmaster.pid"):
+            try:
+                lock_file.unlink()
+            except OSError:
+                pass
+
+
+# =============================================================================
 # Dependency Availability Checks
 # =============================================================================
 
