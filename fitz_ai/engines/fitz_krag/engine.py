@@ -70,6 +70,12 @@ class FitzKragEngine:
             self._source_dir: Path | None = None
             self._init_components()
         except Exception as e:
+            msg = str(e)
+            if "ConnectError" in type(e).__name__ or "10061" in msg or "Connection refused" in msg:
+                raise ConfigurationError(
+                    "Cannot connect to Ollama. Start it with: ollama serve\n"
+                    "Config: .fitz/config.yaml"
+                ) from e
             raise ConfigurationError(f"Failed to initialize Fitz KRAG engine: {e}") from e
 
     def load(self, collection: str) -> None:
