@@ -71,10 +71,6 @@ pip install fitz-ai
 fitz query "What is our refund policy?" --source ./docs
 ```
 
-> `fitz` command not found? Use `python -m fitz_ai.cli.cli` instead, or ensure your Python Scripts directory is on PATH.
-
-> For PDF/DOCX support: `pip install fitz-ai[docs]`
-
 That's it. Your documents are now searchable with AI.
 
 
@@ -609,6 +605,53 @@ curl -X POST http://localhost:8000/query \
   -H "Content-Type: application/json" \
   -d '{"question": "What is the refund policy?", "collection": "default"}'
 ```
+
+</details>
+
+---
+
+<details>
+
+<summary><strong>📦 FAQ / Troubleshooting</strong></summary>
+
+<br>
+
+**`fitz` command not found after install**
+> Your Python Scripts directory isn't on PATH. Use `python -m fitz_ai.cli.cli` instead, or add the Scripts directory to your system PATH.
+
+**PDF/DOCX files are being skipped**
+> Document parsing requires docling, which is optional to keep the base install lightweight. Install it with: `pip install fitz-ai[docs]`
+
+**"Cannot connect to Ollama" error**
+> Ollama needs to be running as a background service. Start it with: `ollama serve`
+
+**"Model not found" error**
+> The configured model isn't pulled in Ollama. Pull it with: `ollama pull <model-name>`. Check your config at `~/.fitz/config.yaml` to see which models are configured.
+
+**First query is slow**
+> First run initializes the database and loads LLM models into memory. Subsequent queries are much faster. For Ollama, larger models take longer to load — use a smaller model like `qwen3.5:0.6b` for faster startup.
+
+**How do I change my LLM models?**
+> Edit `~/.fitz/config.yaml`. The config uses `provider/model` format:
+> ```yaml
+> chat_fast: ollama/qwen3.5:0.6b
+> chat_smart: ollama/llama3.2
+> embedding: ollama/nomic-embed-text
+> ```
+
+**How do I use a cloud provider instead of Ollama?**
+> Set your API key and update the config:
+> ```bash
+> export COHERE_API_KEY=your-key-here
+> ```
+> ```yaml
+> chat_fast: cohere
+> chat_smart: cohere
+> embedding: cohere
+> ```
+
+**How do I reset everything?**
+> Delete the `.fitz/` directory in your project root. Next run will re-detect and re-configure.
 
 </details>
 
