@@ -9,6 +9,18 @@ import pytest
 import yaml
 
 
+def _write_test_config(path, collection="default"):
+    """Write a minimal valid config file for testing."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"chat_fast: ollama/test\n"
+        f"chat_balanced: ollama/test\n"
+        f"chat_smart: ollama/test\n"
+        f"embedding: ollama/test\n"
+        f"collection: {collection}\n"
+    )
+
+
 class TestFitzInit:
     """Tests for fitz initialization."""
 
@@ -47,53 +59,19 @@ class TestFitzInit:
 
 
 class TestFitzConfigCreation:
-    """Tests for config file creation."""
+    """Tests for config handling."""
 
-    def test_ensure_config_creates_file(self, tmp_path):
-        """Test that _ensure_config creates config when auto_init=True."""
+    def test_ensure_config_skips_when_exists(self, tmp_path):
+        """Test that _ensure_config does nothing when config exists."""
         from fitz_ai.sdk import fitz
 
-        config_path = tmp_path / ".fitz" / "config.yaml"
-        f = fitz(config_path=config_path, auto_init=True)
+        config_path = tmp_path / "config.yaml"
+        _write_test_config(config_path)
+        f = fitz(config_path=config_path)
 
-        # Call ensure config
-        f._ensure_config()
+        f._ensure_config()  # Should not raise
 
-        # Config should have been created
         assert config_path.exists()
-
-    def test_config_has_required_sections(self, tmp_path):
-        """Test that created config has all required keys (flat format)."""
-        from fitz_ai.sdk import fitz
-
-        config_path = tmp_path / "config.yaml"
-        f = fitz(config_path=config_path, collection="test")
-
-        # Manually call the config creation
-        f._create_default_config(config_path)
-
-        config = yaml.safe_load(config_path.read_text())
-
-        # Flat format keys (v0.9.0+ KRAG)
-        assert "chat" in config
-        assert "embedding" in config
-        assert "vector_db" in config
-        assert "rerank" in config
-        assert "collection" in config
-
-    def test_config_uses_collection_name(self, tmp_path):
-        """Test that config uses the fitz instance's collection name."""
-        from fitz_ai.sdk import fitz
-
-        config_path = tmp_path / "config.yaml"
-        f = fitz(config_path=config_path, collection="my_collection")
-
-        f._create_default_config(config_path)
-
-        config = yaml.safe_load(config_path.read_text())
-
-        # Flat format: collection is top-level
-        assert config["collection"] == "my_collection"
 
     def test_raises_without_auto_init(self, tmp_path):
         """Test that ConfigurationError is raised when auto_init=False and no config."""
@@ -116,8 +94,8 @@ class TestFitzQuery:
         from fitz_ai.services.fitz_service import QueryError
 
         config_path = tmp_path / "config.yaml"
+        _write_test_config(config_path)
         f = fitz(config_path=config_path)
-        f._create_default_config(config_path)
 
         with pytest.raises(QueryError, match="cannot be empty"):
             f.query("")
@@ -128,8 +106,8 @@ class TestFitzQuery:
         from fitz_ai.services.fitz_service import QueryError
 
         config_path = tmp_path / "config.yaml"
+        _write_test_config(config_path)
         f = fitz(config_path=config_path)
-        f._create_default_config(config_path)
 
         with pytest.raises(QueryError, match="cannot be empty"):
             f.query("   ")

@@ -135,33 +135,14 @@ class fitz:
 
         if not self._auto_init:
             raise ConfigurationError(
-                f"Config file not found: {config_path}. Run 'fitz init' or pass auto_init=True."
+                f"Config file not found: {config_path}. "
+                f"Run 'fitz init' or pass auto_init=True."
             )
 
-        # Create default config
-        self._create_default_config(config_path)
+        # Auto-detect providers and write config (same logic as CLI first-run)
+        from fitz_ai.core.firstrun import run_firstrun_setup
 
-    def _create_default_config(self, config_path: Path) -> None:
-        """Create default configuration file."""
-        config_content = f"""\
-# Fitz Configuration
-# Docs: https://github.com/yafitzdev/fitz-ai/blob/main/docs/CONFIG.md
-
-# Chat models by tier (provider/model)
-chat_fast: ollama/qwen3.5:0.6b
-chat_balanced: ollama/qwen2.5:7b
-chat_smart: ollama/qwen2.5:14b
-
-# Embedding model
-embedding: ollama/nomic-embed-text
-
-# Optional (remove line to disable)
-# rerank: cohere/rerank-v3.5
-# vision: ollama/llava
-
-collection: {self._collection}
-"""
-
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(config_content)
-        logger.info(f"Created default config at {config_path}")
+        if not run_firstrun_setup():
+            raise ConfigurationError(
+                f"No LLM provider available. Config: {config_path}"
+            )
