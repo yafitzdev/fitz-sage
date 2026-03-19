@@ -74,6 +74,16 @@ def command(
 ) -> None:
     """Query your knowledge base."""
     # =========================================================================
+    # First-run setup (auto-detect providers if no config exists)
+    # =========================================================================
+
+    from fitz_ai.core.firstrun import needs_firstrun, run_firstrun_setup
+
+    if needs_firstrun():
+        if not run_firstrun_setup():
+            raise typer.Exit(1)
+
+    # =========================================================================
     # Engine selection (use default if not specified)
     # =========================================================================
 
