@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.10.4] - 2026-03-19
+
+### 🔄 Changed
+
+- **Removed LM Studio provider** — Ollama is the only local LLM provider. Simplifies the provider stack. fitz-graveyard has its own independent LM Studio implementation. (`2b07944`)
+- Removed LM Studio from firstrun fallback chain, README, architecture diagram, docs (`2b07944`, `e5cde2d`)
+
+### 🔧 Fixed
+
+- **Single-file agentic search always uses the file** — when user points at exactly one file with `--source`, skip BM25 filtering and use it directly (`7b24a93`)
+
+---
+
 ## [0.10.3] - 2026-03-19
 
 ### 🎉 Highlights
