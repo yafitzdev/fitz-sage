@@ -11,7 +11,7 @@ Usage:
 
     retriever = CodeRetriever(
         source_dir="./myproject",
-        chat_factory=get_chat_factory("lmstudio"),
+        chat_factory=get_chat_factory({"fast": "ollama/qwen2.5:3b", "smart": "ollama/qwen2.5:7b"}),
     )
     results = retriever.retrieve("How does authentication work?")
 """

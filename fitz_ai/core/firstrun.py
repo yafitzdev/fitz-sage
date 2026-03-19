@@ -9,7 +9,7 @@ Flow:
     1. Check if .fitz/config.yaml exists → if yes, skip
     2. Detect Ollama → list models → classify into tiers
     3. If models missing → prompt user to pull them
-    4. Fallback: LM Studio → API keys → helpful error
+    4. Fallback: API keys → helpful error
     5. Write config and continue
 """
 
@@ -310,20 +310,6 @@ def run_firstrun_setup() -> bool:
         print("  Start it with: ollama serve")
         print("\n  Then run fitz again.\n")
         return False
-
-    # ── Try LM Studio ───────────────────────────────────────────
-    try:
-        import httpx
-
-        response = httpx.get("http://localhost:1234/v1/models", timeout=3)
-        if response.status_code == 200:
-            print("\n  LM Studio detected but embedding model still needed.")
-            print("  Install Ollama and pull an embedding model:")
-            print(f"    ollama pull {RECOMMENDED_EMBEDDING}")
-            print(f"\n  Config: {config_path}\n")
-            return False
-    except Exception:
-        pass
 
     # ── Try API keys ────────────────────────────────────────────
     import os
