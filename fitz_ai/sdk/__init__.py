@@ -7,8 +7,7 @@ Provides a simple two-step API for pointing at documents and asking questions.
 Examples:
     >>> from fitz_ai import fitz
     >>> f = fitz()
-    >>> f.point("./docs")
-    >>> answer = f.query("What is quantum computing?")
+    >>> answer = f.query("What is quantum computing?", source="./docs")
     >>> print(answer.text)
 """
 

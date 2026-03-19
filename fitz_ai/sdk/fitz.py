@@ -27,9 +27,8 @@ class fitz:
     """
     Stateful SDK for the Fitz RAG framework.
 
-    Provides a simple two-step workflow:
-    1. Point at docs: fitz.point("./docs")
-    2. Query: answer = fitz.query("question?")
+    Provides a single-call workflow:
+        answer = fitz.query("question?", source="./docs")
 
     Queries work immediately via agentic LLM-driven search.
     Background indexing runs silently — queries get progressively faster.
@@ -37,14 +36,12 @@ class fitz:
     Examples:
         Simple usage:
         >>> f = fitz()
-        >>> f.point("./docs")
-        >>> answer = f.query("What is the refund policy?")
+        >>> answer = f.query("What is the refund policy?", source="./docs")
         >>> print(answer.text)
 
         With collection name:
         >>> f = fitz(collection="physics")
-        >>> f.point("./physics_papers")
-        >>> answer = f.query("Explain entanglement")
+        >>> answer = f.query("Explain entanglement", source="./physics_papers")
 
         With custom config:
         >>> f = fitz(config_path="my_config.yaml")
@@ -92,30 +89,20 @@ class fitz:
 
         return FitzPaths.config()
 
-    def point(self, source: Union[str, Path]) -> None:
-        """Point at a folder for immediate querying with background indexing.
-
-        Args:
-            source: Path to a file or directory to query.
-
-        Raises:
-            ConfigurationError: If config cannot be loaded/created.
-            ValueError: If source path doesn't exist.
-        """
-        self._ensure_config()
-        self._service.point(source=source, collection=self._collection)
-
     def query(
         self,
         question: str,
+        source: Optional[Union[str, Path]] = None,
         top_k: Optional[int] = None,
         conversation_context: Optional["ConversationContext"] = None,
     ) -> Answer:
         """
-        Query the knowledge base about the ingested documents.
+        Query the knowledge base. Optionally point at a source directory first.
 
         Args:
             question: The question to ask.
+            source: Path to a file or directory. If provided, registers documents
+                before querying (equivalent to CLI --source flag).
             top_k: Override the number of results to retrieve.
             conversation_context: Optional ConversationContext for query rewriting.
                 Enables conversational pronoun resolution (e.g., "their" → "TechCorp's").
@@ -128,6 +115,9 @@ class fitz:
             QueryError: If query fails or question is empty.
         """
         self._ensure_config()
+
+        if source is not None:
+            self._service.point(source=source, collection=self._collection)
 
         return self._service.query(
             question=question,

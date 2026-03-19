@@ -20,6 +20,9 @@ class QueryRequest(BaseModel):
     """Request to query the knowledge base."""
 
     question: str = Field(..., description="The question to ask", min_length=1)
+    source: Optional[str] = Field(
+        None, description="Path to file or directory. If provided, registers documents before querying."
+    )
     collection: str = Field("default", description="Collection to query")
     top_k: Optional[int] = Field(None, description="Number of results to retrieve", ge=1)
     conversation_history: List["ChatMessage"] = Field(
@@ -64,25 +67,6 @@ class ChatResponse(BaseModel):
     sources: List[SourceInfo] = Field(
         default_factory=list, description="Sources used in the response"
     )
-
-
-class PointRequest(BaseModel):
-    """Request to point at a source directory for progressive querying."""
-
-    source: str = Field(..., description="Path to file or directory")
-    collection: str = Field("default", description="Target collection name")
-
-
-class PointResponse(BaseModel):
-    """Response from a point request."""
-
-    files: int = Field(..., description="Number of files registered")
-    collection: str = Field(..., description="Target collection name")
-
-
-# Backward-compatible aliases
-IngestRequest = PointRequest
-IngestResponse = PointResponse
 
 
 class CollectionInfo(BaseModel):

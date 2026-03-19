@@ -9,11 +9,7 @@ Complete reference for the Fitz Python SDK (v0.10.0).
 ```python
 import fitz_ai
 
-# Point to documents (starts background indexing)
-fitz_ai.point("./docs")
-
-# Ask questions
-answer = fitz_ai.query("What is the refund policy?")
+answer = fitz_ai.query("What is the refund policy?", source="./docs")
 print(answer.text)
 ```
 
@@ -22,29 +18,6 @@ print(answer.text)
 ## Module-Level API
 
 The simplest way to use Fitz - matches CLI behavior.
-
-### fitz_ai.point()
-
-Point Fitz at a document source. Starts background indexing.
-
-```python
-fitz_ai.point(
-    source,                    # Path to file or directory
-    collection: str = None,    # Collection name (uses default)
-) -> None
-```
-
-**Returns:** None (background indexing begins immediately)
-
-**Examples:**
-
-```python
-# Basic indexing
-fitz_ai.point("./docs")
-
-# With collection name
-fitz_ai.point("./physics_papers", collection="physics")
-```
 
 ### fitz_ai.query()
 
@@ -100,25 +73,15 @@ f = fitz(
 
 ### Methods
 
-#### point()
-
-Point Fitz at a document source. Starts background indexing.
-
-```python
-f.point(
-    source: str | Path,
-) -> None
-```
-
-#### query() / ask()
+#### query()
 
 ```python
 f.query(
     question: str,
+    source: str | Path = None,  # If provided, registers documents before querying
+    top_k: int = None,
 ) -> Answer
 ```
-
-Note: `ask()` is an alias for `query()`.
 
 ### Properties
 
@@ -134,15 +97,10 @@ from fitz_ai import fitz
 
 # Multiple collections
 physics = fitz(collection="physics")
-physics.point("./physics_papers")
-physics_answer = physics.query("Explain entanglement")
+physics_answer = physics.query("Explain entanglement", source="./physics_papers")
 
 legal = fitz(collection="legal")
-legal.point("./contracts")
-legal_answer = legal.query("What are the payment terms?")
-
-# With different collection
-answer = legal.query("What are the payment terms?")
+legal_answer = legal.query("What are the payment terms?", source="./contracts")
 
 # Custom config
 f = fitz(config_path="./my_config.yaml")

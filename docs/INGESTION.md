@@ -361,11 +361,8 @@ fitz query "Explain entanglement"
 ```python
 import fitz_ai
 
-# Point at a source directory (ingestion happens in background)
-fitz_ai.point("./docs")
-
-# Query after pointing
-answer = fitz_ai.query("What is quantum computing?")
+# Query with source (ingestion happens in background)
+answer = fitz_ai.query("What is quantum computing?", source="./docs")
 ```
 
 ### Advanced usage

@@ -269,7 +269,7 @@ fitz query --source ./docs "test query"
 
 Or in Python:
 ```python
-fitz_ai.point("./docs")
+fitz_ai.query("test query", source="./docs")
 ```
 
 ---

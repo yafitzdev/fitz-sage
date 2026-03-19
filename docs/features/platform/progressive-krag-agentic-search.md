@@ -28,13 +28,12 @@ Replaces `fitz ingest` entirely. The `ingest` command, its CLI subcommands, and 
 from fitz_ai.sdk import Fitz
 
 fitz = Fitz()
-fitz.point("./docs")                          # instant
-answer = fitz.query("how does X work?")         # works immediately
+answer = fitz.query("how does X work?", source="./docs")  # works immediately
 ```
 
 ### API
 
-The REST API's `/ingest` endpoint has been replaced with `/point`.
+The REST API's `/query` endpoint accepts an optional `source` field to register documents before querying.
 
 ## Architecture
 

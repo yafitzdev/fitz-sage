@@ -336,8 +336,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >```python
 >import fitz_ai
 >
->fitz_ai.point("./docs")
->answer = fitz_ai.query("Your question here")
+>answer = fitz_ai.query("Your question here", source="./docs")
 >
 >print(answer.text)
 >for source in answer.provenance:
@@ -345,7 +344,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >```
 >
 >The SDK provides:
->- Module-level functions matching CLI (`point`, `query`)
+>- Module-level `query()` matching CLI
 >- Auto-config creation (no setup required)
 >- Full provenance tracking
 >- Same honest retrieval as the CLI
@@ -355,8 +354,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >from fitz_ai import fitz
 >
 >physics = fitz(collection="physics")
->physics.point("./physics_papers")
->answer = physics.query("Explain entanglement")
+>answer = physics.query("Explain entanglement", source="./physics_papers")
 >```
 
 <br>
@@ -446,8 +444,8 @@ Fitz is a foundation. It handles document indexing and grounded retrieval—you 
 ├───────────────────────────────────────────────────────────────┤
 │  User Interfaces                                              │
 │  CLI: query (--source) | init | collections | config | serve  │
-│  SDK: fitz_ai.point() → fitz_ai.query()                       │
-│  API: /query | /chat | /point | /collections | /health        │
+│  SDK: fitz_ai.query(source=...)                                │
+│  API: /query | /chat | /collections | /health                 │
 ├───────────────────────────────────────────────────────────────┤
 │  Engines                                                      │
 │  ┌────────────┐  ┌────────────┐                               │
@@ -511,8 +509,7 @@ fitz config --doctor                   # System diagnostics
 ```python
 import fitz_ai
 
-fitz_ai.point("./docs")
-answer = fitz_ai.query("What is the refund policy?")
+answer = fitz_ai.query("What is the refund policy?", source="./docs")
 print(answer.text)
 ```
 
@@ -524,14 +521,11 @@ from fitz_ai import fitz
 
 # Create separate instances for different collections
 physics = fitz(collection="physics")
-physics.point("./physics_papers")
-
 legal = fitz(collection="legal")
-legal.point("./contracts")
 
 # Query each collection
-physics_answer = physics.query("Explain entanglement")
-legal_answer = legal.query("What are the payment terms?")
+physics_answer = physics.query("Explain entanglement", source="./physics_papers")
+legal_answer = legal.query("What are the payment terms?", source="./contracts")
 ```
 
 <br>
@@ -577,7 +571,6 @@ fitz serve --host 0.0.0.0     # all interfaces
 |--------|----------|-------------|
 | POST | `/query` | Query knowledge base |
 | POST | `/chat` | Multi-turn chat (stateless) |
-| POST | `/point` | Point at folder for indexing |
 | GET | `/collections` | List all collections |
 | GET | `/collections/{name}` | Get collection stats |
 | DELETE | `/collections/{name}` | Delete a collection |

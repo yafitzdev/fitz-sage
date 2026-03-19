@@ -126,31 +126,7 @@ def _get_default_fitz():
     return _default_fitz
 
 
-def point(source, collection: str = None):
-    """
-    Point at a folder for immediate querying with background indexing.
-
-    Module-level convenience function matching `fitz point` CLI.
-
-    Args:
-        source: Path to file or directory.
-        collection: Collection name (uses default if not specified).
-
-    Examples:
-        >>> import fitz_ai
-        >>> fitz_ai.point("./docs")
-        >>> answer = fitz_ai.query("What is X?")
-    """
-    global _default_fitz
-    if collection is not None:
-        from fitz_ai.sdk import fitz
-
-        _default_fitz = fitz(collection=collection)
-    f = _get_default_fitz()
-    return f.point(source)
-
-
-def query(question: str, top_k: int = None):
+def query(question: str, source=None, collection: str = None, top_k: int = None):
     """
     Query the knowledge base.
 
@@ -158,6 +134,9 @@ def query(question: str, top_k: int = None):
 
     Args:
         question: The question to ask.
+        source: Path to file or directory. If provided, registers documents
+            before querying (equivalent to CLI --source flag).
+        collection: Collection name (uses default if not specified).
         top_k: Number of chunks to retrieve (uses config default if not specified).
 
     Returns:
@@ -165,12 +144,16 @@ def query(question: str, top_k: int = None):
 
     Examples:
         >>> import fitz_ai
-        >>> fitz_ai.point("./docs")
-        >>> answer = fitz_ai.query("What is the refund policy?")
+        >>> answer = fitz_ai.query("What is the refund policy?", source="./docs")
         >>> print(answer.text)
     """
+    global _default_fitz
+    if collection is not None:
+        from fitz_ai.sdk import fitz
+
+        _default_fitz = fitz(collection=collection)
     f = _get_default_fitz()
-    return f.query(question, top_k=top_k)
+    return f.query(question, source=source, top_k=top_k)
 
 
 # =============================================================================
@@ -203,6 +186,5 @@ __all__ = [
     "get_engine_registry",
     # SDK
     "fitz",
-    "point",
     "query",
 ]

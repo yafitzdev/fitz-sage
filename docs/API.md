@@ -52,7 +52,6 @@ fitz serve --reload
 |--------|----------|-------------|
 | POST | `/query` | Query knowledge base |
 | POST | `/chat` | Multi-turn chat |
-| POST | `/point` | Point at source for indexing |
 | GET | `/collections` | List collections |
 | GET | `/collections/{name}` | Get collection stats |
 | DELETE | `/collections/{name}` | Delete collection |
@@ -69,6 +68,7 @@ Query the knowledge base with a single question.
 ```json
 {
   "question": "What is the refund policy?",
+  "source": "./docs",
   "collection": "default",
   "top_k": 5
 }
@@ -77,6 +77,7 @@ Query the knowledge base with a single question.
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `question` | string | Yes | - | The question to ask |
+| `source` | string | No | null | Path to file or directory. If provided, registers documents before querying. |
 | `collection` | string | No | `"default"` | Collection to query |
 | `top_k` | integer | No | config value | Chunks to retrieve |
 
@@ -172,51 +173,6 @@ curl -X POST http://localhost:8000/chat \
       {"role": "assistant", "content": "The refund policy allows..."}
     ]
   }'
-```
-
----
-
-## POST /point
-
-Point at a source directory for progressive querying.
-
-Queries work immediately via agentic search. Background indexing runs silently
-and queries get progressively faster over time. The endpoint is non-blocking.
-
-### Request
-
-```json
-{
-  "source": "./docs",
-  "collection": "default"
-}
-```
-
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `source` | string | Yes | - | Path to file or directory |
-| `collection` | string | No | `"default"` | Target collection |
-
-### Response
-
-```json
-{
-  "collection": "default",
-  "files": 15
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `collection` | string | Target collection name |
-| `files` | integer | Number of files registered |
-
-### Example
-
-```bash
-curl -X POST http://localhost:8000/point \
-  -H "Content-Type: application/json" \
-  -d '{"source": "./docs", "collection": "mydata"}'
 ```
 
 ---

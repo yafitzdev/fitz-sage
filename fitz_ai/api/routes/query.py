@@ -35,10 +35,14 @@ async def query(request: QueryRequest) -> QueryResponse:
     Query the knowledge base.
 
     Submit a question and receive an answer with sources.
-    Optionally include conversation_history for query rewriting
-    (resolves pronouns like "their" to referenced entities).
+    Optionally include source to register documents before querying,
+    or conversation_history for query rewriting.
     """
     service = get_service()
+
+    if request.source is not None:
+        service.point(source=request.source, collection=request.collection or "default")
+
     context = _to_conversation_context(request.conversation_history)
 
     answer = service.query(

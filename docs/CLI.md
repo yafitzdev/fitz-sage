@@ -124,9 +124,8 @@ fitz serve --reload              # Auto-reload for development
 - `--reload` - Enable auto-reload
 
 **API Endpoints:**
-- `POST /query` - Query the knowledge base
+- `POST /query` - Query the knowledge base (optional `source` field to register documents)
 - `POST /chat` - Multi-turn conversation
-- `POST /point` - Register (index) documents
 - `GET /collections` - List collections
 - `GET /collections/{name}` - Collection details
 - `DELETE /collections/{name}` - Delete a collection
