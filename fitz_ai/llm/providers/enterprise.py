@@ -53,9 +53,28 @@ class EnterpriseChat:
         self._client = httpx.Client(**client_kwargs)
         self._model = model
         self._defaults = kwargs
+        self._is_lmstudio = "localhost:1234" in base_url
+        self._model_loaded = False
+
+    def _ensure_model(self) -> None:
+        """Load model in LM Studio on first use."""
+        if self._model_loaded or not self._is_lmstudio:
+            return
+        self._model_loaded = True
+        try:
+            resp = httpx.post(
+                "http://localhost:1234/api/v1/models/load",
+                json={"model": self._model},
+                timeout=120.0,
+            )
+            if resp.status_code == 200:
+                logger.info(f"LM Studio: loaded '{self._model}'")
+        except Exception as e:
+            logger.debug(f"LM Studio model load skipped: {e}")
 
     def chat(self, messages: list[dict[str, Any]], **kwargs: Any) -> str:
         """Generate a chat completion."""
+        self._ensure_model()
         params = {**self._defaults, **kwargs}
 
         body = {
@@ -136,9 +155,28 @@ class EnterpriseEmbedding:
         self._client = httpx.Client(**client_kwargs)
         self._model = model
         self._dimensions = dimensions
+        self._is_lmstudio = "localhost:1234" in base_url
+        self._model_loaded = False
+
+    def _ensure_model(self) -> None:
+        """Load model in LM Studio on first use."""
+        if self._model_loaded or not self._is_lmstudio:
+            return
+        self._model_loaded = True
+        try:
+            resp = httpx.post(
+                "http://localhost:1234/api/v1/models/load",
+                json={"model": self._model},
+                timeout=120.0,
+            )
+            if resp.status_code == 200:
+                logger.info(f"LM Studio: loaded '{self._model}'")
+        except Exception as e:
+            logger.debug(f"LM Studio model load skipped: {e}")
 
     def embed(self, text: str, *, task_type: str | None = None) -> list[float]:
         """Embed a single text."""
+        self._ensure_model()
         body: dict[str, Any] = {
             "model": self._model,
             "input": text,
