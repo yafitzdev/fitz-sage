@@ -63,7 +63,8 @@ A: "I don't have enough information
 
 ### Where to start 🚀
 
-Requires [Ollama](https://ollama.ai), [LM Studio](https://lmstudio.ai), or a Cohere/OpenAI API key. Fitz auto-detects your setup on first run.
+> [!IMPORTANT]
+> Requires [Ollama](https://ollama.ai), [LM Studio](https://lmstudio.ai), or a Cohere/OpenAI API key. Fitz auto-detects your setup on first run.
 
 ```bash
 pip install fitz-ai
