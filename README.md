@@ -71,6 +71,10 @@ pip install fitz-ai
 fitz query "What is our refund policy?" --source ./docs
 ```
 
+> `fitz` command not found? Use `python -m fitz_ai.cli.cli` instead, or ensure your Python Scripts directory is on PATH.
+
+> For PDF/DOCX support: `pip install fitz-ai[docs]`
+
 That's it. Your documents are now searchable with AI.
 
 
