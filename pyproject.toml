@@ -66,6 +66,10 @@ dependencies = [
     "psycopg-pool>=3.1",
     "pgvector>=0.2.0",
     "fitz-pgserver>=0.1.5",  # Fork of pgserver with Windows crash recovery fix
+    # Lightweight document parsing (PDF, DOCX, PPTX — no ML)
+    "pypdfium2>=4.0",
+    "python-docx>=1.0",
+    "python-pptx>=0.6",
     # Resilience for M2M auth (retry, circuit breaker)
     "tenacity>=8.0.0",
     "circuitbreaker>=2.1.3",

@@ -84,7 +84,7 @@ class ParserRouter:
         for ext in PLAINTEXT_EXTENSIONS:
             self._parsers[ext] = plaintext
 
-        # Register Docling parser for complex documents (PDF, DOCX, images, etc.)
+        # Register document parsers: Docling (advanced) or lightweight fallback
         # Docling is optional — install with: pip install fitz-ai[docs]
         try:
             if self.docling_parser == "docling_vision":
@@ -106,10 +106,17 @@ class ParserRouter:
             for ext in DOCLING_EXTENSIONS:
                 self._parsers[ext] = docling
         except ImportError:
-            logger.info(
-                "Docling not installed — PDF/DOCX/PPTX parsing disabled. "
-                "Install with: pip install fitz-ai[docs]"
+            # Docling not installed — register lightweight parsers instead
+            logger.info("Docling not installed — using lightweight parsers for PDF/DOCX/PPTX")
+            from fitz_ai.ingestion.parser.plugins.lightweight import (
+                LightweightDOCXParser,
+                LightweightPDFParser,
+                LightweightPPTXParser,
             )
+
+            self._parsers[".pdf"] = LightweightPDFParser()
+            self._parsers[".docx"] = LightweightDOCXParser()
+            self._parsers[".pptx"] = LightweightPPTXParser()
 
     def register_parser(self, parser: Parser, extensions: Optional[List[str]] = None) -> None:
         """
@@ -145,23 +152,10 @@ class ParserRouter:
         # Fall back to default
         if normalized not in self._warned_extensions:
             self._warned_extensions.add(normalized)
-            _docling_exts = {".pdf", ".docx", ".pptx", ".xlsx", ".html"}
-            if normalized in _docling_exts:
-                logger.warning(
-                    f"No parser for '{normalized}' — install docling for "
-                    f"PDF/DOCX/PPTX support: pip install fitz-ai[docs]"
-                )
-                import sys
-                print(
-                    f"  Warning: {normalized} files skipped — "
-                    f"install docling: pip install fitz-ai[docs]",
-                    file=sys.stderr,
-                )
-            else:
-                logger.debug(
-                    f"No parser registered for '{normalized}', "
-                    f"using default '{self._default_parser.plugin_name}'"
-                )
+            logger.debug(
+                f"No parser registered for '{normalized}', "
+                f"using default '{self._default_parser.plugin_name}'"
+            )
 
         return self._default_parser
 
