@@ -160,17 +160,11 @@ def _open_in_editor(config_path: Path) -> None:
 
 
 def _get_config_path() -> Path:
-    """Get config path, checking engine-specific first, then global."""
+    """Get config path."""
     ctx = CLIContext.load()
     if ctx.config_path is not None:
         return ctx.config_path
 
-    # Fall back to expected path for error messages (when no user config exists)
-    from fitz_ai.runtime import get_default_engine
-
-    engine_config = FitzPaths.engine_config(get_default_engine())
-    if engine_config.exists():
-        return engine_config
     return FitzPaths.config()
 
 

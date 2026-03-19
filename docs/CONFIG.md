@@ -13,7 +13,7 @@ Fitz uses a two-file configuration structure:
 | `.fitz/config.yaml` | Global config (default engine) |
 | `.fitz/config/fitz_krag.yaml` | Engine-specific config |
 
-The `.fitz/` directory is created in your project root when you run `fitz init`.
+The `.fitz/` directory is auto-created in your project root on first run.
 
 ---
 

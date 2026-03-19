@@ -9,7 +9,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.10.2-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.10.3-green.svg)](CHANGELOG.md)
 [![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
 
 [Why Fitz?](#why-fitz) • [Retrieval Intelligence](#retrieval-intelligence) • [Governance](#governance--know-what-you-dont-know) • [Documentation](#links) • [GitHub](https://github.com/yafitzdev/fitz-ai)
@@ -61,7 +61,9 @@ A: "I don't have enough information
 
 ---
 
-### Where to start
+### Where to start 🚀
+
+Requires [Ollama](https://ollama.ai), [LM Studio](https://lmstudio.ai), or a Cohere/OpenAI API key. Fitz auto-detects your setup on first run.
 
 ```bash
 pip install fitz-ai
@@ -504,14 +506,12 @@ Fitz is a foundation. It handles document indexing and grounded retrieval—you 
 fitz query "question" --source ./docs  # Point at docs and query (start here)
 fitz query "question"                  # Query existing collection
 fitz query --chat                      # Multi-turn conversation mode
-fitz init                              # Interactive setup wizard
 fitz collections                       # List and delete knowledge collections
-fitz config                            # View/edit configuration
 fitz serve                             # Start REST API server
 fitz reset                             # Reset pgserver database (when stuck/corrupted)
-fitz eval                              # Evaluation tools
-fitz config --doctor                   # System diagnostics
 ```
+
+Config: `.fitz/config.yaml` — auto-created on first run, edit to change models.
 
 </details>
 
@@ -603,6 +603,53 @@ curl -X POST http://localhost:8000/query \
   -H "Content-Type: application/json" \
   -d '{"question": "What is the refund policy?", "collection": "default"}'
 ```
+
+</details>
+
+---
+
+<details>
+
+<summary><strong>📦 FAQ / Troubleshooting</strong></summary>
+
+<br>
+
+**`fitz` command not found after install**
+> Your Python Scripts directory isn't on PATH. Use `python -m fitz_ai.cli.cli` instead, or add the Scripts directory to your system PATH.
+
+**PDF/DOCX files are being skipped**
+> Document parsing requires docling, which is optional to keep the base install lightweight. Install it with: `pip install fitz-ai[docs]`
+
+**"Cannot connect to Ollama" error**
+> Ollama needs to be running as a background service. Start it with: `ollama serve`
+
+**"Model not found" error**
+> The configured model isn't pulled in Ollama. Pull it with: `ollama pull <model-name>`. Check your config at `.fitz/config.yaml` to see which models are configured.
+
+**First query is slow**
+> First run initializes the database and loads LLM models into memory. Subsequent queries are much faster. For Ollama, larger models take longer to load — use a smaller model like `qwen3.5:0.6b` for faster startup.
+
+**How do I change my LLM models?**
+> Edit `.fitz/config.yaml`. The config uses `provider/model` format:
+> ```yaml
+> chat_fast: ollama/qwen3.5:0.6b
+> chat_smart: ollama/llama3.2
+> embedding: ollama/nomic-embed-text
+> ```
+
+**How do I use a cloud provider instead of Ollama?**
+> Set your API key and update the config:
+> ```bash
+> export COHERE_API_KEY=your-key-here
+> ```
+> ```yaml
+> chat_fast: cohere
+> chat_smart: cohere
+> embedding: cohere
+> ```
+
+**How do I reset everything?**
+> Delete the `.fitz/` directory in your project root. Next run will re-detect and re-configure.
 
 </details>
 

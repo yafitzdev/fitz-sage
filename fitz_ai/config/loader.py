@@ -9,7 +9,7 @@ Usage:
     config = load_engine_config("fitz_krag")
 
     # Values are typed and validated
-    chat_plugin = config.chat  # "cohere" or "anthropic/claude-sonnet-4"
+    chat_plugin = config.chat_smart  # "ollama/qwen2.5:14b"
 """
 
 from __future__ import annotations
@@ -107,17 +107,17 @@ def _load_defaults(engine: str) -> dict[str, Any]:
 
 
 def _load_user_config(engine: str) -> dict[str, Any] | None:
-    """Load user config for an engine, or None if not found."""
-    user_path = FitzPaths.engine_config(engine)
+    """Load user config from .fitz/config.yaml, or None if not found."""
+    user_path = FitzPaths.config()
 
     if not user_path.exists():
-        logger.debug(f"No user config for {engine} at {user_path}")
+        logger.debug(f"No user config at {user_path}")
         return None
 
     try:
         with user_path.open("r", encoding="utf-8") as f:
             user_config = yaml.safe_load(f) or {}
-        logger.debug(f"Loaded user config for {engine} from {user_path}")
+        logger.debug(f"Loaded user config from {user_path}")
         return user_config
     except Exception as e:
         logger.warning(f"Failed to load user config from {user_path}: {e}")
@@ -143,7 +143,7 @@ def load_engine_config(engine: str):
 
     Examples:
         >>> config = load_engine_config("fitz_krag")
-        >>> config.chat  # str: "cohere" or "anthropic/claude-sonnet-4"
+        >>> config.chat_smart  # str: "ollama/qwen2.5:14b"
     """
     # Import engine-specific schema
     if engine == "fitz_krag":
@@ -185,7 +185,7 @@ def get_config_source(engine: str) -> str:
     Returns:
         Human-readable source description
     """
-    user_path = FitzPaths.engine_config(engine)
+    user_path = FitzPaths.config()
 
     if user_path.exists():
         return f"{user_path} (overriding defaults)"

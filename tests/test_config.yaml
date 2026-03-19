@@ -10,25 +10,21 @@ vector_db_kwargs: {}
 tiers:
   - name: local
     chat: ollama
-    chat_kwargs:
-      models:
-        smart: qwen2.5:7b
-        fast: qwen2.5:1.5b
-        balanced: qwen2.5:3b
+    chat_models:
+      smart: qwen2.5:7b
+      fast: qwen2.5:1.5b
+      balanced: qwen2.5:3b
     embedding: ollama
-    embedding_kwargs:
-      model: nomic-embed-text
+    embedding_model: nomic-embed-text
 
   - name: cloud
     chat: cohere
-    chat_kwargs:
-      models:
-        smart: command-a-03-2025
-        fast: command-r7b-12-2024
-        balanced: command-r-08-2024
+    chat_models:
+      smart: command-a-03-2025
+      fast: command-r7b-12-2024
+      balanced: command-r-08-2024
     embedding: cohere
-    embedding_kwargs:
-      model: embed-v4.0
+    embedding_model: embed-v4.0
 
 # Response cache (E2E)
 cache:

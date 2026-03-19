@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.10.3] - 2026-03-19
+
+### 🎉 Highlights
+
+**Flat Config** — Single config file (`.fitz/config.yaml`) with flat `provider/model` keys. No nested `chat_kwargs`, no engine-specific config directory. `chat_fast: ollama/qwen3.5:0.6b` is the entire config for a chat tier. Auto-created on first run.
+
+**Zero-Friction First Run** — `pip install fitz-ai` then `fitz query "Q" --source ./docs` just works. Auto-detects Ollama models, classifies into tiers, writes config. If models are missing, prompts to pull them. Fallback chain: Ollama → LM Studio → API keys → clear instructions.
+
+**Lightweight Install** — `docling` moved to optional extra (`pip install fitz-ai[docs]`). Base install includes lightweight PDF/DOCX/PPTX parsers via pypdfium2, python-docx, python-pptx (~25MB instead of ~5GB).
+
+**Simplified CLI** — Removed `fitz init`, `fitz config`, `fitz eval` from public CLI. Config is auto-created and users edit `.fitz/config.yaml` directly. Four commands remain: `query`, `collections`, `serve`, `reset`.
+
+### 🚀 Added
+
+- Flat config schema: `chat_fast`, `chat_balanced`, `chat_smart` replace `chat` + `chat_kwargs.models` (`37b6832`)
+- First-run auto-detection: Ollama model discovery via `/api/tags`, tier classification by parameter size (`2c328d5`)
+- Interactive model pull prompt when Ollama has no suitable models (`2c328d5`)
+- Fallback chain: Ollama → LM Studio → Cohere/OpenAI API keys → clear error (`2c328d5`)
+- "Ollama installed but not running" detection via PATH binary check (`666fc87`)
+- Lightweight PDF parser (pypdfium2) with heading heuristics (`a6c0063`)
+- Lightweight DOCX parser (python-docx) with structural parsing (`a6c0063`)
+- Lightweight PPTX parser (python-pptx) with slide/title extraction (`a6c0063`)
+- FAQ/Troubleshooting section in README (`4e4340c`)
+- Config file guard on `fitz serve` — refuses to start without config, gives instructions (`25dadd7`)
+- Progress messages during engine init: "Starting database...", "Loading LLM models..." (`a8e6c71`)
+- Actionable Ollama errors: 404 → "run `ollama pull X`", ConnectError → "run `ollama serve`" (`2c328d5`, `7f6df38`)
+- `pytest_sessionstart` cleanup for zombie postgres processes on Windows (`0b3a95c`)
+
+### 🔄 Changed
+
+- Config: single file `.fitz/config.yaml` replaces `.fitz/config.yaml` + `.fitz/config/fitz_krag.yaml` (`37b6832`)
+- Config: `embedding` default includes model (`ollama/nomic-embed-text`) (`37b6832`)
+- Deleted `chat_kwargs`, `embedding_kwargs`, `rerank_kwargs`, `vision_kwargs` from schema (`37b6832`)
+- Deleted `FitzPaths.engine_config()`, `config_dir()`, `ensure_config_dir()` (`37b6832`)
+- `get_chat_factory()` accepts tier specs dict instead of single provider string (`37b6832`)
+- SDK `_ensure_config()` uses first-run auto-detection instead of hardcoded Cohere template (`910c576`)
+- `docling` moved from core dependency to `[docs]` extra (`a8e6c71`)
+- Parser router falls back to lightweight parsers when docling not installed (`a6c0063`)
+- Removed `fitz init`, `fitz config`, `fitz eval` CLI commands (`c60a57e`, `8c328c6`)
+- All "run fitz init" messages replaced with "edit .fitz/config.yaml" (`c60a57e`)
+- README: added prereqs line, FAQ section, removed inline fallback notes (`666fc87`, `4e4340c`)
+
+### 🔧 Fixed
+
+- Clean error message when Ollama not running (was raw WinError 10061 stacktrace) (`7f6df38`)
+- Warning when PDF/DOCX files encountered without docling installed (`a8e6c71`)
+
+### 📝 Docs
+
+- Removed all `fitz init`/`fitz config`/`fitz eval` references from CLI.md, CONFIG.md, PLUGINS.md, FEATURE_CONTROL.md, TROUBLESHOOTING.md (`b905c8c`)
+- README: LM Studio added as prerequisite option (`cd9cdc6`)
+- README: CLI reference reduced to 4 commands with config note (`c60a57e`)
+- FAQ covers: fitz not found, PDF support, Ollama errors, model changes, cloud providers, reset (`4e4340c`)
+
+---
+
 ## [0.10.2] - 2026-03-12
 
 ### 🎉 Highlights
@@ -1769,7 +1825,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.3...HEAD
+[0.10.3]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.9.0...v0.10.0

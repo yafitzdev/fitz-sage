@@ -69,14 +69,31 @@ class DirectRAGUser(User):
 
             # Use first tier (local) for load testing
             tier = test_config["tiers"][0]
+            chat_plugin = tier["chat"]
+            chat_models = tier.get("chat_models", {})
+            embedding_plugin = tier.get("embedding", test_config.get("embedding"))
+            embedding_model = tier.get("embedding_model", "")
+
             config_dict = {
-                "chat": tier["chat"],
-                "embedding": tier.get("embedding", test_config.get("embedding")),
-                "vector_db": test_config["vector_db"],
-                "chat_kwargs": tier.get("chat_kwargs", {}),
-                "embedding_kwargs": tier.get(
-                    "embedding_kwargs", test_config.get("embedding_kwargs", {})
+                "chat_fast": (
+                    f"{chat_plugin}/{chat_models['fast']}"
+                    if chat_models.get("fast")
+                    else chat_plugin
                 ),
+                "chat_balanced": (
+                    f"{chat_plugin}/{chat_models['balanced']}"
+                    if chat_models.get("balanced")
+                    else chat_plugin
+                ),
+                "chat_smart": (
+                    f"{chat_plugin}/{chat_models['smart']}"
+                    if chat_models.get("smart")
+                    else chat_plugin
+                ),
+                "embedding": (
+                    f"{embedding_plugin}/{embedding_model}" if embedding_model else embedding_plugin
+                ),
+                "vector_db": test_config["vector_db"],
                 "vector_db_kwargs": test_config.get("vector_db_kwargs", {}),
                 "collection": "e2e_test_collection",
                 "top_addresses": 20,

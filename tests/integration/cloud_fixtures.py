@@ -252,14 +252,14 @@ def cloud_pipeline(
 
     # Build KRAG engine with cloud client
     config_dict = {
-        "chat": "local_ollama",
-        "embedding": "local_ollama",
+        "chat_fast": "ollama/qwen2.5:1.5b",
+        "chat_balanced": "ollama/qwen2.5:1.5b",
+        "chat_smart": "ollama/qwen2.5:1.5b",
+        "embedding": "ollama/nomic-embed-text",
         "vector_db": "pgvector",
         "collection": collection,
         "top_addresses": 10,
         "strict_grounding": False,
-        "chat_kwargs": {"model": "qwen2.5:1.5b"},
-        "embedding_kwargs": {"model": "nomic-embed-text"},
     }
 
     cfg = FitzKragConfig(**config_dict)

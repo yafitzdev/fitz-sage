@@ -20,13 +20,7 @@ This keeps the config declarative and avoids boolean flags that can get out of s
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         fitz init                               │
-│              (configures providers and models)                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  CONFIG (.fitz/config/fitz_krag.yaml)                           │
+│  CONFIG (.fitz/config.yaml — auto-created on first run)         │
 │  Declares WHICH provider/model to use                           │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
@@ -74,7 +68,7 @@ VLM is used to describe figures and images in PDFs during ingestion.
 
 ### How it works:
 
-1. **`fitz init`** prompts for a vision provider (cohere, openai, anthropic, ollama)
+1. Set a vision provider (cohere, openai, anthropic, ollama) in `.fitz/config.yaml`
 2. Config saves the provider in `vision:` section
 3. **Parser plugin** determines if VLM is actually used:
    - `parser: docling` → Figures become `[Figure]` placeholder
@@ -116,7 +110,7 @@ Reranking improves retrieval quality by re-scoring chunks with a cross-encoder m
 
 ### How it works:
 
-1. **`fitz init`** prompts for a rerank provider (typically cohere)
+1. Set a rerank provider (typically cohere) in `.fitz/config.yaml`
 2. Config saves the provider in `rerank:` section
 3. **Reranking is automatically enabled** when a rerank provider is configured
 4. No separate plugin choice needed - it's baked into the `dense` retrieval pipeline

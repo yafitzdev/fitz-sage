@@ -65,6 +65,19 @@ def command(
         ui.info("Install with: pip install fitz-ai[api]")
         raise typer.Exit(1)
 
+    # Require config before starting server (no interactive prompt in server mode)
+    from fitz_ai.core.firstrun import needs_firstrun
+    from fitz_ai.core.paths import FitzPaths
+
+    if needs_firstrun():
+        config_path = FitzPaths.config()
+        ui.error("No configuration found.")
+        ui.info("Run a query first to auto-configure:")
+        ui.info('  fitz query "test" --source ./docs')
+        ui.info("Or create the config manually:")
+        ui.info(f"  {config_path}")
+        raise typer.Exit(1)
+
     ui.header("Fitz API Server", f"http://{host}:{port}")
     ui.info(f"API docs: http://{host}:{port}/docs")
     ui.info("Press Ctrl+C to stop")

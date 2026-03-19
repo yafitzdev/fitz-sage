@@ -411,9 +411,8 @@ class FitzService:
 
         # Check config exists
         from fitz_ai.core.paths import FitzPaths
-        from fitz_ai.runtime import get_default_engine
 
-        config_path = FitzPaths.engine_config(get_default_engine())
+        config_path = FitzPaths.config()
         if not config_path.exists():
             issues.append(f"Config not found: {config_path}")
             return ConfigValidationResult(valid=False, issues=issues)
@@ -432,7 +431,7 @@ class FitzService:
         try:
             from fitz_ai.llm import get_chat_factory
 
-            get_chat_factory(ctx.chat_plugin)
+            get_chat_factory(ctx.chat_tier_specs)
         except Exception as e:
             logger.warning(f"Chat plugin '{ctx.chat_plugin}' validation failed: {e}")
             issues.append(f"Chat plugin '{ctx.chat_plugin}' not available: {e}")
@@ -526,7 +525,7 @@ class FitzService:
             from fitz_ai.llm import get_chat_factory
 
             ctx = CLIContext.load()
-            get_chat_factory(ctx.chat_plugin)  # Verify factory works
+            get_chat_factory(ctx.chat_tier_specs)  # Verify factory works
             components["chat"] = True
         except Exception as e:
             logger.warning(f"Chat provider health check failed: {e}")

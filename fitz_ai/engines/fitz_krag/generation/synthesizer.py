@@ -202,7 +202,9 @@ class CodeSynthesizer:
         corpus_size = gap_context.get("corpus_document_count", 0)
         if corpus_size == 0:
             lines.append("  - Documents or code files covering this topic")
-            lines.append("  - Use fitz_ai.query('your question', source='./path') to query a directory")
+            lines.append(
+                "  - Use fitz_ai.query('your question', source='./path') to query a directory"
+            )
         else:
             lines.append("  - Documents covering the specific topic of this question")
             lines.append("  - More detailed documentation or examples on this subject")

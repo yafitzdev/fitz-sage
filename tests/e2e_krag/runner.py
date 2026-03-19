@@ -204,11 +204,27 @@ class KragE2ERunner:
         tier_config = get_tier_config(tier_name, e2e_config)
 
         chat_plugin = tier_config["chat"]["plugin_name"]
-        chat_kwargs = tier_config["chat"].get("kwargs", {})
+        chat_models = tier_config["chat"].get("models", {})
         embedding_plugin = tier_config["embedding"]["plugin_name"]
-        embedding_kwargs = tier_config["embedding"].get("kwargs", {})
+        embedding_model = tier_config["embedding"].get("model", "")
         vector_db_plugin = tier_config["vector_db"]["plugin_name"]
         vector_db_kwargs = tier_config["vector_db"].get("kwargs", {})
+
+        # Build flat chat specs
+        chat_fast = (
+            f"{chat_plugin}/{chat_models['fast']}" if chat_models.get("fast") else chat_plugin
+        )
+        chat_balanced = (
+            f"{chat_plugin}/{chat_models['balanced']}"
+            if chat_models.get("balanced")
+            else chat_plugin
+        )
+        chat_smart = (
+            f"{chat_plugin}/{chat_models['smart']}" if chat_models.get("smart") else chat_plugin
+        )
+        embedding_spec = (
+            f"{embedding_plugin}/{embedding_model}" if embedding_model else embedding_plugin
+        )
 
         logger.info(
             f"KRAG E2E Setup: chat={chat_plugin}, embedding={embedding_plugin}, "
@@ -220,8 +236,10 @@ class KragE2ERunner:
 
         # Build KRAG config
         config_dict = {
-            "chat": chat_plugin,
-            "embedding": embedding_plugin,
+            "chat_fast": chat_fast,
+            "chat_balanced": chat_balanced,
+            "chat_smart": chat_smart,
+            "embedding": embedding_spec,
             "vector_db": vector_db_plugin,
             "collection": tier_collection,
             # Disable guardrails for E2E tests to isolate retrieval testing
@@ -231,9 +249,6 @@ class KragE2ERunner:
             # Higher retrieval for better recall
             "top_addresses": 20,
             "top_read": 10,
-            # Plugin kwargs
-            "chat_kwargs": chat_kwargs,
-            "embedding_kwargs": embedding_kwargs,
             "vector_db_kwargs": vector_db_kwargs,
         }
 
@@ -290,27 +305,43 @@ class KragE2ERunner:
         tier_config = get_tier_config(tier_name, e2e_config)
 
         chat_plugin = tier_config["chat"]["plugin_name"]
-        chat_kwargs = tier_config["chat"].get("kwargs", {})
+        chat_models = tier_config["chat"].get("models", {})
         embedding_plugin = tier_config["embedding"]["plugin_name"]
-        embedding_kwargs = tier_config["embedding"].get("kwargs", {})
+        embedding_model = tier_config["embedding"].get("model", "")
         vector_db_plugin = tier_config["vector_db"]["plugin_name"]
         vector_db_kwargs = tier_config["vector_db"].get("kwargs", {})
+
+        # Build flat chat specs
+        chat_fast = (
+            f"{chat_plugin}/{chat_models['fast']}" if chat_models.get("fast") else chat_plugin
+        )
+        chat_balanced = (
+            f"{chat_plugin}/{chat_models['balanced']}"
+            if chat_models.get("balanced")
+            else chat_plugin
+        )
+        chat_smart = (
+            f"{chat_plugin}/{chat_models['smart']}" if chat_models.get("smart") else chat_plugin
+        )
+        embedding_spec = (
+            f"{embedding_plugin}/{embedding_model}" if embedding_model else embedding_plugin
+        )
 
         tier_collection = self._collection_for_tier(tier_name)
         self._tier_collections.add(tier_collection)
 
         # Rebuild engine with new tier config and tier-specific collection
         config_dict = {
-            "chat": chat_plugin,
-            "embedding": embedding_plugin,
+            "chat_fast": chat_fast,
+            "chat_balanced": chat_balanced,
+            "chat_smart": chat_smart,
+            "embedding": embedding_spec,
             "vector_db": vector_db_plugin,
             "collection": tier_collection,
             "enable_guardrails": False,
             "strict_grounding": False,
             "top_addresses": 20,
             "top_read": 10,
-            "chat_kwargs": chat_kwargs,
-            "embedding_kwargs": embedding_kwargs,
             "vector_db_kwargs": vector_db_kwargs,
         }
 

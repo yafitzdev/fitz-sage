@@ -14,14 +14,16 @@ def test_load_config_from_defaults():
     with patch("fitz_ai.config.loader._load_user_config", return_value=None):
         config = load_engine_config("fitz_krag")
 
-    # Verify it's a Pydantic model
-    assert hasattr(config, "chat")
+    # Verify it's a Pydantic model with flat chat tier fields
+    assert hasattr(config, "chat_fast")
+    assert hasattr(config, "chat_balanced")
+    assert hasattr(config, "chat_smart")
     assert hasattr(config, "embedding")
     assert hasattr(config, "vector_db")
     assert hasattr(config, "collection")
 
     # Verify string plugin specs
-    assert isinstance(config.chat, str)
+    assert isinstance(config.chat_smart, str)
     assert isinstance(config.embedding, str)
 
     # Verify None for disabled features
@@ -41,7 +43,7 @@ def test_config_required_field():
 
     # Missing required 'collection' field
     with pytest.raises(ValidationError):
-        FitzKragConfig(chat="cohere", embedding="cohere")
+        FitzKragConfig(chat_smart="cohere", embedding="cohere")
 
 
 def test_config_validation():
@@ -52,11 +54,13 @@ def test_config_validation():
 
     # Invalid top_addresses (must be >= 1)
     with pytest.raises(ValidationError):
-        FitzKragConfig(chat="cohere", embedding="cohere", collection="test", top_addresses=0)
+        FitzKragConfig(chat_smart="cohere", embedding="cohere", collection="test", top_addresses=0)
 
     # Invalid max_context_tokens (must be >= 100)
     with pytest.raises(ValidationError):
-        FitzKragConfig(chat="cohere", embedding="cohere", collection="test", max_context_tokens=10)
+        FitzKragConfig(
+            chat_smart="cohere", embedding="cohere", collection="test", max_context_tokens=10
+        )
 
 
 def test_config_none_for_disabled():
@@ -64,7 +68,7 @@ def test_config_none_for_disabled():
     from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 
     config = FitzKragConfig(
-        chat="cohere",
+        chat_smart="cohere",
         embedding="cohere",
         collection="test",
         rerank=None,  # Explicitly disabled

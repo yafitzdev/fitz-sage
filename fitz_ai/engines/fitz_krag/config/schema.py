@@ -20,8 +20,10 @@ class FitzKragConfig(BasePluginConfig):
 
     Minimal config:
     ```yaml
-    chat: cohere
-    embedding: cohere
+    chat_fast: ollama/qwen3.5:0.6b
+    chat_balanced: ollama/qwen2.5:7b
+    chat_smart: ollama/qwen2.5:14b
+    embedding: ollama/nomic-embed-text
     collection: my_project
     ```
     """
@@ -30,14 +32,24 @@ class FitzKragConfig(BasePluginConfig):
     # Core Plugins (shared infrastructure)
     # ==========================================================================
 
-    chat: str = Field(
-        default="lmstudio",
-        description="Chat plugin: 'provider' or 'provider/model'",
+    chat_fast: str = Field(
+        default="ollama/qwen3.5:0.6b",
+        description="Chat model for detection, guardrails (provider/model)",
+    )
+
+    chat_balanced: str = Field(
+        default="ollama/qwen2.5:7b",
+        description="Chat model for general queries (provider/model)",
+    )
+
+    chat_smart: str = Field(
+        default="ollama/qwen2.5:14b",
+        description="Chat model for complex generation (provider/model)",
     )
 
     embedding: str = Field(
-        default="ollama",
-        description="Embedding plugin: 'provider' or 'provider/model'",
+        default="ollama/nomic-embed-text",
+        description="Embedding model (provider/model)",
     )
 
     vector_db: str = Field(
@@ -348,26 +360,6 @@ class FitzKragConfig(BasePluginConfig):
     # ==========================================================================
     # Plugin kwargs
     # ==========================================================================
-
-    chat_kwargs: PluginKwargs = Field(
-        default_factory=PluginKwargs,
-        description="Additional kwargs for chat plugin",
-    )
-
-    embedding_kwargs: PluginKwargs = Field(
-        default_factory=PluginKwargs,
-        description="Additional kwargs for embedding plugin",
-    )
-
-    rerank_kwargs: PluginKwargs = Field(
-        default_factory=PluginKwargs,
-        description="Additional kwargs for rerank plugin",
-    )
-
-    vision_kwargs: PluginKwargs = Field(
-        default_factory=PluginKwargs,
-        description="Additional kwargs for vision plugin",
-    )
 
     vector_db_kwargs: PluginKwargs = Field(
         default_factory=PluginKwargs,

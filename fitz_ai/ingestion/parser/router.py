@@ -84,27 +84,39 @@ class ParserRouter:
         for ext in PLAINTEXT_EXTENSIONS:
             self._parsers[ext] = plaintext
 
-        # Register Docling parser for complex documents (PDF, DOCX, images, etc.)
-        # Use docling_vision if configured for VLM-powered figure description
-        if self.docling_parser == "docling_vision":
-            from fitz_ai.ingestion.parser.plugins.docling_vision import (
-                DOCLING_EXTENSIONS,
-                DoclingVisionParser,
+        # Register document parsers: Docling (advanced) or lightweight fallback
+        # Docling is optional — install with: pip install fitz-ai[docs]
+        try:
+            if self.docling_parser == "docling_vision":
+                from fitz_ai.ingestion.parser.plugins.docling_vision import (
+                    DOCLING_EXTENSIONS,
+                    DoclingVisionParser,
+                )
+
+                docling = DoclingVisionParser()
+                logger.info("Using docling_vision parser (VLM-powered figure description)")
+            else:
+                from fitz_ai.ingestion.parser.plugins.docling import (
+                    DOCLING_EXTENSIONS,
+                    DoclingParser,
+                )
+
+                docling = DoclingParser()
+
+            for ext in DOCLING_EXTENSIONS:
+                self._parsers[ext] = docling
+        except ImportError:
+            # Docling not installed — register lightweight parsers instead
+            logger.info("Docling not installed — using lightweight parsers for PDF/DOCX/PPTX")
+            from fitz_ai.ingestion.parser.plugins.lightweight import (
+                LightweightDOCXParser,
+                LightweightPDFParser,
+                LightweightPPTXParser,
             )
 
-            docling = DoclingVisionParser()
-            logger.info("Using docling_vision parser (VLM-powered figure description)")
-        else:
-            from fitz_ai.ingestion.parser.plugins.docling import (
-                DOCLING_EXTENSIONS,
-                DoclingParser,
-            )
-
-            docling = DoclingParser()
-
-        for ext in DOCLING_EXTENSIONS:
-            # Docling handles these formats - override any plaintext registrations
-            self._parsers[ext] = docling
+            self._parsers[".pdf"] = LightweightPDFParser()
+            self._parsers[".docx"] = LightweightDOCXParser()
+            self._parsers[".pptx"] = LightweightPPTXParser()
 
     def register_parser(self, parser: Parser, extensions: Optional[List[str]] = None) -> None:
         """

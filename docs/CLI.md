@@ -13,8 +13,7 @@ Fitz provides a clean, minimal command-line interface for local-first RAG. Versi
 # Zero-config RAG in one command
 fitz query "What are the main topics?" --source ./docs
 
-# Or step by step
-fitz init                                        # Setup wizard
+# Config is auto-created on first run at .fitz/config.yaml
 fitz query "What's in my docs?" --source ./docs  # Register docs + query
 fitz query "Follow-up question"                  # Query existing collection
 ```
@@ -53,22 +52,6 @@ When you pass `--source`, Fitz registers (ingests) the documents into the collec
 
 ---
 
-### `fitz init`
-
-Interactive setup wizard that detects your system and creates configuration.
-
-```bash
-fitz init              # Interactive wizard
-fitz init -y           # Auto-detect and use defaults
-fitz init --show       # Preview config without saving
-```
-
-**Options:**
-- `-y, --non-interactive` - Use defaults without prompting
-- `-s, --show` - Preview config without saving
-
----
-
 ### `fitz collections`
 
 Manage collections (list, info, delete).
@@ -81,30 +64,6 @@ Interactive menu to:
 - List all collections
 - View collection info
 - Delete collections
-
----
-
-### `fitz config`
-
-View or edit configuration, and run system diagnostics.
-
-```bash
-fitz config              # Show config summary
-fitz config --raw        # Show raw YAML
-fitz config --json       # Output as JSON
-fitz config --path       # Show config file path
-fitz config --edit       # Open in editor
-fitz config --doctor     # Run system diagnostics
-fitz config --test       # Test actual LLM connections
-```
-
-**Options:**
-- `-p, --path` - Show config file path
-- `--json` - Output as JSON
-- `--raw` - Show raw YAML
-- `-e, --edit` - Open config in editor
-- `-d, --doctor` - Run system diagnostics (Python version, dependencies, PostgreSQL status, API keys)
-- `-t, --test` - Test actual LLM connections
 
 ---
 
@@ -147,24 +106,9 @@ fitz reset --force       # Skip confirmation prompt
 
 ---
 
-### `fitz eval`
-
-Evaluation and benchmarking tools.
-
-```bash
-fitz eval governance-stats    # Show governance decision statistics
-fitz eval beir                # Run BEIR retrieval benchmark
-fitz eval rgb                 # Run RGB robustness tests
-fitz eval fitz-gov            # Run fitz-gov governance benchmark
-fitz eval dashboard           # Display benchmark results dashboard
-fitz eval all                 # Run all benchmarks
-```
-
----
-
 ## Configuration
 
-The `fitz init` command creates `.fitz/config/fitz_krag.yaml` in your project root:
+Config is auto-created on first run at `.fitz/config.yaml` in your project root:
 
 ```yaml
 chat:
@@ -230,8 +174,7 @@ export AZURE_OPENAI_ENDPOINT="your-endpoint"
 ollama serve
 ollama pull llama3.2
 
-# Initialize and use (PostgreSQL starts automatically via pgserver)
-fitz init
+# Query (PostgreSQL starts automatically via pgserver, config auto-created on first run)
 fitz query "What's in my docs?" --source ./docs
 ```
 
@@ -248,7 +191,7 @@ fitz query --chat -c my_project
 ### Development Workflow
 
 ```bash
-fitz config --doctor --test      # Verify setup and test connections
+# Edit .fitz/config.yaml to verify setup
 fitz query "Summarize the architecture" --source ./project -c project
 fitz query --chat -c project     # Interactive exploration
 ```
@@ -260,5 +203,4 @@ fitz query --chat -c project     # Interactive exploration
 ```bash
 fitz --help
 fitz <command> --help
-fitz eval --help
 ```

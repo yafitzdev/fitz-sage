@@ -1,0 +1,239 @@
+[
+  {
+    "id": 1,
+    "query": "What are the three paradigms of RAG and how do they differ?",
+    "document": "rag_survey_2312.10997.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Naive RAG", "page": 2, "keywords": ["naive", "retrieve", "generate"]},
+      {"heading": "Advanced RAG", "page": 3, "keywords": ["advanced", "pre-retrieval", "post-retrieval"]},
+      {"heading": "Modular RAG", "page": 4, "keywords": ["modular", "module", "pattern"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Overview of RAG", "page": 2}
+    ]
+  },
+  {
+    "id": 2,
+    "query": "What chunking strategies are used in RAG systems?",
+    "document": "rag_survey_2312.10997.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Chunking Strategy", "page": 8, "keywords": ["chunk", "token", "sentence", "proposition"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Retrieval Granularity", "page": 7},
+      {"heading": "Indexing Optimization", "page": 8}
+    ]
+  },
+  {
+    "id": 3,
+    "query": "How does query expansion work in retrieval augmented generation?",
+    "document": "rag_survey_2312.10997.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Query Expansion", "page": 8, "keywords": ["expansion", "multi-query", "sub-question"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Query Optimization", "page": 8},
+      {"heading": "Query Transformation", "page": 9}
+    ]
+  },
+  {
+    "id": 4,
+    "query": "What metrics are used to evaluate RAG systems?",
+    "document": "rag_survey_2312.10997.pdf",
+    "category": "table-lookup",
+    "critical_sections": [
+      {"heading": "Metrics and Benchmarks", "page": 14, "keywords": ["accuracy", "BLEU", "ROUGE", "faithfulness"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Evaluation", "page": 13}
+    ]
+  },
+  {
+    "id": 5,
+    "query": "What evaluation frameworks exist for RAG like RAGAS and ARES?",
+    "document": "rag_survey_2312.10997.pdf",
+    "category": "table-lookup",
+    "critical_sections": [
+      {"heading": "Evaluation Frameworks", "page": 15, "keywords": ["RAGAS", "ARES", "TruLens"]}
+    ],
+    "relevant_sections": []
+  },
+  {
+    "id": 6,
+    "query": "How does RAG compare to fine-tuning for LLMs?",
+    "document": "rag_survey_2312.10997.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "RAG vs Fine-tuning", "page": 5, "keywords": ["fine-tuning", "external knowledge", "adaptation"]}
+    ],
+    "relevant_sections": []
+  },
+  {
+    "id": 7,
+    "query": "What is the standard deduction amount for 2024 taxes?",
+    "document": "irs_1040_instructions_2024.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Standard Deduction", "page": 12, "keywords": ["standard deduction", "amount", "filing status"]}
+    ],
+    "relevant_sections": [
+      {"heading": "What's New", "page": 6}
+    ]
+  },
+  {
+    "id": 8,
+    "query": "Do I have to file a tax return if my income is below a certain amount?",
+    "document": "irs_1040_instructions_2024.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Do You Have To File", "page": 8, "keywords": ["filing", "requirement", "income", "threshold"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Filing Requirements", "page": 8}
+    ]
+  },
+  {
+    "id": 9,
+    "query": "How do I report pension and annuity income on my tax return?",
+    "document": "irs_1040_instructions_2024.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Pensions and Annuities", "page": 29, "keywords": ["pension", "annuity", "taxable", "simplified method"]}
+    ],
+    "relevant_sections": []
+  },
+  {
+    "id": 10,
+    "query": "What if I can't file my tax return on time?",
+    "document": "irs_1040_instructions_2024.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Can't File on Time", "page": 8, "keywords": ["extension", "automatic", "file", "late"]}
+    ],
+    "relevant_sections": [
+      {"heading": "When and Where Should You File", "page": 8}
+    ]
+  },
+  {
+    "id": 11,
+    "query": "What are the key characteristics of trustworthy AI according to NIST?",
+    "document": "nist_ai_rmf_100-1.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "AI Risks and Trustworthiness", "page": 17, "keywords": ["trustworthy", "valid", "reliable", "safe", "fair"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Valid and Reliable", "page": 18},
+      {"heading": "Safe", "page": 19},
+      {"heading": "Fair", "page": 22}
+    ]
+  },
+  {
+    "id": 12,
+    "query": "How does the NIST AI framework define AI safety?",
+    "document": "nist_ai_rmf_100-1.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Safe", "page": 19, "keywords": ["safety", "simulation", "testing", "monitoring", "shut down"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Secure and Resilient", "page": 20}
+    ]
+  },
+  {
+    "id": 13,
+    "query": "What is the GOVERN function in the NIST AI risk management framework?",
+    "document": "nist_ai_rmf_100-1.pdf",
+    "category": "table-lookup",
+    "critical_sections": [
+      {"heading": "GOVERN", "page": 27, "keywords": ["govern", "cross-cutting", "risk management", "organizational"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Categories and subcategories", "page": 28}
+    ]
+  },
+  {
+    "id": 14,
+    "query": "What challenges exist for AI risk measurement?",
+    "document": "nist_ai_rmf_100-1.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Risk Measurement", "page": 10, "keywords": ["measurement", "challenge", "quantify", "metric"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Challenges for AI Risk Management", "page": 10},
+      {"heading": "Risk Tolerance", "page": 12}
+    ]
+  },
+  {
+    "id": 15,
+    "query": "How does the NIST framework address AI explainability and interpretability?",
+    "document": "nist_ai_rmf_100-1.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Explainable and Interpretable", "page": 21, "keywords": ["explainable", "interpretable", "transparent", "decision"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Accountable and Transparent", "page": 20}
+    ]
+  },
+  {
+    "id": 16,
+    "query": "What are the differences between context relevance and answer relevance in RAG evaluation?",
+    "document": "rag_survey_2312.10997.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Evaluation", "page": 13, "keywords": ["context relevance", "answer relevance", "faithfulness"]}
+    ],
+    "relevant_sections": []
+  },
+  {
+    "id": 17,
+    "query": "How should organizations prioritize AI risks according to NIST?",
+    "document": "nist_ai_rmf_100-1.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Risk Prioritization", "page": 12, "keywords": ["prioritization", "severity", "likelihood", "impact"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Organizational Integration", "page": 13}
+    ]
+  },
+  {
+    "id": 18,
+    "query": "What is the role of metadata attachments in RAG indexing?",
+    "document": "rag_survey_2312.10997.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Metadata Attachments", "page": 8, "keywords": ["metadata", "date", "purpose", "filtering"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Structural Index", "page": 8}
+    ]
+  },
+  {
+    "id": 19,
+    "query": "What private delivery services can I use to file my tax return?",
+    "document": "irs_1040_instructions_2024.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Private Delivery Services", "page": 9, "keywords": ["delivery", "private", "DHL", "FedEx", "UPS"]}
+    ],
+    "relevant_sections": []
+  },
+  {
+    "id": 20,
+    "query": "How does the NIST AI framework address privacy in AI systems?",
+    "document": "nist_ai_rmf_100-1.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Privacy-Enhanced", "page": 22, "keywords": ["privacy", "data", "personal", "protection"]}
+    ],
+    "relevant_sections": [
+      {"heading": "Fair", "page": 22}
+    ]
+  }
+]

@@ -7,35 +7,32 @@
 
 fitz_krag:
 
-  # ===========================================================================
-  # Core Plugins (shared infrastructure)
-  # ===========================================================================
+  # Chat models by tier (provider/model)
+  chat_fast: ollama/qwen3.5:0.6b
+  chat_balanced: ollama/qwen2.5:7b
+  chat_smart: ollama/qwen2.5:14b
 
-  chat: lmstudio
-  embedding: ollama
+  # Embedding
+  embedding: ollama/nomic-embed-text
+
+  # Vector DB
   vector_db: pgvector
+
+  # Optional (null = disabled)
   rerank: null
+  vision: null
   parser: docling
 
-  # ===========================================================================
   # Collection
-  # ===========================================================================
-
   collection: default
 
-  # ===========================================================================
-  # Code Strategy
-  # ===========================================================================
-
+  # Code
   code_languages: [python, typescript, java, go]
   summary_batch_size: 15
   max_expansion_depth: 1
   include_class_context: true
 
-  # ===========================================================================
   # Retrieval
-  # ===========================================================================
-
   top_addresses: 50
   top_read: 50
   keyword_weight: 0.4
@@ -44,31 +41,17 @@ fitz_krag:
   section_bm25_weight: 0.6
   section_semantic_weight: 0.4
 
-  # ===========================================================================
-  # Context Assembly
-  # ===========================================================================
-
+  # Context
   max_context_tokens: 48000
   include_file_header: true
 
-  # ===========================================================================
   # Generation
-  # ===========================================================================
-
   enable_citations: true
   strict_grounding: true
 
-  # ===========================================================================
-  # Plugin kwargs
-  # ===========================================================================
-
-  chat_kwargs: {}
-  embedding_kwargs: {}
+  # Vector DB kwargs
   vector_db_kwargs:
     mode: local
 
-  # ===========================================================================
   # Logging
-  # ===========================================================================
-
   log_level: INFO

@@ -14,7 +14,7 @@ Usage:
     config = load_engine_config("fitz_krag")
 
     # Access typed and validated config
-    chat_plugin = config.chat  # "cohere" or "provider/model"
+    chat_plugin = config.chat_smart  # "ollama/qwen2.5:14b"
 """
 
 from fitz_ai.config.loader import load_engine_config

@@ -189,14 +189,8 @@ def resolve_auth(provider: str, config: dict[str, Any] | None = None) -> AuthPro
         raise ValueError(
             "Enterprise provider requires an 'auth' block in config.\n"
             "Example:\n"
-            "  chat_kwargs:\n"
-            "    auth:\n"
-            "      type: m2m\n"
-            "      token_url: https://auth.corp.internal/oauth/token\n"
-            "      client_id: ${CLIENT_ID}\n"
-            "      client_secret: ${CLIENT_SECRET}\n"
-            "    base_url: https://llm.corp.internal/v1\n"
-            "    model: openai/gpt-4o"
+            "  chat_smart: enterprise/gpt-4o\n"
+            "  # with auth configured in provider config"
         )
 
     # Default: API key auth
@@ -273,17 +267,13 @@ def create_chat_provider(
             raise ValueError(
                 "Enterprise provider requires 'base_url' in config.\n"
                 "Example:\n"
-                "  chat_kwargs:\n"
-                "    base_url: https://llm.corp.internal/v1\n"
-                "    model: openai/gpt-4o"
+                "  chat_smart: enterprise/gpt-4o"
             )
         if not model:
             raise ValueError(
                 "Enterprise provider requires 'model' in config.\n"
                 "Example:\n"
-                "  chat_kwargs:\n"
-                "    base_url: https://llm.corp.internal/v1\n"
-                "    model: openai/gpt-4o"
+                "  chat_smart: enterprise/gpt-4o"
             )
         return EnterpriseChat(auth, base_url=base_url, model=model, **kwargs)  # type: ignore[arg-type]
 
@@ -313,10 +303,7 @@ def create_chat_provider(
             raise ValueError(
                 "LM Studio requires a model name.\n"
                 "Example:\n"
-                "  chat: lmstudio/qwen3-coder-30b\n"
-                "Or set model in chat_kwargs:\n"
-                "  chat_kwargs:\n"
-                "    model: qwen3-coder-30b"
+                "  chat_smart: lmstudio/qwen3-coder-30b"
             )
         return EnterpriseChat(None, base_url=base_url, model=model, **kwargs)
 
@@ -365,17 +352,13 @@ def create_embedding_provider(
             raise ValueError(
                 "Enterprise provider requires 'base_url' in config.\n"
                 "Example:\n"
-                "  embedding_kwargs:\n"
-                "    base_url: https://llm.corp.internal/v1\n"
-                "    model: openai/text-embedding-3-small"
+                "  embedding: enterprise/text-embedding-3-small"
             )
         if not model:
             raise ValueError(
                 "Enterprise provider requires 'model' in config.\n"
                 "Example:\n"
-                "  embedding_kwargs:\n"
-                "    base_url: https://llm.corp.internal/v1\n"
-                "    model: openai/text-embedding-3-small"
+                "  embedding: enterprise/text-embedding-3-small"
             )
         return EnterpriseEmbedding(auth, base_url=base_url, model=model, **kwargs)  # type: ignore[arg-type]
 
@@ -402,10 +385,7 @@ def create_embedding_provider(
             raise ValueError(
                 "LM Studio requires a model name.\n"
                 "Example:\n"
-                "  embedding: lmstudio/text-embedding-nomic-embed-text-v1.5\n"
-                "Or set model in embedding_kwargs:\n"
-                "  embedding_kwargs:\n"
-                "    model: text-embedding-nomic-embed-text-v1.5"
+                "  embedding: lmstudio/text-embedding-nomic-embed-text-v1.5"
             )
         return EnterpriseEmbedding(None, base_url=base_url, model=model, **kwargs)
 

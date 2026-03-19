@@ -21,7 +21,8 @@ class QueryRequest(BaseModel):
 
     question: str = Field(..., description="The question to ask", min_length=1)
     source: Optional[str] = Field(
-        None, description="Path to file or directory. If provided, registers documents before querying."
+        None,
+        description="Path to file or directory. If provided, registers documents before querying.",
     )
     collection: str = Field("default", description="Collection to query")
     top_k: Optional[int] = Field(None, description="Number of results to retrieve", ge=1)

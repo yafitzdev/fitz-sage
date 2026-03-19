@@ -7,7 +7,7 @@ No more scattered dict.get() chains across every command file.
 
 Config Loading Strategy:
     1. Package defaults (fitz_ai/engines/<engine>/config/default.yaml) - always loaded
-    2. User config (.fitz/config/<engine>.yaml) - overrides defaults
+    2. User config (.fitz/config.yaml) - overrides defaults
 
 Values are ALWAYS guaranteed to exist. No fallback logic needed in CLI code.
 
@@ -42,62 +42,6 @@ def _default_engine() -> str:
     from fitz_ai.runtime import get_default_engine
 
     return get_default_engine()
-
-
-# =============================================================================
-# Provider Model Defaults
-# =============================================================================
-
-
-def _get_chat_model_defaults(provider: str) -> dict:
-    """Get chat model defaults for a provider."""
-    if provider == "cohere":
-        from fitz_ai.llm.providers.cohere import CHAT_MODELS
-
-        return dict(CHAT_MODELS)  # {tier: model_name}
-    elif provider == "openai":
-        from fitz_ai.llm.providers.openai import CHAT_MODELS
-
-        return dict(CHAT_MODELS)
-    elif provider == "anthropic":
-        from fitz_ai.llm.providers.anthropic import CHAT_MODELS
-
-        return dict(CHAT_MODELS)
-    elif provider == "ollama":
-        from fitz_ai.llm.providers.ollama import CHAT_MODELS
-
-        return dict(CHAT_MODELS)
-    return {}
-
-
-def _get_embedding_model_default(provider: str) -> str:
-    """Get embedding model default for a provider."""
-    if provider == "cohere":
-        from fitz_ai.llm.providers.cohere import EMBEDDING_MODEL
-
-        return EMBEDDING_MODEL
-    elif provider == "openai":
-        from fitz_ai.llm.providers.openai import EMBEDDING_MODEL
-
-        return EMBEDDING_MODEL
-    elif provider == "ollama":
-        from fitz_ai.llm.providers.ollama import EMBEDDING_MODEL
-
-        return EMBEDDING_MODEL
-    return ""
-
-
-def _get_rerank_model_default(provider: str) -> str:
-    """Get rerank model default for a provider."""
-    if provider == "cohere":
-        from fitz_ai.llm.providers.cohere import RERANK_MODEL
-
-        return RERANK_MODEL
-    elif provider == "ollama":
-        from fitz_ai.llm.providers.ollama import RERANK_MODEL
-
-        return RERANK_MODEL
-    return ""
 
 
 @dataclass
@@ -153,10 +97,8 @@ class CLIContext:
     chunk_size: int = 512
     chunk_overlap: int = 0
 
-    # Plugin kwargs (for factory functions)
-    chat_kwargs: dict = field(default_factory=dict)
-    embedding_kwargs: dict = field(default_factory=dict)
-    rerank_kwargs: dict = field(default_factory=dict)
+    # Tier specs (for factory functions)
+    chat_tier_specs: dict = field(default_factory=dict)
 
     # -------------------------------------------------------------------------
     # Display Properties (formatted strings for UI)
@@ -249,7 +191,7 @@ class CLIContext:
 
         # Get config source info
         source = get_config_source(engine)
-        user_config_path = FitzPaths.engine_config(engine)
+        user_config_path = FitzPaths.config()
         has_user = user_config_path.exists()
 
         # Extract all values from config dict
@@ -286,28 +228,37 @@ class CLIContext:
         """
         Extract all values from merged config.
 
-        V2 config has flat structure, not nested sections.
+        Flat config: chat_fast/chat_balanced/chat_smart as top-level provider/model specs.
         """
-        # V2 flat structure: top-level plugin strings
-        chat_plugin_name = cls._parse_plugin_string(config.get("chat", ""))
-        emb_plugin_name = cls._parse_plugin_string(config.get("embedding", ""))
+        # Extract provider names from flat tier specs
+        chat_smart_spec = config.get("chat_smart", "")
+        chat_fast_spec = config.get("chat_fast", "")
+        chat_balanced_spec = config.get("chat_balanced", "")
+        chat_plugin_name = cls._parse_plugin_string(chat_smart_spec)
+
+        emb_spec = config.get("embedding", "")
+        emb_plugin_name = cls._parse_plugin_string(emb_spec)
+        # Extract model from "provider/model" spec
+        emb_model = emb_spec.split("/", 1)[1] if "/" in emb_spec else ""
+
         vdb_plugin_name = config.get("vector_db", "pgvector")
-        rerank_plugin_name = cls._parse_plugin_string(config.get("rerank"))
 
-        # Load plugin specs to get model defaults
-        chat_models = cls._get_chat_models_v2(config.get("chat", ""), config.get("chat_kwargs", {}))
-        emb_model = cls._get_embedding_model_v2(
-            config.get("embedding", ""), config.get("embedding_kwargs", {})
-        )
-        rerank_model = cls._get_rerank_model_v2(
-            config.get("rerank"), config.get("rerank_kwargs", {})
-        )
+        rerank_spec = config.get("rerank")
+        rerank_plugin_name = cls._parse_plugin_string(rerank_spec)
+        rerank_model = rerank_spec.split("/", 1)[1] if rerank_spec and "/" in rerank_spec else ""
 
-        # Extract kwargs (may be PluginKwargs objects or dicts)
-        chat_kwargs = cls._to_dict(config.get("chat_kwargs", {}))
-        embedding_kwargs = cls._to_dict(config.get("embedding_kwargs", {}))
-        rerank_kwargs = cls._to_dict(config.get("rerank_kwargs", {}))
+        # Extract model names from tier specs
+        chat_model_smart = chat_smart_spec.split("/", 1)[1] if "/" in chat_smart_spec else ""
+        chat_model_fast = chat_fast_spec.split("/", 1)[1] if "/" in chat_fast_spec else ""
+
         vector_db_kwargs = cls._to_dict(config.get("vector_db_kwargs", {}))
+
+        # Build tier specs dict for factory
+        chat_tier_specs = {
+            "fast": chat_fast_spec,
+            "balanced": chat_balanced_spec,
+            "smart": chat_smart_spec,
+        }
 
         return cls(
             engine_name=engine,
@@ -318,8 +269,8 @@ class CLIContext:
             has_user_config=has_user,
             # Chat
             chat_plugin=chat_plugin_name,
-            chat_model_smart=chat_models.get("smart", ""),
-            chat_model_fast=chat_models.get("fast", ""),
+            chat_model_smart=chat_model_smart,
+            chat_model_fast=chat_model_fast,
             # Embedding
             embedding_plugin=emb_plugin_name,
             embedding_model=emb_model,
@@ -341,10 +292,8 @@ class CLIContext:
             parser=config.get("parser", "docling"),
             chunk_size=config.get("chunk_size", 512),
             chunk_overlap=config.get("chunk_overlap", 0),
-            # Plugin kwargs
-            chat_kwargs=chat_kwargs,
-            embedding_kwargs=embedding_kwargs,
-            rerank_kwargs=rerank_kwargs,
+            # Tier specs
+            chat_tier_specs=chat_tier_specs,
         )
 
     @staticmethod
@@ -372,121 +321,6 @@ class CLIContext:
         # Split on "/" and take first part
         return plugin.split("/")[0]
 
-    @staticmethod
-    def _get_chat_models_v2(plugin_string: str, chat_kwargs: dict) -> dict:
-        """Get chat model names from V2 config or plugin defaults."""
-        if not plugin_string:
-            return {}
-
-        # User-specified models take precedence
-        if "models" in chat_kwargs:
-            return chat_kwargs["models"]
-
-        # Extract provider name
-        provider = plugin_string.split("/")[0]
-
-        # Get defaults from provider modules
-        try:
-            return _get_chat_model_defaults(provider)
-        except Exception:
-            return {}
-
-    @staticmethod
-    def _get_embedding_model_v2(plugin_string: str, emb_kwargs: dict) -> str:
-        """Get embedding model from V2 config or plugin defaults."""
-        if not plugin_string:
-            return ""
-
-        # User-specified model takes precedence
-        if "model" in emb_kwargs:
-            return emb_kwargs["model"]
-
-        # If plugin_string is "provider/model", extract model
-        if "/" in plugin_string:
-            return plugin_string.split("/", 1)[1]
-
-        # Get defaults from provider modules
-        provider = plugin_string
-        try:
-            return _get_embedding_model_default(provider)
-        except Exception:
-            return ""
-
-    @staticmethod
-    def _get_rerank_model_v2(plugin_string: str | None, rerank_kwargs: dict) -> str:
-        """Get rerank model from V2 config or plugin defaults."""
-        if not plugin_string:
-            return ""
-
-        # User-specified model takes precedence
-        if "model" in rerank_kwargs:
-            return rerank_kwargs["model"]
-
-        # If plugin_string is "provider/model", extract model
-        if "/" in plugin_string:
-            return plugin_string.split("/", 1)[1]
-
-        # Get defaults from provider modules
-        provider = plugin_string
-        try:
-            return _get_rerank_model_default(provider)
-        except Exception:
-            return ""
-
-    @staticmethod
-    def _get_chat_models(chat: dict, plugin_name: str) -> dict:
-        """Get chat model names from config or plugin defaults."""
-        if not plugin_name:
-            return {}
-
-        chat_kwargs = chat.get("kwargs", {})
-
-        # User-specified models take precedence
-        if "models" in chat_kwargs:
-            return chat_kwargs["models"]
-
-        # Get defaults from provider modules
-        try:
-            return _get_chat_model_defaults(plugin_name)
-        except Exception:
-            return {}
-
-    @staticmethod
-    def _get_embedding_model(emb: dict, plugin_name: str) -> str:
-        """Get embedding model name from config or plugin defaults."""
-        if not plugin_name:
-            return ""
-
-        emb_kwargs = emb.get("kwargs", {})
-
-        # User-specified model takes precedence
-        if "model" in emb_kwargs:
-            return emb_kwargs["model"]
-
-        # Get defaults from provider modules
-        try:
-            return _get_embedding_model_default(plugin_name)
-        except Exception:
-            return ""
-
-    @staticmethod
-    def _get_rerank_model(rerank: dict, plugin_name: str) -> str:
-        """Get rerank model name from config or plugin defaults."""
-        if not rerank.get("enabled") or not plugin_name:
-            return ""
-
-        rerank_kwargs = rerank.get("kwargs", {})
-
-        # User-specified model takes precedence
-        if "model" in rerank_kwargs:
-            return rerank_kwargs["model"]
-
-        # Get defaults from provider modules
-        try:
-            return _get_rerank_model_default(plugin_name)
-        except Exception:
-            return ""
-
     # -------------------------------------------------------------------------
     # Component Accessors
     # -------------------------------------------------------------------------
@@ -507,13 +341,15 @@ class CLIContext:
         """Get initialized embedder instance using configured plugin."""
         from fitz_ai.llm import get_embedder
 
-        return get_embedder(self.embedding_plugin, config=self.embedding_kwargs)
+        # Use full embedding spec (provider/model) from config
+        emb_spec = self.raw_config.get("embedding", self.embedding_plugin)
+        return get_embedder(emb_spec)
 
     def get_chat_factory(self):
         """Get chat factory for per-task tier selection."""
         from fitz_ai.llm import get_chat_factory
 
-        return get_chat_factory(self.chat_plugin, config=self.chat_kwargs)
+        return get_chat_factory(self.chat_tier_specs)
 
     def get_chat(self, tier: str = "smart"):
         """Get chat client for specified tier."""
@@ -615,7 +451,7 @@ class CLIContext:
         from fitz_ai.cli.ui import ui
 
         if self.typed_config is None:
-            ui.error("Invalid config. Run 'fitz init' to reconfigure.")
+            ui.error("Invalid config. Edit .fitz/config.yaml to fix.")
             raise typer.Exit(1)
         return self.typed_config
 

@@ -11,7 +11,7 @@ Fitz uses Python providers for LLM services and a plugin system for other compon
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  CONFIG declares WHICH provider/model to use                    │
-│  (fitz init configures these sections)                          │
+│  (edit .fitz/config.yaml to configure these sections)           │
 ├─────────────────────────────────────────────────────────────────┤
 │  vision:                    │  rerank:                          │
 │    plugin_name: cohere      │    plugin_name: cohere            │
@@ -32,7 +32,7 @@ Fitz uses Python providers for LLM services and a plugin system for other compon
 ```
 
 **The pattern:**
-- `fitz init` prompts for providers and saves them to config
+- Edit `.fitz/config.yaml` to set providers
 - Config sections (`vision:`, `rerank:`) specify WHAT provider to use
 - VLM: Parser plugin choice specifies IF the feature is used
 - Reranking: Provider presence enables the feature (baked into `dense` plugin)
@@ -221,7 +221,7 @@ Higher values = better recall but slower indexing.
 In configuration:
 
 ```yaml
-# .fitz/config/fitz_krag.yaml
+# .fitz/config.yaml
 chat:
   plugin_name: cohere
   kwargs:

@@ -12,8 +12,10 @@ class TestFitzKragConfig:
     def test_minimal_config(self):
         config = FitzKragConfig(collection="test")
         assert config.collection == "test"
-        assert config.chat == "lmstudio"
-        assert config.embedding == "ollama"
+        assert config.chat_fast == "ollama/qwen3.5:0.6b"
+        assert config.chat_balanced == "ollama/qwen2.5:7b"
+        assert config.chat_smart == "ollama/qwen2.5:14b"
+        assert config.embedding == "ollama/nomic-embed-text"
 
     def test_defaults(self):
         config = FitzKragConfig(collection="test")
@@ -31,13 +33,16 @@ class TestFitzKragConfig:
     def test_custom_values(self):
         config = FitzKragConfig(
             collection="my_project",
-            chat="anthropic/claude-sonnet-4",
+            chat_smart="anthropic/claude-sonnet-4",
+            chat_fast="anthropic/claude-haiku",
+            chat_balanced="anthropic/claude-sonnet-4",
             embedding="openai/text-embedding-3-small",
             top_addresses=20,
             keyword_weight=0.3,
             semantic_weight=0.7,
         )
-        assert config.chat == "anthropic/claude-sonnet-4"
+        assert config.chat_smart == "anthropic/claude-sonnet-4"
+        assert config.chat_fast == "anthropic/claude-haiku"
         assert config.top_addresses == 20
         assert config.keyword_weight == 0.3
 
@@ -57,6 +62,19 @@ class TestFitzKragConfig:
         with pytest.raises(Exception):
             FitzKragConfig(collection="test", nonexistent_field=True)
 
+    def test_no_chat_kwargs_field(self):
+        """chat_kwargs, embedding_kwargs, rerank_kwargs, vision_kwargs are deleted."""
+        config = FitzKragConfig(collection="test")
+        assert not hasattr(config, "chat_kwargs")
+        assert not hasattr(config, "embedding_kwargs")
+        assert not hasattr(config, "rerank_kwargs")
+        assert not hasattr(config, "vision_kwargs")
+
+    def test_vector_db_kwargs_kept(self):
+        """vector_db_kwargs still exists."""
+        config = FitzKragConfig(collection="test")
+        assert hasattr(config, "vector_db_kwargs")
+
 
 class TestDefaultYaml:
     def test_default_config_path_exists(self):
@@ -69,7 +87,10 @@ class TestDefaultYaml:
         with path.open("r", encoding="utf-8") as f:
             raw = yaml.safe_load(f)
         assert "fitz_krag" in raw
-        assert raw["fitz_krag"]["chat"] == "lmstudio"
+        assert raw["fitz_krag"]["chat_fast"] == "ollama/qwen3.5:0.6b"
+        assert raw["fitz_krag"]["chat_balanced"] == "ollama/qwen2.5:7b"
+        assert raw["fitz_krag"]["chat_smart"] == "ollama/qwen2.5:14b"
+        assert raw["fitz_krag"]["embedding"] == "ollama/nomic-embed-text"
         assert raw["fitz_krag"]["collection"] == "default"
 
     def test_default_yaml_creates_valid_config(self):

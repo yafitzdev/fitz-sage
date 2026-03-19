@@ -18,6 +18,27 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "http://localhost:11434"
 
+
+def _check_ollama_response(response: httpx.Response, model: str) -> None:
+    """Check Ollama response and raise actionable errors."""
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise RuntimeError(
+                f"Ollama model '{model}' not found. "
+                f"Pull it with: ollama pull {model}\n"
+                f"Config: .fitz/config.yaml"
+            ) from e
+        raise
+    except httpx.ConnectError:
+        raise RuntimeError(
+            "Cannot connect to Ollama at http://localhost:11434. "
+            "Start Ollama with: ollama serve\n"
+            "Config: .fitz/config.yaml"
+        )
+
+
 # Default models by tier (common Ollama models)
 CHAT_MODELS: dict[ModelTier, str] = {
     "smart": "qwen2.5:14b",
@@ -77,7 +98,7 @@ class OllamaChat:
         payload.update(params)
 
         response = self._client.post("/api/chat", json=payload)
-        response.raise_for_status()
+        _check_ollama_response(response, payload.get("model", self._model))
         data = response.json()
 
         if "message" in data and "content" in data["message"]:
@@ -189,7 +210,7 @@ class OllamaEmbedding:
             payload["options"] = {"num_ctx": self._num_ctx}
 
         response = self._client.post("/api/embed", json=payload)
-        response.raise_for_status()
+        _check_ollama_response(response, self._model)
         data = response.json()
 
         if "embeddings" in data and data["embeddings"]:
@@ -214,7 +235,7 @@ class OllamaEmbedding:
             payload["options"] = {"num_ctx": self._num_ctx}
 
         response = self._client.post("/api/embed", json=payload)
-        response.raise_for_status()
+        _check_ollama_response(response, self._model)
         data = response.json()
 
         if "embeddings" in data:

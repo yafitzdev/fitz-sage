@@ -70,6 +70,12 @@ class FitzKragEngine:
             self._source_dir: Path | None = None
             self._init_components()
         except Exception as e:
+            msg = str(e)
+            if "ConnectError" in type(e).__name__ or "10061" in msg or "Connection refused" in msg:
+                raise ConfigurationError(
+                    "Cannot connect to Ollama. Start it with: ollama serve\n"
+                    "Config: .fitz/config.yaml"
+                ) from e
             raise ConfigurationError(f"Failed to initialize Fitz KRAG engine: {e}") from e
 
     def load(self, collection: str) -> None:
@@ -151,22 +157,23 @@ class FitzKragEngine:
         # LLM providers and PostgreSQL are independent — init in parallel.
         # PostgreSQL startup (pgserver) can take 1-2s; LLM provider init
         # creates HTTP clients. Overlapping saves the slower of the two.
+
+        print("  Starting database and connecting to LLM providers...", end="", flush=True)
         with ThreadPoolExecutor(max_workers=3) as pool:
             chat_future = pool.submit(
                 get_chat,
-                self._config.chat,
-                config=self._config.chat_kwargs.model_dump(exclude_none=True) or None,
+                self._config.chat_smart,
             )
             embed_future = pool.submit(
                 get_embedder,
                 self._config.embedding,
-                config=self._config.embedding_kwargs.model_dump(exclude_none=True) or None,
             )
             pg_future = pool.submit(PostgresConnectionManager.get_instance)
 
             self._chat = chat_future.result()
             self._embedder = embed_future.result()
             self._connection_manager = pg_future.result()
+        print(" done.", flush=True)
 
         _t1 = _t.perf_counter()
         logger.debug(f"[init] providers+pg: {(_t1-_t0)*1000:.0f}ms")
@@ -254,11 +261,18 @@ class FitzKragEngine:
         # Chat factory (shared by detection, rewriter, HyDE, multi-hop, enrichment)
         from fitz_ai.llm.factory import get_chat_factory
 
-        self._chat_factory = get_chat_factory(self._config.chat)
+        self._chat_factory = get_chat_factory(
+            {
+                "fast": self._config.chat_fast,
+                "balanced": self._config.chat_balanced,
+                "smart": self._config.chat_smart,
+            }
+        )
 
         # Pre-load chat models sequentially: fast first (guardrails/detection),
         # then smart (generation). Sequential avoids VRAM contention on ollama.
         def _warmup_chat():
+            print("  Loading LLM models (first run may take a moment)...", end="", flush=True)
             try:
                 self._chat_factory("fast").chat(
                     [{"role": "user", "content": "hi"}],
@@ -273,6 +287,7 @@ class FitzKragEngine:
                 )
             except Exception:
                 pass
+            print(" done.", flush=True)
 
         threading.Thread(target=_warmup_chat, daemon=True).start()
 
@@ -1026,7 +1041,7 @@ class FitzKragEngine:
             optimizer=CLOUD_OPTIMIZER_VERSION,
             engine=fitz_ai.__version__,
             collection=self._config.collection,
-            llm_model=self._config.chat,
+            llm_model=self._config.chat_smart,
             prompt_template="default",
         )
 
