@@ -76,11 +76,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Legacy FAISS support (for migration from older versions)
-faiss = [
-    "faiss-cpu>=1.7.0",
-]
-
 # Document parsing (PDF, DOCX, PPTX, images)
 docs = [
     "docling>=2.0",
