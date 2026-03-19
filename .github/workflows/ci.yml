@@ -96,8 +96,8 @@ jobs:
         env:
           PYTHONUTF8: 1
         run: |
-          # Run non-postgres tests in parallel (fast)
-          pytest tests/unit/ -v --tb=short -n auto -m "not postgres"
+          # Run non-postgres tests in parallel (2 workers to avoid OOM on CI runners)
+          pytest tests/unit/ -v --tb=short -n 2 -m "not postgres"
 
       - name: Run postgres tests (Linux only)
         if: runner.os == 'Linux'
@@ -178,7 +178,7 @@ jobs:
         run: |
           # Run non-postgres tests in parallel, postgres tests serially
           # Use --cov-append to combine coverage from both runs
-          pytest tests/unit/ --cov=fitz_ai --cov-report=xml --cov-report=term-missing -n auto -m "not postgres"
+          pytest tests/unit/ --cov=fitz_ai --cov-report=xml --cov-report=term-missing -n 2 -m "not postgres"
           pytest tests/unit/ --cov=fitz_ai --cov-report=xml --cov-report=term-missing --cov-append -m "postgres"
 
       - name: Upload coverage to Codecov
