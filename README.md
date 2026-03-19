@@ -61,7 +61,9 @@ A: "I don't have enough information
 
 ---
 
-### Where to start
+### Where to start 🚀
+
+Requires [Ollama](https://ollama.ai) (local) or a Cohere/OpenAI API key. Fitz auto-detects your setup on first run.
 
 ```bash
 pip install fitz-ai

@@ -53,6 +53,13 @@ class DetectedModels:
     embedding_models: list[OllamaModel] = field(default_factory=list)
 
 
+def _ollama_binary_exists() -> bool:
+    """Check if the ollama binary is on PATH (installed but maybe not running)."""
+    import shutil
+
+    return shutil.which("ollama") is not None
+
+
 def needs_firstrun() -> bool:
     """Check if first-run setup is needed (no config exists)."""
     return not FitzPaths.config().exists()
@@ -297,6 +304,13 @@ def run_firstrun_setup() -> bool:
                 print(f"    ollama pull {model_name}")
             print(f"\n  Config: {config_path}\n")
             return False
+
+    # ── Ollama installed but not running? ──────────────────────
+    if models is None and _ollama_binary_exists():
+        print("\n  Ollama is installed but not running.")
+        print(f"  Start it with: ollama serve")
+        print(f"\n  Then run fitz again.\n")
+        return False
 
     # ── Try LM Studio ───────────────────────────────────────────
     try:
