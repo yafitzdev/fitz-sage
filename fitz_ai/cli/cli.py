@@ -7,7 +7,6 @@ Commands:
     fitz collections   Manage collections (list, info, delete)
     fitz serve         Start the REST API server
     fitz reset         Reset pgserver database (when stuck/corrupted)
-    fitz eval          Evaluation tools
 
 Configuration: .fitz/config.yaml (auto-created on first run)
 
@@ -95,16 +94,6 @@ def reset(
 # =============================================================================
 # SUBCOMMAND GROUPS
 # =============================================================================
-
-
-def _register_subcommands() -> None:
-    """Register subcommand groups with lazy imports."""
-    from fitz_ai.cli.commands.eval import app as eval_app
-
-    app.add_typer(eval_app, name="eval")
-
-
-_register_subcommands()
 
 
 # =============================================================================

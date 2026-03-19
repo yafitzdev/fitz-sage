@@ -509,7 +509,6 @@ fitz query --chat                      # Multi-turn conversation mode
 fitz collections                       # List and delete knowledge collections
 fitz serve                             # Start REST API server
 fitz reset                             # Reset pgserver database (when stuck/corrupted)
-fitz eval                              # Evaluation tools
 ```
 
 Config: `.fitz/config.yaml` — auto-created on first run, edit to change models.
