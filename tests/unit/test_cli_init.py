@@ -188,8 +188,9 @@ class TestGenerateConfig:
         # Should be valid YAML with flat format
         config = yaml.safe_load(config_str)
 
-        # New flat format: plugins are strings, not dicts
-        assert config["chat"] == "cohere"
+        # New flat format: tier-specific chat specs
+        assert "chat_fast" in config
+        assert "chat_smart" in config
         assert config["embedding"] == "cohere"
         assert config["vector_db"] == "pgvector"
 
