@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fitz-ai"
-version = "0.10.3"
+version = "0.10.4"
 description = "Intelligent, honest knowledge retrieval in 5 minutes. No infrastructure. No boilerplate."
 readme = "README.md"
 license = {text = "MIT"}
@@ -76,86 +76,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Document parsing (PDF, DOCX, PPTX, images)
-docs = [
-    "docling>=2.0",
-]
+# Advanced document parsing (PDF layout analysis, table detection, figures)
+docs = ["docling>=2.0"]
 
 # Standalone code retrieval (no PostgreSQL, no pgvector, no docling)
 code = []
 
-# Local LLM capabilities (Ollama)
-local = [
-    "ollama>=0.1.0",
-]
-
-# Knowledge map visualization (experimental)
-map = [
-    "umap-learn>=0.5.0",
-    "scikit-learn>=1.0",
-]
-
-# Remote vector DB support (Qdrant, etc.)
-remote = [
-    "qdrant-client>=1.7",
-]
-
-# CLaRa compression-native engine (requires GPU)
-clara = [
-    "torch>=2.0",
-    "transformers>=4.35",
-    "accelerate>=0.24",
-    "bitsandbytes>=0.41",
-    "peft>=0.10",
-]
-
-# LangChain integration for Fitz Cloud
-langchain = [
-    "langchain-core>=0.2.0",
-]
-
-# LlamaIndex integration for Fitz Cloud
-llamaindex = [
-    "llama-index-core>=0.10.0",
-]
-
-# All framework integrations
-integrations = [
-    "langchain-core>=0.2.0",
-    "llama-index-core>=0.10.0",
-]
+# Local LLM (Ollama Python client)
+local = ["ollama>=0.1.0"]
 
 # REST API server
-api = [
-    "fastapi>=0.100.0",
-    "uvicorn[standard]>=0.23.0",
-]
+api = ["fastapi>=0.100.0", "uvicorn[standard]>=0.23.0"]
 
-# Development tools
-dev = [
-    "pytest>=7.0",
-    "pytest-cov>=4.0",
-    "pytest-xdist>=3.0",
-    "black>=23.0",
-    "isort>=5.0",
-    "mypy>=1.0",
-    "ruff>=0.1.0",
-    "psutil>=5.9",
-    "mutmut>=2.4,<3",  # Mutation testing (3.x removed CI-friendly commands)
-    "hypothesis>=6.100.0",  # Property-based testing
-]
-
-# Load and performance testing
-loadtest = [
-    "locust>=2.20",
-    "psutil>=5.9",
-]
-
-# Benchmarking (BEIR for cross-RAG comparison, fitz-gov for governance)
-benchmarks = [
-    "beir>=2.0.0",
-    "fitz-gov>=2.0.0",  # RAG governance benchmark (epistemic honesty)
-]
+# Framework integrations
+langchain = ["langchain-core>=0.2.0"]
+llamaindex = ["llama-index-core>=0.10.0"]
 
 # KRAG additional language support (tree-sitter extractors)
 krag-typescript = ["tree-sitter>=0.22", "tree-sitter-typescript>=0.22"]
@@ -168,21 +103,16 @@ krag-all = [
     "tree-sitter-go>=0.22",
 ]
 
-# Install everything at once (core deps include pgvector now)
-all = [
-    "ollama>=0.1.0",
-    "qdrant-client>=1.7",
-    "umap-learn>=0.5.0",
-    "scikit-learn>=1.0",
-    "fastapi>=0.100.0",
-    "uvicorn[standard]>=0.23.0",
-    "torch>=2.0",
-    "transformers>=4.35",
-    "accelerate>=0.24",
-    "bitsandbytes>=0.41",
-    "peft>=0.10",
-    "langchain-core>=0.2.0",
-    "llama-index-core>=0.10.0",
+# Development
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-xdist>=3.0",
+    "black>=23.0",
+    "isort>=5.0",
+    "ruff>=0.1.0",
+    "psutil>=5.9",
+    "hypothesis>=6.100.0",
 ]
 
 
