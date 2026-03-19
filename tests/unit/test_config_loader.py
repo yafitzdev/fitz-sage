@@ -54,9 +54,7 @@ def test_config_validation():
 
     # Invalid top_addresses (must be >= 1)
     with pytest.raises(ValidationError):
-        FitzKragConfig(
-            chat_smart="cohere", embedding="cohere", collection="test", top_addresses=0
-        )
+        FitzKragConfig(chat_smart="cohere", embedding="cohere", collection="test", top_addresses=0)
 
     # Invalid max_context_tokens (must be >= 100)
     with pytest.raises(ValidationError):

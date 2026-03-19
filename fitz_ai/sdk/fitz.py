@@ -143,6 +143,4 @@ class fitz:
         from fitz_ai.core.firstrun import run_firstrun_setup
 
         if not run_firstrun_setup():
-            raise ConfigurationError(
-                f"No LLM provider available. Config: {config_path}"
-            )
+            raise ConfigurationError(f"No LLM provider available. Config: {config_path}")

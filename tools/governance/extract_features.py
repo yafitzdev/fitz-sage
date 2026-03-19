@@ -335,11 +335,13 @@ def main():
     cfg = load_engine_config("fitz_krag")
 
     chat_spec = args.chat or cfg.chat_smart
-    chat_factory = get_chat_factory({
-        "fast": cfg.chat_fast,
-        "balanced": cfg.chat_balanced,
-        "smart": cfg.chat_smart,
-    })
+    chat_factory = get_chat_factory(
+        {
+            "fast": cfg.chat_fast,
+            "balanced": cfg.chat_balanced,
+            "smart": cfg.chat_smart,
+        }
+    )
     chat = chat_factory("fast")
     chat_balanced = chat_factory("balanced")
     model_name = getattr(chat, "_model", "unknown")

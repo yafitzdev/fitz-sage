@@ -6,7 +6,6 @@ Tests for the Fitz SDK.
 from __future__ import annotations
 
 import pytest
-import yaml
 
 
 def _write_test_config(path, collection="default"):

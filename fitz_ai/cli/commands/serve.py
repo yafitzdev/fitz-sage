@@ -72,9 +72,9 @@ def command(
     if needs_firstrun():
         config_path = FitzPaths.config()
         ui.error("No configuration found.")
-        ui.info(f"Run a query first to auto-configure:")
-        ui.info(f'  fitz query "test" --source ./docs')
-        ui.info(f"Or create the config manually:")
+        ui.info("Run a query first to auto-configure:")
+        ui.info('  fitz query "test" --source ./docs')
+        ui.info("Or create the config manually:")
         ui.info(f"  {config_path}")
         raise typer.Exit(1)
 

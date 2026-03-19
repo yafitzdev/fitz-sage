@@ -75,10 +75,24 @@ class DirectRAGUser(User):
             embedding_model = tier.get("embedding_model", "")
 
             config_dict = {
-                "chat_fast": f"{chat_plugin}/{chat_models['fast']}" if chat_models.get("fast") else chat_plugin,
-                "chat_balanced": f"{chat_plugin}/{chat_models['balanced']}" if chat_models.get("balanced") else chat_plugin,
-                "chat_smart": f"{chat_plugin}/{chat_models['smart']}" if chat_models.get("smart") else chat_plugin,
-                "embedding": f"{embedding_plugin}/{embedding_model}" if embedding_model else embedding_plugin,
+                "chat_fast": (
+                    f"{chat_plugin}/{chat_models['fast']}"
+                    if chat_models.get("fast")
+                    else chat_plugin
+                ),
+                "chat_balanced": (
+                    f"{chat_plugin}/{chat_models['balanced']}"
+                    if chat_models.get("balanced")
+                    else chat_plugin
+                ),
+                "chat_smart": (
+                    f"{chat_plugin}/{chat_models['smart']}"
+                    if chat_models.get("smart")
+                    else chat_plugin
+                ),
+                "embedding": (
+                    f"{embedding_plugin}/{embedding_model}" if embedding_model else embedding_plugin
+                ),
                 "vector_db": test_config["vector_db"],
                 "vector_db_kwargs": test_config.get("vector_db_kwargs", {}),
                 "collection": "e2e_test_collection",

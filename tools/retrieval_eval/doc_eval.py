@@ -73,9 +73,7 @@ def _provenance_matches_document(prov, document: str) -> bool:
 
     doc_lower = document.lower()
     return (
-        doc_lower in source.lower()
-        or doc_lower in title.lower()
-        or doc_lower in file_path.lower()
+        doc_lower in source.lower() or doc_lower in title.lower() or doc_lower in file_path.lower()
     )
 
 
@@ -166,8 +164,12 @@ def _ensure_lmstudio_models(
         return
     try:
         result = subprocess.run(
-            [lms, "ps"], capture_output=True, text=True, timeout=10,
-            encoding="utf-8", errors="replace",
+            [lms, "ps"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            encoding="utf-8",
+            errors="replace",
         )
         loaded = result.stdout + result.stderr
     except Exception:
@@ -182,8 +184,11 @@ def _ensure_lmstudio_models(
         print(f"Loading {model} in LM Studio...")
         subprocess.run(
             [lms, "load", model, "-y"] + extra_args,
-            capture_output=True, text=True, timeout=300,
-            encoding="utf-8", errors="replace",
+            capture_output=True,
+            text=True,
+            timeout=300,
+            encoding="utf-8",
+            errors="replace",
         )
         print(f"  {model} loaded.")
 
@@ -191,7 +196,8 @@ def _ensure_lmstudio_models(
 def ingest_corpus(engine, corpus_dir: Path, collection: str) -> dict:
     """Ingest test corpus into a collection. Returns ingestion stats."""
     doc_files = [
-        f for f in corpus_dir.iterdir()
+        f
+        for f in corpus_dir.iterdir()
         if f.suffix.lower() in (".pdf", ".docx", ".pptx", ".md", ".txt", ".csv", ".xlsx")
     ]
     if not doc_files:
@@ -214,6 +220,7 @@ def ingest_corpus(engine, corpus_dir: Path, collection: str) -> dict:
 def run_query(engine, query_text: str, top_k: int = 10):
     """Run a query and return provenance list."""
     from fitz_ai.core import Query
+
     query = Query(text=query_text)
     answer = engine.answer(query)
     return answer.provenance if answer else []
@@ -281,7 +288,7 @@ def run_eval(
                     print(f"  DEBUG prov[{i}]:")
                     print(f"    source_id: {getattr(prov, 'source_id', None)}")
                     print(f"    excerpt:   {(getattr(prov, 'excerpt', '') or '')[:100]}")
-                    meta = getattr(prov, 'metadata', {}) or {}
+                    meta = getattr(prov, "metadata", {}) or {}
                     for k, v in meta.items():
                         print(f"    meta.{k}: {v}")
 
@@ -330,10 +337,11 @@ def run_eval(
     # By category
     categories = sorted(set(q.get("category", "uncategorized") for q in queries))
     if len(categories) > 1:
-        print(f"\nBy category:")
+        print("\nBy category:")
         for cat in categories:
-            cat_results = [r for r, q in zip(results, queries)
-                          if q.get("category") == cat and "error" not in r]
+            cat_results = [
+                r for r, q in zip(results, queries) if q.get("category") == cat and "error" not in r
+            ]
             if cat_results:
                 cat_crit = sum(r["critical_recall"] for r in cat_results) / len(cat_results)
                 cat_perfect = sum(1 for r in cat_results if r["critical_recall"] == 1.0)
@@ -345,8 +353,9 @@ def run_eval(
         all_missed.extend(r.get("critical_missed", []))
     if all_missed:
         from collections import Counter
+
         missed_counts = Counter(all_missed).most_common(10)
-        print(f"\nMost-missed critical sections:")
+        print("\nMost-missed critical sections:")
         for section, count in missed_counts:
             print(f"  {count}x {section}")
 

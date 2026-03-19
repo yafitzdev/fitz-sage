@@ -136,9 +136,15 @@ def vlm_krag_engine(set_workspace):
     embedding_model = tier_config["embedding"].get("model", "")
 
     chat_fast = f"{chat_plugin}/{chat_models['fast']}" if chat_models.get("fast") else chat_plugin
-    chat_balanced = f"{chat_plugin}/{chat_models['balanced']}" if chat_models.get("balanced") else chat_plugin
-    chat_smart = f"{chat_plugin}/{chat_models['smart']}" if chat_models.get("smart") else chat_plugin
-    embedding_spec = f"{embedding_plugin}/{embedding_model}" if embedding_model else embedding_plugin
+    chat_balanced = (
+        f"{chat_plugin}/{chat_models['balanced']}" if chat_models.get("balanced") else chat_plugin
+    )
+    chat_smart = (
+        f"{chat_plugin}/{chat_models['smart']}" if chat_models.get("smart") else chat_plugin
+    )
+    embedding_spec = (
+        f"{embedding_plugin}/{embedding_model}" if embedding_model else embedding_plugin
+    )
 
     config_dict = {
         "chat_fast": chat_fast,

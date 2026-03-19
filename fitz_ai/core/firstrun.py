@@ -18,7 +18,6 @@ from __future__ import annotations
 import logging
 import re
 import subprocess
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -235,13 +234,13 @@ def run_firstrun_setup() -> bool:
                 chat_smart=f"ollama/{tiers['smart']}",
                 embedding=f"ollama/{embedding_name}",
             )
-            print(f"\n  Auto-configured from Ollama models:")
+            print("\n  Auto-configured from Ollama models:")
             print(f"    fast:      {tiers['fast']}")
             print(f"    balanced:  {tiers['balanced']}")
             print(f"    smart:     {tiers['smart']}")
             print(f"    embedding: {embedding_name}")
             print(f"\n  Config: {config_path}")
-            print(f"  Edit this file to change models.\n")
+            print("  Edit this file to change models.\n")
             return True
 
         # Missing models — prompt to pull
@@ -256,10 +255,10 @@ def run_firstrun_setup() -> bool:
         if not tiers and detected.chat_models:
             pass  # Shouldn't happen, but just in case
         elif not tiers:
-            print(f"  Chat model needed. Example:")
+            print("  Chat model needed. Example:")
             print(f"    ollama pull {RECOMMENDED_CHAT}\n")
         if not has_embedding:
-            print(f"  Embedding model needed. Example:")
+            print("  Embedding model needed. Example:")
             print(f"    ollama pull {RECOMMENDED_EMBEDDING}\n")
 
         # Offer to pull
@@ -295,11 +294,11 @@ def run_firstrun_setup() -> bool:
                     print(f"\n  Configured. Config: {config_path}\n")
                     return True
 
-            print(f"  Could not configure after pulling. Edit config manually.")
+            print("  Could not configure after pulling. Edit config manually.")
             print(f"  Config: {config_path}\n")
             return False
         else:
-            print(f"\n  Pull the models manually, then run fitz again:")
+            print("\n  Pull the models manually, then run fitz again:")
             for _kind, model_name in missing:
                 print(f"    ollama pull {model_name}")
             print(f"\n  Config: {config_path}\n")
@@ -308,8 +307,8 @@ def run_firstrun_setup() -> bool:
     # ── Ollama installed but not running? ──────────────────────
     if models is None and _ollama_binary_exists():
         print("\n  Ollama is installed but not running.")
-        print(f"  Start it with: ollama serve")
-        print(f"\n  Then run fitz again.\n")
+        print("  Start it with: ollama serve")
+        print("\n  Then run fitz again.\n")
         return False
 
     # ── Try LM Studio ───────────────────────────────────────────
@@ -319,7 +318,7 @@ def run_firstrun_setup() -> bool:
         response = httpx.get("http://localhost:1234/v1/models", timeout=3)
         if response.status_code == 200:
             print("\n  LM Studio detected but embedding model still needed.")
-            print(f"  Install Ollama and pull an embedding model:")
+            print("  Install Ollama and pull an embedding model:")
             print(f"    ollama pull {RECOMMENDED_EMBEDDING}")
             print(f"\n  Config: {config_path}\n")
             return False
@@ -347,14 +346,14 @@ def run_firstrun_setup() -> bool:
 
     # ── Nothing available ───────────────────────────────────────
     print("\n  No LLM provider found. Set up one of these:\n")
-    print(f"  Option 1 — Ollama (local, free):")
-    print(f"    Install from https://ollama.ai")
+    print("  Option 1 — Ollama (local, free):")
+    print("    Install from https://ollama.ai")
     print(f"    ollama pull {RECOMMENDED_CHAT}")
     print(f"    ollama pull {RECOMMENDED_EMBEDDING}\n")
-    print(f"  Option 2 — Cohere (cloud, free tier):")
-    print(f"    export COHERE_API_KEY=your-key-here\n")
-    print(f"  Option 3 — OpenAI:")
-    print(f"    export OPENAI_API_KEY=your-key-here\n")
-    print(f"  Then run fitz again.\n")
+    print("  Option 2 — Cohere (cloud, free tier):")
+    print("    export COHERE_API_KEY=your-key-here\n")
+    print("  Option 3 — OpenAI:")
+    print("    export OPENAI_API_KEY=your-key-here\n")
+    print("  Then run fitz again.\n")
     print(f"  Config: {config_path}\n")
     return False

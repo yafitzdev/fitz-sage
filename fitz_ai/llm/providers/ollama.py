@@ -38,6 +38,7 @@ def _check_ollama_response(response: httpx.Response, model: str) -> None:
             "Config: .fitz/config.yaml"
         )
 
+
 # Default models by tier (common Ollama models)
 CHAT_MODELS: dict[ModelTier, str] = {
     "smart": "qwen2.5:14b",

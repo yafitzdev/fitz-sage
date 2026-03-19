@@ -157,7 +157,6 @@ class FitzKragEngine:
         # LLM providers and PostgreSQL are independent — init in parallel.
         # PostgreSQL startup (pgserver) can take 1-2s; LLM provider init
         # creates HTTP clients. Overlapping saves the slower of the two.
-        import sys
 
         print("  Starting database and connecting to LLM providers...", end="", flush=True)
         with ThreadPoolExecutor(max_workers=3) as pool:
@@ -262,11 +261,13 @@ class FitzKragEngine:
         # Chat factory (shared by detection, rewriter, HyDE, multi-hop, enrichment)
         from fitz_ai.llm.factory import get_chat_factory
 
-        self._chat_factory = get_chat_factory({
-            "fast": self._config.chat_fast,
-            "balanced": self._config.chat_balanced,
-            "smart": self._config.chat_smart,
-        })
+        self._chat_factory = get_chat_factory(
+            {
+                "fast": self._config.chat_fast,
+                "balanced": self._config.chat_balanced,
+                "smart": self._config.chat_smart,
+            }
+        )
 
         # Pre-load chat models sequentially: fast first (guardrails/detection),
         # then smart (generation). Sequential avoids VRAM contention on ollama.

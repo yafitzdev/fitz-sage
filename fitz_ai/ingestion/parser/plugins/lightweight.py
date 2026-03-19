@@ -48,8 +48,7 @@ class LightweightPDFParser(BaseParser):
             import pypdfium2 as pdfium
         except ImportError:
             raise ImportError(
-                "pypdfium2 required for PDF parsing. "
-                "Install with: pip install pypdfium2"
+                "pypdfium2 required for PDF parsing. " "Install with: pip install pypdfium2"
             )
 
         file_bytes = self._read_file_bytes(file)
@@ -126,8 +125,7 @@ class LightweightDOCXParser(BaseParser):
             import docx
         except ImportError:
             raise ImportError(
-                "python-docx required for DOCX parsing. "
-                "Install with: pip install python-docx"
+                "python-docx required for DOCX parsing. " "Install with: pip install python-docx"
             )
 
         doc = docx.Document(str(file.local_path))
@@ -203,8 +201,7 @@ class LightweightPPTXParser(BaseParser):
             from pptx import Presentation
         except ImportError:
             raise ImportError(
-                "python-pptx required for PPTX parsing. "
-                "Install with: pip install python-pptx"
+                "python-pptx required for PPTX parsing. " "Install with: pip install python-pptx"
             )
 
         prs = Presentation(str(file.local_path))

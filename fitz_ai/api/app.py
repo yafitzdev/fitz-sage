@@ -24,8 +24,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Fitz RAG API",
         description=(
-            "REST API for the Fitz RAG framework. "
-            "Query knowledge bases and manage collections."
+            "REST API for the Fitz RAG framework. " "Query knowledge bases and manage collections."
         ),
         version=get_fitz_version(),
         docs_url="/docs",

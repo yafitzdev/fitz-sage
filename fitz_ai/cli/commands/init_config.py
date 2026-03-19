@@ -35,6 +35,7 @@ def _build_chat_specs(
     chat_model_balanced: str,
 ) -> str:
     """Build chat tier spec lines."""
+
     def _spec(model: str) -> str:
         if model:
             return f"{chat}/{model}"

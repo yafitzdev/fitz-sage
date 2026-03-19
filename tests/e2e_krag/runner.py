@@ -211,10 +211,20 @@ class KragE2ERunner:
         vector_db_kwargs = tier_config["vector_db"].get("kwargs", {})
 
         # Build flat chat specs
-        chat_fast = f"{chat_plugin}/{chat_models['fast']}" if chat_models.get("fast") else chat_plugin
-        chat_balanced = f"{chat_plugin}/{chat_models['balanced']}" if chat_models.get("balanced") else chat_plugin
-        chat_smart = f"{chat_plugin}/{chat_models['smart']}" if chat_models.get("smart") else chat_plugin
-        embedding_spec = f"{embedding_plugin}/{embedding_model}" if embedding_model else embedding_plugin
+        chat_fast = (
+            f"{chat_plugin}/{chat_models['fast']}" if chat_models.get("fast") else chat_plugin
+        )
+        chat_balanced = (
+            f"{chat_plugin}/{chat_models['balanced']}"
+            if chat_models.get("balanced")
+            else chat_plugin
+        )
+        chat_smart = (
+            f"{chat_plugin}/{chat_models['smart']}" if chat_models.get("smart") else chat_plugin
+        )
+        embedding_spec = (
+            f"{embedding_plugin}/{embedding_model}" if embedding_model else embedding_plugin
+        )
 
         logger.info(
             f"KRAG E2E Setup: chat={chat_plugin}, embedding={embedding_plugin}, "
@@ -302,10 +312,20 @@ class KragE2ERunner:
         vector_db_kwargs = tier_config["vector_db"].get("kwargs", {})
 
         # Build flat chat specs
-        chat_fast = f"{chat_plugin}/{chat_models['fast']}" if chat_models.get("fast") else chat_plugin
-        chat_balanced = f"{chat_plugin}/{chat_models['balanced']}" if chat_models.get("balanced") else chat_plugin
-        chat_smart = f"{chat_plugin}/{chat_models['smart']}" if chat_models.get("smart") else chat_plugin
-        embedding_spec = f"{embedding_plugin}/{embedding_model}" if embedding_model else embedding_plugin
+        chat_fast = (
+            f"{chat_plugin}/{chat_models['fast']}" if chat_models.get("fast") else chat_plugin
+        )
+        chat_balanced = (
+            f"{chat_plugin}/{chat_models['balanced']}"
+            if chat_models.get("balanced")
+            else chat_plugin
+        )
+        chat_smart = (
+            f"{chat_plugin}/{chat_models['smart']}" if chat_models.get("smart") else chat_plugin
+        )
+        embedding_spec = (
+            f"{embedding_plugin}/{embedding_model}" if embedding_model else embedding_plugin
+        )
 
         tier_collection = self._collection_for_tier(tier_name)
         self._tier_collections.add(tier_collection)
