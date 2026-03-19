@@ -451,7 +451,7 @@ class CLIContext:
         from fitz_ai.cli.ui import ui
 
         if self.typed_config is None:
-            ui.error("Invalid config. Run 'fitz init' to reconfigure.")
+            ui.error("Invalid config. Edit .fitz/config.yaml to fix.")
             raise typer.Exit(1)
         return self.typed_config
 

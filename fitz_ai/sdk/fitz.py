@@ -136,7 +136,7 @@ class fitz:
         if not self._auto_init:
             raise ConfigurationError(
                 f"Config file not found: {config_path}. "
-                f"Run 'fitz init' or pass auto_init=True."
+                f"Create it manually or pass auto_init=True."
             )
 
         # Auto-detect providers and write config (same logic as CLI first-run)

@@ -3,11 +3,12 @@
 Fitz CLI - Clean, minimal CLI.
 
 Usage:
-    fitz init                                        # Setup wizard
     fitz query "question" --source ./docs            # Register + query
     fitz query "question"                            # Query existing collection
     fitz collections                                 # List/manage collections
-    fitz config                                      # Show configuration
+    fitz serve                                       # Start REST API
+
+Config: .fitz/config.yaml (auto-created on first run)
 """
 
 from fitz_ai.cli.cli import app  # noqa: E402

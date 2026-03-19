@@ -4,12 +4,12 @@ Fitz CLI - Main application.
 
 Commands:
     fitz query         Query knowledge base (--source to register, --chat for interactive)
-    fitz init          Setup wizard
     fitz collections   Manage collections (list, info, delete)
-    fitz config        View config, run diagnostics (--doctor, --test)
     fitz serve         Start the REST API server
     fitz reset         Reset pgserver database (when stuck/corrupted)
     fitz eval          Evaluation tools
+
+Configuration: .fitz/config.yaml (auto-created on first run)
 
 NOTE: Commands use lazy loading - heavy imports only happen when a command is invoked.
 """
@@ -62,38 +62,12 @@ def query(
     mod.command(question=question, source=source, collection=collection, engine=engine, chat=chat)
 
 
-@app.command("init")
-def init(
-    non_interactive: bool = typer.Option(False, "--non-interactive", "-y", help="Use defaults."),
-    show_config: bool = typer.Option(False, "--show", "-s", help="Preview config without saving."),
-) -> None:
-    """Initialize Fitz with an interactive setup wizard."""
-    from fitz_ai.cli.commands import init as mod
-
-    mod.command(non_interactive=non_interactive, show_config=show_config)
-
-
 @app.command("collections")
 def collections() -> None:
     """Manage collections (list, info, delete)."""
     from fitz_ai.cli.commands import collections as mod
 
     mod.command()
-
-
-@app.command("config")
-def config(
-    show_path: bool = typer.Option(False, "--path", "-p", help="Show config file path."),
-    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
-    raw: bool = typer.Option(False, "--raw", help="Show raw YAML."),
-    edit: bool = typer.Option(False, "--edit", "-e", help="Open config in editor."),
-    doctor: bool = typer.Option(False, "--doctor", "-d", help="Run system diagnostics."),
-    test: bool = typer.Option(False, "--test", "-t", help="Test actual connections."),
-) -> None:
-    """View configuration and run diagnostics."""
-    from fitz_ai.cli.commands import config as mod
-
-    mod.command(show_path=show_path, as_json=as_json, raw=raw, edit=edit, doctor=doctor, test=test)
 
 
 @app.command("serve")

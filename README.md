@@ -506,14 +506,13 @@ Fitz is a foundation. It handles document indexing and grounded retrieval—you 
 fitz query "question" --source ./docs  # Point at docs and query (start here)
 fitz query "question"                  # Query existing collection
 fitz query --chat                      # Multi-turn conversation mode
-fitz init                              # Interactive setup wizard
 fitz collections                       # List and delete knowledge collections
-fitz config                            # View/edit configuration
 fitz serve                             # Start REST API server
 fitz reset                             # Reset pgserver database (when stuck/corrupted)
 fitz eval                              # Evaluation tools
-fitz config --doctor                   # System diagnostics
 ```
+
+Config: `.fitz/config.yaml` — auto-created on first run, edit to change models.
 
 </details>
 
@@ -626,13 +625,13 @@ curl -X POST http://localhost:8000/query \
 > Ollama needs to be running as a background service. Start it with: `ollama serve`
 
 **"Model not found" error**
-> The configured model isn't pulled in Ollama. Pull it with: `ollama pull <model-name>`. Check your config at `~/.fitz/config.yaml` to see which models are configured.
+> The configured model isn't pulled in Ollama. Pull it with: `ollama pull <model-name>`. Check your config at `.fitz/config.yaml` to see which models are configured.
 
 **First query is slow**
 > First run initializes the database and loads LLM models into memory. Subsequent queries are much faster. For Ollama, larger models take longer to load — use a smaller model like `qwen3.5:0.6b` for faster startup.
 
 **How do I change my LLM models?**
-> Edit `~/.fitz/config.yaml`. The config uses `provider/model` format:
+> Edit `.fitz/config.yaml`. The config uses `provider/model` format:
 > ```yaml
 > chat_fast: ollama/qwen3.5:0.6b
 > chat_smart: ollama/llama3.2

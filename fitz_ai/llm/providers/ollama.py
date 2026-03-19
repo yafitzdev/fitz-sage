@@ -28,14 +28,14 @@ def _check_ollama_response(response: httpx.Response, model: str) -> None:
             raise RuntimeError(
                 f"Ollama model '{model}' not found. "
                 f"Pull it with: ollama pull {model}\n"
-                f"Config: ~/.fitz/config.yaml"
+                f"Config: .fitz/config.yaml"
             ) from e
         raise
     except httpx.ConnectError:
         raise RuntimeError(
             "Cannot connect to Ollama at http://localhost:11434. "
             "Start Ollama with: ollama serve\n"
-            "Config: ~/.fitz/config.yaml"
+            "Config: .fitz/config.yaml"
         )
 
 # Default models by tier (common Ollama models)
