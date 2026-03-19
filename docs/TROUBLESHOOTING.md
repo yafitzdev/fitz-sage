@@ -6,13 +6,7 @@ Common issues and solutions for Fitz.
 
 ## Quick Diagnostics
 
-Run the built-in diagnostic tool:
-
-```bash
-fitz config --doctor           # Run all checks
-fitz config --doctor --verbose # More details
-fitz config --doctor --test    # Test actual connections
-```
+Check your config file at `.fitz/config.yaml` and verify providers, API keys, and storage settings are correct.
 
 ---
 
@@ -26,11 +20,8 @@ ConfigNotFoundError: Config file not found: .fitz/config/fitz_krag.yaml
 ```
 
 **Solution:**
-```bash
-fitz init  # Creates config interactively
-```
 
-Or with auto-init in Python:
+Edit `.fitz/config.yaml` (auto-created on first run). Or with auto-init in Python:
 ```python
 from fitz_ai import fitz
 f = fitz(auto_init=True)  # Creates default config
@@ -328,7 +319,7 @@ TimeoutError: Request timed out after 120 seconds
 ### Enable Debug Logging
 
 ```yaml
-# In .fitz/config/fitz_krag.yaml
+# In .fitz/config.yaml
 logging:
   level: DEBUG
 ```
@@ -407,7 +398,7 @@ ConfigError
 
 ## Getting Help
 
-1. **Run diagnostics:** `fitz config --doctor --verbose`
+1. **Check config:** Verify `.fitz/config.yaml` is correct
 2. **Check logs:** Enable DEBUG level
 3. **Report issues:** [GitHub Issues](https://github.com/yafitzdev/fitz-ai/issues)
 
@@ -416,7 +407,7 @@ When reporting issues, include:
 - Python version: `python --version`
 - OS: Windows/macOS/Linux
 - Full error traceback
-- Output of `fitz config --doctor`
+- Contents of `.fitz/config.yaml`
 
 ---
 
