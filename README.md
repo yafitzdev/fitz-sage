@@ -20,30 +20,44 @@
 
 ---
 
-**Other RAG systems** ❌
-```
-  Q: "Who won the 2024 FIFA World Cup?"
-  A: "Germany won the 2024 FIFA World Cup, defeating Argentina
-      1-0 in the final."
+<div align="center">
+<table>
+  <tr>
+    <td align="center" colspan="2">
+      <pre><strong>Q: "Who won the 2024 FIFA World Cup?"</strong>
+(There was no World Cup in 2024.)</pre>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <strong>❌ Uncalibrated RAG systems</strong>
+<pre>
+A: "Germany won the 2024 FIFA World Cup,
+    defeating Argentina 1-0 in the final."
+</pre>
+    </td>
+    <td align="center" width="50%">
+      <strong>🛡️ fitz-ai</strong>
+<pre>
+A: "I don't have enough information
+    to answer this question.
+</pre><pre>
+    Related topics in the knowledge base:
+      - FIFA tournament history (4 mentions)
+      - 2022 World Cup coverage (7 mentions)
+</pre><pre>
+    To answer this, consider adding:
+      - Documents covering 2024 FIFA events."
+</pre>
+    </td>
+  </tr>
+</table>
+  → Uncalibrated RAG hallucinates confidently when the answer isn't in your documents. 
+  
+  Fitz refuses, explains why, and tells you what to add.
+</div>
 
-     ← There was no World Cup in 2024. But the RAG system
-        confidently made one up — and it sounds plausible.
-```
 
-**fitz-ai** 🛡️
-```
-  Q: "Who won the 2024 FIFA World Cup?"
-  A: "I don't have enough information to answer this question.
-
-      Related topics in the knowledge base:
-        - FIFA tournament history (4 mentions)
-        - 2022 World Cup coverage (7 mentions)
-
-      To answer this, consider adding:
-        - Documents covering 2024 FIFA events."
-```
-
-Most RAG tools hallucinate confidently when the answer isn't in your documents. Fitz refuses, explains why, and tells you what to add.
 
 ---
 
@@ -59,17 +73,23 @@ That's it. Your documents are now searchable with AI.
 
 
 ![fitz-ai quickstart demo](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/quickstart_demo.gif)
+*Figure 1: Example of user experience for querying documents using fitz-ai.*
 
 ---
 
 ### About
 
-  Solo project by Yan Fitzner ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)).
+Existing RAG tools hallucinate. When the answer isn't in your documents, they invent one — confidently, fluently, wrongly. In production, that's not a minor inconvenience. It's the reason you can't trust the system. I built fitz-ai to solve that problem directly, while working as a Data Engineer in the automotive industry. No LangChain. No LlamaIndex. Every layer written from scratch.
 
-  - ~55k lines of Python
-  - 2000+ tests, 99% coverage
-  - Zero LangChain/LlamaIndex dependencies — built from scratch
-  - Powers [fitz-graveyard](https://github.com/yafitzdev/fitz-graveyard) and one Fortune 500 internal deployment
+The retrieval architecture is [KRAG (Knowledge Routing Augmented Generation)](docs/features/platform/krag.md) — documents are parsed into typed units (code symbols, sections, tables) and each query is routed to the right search strategy, rather than searching flat chunks uniformly.
+
+Honesty is enforced by an [ML governance classifier](docs/features/governance/governance-benchmarking.md) that decides when to answer, hedge, refuse — validated against [fitz-gov](https://github.com/yafitzdev/fitz-gov), a purpose-built benchmark of 2,900+ adversarial test cases.
+
+It runs in production today and powers [fitz-graveyard](https://github.com/yafitzdev/fitz-graveyard).
+
+~55k lines of Python. 2,000+ tests. 99% coverage.
+
+Yan Fitzner — ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)).
 
 ![fitz-ai honest_rag](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/honest_rag.jpg)
 
@@ -147,13 +167,16 @@ You trade flexibility for a pipeline that handles temporal queries, comparison q
 
 ### Why Fitz?
 
+**Asymmetric indexing 🗂️** → [KRAG (Knowledge Routing Augmented Generation)](docs/features/platform/krag.md)
+> Documents are parsed into typed retrieval units (symbols, sections, tables) with structural metadata, not flat chunks. Queries are routed to the right strategy per content type.
+
 **Zero-wait querying 🐆** → [Progressive KRAG](docs/features/platform/progressive-krag-agentic-search.md)
-> Point at a folder. Ask a question immediately — no ingestion step required. Fitz serves answers instantly via agentic search while a background worker indexes your files. Queries get faster over time as indexing completes, but they work from second one.
+> Ask a question immediately — no ingestion step required. Fitz serves answers instantly via agentic search while a background worker indexes your files. Queries get faster over time as indexing completes, but they work from second one.
 
 **Honest answers ✅** → [Governance Benchmark](docs/features/governance/governance-benchmarking.md)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."
 >
-> → Fitz detects disputes at **79.1% recall** on [fitz-gov 5.0](https://github.com/yafitzdev/fitz-gov), a 2,900+ case benchmark for epistemic honesty (92% hard difficulty).
+> → Fitz detects when to abstain at **90.2% recall** on [fitz-gov 5.0](https://github.com/yafitzdev/fitz-gov), a 2,900+ case benchmark for epistemic honesty (62.7% hard difficulty).
 
 **Actionable failures 🔍**
 > When Fitz can't answer, it doesn't just refuse — it explains what it searched for, shows related topics that *do* exist, and suggests what documents to add. When sources conflict, Fitz tells you exactly which sources disagree and what the disagreement is about. Every failure mode is a feedback signal, not a dead end.
@@ -164,13 +187,8 @@ You trade flexibility for a pipeline that handles temporal queries, comparison q
 **Tabular data that is actually searchable 📈** → [Unified Storage](docs/features/platform/unified-storage.md)
 > CSV and table data is a nightmare in most RAG systems—chunked arbitrarily, structure lost, queries fail. Fitz stores tables natively in PostgreSQL alongside your vectors—same database, no sync issues. Auto-detects schema and runs real SQL. Ask "What's the average price by region?" and get an actual computed answer, not fragmented rows.
 
-**Other Features at a Glance 🃏**
->1. [x] **Fully local execution possible.** Embedded PostgreSQL + Ollama, no API keys required to start.
->2. [x] **Plugin-based architecture.** Swap LLMs, rerankers, and retrieval pipelines via YAML config.
->3. [x] **[KRAG (Knowledge Routing Augmented Generation)](docs/features/platform/krag.md).** Asymmetric indexing — documents are parsed into typed retrieval units (symbols, sections, tables) with structural metadata, not flat chunks. Queries are routed to the right strategy per content type.
->4. [x] **Full provenance.** Every answer traces back to the exact source symbol, section, or document.
->5. [x] **Data privacy**: No telemetry, no cloud, no external calls except to the LLM provider you configure.
->6. [x] **[Enterprise gateway support](docs/features/platform/enterprise-gateway.md).** OAuth2 M2M, custom CA certs, mTLS, and corporate proxy/gateway integration.
+**Fully local execution possible 🏠**
+> Embedded PostgreSQL + Ollama/LM Studio. No API keys required to start.
 
 ####
 
@@ -290,12 +308,12 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 | **DISPUTED** | Sources contradict each other        | **74.9%** |
 | **TRUSTWORTHY** | Consistent, sufficient evidence      | **78.6%** |
 
-**Overall accuracy: 81.3%** on fitz-gov 5.0 (2,910 cases, 5-fold cross-validated, 92% hard difficulty)
+**Overall accuracy: 81.3%** on fitz-gov 5.0 (2,910 cases, 5-fold cross-validated, 62.7% hard difficulty)
 
 <br>
 
 > [!NOTE]
-> Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on. 92% of our test cases are rated "hard."
+> Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on.
 
 <strong>The system fails safe 🛡️</strong>
 > The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence ("trustworthy" instead of "disputed") is the rarest error mode.
