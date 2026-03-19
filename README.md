@@ -63,7 +63,8 @@ A: "I don't have enough information
 
 ### Where to start 🚀
 
-Requires [Ollama](https://ollama.ai) or a Cohere/OpenAI API key. Fitz auto-detects your setup on first run.
+> [!IMPORTANT]
+> Requires [Ollama](https://ollama.ai), [LM Studio](https://lmstudio.ai), or a Cohere/OpenAI API key. Fitz auto-detects your setup on first run.
 
 ```bash
 pip install fitz-ai
@@ -190,7 +191,7 @@ You trade flexibility for a pipeline that handles temporal queries, comparison q
 > CSV and table data is a nightmare in most RAG systems—chunked arbitrarily, structure lost, queries fail. Fitz stores tables natively in PostgreSQL alongside your vectors—same database, no sync issues. Auto-detects schema and runs real SQL. Ask "What's the average price by region?" and get an actual computed answer, not fragmented rows.
 
 **Fully local execution possible 🏠**
-> Embedded PostgreSQL + Ollama. No API keys required to start.
+> Embedded PostgreSQL + Ollama/LM Studio. No API keys required to start.
 
 ####
 
@@ -476,7 +477,7 @@ Fitz is a foundation. It handles document indexing and grounded retrieval—you 
 │  ┌────────┐ ┌───────────┐ ┌────────┐                          │
 │  │  Chat  │ │ Embedding │ │ Rerank │                          │
 │  └────────┘ └───────────┘ └────────┘                          │
-│  openai, cohere, anthropic, ollama, azure...                  │
+│  openai, cohere, anthropic, ollama, lmstudio, azure...        │
 ├───────────────────────────────────────────────────────────────┤
 │  Storage (PostgreSQL + pgvector)                              │
 │  vectors | metadata | tables | keywords | full-text search    │
