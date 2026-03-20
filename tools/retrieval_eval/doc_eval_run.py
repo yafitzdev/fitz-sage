@@ -6,7 +6,6 @@ CORPUS_DIR = "C:/Users/yanfi/PycharmProjects/fitz-ai/tools/retrieval_eval/test_c
 COLLECTION = "doc_eval"
 CATEGORY = None  # e.g. "section-lookup", "table-lookup", None for all
 IDS = None  # e.g. "1,2,3", None for all
-TOP_K = 10  # chunks/sections to retrieve per query
 VERBOSE = True
 SKIP_INGEST = False  # True to skip re-ingestion (use existing collection)
 # -----------------
@@ -19,7 +18,6 @@ if __name__ == "__main__":
         collection=COLLECTION,
         category=CATEGORY,
         ids=IDS,
-        top_k=TOP_K,
         verbose=VERBOSE,
         skip_ingest=SKIP_INGEST,
     )

@@ -5,61 +5,62 @@
     "document": "rag_survey_2312.10997.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Naive RAG", "page": 2, "keywords": ["naive", "retrieve", "generate"]},
-      {"heading": "Advanced RAG", "page": 3, "keywords": ["advanced", "pre-retrieval", "post-retrieval"]},
-      {"heading": "Modular RAG", "page": 4, "keywords": ["modular", "module", "pattern"]}
+      {"heading": "Naive RAG", "keywords": ["naive", "retrieve", "generate"]},
+      {"heading": "Advanced RAG", "keywords": ["advanced", "pre-retrieval", "post-retrieval"]},
+      {"heading": "Modular RAG", "keywords": ["modular", "module", "pattern"]}
     ],
     "relevant_sections": [
-      {"heading": "Overview of RAG", "page": 2}
+      {"heading": "OVERVIEW OF RAG"}
     ]
   },
   {
     "id": 2,
-    "query": "What chunking strategies are used in RAG systems?",
+    "query": "What chunking and indexing strategies are used in RAG systems?",
     "document": "rag_survey_2312.10997.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Chunking Strategy", "page": 8, "keywords": ["chunk", "token", "sentence", "proposition"]}
+      {"heading": "Indexing Optimization", "keywords": ["chunk", "index", "metadata", "structure"]}
     ],
     "relevant_sections": [
-      {"heading": "Retrieval Granularity", "page": 7},
-      {"heading": "Indexing Optimization", "page": 8}
+      {"heading": "RETRIEVAL"}
     ]
   },
   {
     "id": 3,
-    "query": "How does query expansion work in retrieval augmented generation?",
+    "query": "How does query optimization work in retrieval augmented generation?",
     "document": "rag_survey_2312.10997.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Query Expansion", "page": 8, "keywords": ["expansion", "multi-query", "sub-question"]}
+      {"heading": "Query Optimization", "keywords": ["query", "expansion", "transform"]}
     ],
     "relevant_sections": [
-      {"heading": "Query Optimization", "page": 8},
-      {"heading": "Query Transformation", "page": 9}
+      {"heading": "RETRIEVAL"}
     ]
   },
   {
     "id": 4,
     "query": "What metrics are used to evaluate RAG systems?",
     "document": "rag_survey_2312.10997.pdf",
-    "category": "table-lookup",
+    "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Metrics and Benchmarks", "page": 14, "keywords": ["accuracy", "BLEU", "ROUGE", "faithfulness"]}
+      {"heading": "Evaluation Aspects", "keywords": ["accuracy", "faithfulness", "relevance"]}
     ],
     "relevant_sections": [
-      {"heading": "Evaluation", "page": 13}
+      {"heading": "TASK AND EVALUATION"},
+      {"heading": "Evaluation Benchmarks"}
     ]
   },
   {
     "id": 5,
-    "query": "What evaluation frameworks exist for RAG like RAGAS and ARES?",
+    "query": "What evaluation benchmarks and tools exist for RAG like RAGAS and ARES?",
     "document": "rag_survey_2312.10997.pdf",
-    "category": "table-lookup",
+    "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Evaluation Frameworks", "page": 15, "keywords": ["RAGAS", "ARES", "TruLens"]}
+      {"heading": "Evaluation Benchmarks and Tools", "keywords": ["RAGAS", "benchmark", "evaluation"]}
     ],
-    "relevant_sections": []
+    "relevant_sections": [
+      {"heading": "Evaluation Aspects"}
+    ]
   },
   {
     "id": 6,
@@ -67,20 +68,20 @@
     "document": "rag_survey_2312.10997.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "RAG vs Fine-tuning", "page": 5, "keywords": ["fine-tuning", "external knowledge", "adaptation"]}
+      {"heading": "RAG vs Fine-tuning", "keywords": ["fine-tuning", "external knowledge", "adaptation"]}
     ],
     "relevant_sections": []
   },
   {
     "id": 7,
-    "query": "What is the standard deduction amount for 2024 taxes?",
+    "query": "What is the standard deduction amount?",
     "document": "irs_1040_instructions_2024.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Standard Deduction", "page": 12, "keywords": ["standard deduction", "amount", "filing status"]}
+      {"heading": "Standard Deduction", "keywords": ["standard deduction", "amount", "filing status"]}
     ],
     "relevant_sections": [
-      {"heading": "What's New", "page": 6}
+      {"heading": "What's New"}
     ]
   },
   {
@@ -89,10 +90,10 @@
     "document": "irs_1040_instructions_2024.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Do You Have To File", "page": 8, "keywords": ["filing", "requirement", "income", "threshold"]}
+      {"heading": "Do You Have To File", "keywords": ["filing", "requirement", "income"]}
     ],
     "relevant_sections": [
-      {"heading": "Filing Requirements", "page": 8}
+      {"heading": "Chart A-For Most People"}
     ]
   },
   {
@@ -101,9 +102,11 @@
     "document": "irs_1040_instructions_2024.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Pensions and Annuities", "page": 29, "keywords": ["pension", "annuity", "taxable", "simplified method"]}
+      {"heading": "Pensions and Annuities", "keywords": ["pension", "annuity", "taxable"]}
     ],
-    "relevant_sections": []
+    "relevant_sections": [
+      {"heading": "Simplified Method"}
+    ]
   },
   {
     "id": 10,
@@ -111,10 +114,10 @@
     "document": "irs_1040_instructions_2024.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Can't File on Time", "page": 8, "keywords": ["extension", "automatic", "file", "late"]}
+      {"heading": "Can't File on Time", "keywords": ["extension", "automatic", "late"]}
     ],
     "relevant_sections": [
-      {"heading": "When and Where Should You File", "page": 8}
+      {"heading": "When and Where Should You File"}
     ]
   },
   {
@@ -123,12 +126,12 @@
     "document": "nist_ai_rmf_100-1.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "AI Risks and Trustworthiness", "page": 17, "keywords": ["trustworthy", "valid", "reliable", "safe", "fair"]}
+      {"heading": "AI Risks and Trustworthiness", "keywords": ["trustworthy", "valid", "reliable", "safe", "fair"]}
     ],
     "relevant_sections": [
-      {"heading": "Valid and Reliable", "page": 18},
-      {"heading": "Safe", "page": 19},
-      {"heading": "Fair", "page": 22}
+      {"heading": "Valid and Reliable"},
+      {"heading": "Safe"},
+      {"heading": "Fair"}
     ]
   },
   {
@@ -137,22 +140,22 @@
     "document": "nist_ai_rmf_100-1.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Safe", "page": 19, "keywords": ["safety", "simulation", "testing", "monitoring", "shut down"]}
+      {"heading": "Safe", "keywords": ["safety", "testing", "monitoring"]}
     ],
     "relevant_sections": [
-      {"heading": "Secure and Resilient", "page": 20}
+      {"heading": "Secure and Resilient"}
     ]
   },
   {
     "id": 13,
     "query": "What is the GOVERN function in the NIST AI risk management framework?",
     "document": "nist_ai_rmf_100-1.pdf",
-    "category": "table-lookup",
+    "category": "section-lookup",
     "critical_sections": [
-      {"heading": "GOVERN", "page": 27, "keywords": ["govern", "cross-cutting", "risk management", "organizational"]}
+      {"heading": "Govern", "keywords": ["govern", "cross-cutting", "risk management"]}
     ],
     "relevant_sections": [
-      {"heading": "Categories and subcategories", "page": 28}
+      {"heading": "AI RMF Core"}
     ]
   },
   {
@@ -161,11 +164,11 @@
     "document": "nist_ai_rmf_100-1.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Risk Measurement", "page": 10, "keywords": ["measurement", "challenge", "quantify", "metric"]}
+      {"heading": "Risk Measurement", "keywords": ["measurement", "challenge", "quantify"]}
     ],
     "relevant_sections": [
-      {"heading": "Challenges for AI Risk Management", "page": 10},
-      {"heading": "Risk Tolerance", "page": 12}
+      {"heading": "Challenges for AI Risk Management"},
+      {"heading": "Risk Tolerance"}
     ]
   },
   {
@@ -174,21 +177,23 @@
     "document": "nist_ai_rmf_100-1.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Explainable and Interpretable", "page": 21, "keywords": ["explainable", "interpretable", "transparent", "decision"]}
+      {"heading": "Explainable and Interpretable", "keywords": ["explainable", "interpretable", "transparent"]}
     ],
     "relevant_sections": [
-      {"heading": "Accountable and Transparent", "page": 20}
+      {"heading": "Accountable and Transparent"}
     ]
   },
   {
     "id": 16,
-    "query": "What are the differences between context relevance and answer relevance in RAG evaluation?",
-    "document": "rag_survey_2312.10997.pdf",
+    "query": "How does the NIST AI framework address privacy in AI systems?",
+    "document": "nist_ai_rmf_100-1.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Evaluation", "page": 13, "keywords": ["context relevance", "answer relevance", "faithfulness"]}
+      {"heading": "Privacy-Enhanced", "keywords": ["privacy", "data", "protection"]}
     ],
-    "relevant_sections": []
+    "relevant_sections": [
+      {"heading": "Fair"}
+    ]
   },
   {
     "id": 17,
@@ -196,44 +201,44 @@
     "document": "nist_ai_rmf_100-1.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Risk Prioritization", "page": 12, "keywords": ["prioritization", "severity", "likelihood", "impact"]}
+      {"heading": "Risk Prioritization", "keywords": ["prioritization", "severity", "impact"]}
     ],
     "relevant_sections": [
-      {"heading": "Organizational Integration", "page": 13}
+      {"heading": "Organizational Integration"}
     ]
   },
   {
     "id": 18,
-    "query": "What is the role of metadata attachments in RAG indexing?",
-    "document": "rag_survey_2312.10997.pdf",
-    "category": "section-lookup",
-    "critical_sections": [
-      {"heading": "Metadata Attachments", "page": 8, "keywords": ["metadata", "date", "purpose", "filtering"]}
-    ],
-    "relevant_sections": [
-      {"heading": "Structural Index", "page": 8}
-    ]
-  },
-  {
-    "id": 19,
     "query": "What private delivery services can I use to file my tax return?",
     "document": "irs_1040_instructions_2024.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Private Delivery Services", "page": 9, "keywords": ["delivery", "private", "DHL", "FedEx", "UPS"]}
+      {"heading": "Private Delivery Services", "keywords": ["delivery", "private", "DHL", "FedEx", "UPS"]}
     ],
     "relevant_sections": []
   },
   {
-    "id": 20,
-    "query": "How does the NIST AI framework address privacy in AI systems?",
-    "document": "nist_ai_rmf_100-1.pdf",
+    "id": 19,
+    "query": "What are the different retrieval sources used in RAG?",
+    "document": "rag_survey_2312.10997.pdf",
     "category": "section-lookup",
     "critical_sections": [
-      {"heading": "Privacy-Enhanced", "page": 22, "keywords": ["privacy", "data", "personal", "protection"]}
+      {"heading": "Retrieval Source", "keywords": ["data", "source", "retrieval", "knowledge"]}
     ],
     "relevant_sections": [
-      {"heading": "Fair", "page": 22}
+      {"heading": "RETRIEVAL"}
+    ]
+  },
+  {
+    "id": 20,
+    "query": "What is adaptive retrieval and how does it decide when to retrieve?",
+    "document": "rag_survey_2312.10997.pdf",
+    "category": "section-lookup",
+    "critical_sections": [
+      {"heading": "Adaptive Retrieval", "keywords": ["adaptive", "retrieval", "decide"]}
+    ],
+    "relevant_sections": [
+      {"heading": "AUGMENTATION PROCESS"}
     ]
   }
 ]

@@ -33,7 +33,6 @@ class CodeSearchStrategy:
         self._symbol_store = symbol_store
         self._embedder = embedder
         self._config = config
-        self._hyde_generator: Any = None  # Set by engine if HyDE enabled
         self._raw_store: Any = None  # Set by engine for freshness boosting
 
     def retrieve(
@@ -79,12 +78,8 @@ class CodeSearchStrategy:
             logger.warning(f"Semantic search failed, using keyword only: {e}")
             semantic_results = []
 
-        # 4. HyDE search
-        # hyde_vectors=None → not pre-computed, strategy may generate its own
-        # hyde_vectors=[] → router intentionally skipped HyDE, don't generate
-        # hyde_vectors=[...] → use pre-computed vectors
-        skip_hyde = hyde_vectors is not None and len(hyde_vectors) == 0
-        if not skip_hyde and (self._hyde_generator or hyde_vectors):
+        # 4. HyDE search (uses pre-computed vectors from router)
+        if hyde_vectors:
             hyde_results = self._run_hyde(query, fetch_limit, hyde_vectors=hyde_vectors)
             semantic_results = self._merge_hyde(semantic_results, hyde_results)
 
@@ -106,27 +101,13 @@ class CodeSearchStrategy:
         query: str,
         limit: int,
         *,
-        hyde_vectors: list[list[float]] | None = None,
+        hyde_vectors: list[list[float]],
     ) -> list[dict[str, Any]]:
-        """Generate hypothetical docs via HyDE and search with their embeddings.
-
-        Args:
-            hyde_vectors: Pre-computed hypothesis embeddings. When provided,
-                          skips HyDE generation and embedding entirely.
-        """
+        """Search with pre-computed HyDE vectors from the router."""
         try:
-            if hyde_vectors:
-                all_results: list[dict[str, Any]] = []
-                for vec in hyde_vectors:
-                    results = self._symbol_store.search_by_vector(vec, limit=limit)
-                    all_results.extend(results)
-                return all_results
-
-            hypotheses = self._hyde_generator.generate(query)
             all_results: list[dict[str, Any]] = []
-            for hyp in hypotheses:
-                hyp_vector = self._embedder.embed(hyp, task_type="document")
-                results = self._symbol_store.search_by_vector(hyp_vector, limit=limit)
+            for vec in hyde_vectors:
+                results = self._symbol_store.search_by_vector(vec, limit=limit)
                 all_results.extend(results)
             return all_results
         except Exception as e:

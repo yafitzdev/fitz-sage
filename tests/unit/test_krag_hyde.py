@@ -2,9 +2,14 @@
 """
 Unit tests for HyDE (Hypothetical Document Embeddings) in KRAG search strategies.
 
-Tests HyDE integration in CodeSearchStrategy and SectionSearchStrategy:
-hypothesis generation, embedding, merging with 0.5 weight discount, and
-graceful fallback when HyDE is disabled or fails.
+HyDE is owned by the retrieval router — it generates hypotheses, embeds them,
+and passes pre-computed vectors to strategies. Strategies never call the HyDE
+generator directly; they only consume hyde_vectors.
+
+Tests cover:
+  - Strategies use pre-computed HyDE vectors for additional searches
+  - HyDE results merged with 0.5 weight discount
+  - Strategies work correctly when no HyDE vectors are provided
 """
 
 from __future__ import annotations
@@ -67,54 +72,36 @@ def _make_section_row(row_id: str, score: float = 0.7, title: str = "Setup") -> 
 
 
 class TestCodeSearchHyDE:
-    """Tests for HyDE in CodeSearchStrategy."""
+    """Tests for HyDE vector consumption in CodeSearchStrategy."""
 
-    def test_hyde_generates_hypotheses_and_searches(self):
-        """HyDE generator produces hypotheses; each is embedded and searched."""
+    def test_hyde_vectors_used_for_additional_searches(self):
+        """Pre-computed HyDE vectors trigger extra vector searches."""
         store = MagicMock(name="symbol_store")
         embedder = MagicMock(name="embedder")
         config = _make_config()
 
-        # Keyword returns one result
         kw_row = _make_symbol_row("kw1", score=0.9, name="authenticate")
         store.search_by_name.return_value = [kw_row]
-
-        # BM25 returns nothing
         store.search_bm25.return_value = []
 
-        # Semantic returns one result
         sem_row = _make_symbol_row("sem1", score=0.85, name="login")
-        embedder.embed.side_effect = lambda text, **kw: [0.1] * 3  # dummy vector
-        store.search_by_vector.return_value = [sem_row]
-
-        # HyDE generator
-        hyde = MagicMock(name="hyde_generator")
-        hyde.generate.return_value = ["def authenticate(user): ...", "def login(creds): ..."]
-
-        # HyDE vector search returns new results
         hyde_row = _make_symbol_row("hyde1", score=0.7, name="verify_token")
-        # search_by_vector: 1st call = semantic, then 2 HyDE calls
+
+        embedder.embed.return_value = [0.1] * 3
         store.search_by_vector.side_effect = [
-            [sem_row],
-            [hyde_row],
-            [_make_symbol_row("hyde2", score=0.6, name="check_session")],
+            [sem_row],    # semantic search
+            [hyde_row],   # HyDE vector 1
+            [_make_symbol_row("hyde2", score=0.6, name="check_session")],  # HyDE vector 2
         ]
 
         strategy = CodeSearchStrategy(store, embedder, config)
-        strategy._hyde_generator = hyde
 
-        result = strategy.retrieve("how does auth work", limit=5)
+        # Pass pre-computed HyDE vectors (as router would)
+        hyde_vectors = [[0.2] * 3, [0.3] * 3]
+        result = strategy.retrieve("how does auth work", limit=5, hyde_vectors=hyde_vectors)
 
-        # HyDE generator called
-        hyde.generate.assert_called_once_with("how does auth work")
-
-        # Embedder called 3 times: 1 for query, 2 for hypotheses
-        assert embedder.embed.call_count == 3
-
-        # Vector search called 3 times: 1 semantic + 2 HyDE hypotheses
+        # Vector search called 3 times: 1 semantic + 2 HyDE vectors
         assert store.search_by_vector.call_count == 3
-
-        # Results are addresses
         assert len(result) > 0
 
     def test_hyde_results_merged_with_lower_weight(self):
@@ -123,26 +110,9 @@ class TestCodeSearchHyDE:
         embedder = MagicMock(name="embedder")
         config = _make_config()
 
-        store.search_by_name.return_value = []
-        store.search_bm25.return_value = []
-
-        sem_row = _make_symbol_row("sem1", score=0.8)
-        hyde_row = _make_symbol_row("hyde1", score=0.9, name="from_hyde")
-
-        embedder.embed.return_value = [0.1]
-        store.search_by_vector.side_effect = [
-            [sem_row],  # semantic search
-            [hyde_row],  # HyDE search for hypothesis
-        ]
-
-        hyde = MagicMock(name="hyde_generator")
-        hyde.generate.return_value = ["hypothesis 1"]
-
         strategy = CodeSearchStrategy(store, embedder, config)
-        strategy._hyde_generator = hyde
 
-        # Call _merge_hyde directly to verify weight discount
-        semantic_results = [sem_row]
+        semantic_results = [_make_symbol_row("sem1", score=0.8)]
         hyde_results = [
             {
                 "id": "hyde1",
@@ -158,18 +128,16 @@ class TestCodeSearchHyDE:
 
         merged = strategy._merge_hyde(semantic_results, hyde_results)
 
-        # HyDE score should be 0.9 * 0.5 = 0.45
         hyde_in_merged = [r for r in merged if r["id"] == "hyde1"]
         assert len(hyde_in_merged) == 1
         assert hyde_in_merged[0]["score"] == pytest.approx(0.45)
 
-        # Original semantic score unchanged
         sem_in_merged = [r for r in merged if r["id"] == "sem1"]
         assert len(sem_in_merged) == 1
         assert sem_in_merged[0]["score"] == 0.8
 
-    def test_search_works_when_hyde_generator_is_none(self):
-        """Without HyDE, strategy uses keyword + BM25 + semantic only."""
+    def test_search_works_without_hyde_vectors(self):
+        """Without HyDE vectors, strategy uses keyword + BM25 + semantic only."""
         store = MagicMock(name="symbol_store")
         embedder = MagicMock(name="embedder")
         config = _make_config()
@@ -183,42 +151,29 @@ class TestCodeSearchHyDE:
         store.search_by_vector.return_value = [sem_row]
 
         strategy = CodeSearchStrategy(store, embedder, config)
-        assert strategy._hyde_generator is None
 
         result = strategy.retrieve("find func", limit=5)
 
-        # No HyDE calls: embedder called once (query), vector search once
         embedder.embed.assert_called_once_with("find func", task_type="query")
         store.search_by_vector.assert_called_once()
-
         assert len(result) > 0
 
-    def test_hyde_failure_does_not_break_search(self):
-        """When HyDE generator raises, search proceeds with keyword + semantic."""
+    def test_empty_hyde_vectors_skips_hyde(self):
+        """Empty hyde_vectors list (router skipped HyDE) means no HyDE search."""
         store = MagicMock(name="symbol_store")
         embedder = MagicMock(name="embedder")
         config = _make_config()
 
-        kw_row = _make_symbol_row("kw1", score=0.9)
-        store.search_by_name.return_value = [kw_row]
+        store.search_by_name.return_value = [_make_symbol_row("kw1")]
         store.search_bm25.return_value = []
-
-        sem_row = _make_symbol_row("sem1", score=0.8)
         embedder.embed.return_value = [0.1]
-        store.search_by_vector.return_value = [sem_row]
-
-        hyde = MagicMock(name="hyde_generator")
-        hyde.generate.side_effect = RuntimeError("HyDE model unavailable")
+        store.search_by_vector.return_value = [_make_symbol_row("sem1")]
 
         strategy = CodeSearchStrategy(store, embedder, config)
-        strategy._hyde_generator = hyde
+        result = strategy.retrieve("find func", limit=5, hyde_vectors=[])
 
-        result = strategy.retrieve("find func", limit=5)
-
-        # HyDE was attempted
-        hyde.generate.assert_called_once()
-
-        # Search still returns results from keyword + semantic
+        # Only 1 vector search (semantic), no HyDE searches
+        store.search_by_vector.assert_called_once()
         assert len(result) > 0
 
 
@@ -228,10 +183,10 @@ class TestCodeSearchHyDE:
 
 
 class TestSectionSearchHyDE:
-    """Tests for HyDE in SectionSearchStrategy."""
+    """Tests for HyDE vector consumption in SectionSearchStrategy."""
 
-    def test_hyde_generates_hypotheses_and_searches(self):
-        """HyDE generator produces hypotheses; each is embedded and searched."""
+    def test_hyde_vectors_used_for_additional_searches(self):
+        """Pre-computed HyDE vectors trigger extra vector searches."""
         store = MagicMock(name="section_store")
         embedder = MagicMock(name="embedder")
         config = _make_config()
@@ -242,22 +197,17 @@ class TestSectionSearchHyDE:
         sem_row = _make_section_row("sem1", score=0.7, title="Configuration")
         hyde_row = _make_section_row("hyde1", score=0.6, title="Deployment")
 
-        embedder.embed.side_effect = lambda text, **kw: [0.1]
+        embedder.embed.return_value = [0.1]
         store.search_by_vector.side_effect = [
-            [sem_row],  # semantic
-            [hyde_row],  # HyDE hypothesis 1
+            [sem_row],    # semantic
+            [hyde_row],   # HyDE vector 1
         ]
 
-        hyde = MagicMock(name="hyde_generator")
-        hyde.generate.return_value = ["## How to deploy the app"]
-
         strategy = SectionSearchStrategy(store, embedder, config)
-        strategy._hyde_generator = hyde
 
-        result = strategy.retrieve("how to deploy", limit=5)
+        hyde_vectors = [[0.2]]
+        result = strategy.retrieve("how to deploy", limit=5, hyde_vectors=hyde_vectors)
 
-        hyde.generate.assert_called_once_with("how to deploy")
-        assert embedder.embed.call_count == 2  # 1 query + 1 hypothesis
         assert store.search_by_vector.call_count == 2  # 1 semantic + 1 HyDE
         assert len(result) > 0
 
@@ -278,8 +228,8 @@ class TestSectionSearchHyDE:
         assert len(hyde_merged) == 1
         assert hyde_merged[0]["score"] == pytest.approx(0.5)
 
-    def test_search_works_when_hyde_generator_is_none(self):
-        """Without HyDE, section strategy uses BM25 + semantic only."""
+    def test_search_works_without_hyde_vectors(self):
+        """Without HyDE vectors, section strategy uses BM25 + semantic only."""
         store = MagicMock(name="section_store")
         embedder = MagicMock(name="embedder")
         config = _make_config()
@@ -289,7 +239,6 @@ class TestSectionSearchHyDE:
         store.search_by_vector.return_value = [_make_section_row("sem1")]
 
         strategy = SectionSearchStrategy(store, embedder, config)
-        assert strategy._hyde_generator is None
 
         result = strategy.retrieve("setup guide", limit=5)
 
@@ -297,8 +246,8 @@ class TestSectionSearchHyDE:
         store.search_by_vector.assert_called_once()
         assert len(result) > 0
 
-    def test_hyde_failure_does_not_break_section_search(self):
-        """When HyDE raises in section search, BM25 + semantic proceed normally."""
+    def test_empty_hyde_vectors_skips_hyde(self):
+        """Empty hyde_vectors list (router skipped HyDE) means no HyDE search."""
         store = MagicMock(name="section_store")
         embedder = MagicMock(name="embedder")
         config = _make_config()
@@ -307,13 +256,8 @@ class TestSectionSearchHyDE:
         embedder.embed.return_value = [0.1]
         store.search_by_vector.return_value = [_make_section_row("sem1")]
 
-        hyde = MagicMock(name="hyde_generator")
-        hyde.generate.side_effect = RuntimeError("HyDE timeout")
-
         strategy = SectionSearchStrategy(store, embedder, config)
-        strategy._hyde_generator = hyde
+        result = strategy.retrieve("setup guide", limit=5, hyde_vectors=[])
 
-        result = strategy.retrieve("setup guide", limit=5)
-
-        hyde.generate.assert_called_once()
+        store.search_by_vector.assert_called_once()
         assert len(result) > 0

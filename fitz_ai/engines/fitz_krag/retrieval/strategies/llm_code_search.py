@@ -230,7 +230,6 @@ class LlmCodeSearchStrategy:
         self._manifest_builder = ManifestBuilder(symbol_store, import_store)
 
         # Forwarded attributes — engine wires these after construction
-        self._hyde_generator: Any = None
         self._raw_store: Any = None
 
     def retrieve(

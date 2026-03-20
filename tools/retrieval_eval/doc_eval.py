@@ -2,26 +2,36 @@
 """
 Evaluate document retrieval quality against ground truth.
 
-Ingests test corpus, runs queries, scores retrieved provenance
-against expected sections/tables/pages.
+Tests the RETRIEVAL pipeline in isolation:
+  Analysis + Detection + Rewriting + Embedding (parallel LLM calls)
+  → Retrieval router (vector + BM25 + RRF)
+  → Reranking
+  → Content reading (to get section titles/pages)
+
+Skips: synthesis, governance, cloud cache, context expansion.
+
+Uses fitz-ai's own engine with config from ~/.fitz/config.yaml
+(ollama/qwen3.5 + nomic-embed-text by default).
+
+Usage:
+    python -m tools.retrieval_eval.doc_eval
+    python -m tools.retrieval_eval.doc_eval --category section-lookup
+    python -m tools.retrieval_eval.doc_eval --ids 1,2,3 -v
+    python -m tools.retrieval_eval.doc_eval --skip-ingest
 
 Scoring:
-  - critical_recall: % of critical sections found in provenance
+  - critical_recall: % of critical sections found in retrieved results
   - relevant_recall: % of all expected sections found
-  - keyword_hit:     % of expected keywords present in retrieved excerpts
-  - precision:       % of retrieved provenance that matches any expected section
-
-A provenance item "matches" an expected section if:
-  1. Document filename matches (substring)
-  2. AND either:
-     a. Heading matches (case-insensitive substring), OR
-     b. Page number is within +/-1 of expected
+  - keyword_hit:     % of expected keywords present in retrieved content
+  - precision:       % of retrieved sections that match any expected section
 """
 
 import json
 import logging
+import re
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 logging.basicConfig(
@@ -36,16 +46,33 @@ RESULTS_DIR = Path(__file__).parent / "results"
 COLLECTION = "doc_eval"
 
 
-def _provenance_matches_section(prov_meta: dict, prov_excerpt: str, section: dict) -> bool:
-    """Check if a provenance item matches an expected section."""
-    # Heading match (fuzzy substring)
+# ---------------------------------------------------------------------------
+# Matching helpers
+# ---------------------------------------------------------------------------
+
+
+def _section_matches(read_meta: dict, section: dict) -> bool:
+    """Check if a ReadResult matches an expected section.
+
+    ReadResult metadata for sections has:
+      - section_title: heading text (e.g. "Naive RAG")
+      - page_start / page_end: page numbers
+    Address metadata has:
+      - location: breadcrumb path (e.g. "Overview of RAG > Naive RAG")
+    """
     heading = section.get("heading", "")
-    prov_title = str(prov_meta.get("title", ""))
-    heading_match = heading and heading.lower() in prov_title.lower()
+    heading_lower = heading.lower()
+
+    # Heading match: check section_title and location (breadcrumb)
+    section_title = str(read_meta.get("section_title", ""))
+    location = str(read_meta.get("location", ""))
+    heading_match = heading_lower and (
+        heading_lower in section_title.lower() or heading_lower in location.lower()
+    )
 
     # Page match (within +/-1)
     expected_page = section.get("page")
-    prov_page = prov_meta.get("page_number") or prov_meta.get("page_start")
+    prov_page = read_meta.get("page_start")
     page_match = (
         expected_page is not None
         and prov_page is not None
@@ -55,88 +82,80 @@ def _provenance_matches_section(prov_meta: dict, prov_excerpt: str, section: dic
     return heading_match or page_match
 
 
-def _check_keywords(excerpts: list[str], keywords: list[str]) -> float:
-    """Check what fraction of keywords appear in any excerpt."""
+def _result_matches_document(meta: dict, document: str) -> bool:
+    """Check if a ReadResult is from the expected document."""
+    file_path = str(meta.get("file_path", ""))
+    location = str(meta.get("location", ""))
+    doc_lower = document.lower()
+    return doc_lower in file_path.lower() or doc_lower in location.lower()
+
+
+def _check_keywords(contents: list[str], keywords: list[str]) -> float:
+    """Check what fraction of keywords appear in any content."""
     if not keywords:
         return 1.0
-    combined = " ".join(excerpts).lower()
+    combined = " ".join(contents).lower()
     found = sum(1 for kw in keywords if kw.lower() in combined)
     return found / len(keywords)
 
 
-def _provenance_matches_document(prov, document: str) -> bool:
-    """Check if provenance is from the expected document."""
-    source = str(getattr(prov, "source_id", "") or "")
-    meta = getattr(prov, "metadata", {}) or {}
-    title = str(meta.get("title", ""))
-    file_path = str(meta.get("file_path", "") or meta.get("source_file", ""))
+def score_query(read_results, query_gt: dict) -> dict:
+    """Score retrieval results for a single query.
 
-    doc_lower = document.lower()
-    return (
-        doc_lower in source.lower() or doc_lower in title.lower() or doc_lower in file_path.lower()
-    )
-
-
-def score_query(provenance_list, query_gt: dict) -> dict:
-    """Score retrieval results for a single query."""
+    read_results: list of ReadResult from ContentReader.read()
+    """
     document = query_gt["document"]
     critical = query_gt.get("critical_sections", [])
     relevant = query_gt.get("relevant_sections", [])
     all_expected = critical + relevant
 
-    # Filter provenance to matching document
-    doc_provs = []
-    for prov in provenance_list:
-        if _provenance_matches_document(prov, document):
-            doc_provs.append(prov)
+    # Build merged metadata + content for each result
+    items = []
+    for r in read_results:
+        meta = dict(r.metadata)
+        # Merge address metadata (has location, page_start, etc.)
+        meta.update({k: v for k, v in r.address.metadata.items() if k != "context_type"})
+        meta["file_path"] = r.file_path
+        meta["location"] = r.address.location
+        items.append({"meta": meta, "content": r.content or ""})
 
-    # Extract metadata and excerpts
-    prov_metas = []
-    prov_excerpts = []
-    for prov in doc_provs:
-        meta = getattr(prov, "metadata", {}) or {}
-        excerpt = getattr(prov, "excerpt", "") or ""
-        prov_metas.append(meta)
-        prov_excerpts.append(excerpt)
+    # Filter to matching document
+    doc_items = [it for it in items if _result_matches_document(it["meta"], document)]
 
     # Score critical sections
     critical_found = []
     critical_missed = []
     for section in critical:
-        found = any(
-            _provenance_matches_section(meta, exc, section)
-            for meta, exc in zip(prov_metas, prov_excerpts)
-        )
+        found = any(_section_matches(it["meta"], section) for it in doc_items)
+        label = section.get("heading", f"page {section.get('page')}")
         if found:
-            critical_found.append(section.get("heading", f"page {section.get('page')}"))
+            critical_found.append(label)
         else:
-            critical_missed.append(section.get("heading", f"page {section.get('page')}"))
+            critical_missed.append(label)
 
-    # Score all sections (critical + relevant)
+    # Score all sections
     all_found = []
     for section in all_expected:
-        found = any(
-            _provenance_matches_section(meta, exc, section)
-            for meta, exc in zip(prov_metas, prov_excerpts)
-        )
+        found = any(_section_matches(it["meta"], section) for it in doc_items)
         if found:
             all_found.append(section.get("heading", f"page {section.get('page')}"))
 
-    # Keyword check across all critical sections
+    # Keyword check
     all_keywords = []
     for section in critical:
         all_keywords.extend(section.get("keywords", []))
-    keyword_hit = _check_keywords(prov_excerpts, all_keywords)
+    keyword_hit = _check_keywords([it["content"] for it in doc_items], all_keywords)
 
-    # Precision: how many provenance items matched any expected section
-    matched_provs = 0
-    for meta, exc in zip(prov_metas, prov_excerpts):
-        if any(_provenance_matches_section(meta, exc, s) for s in all_expected):
-            matched_provs += 1
+    # Precision
+    matched = sum(
+        1
+        for it in doc_items
+        if any(_section_matches(it["meta"], s) for s in all_expected)
+    )
 
     critical_recall = len(critical_found) / len(critical) if critical else 1.0
     total_recall = len(all_found) / len(all_expected) if all_expected else 1.0
-    precision = matched_provs / len(doc_provs) if doc_provs else 0.0
+    precision = matched / len(doc_items) if doc_items else 0.0
 
     return {
         "critical_recall": round(critical_recall, 2),
@@ -145,56 +164,50 @@ def score_query(provenance_list, query_gt: dict) -> dict:
         "total_recall": round(total_recall, 2),
         "keyword_hit": round(keyword_hit, 2),
         "precision": round(precision, 2),
-        "doc_provenance_count": len(doc_provs),
-        "total_provenance_count": len(provenance_list),
+        "doc_result_count": len(doc_items),
+        "total_result_count": len(items),
     }
 
 
-def _ensure_lmstudio_models(
-    chat_model: str = "qwen3-coder-30b-a3b-instruct",
-    embed_model: str = "text-embedding-nomic-embed-text-v1.5@q8_0",
-    ctx: int = 32768,
-) -> None:
-    """Ensure both chat and embedding models are loaded in LM Studio."""
+# ---------------------------------------------------------------------------
+# Ingestion helpers
+# ---------------------------------------------------------------------------
+
+
+def _clean_collection(collection: str) -> None:
+    """Delete stale manifest + parsed cache so point() re-indexes from scratch."""
     import shutil
-    import subprocess
 
-    lms = shutil.which("lms")
-    if not lms:
+    from fitz_ai.core.paths import FitzPaths
+
+    col_dir = FitzPaths.workspace() / "collections" / collection
+    if col_dir.exists():
+        shutil.rmtree(col_dir)
+        print(f"Cleaned collection directory: {col_dir}")
+
+
+def _wait_for_indexing(engine, timeout: float = 1800) -> None:
+    """Wait for background indexing to complete."""
+    worker = getattr(engine, "_bg_worker", None)
+    if not worker:
         return
-    try:
-        result = subprocess.run(
-            [lms, "ps"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            encoding="utf-8",
-            errors="replace",
-        )
-        loaded = result.stdout + result.stderr
-    except Exception:
-        loaded = ""
+    thread = getattr(worker, "_thread", None)
+    if not thread or not thread.is_alive():
+        return
 
-    for model, extra_args in [
-        (chat_model, ["-c", str(ctx), "--parallel", "1"]),
-        (embed_model, []),
-    ]:
-        if model in loaded:
-            continue
-        print(f"Loading {model} in LM Studio...")
-        subprocess.run(
-            [lms, "load", model, "-y"] + extra_args,
-            capture_output=True,
-            text=True,
-            timeout=300,
-            encoding="utf-8",
-            errors="replace",
-        )
-        print(f"  {model} loaded.")
+    print("Waiting for background indexing to complete...")
+    t0 = time.monotonic()
+    thread.join(timeout=timeout)
+    elapsed = time.monotonic() - t0
+
+    if thread.is_alive():
+        print(f"  WARNING: Indexing still running after {timeout:.0f}s timeout")
+    else:
+        print(f"  Indexing complete in {elapsed:.1f}s")
 
 
-def ingest_corpus(engine, corpus_dir: Path, collection: str) -> dict:
-    """Ingest test corpus into a collection. Returns ingestion stats."""
+def ingest_corpus(engine, corpus_dir: Path, collection: str) -> bool:
+    """Ingest test corpus into a collection. Returns True on success."""
     doc_files = [
         f
         for f in corpus_dir.iterdir()
@@ -203,27 +216,143 @@ def ingest_corpus(engine, corpus_dir: Path, collection: str) -> dict:
     if not doc_files:
         print(f"No documents found in {corpus_dir}")
         print("Add test documents to tools/retrieval_eval/test_corpus/")
-        return {}
+        return False
+
+    _clean_collection(collection)
+
+    # IMPORTANT: load() switches the engine's stores to the target collection
+    # database BEFORE point() starts writing data. Without this, stores write
+    # to the default collection from config.yaml.
+    engine.load(collection)
 
     print(f"Ingesting {len(doc_files)} documents into collection '{collection}'...")
+    for f in doc_files:
+        print(f"  {f.name} ({f.stat().st_size / 1024:.0f} KB)")
+
     t0 = time.monotonic()
-    result = engine.point(source=corpus_dir, collection=collection)
+    engine.point(source=corpus_dir, collection=collection)
     elapsed = time.monotonic() - t0
-    print(f"Ingestion complete in {elapsed:.1f}s")
-    if isinstance(result, dict):
-        for k, v in result.items():
-            if isinstance(v, (int, float)) and v > 0:
-                print(f"  {k}: {v}")
-    return result or {}
+    print(f"Manifest built in {elapsed:.1f}s")
+
+    _wait_for_indexing(engine)
+    return True
 
 
-def run_query(engine, query_text: str, top_k: int = 10):
-    """Run a query and return provenance list."""
-    from fitz_ai.core import Query
+# ---------------------------------------------------------------------------
+# Isolated retrieval — runs steps 1-4 of the engine, skips synthesis
+# ---------------------------------------------------------------------------
 
-    query = Query(text=query_text)
-    answer = engine.answer(query)
-    return answer.provenance if answer else []
+
+def run_retrieval(engine, query_text: str, top_k: int = 15):
+    """Run the retrieval pipeline in isolation and return ReadResults.
+
+    Executes:
+      1. Analysis + Detection + Rewriting + Embedding (parallel)
+      2. Retrieval router (section search: vector + BM25 + RRF)
+      3. Reranking
+      4. Content reading
+
+    Skips: synthesis, governance, cloud cache, agentic search.
+    """
+    # Disable agentic strategy — it returns whole-file results that pollute
+    # section search. For eval, data is fully indexed so we want pure section search.
+    saved_agentic = getattr(engine._retrieval_router, "_agentic_strategy", None)
+    engine._retrieval_router._agentic_strategy = None
+
+    # Disable HyDE — it times out consistently on local ollama (120s per attempt,
+    # multiple retries) adding 200-500s per query with no benefit when vectors work.
+    saved_hyde = engine._retrieval_router._hyde_generator
+    engine._retrieval_router._hyde_generator = None
+
+    sanitized = re.sub(r"<[^>]+>", "", query_text).strip()[:500]
+
+    # 1. Analysis + Detection + Rewriting + Embedding (parallel)
+    fast_analysis = engine._fast_analyze(sanitized)
+    need_llm_analysis = fast_analysis is None
+    need_detection = engine._detection_orchestrator and engine._needs_detection(sanitized)
+    need_rewrite = engine._query_rewriter is not None
+
+    retrieval_query = sanitized
+    rewrite_result = None
+
+    if need_llm_analysis or need_detection or need_rewrite:
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            analysis_future = (
+                pool.submit(engine._query_analyzer.analyze, sanitized)
+                if need_llm_analysis
+                else None
+            )
+            detection_future = (
+                pool.submit(engine._detection_orchestrator.detect_for_retrieval, sanitized)
+                if need_detection
+                else None
+            )
+            rewrite_future = (
+                pool.submit(engine._query_rewriter.rewrite, sanitized)
+                if need_rewrite
+                else None
+            )
+            embed_future = pool.submit(engine._embedder.embed_batch, [sanitized])
+
+            analysis = analysis_future.result() if analysis_future else fast_analysis
+            detection = detection_future.result() if detection_future else None
+
+            if rewrite_future:
+                try:
+                    rewrite_result = rewrite_future.result()
+                    if rewrite_result.rewritten_query != sanitized:
+                        retrieval_query = rewrite_result.rewritten_query
+                except Exception:
+                    pass
+
+            try:
+                vectors = embed_future.result()
+                precomputed = dict(zip([sanitized], vectors))
+            except Exception:
+                precomputed = None
+    else:
+        analysis = fast_analysis
+        detection = None
+        try:
+            vectors = engine._embedder.embed_batch([sanitized], task_type="query")
+            precomputed = dict(zip([sanitized], vectors))
+        except Exception:
+            precomputed = None
+
+    # 2. Retrieve addresses
+    if engine._hop_controller:
+        read_results = engine._hop_controller.execute(retrieval_query, analysis, detection)
+        addresses = [r.address for r in read_results] if read_results else []
+    else:
+        addresses = engine._retrieval_router.retrieve(
+            retrieval_query,
+            analysis,
+            detection=detection,
+            rewrite_result=rewrite_result,
+            precomputed_query_vectors=precomputed,
+        )
+
+    if not addresses:
+        engine._retrieval_router._agentic_strategy = saved_agentic
+        engine._retrieval_router._hyde_generator = saved_hyde
+        return []
+
+    # 3. Rerank
+    if engine._address_reranker and not engine._hop_controller:
+        addresses = engine._address_reranker.rerank(retrieval_query, addresses)
+
+    # 4. Read content — restore disabled components
+    engine._retrieval_router._agentic_strategy = saved_agentic
+    for obj, gen in hyde_locations:
+        obj._hyde_generator = gen
+    if engine._hop_controller:
+        return read_results or []
+    return engine._reader.read(addresses, min(len(addresses), top_k))
+
+
+# ---------------------------------------------------------------------------
+# Main eval
+# ---------------------------------------------------------------------------
 
 
 def run_eval(
@@ -231,7 +360,7 @@ def run_eval(
     collection: str = COLLECTION,
     category: str | None = None,
     ids: str | None = None,
-    top_k: int = 10,
+    top_k: int = 15,
     verbose: bool = True,
     skip_ingest: bool = False,
 ):
@@ -259,14 +388,10 @@ def run_eval(
         print("No queries match filters.")
         return
 
-    # Pre-load LM Studio models (chat + embedding)
-    _ensure_lmstudio_models()
-
-    # Create engine and ingest
+    # Create engine (auto-loads ~/.fitz/config.yaml)
     engine = create_engine("fitz_krag")
     if not skip_ingest:
-        stats = ingest_corpus(engine, corpus_dir, collection)
-        if not stats:
+        if not ingest_corpus(engine, corpus_dir, collection):
             return
     else:
         print(f"Skipping ingestion, loading collection '{collection}'...")
@@ -278,30 +403,36 @@ def run_eval(
     for q in queries:
         t0 = time.monotonic()
         try:
-            provenance = run_query(engine, q["query"], top_k)
+            read_results = run_retrieval(engine, q["query"], top_k)
             elapsed = time.monotonic() - t0
 
-            # Debug: dump first provenance metadata for first query
-            if q["id"] == 1 and provenance:
-                print(f"  DEBUG: {len(provenance)} provenance items")
-                for i, prov in enumerate(provenance[:3]):
-                    print(f"  DEBUG prov[{i}]:")
-                    print(f"    source_id: {getattr(prov, 'source_id', None)}")
-                    print(f"    excerpt:   {(getattr(prov, 'excerpt', '') or '')[:100]}")
-                    meta = getattr(prov, "metadata", {}) or {}
-                    for k, v in meta.items():
-                        print(f"    meta.{k}: {v}")
+            # Debug: dump first result metadata for first query
+            if q["id"] == queries[0]["id"] and read_results and verbose:
+                print(f"  DEBUG: {len(read_results)} read results")
+                for i, r in enumerate(read_results[:3]):
+                    meta = dict(r.metadata)
+                    meta.update(r.address.metadata)
+                    title = meta.get("section_title", meta.get("name", "?"))
+                    page = meta.get("page_start", "?")
+                    kind = r.address.kind.value
+                    fp = r.file_path
+                    print(f"    [{i}] kind={kind} file={fp} title={title} page={page}")
 
-            scores = score_query(provenance, q)
+            scores = score_query(read_results, q)
             scores["id"] = q["id"]
+            scores["query"] = q["query"][:60]
+            scores["category"] = q.get("category", "")
             scores["time"] = round(elapsed, 1)
 
             is_pass = scores["critical_recall"] == 1.0
             status = "PASS" if is_pass else "MISS"
-            label = f"crit={scores['critical_recall']:.0%} total={scores['total_recall']:.0%} kw={scores['keyword_hit']:.0%}"
+            label = (
+                f"crit={scores['critical_recall']:.0%} "
+                f"total={scores['total_recall']:.0%} "
+                f"kw={scores['keyword_hit']:.0%}"
+            )
 
-            query_preview = q["query"][:60]
-            print(f"  [{q['id']:2d}] {status} {label} ({elapsed:.1f}s) {query_preview}")
+            print(f"  [{q['id']:2d}] {status} {label} ({elapsed:.1f}s) {q['query'][:55]}")
 
             if not is_pass and verbose:
                 for missed in scores["critical_missed"]:
@@ -309,7 +440,12 @@ def run_eval(
 
             results.append(scores)
         except Exception as e:
-            print(f"  [{q['id']:2d}] FAILED: {e}")
+            import traceback
+
+            elapsed = time.monotonic() - t0
+            print(f"  [{q['id']:2d}] FAILED ({elapsed:.1f}s): {e}")
+            if verbose:
+                traceback.print_exc()
             results.append({"id": q["id"], "error": str(e)})
 
     # Summary
@@ -324,9 +460,10 @@ def run_eval(
     avg_prec = sum(r["precision"] for r in scored) / len(scored)
     perfect = sum(1 for r in scored if r["critical_recall"] == 1.0)
     avg_time = sum(r["time"] for r in scored) / len(scored)
+    total_time = sum(r["time"] for r in scored)
 
     print(f"\n{'=' * 60}")
-    print(f"RESULTS ({len(queries)} queries)")
+    print(f"RESULTS ({len(scored)} queries, {total_time:.0f}s total)")
     print(f"{'=' * 60}")
     print(f"Critical recall:  {avg_crit:.0%} avg ({perfect}/{len(scored)} perfect)")
     print(f"Total recall:     {avg_total:.0%} avg")
@@ -335,17 +472,20 @@ def run_eval(
     print(f"Avg time:         {avg_time:.1f}s per query")
 
     # By category
-    categories = sorted(set(q.get("category", "uncategorized") for q in queries))
+    categories = sorted(set(r.get("category", "uncategorized") for r in scored))
     if len(categories) > 1:
         print("\nBy category:")
         for cat in categories:
-            cat_results = [
-                r for r, q in zip(results, queries) if q.get("category") == cat and "error" not in r
-            ]
+            cat_results = [r for r in scored if r.get("category") == cat]
             if cat_results:
                 cat_crit = sum(r["critical_recall"] for r in cat_results) / len(cat_results)
                 cat_perfect = sum(1 for r in cat_results if r["critical_recall"] == 1.0)
-                print(f"  {cat:25s} crit={cat_crit:.0%} ({cat_perfect}/{len(cat_results)} perfect)")
+                cat_time = sum(r["time"] for r in cat_results) / len(cat_results)
+                print(
+                    f"  {cat:25s} crit={cat_crit:.0%} "
+                    f"({cat_perfect}/{len(cat_results)} perfect) "
+                    f"avg={cat_time:.1f}s"
+                )
 
     # Most-missed sections
     all_missed = []
@@ -365,3 +505,27 @@ def run_eval(
     out_path = RESULTS_DIR / f"doc_eval_{ts}.json"
     out_path.write_text(json.dumps(results, indent=2))
     print(f"\nResults saved to {out_path}")
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Document retrieval eval")
+    parser.add_argument("--corpus-dir", default=str(CORPUS_DIR))
+    parser.add_argument("--collection", default=COLLECTION)
+    parser.add_argument("--category", default=None)
+    parser.add_argument("--ids", default=None)
+    parser.add_argument("--top-k", type=int, default=15)
+    parser.add_argument("-v", "--verbose", action="store_true", default=True)
+    parser.add_argument("--skip-ingest", action="store_true")
+    args = parser.parse_args()
+
+    run_eval(
+        corpus_dir=args.corpus_dir,
+        collection=args.collection,
+        category=args.category,
+        ids=args.ids,
+        top_k=args.top_k,
+        verbose=args.verbose,
+        skip_ingest=args.skip_ingest,
+    )

@@ -388,8 +388,6 @@ class FitzKragEngine:
         if self._config.enable_multi_query:
             self._retrieval_router._chat_factory = self._chat_factory
         if self._hyde_generator:
-            code_strategy._hyde_generator = self._hyde_generator
-            section_strategy._hyde_generator = self._hyde_generator
             self._retrieval_router._hyde_generator = self._hyde_generator
         # Wire raw_store for freshness boosting
         code_strategy._raw_store = self._raw_store
