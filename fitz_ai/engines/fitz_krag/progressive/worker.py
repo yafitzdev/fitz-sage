@@ -262,6 +262,9 @@ class BackgroundIngestWorker:
                             )
                         self._symbol_store.upsert_batch(symbol_dicts)
 
+                        # Embed symbol signatures immediately (no LLM needed)
+                        self._embed_symbols_from_signatures(entry.file_id, symbol_dicts)
+
                     if result.imports:
                         import_edges = [
                             {
@@ -321,6 +324,11 @@ class BackgroundIngestWorker:
                     }
                 )
             self._section_store.upsert_batch(section_dicts)
+
+            # Embed content immediately so vector search works before LLM
+            # summaries are generated. Phase 3 will upgrade these with
+            # summary-based embeddings if summaries become available.
+            self._embed_sections_from_content(entry.file_id, section_dicts)
 
         except Exception as e:
             logger.debug(f"Doc section extraction failed for {entry.rel_path}: {e}")
@@ -658,6 +666,52 @@ class BackgroundIngestWorker:
             self._symbol_store.update_vectors_by_file(entry.file_id, vectors)
         except Exception as e:
             logger.warning(f"Embedding failed for {entry.rel_path}: {e}")
+
+    def _embed_symbols_from_signatures(
+        self, file_id: str, symbol_dicts: list[dict]
+    ) -> None:
+        """Embed symbol signatures immediately during Phase 1 (no LLM needed).
+
+        Uses kind + qualified_name + signature to produce a vector that
+        enables vector search before LLM summaries are generated.
+        """
+        if not symbol_dicts:
+            return
+        texts = [
+            f"{s['kind']} {s['qualified_name']} {s.get('signature') or ''}"
+            for s in symbol_dicts
+        ]
+        try:
+            vectors = self._embedder.embed_batch(texts, task_type="document")
+            self._symbol_store.update_vectors_by_file(file_id, vectors)
+            logger.debug(
+                f"Embedded {len(vectors)} symbols from signatures for file {file_id[:8]}"
+            )
+        except Exception as e:
+            logger.debug(f"Signature embedding skipped for {file_id[:8]}: {e}")
+
+    def _embed_sections_from_content(
+        self, file_id: str, section_dicts: list[dict]
+    ) -> None:
+        """Embed section content immediately during Phase 1 (no LLM needed).
+
+        Uses title + first 2000 chars of content to produce a vector that
+        enables vector search before LLM summaries are generated. Phase 3
+        will upgrade these with summary-based embeddings when available.
+        """
+        if not section_dicts:
+            return
+        texts = [
+            f"{s['title']}. {(s.get('content') or '')[:2000]}" for s in section_dicts
+        ]
+        try:
+            vectors = self._embedder.embed_batch(texts, task_type="document")
+            self._section_store.update_vectors_by_file(file_id, vectors)
+            logger.debug(
+                f"Embedded {len(vectors)} sections from content for file {file_id[:8]}"
+            )
+        except Exception as e:
+            logger.debug(f"Content embedding skipped for {file_id[:8]}: {e}")
 
     def _embed_file_sections(self, entry: "ManifestEntry") -> None:
         """Compute and store embeddings for sections in a file."""

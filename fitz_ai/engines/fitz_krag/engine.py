@@ -1251,11 +1251,12 @@ class FitzKragEngine:
         source_dir: Path,
         progress: Callable[[str], None] | None = None,
     ) -> None:
-        """Fast synchronous AST extraction for all code files in the manifest.
+        """Fast synchronous AST extraction + embedding for code files.
 
         Populates raw_store, symbol_store, and import_store so that LLM code
-        search and hybrid code search work on the very first query.  No LLM
-        calls, no embeddings — pure AST parsing + DB writes.
+        search and hybrid code search work on the very first query. Embeds
+        symbol signatures immediately so vector search works before LLM
+        summaries are generated.
 
         Files are transitioned to PARSED state so the background worker skips
         Phase 1 and starts with Phase 2 (LLM summaries).
@@ -1347,28 +1348,43 @@ class FitzKragEngine:
 
                 if result is not None:
                     if result.symbols:
-                        self._symbol_store.upsert_batch(
-                            [
-                                {
-                                    "id": str(uuid.uuid4()),
-                                    "name": sym.name,
-                                    "qualified_name": sym.qualified_name,
-                                    "kind": sym.kind,
-                                    "raw_file_id": entry.file_id,
-                                    "start_line": sym.start_line,
-                                    "end_line": sym.end_line,
-                                    "signature": sym.signature,
-                                    "summary": None,
-                                    "summary_vector": None,
-                                    "imports": sym.imports,
-                                    "references": sym.references,
-                                    "keywords": [],
-                                    "entities": [],
-                                    "metadata": {},
-                                }
-                                for sym in result.symbols
+                        symbol_dicts = [
+                            {
+                                "id": str(uuid.uuid4()),
+                                "name": sym.name,
+                                "qualified_name": sym.qualified_name,
+                                "kind": sym.kind,
+                                "raw_file_id": entry.file_id,
+                                "start_line": sym.start_line,
+                                "end_line": sym.end_line,
+                                "signature": sym.signature,
+                                "summary": None,
+                                "summary_vector": None,
+                                "imports": sym.imports,
+                                "references": sym.references,
+                                "keywords": [],
+                                "entities": [],
+                                "metadata": {},
+                            }
+                            for sym in result.symbols
+                        ]
+                        self._symbol_store.upsert_batch(symbol_dicts)
+
+                        # Embed signatures immediately for vector search
+                        try:
+                            texts = [
+                                f"{s['kind']} {s['qualified_name']} {s.get('signature') or ''}"
+                                for s in symbol_dicts
                             ]
-                        )
+                            vectors = self._embedder.embed_batch(
+                                texts, task_type="document"
+                            )
+                            self._symbol_store.update_vectors_by_file(
+                                entry.file_id, vectors
+                            )
+                        except Exception:
+                            pass  # Vector search will degrade but BM25 still works
+
                     if result.imports:
                         self._import_store.upsert_batch(
                             [

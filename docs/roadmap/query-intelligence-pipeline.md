@@ -53,9 +53,9 @@ Trade-off: 7% recall loss for 28% speed gain. The recall gap is model-dependent 
 
 Piggyback additional signals onto the batched analysis + detection call at near-zero marginal cost. These are **advisory signals** — used to boost/adjust existing retrieval, not as hard gates. The pipeline must work correctly without them (graceful degradation for weaker models).
 
-### Current retrieval trigger mechanisms (fragmented)
+### Retrieval trigger mechanisms — unified into RetrievalProfile (Done)
 
-Retrieval features are currently triggered by three independent mechanisms that don't share a unified model:
+Previously fragmented across three mechanisms, now unified:
 
 1. **Analysis type → static weight map** (`query_analyzer.py`)
    - Hard-coded dict: CODE → code=0.75/section=0.10, DOCUMENTATION → code=0.10/section=0.75, etc.
@@ -67,9 +67,9 @@ Retrieval features are currently triggered by three independent mechanisms that 
 3. **Hard-coded config** (no query awareness)
    - BM25/semantic weights (0.6/0.4), top_k, reranking on/off, context budget
 
-### Proposed: unified retrieval profile
+### RetrievalProfile (Done)
 
-Extended classification signals feed a `RetrievalProfile` that tunes the pipeline per-query. Signals are advisory — missing signals fall back to current defaults.
+All retrieval tuning unified into a single `RetrievalProfile` dataclass built once per query. Extended signals are advisory — missing signals fall back to defaults.
 
 | Signal | Source | Tunes | Fallback |
 |--------|--------|-------|----------|
