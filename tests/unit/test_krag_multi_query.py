@@ -12,6 +12,7 @@ import json
 from unittest.mock import MagicMock
 
 from fitz_ai.engines.fitz_krag.retrieval.router import RetrievalRouter
+from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind
 
 # ---------------------------------------------------------------------------
@@ -93,7 +94,8 @@ class TestMultiQueryExpansion:
         )
 
         long_q = _long_query(150)
-        router.retrieve(long_q)
+        profile = RetrievalProfile(run_multi_query=True)
+        router.retrieve(long_q, profile)
 
         # chat_factory called with "fast" to get cheap LLM
         chat_factory.assert_called_once_with("fast")
@@ -204,7 +206,8 @@ class TestMultiQueryExpansion:
             chat_factory=chat_factory,
         )
 
-        result = router.retrieve(_long_query(200))
+        profile = RetrievalProfile(run_multi_query=True)
+        result = router.retrieve(_long_query(200), profile)
 
         # chat_factory was called (expansion was attempted)
         chat_factory.assert_called_once()

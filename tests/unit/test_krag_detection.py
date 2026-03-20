@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
 from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
 from fitz_ai.engines.fitz_krag.retrieval.router import RetrievalRouter
+from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind
 
 # ---------------------------------------------------------------------------
@@ -123,6 +124,26 @@ def _make_detection_summary(
     detection.comparison_queries = comparison_queries or []
     detection.fetch_multiplier = fetch_multiplier
     return detection
+
+
+def _make_profile(
+    query_variations: list[str] | None = None,
+    comparison_entities: list[str] | None = None,
+    comparison_queries: list[str] | None = None,
+    fetch_multiplier: int = 1,
+    top_addresses: int = 10,
+    temporal_references: list[str] | None = None,
+) -> RetrievalProfile:
+    """Build a RetrievalProfile with detection-derived fields for testing router."""
+    return RetrievalProfile(
+        top_k=top_addresses * fetch_multiplier,
+        top_read=top_addresses,
+        query_variations=query_variations or [],
+        comparison_queries=comparison_queries or [],
+        comparison_entities=comparison_entities or [],
+        temporal_references=temporal_references or [],
+        fallback_to_chunks=False,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -262,8 +283,8 @@ class TestRouterDetection:
             section_strategy=section_strategy,
         )
 
-        detection = _make_detection_summary(query_variations=["expanded query"])
-        results = router.retrieve("original query", detection=detection)
+        profile = _make_profile(query_variations=["expanded query"])
+        results = router.retrieve("original query", profile)
 
         # Code strategy called twice: once for "original query", once for "expanded query"
         assert code_strategy.retrieve.call_count == 2
@@ -291,10 +312,10 @@ class TestRouterDetection:
             section_strategy=section_strategy,
         )
 
-        detection = _make_detection_summary(
+        profile = _make_profile(
             comparison_queries=["React hooks state", "Vue composition API", "React vs Vue"],
         )
-        router.retrieve("compare frameworks", detection=detection)
+        router.retrieve("compare frameworks", profile)
 
         # Code strategy called 4 times: original + 3 comparison queries
         assert code_strategy.retrieve.call_count == 4
@@ -320,8 +341,8 @@ class TestRouterDetection:
             section_strategy=section_strategy,
         )
 
-        detection = _make_detection_summary(comparison_entities=["A", "B"])
-        router.retrieve("compare A and B", detection=detection)
+        profile = _make_profile(comparison_entities=["A", "B"])
+        router.retrieve("compare A and B", profile)
 
         # Falls back to naive: original + "compare A and B A" + "compare A and B B"
         assert code_strategy.retrieve.call_count == 3
@@ -347,8 +368,8 @@ class TestRouterDetection:
             section_strategy=section_strategy,
         )
 
-        detection = _make_detection_summary(fetch_multiplier=3)
-        router.retrieve("query", detection=detection)
+        profile = _make_profile(fetch_multiplier=3, top_addresses=5)
+        router.retrieve("query", profile)
 
         # limit passed to code strategy should be 5 * 3 = 15
         call_args = code_strategy.retrieve.call_args
@@ -406,10 +427,11 @@ class TestEngineAnswerDetectionFlow:
         # Batcher called (batched path)
         engine._query_batcher.batch_classify.assert_called_once()
 
-        # Router called with detection result (not None)
+        # Router called with a RetrievalProfile (detection data baked in)
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[1]["detection"] is not None
+        from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
+        assert isinstance(call_args[0][1], RetrievalProfile)
 
     def test_detection_disabled_stays_none_in_answer_flow(self):
         """When detection is disabled, detection stays None through answer flow."""
@@ -430,11 +452,16 @@ class TestEngineAnswerDetectionFlow:
 
         engine.answer(query)
 
-        # Router called with detection=None (no detection orchestrator)
+        # Router called with query text and a profile built from detection=None
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
         assert call_args[0][0] == query.text
-        assert call_args[1]["detection"] is None
+        from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
+        profile = call_args[0][1]
+        assert isinstance(profile, RetrievalProfile)
+        # No detection ran: profile carries no detection-derived query expansions
+        assert profile.query_variations == []
+        assert profile.comparison_queries == []
 
 
 # ---------------------------------------------------------------------------
@@ -467,22 +494,12 @@ class TestTemporalTagging:
         addr = _make_address("a.py", "report.revenue", 0.8)
         router = self._make_router(code_results=[addr])
 
-        # Detection with temporal data
-        detection = MagicMock(name="detection")
-        detection.query_variations = ["Q1 2024 revenue", "Q2 2024 revenue"]
-        detection.comparison_entities = []
-        detection.fetch_multiplier = 1
-        # Temporal result with references
-        temporal = MagicMock(name="temporal_result")
-        temporal.metadata = {
-            "references": [
-                {"text": "Q1 2024", "type": "quarter"},
-                {"text": "Q2 2024", "type": "quarter"},
-            ]
-        }
-        detection.temporal = temporal
+        profile = _make_profile(
+            query_variations=["Q1 2024 revenue", "Q2 2024 revenue"],
+            temporal_references=["Q1 2024", "Q2 2024"],
+        )
 
-        results = router.retrieve("compare Q1 vs Q2 revenue", detection=detection)
+        results = router.retrieve("compare Q1 vs Q2 revenue", profile)
 
         # Addresses from temporal queries should have temporal_refs in metadata
         tagged = [r for r in results if r.metadata.get("temporal_refs")]
@@ -511,15 +528,12 @@ class TestTemporalTagging:
             section_strategy=section_strategy,
         )
 
-        detection = MagicMock(name="detection")
-        detection.query_variations = ["Q1 revenue"]
-        detection.comparison_entities = []
-        detection.fetch_multiplier = 1
-        temporal = MagicMock()
-        temporal.metadata = {"references": [{"text": "Q1 2024", "type": "quarter"}]}
-        detection.temporal = temporal
+        profile = _make_profile(
+            query_variations=["Q1 revenue"],
+            temporal_references=["Q1 2024"],
+        )
 
-        results = router.retrieve("revenue trends", detection=detection)
+        results = router.retrieve("revenue trends", profile)
 
         # Find the original query's address (unique.symbol)
         original = [r for r in results if r.location == "unique.symbol"]
@@ -531,13 +545,12 @@ class TestTemporalTagging:
         addr = _make_address("a.py", "mod.func", 0.9)
         router = self._make_router(code_results=[addr])
 
-        detection = MagicMock(name="detection")
-        detection.query_variations = ["synonym query"]
-        detection.comparison_entities = []
-        detection.fetch_multiplier = 1
-        detection.temporal = None  # No temporal data
+        profile = _make_profile(
+            query_variations=["synonym query"],
+            temporal_references=[],  # No temporal data
+        )
 
-        results = router.retrieve("original query", detection=detection)
+        results = router.retrieve("original query", profile)
 
         for r in results:
             assert "temporal_refs" not in r.metadata

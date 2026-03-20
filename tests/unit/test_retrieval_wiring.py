@@ -16,6 +16,7 @@ from fitz_ai.engines.fitz_krag.retrieval.strategies.code_search import CodeSearc
 from fitz_ai.engines.fitz_krag.retrieval.strategies.section_search import (
     SectionSearchStrategy,
 )
+from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind
 
 # ---------------------------------------------------------------------------
@@ -119,25 +120,20 @@ class TestRouterRewriteVariations:
 
 
 class TestRouterFallbackToExpandQuery:
-    """Test 2: Without rewrite_result, router falls back to _expand_query."""
+    """Test 2: Without rewrite_result, router falls back to _expand_query when profile.run_multi_query=True."""
 
     def test_router_falls_back_to_expand_query(self):
-        chat_factory = MagicMock()
-        config = _make_config(enable_multi_query=True, multi_query_min_length=5)
-
         code_strategy = MagicMock()
         code_strategy.retrieve = MagicMock(return_value=[])
 
-        router = _make_router(
-            config=config,
-            code_strategy=code_strategy,
-            chat_factory=chat_factory,
-        )
+        router = _make_router(code_strategy=code_strategy)
 
-        long_query = "a" * 300  # Exceeds multi_query_min_length
+        long_query = "a" * 300
+
+        profile = RetrievalProfile(run_multi_query=True)
 
         with patch.object(router, "_expand_query", return_value=["eq1", "eq2"]) as mock_expand:
-            router.retrieve(long_query)
+            router.retrieve(long_query, profile)
             mock_expand.assert_called_once_with(long_query)
 
         # Original query + 2 expanded = 3 calls
@@ -168,7 +164,7 @@ class TestRouterSkipsExpandWhenRewriteHasVariations:
 
 
 class TestRouterUsesDetectionComparisonQueries:
-    """Test 4: Router uses detection.comparison_queries directly."""
+    """Test 4: Router uses comparison_queries from RetrievalProfile."""
 
     def test_router_uses_detection_comparison_queries(self):
         code_strategy = MagicMock()
@@ -176,14 +172,9 @@ class TestRouterUsesDetectionComparisonQueries:
 
         router = _make_router(code_strategy=code_strategy)
 
-        detection = SimpleNamespace(
-            fetch_multiplier=1,
-            query_variations=[],
-            comparison_queries=["cq1", "cq2"],
-            comparison_entities=[],
-        )
+        profile = RetrievalProfile(comparison_queries=["cq1", "cq2"])
 
-        router.retrieve("original query", detection=detection)
+        router.retrieve("original query", profile)
 
         queries_called = [c.args[0] for c in code_strategy.retrieve.call_args_list]
         assert "cq1" in queries_called
@@ -191,7 +182,7 @@ class TestRouterUsesDetectionComparisonQueries:
 
 
 class TestRouterEntityFallbackWithoutComparisonQueries:
-    """Test 5: detection has comparison_entities but no comparison_queries."""
+    """Test 5: profile has comparison_entities but no comparison_queries — entity fallback."""
 
     def test_router_entity_fallback_without_comparison_queries(self):
         code_strategy = MagicMock()
@@ -199,14 +190,12 @@ class TestRouterEntityFallbackWithoutComparisonQueries:
 
         router = _make_router(code_strategy=code_strategy)
 
-        detection = SimpleNamespace(
-            fetch_multiplier=1,
-            query_variations=[],
+        profile = RetrievalProfile(
             comparison_queries=[],  # Empty — triggers entity fallback
             comparison_entities=["EntityA", "EntityB"],
         )
 
-        router.retrieve("how does", detection=detection)
+        router.retrieve("how does", profile)
 
         queries_called = [c.args[0] for c in code_strategy.retrieve.call_args_list]
         assert "how does EntityA" in queries_called
@@ -214,7 +203,7 @@ class TestRouterEntityFallbackWithoutComparisonQueries:
 
 
 class TestRouterPassesDetectionToStrategies:
-    """Test 6: detection kwarg flows to strategy.retrieve()."""
+    """Test 6: profile flows to strategy.retrieve() as detection kwarg."""
 
     def test_router_passes_detection_to_strategies(self):
         code_strategy = MagicMock()
@@ -230,24 +219,19 @@ class TestRouterPassesDetectionToStrategies:
             table_strategy=table_strategy,
         )
 
-        detection = SimpleNamespace(
-            fetch_multiplier=1,
-            query_variations=[],
-            comparison_queries=[],
-            comparison_entities=[],
-        )
+        profile = RetrievalProfile()
 
-        router.retrieve("test query", detection=detection)
+        router.retrieve("test query", profile)
 
-        # Every strategy call should receive detection=detection
+        # Every strategy call should receive detection=profile
         for call in code_strategy.retrieve.call_args_list:
-            assert call.kwargs.get("detection") is detection
+            assert call.kwargs.get("detection") is profile
 
         for call in section_strategy.retrieve.call_args_list:
-            assert call.kwargs.get("detection") is detection
+            assert call.kwargs.get("detection") is profile
 
         for call in table_strategy.retrieve.call_args_list:
-            assert call.kwargs.get("detection") is detection
+            assert call.kwargs.get("detection") is profile
 
 
 # ===========================================================================

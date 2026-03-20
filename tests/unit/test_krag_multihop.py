@@ -416,8 +416,8 @@ class TestDeduplication:
         assert len(second_read_addrs) == 1
         assert second_read_addrs[0].location == "mod.new_func"
 
-    def test_passes_analysis_and_detection(self):
-        """execute forwards analysis and detection to the router."""
+    def test_passes_profile_to_router(self):
+        """execute forwards the profile to router.retrieve."""
         addr1 = _addr(source_id="f1", location="mod.func")
         result1 = _read_result(source_id="f1", location="mod.func")
 
@@ -425,8 +425,9 @@ class TestDeduplication:
         reader = _make_reader([[result1]])
         factory = _make_chat_factory(is_sufficient=True)
 
-        analysis = MagicMock(name="analysis")
-        detection = MagicMock(name="detection")
+        from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
+
+        profile = RetrievalProfile()
 
         controller = KragHopController(
             router=router,
@@ -436,10 +437,6 @@ class TestDeduplication:
             top_read=5,
         )
 
-        controller.execute("query", analysis=analysis, detection=detection)
+        controller.execute("query", profile)
 
-        router.retrieve.assert_called_once_with(
-            "query",
-            analysis,
-            detection=detection,
-        )
+        router.retrieve.assert_called_once_with("query", profile)

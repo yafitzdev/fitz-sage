@@ -275,7 +275,8 @@ class TestAnswer:
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
         assert call_args[0][0] == query.text
-        assert call_args[1]["detection"] is None
+        from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
+        assert isinstance(call_args[0][1], RetrievalProfile)
         assert call_args[1]["rewrite_result"] is None
         engine._reader.read.assert_called_once_with(
             [address_1, address_2],
