@@ -69,7 +69,7 @@ class FitzKragConfig(BasePluginConfig):
 
     parser: str = Field(
         default="docling",
-        description="Document parser plugin: 'docling' or 'docling_vision' (VLM)",
+        description="Document parser: 'docling', 'docling_vision', or 'glm_ocr' (hybrid pypdfium2 + GLM-OCR via ollama)",
     )
 
     # ==========================================================================

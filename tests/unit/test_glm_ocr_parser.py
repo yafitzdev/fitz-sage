@@ -1,0 +1,175 @@
+# tests/unit/test_glm_ocr_parser.py
+"""
+Unit tests for GlmOcrParser — markdown parsing and page routing heuristics.
+No ollama or GLM-OCR model needed for these tests.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from fitz_ai.core.document import ElementType
+from fitz_ai.ingestion.parser.plugins.glm_ocr import GlmOcrParser
+
+
+@pytest.fixture
+def parser():
+    return GlmOcrParser()
+
+
+# ---------------------------------------------------------------------------
+# Markdown → Elements parsing
+# ---------------------------------------------------------------------------
+
+
+class TestMarkdownToElements:
+    """Tests for _markdown_to_elements (GLM-OCR output parsing)."""
+
+    def test_heading_levels(self, parser):
+        md = "# Title\n\n## Subtitle\n\n### Deep"
+        elements = parser._markdown_to_elements(md, page=1)
+
+        headings = [e for e in elements if e.type == ElementType.HEADING]
+        assert len(headings) == 3
+        assert headings[0].content == "Title"
+        assert headings[0].level == 1
+        assert headings[1].content == "Subtitle"
+        assert headings[1].level == 2
+        assert headings[2].content == "Deep"
+        assert headings[2].level == 3
+
+    def test_plain_text(self, parser):
+        md = "This is a paragraph of text."
+        elements = parser._markdown_to_elements(md, page=5)
+
+        assert len(elements) == 1
+        assert elements[0].type == ElementType.TEXT
+        assert elements[0].content == "This is a paragraph of text."
+        assert elements[0].page == 5
+
+    def test_code_block(self, parser):
+        md = "```python\ndef hello():\n    pass\n```"
+        elements = parser._markdown_to_elements(md, page=1)
+
+        assert len(elements) == 1
+        assert elements[0].type == ElementType.CODE_BLOCK
+        assert "def hello():" in elements[0].content
+        assert elements[0].language == "python"
+
+    def test_table(self, parser):
+        md = "| Name | Age |\n|------|-----|\n| Alice | 30 |\n| Bob | 25 |"
+        elements = parser._markdown_to_elements(md, page=1)
+
+        tables = [e for e in elements if e.type == ElementType.TABLE]
+        assert len(tables) == 1
+        assert "Alice" in tables[0].content
+        assert "Bob" in tables[0].content
+
+    def test_mixed_content(self, parser):
+        md = (
+            "# Introduction\n\n"
+            "Some text here.\n\n"
+            "| Col1 | Col2 |\n|------|------|\n| A | B |\n\n"
+            "More text."
+        )
+        elements = parser._markdown_to_elements(md, page=3)
+
+        types = [e.type for e in elements]
+        assert ElementType.HEADING in types
+        assert ElementType.TEXT in types
+        assert ElementType.TABLE in types
+        assert all(e.page == 3 for e in elements)
+
+    def test_empty_markdown(self, parser):
+        elements = parser._markdown_to_elements("", page=1)
+        assert elements == []
+
+    def test_heading_with_special_chars(self, parser):
+        md = "# Section 3.2: Valid & Reliable"
+        elements = parser._markdown_to_elements(md, page=1)
+        assert elements[0].content == "Section 3.2: Valid & Reliable"
+
+
+# ---------------------------------------------------------------------------
+# Text → Elements (pypdfium2 fast path)
+# ---------------------------------------------------------------------------
+
+
+class TestTextToElements:
+    """Tests for _text_to_elements (pypdfium2 text parsing)."""
+
+    def test_heading_detection(self, parser):
+        text = "INTRODUCTION\n\nThis is the first paragraph."
+        elements = parser._text_to_elements(text, page_num=1)
+
+        assert elements[0].type == ElementType.HEADING
+        assert elements[0].content == "INTRODUCTION"
+        assert elements[1].type == ElementType.TEXT
+
+    def test_title_case_heading(self, parser):
+        text = "Executive Summary\n\nThe report covers..."
+        elements = parser._text_to_elements(text, page_num=1)
+
+        assert elements[0].type == ElementType.HEADING
+        assert elements[0].content == "Executive Summary"
+
+    def test_long_line_not_heading(self, parser):
+        text = "This Is A Very Long Line That Should Not Be Treated As A Heading Because It Exceeds The Length Threshold For Heading Detection"
+        elements = parser._text_to_elements(text, page_num=1)
+
+        assert elements[0].type == ElementType.TEXT
+
+    def test_page_number_on_elements(self, parser):
+        text = "Some text"
+        elements = parser._text_to_elements(text, page_num=42)
+        assert elements[0].page == 42
+
+    def test_empty_text(self, parser):
+        elements = parser._text_to_elements("", page_num=1)
+        assert elements == []
+
+
+# ---------------------------------------------------------------------------
+# Page routing heuristic
+# ---------------------------------------------------------------------------
+
+
+class TestNeedsOcr:
+    """Tests for _needs_ocr page routing decision."""
+
+    def test_short_text_needs_ocr(self, parser):
+        """Pages with < 50 chars of text are likely scanned → need OCR."""
+        import unittest.mock as mock
+
+        page = mock.MagicMock()
+        pdfium = mock.MagicMock()
+        assert parser._needs_ocr(page, "Short", pdfium) is True
+        assert parser._needs_ocr(page, "", pdfium) is True
+
+    def test_long_text_no_images_skips_ocr(self, parser):
+        """Pages with enough text and no images don't need OCR."""
+        import unittest.mock as mock
+
+        page = mock.MagicMock()
+        page.count_objects.return_value = 0
+        pdfium = mock.MagicMock()
+        pdfium.FPDF_PAGEOBJ_IMAGE = 3
+
+        long_text = "A" * 100
+        assert parser._needs_ocr(page, long_text, pdfium) is False
+
+    def test_text_with_images_needs_ocr(self, parser):
+        """Pages with text BUT also image objects → need OCR."""
+        import unittest.mock as mock
+
+        page = mock.MagicMock()
+        img_obj = mock.MagicMock()
+        img_obj.type = 3  # FPDF_PAGEOBJ_IMAGE
+        page.count_objects.return_value = 1
+        page.get_object.return_value = img_obj
+
+        pdfium = mock.MagicMock()
+        pdfium.FPDF_PAGEOBJ_IMAGE = 3
+
+        long_text = "A" * 100
+        assert parser._needs_ocr(page, long_text, pdfium) is True

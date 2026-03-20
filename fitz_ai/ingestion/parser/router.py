@@ -84,7 +84,23 @@ class ParserRouter:
         for ext in PLAINTEXT_EXTENSIONS:
             self._parsers[ext] = plaintext
 
-        # Register document parsers: Docling (advanced) or lightweight fallback
+        # Register document parsers by config selection
+        if self.docling_parser == "glm_ocr":
+            try:
+                from fitz_ai.ingestion.parser.plugins.glm_ocr import (
+                    GLM_OCR_EXTENSIONS,
+                    GlmOcrParser,
+                )
+
+                glm = GlmOcrParser()
+                for ext in GLM_OCR_EXTENSIONS:
+                    self._parsers[ext] = glm
+                logger.info("Using glm_ocr parser (hybrid pypdfium2 + GLM-OCR)")
+                return
+            except ImportError:
+                logger.warning("GLM-OCR parser import failed, falling back to Docling")
+
+        # Docling (advanced) or lightweight fallback
         # Docling is optional — install with: pip install fitz-ai[docs]
         try:
             if self.docling_parser == "docling_vision":

@@ -64,10 +64,15 @@ def _section_matches(read_meta: dict, section: dict) -> bool:
     heading_lower = heading.lower()
 
     # Heading match: check section_title and location (breadcrumb)
+    # Also compare with spaces stripped to handle "RiskPrioritization" vs "Risk Prioritization"
     section_title = str(read_meta.get("section_title", ""))
     location = str(read_meta.get("location", ""))
+    heading_nospace = heading_lower.replace(" ", "")
     heading_match = heading_lower and (
-        heading_lower in section_title.lower() or heading_lower in location.lower()
+        heading_lower in section_title.lower()
+        or heading_lower in location.lower()
+        or heading_nospace in section_title.lower().replace(" ", "")
+        or heading_nospace in location.lower().replace(" ", "")
     )
 
     # Page match (within +/-1)
