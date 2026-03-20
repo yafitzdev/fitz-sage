@@ -10,12 +10,12 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
 from fitz_ai.engines.fitz_krag.retrieval.ranker import (
     ENTITY_MATCH_BONUS,
     CrossStrategyRanker,
 )
 from fitz_ai.engines.fitz_krag.retrieval.router import RetrievalRouter
+from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind
 
 # ---------------------------------------------------------------------------
@@ -51,54 +51,39 @@ def _addr(
     )
 
 
-def _code_analysis(
+def _code_profile(
     entities: tuple[str, ...] = (),
-    confidence: float = 0.9,
-) -> QueryAnalysis:
-    """QueryAnalysis with CODE primary type."""
-    return QueryAnalysis(
-        primary_type=QueryType.CODE,
-        confidence=confidence,
+    top_k: int = 10,
+    fallback_to_chunks: bool = True,
+) -> RetrievalProfile:
+    """RetrievalProfile with CODE-like weights."""
+    return RetrievalProfile(
+        strategy_weights={"code": 0.8, "section": 0.1, "table": 0.05, "chunk": 0.05},
         entities=entities,
-        refined_query="test query",
+        top_k=top_k,
+        fallback_to_chunks=fallback_to_chunks,
+        analysis_type="code",
+        analysis_confidence=0.9,
     )
 
 
-def _doc_analysis(
-    entities: tuple[str, ...] = (),
-    confidence: float = 0.9,
-) -> QueryAnalysis:
-    """QueryAnalysis with DOCUMENTATION primary type."""
-    return QueryAnalysis(
-        primary_type=QueryType.DOCUMENTATION,
-        confidence=confidence,
-        entities=entities,
-        refined_query="test query",
-    )
-
-
-def _custom_weight_analysis(
+def _custom_weight_profile(
     code: float,
     section: float,
     chunk: float,
     entities: tuple[str, ...] = (),
-) -> QueryAnalysis:
-    """
-    Build a QueryAnalysis whose strategy_weights returns custom values.
-
-    QueryAnalysis.strategy_weights is a property derived from primary_type.
-    To get arbitrary weights we mock the property on the instance.
-    """
-    analysis = MagicMock(spec=QueryAnalysis)
-    analysis.strategy_weights = {
-        "code": code,
-        "section": section,
-        "chunk": chunk,
-    }
-    analysis.entities = entities
-    analysis.primary_type = QueryType.GENERAL
-    analysis.confidence = 0.8
-    return analysis
+    top_k: int = 10,
+    fallback_to_chunks: bool = True,
+) -> RetrievalProfile:
+    """Build a RetrievalProfile with custom strategy weights."""
+    return RetrievalProfile(
+        strategy_weights={"code": code, "section": section, "chunk": chunk},
+        entities=entities,
+        top_k=top_k,
+        fallback_to_chunks=fallback_to_chunks,
+        analysis_type="general",
+        analysis_confidence=0.8,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +116,7 @@ class TestRetrievalRouter:
             "find func", 10, detection=None, query_vector=None, hyde_vectors=None
         )
         assert len(result) == 2
-        # Without analysis, sorted by score descending
+        # Without profile, sorted by score descending
         assert result[0].score >= result[1].score
 
     # -- test_retrieve_with_section_strategy ------------------------------
@@ -183,9 +168,9 @@ class TestRetrievalRouter:
         )
 
         # Custom weights: section weight is 0.04 (below 0.05 threshold)
-        analysis = _custom_weight_analysis(code=0.9, section=0.04, chunk=0.04)
+        profile = _custom_weight_profile(code=0.9, section=0.04, chunk=0.04)
 
-        result = router.retrieve("find func", analysis=analysis)
+        result = router.retrieve("find func", profile)
 
         code_strat.retrieve.assert_called_once()
         section_strat.retrieve.assert_not_called()
@@ -294,10 +279,10 @@ class TestRetrievalRouter:
         assert len(result) == 1
         assert result[0].score == 0.9
 
-    # -- test_retrieve_with_analysis_uses_ranker --------------------------
+    # -- test_retrieve_with_profile_uses_ranker ---------------------------
 
-    def test_retrieve_with_analysis_uses_ranker(self):
-        """When analysis is provided, CrossStrategyRanker is used."""
+    def test_retrieve_with_profile_uses_ranker(self):
+        """When profile is provided, CrossStrategyRanker is used."""
         code_strat = MagicMock()
         sym_hi = _addr(AddressKind.SYMBOL, score=0.5, location="low_sym")
         sym_lo = _addr(AddressKind.SYMBOL, score=0.9, location="hi_sym")
@@ -310,18 +295,18 @@ class TestRetrievalRouter:
             config=config,
         )
 
-        analysis = _code_analysis(entities=("hi_sym",))
-        result = router.retrieve("find hi_sym", analysis=analysis)
+        profile = _code_profile(entities=("hi_sym",))
+        result = router.retrieve("find hi_sym", profile)
 
         # Ranker should apply entity bonus to hi_sym, boosting it
         assert len(result) == 2
         # hi_sym should rank first because of entity match bonus
         assert result[0].location == "hi_sym"
 
-    # -- test_retrieve_without_analysis_sorts_by_score --------------------
+    # -- test_retrieve_without_profile_sorts_by_score --------------------
 
-    def test_retrieve_without_analysis_sorts_by_score(self):
-        """No analysis -> results sorted by raw score descending."""
+    def test_retrieve_without_profile_sorts_by_score(self):
+        """No profile -> results sorted by raw score descending."""
         code_strat = MagicMock()
         code_strat.retrieve.return_value = [
             _addr(score=0.3, location="low"),
@@ -377,14 +362,14 @@ class TestCrossStrategyRanker:
     # -- test_rank_applies_weights ----------------------------------------
 
     def test_rank_applies_weights(self):
-        """CODE analysis boosts SYMBOL addresses via higher weight."""
+        """CODE profile boosts SYMBOL addresses via higher weight."""
         sym_addr = _addr(AddressKind.SYMBOL, score=0.5, location="func")
         chunk_addr = _addr(AddressKind.CHUNK, score=0.5, location="chunk1")
 
-        analysis = _code_analysis()
-        # CODE weights: code=0.8, section=0.1, chunk=0.1
-        # sym: 0.5 * 0.8 = 0.40,  chunk: 0.5 * 0.1 = 0.05
-        result = self.ranker.rank([chunk_addr, sym_addr], analysis)
+        profile = _code_profile()
+        # CODE weights: code=0.8, section=0.1, chunk=0.05
+        # sym: 0.5 * 0.8 = 0.40,  chunk: 0.5 * 0.05 = 0.025
+        result = self.ranker.rank([chunk_addr, sym_addr], profile)
 
         assert result[0].kind == AddressKind.SYMBOL
         assert result[1].kind == AddressKind.CHUNK
@@ -404,15 +389,15 @@ class TestCrossStrategyRanker:
             location="other_func",
         )
 
-        analysis = _code_analysis(entities=("MyClass",))
-        result = self.ranker.rank([addr_no, addr_match], analysis)
+        profile = _code_profile(entities=("MyClass",))
+        result = self.ranker.rank([addr_no, addr_match], profile)
 
         # addr_match gets bonus, should rank higher
         assert result[0].location == "MyClass.do_work"
 
         # Verify the bonus magnitude: both have same base * weight,
         # but match gets +ENTITY_MATCH_BONUS
-        weights = analysis.strategy_weights
+        weights = profile.strategy_weights
         expected_match = 0.5 * weights["code"] + ENTITY_MATCH_BONUS
         expected_no = 0.5 * weights["code"]
         assert expected_match > expected_no
@@ -434,8 +419,8 @@ class TestCrossStrategyRanker:
             summary="unrelated work",
         )
 
-        analysis = _code_analysis(entities=("MyClass",))
-        result = self.ranker.rank([addr_no, addr], analysis)
+        profile = _code_profile(entities=("MyClass",))
+        result = self.ranker.rank([addr_no, addr], profile)
 
         assert result[0].summary == "Handles MyClass initialization"
 
@@ -446,8 +431,8 @@ class TestCrossStrategyRanker:
         addr1 = _addr(AddressKind.SYMBOL, score=0.8, location="func_a")
         addr2 = _addr(AddressKind.SYMBOL, score=0.6, location="func_b")
 
-        analysis = _code_analysis(entities=("NonExistent",))
-        result = self.ranker.rank([addr2, addr1], analysis)
+        profile = _code_profile(entities=("NonExistent",))
+        result = self.ranker.rank([addr2, addr1], profile)
 
         # Neither gets bonus; order by weighted score alone
         assert result[0].location == "func_a"
@@ -463,8 +448,8 @@ class TestCrossStrategyRanker:
             _addr(AddressKind.SYMBOL, score=0.6, location="mid"),
         ]
 
-        analysis = _code_analysis()
-        result = self.ranker.rank(addrs, analysis)
+        profile = _code_profile()
+        result = self.ranker.rank(addrs, profile)
 
         scores = [a.score for a in result]
         # Original scores should be in descending order (all same weight)
@@ -474,6 +459,19 @@ class TestCrossStrategyRanker:
 
     def test_rank_empty_addresses(self):
         """Empty address list returns empty list."""
-        analysis = _code_analysis()
-        result = self.ranker.rank([], analysis)
+        profile = _code_profile()
+        result = self.ranker.rank([], profile)
         assert result == []
+
+    # -- test_rank_without_profile ----------------------------------------
+
+    def test_rank_without_profile(self):
+        """When profile is None, rank by raw score only."""
+        addrs = [
+            _addr(AddressKind.SYMBOL, score=0.3, location="low"),
+            _addr(AddressKind.SYMBOL, score=0.9, location="high"),
+        ]
+        result = self.ranker.rank(addrs, None)
+
+        assert result[0].location == "high"
+        assert result[1].location == "low"

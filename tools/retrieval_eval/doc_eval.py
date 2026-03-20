@@ -333,15 +333,18 @@ def run_retrieval(engine, query_text: str, top_k: int = 15):
         except Exception:
             precomputed = None
 
-    # 2. Retrieve addresses
+    # 2. Build retrieval profile and retrieve addresses
+    from fitz_ai.engines.fitz_krag.retrieval_profile import build_retrieval_profile
+
+    profile = build_retrieval_profile(analysis, detection, engine._config)
+
     if engine._hop_controller:
-        read_results = engine._hop_controller.execute(retrieval_query, analysis, detection)
+        read_results = engine._hop_controller.execute(retrieval_query, profile)
         addresses = [r.address for r in read_results] if read_results else []
     else:
         addresses = engine._retrieval_router.retrieve(
             retrieval_query,
-            analysis,
-            detection=detection,
+            profile,
             rewrite_result=rewrite_result,
             precomputed_query_vectors=precomputed,
         )

@@ -2,19 +2,16 @@
 """
 Cross-strategy ranker — scores and ranks addresses from multiple strategies.
 
-Uses query analysis weights, entity matching bonuses, and type mismatch
+Uses strategy weights, entity matching bonuses, and type mismatch
 penalties to produce a coherent ranking across code and document results.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import Any
 
 from fitz_ai.engines.fitz_krag.types import Address, AddressKind
-
-if TYPE_CHECKING:
-    from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis
 
 logger = logging.getLogger(__name__)
 
@@ -32,23 +29,23 @@ _KIND_TO_STRATEGY: dict[AddressKind, str] = {
 
 
 class CrossStrategyRanker:
-    """Ranks addresses across strategies using query analysis."""
+    """Ranks addresses across strategies using retrieval profile."""
 
     def rank(
         self,
         addresses: list[Address],
-        analysis: "QueryAnalysis",
+        profile: Any = None,
     ) -> list[Address]:
         """
-        Score and rank addresses using query analysis weights.
+        Score and rank addresses using strategy weights from profile.
 
         Scoring:
         1. Base score from strategy's internal ranking (addr.score)
-        2. Strategy weight multiplier from query analysis
+        2. Strategy weight multiplier from profile
         3. Entity match bonus when query mentions symbol/section name
         """
-        weights = analysis.strategy_weights
-        entities = set(e.lower() for e in analysis.entities)
+        weights = profile.strategy_weights if profile else None
+        entities = set(e.lower() for e in profile.entities) if profile else set()
 
         scored: list[tuple[float, Address]] = []
         for addr in addresses:
@@ -61,7 +58,7 @@ class CrossStrategyRanker:
     def _compute_score(
         self,
         addr: Address,
-        weights: dict[str, float],
+        weights: dict[str, float] | None,
         entities: set[str],
     ) -> float:
         """Compute weighted score for an address."""
@@ -69,9 +66,12 @@ class CrossStrategyRanker:
         base_score = addr.score
 
         # Strategy weight multiplier
-        strategy = _KIND_TO_STRATEGY.get(addr.kind, "chunk")
-        weight = weights.get(strategy, 0.1)
-        weighted_score = base_score * weight
+        if weights:
+            strategy = _KIND_TO_STRATEGY.get(addr.kind, "chunk")
+            weight = weights.get(strategy, 0.1)
+            weighted_score = base_score * weight
+        else:
+            weighted_score = base_score
 
         # Entity match bonus
         if entities:

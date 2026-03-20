@@ -718,6 +718,7 @@ class FitzKragEngine:
                         include_detection=need_detection,
                         detection_limit_to=detection_limit_to,
                         include_rewriting=False,
+                        include_extended=True,
                     )
                     embed_future = pool.submit(self._embedder.embed_batch, [sanitized])
 
@@ -741,6 +742,7 @@ class FitzKragEngine:
                             refined_query=sanitized,
                         )
                         detection = None
+                        batch_result = None
 
                     try:
                         precomputed_vectors = embed_future.result()
@@ -751,6 +753,7 @@ class FitzKragEngine:
                 # No LLM needed: fast_analyze succeeded, no detection needed
                 analysis = fast_analysis
                 detection = None
+                batch_result = None
                 try:
                     precomputed_vectors = self._embedder.embed_batch([sanitized], task_type="query")
                     precomputed_query_vector = dict(zip([sanitized], precomputed_vectors))
@@ -758,18 +761,31 @@ class FitzKragEngine:
                     precomputed_query_vector = None
             timings.append(("Analysis + Detection", time.perf_counter() - t0))
 
+            # Build retrieval profile — single object with all gates and signals
+            from fitz_ai.engines.fitz_krag.retrieval_profile import build_retrieval_profile
+
+            profile = build_retrieval_profile(
+                analysis,
+                detection,
+                self._config,
+                query_length=len(retrieval_query),
+                has_chat_factory=bool(self._chat_factory),
+                extended_signals=(
+                    batch_result.extended_signals if batch_result else None
+                ),
+            )
+
             # 2. Retrieve addresses (or multi-hop)
             _progress("Retrieving relevant sources...")
             t0 = time.perf_counter()
             if self._hop_controller:
                 # Multi-hop: iterative retrieve → read → evaluate → bridge
-                read_results = self._hop_controller.execute(retrieval_query, analysis, detection)
+                read_results = self._hop_controller.execute(retrieval_query, profile)
                 addresses = [r.address for r in read_results] if read_results else []
             else:
                 addresses = self._retrieval_router.retrieve(
                     retrieval_query,
-                    analysis,
-                    detection=detection,
+                    profile,
                     rewrite_result=rewrite_result,
                     progress=progress,
                     precomputed_query_vectors=precomputed_query_vector,
@@ -824,14 +840,8 @@ class FitzKragEngine:
 
             # 4. Expand with context
             t0 = time.perf_counter()
-            # Broad/thematic queries benefit from wider entity graph traversal
-            _is_thematic = (
-                analysis is not None
-                and analysis.primary_type.value not in ("code", "data")
-                and analysis.confidence < 0.6
-            )
             expanded = self._expander.expand(
-                read_results, entity_expansion_limit=12 if _is_thematic else 3
+                read_results, entity_expansion_limit=profile.entity_expansion_limit
             )
             timings.append(("Expand context", time.perf_counter() - t0))
 

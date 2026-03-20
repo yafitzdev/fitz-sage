@@ -79,6 +79,21 @@ _REWRITING_INSTRUCTIONS = """\
 - If multiple topics, set is_compound=true and provide decomposed_queries
 - Resolve pronouns if conversation history is present"""
 
+_EXTENDED_JSON = """\
+  "extended": {{
+    "specificity": "broad" | "moderate" | "narrow",
+    "answer_type": "factual" | "procedural" | "comparative" | "exploratory",
+    "domain": "general" | "technical" | "legal" | "financial" | "medical",
+    "multi_hop": true/false
+  }}"""
+
+_EXTENDED_INSTRUCTIONS = """\
+## extended
+- specificity: "broad" for overview/survey questions, "narrow" for specific fact/symbol lookup, "moderate" otherwise
+- answer_type: what kind of answer the user expects
+- domain: primary domain vocabulary of the query
+- multi_hop: true if answering requires combining information from multiple unrelated sections or documents"""
+
 
 @dataclass
 class BatchResult:
@@ -87,6 +102,7 @@ class BatchResult:
     analysis: QueryAnalysis | None = None
     detection_results: dict["DetectionCategory", "DetectionResult"] | None = None
     rewrite_result: RewriteResult | None = None
+    extended_signals: dict[str, Any] | None = None
 
 
 @dataclass
@@ -104,6 +120,7 @@ class QueryBatcher:
         include_detection: bool = True,
         detection_limit_to: "set[DetectionCategory] | None" = None,
         include_rewriting: bool = True,
+        include_extended: bool = False,
         conversation_context: Any = None,
     ) -> BatchResult:
         """Run analysis + detection + rewriting in a single LLM call.
@@ -114,6 +131,7 @@ class QueryBatcher:
             include_detection: Include detection modules.
             detection_limit_to: Only include these detection categories (None = all).
             include_rewriting: Include query rewriting.
+            include_extended: Include extended advisory signals (specificity, domain, etc.).
             conversation_context: Optional ConversationContext for rewriting.
 
         Returns:
@@ -129,6 +147,7 @@ class QueryBatcher:
             include_detection=include_detection,
             active_modules=active_modules,
             include_rewriting=include_rewriting,
+            include_extended=include_extended,
             conversation_context=conversation_context,
         )
 
@@ -146,6 +165,7 @@ class QueryBatcher:
             include_detection=include_detection,
             active_modules=active_modules,
             include_rewriting=include_rewriting,
+            include_extended=include_extended,
         )
 
     def _get_active_modules(
@@ -164,6 +184,7 @@ class QueryBatcher:
         include_detection: bool,
         active_modules: list["DetectionModule"],
         include_rewriting: bool,
+        include_extended: bool = False,
         conversation_context: Any = None,
     ) -> str:
         """Build the combined prompt from active sections."""
@@ -190,6 +211,11 @@ class QueryBatcher:
             section_names.append("rewriting")
             json_parts.append(_REWRITING_JSON)
             instruction_parts.append(_REWRITING_INSTRUCTIONS)
+
+        if include_extended:
+            section_names.append("extended")
+            json_parts.append(_EXTENDED_JSON)
+            instruction_parts.append(_EXTENDED_INSTRUCTIONS)
 
         history_section = ""
         if conversation_context and hasattr(conversation_context, "format_for_prompt"):
@@ -255,6 +281,7 @@ class QueryBatcher:
         include_detection: bool,
         active_modules: list["DetectionModule"],
         include_rewriting: bool,
+        include_extended: bool = False,
     ) -> BatchResult:
         """Distribute parsed JSON to per-section parsers with independent fallbacks."""
         result = BatchResult()
@@ -297,5 +324,10 @@ class QueryBatcher:
                     rewrite_type=RewriteType.NONE,
                     confidence=0.0,
                 )
+
+        if include_extended:
+            extended_data = raw.get("extended")
+            if isinstance(extended_data, dict):
+                result.extended_signals = extended_data
 
         return result

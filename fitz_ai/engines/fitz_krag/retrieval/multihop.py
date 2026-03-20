@@ -46,16 +46,14 @@ class KragHopController:
     def execute(
         self,
         query: str,
-        analysis: Any = None,
-        detection: Any = None,
+        profile: Any = None,
     ) -> list[ReadResult]:
         """
         Run iterative multi-hop retrieval.
 
         Args:
             query: Original user query
-            analysis: Query analysis result
-            detection: Detection summary
+            profile: RetrievalProfile with pre-computed gates and signals
 
         Returns:
             Accumulated read results across all hops
@@ -66,7 +64,7 @@ class KragHopController:
 
         for hop in range(self._max_hops):
             # 1. Retrieve addresses
-            addresses = self._router.retrieve(current_query, analysis, detection=detection)
+            addresses = self._router.retrieve(current_query, profile)
             if not addresses:
                 break
 

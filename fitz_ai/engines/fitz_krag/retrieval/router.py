@@ -1,6 +1,10 @@
 # fitz_ai/engines/fitz_krag/retrieval/router.py
 """
 Retrieval router — dispatches queries to available strategies and merges results.
+
+All gating decisions (HyDE, multi-query, agentic, corpus summaries, chunk
+fallback) are pre-computed in RetrievalProfile.  The router reads booleans
+and lists from the profile — no analysis/detection/config introspection here.
 """
 
 from __future__ import annotations
@@ -13,7 +17,6 @@ from fitz_ai.engines.fitz_krag.types import Address
 
 if TYPE_CHECKING:
     from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-    from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis
     from fitz_ai.engines.fitz_krag.retrieval.strategies.chunk_fallback import (
         ChunkFallbackStrategy,
     )
@@ -59,143 +62,47 @@ class RetrievalRouter:
         self._hyde_generator = hyde_generator
         self._keyword_matcher: Any = None  # Set by engine for vocabulary filtering
 
-    @staticmethod
-    def _should_run_hyde(analysis: "QueryAnalysis | None", detection: "Any | None") -> bool:
-        """Decide whether HyDE is likely to improve retrieval for this query.
-
-        HyDE helps abstract/conceptual queries where user words don't match
-        document vocabulary. It adds no value for direct code lookups, data/SQL
-        queries, or high-confidence queries that already match well.
-        """
-        if not analysis:
-            return True  # No signal — run HyDE to be safe
-
-        # Complex intent detected — always run HyDE
-        if detection and (
-            getattr(detection, "has_comparison_intent", False)
-            or getattr(detection, "has_temporal_intent", False)
-            or getattr(detection, "has_aggregation_intent", False)
-        ):
-            return True
-
-        # Code queries: keyword/AST search is primary, HyDE prose doesn't help
-        if analysis.primary_type.value == "code" and analysis.confidence >= 0.7:
-            return False
-
-        # Data queries: table search uses SQL, not vector similarity
-        if analysis.primary_type.value == "data":
-            return False
-
-        # Very high confidence: query already matches document vocabulary well
-        if analysis.confidence >= 0.9:
-            return False
-
-        return True
-
-    @staticmethod
-    def _should_run_multi_query(
-        analysis: "QueryAnalysis | None",
-    ) -> bool:
-        """Decide whether multi-query expansion adds value."""
-        if not analysis:
-            return True
-
-        # Code/data queries don't benefit from prose decomposition
-        if analysis.primary_type.value in ("code", "data"):
-            return False
-
-        # High confidence means the query is already focused
-        if analysis.confidence >= 0.8:
-            return False
-
-        return True
-
-    @staticmethod
-    def _should_inject_corpus_summaries(
-        analysis: "QueryAnalysis | None",
-    ) -> bool:
-        """Decide whether to inject L2 corpus summary chunks for thematic coverage.
-
-        Broad, low-confidence queries benefit from corpus-level summaries that
-        capture themes across documents — analogous to LightRAG's high-level retrieval.
-        Code and data queries are already routed precisely and don't benefit.
-        """
-        if not analysis:
-            return False
-        if analysis.primary_type.value in ("code", "data"):
-            return False
-        return analysis.confidence < 0.6
-
-    @staticmethod
-    def _should_run_agentic(
-        analysis: "QueryAnalysis | None",
-    ) -> bool:
-        """Decide whether agentic file scanning adds value.
-
-        Agentic search scans unindexed files — most valuable for code queries
-        or low-confidence queries where indexed content may be insufficient.
-        For clear, high-confidence queries against fully indexed collections,
-        indexed content suffices. However, when point() was used (progressive
-        mode), agentic is often the ONLY retrieval path and must always run.
-        """
-        if not analysis:
-            return True
-
-        # Data queries: agentic scans files, not tables
-        if analysis.primary_type.value == "data":
-            return False
-
-        return True
-
     def retrieve(
         self,
         query: str,
-        analysis: "QueryAnalysis | None" = None,
-        detection: "Any | None" = None,
+        profile: Any = None,
         rewrite_result: "Any | None" = None,
         progress: Callable[[str], None] | None = None,
         precomputed_query_vectors: dict[str, list[float]] | None = None,
     ) -> list[Address]:
         """
-        Retrieve addresses using strategy weights from query analysis.
+        Retrieve addresses using strategy weights from retrieval profile.
 
-        When analysis is provided, strategies with near-zero weight are skipped
-        and results are ranked using CrossStrategyRanker. Without analysis,
+        When profile is provided, strategies with near-zero weight are skipped
+        and results are ranked using CrossStrategyRanker. Without profile,
         all strategies run equally (backward compatible).
 
-        When detection is provided (DetectionSummary), it enhances retrieval:
-        - Query expansion: additional retrievals with detection.query_variations
-        - Comparison: search both detection.comparison_entities
-        - Fetch multiplier: increase limit by detection.fetch_multiplier
+        Profile contains pre-computed gates and query expansions that replace
+        the old analysis/detection/config reads.
         """
         from fitz_ai.engines.fitz_krag.retrieval.ranker import CrossStrategyRanker
 
-        limit = self._config.top_addresses
-
-        # Apply fetch multiplier from detection
-        if detection and hasattr(detection, "fetch_multiplier"):
-            limit = limit * detection.fetch_multiplier
-
-        weights = analysis.strategy_weights if analysis else None
+        limit = profile.top_k if profile else self._config.top_addresses
+        weights = profile.strategy_weights if profile else None
         all_addresses: list[Address] = []
 
-        # Collect queries to run (original + detection expansions + multi-query)
+        # Collect queries to run (original + profile expansions + multi-query)
         # Each entry is (query_text, tag) where tag is used for temporal metadata
         tagged_queries: list[tuple[str, str | None]] = [(query, None)]
-        if detection:
-            if hasattr(detection, "query_variations") and detection.query_variations:
+        if profile:
+            if profile.query_variations:
                 # Tag temporal variations with their reference text
-                temporal_refs = self._extract_temporal_refs(detection)
-                for i, variation in enumerate(detection.query_variations):
+                temporal_refs = profile.temporal_references
+                for i, variation in enumerate(profile.query_variations):
                     tag = temporal_refs[i] if i < len(temporal_refs) else None
                     tagged_queries.append((variation, tag))
-            if hasattr(detection, "comparison_queries") and detection.comparison_queries:
+            if profile.comparison_queries:
                 # Use comparison queries already generated by ComparisonModule
-                for cq in detection.comparison_queries:
+                for cq in profile.comparison_queries:
                     tagged_queries.append((cq, None))
-            elif hasattr(detection, "comparison_entities") and detection.comparison_entities:
+            elif profile.comparison_entities:
                 # Fallback: naive entity expansion (no LLM call)
-                for entity in detection.comparison_entities:
+                for entity in profile.comparison_entities:
                     tagged_queries.append((f"{query} {entity}", None))
 
         # Multi-query expansion: prefer rewriter's decomposed queries over separate LLM call
@@ -204,12 +111,7 @@ class RetrievalRouter:
             # Rewriter already decomposed — use its variations (skip [0] = original)
             for var in rewrite_variations[1:]:
                 tagged_queries.append((var, None))
-        elif (
-            self._config.enable_multi_query
-            and self._chat_factory
-            and len(query) >= self._config.multi_query_min_length
-            and self._should_run_multi_query(analysis)
-        ):
+        elif profile.run_multi_query if profile else False:
             # Fallback: only when rewriter is disabled or didn't decompose
             expanded = self._expand_query(query)
             for eq in expanded:
@@ -237,12 +139,12 @@ class RetrievalRouter:
         else:
             _embed_ms = 0
 
-        run_hyde = self._should_run_hyde(analysis, detection)
-        run_agentic = self._should_run_agentic(analysis)
+        run_hyde = profile.run_hyde if profile else True
+        run_agentic = profile.run_agentic if profile else True
         logger.debug(
             f"Retrieval gates: hyde={run_hyde}, agentic={run_agentic}, "
-            f"type={analysis.primary_type.value if analysis else 'none'}, "
-            f"conf={analysis.confidence if analysis else 0:.2f}, "
+            f"type={profile.analysis_type if profile else 'none'}, "
+            f"conf={profile.analysis_confidence if profile else 0:.2f}, "
             f"queries={len(unique_queries)}, embed={_embed_ms:.0f}ms"
         )
 
@@ -280,19 +182,19 @@ class RetrievalRouter:
 
                 if not weights or weights.get("code", 1.0) > 0.05:
                     fut = pool.submit(
-                        self._run_strategy, self._code_strategy, q, limit, detection, qv, hv
+                        self._run_strategy, self._code_strategy, q, limit, profile, qv, hv
                     )
                     futures.append((fut, temporal_tag))
 
                 if self._section_strategy and (not weights or weights.get("section", 1.0) > 0.05):
                     fut = pool.submit(
-                        self._run_strategy, self._section_strategy, q, limit, detection, qv, hv
+                        self._run_strategy, self._section_strategy, q, limit, profile, qv, hv
                     )
                     futures.append((fut, temporal_tag))
 
                 if self._table_strategy and (not weights or weights.get("table", 1.0) > 0.05):
                     fut = pool.submit(
-                        self._run_strategy_table, self._table_strategy, q, limit, detection, qv
+                        self._run_strategy_table, self._table_strategy, q, limit, profile, qv
                     )
                     futures.append((fut, temporal_tag))
 
@@ -326,10 +228,11 @@ class RetrievalRouter:
         logger.debug(f"Retrieval breakdown: strategies={_strategies_ms:.0f}ms")
 
         # Corpus summary injection for broad/thematic queries
-        if self._section_strategy and self._should_inject_corpus_summaries(analysis):
+        inject_summaries = profile.inject_corpus_summaries if profile else False
+        if self._section_strategy and inject_summaries:
             try:
                 corpus_addresses = self._section_strategy.retrieve(
-                    query, limit=limit, detection=detection, inject_corpus_summaries=True
+                    query, limit=limit, detection=profile, inject_corpus_summaries=True
                 )
                 all_addresses.extend(corpus_addresses)
                 logger.debug(f"Injected {len(corpus_addresses)} corpus summary chunk(s)")
@@ -337,9 +240,10 @@ class RetrievalRouter:
                 logger.debug(f"Corpus summary injection skipped: {e}")
 
         # Chunk fallback when other results are insufficient
+        fallback = profile.fallback_to_chunks if profile else self._config.fallback_to_chunks
         if (
             self._chunk_strategy
-            and self._config.fallback_to_chunks
+            and fallback
             and (not weights or weights.get("chunk", 1.0) > 0.05)
             and len(all_addresses) < self._config.top_addresses // 2
         ):
@@ -357,10 +261,10 @@ class RetrievalRouter:
         if self._keyword_matcher:
             deduped = self._apply_keyword_boost(query, deduped)
 
-        # Rank using analysis if available
-        if analysis:
+        # Rank using profile if available
+        if profile:
             ranker = CrossStrategyRanker()
-            ranked = ranker.rank(deduped, analysis)
+            ranked = ranker.rank(deduped, profile)
         else:
             # Fallback: sort by score
             deduped.sort(key=lambda a: a.score, reverse=True)
@@ -375,7 +279,7 @@ class RetrievalRouter:
         strategy: Any,
         query: str,
         limit: int,
-        detection: Any,
+        profile: Any,
         query_vector: list[float] | None,
         hyde_vectors: list[list[float]] | None,
     ) -> list[Address]:
@@ -384,7 +288,7 @@ class RetrievalRouter:
             return strategy.retrieve(
                 query,
                 limit,
-                detection=detection,
+                detection=profile,
                 query_vector=query_vector,
                 hyde_vectors=hyde_vectors,
             )
@@ -397,7 +301,7 @@ class RetrievalRouter:
         strategy: Any,
         query: str,
         limit: int,
-        detection: Any,
+        profile: Any,
         query_vector: list[float] | None,
     ) -> list[Address]:
         """Run table strategy with pre-computed query vector (no HyDE)."""
@@ -405,7 +309,7 @@ class RetrievalRouter:
             return strategy.retrieve(
                 query,
                 limit,
-                detection=detection,
+                detection=profile,
                 query_vector=query_vector,
             )
         except Exception as e:
@@ -438,23 +342,6 @@ class RetrievalRouter:
             return agentic_addresses
         except Exception as e:
             logger.warning(f"Agentic strategy failed: {e}")
-            return []
-
-    def _extract_temporal_refs(self, detection: Any) -> list[str]:
-        """Extract temporal reference texts from detection metadata."""
-        try:
-            temporal = getattr(detection, "temporal", None)
-            if not temporal:
-                return []
-            refs = temporal.metadata.get("references", [])
-            result = []
-            for r in refs:
-                if isinstance(r, dict):
-                    result.append(r.get("text", ""))
-                elif isinstance(r, str):
-                    result.append(r)
-            return result
-        except Exception:
             return []
 
     def _tag_temporal(self, addresses: list[Address], ref_text: str) -> list[Address]:
