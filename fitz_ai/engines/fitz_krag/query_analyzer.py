@@ -129,22 +129,30 @@ class QueryAnalyzer:
                 refined_query=original_query,
             )
 
-        primary = _parse_query_type(data.get("primary_type") or "general")
-        secondary = None
-        if data.get("secondary_type"):
-            secondary = _parse_query_type(data["secondary_type"])
+        return parse_analysis_dict(data, original_query)
 
-        entities = data.get("entities", [])
-        if not isinstance(entities, list):
-            entities = []
 
-        return QueryAnalysis(
-            primary_type=primary,
-            secondary_type=secondary,
-            confidence=min(1.0, max(0.0, float(data.get("confidence", 0.5)))),
-            entities=tuple(str(e) for e in entities),
-            refined_query=str(data.get("refined_query", original_query)),
-        )
+def parse_analysis_dict(data: dict, original_query: str) -> QueryAnalysis:
+    """Parse a dict (already JSON-decoded) into QueryAnalysis.
+
+    Used by both QueryAnalyzer._parse_response and QueryBatcher.
+    """
+    primary = _parse_query_type(data.get("primary_type") or "general")
+    secondary = None
+    if data.get("secondary_type"):
+        secondary = _parse_query_type(data["secondary_type"])
+
+    entities = data.get("entities", [])
+    if not isinstance(entities, list):
+        entities = []
+
+    return QueryAnalysis(
+        primary_type=primary,
+        secondary_type=secondary,
+        confidence=min(1.0, max(0.0, float(data.get("confidence", 0.5)))),
+        entities=tuple(str(e) for e in entities),
+        refined_query=str(data.get("refined_query", original_query)),
+    )
 
 
 def _parse_query_type(value: str) -> QueryType:

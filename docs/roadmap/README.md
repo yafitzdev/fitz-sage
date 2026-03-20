@@ -19,6 +19,19 @@ Surface fitz-ai's hidden intelligence to developers. Actionable ABSTAIN (explain
 
 ---
 
+## Next: Query Intelligence Pipeline
+
+**[Rewrite-First with Batched Classification](./query-intelligence-pipeline.md)**
+
+Reorder query preprocessing: rewrite first, then batch analysis + detection on the cleaned query. Reduces local LLM calls from 3 to 2, improves classification accuracy. Phase 2 adds extended signals (specificity, domain, multi-hop) to replace hard-coded retrieval gates.
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Rewrite-first pipeline + batched analysis/detection | In Progress |
+| 2 | Extended classification signals (specificity, domain, multi-hop) | Proposed |
+
+---
+
 ## Future: KRAG Agent
 
 **[KRAG Agent — Retrieval-as-Tools with Epistemic Self-Verification](./krag-agent.md)**

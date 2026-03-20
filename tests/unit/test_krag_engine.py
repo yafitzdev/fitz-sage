@@ -77,6 +77,21 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._manifest = None
     engine._source_dir = None
     engine._hyde_generator = None
+    # Configure batcher to return sensible defaults so batched dispatch works
+    from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
+    from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
+
+    def _default_batch_classify(query, **kwargs):
+        return BatchResult(
+            analysis=QueryAnalysis(
+                primary_type=QueryType.GENERAL, confidence=0.8, refined_query=query
+            ),
+            detection_results=None,
+            rewrite_result=None,
+        )
+
+    engine._query_batcher = MagicMock(name="query_batcher")
+    engine._query_batcher.batch_classify.side_effect = _default_batch_classify
     return engine
 
 
@@ -226,10 +241,6 @@ class TestAnswer:
         )
 
         # Wire up the pipeline stages
-        analysis = MagicMock(name="analysis")
-        analysis.confidence = 0.8
-        engine._query_analyzer.analyze.return_value = analysis
-
         address_1 = MagicMock(name="addr1")
         address_2 = MagicMock(name="addr2")
         engine._retrieval_router.retrieve.return_value = [
@@ -259,12 +270,11 @@ class TestAnswer:
         result = engine.answer(query)
 
         # Verify each stage called with correct args
-        engine._query_analyzer.analyze.assert_called_once_with(
-            query.text,
-        )
+        # _query_analyzer is not called in the batched dispatch path
+        engine._query_analyzer.analyze.assert_not_called()
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[0] == (query.text, analysis)
+        assert call_args[0][0] == query.text
         assert call_args[1]["detection"] is None
         assert call_args[1]["rewrite_result"] is None
         engine._reader.read.assert_called_once_with(

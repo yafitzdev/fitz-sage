@@ -72,6 +72,7 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._manifest = None
     engine._source_dir = None
     engine._hyde_generator = None
+    engine._query_batcher = MagicMock(name="query_batcher")
     return engine
 
 

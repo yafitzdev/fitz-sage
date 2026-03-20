@@ -179,6 +179,18 @@ class DetectionOrchestrator:
             self._expansion_detector = ExpansionDetector()
         return self._expansion_detector
 
+    def gate_categories(self, query: str) -> set["DetectionCategory"] | None:
+        """Run ML/semantic gate only — no LLM call.
+
+        Returns:
+            Set of flagged categories, or None if gate unavailable (run all).
+            Empty set means skip detection entirely.
+        """
+        gate = self._ensure_concept_detector() or self._ensure_ml_classifier()
+        if gate is None:
+            return None
+        return gate.predict(query)
+
     def detect_for_retrieval(self, query: str) -> DetectionSummary:
         """
         Run detection optimized for retrieval routing.

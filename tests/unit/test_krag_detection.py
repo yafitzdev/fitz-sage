@@ -71,6 +71,21 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._manifest = None
     engine._source_dir = None
     engine._hyde_generator = None
+
+    from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
+    from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
+
+    def _default_batch_classify(query, **kwargs):
+        return BatchResult(
+            analysis=QueryAnalysis(
+                primary_type=QueryType.GENERAL, confidence=0.8, refined_query=query
+            ),
+            detection_results=None,
+            rewrite_result=None,
+        )
+
+    engine._query_batcher = MagicMock(name="query_batcher")
+    engine._query_batcher.batch_classify.side_effect = _default_batch_classify
     return engine
 
 
@@ -349,23 +364,35 @@ class TestEngineAnswerDetectionFlow:
     """Tests for detection flowing through engine.answer() to the router."""
 
     def test_detection_result_flows_to_router(self):
-        """Detection result from orchestrator is passed to router.retrieve."""
+        """Detection result from batched call is passed to router.retrieve."""
         engine = _make_engine(enable_detection=True)
 
-        # Wire up detection orchestrator
+        # Wire up detection orchestrator (gate_categories decides which modules run)
         mock_orchestrator = MagicMock(name="detection_orchestrator")
-        mock_detection = _make_detection_summary(query_variations=["expanded"])
-        mock_orchestrator.detect_for_retrieval.return_value = mock_detection
+        mock_orchestrator.gate_categories.return_value = None  # run all modules
+        mock_orchestrator._get_expansion_detector.return_value.detect.return_value = (
+            MagicMock(detected=False)
+        )
         engine._detection_orchestrator = mock_orchestrator
+
+        # Wire up batcher to return detection results
+        from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
+        from fitz_ai.retrieval.detection.protocol import DetectionCategory, DetectionResult
+
+        mock_detection_results = {
+            DetectionCategory.TEMPORAL: DetectionResult.not_detected(DetectionCategory.TEMPORAL),
+        }
+        mock_batch_result = BatchResult(
+            analysis=MagicMock(primary_type=MagicMock(value="general"), confidence=0.85),
+            detection_results=mock_detection_results,
+            rewrite_result=MagicMock(rewritten_query="same query", was_rewritten=False),
+        )
+        engine._query_batcher.batch_classify = MagicMock(return_value=mock_batch_result)
 
         # Wire up pipeline stages (query must trigger detection + LLM analysis — >8 words)
         query = _make_query(
             "compare the latest authentication changes between the different modules in the system"
         )
-        analysis = MagicMock(name="analysis")
-        analysis.confidence = 0.85
-        analysis.primary_type.value = "general"
-        engine._query_analyzer.analyze.return_value = analysis
         engine._retrieval_router.retrieve.return_value = [MagicMock()]
         engine._reader.read.return_value = [MagicMock()]
         engine._expander.expand.return_value = [MagicMock()]
@@ -376,14 +403,13 @@ class TestEngineAnswerDetectionFlow:
 
         engine.answer(query)
 
-        # Detection orchestrator called with query text
-        mock_orchestrator.detect_for_retrieval.assert_called_once_with(query.text)
+        # Batcher called (batched path)
+        engine._query_batcher.batch_classify.assert_called_once()
 
-        # Router called with detection result
+        # Router called with detection result (not None)
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[0] == (query.text, analysis)
-        assert call_args[1]["detection"] is mock_detection
+        assert call_args[1]["detection"] is not None
 
     def test_detection_disabled_stays_none_in_answer_flow(self):
         """When detection is disabled, detection stays None through answer flow."""
@@ -394,10 +420,6 @@ class TestEngineAnswerDetectionFlow:
         query = _make_query(
             "How does the authentication system work when handling multiple concurrent user sessions?"
         )
-        analysis = MagicMock(name="analysis")
-        analysis.confidence = 0.85
-        analysis.primary_type.value = "general"
-        engine._query_analyzer.analyze.return_value = analysis
         engine._retrieval_router.retrieve.return_value = [MagicMock()]
         engine._reader.read.return_value = [MagicMock()]
         engine._expander.expand.return_value = [MagicMock()]
@@ -408,10 +430,10 @@ class TestEngineAnswerDetectionFlow:
 
         engine.answer(query)
 
-        # Router called with detection=None (no detection)
+        # Router called with detection=None (no detection orchestrator)
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[0] == (query.text, analysis)
+        assert call_args[0][0] == query.text
         assert call_args[1]["detection"] is None
 
 

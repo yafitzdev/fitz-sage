@@ -346,6 +346,15 @@ class FitzKragEngine:
 
             self._query_rewriter = QueryRewriter(chat_factory=self._chat_factory)
 
+        # Batched query intelligence (analysis + detection + rewriting in 1 LLM call)
+        from fitz_ai.engines.fitz_krag.query_batcher import QueryBatcher
+        from fitz_ai.retrieval.detection.modules import DEFAULT_MODULES
+
+        self._query_batcher = QueryBatcher(
+            chat_factory=self._chat_factory,
+            detection_modules=list(DEFAULT_MODULES),
+        )
+
         # HyDE generator (passed to strategies)
         self._hyde_generator: Any = None
         if self._config.enable_hyde:
@@ -526,6 +535,48 @@ class FitzKragEngine:
         "should would will shall may might be been being have has had".split()
     )
 
+    def _build_detection_summary(
+        self, results: dict, query: str
+    ) -> "DetectionSummary":
+        """Build DetectionSummary from batched detection results.
+
+        Adds the dict-based expansion detector (not LLM) and wraps
+        module results into the same structure detect_for_retrieval returns.
+        """
+        from fitz_ai.retrieval.detection.protocol import (
+            DetectionCategory,
+            DetectionResult,
+        )
+        from fitz_ai.retrieval.detection.registry import DetectionSummary
+
+        expansion_detector = self._detection_orchestrator._get_expansion_detector()
+        expansion_result = expansion_detector.detect(query)
+
+        return DetectionSummary(
+            temporal=results.get(
+                DetectionCategory.TEMPORAL,
+                DetectionResult.not_detected(DetectionCategory.TEMPORAL),
+            ),
+            aggregation=results.get(
+                DetectionCategory.AGGREGATION,
+                DetectionResult.not_detected(DetectionCategory.AGGREGATION),
+            ),
+            comparison=results.get(
+                DetectionCategory.COMPARISON,
+                DetectionResult.not_detected(DetectionCategory.COMPARISON),
+            ),
+            freshness=results.get(
+                DetectionCategory.FRESHNESS,
+                DetectionResult.not_detected(DetectionCategory.FRESHNESS),
+            ),
+            expansion=expansion_result,
+            rewriter=results.get(
+                DetectionCategory.REWRITER,
+                DetectionResult.not_detected(DetectionCategory.REWRITER),
+            ),
+            vocabulary=DetectionResult.not_detected(DetectionCategory.VOCABULARY),
+        )
+
     @staticmethod
     def _fast_analyze(query: str) -> "QueryAnalysis | None":
         """Try to classify simple queries without an LLM call.
@@ -609,58 +660,87 @@ class FitzKragEngine:
             timings: list[tuple[str, float]] = []
             pipeline_start = time.perf_counter()
 
-            # 1. Rewrite + Analyze + Detect — all in parallel
+            # 1. Rewrite-first pipeline:
+            #    Step 1: Rewrite query (if configured)
+            #    Step 2: Batch(Analysis + Detection) on rewritten query + Embed (parallel)
             #
-            # Analysis and detection classify intent from the original query
-            # (rewriting doesn't change intent). Rewriting optimizes the query
-            # for retrieval. All three are independent LLM calls.
+            # Rewriting runs first so analysis and detection classify the
+            # cleaned-up query (noise removed, pronouns resolved). The batch
+            # combines analysis + detection into 1 LLM call to avoid model-swap
+            # overhead on local providers like ollama.
             _progress("Analyzing query...")
             t0 = time.perf_counter()
             from concurrent.futures import ThreadPoolExecutor
 
-            fast_analysis = self._fast_analyze(sanitized)
-            need_llm_analysis = fast_analysis is None
-            need_detection = self._detection_orchestrator and self._needs_detection(sanitized)
-            need_rewrite = self._query_rewriter is not None
+            from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
 
             retrieval_query = sanitized
             rewrite_result = None
 
-            if need_llm_analysis or need_detection or need_rewrite:
-                with ThreadPoolExecutor(max_workers=4) as pool:
-                    analysis_future = (
-                        pool.submit(self._query_analyzer.analyze, sanitized)
-                        if need_llm_analysis
-                        else None
-                    )
-                    detection_future = (
-                        pool.submit(self._detection_orchestrator.detect_for_retrieval, sanitized)
-                        if need_detection
-                        else None
-                    )
-                    rewrite_future = (
-                        pool.submit(self._query_rewriter.rewrite, sanitized)
-                        if need_rewrite
-                        else None
+            # Step 1: Rewrite (individual LLM call, runs first)
+            if self._query_rewriter:
+                try:
+                    rewrite_result = self._query_rewriter.rewrite(sanitized)
+                    if rewrite_result.rewritten_query != sanitized:
+                        retrieval_query = rewrite_result.rewritten_query
+                        logger.debug(
+                            "Query rewritten",
+                            original_preview=sanitized[:50],
+                            rewritten_preview=retrieval_query[:50],
+                        )
+                except Exception as e:
+                    logger.warning("Query rewriting failed, using original", error=str(e))
+
+            # Step 2: Analysis + Detection on rewritten query, + Embedding
+            classify_query = retrieval_query  # classify the rewritten query
+            fast_analysis = self._fast_analyze(classify_query)
+            need_llm_analysis = fast_analysis is None
+            need_detection = bool(
+                self._detection_orchestrator and self._needs_detection(classify_query)
+            )
+
+            # Run non-LLM gates to refine detection
+            detection_limit_to = None
+            if need_detection:
+                flagged = self._detection_orchestrator.gate_categories(classify_query)
+                if flagged is not None and len(flagged) == 0:
+                    need_detection = False
+                else:
+                    detection_limit_to = flagged
+
+            if need_llm_analysis or need_detection:
+                # Batch analysis + detection in one LLM call, embed in parallel
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    batch_future = pool.submit(
+                        self._query_batcher.batch_classify,
+                        classify_query,
+                        include_analysis=need_llm_analysis,
+                        include_detection=need_detection,
+                        detection_limit_to=detection_limit_to,
+                        include_rewriting=False,
                     )
                     embed_future = pool.submit(self._embedder.embed_batch, [sanitized])
 
-                    analysis = analysis_future.result() if analysis_future else fast_analysis
-                    detection = detection_future.result() if detection_future else None
-
-                    # Collect rewrite result
-                    if rewrite_future:
-                        try:
-                            rewrite_result = rewrite_future.result()
-                            if rewrite_result.rewritten_query != sanitized:
-                                retrieval_query = rewrite_result.rewritten_query
-                                logger.debug(
-                                    "Query rewritten",
-                                    original_preview=sanitized[:50],
-                                    rewritten_preview=retrieval_query[:50],
-                                )
-                        except Exception as e:
-                            logger.warning("Query rewriting failed, using original", error=str(e))
+                    try:
+                        batch_result = batch_future.result()
+                        analysis = (
+                            batch_result.analysis if batch_result.analysis else fast_analysis
+                        )
+                        detection = (
+                            self._build_detection_summary(
+                                batch_result.detection_results, classify_query
+                            )
+                            if need_detection and batch_result.detection_results is not None
+                            else None
+                        )
+                    except Exception as e:
+                        logger.warning(f"Batched query intelligence failed: {e}")
+                        analysis = fast_analysis or QueryAnalysis(
+                            primary_type=QueryType.GENERAL,
+                            confidence=0.3,
+                            refined_query=sanitized,
+                        )
+                        detection = None
 
                     try:
                         precomputed_vectors = embed_future.result()
@@ -668,7 +748,7 @@ class FitzKragEngine:
                     except Exception:
                         precomputed_query_vector = None
             else:
-                # Simple query: no LLM calls needed, just embed
+                # No LLM needed: fast_analyze succeeded, no detection needed
                 analysis = fast_analysis
                 detection = None
                 try:

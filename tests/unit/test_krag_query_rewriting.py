@@ -67,6 +67,28 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._manifest = None
     engine._source_dir = None
     engine._hyde_generator = None
+
+    # Configure batcher to return sensible defaults so batched dispatch works
+    from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
+    from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
+    from fitz_ai.retrieval.rewriter.types import RewriteResult, RewriteType
+
+    def _default_batch_classify(query, **kwargs):
+        return BatchResult(
+            analysis=QueryAnalysis(
+                primary_type=QueryType.GENERAL, confidence=0.8, refined_query=query
+            ),
+            detection_results=None,
+            rewrite_result=RewriteResult(
+                original_query=query,
+                rewritten_query=query,
+                rewrite_type=RewriteType.NONE,
+                confidence=0.0,
+            ),
+        )
+
+    engine._query_batcher = MagicMock(name="query_batcher")
+    engine._query_batcher.batch_classify.side_effect = _default_batch_classify
     return engine
 
 
@@ -111,90 +133,99 @@ class TestQueryRewriting:
     """Tests for query rewriting integration in the answer() pipeline."""
 
     def test_rewrite_called_and_rewritten_query_used(self):
-        """Rewrite runs in parallel with analysis; rewritten query used for retrieval."""
+        """Rewriter called directly first; rewritten query used for retrieval and batcher."""
         engine = _make_engine()
         query = _make_query(
             "How does the authentication system handle user login sessions securely?"
         )
 
-        # Set up rewriter
-        rewriter = MagicMock(name="rewriter")
-        rewrite_result = MagicMock()
-        rewrite_result.rewritten_query = (
-            "authentication module implementation for secure user login session handling"
+        # Enable rewriter and configure it to return a real RewriteResult
+        from fitz_ai.retrieval.rewriter.types import RewriteResult, RewriteType
+
+        rewritten = "authentication module implementation for secure user login session handling"
+        rewrite_result = RewriteResult(
+            original_query=query.text,
+            rewritten_query=rewritten,
+            rewrite_type=RewriteType.RETRIEVAL,
+            confidence=0.9,
         )
-        rewriter.rewrite.return_value = rewrite_result
-        engine._query_rewriter = rewriter
+        engine._query_rewriter = MagicMock(name="rewriter")
+        engine._query_rewriter.rewrite.return_value = rewrite_result
 
         expected = _wire_happy_path(engine, query.text)
 
         result = engine.answer(query)
 
-        # Rewriter called with original query
-        rewriter.rewrite.assert_called_once_with(query.text)
+        # Rewriter called directly with the sanitized query (Step 1)
+        engine._query_rewriter.rewrite.assert_called_once_with(query.text)
 
-        # Analyzer receives original query (runs in parallel with rewrite)
-        engine._query_analyzer.analyze.assert_called_once_with(query.text)
+        # Batcher called with the rewritten query for analysis (rewritten is 9 words > 8)
+        engine._query_batcher.batch_classify.assert_called_once()
+        batch_call_args = engine._query_batcher.batch_classify.call_args
+        assert batch_call_args[0][0] == rewritten
+        assert batch_call_args[1].get("include_rewriting") is False
 
-        # Router receives the rewritten query for retrieval
+        # Router receives the rewritten query and the rewrite_result
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[0] == (
-            rewrite_result.rewritten_query,
-            engine._query_analyzer.analyze.return_value,
-        )
+        assert call_args[0][0] == rewritten
         assert call_args[1]["rewrite_result"] is rewrite_result
 
         assert result is expected
 
     def test_original_query_used_when_rewrite_returns_same_text(self):
-        """When rewriter returns the same text, original query flows through unchanged."""
+        """When rewriter returns same text, original query flows through unchanged."""
         engine = _make_engine()
         query = _make_query("What is the login function and how does it validate user credentials?")
 
-        rewriter = MagicMock(name="rewriter")
-        rewrite_result = MagicMock()
-        rewrite_result.rewritten_query = query.text
-        rewriter.rewrite.return_value = rewrite_result
-        engine._query_rewriter = rewriter
+        # Rewriter returns the original text unchanged
+        from fitz_ai.retrieval.rewriter.types import RewriteResult, RewriteType
+
+        rewrite_result = RewriteResult(
+            original_query=query.text,
+            rewritten_query=query.text,
+            rewrite_type=RewriteType.NONE,
+            confidence=0.0,
+        )
+        engine._query_rewriter = MagicMock(name="rewriter")
+        engine._query_rewriter.rewrite.return_value = rewrite_result
 
         expected = _wire_happy_path(engine, query.text)
 
         result = engine.answer(query)
 
-        rewriter.rewrite.assert_called_once_with(query.text)
+        # Rewriter was called
+        engine._query_rewriter.rewrite.assert_called_once_with(query.text)
 
-        # Analyzer and router use the original query (same as rewritten)
-        engine._query_analyzer.analyze.assert_called_once_with(query.text)
+        # Router uses original query (rewrite returned same text)
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[0] == (query.text, engine._query_analyzer.analyze.return_value)
-        assert call_args[1]["rewrite_result"] is rewrite_result
+        assert call_args[0][0] == query.text
 
         assert result is expected
 
-    def test_fallback_to_original_on_rewrite_error(self):
-        """When rewriter raises an exception, the original query is used."""
+    def test_fallback_to_original_on_batch_error(self):
+        """When batcher raises, the original query is used with fallback analysis."""
         engine = _make_engine()
         query = _make_query(
             "How does the authentication system work when handling multiple sessions?"
         )
 
-        rewriter = MagicMock(name="rewriter")
-        rewriter.rewrite.side_effect = RuntimeError("LLM timeout")
-        engine._query_rewriter = rewriter
+        # No rewriter: rewrite_result stays None so fallback is clean
+        assert engine._query_rewriter is None
+        engine._query_batcher.batch_classify.side_effect = RuntimeError("LLM timeout")
 
         expected = _wire_happy_path(engine, query.text)
 
         result = engine.answer(query)
 
-        rewriter.rewrite.assert_called_once_with(query.text)
+        # Batcher was called (query is 10 words > 8, so LLM analysis needed) and failed
+        engine._query_batcher.batch_classify.assert_called_once()
 
-        # Falls back to original query text
-        engine._query_analyzer.analyze.assert_called_once_with(query.text)
+        # Falls back to original query text with no rewrite_result
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[0] == (query.text, engine._query_analyzer.analyze.return_value)
+        assert call_args[0][0] == query.text
         assert call_args[1]["rewrite_result"] is None
 
         assert result is expected
@@ -211,11 +242,13 @@ class TestQueryRewriting:
 
         result = engine.answer(query)
 
-        # Analyzer uses original query directly
-        engine._query_analyzer.analyze.assert_called_once_with(query.text)
+        # query_analyzer is not called in the new batched dispatch path
+        engine._query_analyzer.analyze.assert_not_called()
+
+        # Router uses original query with no rewrite_result
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        assert call_args[0] == (query.text, engine._query_analyzer.analyze.return_value)
+        assert call_args[0][0] == query.text
         assert call_args[1]["rewrite_result"] is None
 
         assert result is expected

@@ -266,44 +266,58 @@ def run_retrieval(engine, query_text: str, top_k: int = 15):
 
     sanitized = re.sub(r"<[^>]+>", "", query_text).strip()[:500]
 
-    # 1. Analysis + Detection + Rewriting + Embedding (parallel)
-    fast_analysis = engine._fast_analyze(sanitized)
-    need_llm_analysis = fast_analysis is None
-    need_detection = engine._detection_orchestrator and engine._needs_detection(sanitized)
-    need_rewrite = engine._query_rewriter is not None
-
+    # 1. Rewrite-first pipeline (mirrors engine.answer dispatch)
     retrieval_query = sanitized
     rewrite_result = None
 
-    if need_llm_analysis or need_detection or need_rewrite:
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            analysis_future = (
-                pool.submit(engine._query_analyzer.analyze, sanitized)
-                if need_llm_analysis
-                else None
-            )
-            detection_future = (
-                pool.submit(engine._detection_orchestrator.detect_for_retrieval, sanitized)
-                if need_detection
-                else None
-            )
-            rewrite_future = (
-                pool.submit(engine._query_rewriter.rewrite, sanitized)
-                if need_rewrite
-                else None
+    # Step 1: Rewrite
+    if engine._query_rewriter:
+        try:
+            rewrite_result = engine._query_rewriter.rewrite(sanitized)
+            if rewrite_result.rewritten_query != sanitized:
+                retrieval_query = rewrite_result.rewritten_query
+        except Exception:
+            pass
+
+    # Step 2: Batch(analysis + detection) on rewritten query + embed
+    classify_query = retrieval_query
+    fast_analysis = engine._fast_analyze(classify_query)
+    need_llm_analysis = fast_analysis is None
+    need_detection = bool(
+        engine._detection_orchestrator and engine._needs_detection(classify_query)
+    )
+
+    detection_limit_to = None
+    if need_detection:
+        flagged = engine._detection_orchestrator.gate_categories(classify_query)
+        if flagged is not None and len(flagged) == 0:
+            need_detection = False
+        else:
+            detection_limit_to = flagged
+
+    if need_llm_analysis or need_detection:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            batch_future = pool.submit(
+                engine._query_batcher.batch_classify,
+                classify_query,
+                include_analysis=need_llm_analysis,
+                include_detection=need_detection,
+                detection_limit_to=detection_limit_to,
+                include_rewriting=False,
             )
             embed_future = pool.submit(engine._embedder.embed_batch, [sanitized])
 
-            analysis = analysis_future.result() if analysis_future else fast_analysis
-            detection = detection_future.result() if detection_future else None
-
-            if rewrite_future:
-                try:
-                    rewrite_result = rewrite_future.result()
-                    if rewrite_result.rewritten_query != sanitized:
-                        retrieval_query = rewrite_result.rewritten_query
-                except Exception:
-                    pass
+            try:
+                batch_result = batch_future.result()
+                analysis = batch_result.analysis if batch_result.analysis else fast_analysis
+                detection = (
+                    engine._build_detection_summary(batch_result.detection_results, classify_query)
+                    if need_detection and batch_result.detection_results is not None
+                    else None
+                )
+            except Exception:
+                analysis = fast_analysis
+                detection = None
 
             try:
                 vectors = embed_future.result()
@@ -343,8 +357,7 @@ def run_retrieval(engine, query_text: str, top_k: int = 15):
 
     # 4. Read content — restore disabled components
     engine._retrieval_router._agentic_strategy = saved_agentic
-    for obj, gen in hyde_locations:
-        obj._hyde_generator = gen
+    engine._retrieval_router._hyde_generator = saved_hyde
     if engine._hop_controller:
         return read_results or []
     return engine._reader.read(addresses, min(len(addresses), top_k))

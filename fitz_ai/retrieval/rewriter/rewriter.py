@@ -244,43 +244,8 @@ class QueryRewriter:
             if start >= 0 and end > start:
                 text = text[start:end]
 
-            result = json.loads(text)
-
-            # Extract fields with defaults
-            rewritten = result.get("rewritten_query", original_query)
-            rewrite_type_str = result.get("rewrite_type", "none")
-            confidence = float(result.get("confidence", 0.5))
-            is_ambiguous = result.get("is_ambiguous", False)
-            disambiguated = result.get("disambiguated_queries", [])
-            is_compound = result.get("is_compound", False)
-            decomposed = result.get("decomposed_queries", [])
-
-            # Map rewrite type
-            type_mapping = {
-                "none": RewriteType.NONE,
-                "conversational": RewriteType.CONVERSATIONAL,
-                "clarity": RewriteType.CLARITY,
-                "retrieval": RewriteType.RETRIEVAL,
-                "decomposition": RewriteType.DECOMPOSITION,
-                "combined": RewriteType.COMBINED,
-            }
-            rewrite_type = type_mapping.get(rewrite_type_str.lower(), RewriteType.NONE)
-
-            # Validate rewritten query
-            if not rewritten or not rewritten.strip():
-                rewritten = original_query
-                rewrite_type = RewriteType.NONE
-
-            return RewriteResult(
-                original_query=original_query,
-                rewritten_query=rewritten.strip(),
-                rewrite_type=rewrite_type,
-                confidence=confidence,
-                is_ambiguous=is_ambiguous,
-                disambiguated_queries=disambiguated[:3],  # Limit to 3
-                is_compound=is_compound,
-                decomposed_queries=decomposed[:5],  # Limit to 5
-            )
+            data = json.loads(text)
+            return parse_rewrite_dict(data, original_query)
 
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
             logger.debug(f"{RETRIEVER} Failed to parse rewrite response: {e}")
@@ -291,3 +256,42 @@ class QueryRewriter:
                 rewrite_type=RewriteType.NONE,
                 confidence=0.0,
             )
+
+
+def parse_rewrite_dict(data: dict, original_query: str) -> RewriteResult:
+    """Parse a dict (already JSON-decoded) into RewriteResult.
+
+    Used by both QueryRewriter._parse_response and QueryBatcher.
+    """
+    rewritten = data.get("rewritten_query", original_query)
+    rewrite_type_str = data.get("rewrite_type", "none")
+    confidence = float(data.get("confidence", 0.5))
+    is_ambiguous = data.get("is_ambiguous", False)
+    disambiguated = data.get("disambiguated_queries", [])
+    is_compound = data.get("is_compound", False)
+    decomposed = data.get("decomposed_queries", [])
+
+    type_mapping = {
+        "none": RewriteType.NONE,
+        "conversational": RewriteType.CONVERSATIONAL,
+        "clarity": RewriteType.CLARITY,
+        "retrieval": RewriteType.RETRIEVAL,
+        "decomposition": RewriteType.DECOMPOSITION,
+        "combined": RewriteType.COMBINED,
+    }
+    rewrite_type = type_mapping.get(str(rewrite_type_str).lower(), RewriteType.NONE)
+
+    if not rewritten or not str(rewritten).strip():
+        rewritten = original_query
+        rewrite_type = RewriteType.NONE
+
+    return RewriteResult(
+        original_query=original_query,
+        rewritten_query=str(rewritten).strip(),
+        rewrite_type=rewrite_type,
+        confidence=confidence,
+        is_ambiguous=is_ambiguous,
+        disambiguated_queries=disambiguated[:3],
+        is_compound=is_compound,
+        decomposed_queries=decomposed[:5],
+    )

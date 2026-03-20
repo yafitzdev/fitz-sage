@@ -145,13 +145,7 @@ class LLMClassifier:
     ) -> dict["DetectionCategory", "DetectionResult[Any]"]:
         """Distribute parsed results to each module (defaults to self.modules)."""
         active = modules if modules is not None else self.modules
-        results = {}
-        for module in active:
-            module_data = raw_results.get(module.json_key, {})
-            if not isinstance(module_data, dict):
-                module_data = {}
-            results[module.category] = module.parse_result(module_data)
-        return results
+        return distribute_to_modules(raw_results, active)
 
     def _empty_results(
         self, modules: "list[DetectionModule] | None" = None
@@ -159,3 +153,20 @@ class LLMClassifier:
         """Return not-detected results for the given modules (defaults to self.modules)."""
         active = modules if modules is not None else self.modules
         return {module.category: module.not_detected() for module in active}
+
+
+def distribute_to_modules(
+    raw_results: dict[str, Any],
+    modules: "list[DetectionModule]",
+) -> dict["DetectionCategory", "DetectionResult[Any]"]:
+    """Distribute parsed JSON results to detection modules.
+
+    Used by both LLMClassifier and QueryBatcher.
+    """
+    results = {}
+    for module in modules:
+        module_data = raw_results.get(module.json_key, {})
+        if not isinstance(module_data, dict):
+            module_data = {}
+        results[module.category] = module.parse_result(module_data)
+    return results
