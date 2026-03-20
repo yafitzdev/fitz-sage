@@ -158,6 +158,12 @@ def build_retrieval_profile(
     elif specificity == "narrow":
         top_read = max(5, int(top_read * 0.8))
 
+    # Answer type: procedural/comparative need more context sources
+    if answer_type == "procedural":
+        top_read = int(top_read * 1.3)
+    elif answer_type in ("comparative", "exploratory"):
+        top_read = int(top_read * 1.2)
+
     # --- HyDE gate (from router._should_run_hyde) ---
     run_hyde = config.enable_hyde
     if run_hyde and analysis:

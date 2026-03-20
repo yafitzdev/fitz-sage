@@ -85,8 +85,8 @@ class SectionSearchStrategy:
         semantic_weight = self._config.section_semantic_weight
         merged = self._merge_results(bm25_results, semantic_results, bm25_weight, semantic_weight)
 
-        # 5. Keyword enrichment boost (from stored keywords)
-        merged = self._apply_keyword_enrichment_boost(query, merged)
+        # 5. Keyword enrichment boost (from stored keywords, domain-scaled)
+        merged = self._apply_keyword_enrichment_boost(query, merged, detection)
 
         # 6. Freshness boost (when detection signals boost_recency)
         if detection and getattr(detection, "boost_recency", False) and self._raw_store:
@@ -194,19 +194,28 @@ class SectionSearchStrategy:
         return results
 
     def _apply_keyword_enrichment_boost(
-        self, query: str, results: list[dict[str, Any]]
+        self, query: str, results: list[dict[str, Any]], detection: Any = None
     ) -> list[dict[str, Any]]:
-        """Boost results that have matching enriched keywords."""
+        """Boost results that have matching enriched keywords.
+
+        Domain-specific queries get a stronger keyword boost since terminology
+        matches are more meaningful in specialized fields.
+        """
         query_terms = [w.lower().strip("?.,!;:()") for w in query.split() if len(w) >= 3]
         if not query_terms:
             return results
+        # Domain signal: amplify keyword importance for specialized domains
+        domain = getattr(detection, "domain", "general")
+        boost = {"technical": 0.15, "legal": 0.12, "medical": 0.12, "financial": 0.12}.get(
+            domain, 0.1
+        )
         try:
             keyword_hits = self._section_store.search_by_keywords(query_terms, limit=50)
             keyword_ids = {r["id"] for r in keyword_hits}
             if keyword_ids:
                 for r in results:
                     if r["id"] in keyword_ids:
-                        r["combined_score"] = r.get("combined_score", 0) + 0.1
+                        r["combined_score"] = r.get("combined_score", 0) + boost
                 # Re-sort after boost
                 results.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
         except Exception as e:

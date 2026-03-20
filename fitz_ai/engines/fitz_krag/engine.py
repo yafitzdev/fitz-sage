@@ -778,7 +778,10 @@ class FitzKragEngine:
             # 2. Retrieve addresses (or multi-hop)
             _progress("Retrieving relevant sources...")
             t0 = time.perf_counter()
-            if self._hop_controller:
+            use_multi_hop = self._hop_controller and (
+                self._config.enable_multi_hop or profile.multi_hop
+            )
+            if use_multi_hop:
                 # Multi-hop: iterative retrieve → read → evaluate → bridge
                 read_results = self._hop_controller.execute(retrieval_query, profile)
                 addresses = [r.address for r in read_results] if read_results else []
@@ -808,7 +811,7 @@ class FitzKragEngine:
                 )
 
             # 2.5. Rerank addresses (when reranker configured)
-            if self._address_reranker and not self._hop_controller:
+            if self._address_reranker and not use_multi_hop:
                 t0 = time.perf_counter()
                 addresses = self._address_reranker.rerank(retrieval_query, addresses)
                 timings.append(("Rerank", time.perf_counter() - t0))
@@ -820,7 +823,7 @@ class FitzKragEngine:
                     return cached
 
             # 3. Read content for top addresses (skip if multi-hop already read)
-            if self._hop_controller:
+            if use_multi_hop:
                 pass  # read_results already populated by hop controller
             else:
                 _progress(
