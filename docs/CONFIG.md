@@ -1,364 +1,117 @@
 # Configuration Reference
 
-Complete reference for all Fitz configuration options.
+All configuration lives in `.fitz/config.yaml` (auto-created on first run).
 
 ---
 
-## Config File Locations
-
-Fitz uses a two-file configuration structure:
-
-| File | Purpose |
-|------|---------|
-| `.fitz/config.yaml` | Global config (default engine) |
-| `.fitz/config/fitz_krag.yaml` | Engine-specific config |
-
-The `.fitz/` directory is auto-created in your project root on first run.
-
----
-
-## Global Config
-
-**File:** `.fitz/config.yaml`
+## Example Config
 
 ```yaml
-# Default engine for CLI commands
-default_engine: fitz_krag  # Default engine (custom engines can be registered)
+# LLM providers — format: provider/model
+chat_fast: ollama/qwen3.5:2b        # Lightweight tasks (classify, detect, rewrite)
+chat_balanced: ollama/qwen3.5:4b    # SQL generation, enrichment
+chat_smart: ollama/qwen3.5:9b       # Answer synthesis
+
+embedding: ollama/nomic-embed-text   # Text-to-vector
+rerank: null                         # Reranker (cohere/rerank-v3.5 or null)
+vision: null                         # VLM for PDF figures (cohere, openai, ollama)
+
+collection: default                  # Active collection name
 ```
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `default_engine` | string | `fitz_krag` | Engine used by CLI commands |
+---
+
+## LLM Tiers
+
+| Key | Purpose | Used for |
+|-----|---------|----------|
+| `chat_fast` | Cheapest/fastest model | Query rewriting, classification, detection, guardrails |
+| `chat_balanced` | Middle tier | SQL generation, table queries, enrichment |
+| `chat_smart` | Best quality model | Answer synthesis |
+
+**Local optimization:** When using `ollama`, the engine maps all tiers to `chat_balanced` automatically to avoid VRAM model swapping. Users control which model via `chat_balanced`.
+
+**Cloud providers:** All three tiers are used as configured (no swap cost with API calls).
+
+### Provider format
+
+`provider/model` — examples:
+
+```yaml
+# Ollama (local)
+chat_fast: ollama/qwen3.5:2b
+embedding: ollama/nomic-embed-text
+
+# Cohere (cloud)
+chat_smart: cohere/command-a-03-2025
+embedding: cohere/embed-v4.0
+rerank: cohere/rerank-v3.5
+
+# OpenAI (cloud)
+chat_smart: openai/gpt-4o
+embedding: openai/text-embedding-3-small
+```
 
 ---
 
-## Fitz KRAG Config
+## Feature Control
 
-**File:** `.fitz/config/fitz_krag.yaml`
+Features are controlled by provider presence — no `enabled` flags:
 
-### Complete Example
+| Feature | Enabled when | Disabled when |
+|---------|-------------|---------------|
+| Reranking | `rerank: cohere/rerank-v3.5` | `rerank: null` |
+| VLM parsing | `parser: docling_vision` + `vision:` set | `parser: docling` or `parser: glm_ocr` |
+| Enrichment | Chat provider available | No chat provider |
+
+---
+
+## Storage
 
 ```yaml
-# =============================================================================
-# LLM Providers
-# =============================================================================
-
-# Chat (LLM for answering questions)
-chat:
-  plugin_name: cohere          # cohere, openai, anthropic, local_ollama, enterprise
-  kwargs:
-    models:
-      smart: command-a-03-2025     # Best quality (queries)
-      fast: command-r7b-12-2024    # Best speed (enrichment)
-      balanced: command-r-08-2024  # Cost-effective (bulk)
-    temperature: 0.2
-
-# Embedding (text to vectors)
-embedding:
-  plugin_name: cohere          # cohere, openai, local_ollama
-  kwargs:
-    model: embed-english-v3.0
-
-# Reranker (improves retrieval quality)
-rerank:
-  plugin_name: cohere          # cohere (only provider with rerank)
-  kwargs:
-    model: rerank-v3.5
-
-# Vision (VLM for describing figures in PDFs)
-vision:
-  plugin_name: cohere          # cohere, openai, anthropic, local_ollama
-  kwargs: {}
-
-# =============================================================================
-# Storage (PostgreSQL + pgvector)
-# =============================================================================
-
-# Vector Database (unified storage for vectors, metadata, and tables)
+# Local (default) — embedded PostgreSQL, zero config
 vector_db: pgvector
-vector_db_kwargs:
-  mode: local                  # local (embedded pgserver) or external
-  # For external PostgreSQL:
-  # mode: external
-  # connection_string: postgresql://user:pass@host:5432/dbname
 
-# =============================================================================
-# Retrieval
-# =============================================================================
-
-retrieval:
-  plugin_name: dense           # Reranking auto-enabled when rerank: configured
-  collection: default          # Collection name
-  top_k: 5                     # Number of chunks to retrieve
-
-# =============================================================================
-# Ingestion
-# =============================================================================
-
-# Chunking (document splitting)
-chunking:
-  default:
-    parser: docling            # docling, docling_vision
-    plugin_name: recursive     # recursive, simple, markdown, python_code
-    kwargs:
-      chunk_size: 1000
-      chunk_overlap: 200
-  by_extension:                # Override by file extension
-    .py:
-      plugin_name: python_code
-    .md:
-      plugin_name: markdown
-
-# Enrichment (keyword/entity extraction during ingestion)
-enable_enrichment: true          # Enable keyword, entity, summary extraction
-enable_hierarchy: true           # Enable L1/L2 hierarchical summaries
-
-# =============================================================================
-# Query Settings
-# =============================================================================
-
-# RGS (Retrieval-Guided Synthesis)
-rgs:
-  enable_citations: true       # Include source citations
-  strict_grounding: true       # Only answer from retrieved context
-  max_chunks: 8                # Max chunks in context
-
-# =============================================================================
-# Logging
-# =============================================================================
-
-logging:
-  level: INFO                  # DEBUG, INFO, WARNING, ERROR
-```
-
----
-
-## Section Reference
-
-### chat
-
-LLM provider for answering questions.
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `plugin_name` | string | `cohere` | Provider plugin |
-| `kwargs.models.smart` | string | varies | Model for user queries |
-| `kwargs.models.fast` | string | varies | Model for background tasks |
-| `kwargs.models.balanced` | string | varies | Model for bulk operations |
-| `kwargs.temperature` | float | `0.2` | Response randomness (0-1) |
-
-**Available plugins:** `cohere`, `openai`, `anthropic`, `azure_openai`, `local_ollama`, `enterprise`
-
-> **Enterprise deployments:** Use `plugin_name: enterprise` with OAuth2 M2M authentication, custom CA certificates, and mTLS support. See [Enterprise Gateway](features/platform/enterprise-gateway.md).
-
----
-
-### embedding
-
-Embedding provider for text-to-vector conversion.
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `plugin_name` | string | `cohere` | Provider plugin |
-| `kwargs.model` | string | varies | Embedding model name |
-
-**Available plugins:** `cohere`, `openai`, `azure_openai`, `local_ollama`, `enterprise`
-
----
-
-### rerank
-
-Reranking provider for improving retrieval quality.
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `plugin_name` | string | `cohere` | Provider plugin |
-| `kwargs.model` | string | `rerank-v3.5` | Reranking model |
-
-**Available plugins:** `cohere`
-
-**Note:** Reranking is automatically enabled when a rerank provider is configured. See [Feature Control](FEATURE_CONTROL.md) and [Reranking Feature](features/retrieval/reranking.md).
-
----
-
-### vision
-
-Vision Language Model for describing figures in PDFs.
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `plugin_name` | string | `cohere` | Provider plugin |
-| `kwargs` | object | `{}` | Provider-specific options |
-
-**Available plugins:** `cohere`, `openai`, `anthropic`, `local_ollama`
-
-**Note:** VLM is only used when `chunking.default.parser: docling_vision`. See [Feature Control](FEATURE_CONTROL.md).
-
----
-
-### vector_db
-
-Unified storage using PostgreSQL + pgvector. Handles vectors, metadata, and structured tables in one database.
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `vector_db` | string | `pgvector` | Storage plugin |
-| `vector_db_kwargs.mode` | string | `local` | `local` (embedded) or `external` |
-| `vector_db_kwargs.connection_string` | string | - | PostgreSQL URI (external mode) |
-| `vector_db_kwargs.hnsw_m` | int | `16` | HNSW index parameter |
-| `vector_db_kwargs.hnsw_ef_construction` | int | `64` | HNSW build quality |
-
-**Modes:**
-
-| Mode | Description | Configuration |
-|------|-------------|---------------|
-| `local` | Embedded PostgreSQL via pgserver | No config needed (auto-starts) |
-| `external` | Your PostgreSQL instance | Provide `connection_string` |
-
-**Local mode example:**
-```yaml
-vector_db: pgvector
-vector_db_kwargs:
-  mode: local
-```
-
-**External mode example:**
-```yaml
+# External PostgreSQL
 vector_db: pgvector
 vector_db_kwargs:
   mode: external
-  connection_string: postgresql://user:pass@localhost:5432/mydb
+  connection_string: postgresql://user:pass@host:5432/dbname
 ```
 
-See [Unified Storage](features/platform/unified-storage.md) for architecture details.
+Data lives in `.fitz/pgdata/`. Collections are managed via `fitz collections`.
 
 ---
 
-### retrieval
+## Parser
 
-Retrieval strategy for finding relevant chunks.
+```yaml
+parser: glm_ocr    # Hybrid: pdfplumber + GLM-OCR for scanned pages
+# parser: docling  # Docling (requires pip install fitz-ai[docs])
+```
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `plugin_name` | string | `dense` | Retrieval strategy |
-| `collection` | string | `default` | Collection to search |
-| `top_k` | int | `5` | Chunks to retrieve |
-
-**Note:** Reranking is automatically enabled when `rerank:` is configured. No plugin choice needed.
-
----
-
-### chunking
-
-Document chunking configuration.
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `default.parser` | string | `docling` | Parser plugin |
-| `default.plugin_name` | string | `recursive` | Chunking strategy |
-| `default.kwargs.chunk_size` | int | `1000` | Target chunk size (chars) |
-| `default.kwargs.chunk_overlap` | int | `200` | Overlap between chunks |
-| `by_extension` | object | `{}` | Per-extension overrides |
-
-**Parser plugins:**
-
-| Plugin | Description |
-|--------|-------------|
-| `docling` | Standard parsing (no VLM) |
-| `docling_vision` | VLM-powered figure descriptions |
-
-**Chunking plugins:**
-
-| Plugin | Description |
-|--------|-------------|
-| `recursive` | General-purpose, respects structure |
-| `simple` | Fixed-size chunks |
-| `markdown` | Header-aware markdown splitting |
-| `python_code` | AST-aware Python splitting |
-
----
-
-### enrichment
-
-Chunk enrichment pipeline. **All chunk-level enrichment (summary, keywords, entities) is baked in** when a chat client is available. Only hierarchy settings are configurable.
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `enabled` | bool | `true` | Master switch for all enrichment |
-
-**What's always on (when chat client available):**
-- Per-chunk summaries
-- Keyword extraction (saved to VocabularyStore)
-- Entity extraction
-
-These run via the `ChunkEnricher` bus which batches ~15 chunks per LLM call, making enrichment nearly free.
-
-#### enrichment.hierarchy
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `grouping_strategy` | string | `metadata` | `metadata` or `semantic` |
-| `group_by` | string | `source_file` | Metadata key for grouping |
-| `n_clusters` | int | null | For semantic grouping |
-| `max_clusters` | int | `10` | Max clusters for auto-detect |
-| `group_prompt` | string | null | Custom group summary prompt |
-| `corpus_prompt` | string | null | Custom corpus summary prompt |
-
----
-
-### rgs
-
-Retrieval-Guided Synthesis settings for answer generation.
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `enable_citations` | bool | `true` | Include source citations |
-| `strict_grounding` | bool | `true` | Only answer from context |
-| `max_chunks` | int | `8` | Max chunks in LLM context |
-
----
-
-### logging
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `level` | string | `INFO` | Log level |
-
-Options: `DEBUG`, `INFO`, `WARNING`, `ERROR`
+| Parser | Speed | Scanned pages | Install |
+|--------|-------|---------------|---------|
+| `glm_ocr` | Fast (28s/100pg) | GLM-OCR via ollama | Base install |
+| `docling` | Slow (21min/100pg) | No | `pip install fitz-ai[docs]` |
+| `docling_vision` | Slow | VLM figure descriptions | `pip install fitz-ai[docs]` + `vision:` |
 
 ---
 
 ## Environment Variables
 
-API keys are read from environment variables:
-
-| Provider | Environment Variable |
-|----------|---------------------|
+| Provider | Variable |
+|----------|----------|
 | Cohere | `COHERE_API_KEY` |
 | OpenAI | `OPENAI_API_KEY` |
 | Anthropic | `ANTHROPIC_API_KEY` |
 | Azure OpenAI | `AZURE_OPENAI_API_KEY` |
 
-**Note:** PostgreSQL credentials are provided via the `connection_string` in config (external mode only). Local mode requires no credentials.
-
----
-
-## CLI Overrides
-
-Some config values can be overridden via CLI flags:
-
-```bash
-# Override collection
-fitz query "question" --source ./docs --collection my_docs
-
-# Override top_k
-fitz query "question" --top-k 10
-```
+Ollama requires no API key — just `ollama serve`.
 
 ---
 
 ## See Also
 
-- [Feature Control](FEATURE_CONTROL.md) - How plugins control optional features
-- [Plugins](PLUGINS.md) - Plugin development guide
-- [CLI](CLI.md) - CLI command reference
+- [Feature Control](FEATURE_CONTROL.md)
+- [CLI](CLI.md)
