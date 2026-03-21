@@ -268,13 +268,12 @@ class FitzKragEngine:
 
         is_local = self._config.chat_balanced.startswith("ollama")
         if is_local:
-            # Local (ollama): two tiers max to limit VRAM model swapping.
-            # fast for lightweight tasks (rewrite, classify, detection),
-            # balanced for heavy tasks (synthesis, SQL, enrichment).
-            # One swap per query (fast→balanced at synthesis) vs zero quality loss.
+            # Local (ollama): single model for all tiers. Model swapping
+            # costs 10-15s per swap, which exceeds the speed gain from
+            # using a smaller model. One model = zero swaps.
             self._chat_factory = get_chat_factory(
                 {
-                    "fast": self._config.chat_fast,
+                    "fast": self._config.chat_balanced,
                     "balanced": self._config.chat_balanced,
                     "smart": self._config.chat_balanced,
                 }
@@ -292,13 +291,6 @@ class FitzKragEngine:
 
         def _warmup_chat():
             print("  Loading LLM models (first run may take a moment)...", end="", flush=True)
-            try:
-                self._chat_factory("fast").chat(
-                    [{"role": "user", "content": "hi"}],
-                    max_tokens=1,
-                )
-            except Exception:
-                pass
             try:
                 self._chat.chat(
                     [{"role": "user", "content": "hi"}],

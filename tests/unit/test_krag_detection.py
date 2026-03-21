@@ -208,10 +208,10 @@ class TestEngineDetectionInit:
         config = _make_config(enable_detection=True, enable_guardrails=False)
         engine = FitzKragEngine(config)
 
-        # Local ollama: fast stays fast, smart maps to balanced (2 tiers max)
+        # Local ollama: all tiers map to balanced (single model, zero swaps)
         mock_get_chat_factory.assert_called_once_with(
             {
-                "fast": config.chat_fast,
+                "fast": config.chat_balanced,
                 "balanced": config.chat_balanced,
                 "smart": config.chat_balanced,
             }
