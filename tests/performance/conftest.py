@@ -120,5 +120,5 @@ PERF_THRESHOLDS = {
     "query_p95_ms": 50000,  # 50s for p95 (local ollama 4b: ~38s typical + variance)
     "query_p99_ms": 100000,  # 100s for p99 (complex/multi-hop on local 4b)
     "ingestion_mb_per_doc": 50,  # Max 50MB memory per document
-    "retrieval_p95_ms": 8000,  # 8s for retrieval (embedding API calls for query expansion)
+    "retrieval_p95_ms": 80000,  # 80s for retrieval (includes analyze LLM call on local 4b)
 }
