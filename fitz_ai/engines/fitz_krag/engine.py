@@ -160,15 +160,14 @@ class FitzKragEngine:
 
         print("  Starting database and connecting to LLM providers...", end="", flush=True)
         with ThreadPoolExecutor(max_workers=3) as pool:
-            # Local: balanced for everything; Cloud: smart for synthesis
-            _chat_model = (
-                self._config.chat_balanced
-                if self._config.chat_balanced.startswith("ollama")
-                else self._config.chat_smart
-            )
+            # self._chat is used for synthesis — smart tier (balanced on local)
             chat_future = pool.submit(
                 get_chat,
-                _chat_model,
+                (
+                    self._config.chat_balanced
+                    if self._config.chat_balanced.startswith("ollama")
+                    else self._config.chat_smart
+                ),
             )
             embed_future = pool.submit(
                 get_embedder,
@@ -269,18 +268,20 @@ class FitzKragEngine:
 
         is_local = self._config.chat_balanced.startswith("ollama")
         if is_local:
-            # Local (ollama): use one model for all tiers to eliminate VRAM
-            # model swapping. Three different models = constant eviction.
+            # Local (ollama): two tiers max to limit VRAM model swapping.
+            # fast for lightweight tasks (rewrite, classify, detection),
+            # balanced for heavy tasks (synthesis, SQL, enrichment).
+            # One swap per query (fast→balanced at synthesis) vs zero quality loss.
             self._chat_factory = get_chat_factory(
                 {
-                    "fast": self._config.chat_balanced,
+                    "fast": self._config.chat_fast,
                     "balanced": self._config.chat_balanced,
                     "smart": self._config.chat_balanced,
                 }
             )
         else:
-            # Cloud (API keys): use configured tiers. No swap cost, and
-            # fast models are cheaper/faster for lightweight tasks.
+            # Cloud (API keys): use all three configured tiers. No swap cost,
+            # and fast models are cheaper/faster for lightweight tasks.
             self._chat_factory = get_chat_factory(
                 {
                     "fast": self._config.chat_fast,
@@ -291,6 +292,13 @@ class FitzKragEngine:
 
         def _warmup_chat():
             print("  Loading LLM models (first run may take a moment)...", end="", flush=True)
+            try:
+                self._chat_factory("fast").chat(
+                    [{"role": "user", "content": "hi"}],
+                    max_tokens=1,
+                )
+            except Exception:
+                pass
             try:
                 self._chat.chat(
                     [{"role": "user", "content": "hi"}],
@@ -305,7 +313,7 @@ class FitzKragEngine:
         # Query Analysis
         from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalyzer
 
-        self._query_analyzer = QueryAnalyzer(self._chat_factory("balanced"))
+        self._query_analyzer = QueryAnalyzer(self._chat_factory("fast"))
 
         # Context + Generation
         from fitz_ai.engines.fitz_krag.context.assembler import ContextAssembler
@@ -322,7 +330,7 @@ class FitzKragEngine:
             from fitz_ai.governance.decider import GovernanceDecider
 
             self._constraints = create_default_constraints(
-                chat=self._chat_factory("balanced"),
+                chat=self._chat_factory("fast"),
                 chat_balanced=self._chat_factory("balanced"),
                 embedder=self._embedder,
             )
