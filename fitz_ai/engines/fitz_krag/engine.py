@@ -160,9 +160,15 @@ class FitzKragEngine:
 
         print("  Starting database and connecting to LLM providers...", end="", flush=True)
         with ThreadPoolExecutor(max_workers=3) as pool:
+            # Local: balanced for everything; Cloud: smart for synthesis
+            _chat_model = (
+                self._config.chat_balanced
+                if self._config.chat_balanced.startswith("ollama")
+                else self._config.chat_smart
+            )
             chat_future = pool.submit(
                 get_chat,
-                self._config.chat_balanced,
+                _chat_model,
             )
             embed_future = pool.submit(
                 get_embedder,
@@ -261,19 +267,28 @@ class FitzKragEngine:
         # Chat factory (shared by detection, rewriter, HyDE, multi-hop, enrichment)
         from fitz_ai.llm.factory import get_chat_factory
 
-        # Use balanced tier for all LLM calls. Running a single model eliminates
-        # ollama model swapping (fast/balanced/smart = 3 models = constant eviction).
-        # With one model, only embed ↔ chat swap remains (~4GB total fits in VRAM).
-        self._chat_factory = get_chat_factory(
-            {
-                "fast": self._config.chat_balanced,
-                "balanced": self._config.chat_balanced,
-                "smart": self._config.chat_balanced,
-            }
-        )
+        is_local = self._config.chat_balanced.startswith("ollama")
+        if is_local:
+            # Local (ollama): use one model for all tiers to eliminate VRAM
+            # model swapping. Three different models = constant eviction.
+            self._chat_factory = get_chat_factory(
+                {
+                    "fast": self._config.chat_balanced,
+                    "balanced": self._config.chat_balanced,
+                    "smart": self._config.chat_balanced,
+                }
+            )
+        else:
+            # Cloud (API keys): use configured tiers. No swap cost, and
+            # fast models are cheaper/faster for lightweight tasks.
+            self._chat_factory = get_chat_factory(
+                {
+                    "fast": self._config.chat_fast,
+                    "balanced": self._config.chat_balanced,
+                    "smart": self._config.chat_smart,
+                }
+            )
 
-        # Pre-load the single chat model. Using one tier (balanced) for all
-        # LLM calls eliminates model swapping on ollama.
         def _warmup_chat():
             print("  Loading LLM models (first run may take a moment)...", end="", flush=True)
             try:
