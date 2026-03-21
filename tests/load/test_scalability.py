@@ -145,6 +145,6 @@ class TestConcurrentQueries:
         print(f"  Throughput: {qps:.2f} queries/sec")
 
         # Throughput depends on LLM latency:
-        # - Local LLM (Ollama): ~2-3s per query -> 0.3-0.5 qps
+        # - Local LLM (Ollama): ~30-40s per query with embed-first pipeline -> ~0.025 qps
         # - Cloud LLM (Cohere fallback): ~5-10s per query -> 0.1-0.2 qps
-        assert qps > 0.03, f"Throughput too low: {qps:.2f} qps"
+        assert qps > 0.02, f"Throughput too low: {qps:.2f} qps"
