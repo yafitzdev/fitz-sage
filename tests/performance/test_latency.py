@@ -31,36 +31,52 @@ class TestHarnessOverhead:
     def test_retrieval_without_llm(self):
         """Pure retrieval (vector + BM25 + RRF) should complete in < 5s.
 
-        Mocks out all LLM calls to measure only the retrieval harness:
-        vector search, BM25, RRF fusion, reranking, content reading.
+        Disables all LLM-backed features (HyDE, multi-query, agentic) and
+        pre-embeds the query to measure only the retrieval harness.
         """
         from fitz_ai.engines.fitz_krag.retrieval_profile import build_retrieval_profile
 
         engine = self.runner.engine
+        router = engine._retrieval_router
         profile = build_retrieval_profile(None, None, engine._config)
+        # Disable LLM features on the profile
+        profile.run_hyde = False
+        profile.run_multi_query = False
+        profile.run_agentic = False
 
-        # Pre-embed the query (this is an LLM call we want to exclude)
+        # Disable LLM features on the router
+        saved_hyde = router._hyde_generator
+        saved_agentic = getattr(router, "_agentic_strategy", None)
+        saved_chat = getattr(router, "_chat_factory", None)
+        router._hyde_generator = None
+        router._agentic_strategy = None
+        router._chat_factory = None
+
+        # Pre-embed the query outside the measurement
         try:
             qvec = engine._embedder.embed("TechCorp electric vehicles", task_type="query")
             precomputed = {"TechCorp electric vehicles": qvec}
         except Exception:
             precomputed = None
 
-        # Now measure just the retrieval router (no LLM)
-        times = []
-        for _ in range(5):
-            start = time.perf_counter()
-            engine._retrieval_router.retrieve(
-                "TechCorp electric vehicles",
-                profile,
-                precomputed_query_vectors=precomputed,
-            )
-            times.append((time.perf_counter() - start) * 1000)
+        try:
+            times = []
+            for _ in range(5):
+                start = time.perf_counter()
+                router.retrieve(
+                    "TechCorp electric vehicles",
+                    profile,
+                    precomputed_query_vectors=precomputed,
+                )
+                times.append((time.perf_counter() - start) * 1000)
+        finally:
+            router._hyde_generator = saved_hyde
+            router._agentic_strategy = saved_agentic
+            router._chat_factory = saved_chat
 
         p50 = sorted(times)[len(times) // 2]
         print(f"\nRetrieval-only (no LLM): p50={p50:.0f}ms")
 
-        # Retrieval harness should be fast — DB queries + ranking, no LLM
         assert p50 < 5000, f"Retrieval harness too slow: {p50:.0f}ms (expected <5s)"
 
     def test_complex_query_not_much_slower_than_simple(self):
