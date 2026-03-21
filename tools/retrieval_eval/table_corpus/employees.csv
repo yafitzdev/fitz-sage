@@ -1,0 +1,16 @@
+id,name,department,role,salary,years_experience,location
+1,Alice Chen,Engineering,Senior Engineer,125000,8,New York
+2,Bob Martinez,Engineering,Staff Engineer,155000,12,San Francisco
+3,Carol White,Sales,Account Executive,85000,3,Chicago
+4,David Kim,Engineering,Junior Engineer,75000,1,New York
+5,Emma Davis,Marketing,Marketing Manager,95000,6,Los Angeles
+6,Frank Wilson,Sales,Sales Director,140000,15,Chicago
+7,Grace Lee,Engineering,Engineering Manager,165000,10,San Francisco
+8,Henry Brown,Marketing,Content Specialist,65000,2,Remote
+9,Iris Johnson,HR,HR Manager,90000,7,New York
+10,Jack Taylor,Engineering,Senior Engineer,130000,9,Remote
+11,Karen Moore,Sales,Account Executive,82000,4,Los Angeles
+12,Leo Garcia,Engineering,Junior Engineer,72000,1,San Francisco
+13,Maria Rodriguez,Finance,Financial Analyst,88000,5,New York
+14,Nathan Clark,Engineering,Staff Engineer,150000,11,Remote
+15,Olivia Wright,Marketing,VP Marketing,180000,14,Los Angeles

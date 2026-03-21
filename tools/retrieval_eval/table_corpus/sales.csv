@@ -1,0 +1,21 @@
+sale_id,date,customer_name,product_name,quantity,unit_price,total_amount,region,payment_method
+S001,2025-01-05,Acme Corp,Wireless Mouse,10,29.99,299.90,East,Invoice
+S002,2025-01-08,GlobalTech,Mechanical Keyboard,5,89.99,449.95,West,Credit Card
+S003,2025-01-12,Acme Corp,USB-C Hub,20,49.99,999.80,East,Invoice
+S004,2025-01-15,StartupX,Ergonomic Chair,3,399.99,1199.97,West,Credit Card
+S005,2025-01-18,MegaCorp,Standing Desk,2,549.99,1099.98,North,Invoice
+S006,2025-01-22,GlobalTech,Noise-Cancelling Headphones,8,199.99,1599.92,West,Credit Card
+S007,2025-01-25,Acme Corp,Monitor Stand,15,34.99,524.85,East,Invoice
+S008,2025-02-01,StartupX,Webcam HD,6,59.99,359.94,West,Credit Card
+S009,2025-02-05,MegaCorp,External SSD 1TB,10,109.99,1099.90,North,Invoice
+S010,2025-02-08,LocalBiz,Desk Lamp,4,24.99,99.96,South,Cash
+S011,2025-02-10,Acme Corp,Wireless Charger,25,19.99,499.75,East,Invoice
+S012,2025-02-15,GlobalTech,Laptop Backpack,12,69.99,839.88,West,Credit Card
+S013,2025-02-18,MegaCorp,Whiteboard,5,79.99,399.95,North,Invoice
+S014,2025-02-20,StartupX,Cable Organizer,30,12.99,389.70,West,Credit Card
+S015,2025-02-25,LocalBiz,Pen Holder,50,8.99,449.50,South,Cash
+S016,2025-03-01,Acme Corp,Mechanical Keyboard,8,89.99,719.92,East,Invoice
+S017,2025-03-05,GlobalTech,Ergonomic Chair,2,399.99,799.98,West,Credit Card
+S018,2025-03-08,MegaCorp,Wireless Mouse,20,29.99,599.80,North,Invoice
+S019,2025-03-10,StartupX,USB-C Hub,15,49.99,749.85,West,Credit Card
+S020,2025-03-12,LocalBiz,Noise-Cancelling Headphones,3,199.99,599.97,South,Cash

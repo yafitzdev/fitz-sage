@@ -1,0 +1,16 @@
+product_id,name,category,price,stock_quantity,supplier,rating,last_restocked
+P001,Wireless Mouse,Electronics,29.99,150,TechSupply Co,4.5,2025-01-15
+P002,Mechanical Keyboard,Electronics,89.99,75,TechSupply Co,4.8,2025-02-01
+P003,USB-C Hub,Electronics,49.99,200,CableWorld,4.2,2025-01-20
+P004,Monitor Stand,Furniture,34.99,45,OfficePro,4.0,2024-12-10
+P005,Ergonomic Chair,Furniture,399.99,12,OfficePro,4.7,2025-01-05
+P006,Standing Desk,Furniture,549.99,8,OfficePro,4.6,2024-11-20
+P007,Webcam HD,Electronics,59.99,90,TechSupply Co,4.3,2025-02-10
+P008,Noise-Cancelling Headphones,Electronics,199.99,30,AudioMax,4.9,2025-01-25
+P009,Desk Lamp,Furniture,24.99,120,OfficePro,3.8,2025-02-15
+P010,Laptop Backpack,Accessories,69.99,60,TravelGear,4.4,2025-01-10
+P011,Cable Organizer,Accessories,12.99,300,CableWorld,3.9,2024-12-20
+P012,Whiteboard,Furniture,79.99,25,OfficePro,4.1,2025-02-05
+P013,Wireless Charger,Electronics,19.99,180,TechSupply Co,4.0,2025-02-20
+P014,Pen Holder,Accessories,8.99,500,OfficePro,3.5,2025-01-01
+P015,External SSD 1TB,Electronics,109.99,40,TechSupply Co,4.7,2025-02-25

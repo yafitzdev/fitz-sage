@@ -55,6 +55,11 @@ Rules:
 8. For "who/which" questions, include identifying columns (name, id) in SELECT
 9. All columns are TEXT type. For numeric operations (MAX, MIN, AVG, SUM, ORDER BY numbers), \
 use CAST(column AS NUMERIC) or column::NUMERIC
+10. ALWAYS include in SELECT every column used in ORDER BY, WHERE, or GROUP BY — \
+the user needs to see the values being compared, not just the names
+11. CRITICAL: When using COUNT, SUM, AVG, or any aggregate function with non-aggregated columns, \
+you MUST add GROUP BY for all non-aggregated columns. Example: \
+SELECT department, COUNT(*) FROM table GROUP BY department
 
 Return ONLY the SQL query, no explanation."""
 
@@ -213,10 +218,24 @@ class TableQueryHandler:
             if result is not None:
                 return sql
 
-            previous_error = "Query execution failed"
+            # Capture actual PostgreSQL error for the retry prompt
+            previous_error = self._validate_sql(sql)
             logger.warning(f"SQL validation failed (attempt {attempt + 1}/{max_retries + 1})")
 
         return sql
+
+    def _validate_sql(self, sql: str) -> str:
+        """Execute SQL and return the error message if it fails."""
+        from fitz_ai.storage import get_connection_manager
+
+        try:
+            cm = get_connection_manager()
+            with cm.connection(self._pg_table_store.collection) as conn:
+                test_sql = sql.replace("%", "%%")
+                conn.execute(test_sql)
+                return "Query execution failed (unknown error)"
+        except Exception as e:
+            return str(e)
 
     def _generate_sql_attempt(
         self,
