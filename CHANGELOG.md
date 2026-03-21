@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.11.0] - 2026-03-21
+
+### 🎉 Highlights
+
+**7x Faster Queries** — Eliminated model swapping on local Ollama. Embed-first pipeline runs the tiny embed model first, then all chat calls use a single model tier with zero swaps. Query wallclock dropped from ~180s to ~27s on local hardware.
+
+**Hybrid PDF Parser** — Replaced Docling (21 min for 113 pages) with pdfplumber + GLM-OCR hybrid parser (28s). Text pages parsed instantly via pdfplumber with font-size/bold heading detection; scanned pages routed to GLM-OCR.
+
+**Retrieval Benchmarks** — Document retrieval eval (20 queries, 3 PDFs, 75% critical recall) and table row retrieval eval (20 queries, 3 CSVs) with automated scoring against ground truth.
+
+### 🚀 Added
+
+- **`QueryBatcher`** — batches analysis + detection into 1 LLM call, halving model-swap overhead (`9e09793`)
+- **`RetrievalProfile`** — single dataclass unifying 3 fragmented retrieval trigger mechanisms (analysis weights, detection flags, config constants) (`a4a5943`)
+- **Extended classification signals** — specificity, domain, answer_type, multi_hop as soft multipliers on retrieval behavior (`777e7fc`)
+- **Hybrid PDF parser** (`glm_ocr.py`) — pdfplumber fast path + GLM-OCR fallback for scanned/image pages (`62c8ff7`)
+- **Phase 1 content embedding** — embed `title + content[:2000]` immediately during parsing, skip 25-min LLM summary wait (`9552705`)
+- **Document retrieval benchmark** (`doc_eval.py`) — 20 queries across IRS 1040, NIST AI RMF, RAG survey PDFs (`5069470`)
+- **Table retrieval benchmark** (`table_eval.py`) — 20 queries testing full pipeline: table discovery → SQL generation → execution (`29cf080`)
+- Roadmap doc for query intelligence pipeline (`9e09793`)
+
+### 🚀 Performance
+
+- **Embed-first pipeline** — embed query before chat calls so chat model loads once and stays loaded for entire pipeline (`a7904d2`)
+- **Single chat tier** — map fast/balanced/smart all to `chat_balanced`, eliminating 5 model swaps per query on Ollama (`a7904d2`)
+- **Combined SQL generation** — merged column selection + SQL gen into 1 LLM call in TableQueryHandler (`a7904d2`)
+- **Rewrite-first dispatch** — rewrite query before classification for better analysis accuracy (`9e09793`)
+
+### 🔄 Changed
+
+- HyDE ownership moved to router only — removed from code_search and section_search strategies (`5069470`)
+- Router `retrieve()` accepts `RetrievalProfile` instead of separate `analysis`/`detection` params (`a4a5943`)
+- Deleted 4 static gating methods from router (`_should_run_hyde`, `_should_run_multi_query`, `_should_inject_corpus_summaries`, `_should_run_agentic`) — logic moved to `RetrievalProfile` (`a4a5943`)
+- `parser` config option now supports `"glm_ocr"` in addition to `"docling"` and `"docling_vision"` (`62c8ff7`)
+- TableQueryHandler uses single LLM call for SQL generation (removed separate column selection step) (`a7904d2`)
+
+### 🔧 Fixed
+
+- SQL prompt: added GROUP BY rule for aggregate queries (`29cf080`)
+- SQL retry: feed actual PostgreSQL error messages to LLM instead of generic "Query execution failed" (`29cf080`)
+- SQL prompt: added rule to include ORDER BY/WHERE columns in SELECT (`29cf080`)
+
+---
+
 ## [0.10.4] - 2026-03-19
 
 ### 🔄 Changed
