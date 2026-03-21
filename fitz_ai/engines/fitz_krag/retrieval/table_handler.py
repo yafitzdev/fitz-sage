@@ -85,7 +85,6 @@ class TableQueryHandler:
         if not table_id:
             return result
 
-        # Get table info from PostgresTableStore
         pg_table_name = self._pg_table_store.get_table_name(table_id)
         if not pg_table_name:
             return result
@@ -96,30 +95,18 @@ class TableQueryHandler:
 
         sanitized_cols, original_cols = col_info
         row_count = self._pg_table_store.get_row_count(table_id)
-
-        # Get sample data — LLM sees all columns + samples in one call
         sample_rows = self._get_sample_data(pg_table_name, sanitized_cols)
 
-        # Single LLM call: SQL generation with retry (column selection is implicit —
-        # the LLM picks what to SELECT based on the question + all available columns)
-        sql = self._generate_sql(query, pg_table_name, sanitized_cols, sample_rows)
-
-        # Execute SQL
-        exec_result = self._pg_table_store.execute_query(table_id, sql)
-        if exec_result is None:
-            return result
-
-        col_names, rows = exec_result
-
-        # If SQL returned 0 rows, don't augment — the table has no relevant data
+        # Generate SQL and get validated result in one pass (no double execution)
+        sql, col_names, rows = self._generate_and_execute_sql(
+            query, pg_table_name, sanitized_cols, sample_rows
+        )
         if not rows:
-            logger.debug(f"SQL returned 0 rows for query '{query[:50]}', dropping table result")
             return result
 
         name = result.address.metadata.get("name", result.address.location)
         columns = result.address.metadata.get("columns", original_cols)
 
-        # Format augmented content
         results_md = self._format_as_markdown(col_names, rows)
         content = (
             f"Table: {name}\n"
@@ -151,15 +138,19 @@ class TableQueryHandler:
             return [[str(v) if v is not None else "" for v in row] for row in rows]
         return []
 
-    def _generate_sql(
+    def _generate_and_execute_sql(
         self,
         query: str,
         table_name: str,
         columns: list[str],
         sample_rows: list[list[str]],
         max_retries: int = 2,
-    ) -> str:
-        """Generate PostgreSQL query with validation and retry."""
+    ) -> tuple[str, list[str], list[list]]:
+        """Generate SQL, validate by execution, and return the result.
+
+        Returns (sql, col_names, rows). On total failure returns (sql, [], []).
+        Reuses the successful validation execution — no double round-trip.
+        """
         previous_error = None
 
         for attempt in range(max_retries + 1):
@@ -167,27 +158,26 @@ class TableQueryHandler:
                 query, table_name, columns, sample_rows, previous_error
             )
 
-            # Validate by test execution
             result = self._pg_table_store.execute_query("", sql)
             if result is not None:
-                return sql
+                col_names, rows = result
+                return sql, col_names, rows
 
             # Capture actual PostgreSQL error for the retry prompt
-            previous_error = self._validate_sql(sql)
+            previous_error = self._capture_sql_error(sql)
             logger.warning(f"SQL validation failed (attempt {attempt + 1}/{max_retries + 1})")
 
-        return sql
+        return sql, [], []
 
-    def _validate_sql(self, sql: str) -> str:
-        """Execute SQL and return the error message if it fails."""
+    def _capture_sql_error(self, sql: str) -> str:
+        """Re-execute SQL to capture the PostgreSQL error message."""
         from fitz_ai.storage import get_connection_manager
 
         try:
             cm = get_connection_manager()
             with cm.connection(self._pg_table_store.collection) as conn:
-                test_sql = sql.replace("%", "%%")
-                conn.execute(test_sql)
-                return "Query execution failed (unknown error)"
+                conn.execute(sql.replace("%", "%%"))
+            return "Query execution failed"
         except Exception as e:
             return str(e)
 

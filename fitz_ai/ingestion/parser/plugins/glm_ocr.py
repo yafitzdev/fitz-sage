@@ -471,37 +471,3 @@ class GlmOcrParser(BaseParser):
 
         return elements
 
-    # --- Legacy text-only parsing (kept for _needs_ocr fallback) ---
-
-    def _text_to_elements(self, text: str, page_num: int) -> List[DocumentElement]:
-        """Parse plain text into DocumentElements (fallback when pdfplumber unavailable)."""
-        elements = []
-        paragraphs = re.split(r"\n{2,}", text)
-
-        for para in paragraphs:
-            para = para.strip()
-            if not para:
-                continue
-
-            lines = para.split("\n")
-            if (
-                len(lines) == 1
-                and len(para) < 100
-                and not para.endswith(".")
-                and (para.isupper() or para.istitle())
-            ):
-                elements.append(
-                    DocumentElement(
-                        type=ElementType.HEADING, content=para, level=1,
-                        page=page_num, metadata={"page": page_num},
-                    )
-                )
-            else:
-                elements.append(
-                    DocumentElement(
-                        type=ElementType.TEXT, content=para,
-                        page=page_num, metadata={"page": page_num},
-                    )
-                )
-
-        return elements

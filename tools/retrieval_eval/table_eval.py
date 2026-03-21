@@ -68,9 +68,7 @@ def _value_in_content(value: str, content: str) -> bool:
     try:
         num = float(norm_val)
         # Check if any number in content is close (within 5% for aggregations)
-        import re as _re
-
-        numbers = _re.findall(r"[\d]+(?:\.[\d]+)?", norm_content)
+        numbers = re.findall(r"[\d]+(?:\.[\d]+)?", norm_content)
         for n_str in numbers:
             try:
                 n = float(n_str)

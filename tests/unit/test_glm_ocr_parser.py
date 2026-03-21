@@ -95,40 +95,6 @@ class TestMarkdownToElements:
 # ---------------------------------------------------------------------------
 
 
-class TestTextToElements:
-    """Tests for _text_to_elements (pypdfium2 text parsing)."""
-
-    def test_heading_detection(self, parser):
-        text = "INTRODUCTION\n\nThis is the first paragraph."
-        elements = parser._text_to_elements(text, page_num=1)
-
-        assert elements[0].type == ElementType.HEADING
-        assert elements[0].content == "INTRODUCTION"
-        assert elements[1].type == ElementType.TEXT
-
-    def test_title_case_heading(self, parser):
-        text = "Executive Summary\n\nThe report covers..."
-        elements = parser._text_to_elements(text, page_num=1)
-
-        assert elements[0].type == ElementType.HEADING
-        assert elements[0].content == "Executive Summary"
-
-    def test_long_line_not_heading(self, parser):
-        text = "This Is A Very Long Line That Should Not Be Treated As A Heading Because It Exceeds The Length Threshold For Heading Detection"
-        elements = parser._text_to_elements(text, page_num=1)
-
-        assert elements[0].type == ElementType.TEXT
-
-    def test_page_number_on_elements(self, parser):
-        text = "Some text"
-        elements = parser._text_to_elements(text, page_num=42)
-        assert elements[0].page == 42
-
-    def test_empty_text(self, parser):
-        elements = parser._text_to_elements("", page_num=1)
-        assert elements == []
-
-
 # ---------------------------------------------------------------------------
 # Page routing heuristic
 # ---------------------------------------------------------------------------
