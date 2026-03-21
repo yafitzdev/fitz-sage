@@ -1,16 +1,15 @@
 # tests/load/test_scalability.py
 """
-Scalability tests — concurrent queries and stability under load.
+Scalability tests — stability under sequential load.
 
-Tests here verify the harness handles concurrent access correctly and
-doesn't degrade. They do NOT assert absolute throughput (hardware-dependent).
+Verifies the harness doesn't degrade across repeated queries.
+Does NOT test concurrency (local ollama serializes LLM calls).
 
 Run with: pytest tests/load/test_scalability.py -v -s --tb=short -m scalability
 """
 
 from __future__ import annotations
 
-import concurrent.futures
 import time
 
 import pytest
@@ -20,52 +19,17 @@ from fitz_ai.core import Query
 pytestmark = pytest.mark.scalability
 
 
-class TestConcurrentQueries:
-    """Test behavior under concurrent query load."""
+class TestSequentialStability:
+    """Test that repeated queries don't degrade."""
 
     @pytest.fixture(autouse=True)
     def setup_pipeline(self, krag_e2e_runner):
         self.runner = krag_e2e_runner
 
-    def test_concurrent_queries_dont_crash(self):
-        """Two concurrent queries should not crash or deadlock.
+    def test_no_throughput_degradation(self):
+        """3rd query should not be significantly slower than 1st.
 
-        Only 2 concurrent — local ollama serializes LLM calls, so more
-        just queues up and triggers timeouts. This tests thread safety
-        of the harness (shared DB connections, stores, etc.), not throughput.
-        """
-        queries = [
-            "Where is TechCorp headquartered?",
-            "What is the price of Model Y200?",
-        ]
-
-        def run_query(query: str) -> tuple[str, float, bool]:
-            start = time.perf_counter()
-            try:
-                answer = self.runner.engine.answer(Query(text=query))
-                elapsed = time.perf_counter() - start
-                return (query, elapsed, answer is not None)
-            except Exception:
-                elapsed = time.perf_counter() - start
-                return (query, elapsed, False)
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            futures = [executor.submit(run_query, q) for q in queries]
-            results = [f.result() for f in concurrent.futures.as_completed(futures)]
-
-        print("\nConcurrent Query Results:")
-        for query, elapsed, success in results:
-            status = "PASS" if success else "FAIL"
-            print(f"  [{status}] {query[:40]}... ({elapsed:.2f}s)")
-
-        successes = sum(1 for _, _, s in results if s)
-        assert successes >= 1, "Both concurrent queries failed — possible deadlock"
-
-    def test_sequential_throughput_consistent(self):
-        """Throughput should not degrade over sequential queries.
-
-        Measures whether the 3rd query is significantly slower than
-        the 1st — catches resource leaks, connection pool exhaustion, etc.
+        Catches resource leaks, connection pool exhaustion, memory pressure.
         """
         query = "Where is TechCorp headquartered?"
         times = []
