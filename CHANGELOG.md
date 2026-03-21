@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🎉 Highlights
 
-**Faster Queries on Local Ollama** — Eliminated model swapping by mapping all chat tiers to `chat_balanced` on local Ollama (one model, zero VRAM swaps). Cloud providers use all three tiers as configured (no swap cost with APIs). Combined with parallel embed + classify pipeline.
+**Local/Cloud Optimization** — Local Ollama automatically maps all chat tiers to `chat_balanced` (one model, zero VRAM swaps). Cloud providers use all three tiers as configured (no swap cost with APIs).
 
 **Hybrid PDF Parser** — Replaced Docling (21 min for 113 pages) with pdfplumber + GLM-OCR hybrid parser (28s). Text pages parsed instantly via pdfplumber with font-size/bold heading detection; scanned pages routed to GLM-OCR.
 
