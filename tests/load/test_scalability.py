@@ -43,7 +43,7 @@ class TestSequentialStability:
         last = times[-1]
         ratio = last / first if first > 0 else float("inf")
 
-        print(f"\nSequential Consistency (3 queries):")
+        print("\nSequential Consistency (3 queries):")
         for i, t in enumerate(times):
             print(f"  Query {i + 1}: {t:.1f}s")
         print(f"  Ratio last/first: {ratio:.2f}x")

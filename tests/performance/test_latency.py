@@ -12,7 +12,6 @@ Run with: pytest tests/performance/ -v -s --tb=short
 from __future__ import annotations
 
 import time
-from unittest.mock import patch
 
 import pytest
 

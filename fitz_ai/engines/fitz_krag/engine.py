@@ -552,7 +552,7 @@ class FitzKragEngine:
         "should would will shall may might be been being have has had".split()
     )
 
-    def _build_detection_summary(self, results: dict, query: str) -> "DetectionSummary":
+    def _build_detection_summary(self, results: dict, query: str) -> Any:
         """Build DetectionSummary from batched detection results.
 
         Adds the dict-based expansion detector (not LLM) and wraps
