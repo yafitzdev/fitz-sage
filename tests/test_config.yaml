@@ -11,9 +11,9 @@ tiers:
   - name: local
     chat: ollama
     chat_models:
-      smart: qwen2.5:7b
-      fast: qwen2.5:1.5b
-      balanced: qwen2.5:3b
+      smart: qwen3.5:4b
+      fast: qwen3.5:4b
+      balanced: qwen3.5:4b
     embedding: ollama
     embedding_model: nomic-embed-text
 
