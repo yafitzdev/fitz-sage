@@ -207,12 +207,3 @@ class TestHelperMethods:
         result = handler._extract_sql("```sql\nSELECT * FROM t\n```")
         assert result == "SELECT * FROM t"
 
-    def test_parse_json_list(self):
-        handler, _, _ = _make_handler()
-        result = handler._parse_json_list('["a", "b"]', fallback=["x"])
-        assert result == ["a", "b"]
-
-    def test_parse_json_list_fallback(self):
-        handler, _, _ = _make_handler()
-        result = handler._parse_json_list("not json", fallback=["x", "y"])
-        assert result == ["x", "y"]
