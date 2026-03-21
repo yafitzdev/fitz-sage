@@ -24,9 +24,14 @@ class RetrievalProfile:
     """Unified retrieval tuning — all consumers read from this."""
 
     # Strategy routing
-    strategy_weights: dict[str, float] = field(default_factory=lambda: {
-        "code": 0.25, "section": 0.25, "table": 0.15, "chunk": 0.35,
-    })
+    strategy_weights: dict[str, float] = field(
+        default_factory=lambda: {
+            "code": 0.25,
+            "section": 0.25,
+            "table": 0.15,
+            "chunk": 0.35,
+        }
+    )
     entities: tuple[str, ...] = ()
 
     # Fetch parameters
@@ -103,7 +108,8 @@ def build_retrieval_profile(
     else:
         primary_type = "general"
         confidence = 0.5
-        from fitz_ai.engines.fitz_krag.query_analyzer import QueryType, _TYPE_WEIGHTS
+        from fitz_ai.engines.fitz_krag.query_analyzer import _TYPE_WEIGHTS, QueryType
+
         strategy_weights = dict(_TYPE_WEIGHTS[QueryType.GENERAL])
         entities = ()
 
@@ -199,17 +205,10 @@ def build_retrieval_profile(
         inject_corpus_summaries = True
 
     # --- Chunk fallback ---
-    fallback_to_chunks = (
-        config.fallback_to_chunks
-        and strategy_weights.get("chunk", 1.0) > 0.05
-    )
+    fallback_to_chunks = config.fallback_to_chunks and strategy_weights.get("chunk", 1.0) > 0.05
 
     # --- Entity expansion limit (from engine._is_thematic) ---
-    is_thematic = (
-        analysis is not None
-        and primary_type not in ("code", "data")
-        and confidence < 0.6
-    )
+    is_thematic = analysis is not None and primary_type not in ("code", "data") and confidence < 0.6
     entity_expansion_limit = 12 if is_thematic else 3
     if specificity == "broad":
         entity_expansion_limit = 12

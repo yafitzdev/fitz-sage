@@ -533,9 +533,7 @@ class FitzKragEngine:
         "should would will shall may might be been being have has had".split()
     )
 
-    def _build_detection_summary(
-        self, results: dict, query: str
-    ) -> "DetectionSummary":
+    def _build_detection_summary(self, results: dict, query: str) -> "DetectionSummary":
         """Build DetectionSummary from batched detection results.
 
         Adds the dict-based expansion detector (not LLM) and wraps
@@ -676,9 +674,7 @@ class FitzKragEngine:
             # Step 1: Embed query first (nomic-embed-text is tiny, loads fast)
             precomputed_query_vector = None
             try:
-                precomputed_vectors = self._embedder.embed_batch(
-                    [sanitized], task_type="query"
-                )
+                precomputed_vectors = self._embedder.embed_batch([sanitized], task_type="query")
                 precomputed_query_vector = dict(zip([sanitized], precomputed_vectors))
             except Exception:
                 pass
@@ -724,9 +720,7 @@ class FitzKragEngine:
                         include_rewriting=False,
                         include_extended=True,
                     )
-                    analysis = (
-                        batch_result.analysis if batch_result.analysis else fast_analysis
-                    )
+                    analysis = batch_result.analysis if batch_result.analysis else fast_analysis
                     detection = (
                         self._build_detection_summary(
                             batch_result.detection_results, classify_query
@@ -758,9 +752,7 @@ class FitzKragEngine:
                 self._config,
                 query_length=len(retrieval_query),
                 has_chat_factory=bool(self._chat_factory),
-                extended_signals=(
-                    batch_result.extended_signals if batch_result else None
-                ),
+                extended_signals=(batch_result.extended_signals if batch_result else None),
             )
 
             # 2. Retrieve addresses (or multi-hop)
@@ -1364,12 +1356,8 @@ class FitzKragEngine:
                                 f"{s['kind']} {s['qualified_name']} {s.get('signature') or ''}"
                                 for s in symbol_dicts
                             ]
-                            vectors = self._embedder.embed_batch(
-                                texts, task_type="document"
-                            )
-                            self._symbol_store.update_vectors_by_file(
-                                entry.file_id, vectors
-                            )
+                            vectors = self._embedder.embed_batch(texts, task_type="document")
+                            self._symbol_store.update_vectors_by_file(entry.file_id, vectors)
                         except Exception:
                             pass  # Vector search will degrade but BM25 still works
 

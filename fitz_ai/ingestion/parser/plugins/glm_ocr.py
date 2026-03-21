@@ -44,9 +44,9 @@ _CODE_FENCE_RE = re.compile(r"^```")
 # Matches: "I. INTRODUCTION", "A. Naive RAG", "1.2.3 Risk", "IV. GENERATION"
 _SECTION_HEADING_RE = re.compile(
     r"^(?:"
-    r"(?:[IVXLC]+\.\s+[A-Z])"            # Roman numeral: "I. INTRO", "IV. GEN"
-    r"|(?:[A-H]\.\s+[A-Z])"              # Letter: "A. Naive", "B. Advanced"
-    r"|(?:\d+(?:\.\d+)*\s+[A-Z])"        # Numbered: "1. Framing", "3.2 Safe"
+    r"(?:[IVXLC]+\.\s+[A-Z])"  # Roman numeral: "I. INTRO", "IV. GEN"
+    r"|(?:[A-H]\.\s+[A-Z])"  # Letter: "A. Naive", "B. Advanced"
+    r"|(?:\d+(?:\.\d+)*\s+[A-Z])"  # Numbered: "1. Framing", "3.2 Safe"
     r")"
 )
 
@@ -57,12 +57,12 @@ _CAMEL_RE = re.compile(r"([a-z])([A-Z])")
 # Noise heading patterns: bullet points, single chars, form metadata
 _NOISE_HEADING_RE = re.compile(
     r"^(?:"
-    r"[•·\-–—]\s"                     # Bullet points
-    r"|Page \d+"                       # Page numbers
-    r"|\d{1,2}:\d{2}\s"               # Timestamps (15:15)
-    r"|AH XSL"                         # PDF tool metadata
-    r"|Fileid:"                        # Form file IDs
-    r"|[A-Z]{2,}\s*$"                  # Short all-caps (form codes)
+    r"[•·\-–—]\s"  # Bullet points
+    r"|Page \d+"  # Page numbers
+    r"|\d{1,2}:\d{2}\s"  # Timestamps (15:15)
+    r"|AH XSL"  # PDF tool metadata
+    r"|Fileid:"  # Form file IDs
+    r"|[A-Z]{2,}\s*$"  # Short all-caps (form codes)
     r")",
     re.IGNORECASE,
 )
@@ -173,9 +173,7 @@ class GlmOcrParser(BaseParser):
             return 10.0
         return size_counts.most_common(1)[0][0]
 
-    def _post_process_elements(
-        self, elements: List[DocumentElement]
-    ) -> List[DocumentElement]:
+    def _post_process_elements(self, elements: List[DocumentElement]) -> List[DocumentElement]:
         """Post-process: fix no-space titles, filter noise headings, deduplicate."""
         result = []
         seen_headings: set[str] = set()
@@ -188,10 +186,14 @@ class GlmOcrParser(BaseParser):
                 # 2. Filter noise headings
                 if _is_noise_heading(title):
                     # Demote to TEXT instead of dropping (content may be useful)
-                    result.append(DocumentElement(
-                        type=ElementType.TEXT, content=title,
-                        page=el.page, metadata=el.metadata,
-                    ))
+                    result.append(
+                        DocumentElement(
+                            type=ElementType.TEXT,
+                            content=title,
+                            page=el.page,
+                            metadata=el.metadata,
+                        )
+                    )
                     continue
 
                 # 3. Deduplicate headings (same title = skip)
@@ -201,10 +203,15 @@ class GlmOcrParser(BaseParser):
                 seen_headings.add(dedup_key)
 
                 # Replace with cleaned title
-                result.append(DocumentElement(
-                    type=ElementType.HEADING, content=title,
-                    level=el.level, page=el.page, metadata=el.metadata,
-                ))
+                result.append(
+                    DocumentElement(
+                        type=ElementType.HEADING,
+                        content=title,
+                        level=el.level,
+                        page=el.page,
+                        metadata=el.metadata,
+                    )
+                )
             else:
                 result.append(el)
 
@@ -243,8 +250,9 @@ class GlmOcrParser(BaseParser):
 
             if current_text and is_heading != current_is_heading:
                 elements.append(
-                    self._make_element(current_text.strip(), current_size,
-                                       body_size, page_num, current_is_heading)
+                    self._make_element(
+                        current_text.strip(), current_size, body_size, page_num, current_is_heading
+                    )
                 )
                 current_text = line_text
                 current_size = line_size
@@ -258,15 +266,14 @@ class GlmOcrParser(BaseParser):
 
         if current_text.strip():
             elements.append(
-                self._make_element(current_text.strip(), current_size, body_size,
-                                   page_num, current_is_heading)
+                self._make_element(
+                    current_text.strip(), current_size, body_size, page_num, current_is_heading
+                )
             )
 
         return elements
 
-    def _group_words_into_lines(
-        self, words: list[dict]
-    ) -> list[tuple[str, float, bool]]:
+    def _group_words_into_lines(self, words: list[dict]) -> list[tuple[str, float, bool]]:
         """Group words into lines by Y-position.
 
         Returns list of (line_text, max_font_size, is_bold).
@@ -301,7 +308,11 @@ class GlmOcrParser(BaseParser):
         return lines
 
     def _make_element(
-        self, text: str, font_size: float, body_size: float, page_num: int,
+        self,
+        text: str,
+        font_size: float,
+        body_size: float,
+        page_num: int,
         force_heading: bool = False,
     ) -> DocumentElement:
         """Create a DocumentElement, classifying as HEADING or TEXT.
@@ -352,9 +363,7 @@ class GlmOcrParser(BaseParser):
             metadata=self._build_metadata(file, parser="glm_ocr"),
         )
 
-    def _ocr_page_to_elements(
-        self, file: SourceFile, page_idx: int
-    ) -> List[DocumentElement]:
+    def _ocr_page_to_elements(self, file: SourceFile, page_idx: int) -> List[DocumentElement]:
         """Render a specific PDF page to image and OCR it with GLM-OCR."""
         import pypdfium2 as pdfium
 
@@ -393,9 +402,7 @@ class GlmOcrParser(BaseParser):
 
     # --- GLM-OCR markdown output parsing (for OCR path) ---
 
-    def _markdown_to_elements(
-        self, markdown: str, page: int
-    ) -> List[DocumentElement]:
+    def _markdown_to_elements(self, markdown: str, page: int) -> List[DocumentElement]:
         """Parse GLM-OCR markdown output into DocumentElements."""
         elements = []
         lines = markdown.split("\n")
@@ -410,8 +417,11 @@ class GlmOcrParser(BaseParser):
                 content = heading_match.group(2).strip()
                 elements.append(
                     DocumentElement(
-                        type=ElementType.HEADING, content=content,
-                        level=level, page=page, metadata={"page": page},
+                        type=ElementType.HEADING,
+                        content=content,
+                        level=level,
+                        page=page,
+                        metadata={"page": page},
                     )
                 )
                 i += 1
@@ -427,8 +437,11 @@ class GlmOcrParser(BaseParser):
                 i += 1
                 elements.append(
                     DocumentElement(
-                        type=ElementType.CODE_BLOCK, content="\n".join(code_lines),
-                        language=lang, page=page, metadata={"page": page},
+                        type=ElementType.CODE_BLOCK,
+                        content="\n".join(code_lines),
+                        language=lang,
+                        page=page,
+                        metadata={"page": page},
                     )
                 )
                 continue
@@ -441,8 +454,10 @@ class GlmOcrParser(BaseParser):
                     i += 1
                 elements.append(
                     DocumentElement(
-                        type=ElementType.TABLE, content="\n".join(table_lines),
-                        page=page, metadata={"page": page},
+                        type=ElementType.TABLE,
+                        content="\n".join(table_lines),
+                        page=page,
+                        metadata={"page": page},
                     )
                 )
                 continue
@@ -461,8 +476,10 @@ class GlmOcrParser(BaseParser):
                     i += 1
                 elements.append(
                     DocumentElement(
-                        type=ElementType.TEXT, content="\n".join(para_lines).strip(),
-                        page=page, metadata={"page": page},
+                        type=ElementType.TEXT,
+                        content="\n".join(para_lines).strip(),
+                        page=page,
+                        metadata={"page": page},
                     )
                 )
                 continue
@@ -470,4 +487,3 @@ class GlmOcrParser(BaseParser):
             i += 1
 
         return elements
-

@@ -78,8 +78,8 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._source_dir = None
     engine._hyde_generator = None
     # Configure batcher to return sensible defaults so batched dispatch works
-    from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
     from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
+    from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
 
     def _default_batch_classify(query, **kwargs):
         return BatchResult(
@@ -276,6 +276,7 @@ class TestAnswer:
         call_args = engine._retrieval_router.retrieve.call_args
         assert call_args[0][0] == query.text
         from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
+
         assert isinstance(call_args[0][1], RetrievalProfile)
         assert call_args[1]["rewrite_result"] is None
         engine._reader.read.assert_called_once_with(

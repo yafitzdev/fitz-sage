@@ -89,8 +89,8 @@ class TestCodeSearchHyDE:
 
         embedder.embed.return_value = [0.1] * 3
         store.search_by_vector.side_effect = [
-            [sem_row],    # semantic search
-            [hyde_row],   # HyDE vector 1
+            [sem_row],  # semantic search
+            [hyde_row],  # HyDE vector 1
             [_make_symbol_row("hyde2", score=0.6, name="check_session")],  # HyDE vector 2
         ]
 
@@ -199,8 +199,8 @@ class TestSectionSearchHyDE:
 
         embedder.embed.return_value = [0.1]
         store.search_by_vector.side_effect = [
-            [sem_row],    # semantic
-            [hyde_row],   # HyDE vector 1
+            [sem_row],  # semantic
+            [hyde_row],  # HyDE vector 1
         ]
 
         strategy = SectionSearchStrategy(store, embedder, config)

@@ -119,9 +119,7 @@ class TestTableQueryHandler:
 
     def test_process_augments_content(self):
         """Content is replaced with SQL results."""
-        handler, _, _ = _make_handler(
-            chat_response='SELECT "col1" FROM "tbl_sales" LIMIT 100'
-        )
+        handler, _, _ = _make_handler(chat_response='SELECT "col1" FROM "tbl_sales" LIMIT 100')
         table_result = _make_table_read_result()
 
         results = handler.process("query", [table_result])
@@ -134,9 +132,7 @@ class TestTableQueryHandler:
 
     def test_process_mixed_results(self):
         """Mix of TABLE and non-TABLE results handled correctly."""
-        handler, _, _ = _make_handler(
-            chat_response='SELECT "col1" FROM "tbl_sales"'
-        )
+        handler, _, _ = _make_handler(chat_response='SELECT "col1" FROM "tbl_sales"')
 
         non_table = _make_non_table_result()
         table_result = _make_table_read_result()
@@ -206,4 +202,3 @@ class TestHelperMethods:
         handler, _, _ = _make_handler()
         result = handler._extract_sql("```sql\nSELECT * FROM t\n```")
         assert result == "SELECT * FROM t"
-

@@ -125,16 +125,17 @@ def score_query(read_results, query_gt: dict) -> dict:
         meta.update({k: v for k, v in r.address.metadata.items() if k != "context_type"})
         meta["file_path"] = r.file_path
         meta["location"] = r.address.location
-        items.append({
-            "meta": meta,
-            "content": r.content or "",
-            "kind": r.address.kind.value,
-        })
+        items.append(
+            {
+                "meta": meta,
+                "content": r.content or "",
+                "kind": r.address.kind.value,
+            }
+        )
 
     # Check if we found the right table
     table_items = [
-        it for it in items
-        if _result_matches_table(it["meta"], it["content"], table_file)
+        it for it in items if _result_matches_table(it["meta"], it["content"], table_file)
     ]
     table_found = len(table_items) > 0
 

@@ -153,9 +153,7 @@ def score_query(read_results, query_gt: dict) -> dict:
 
     # Precision
     matched = sum(
-        1
-        for it in doc_items
-        if any(_section_matches(it["meta"], s) for s in all_expected)
+        1 for it in doc_items if any(_section_matches(it["meta"], s) for s in all_expected)
     )
 
     critical_recall = len(critical_found) / len(critical) if critical else 1.0

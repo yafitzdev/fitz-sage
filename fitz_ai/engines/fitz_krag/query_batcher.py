@@ -160,7 +160,8 @@ class QueryBatcher:
             raw = {}
 
         return self._distribute(
-            raw, query,
+            raw,
+            query,
             include_analysis=include_analysis,
             include_detection=include_detection,
             active_modules=active_modules,
@@ -306,9 +307,7 @@ class QueryBatcher:
                 except Exception:
                     pass
             if result.detection_results is None:
-                result.detection_results = {
-                    m.category: m.not_detected() for m in active_modules
-                }
+                result.detection_results = {m.category: m.not_detected() for m in active_modules}
 
         if include_rewriting:
             rewrite_data = raw.get("rewriting")

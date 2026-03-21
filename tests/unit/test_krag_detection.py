@@ -73,8 +73,8 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._source_dir = None
     engine._hyde_generator = None
 
-    from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
     from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
+    from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
 
     def _default_batch_classify(query, **kwargs):
         return BatchResult(
@@ -391,8 +391,8 @@ class TestEngineAnswerDetectionFlow:
         # Wire up detection orchestrator (gate_categories decides which modules run)
         mock_orchestrator = MagicMock(name="detection_orchestrator")
         mock_orchestrator.gate_categories.return_value = None  # run all modules
-        mock_orchestrator._get_expansion_detector.return_value.detect.return_value = (
-            MagicMock(detected=False)
+        mock_orchestrator._get_expansion_detector.return_value.detect.return_value = MagicMock(
+            detected=False
         )
         engine._detection_orchestrator = mock_orchestrator
 
@@ -431,6 +431,7 @@ class TestEngineAnswerDetectionFlow:
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
         from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
+
         assert isinstance(call_args[0][1], RetrievalProfile)
 
     def test_detection_disabled_stays_none_in_answer_flow(self):
@@ -457,6 +458,7 @@ class TestEngineAnswerDetectionFlow:
         call_args = engine._retrieval_router.retrieve.call_args
         assert call_args[0][0] == query.text
         from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
+
         profile = call_args[0][1]
         assert isinstance(profile, RetrievalProfile)
         # No detection ran: profile carries no detection-derived query expansions

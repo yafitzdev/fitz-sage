@@ -667,9 +667,7 @@ class BackgroundIngestWorker:
         except Exception as e:
             logger.warning(f"Embedding failed for {entry.rel_path}: {e}")
 
-    def _embed_symbols_from_signatures(
-        self, file_id: str, symbol_dicts: list[dict]
-    ) -> None:
+    def _embed_symbols_from_signatures(self, file_id: str, symbol_dicts: list[dict]) -> None:
         """Embed symbol signatures immediately during Phase 1 (no LLM needed).
 
         Uses kind + qualified_name + signature to produce a vector that
@@ -678,21 +676,16 @@ class BackgroundIngestWorker:
         if not symbol_dicts:
             return
         texts = [
-            f"{s['kind']} {s['qualified_name']} {s.get('signature') or ''}"
-            for s in symbol_dicts
+            f"{s['kind']} {s['qualified_name']} {s.get('signature') or ''}" for s in symbol_dicts
         ]
         try:
             vectors = self._embedder.embed_batch(texts, task_type="document")
             self._symbol_store.update_vectors_by_file(file_id, vectors)
-            logger.debug(
-                f"Embedded {len(vectors)} symbols from signatures for file {file_id[:8]}"
-            )
+            logger.debug(f"Embedded {len(vectors)} symbols from signatures for file {file_id[:8]}")
         except Exception as e:
             logger.debug(f"Signature embedding skipped for {file_id[:8]}: {e}")
 
-    def _embed_sections_from_content(
-        self, file_id: str, section_dicts: list[dict]
-    ) -> None:
+    def _embed_sections_from_content(self, file_id: str, section_dicts: list[dict]) -> None:
         """Embed section content immediately during Phase 1 (no LLM needed).
 
         Uses title + first 2000 chars of content to produce a vector that
@@ -701,15 +694,11 @@ class BackgroundIngestWorker:
         """
         if not section_dicts:
             return
-        texts = [
-            f"{s['title']}. {(s.get('content') or '')[:2000]}" for s in section_dicts
-        ]
+        texts = [f"{s['title']}. {(s.get('content') or '')[:2000]}" for s in section_dicts]
         try:
             vectors = self._embedder.embed_batch(texts, task_type="document")
             self._section_store.update_vectors_by_file(file_id, vectors)
-            logger.debug(
-                f"Embedded {len(vectors)} sections from content for file {file_id[:8]}"
-            )
+            logger.debug(f"Embedded {len(vectors)} sections from content for file {file_id[:8]}")
         except Exception as e:
             logger.debug(f"Content embedding skipped for {file_id[:8]}: {e}")
 

@@ -69,8 +69,8 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._hyde_generator = None
 
     # Configure batcher to return sensible defaults so batched dispatch works
-    from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
     from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
+    from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
     from fitz_ai.retrieval.rewriter.types import RewriteResult, RewriteType
 
     def _default_batch_classify(query, **kwargs):
