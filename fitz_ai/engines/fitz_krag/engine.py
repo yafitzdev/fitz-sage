@@ -162,7 +162,9 @@ class FitzKragEngine:
         with ThreadPoolExecutor(max_workers=3) as pool:
             chat_future = pool.submit(
                 get_chat,
-                self._config.chat_smart,
+                self._config.chat_balanced
+                if self._config.chat_balanced.startswith("ollama")
+                else self._config.chat_smart,
             )
             embed_future = pool.submit(
                 get_embedder,
@@ -261,13 +263,26 @@ class FitzKragEngine:
         # Chat factory (shared by detection, rewriter, HyDE, multi-hop, enrichment)
         from fitz_ai.llm.factory import get_chat_factory
 
-        self._chat_factory = get_chat_factory(
-            {
-                "fast": self._config.chat_fast,
-                "balanced": self._config.chat_balanced,
-                "smart": self._config.chat_smart,
-            }
-        )
+        is_local = self._config.chat_balanced.startswith("ollama")
+        if is_local:
+            # Local (ollama): single model for all tiers to avoid VRAM
+            # model swapping. Users control which model via chat_balanced.
+            self._chat_factory = get_chat_factory(
+                {
+                    "fast": self._config.chat_balanced,
+                    "balanced": self._config.chat_balanced,
+                    "smart": self._config.chat_balanced,
+                }
+            )
+        else:
+            # Cloud (API keys): use all three configured tiers.
+            self._chat_factory = get_chat_factory(
+                {
+                    "fast": self._config.chat_fast,
+                    "balanced": self._config.chat_balanced,
+                    "smart": self._config.chat_smart,
+                }
+            )
 
         def _warmup_chat():
             print("  Loading LLM models (first run may take a moment)...", end="", flush=True)

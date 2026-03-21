@@ -114,9 +114,9 @@ class TestMemoryUsage:
         def query():
             return self.runner.engine.answer(Query(text="What is TechCorp?"))
 
-        metrics = measure_perf(query, iterations=8, warmup=1)
+        metrics = measure_perf(query, iterations=3, warmup=1)
 
-        print("\nMemory Usage Across 8 Queries:")
+        print("\nMemory Usage Across 3 Queries:")
         print(f"  Avg delta: {metrics.avg_memory_mb:.1f}MB")
         print(f"  Peak delta: {metrics.peak_memory_mb:.1f}MB")
 

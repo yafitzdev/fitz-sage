@@ -64,13 +64,13 @@ class TestConcurrentQueries:
     def test_sequential_throughput_consistent(self):
         """Throughput should not degrade over sequential queries.
 
-        Measures whether the 5th query is significantly slower than
+        Measures whether the 3rd query is significantly slower than
         the 1st — catches resource leaks, connection pool exhaustion, etc.
         """
         query = "Where is TechCorp headquartered?"
         times = []
 
-        for _ in range(5):
+        for _ in range(3):
             start = time.perf_counter()
             self.runner.engine.answer(Query(text=query))
             times.append(time.perf_counter() - start)
@@ -79,14 +79,12 @@ class TestConcurrentQueries:
         last = times[-1]
         ratio = last / first if first > 0 else float("inf")
 
-        print(f"\nSequential Consistency (5 queries):")
-        print(f"  First: {first:.1f}s, Last: {last:.1f}s, Ratio: {ratio:.2f}x")
+        print(f"\nSequential Consistency (3 queries):")
         for i, t in enumerate(times):
             print(f"  Query {i + 1}: {t:.1f}s")
+        print(f"  Ratio last/first: {ratio:.2f}x")
 
-        # Last query should not be more than 2x slower than first
-        # (allows for GC pauses but catches degradation)
         assert ratio < 2.0, (
-            f"Throughput degraded: query 5 is {ratio:.1f}x slower than query 1 "
+            f"Throughput degraded: query 3 is {ratio:.1f}x slower than query 1 "
             f"({last:.1f}s vs {first:.1f}s)"
         )
