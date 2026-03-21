@@ -88,34 +88,18 @@ print(answer.provenance)
 ### Configuration
 
 ```yaml
-# .fitz/config/fitz_krag.yaml
-chat:
-  plugin_name: cohere
-  kwargs:
-    models:
-      smart: command-a-03-2025
-      fast: command-r7b-12-2024
-
-embedding:
-  plugin_name: cohere
-  kwargs:
-    model: embed-english-v3.0
+# .fitz/config.yaml
+chat_fast: cohere/command-r7b-12-2024
+chat_balanced: cohere/command-r-08-2024
+chat_smart: cohere/command-a-03-2025
+embedding: cohere/embed-v4.0
+rerank: cohere/rerank-v3.5       # or null to disable
+collection: my_knowledge
+parser: glm_ocr                  # or docling, docling_vision
 
 vector_db: pgvector
 vector_db_kwargs:
   mode: local  # or "external" with connection_string
-
-# Retrieval strategy
-retrieval:
-  plugin_name: dense
-  collection: my_knowledge
-  top_k: 5
-
-# Rerank provider (presence enables reranking automatically)
-rerank:
-  plugin_name: cohere
-  kwargs:
-    model: rerank-v3.5
 ```
 
 ### Features

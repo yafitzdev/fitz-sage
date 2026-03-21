@@ -46,31 +46,17 @@ Fitz includes a lightweight, SDK-free enterprise provider that supports:
 ### Basic M2M Authentication
 
 ```yaml
-# .fitz/config/fitz_krag.yaml
+# .fitz/config.yaml
+chat_smart: enterprise/openai/gpt-4o
+embedding: enterprise/openai/text-embedding-3-small
 
-chat:
-  plugin_name: enterprise
-  kwargs:
-    base_url: https://llm.corp.internal/v1
-    model: openai/gpt-4o
-    auth:
-      type: m2m
-      token_url: https://auth.corp.internal/oauth/token
-      client_id: ${CLIENT_ID}
-      client_secret: ${CLIENT_SECRET}
-      scope: llm.access  # optional
-
-embedding:
-  plugin_name: enterprise
-  kwargs:
-    base_url: https://llm.corp.internal/v1
-    model: openai/text-embedding-3-small
-    dimensions: 1536
-    auth:
-      type: m2m
-      token_url: https://auth.corp.internal/oauth/token
-      client_id: ${CLIENT_ID}
-      client_secret: ${CLIENT_SECRET}
+auth:
+  type: m2m
+  base_url: https://llm.corp.internal/v1
+  token_url: https://auth.corp.internal/oauth/token
+  client_id: ${CLIENT_ID}
+  client_secret: ${CLIENT_SECRET}
+  scope: llm.access  # optional
 ```
 
 ### Enterprise Auth (M2M + API Key)
@@ -78,21 +64,19 @@ embedding:
 Some gateways require both OAuth2 bearer token AND an LLM API key:
 
 ```yaml
-chat:
-  plugin_name: enterprise
-  kwargs:
-    base_url: https://llm.corp.internal/v1
-    model: openai/gpt-4o
-    auth:
-      type: enterprise
-      # OAuth2 M2M for gateway authentication
-      token_url: https://auth.corp.internal/oauth/token
-      client_id: ${CLIENT_ID}
-      client_secret: ${CLIENT_SECRET}
-      scope: llm.access
-      # LLM API key for underlying provider
-      llm_api_key_env: CORP_LLM_API_KEY
-      llm_api_key_header: X-Api-Key  # default
+chat_smart: enterprise/openai/gpt-4o
+
+auth:
+  type: enterprise
+  base_url: https://llm.corp.internal/v1
+  # OAuth2 M2M for gateway authentication
+  token_url: https://auth.corp.internal/oauth/token
+  client_id: ${CLIENT_ID}
+  client_secret: ${CLIENT_SECRET}
+  scope: llm.access
+  # LLM API key for underlying provider
+  llm_api_key_env: CORP_LLM_API_KEY
+  llm_api_key_header: X-Api-Key  # default
 ```
 
 This sends two headers:
@@ -104,17 +88,15 @@ This sends two headers:
 For internal PKI (non-public certificate authorities):
 
 ```yaml
-chat:
-  plugin_name: enterprise
-  kwargs:
-    base_url: https://llm.corp.internal/v1
-    model: openai/gpt-4o
-    cert_path: /etc/ssl/corp-ca-bundle.crt
-    auth:
-      type: m2m
-      token_url: https://auth.corp.internal/oauth/token
-      client_id: ${CLIENT_ID}
-      client_secret: ${CLIENT_SECRET}
+chat_smart: enterprise/openai/gpt-4o
+
+auth:
+  type: m2m
+  base_url: https://llm.corp.internal/v1
+  token_url: https://auth.corp.internal/oauth/token
+  client_id: ${CLIENT_ID}
+  client_secret: ${CLIENT_SECRET}
+  cert_path: /etc/ssl/corp-ca-bundle.crt
 ```
 
 ### Mutual TLS (mTLS)
@@ -122,21 +104,19 @@ chat:
 For gateways requiring client certificate authentication:
 
 ```yaml
-chat:
-  plugin_name: enterprise
-  kwargs:
-    base_url: https://llm.corp.internal/v1
-    model: openai/gpt-4o
-    cert_path: /etc/ssl/corp-ca-bundle.crt
-    auth:
-      type: m2m
-      token_url: https://auth.corp.internal/oauth/token
-      client_id: ${CLIENT_ID}
-      client_secret: ${CLIENT_SECRET}
-      # mTLS client certificate
-      client_cert_path: /etc/ssl/client.crt
-      client_key_path: /etc/ssl/client.key
-      client_key_password: ${KEY_PASSWORD}  # if key is encrypted
+chat_smart: enterprise/openai/gpt-4o
+
+auth:
+  type: m2m
+  base_url: https://llm.corp.internal/v1
+  token_url: https://auth.corp.internal/oauth/token
+  client_id: ${CLIENT_ID}
+  client_secret: ${CLIENT_SECRET}
+  cert_path: /etc/ssl/corp-ca-bundle.crt
+  # mTLS client certificate
+  client_cert_path: /etc/ssl/client.crt
+  client_key_path: /etc/ssl/client.key
+  client_key_password: ${KEY_PASSWORD}  # if key is encrypted
 ```
 
 ## Environment Variable Resolution
@@ -236,39 +216,23 @@ Model strings are passed verbatim to the gateway. Common formats:
 ## Example: Full Enterprise Setup
 
 ```yaml
-# .fitz/config/fitz_krag.yaml
+# .fitz/config.yaml
+chat_smart: enterprise/openai/gpt-4o
+embedding: enterprise/openai/text-embedding-3-small
+collection: default
 
-chat:
-  plugin_name: enterprise
-  kwargs:
-    base_url: https://llm.corp.internal/v1
-    model: openai/gpt-4o
-    cert_path: /etc/ssl/corp-ca-bundle.crt
-    auth:
-      type: enterprise
-      token_url: https://auth.corp.internal/oauth/token
-      client_id: ${CORP_CLIENT_ID}
-      client_secret: ${CORP_CLIENT_SECRET}
-      scope: llm.access
-      llm_api_key_env: CORP_LLM_API_KEY
-      llm_api_key_header: X-Api-Key
-      client_cert_path: /etc/ssl/client.crt
-      client_key_path: /etc/ssl/client.key
-
-embedding:
-  plugin_name: enterprise
-  kwargs:
-    base_url: https://llm.corp.internal/v1
-    model: openai/text-embedding-3-small
-    dimensions: 1536
-    cert_path: /etc/ssl/corp-ca-bundle.crt
-    auth:
-      type: enterprise
-      token_url: https://auth.corp.internal/oauth/token
-      client_id: ${CORP_CLIENT_ID}
-      client_secret: ${CORP_CLIENT_SECRET}
-      scope: llm.access
-      llm_api_key_env: CORP_LLM_API_KEY
+auth:
+  type: enterprise
+  base_url: https://llm.corp.internal/v1
+  token_url: https://auth.corp.internal/oauth/token
+  client_id: ${CORP_CLIENT_ID}
+  client_secret: ${CORP_CLIENT_SECRET}
+  scope: llm.access
+  llm_api_key_env: CORP_LLM_API_KEY
+  llm_api_key_header: X-Api-Key
+  cert_path: /etc/ssl/corp-ca-bundle.crt
+  client_cert_path: /etc/ssl/client.crt
+  client_key_path: /etc/ssl/client.key
 
 # Vector DB remains standard
 vector_db: pgvector

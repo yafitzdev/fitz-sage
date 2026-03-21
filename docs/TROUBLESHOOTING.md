@@ -16,7 +16,7 @@ Check your config file at `.fitz/config.yaml` and verify providers, API keys, an
 
 **Error:**
 ```
-ConfigNotFoundError: Config file not found: .fitz/config/fitz_krag.yaml
+ConfigNotFoundError: Config file not found: .fitz/config.yaml
 ```
 
 **Solution:**
@@ -208,12 +208,9 @@ RateLimitError: Rate limit exceeded
 
 1. Wait and retry (automatic backoff)
 2. Reduce batch size for ingestion
-3. Use a different model tier:
+3. Use a lighter model tier:
    ```yaml
-   chat:
-     kwargs:
-       models:
-         fast: command-r7b-12-2024  # Lighter model
+   chat_fast: cohere/command-r7b-12-2024  # Lighter model
    ```
 
 ---
@@ -306,10 +303,7 @@ TimeoutError: Request timed out after 120 seconds
 2. For large files, increase timeout in config
 3. Try smaller batches:
    ```yaml
-   chunking:
-     default:
-       kwargs:
-         chunk_size: 500  # Smaller chunks
+   chunk_size: 500  # Smaller chunks
    ```
 
 ---
@@ -340,8 +334,8 @@ cat .fitz/ingest_state.json | python -m json.tool
 
 ```python
 # Test embedding
-from fitz_ai.llm.registry import get_llm_plugin
-embedder = get_llm_plugin(plugin_type="embedding", plugin_name="cohere")
+from fitz_ai.llm import get_embedder
+embedder = get_embedder("cohere/embed-v4.0")
 vector = embedder.embed("test")
 print(f"Embedding dim: {len(vector)}")
 
@@ -352,7 +346,8 @@ collections = vdb.list_collections()
 print(f"Collections: {collections}")
 
 # Test chat
-chat = get_llm_plugin(plugin_type="chat", plugin_name="cohere")
+from fitz_ai.llm import get_chat
+chat = get_chat("cohere", tier="smart")
 response = chat.chat([{"role": "user", "content": "Hello"}])
 print(f"Response: {response}")
 ```

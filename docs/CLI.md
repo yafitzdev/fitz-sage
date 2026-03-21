@@ -111,40 +111,18 @@ fitz reset --force       # Skip confirmation prompt
 Config is auto-created on first run at `.fitz/config.yaml` in your project root:
 
 ```yaml
-chat:
-  plugin_name: cohere
-  kwargs:
-    models:
-      smart: command-a-03-2025
-      fast: command-r7b-12-2024
-    temperature: 0.2
-
-embedding:
-  plugin_name: cohere
-  kwargs:
-    model: embed-english-v3.0
+chat_fast: cohere/command-r7b-12-2024
+chat_balanced: cohere/command-r-08-2024
+chat_smart: cohere/command-a-03-2025
+embedding: cohere/embed-v4.0
+rerank: cohere/rerank-v3.5      # or null to disable
+vision: null                     # or cohere (for docling_vision parser)
+collection: default
+parser: glm_ocr                  # or docling, docling_vision
 
 vector_db: pgvector
 vector_db_kwargs:
   mode: local  # or "external" with connection_string
-
-# Retrieval strategy
-retrieval:
-  plugin_name: dense
-  collection: default
-  top_k: 5
-
-# Rerank provider (presence enables reranking automatically)
-rerank:
-  plugin_name: cohere
-  kwargs:
-    model: rerank-v3.5
-
-# Parser choice controls VLM usage
-chunking:
-  default:
-    parser: docling_vision  # or "docling" for no VLM
-    plugin_name: recursive
 ```
 
 ---
@@ -191,7 +169,7 @@ fitz query --chat -c my_project
 ### Development Workflow
 
 ```bash
-# Edit .fitz/config.yaml to verify setup
+# Edit .fitz/config.yaml to configure providers
 fitz query "Summarize the architecture" --source ./project -c project
 fitz query --chat -c project     # Interactive exploration
 ```

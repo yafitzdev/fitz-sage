@@ -178,19 +178,18 @@ Verify with: `python -m tools.contract_map --fail-on-errors`
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  Configuration (.fitz/config/fitz_krag.yaml)                                │
+│  Configuration (.fitz/config.yaml)                                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  chat:                                                                      │
-│    plugin_name: cohere    ◀─── Selects which provider to use                │
-│    kwargs:                                                                  │
-│      model: command-r     ◀─── Passed to provider constructor               │
+│  chat_smart: cohere/command-a-03-2025  ◀─── provider/model string           │
+│  chat_fast: cohere/command-r7b-12-2024                                      │
+│  embedding: cohere/embed-v4.0                                               │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  Factory (fitz_ai/llm/config.py)                                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  create_chat_provider(spec="cohere", config=config, tier="smart")           │
+│  create_chat_provider(spec="cohere/command-a-03-2025")                      │
 │                                                                             │
 │  Parses provider/model spec, resolves auth, instantiates provider:          │
 │  - cohere → CohereChat + ApiKeyAuth(COHERE_API_KEY)                         │
@@ -201,7 +200,7 @@ Verify with: `python -m tools.contract_map --fail-on-errors`
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  Provider Instance                                                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  CohereChat(model="command-r", auth=ApiKeyAuth(...))                        │
+│  CohereChat(model="command-a-03-2025", auth=ApiKeyAuth(...))                │
 │  - chat(messages) -> str                                                    │
 │  - Implements ChatProvider protocol                                         │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -239,7 +238,7 @@ Features are controlled by plugin selection, not boolean flags:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  RIGHT: Provider presence                                                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  rerank: cohere              ◀─── Enables reranking (baked in)              │
+│  rerank: cohere/rerank-v3.5  ◀─── Enables reranking (baked in)              │
 │  # or                                                                       │
 │  rerank: null                ◀─── No reranking                              │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -249,8 +248,8 @@ Features are controlled by plugin selection, not boolean flags:
 
 | Feature | Enabled By | Disabled By |
 |---------|------------|-------------|
-| Reranking | `rerank: cohere` | `rerank: null` (or omit) |
-| Vision/VLM | `parser.plugin_name: docling_vision` | `parser.plugin_name: docling` |
+| Reranking | `rerank: cohere/rerank-v3.5` | `rerank: null` (or omit) |
+| Vision/VLM | `parser: docling_vision` | `parser: docling` or `parser: glm_ocr` |
 | Enrichment | Chat client available (automatic) | No chat client configured |
 
 ---
@@ -294,8 +293,7 @@ class Chunk:
 
 ```
 .fitz/
-├── config/
-│   └── fitz_krag.yaml    # Main engine config
+├── config.yaml           # Main config file
 ├── pgdata/               # PostgreSQL data (local mode)
 └── ingest_state.json     # Incremental ingestion state
 ```
@@ -303,45 +301,20 @@ class Chunk:
 **Config structure:**
 
 ```yaml
-# Engine selection
-engine: fitz_krag
-
-# LLM services (Python providers)
-chat:
-  plugin_name: cohere
-  kwargs: { model: command-r-plus }
-
-embedding:
-  plugin_name: cohere
-  kwargs: { model: embed-v4.0 }
-
-# Provider presence enables reranking (no enabled flag)
-rerank:
-  plugin_name: cohere
-  kwargs: { model: rerank-v3.5 }
+# .fitz/config.yaml
+chat_fast: cohere/command-r7b-12-2024
+chat_balanced: cohere/command-r-08-2024
+chat_smart: cohere/command-a-03-2025
+embedding: cohere/embed-v4.0
+rerank: cohere/rerank-v3.5       # or null to disable
+vision: null                     # or cohere (for docling_vision parser)
+collection: default
+parser: glm_ocr                  # or docling, docling_vision
 
 # Vector storage (PostgreSQL + pgvector)
 vector_db: pgvector
 vector_db_kwargs:
   mode: local  # or "external" with connection_string
-
-# Ingestion (mixed plugin types)
-parser:
-  plugin_name: docling_vision    # Python plugin
-
-chunking:
-  default:
-    plugin_name: semantic        # Python plugin
-
-# Retrieval pipeline
-retrieval:
-  plugin_name: dense             # YAML plugin
-
-# Enrichment (always on when chat client available)
-enrichment:
-  hierarchy:
-    grouping_strategy: metadata  # or "semantic"
-    group_by: source_file
 ```
 
 ---

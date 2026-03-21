@@ -120,7 +120,7 @@ Fitz uses [fitz-pgserver](https://github.com/yafitzdev/fitz-pgserver)—a pip-in
 For production or shared deployments, point fitz at any PostgreSQL 14+ instance with pgvector:
 
 ```yaml
-# ~/.fitz/config/fitz_krag.yaml
+# .fitz/config.yaml
 vector_db: pgvector
 vector_db_kwargs:
   mode: external

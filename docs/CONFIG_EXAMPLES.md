@@ -5,12 +5,12 @@ The configuration schema uses:
 - **None for disabled** instead of `enabled` flags
 - **Sensible defaults** - works out of the box
 
-## Minimal 3-Line Config
+## Minimal Config
 
 The absolute minimum to get started:
 
 ```yaml
-chat: anthropic/claude-sonnet-4
+chat_smart: anthropic/claude-sonnet-4
 embedding: openai/text-embedding-3-small
 collection: my_docs
 ```
@@ -27,7 +27,7 @@ Everything else uses sensible defaults:
 ### Anthropic + OpenAI (Recommended)
 
 ```yaml
-chat: anthropic/claude-sonnet-4
+chat_smart: anthropic/claude-sonnet-4
 embedding: openai/text-embedding-3-small
 collection: my_docs
 ```
@@ -35,16 +35,18 @@ collection: my_docs
 ### All Cohere (Single API Key)
 
 ```yaml
-chat: cohere/command-r-plus
-embedding: cohere/embed-english-v3.0
-rerank: cohere/rerank-english-v3.0
+chat_fast: cohere/command-r7b-12-2024
+chat_balanced: cohere/command-r-08-2024
+chat_smart: cohere/command-a-03-2025
+embedding: cohere/embed-v4.0
+rerank: cohere/rerank-v3.5
 collection: my_docs
 ```
 
 ### With External PostgreSQL
 
 ```yaml
-chat: anthropic/claude-sonnet-4
+chat_smart: anthropic/claude-sonnet-4
 embedding: openai/text-embedding-3-small
 collection: my_docs
 
@@ -56,7 +58,7 @@ vector_db_kwargs:
 ### With Vision/VLM for Images
 
 ```yaml
-chat: anthropic/claude-sonnet-4
+chat_smart: anthropic/claude-sonnet-4
 embedding: openai/text-embedding-3-small
 vision: openai/gpt-4o
 parser: docling_vision  # Enable VLM parsing
@@ -66,27 +68,22 @@ collection: my_docs
 ### Production Setup with All Features
 
 ```yaml
-# Core plugins
-chat: anthropic/claude-sonnet-4
+# Chat tiers
+chat_fast: cohere/command-r7b-12-2024
+chat_balanced: cohere/command-r-08-2024
+chat_smart: cohere/command-a-03-2025
 embedding: openai/text-embedding-3-small
 
 # Optional features
-rerank: cohere/rerank-english-v3.0
+rerank: cohere/rerank-v3.5
 vision: openai/gpt-4o
 
-# Retrieval (reranking auto-enabled by rerank: above)
-retrieval_plugin: dense
 collection: production_docs
-top_k: 10
+parser: docling_vision
 
 # Generation
 enable_citations: true
 strict_grounding: true
-max_chunks: 12
-
-# Chunking
-chunk_size: 768
-parser: docling_vision
 
 # Cloud cache
 cloud:
@@ -106,7 +103,7 @@ vector_db_kwargs:
 
 ```yaml
 # Enabled
-rerank: cohere/rerank-english-v3.0
+rerank: cohere/rerank-v3.5
 
 # Disabled
 rerank: null
@@ -158,25 +155,6 @@ Plugins use a simple string format:
 | Ollama | `ollama/llama3` | Local models |
 | Azure OpenAI | `azure_openai/gpt-4` | Requires endpoint config |
 
-## Advanced: Plugin Kwargs
-
-For advanced use cases, you can pass additional kwargs to plugins:
-
-```yaml
-chat: anthropic/claude-sonnet-4
-chat_kwargs:
-  temperature: 0.2
-  max_tokens: 4096
-
-embedding: openai/text-embedding-3-small
-embedding_kwargs:
-  dimensions: 1536
-
-rerank: cohere/rerank-english-v3.0
-rerank_kwargs:
-  top_n: 10
-```
-
 ## Zero-Config Example
 
 Just use defaults from `default.yaml`:
@@ -184,7 +162,7 @@ Just use defaults from `default.yaml`:
 ```python
 from fitz_ai.engines.fitz_krag import FitzKragEngine
 
-# Uses all defaults from default_v2.yaml
+# Uses all defaults from default.yaml
 engine = FitzKragEngine()
 
 # Query immediately

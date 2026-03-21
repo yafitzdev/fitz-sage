@@ -11,35 +11,32 @@ Fitz uses Python providers for LLM services and a plugin system for other compon
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  CONFIG declares WHICH provider/model to use                    │
-│  (edit .fitz/config.yaml to configure these sections)           │
+│  (edit .fitz/config.yaml)                                       │
 ├─────────────────────────────────────────────────────────────────┤
-│  vision:                    │  rerank:                          │
-│    plugin_name: cohere      │    plugin_name: cohere            │
-│    kwargs: {}               │    kwargs:                        │
-│                             │      model: rerank-v3.5           │
+│  vision: cohere             │  rerank: cohere/rerank-v3.5      │
+│  parser: docling_vision     │                                   │
 ├─────────────────────────────────────────────────────────────────┤
-│  PLUGIN determines IF the feature is used                       │
-│  (plugin choice enables/disables the feature)                   │
+│  PROVIDER PRESENCE determines IF the feature is used            │
 ├─────────────────────────────────────────────────────────────────┤
-│  Parser Plugin (VLM control):                                   │
-│    docling        → No VLM (figures become "[Figure]")          │
-│    docling_vision → Uses VLM from vision: config                │
+│  Parser (VLM control):                                          │
+│    parser: docling        → No VLM (figures become "[Figure]")  │
+│    parser: docling_vision → Uses VLM from vision: config        │
 │                                                                 │
 │  Reranking (Provider-presence control):                         │
 │    rerank: null   → No reranking (pure vector search)           │
-│    rerank: cohere → Reranking auto-enabled (baked in)           │
+│    rerank: cohere/rerank-v3.5 → Reranking auto-enabled          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 **The pattern:**
 - Edit `.fitz/config.yaml` to set providers
-- Config sections (`vision:`, `rerank:`) specify WHAT provider to use
-- VLM: Parser plugin choice specifies IF the feature is used
+- `vision:` and `rerank:` specify WHAT provider/model to use
+- VLM: `parser:` choice specifies IF the feature is used
 - Reranking: Provider presence enables the feature (baked into `dense` plugin)
 
 **Config locations:**
-- Parser: `chunking.default.parser` → `"docling"` or `"docling_vision"`
-- Reranking: `rerank:` → `cohere` (enabled) or `null` (disabled)
+- Parser: `parser:` → `"docling"`, `"docling_vision"`, or `"glm_ocr"`
+- Reranking: `rerank:` → `cohere/rerank-v3.5` (enabled) or `null` (disabled)
 
 ---
 
@@ -222,18 +219,11 @@ In configuration:
 
 ```yaml
 # .fitz/config.yaml
-chat:
-  plugin_name: cohere
-  kwargs:
-    model: command-a-03-2025
-
-embedding:
-  plugin_name: cohere
-
-rerank:
-  plugin_name: cohere
-  kwargs:
-    model: rerank-v3.5
+chat_smart: cohere/command-a-03-2025
+chat_fast: cohere/command-r7b-12-2024
+embedding: cohere/embed-v4.0
+rerank: cohere/rerank-v3.5
+collection: default
 
 # Vector storage (pgvector is the default)
 vector_db: pgvector

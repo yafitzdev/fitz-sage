@@ -80,26 +80,24 @@ Cross-encoders are more accurate because they see query and document together, b
 ### Enable Reranking
 
 ```yaml
-# ~/.fitz/config/fitz_krag.yaml
-fitz_krag:
-  rerank: cohere                    # Provider - this alone enables reranking
-  # retrieval_plugin: dense         # No need to change - reranking auto-injected
+# .fitz/config.yaml
+rerank: cohere/rerank-v3.5          # Provider/model - this alone enables reranking
 ```
 
 ### Disable Reranking (default)
 
 ```yaml
-fitz_krag:
-  rerank: null                      # No provider = no reranking
-  # Or simply omit the rerank line
+# .fitz/config.yaml
+rerank: null                        # No provider = no reranking
+# Or simply omit the rerank line
 ```
 
 ### Provider Options
 
 | Provider | Config | Model |
 |----------|--------|-------|
-| Cohere | `rerank: cohere` | `rerank-english-v3.0` (default) |
-| Cohere (specific model) | `rerank: cohere/rerank-multilingual-v3.0` | Multilingual support |
+| Cohere | `rerank: cohere/rerank-v3.5` | Default reranker |
+| Cohere (multilingual) | `rerank: cohere/rerank-multilingual-v3.0` | Multilingual support |
 
 ### Pipeline Behavior
 
@@ -164,7 +162,7 @@ The cross-encoder correctly identifies the warranty-specific chunk as most relev
 
 ## Dependencies
 
-- Requires rerank provider (e.g., `rerank: cohere`)
+- Requires rerank provider (e.g., `rerank: cohere/rerank-v3.5`)
 - Works with all other retrieval features (hybrid search, detection, etc.)
 - No separate plugin choice needed
 

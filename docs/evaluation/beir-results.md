@@ -112,13 +112,11 @@ Financial Q&A from Reddit and investment forums. bge-m3 scores **0.2702**, beati
 bge-m3 via Ollama defaults to a small context window, causing 500 errors on longer texts. Always set `num_ctx: 8192` in config:
 
 ```yaml
-# .fitz/config/fitz_krag.yaml
-embedding_kwargs:
-  model: bge-m3
-  num_ctx: 8192
+# .fitz/config.yaml
+embedding: ollama/bge-m3
 ```
 
-This is implemented via `options: {num_ctx: 8192}` in the Ollama `/api/embed` payload, added in `fitz_ai/llm/providers/ollama.py`.
+Set `num_ctx` via Ollama modelfile or API options. This is implemented via `options: {num_ctx: 8192}` in the Ollama `/api/embed` payload.
 
 ### Switching embedding models
 

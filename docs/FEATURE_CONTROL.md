@@ -24,15 +24,8 @@ This keeps the config declarative and avoids boolean flags that can get out of s
 │  Declares WHICH provider/model to use                           │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  vision:                         rerank:                        │
-│    plugin_name: cohere             plugin_name: cohere          │
-│    kwargs: {}                      kwargs:                      │
-│                                      model: rerank-v3.5         │
-│                                                                 │
-│  chunking:                       retrieval:                     │
-│    default:                        plugin_name: dense           │
-│      parser: docling_vision        collection: default          │
-│      plugin_name: recursive        top_k: 5                     │
+│  vision: cohere                  rerank: cohere/rerank-v3.5    │
+│  parser: docling_vision          collection: default            │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -43,19 +36,21 @@ This keeps the config declarative and avoids boolean flags that can get out of s
 │                                                                 │
 │  VLM (controlled by parser plugin):                             │
 │    ┌──────────────────────┐    ┌──────────────────┐             │
-│    │     docling          │    │  docling_vision  │             │
-│    ├──────────────────────┤    ├──────────────────┤             │
-│    │ No VLM               │    │ Uses VLM from    │             │
-│    │ Figures → "[Figure]" │    │ vision: config   │             │
-│    └──────────────────────┘    └──────────────────┘             │
+│    │  parser: docling     │    │ parser:          │             │
+│    ├──────────────────────┤    │ docling_vision   │             │
+│    │ No VLM               │    ├──────────────────┤             │
+│    │ Figures → "[Figure]" │    │ Uses VLM from    │             │
+│    └──────────────────────┘    │ vision: config   │             │
+│                                └──────────────────┘             │
 │                                                                 │
 │  Reranking (controlled by provider presence):                   │
-│    ┌────────────────────┐    ┌──────────────────┐               │
-│    │   rerank: null     │    │  rerank: cohere  │               │
-│    ├────────────────────┤    ├──────────────────┤               │
-│    │ No reranking       │    │ Reranking auto-  │               │
-│    │ Pure vector search │    │ enabled (baked)  │               │
-│    └────────────────────┘    └──────────────────┘               │
+│    ┌────────────────────┐    ┌────────────────────────┐         │
+│    │   rerank: null     │    │ rerank:                │         │
+│    ├────────────────────┤    │ cohere/rerank-v3.5     │         │
+│    │ No reranking       │    ├────────────────────────┤         │
+│    │ Pure vector search │    │ Reranking auto-        │         │
+│    └────────────────────┘    │ enabled (baked)        │         │
+│                              └────────────────────────┘         │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -78,19 +73,12 @@ VLM is used to describe figures and images in PDFs during ingestion.
 
 ```yaml
 # Parser choice enables VLM
-chunking:
-  default:
-    parser: docling_vision  # ← Uses VLM
-    # parser: docling       # ← No VLM
-    plugin_name: recursive
-    kwargs:
-      chunk_size: 1000
-      chunk_overlap: 200
+parser: docling_vision  # ← Uses VLM
+# parser: docling       # ← No VLM
+# parser: glm_ocr       # ← Fast default, no VLM
 
 # Vision provider (used only if parser: docling_vision)
-vision:
-  plugin_name: cohere
-  kwargs: {}
+vision: cohere          # or openai, anthropic, ollama
 ```
 
 ### Key files:
@@ -119,14 +107,8 @@ Reranking improves retrieval quality by re-scoring chunks with a cross-encoder m
 
 ```yaml
 # Rerank provider presence enables reranking
-rerank: cohere                  # ← Reranking enabled
+rerank: cohere/rerank-v3.5      # ← Reranking enabled
 # rerank: null                  # ← No reranking (default)
-
-# Retrieval pipeline (reranking auto-injected when provider configured)
-retrieval:
-  plugin_name: dense            # Single plugin - handles both cases
-  collection: default
-  top_k: 5
 ```
 
 ### Key files:
@@ -156,9 +138,7 @@ retrieval:
   plugin_name: dense_rerank     # Had to choose plugin
 
 # ✅ NEW: Provider presence is the toggle
-rerank: cohere                  # This alone enables reranking
-retrieval:
-  plugin_name: dense            # Single plugin
+rerank: cohere/rerank-v3.5      # This alone enables reranking
 ```
 
 ---
@@ -186,10 +166,10 @@ summarizer: cohere              # Presence enables the feature
 
 ## Quick Reference
 
-| Feature | Config Section | Enable | Disable |
-|---------|---------------|--------|---------|
-| VLM | `vision:` + `chunking.default.parser` | `parser: docling_vision` | `parser: docling` |
-| Rerank | `rerank:` | `rerank: cohere` | `rerank: null` (or omit) |
+| Feature | Config Key | Enable | Disable |
+|---------|-----------|--------|---------|
+| VLM | `vision:` + `parser:` | `parser: docling_vision` | `parser: docling` or `parser: glm_ocr` |
+| Rerank | `rerank:` | `rerank: cohere/rerank-v3.5` | `rerank: null` (or omit) |
 
 ---
 

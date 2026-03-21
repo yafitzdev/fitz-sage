@@ -259,7 +259,7 @@ The SDK uses the same config as CLI. See [CONFIG.md](CONFIG.md) for details.
 
 **Config search order:**
 1. `config_path` parameter (if provided)
-2. `.fitz/config/fitz_krag.yaml` (project config)
+2. `.fitz/config.yaml` (project config)
 3. Auto-created default config (if `auto_init=True`)
 
 ---
