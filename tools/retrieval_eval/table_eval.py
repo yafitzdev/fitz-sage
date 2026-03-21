@@ -301,13 +301,7 @@ def run_table_retrieval(engine, query_text: str, top_k: int = 10):
         return []
 
     # 4. Table handler: LLM column selection + SQL generation + execution
-    # Use balanced chat model (4b) — fast model (2b) is too small for reliable
-    # SQL generation (misses GROUP BY, generates think tags, prompt leakage).
-    from fitz_ai.engines.fitz_krag.retrieval.table_handler import TableQueryHandler
-
-    balanced_chat = engine._chat_factory("balanced")
-    handler = TableQueryHandler(balanced_chat, engine._pg_table_store, engine._config)
-    augmented = handler.process(sanitized, read_results)
+    augmented = engine._table_handler.process(sanitized, read_results)
     return augmented
 
 

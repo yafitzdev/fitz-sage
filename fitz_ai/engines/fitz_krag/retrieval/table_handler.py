@@ -8,7 +8,6 @@ schemas and replaces their content with actual SQL query results.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from typing import TYPE_CHECKING, Any
@@ -22,25 +21,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-COLUMN_SELECT_PROMPT = """Given this table schema and question, which columns are needed to answer?
-
-Table columns: {columns}
-Sample data: {samples}
-Question: {question}
-
-Return ONLY a JSON array of column names needed. Example: ["col1", "col2"]
-Rules:
-- Include columns needed for filtering AND for displaying results
-- Look at sample data to find which columns contain relevant values for the question
-- For "who/which/what" questions, ALWAYS include identifying columns (name, id, title, etc.)
-- For numeric comparisons (highest, lowest, average), include the numeric column
-- When in doubt, include more columns rather than fewer"""
-
 SQL_PROMPT = """Generate a PostgreSQL query to answer this question.
 
 Table name: {table_name}
-Columns: {columns}
-Sample values: {samples}
+Columns (all TEXT type): {columns}
+Sample data:
+{samples}
 
 Question: {question}
 
@@ -48,18 +34,15 @@ Rules:
 1. Use only the columns listed above
 2. Use the exact table name: {table_name}
 3. Use LIMIT {max_results} unless aggregating
-4. For text search use ILIKE with % wildcards (PostgreSQL is case-insensitive with ILIKE)
-5. Column names need double quotes if they contain special characters
-6. For "highest/maximum" use ORDER BY column DESC LIMIT 1
-7. For "lowest/minimum" use ORDER BY column ASC LIMIT 1
-8. For "who/which" questions, include identifying columns (name, id) in SELECT
-9. All columns are TEXT type. For numeric operations (MAX, MIN, AVG, SUM, ORDER BY numbers), \
+4. For text search use ILIKE with '%pattern%' (with quotes around wildcards)
+5. For "highest/maximum" use ORDER BY column DESC LIMIT 1
+6. For "lowest/minimum" use ORDER BY column ASC LIMIT 1
+7. For "who/which" questions, include identifying columns (name, id) in SELECT
+8. For numeric operations (MAX, MIN, AVG, SUM, ORDER BY numbers), \
 use CAST(column AS NUMERIC) or column::NUMERIC
-10. ALWAYS include in SELECT every column used in ORDER BY, WHERE, or GROUP BY — \
-the user needs to see the values being compared, not just the names
-11. CRITICAL: When using COUNT, SUM, AVG, or any aggregate function with non-aggregated columns, \
-you MUST add GROUP BY for all non-aggregated columns. Example: \
-SELECT department, COUNT(*) FROM table GROUP BY department
+9. ALWAYS include in SELECT every column used in ORDER BY, WHERE, or GROUP BY
+10. CRITICAL: When using COUNT, SUM, AVG with non-aggregated columns, \
+you MUST add GROUP BY. Example: SELECT department, COUNT(*) FROM t GROUP BY department
 
 Return ONLY the SQL query, no explanation."""
 
@@ -97,7 +80,7 @@ class TableQueryHandler:
         return non_table_results + augmented
 
     def _process_table_result(self, query: str, result: ReadResult) -> ReadResult:
-        """Process a single TABLE ReadResult: column select → SQL gen → execute."""
+        """Process a single TABLE ReadResult: SQL gen → execute (single LLM call)."""
         table_id = result.metadata.get("table_id") or result.address.metadata.get("table_id")
         if not table_id:
             return result
@@ -114,21 +97,12 @@ class TableQueryHandler:
         sanitized_cols, original_cols = col_info
         row_count = self._pg_table_store.get_row_count(table_id)
 
-        # Get sample data
+        # Get sample data — LLM sees all columns + samples in one call
         sample_rows = self._get_sample_data(pg_table_name, sanitized_cols)
 
-        # LLM column selection (using original names)
-        needed_original = self._select_columns(query, original_cols, sample_rows)
-        col_mapping = dict(zip(original_cols, sanitized_cols))
-        needed_sanitized = [col_mapping.get(c, c) for c in needed_original if c in col_mapping]
-        if not needed_sanitized:
-            needed_sanitized = sanitized_cols
-
-        # Get samples for selected columns
-        sample_for_sql = self._get_sample_data(pg_table_name, needed_sanitized)
-
-        # LLM SQL generation with retry
-        sql = self._generate_sql(query, pg_table_name, needed_sanitized, sample_for_sql)
+        # Single LLM call: SQL generation with retry (column selection is implicit —
+        # the LLM picks what to SELECT based on the question + all available columns)
+        sql = self._generate_sql(query, pg_table_name, sanitized_cols, sample_rows)
 
         # Execute SQL
         exec_result = self._pg_table_store.execute_query(table_id, sql)
@@ -176,26 +150,6 @@ class TableQueryHandler:
             _, rows = result
             return [[str(v) if v is not None else "" for v in row] for row in rows]
         return []
-
-    def _select_columns(
-        self, query: str, columns: list[str], sample_rows: list[list[str]]
-    ) -> list[str]:
-        """Use LLM to select relevant columns."""
-        samples_str = "(no sample data)"
-        if sample_rows:
-            sample_lines = []
-            for row in sample_rows[:3]:
-                row_str = " | ".join(f"{col}={val}" for col, val in zip(columns, row))
-                sample_lines.append(row_str)
-            samples_str = "\n".join(sample_lines)
-
-        prompt = COLUMN_SELECT_PROMPT.format(
-            columns=columns,
-            samples=samples_str,
-            question=query,
-        )
-        response = self._chat.chat([{"role": "user", "content": prompt}])
-        return self._parse_json_list(response, fallback=columns)
 
     def _generate_sql(
         self,
@@ -246,22 +200,25 @@ class TableQueryHandler:
         previous_error: str | None,
     ) -> str:
         """Generate SQL query (single attempt)."""
-        samples: dict[str, list[str]] = {}
-        for i, col in enumerate(columns):
-            samples[col] = [row[i] for row in sample_rows if i < len(row)]
+        # Format samples as readable rows (col=val pairs)
+        sample_lines = []
+        for row in sample_rows[:3]:
+            pairs = [f"{col}={val}" for col, val in zip(columns, row) if val]
+            sample_lines.append(" | ".join(pairs[:10]))
+        samples_str = "\n".join(sample_lines) if sample_lines else "(no sample data)"
 
         error_context = ""
         if previous_error:
             error_context = (
-                f"\nIMPORTANT: Your previous SQL query failed with this error:\n"
-                f"{previous_error}\n\n"
-                f"Please generate corrected SQL that avoids this error."
+                f"\nIMPORTANT: Your previous SQL failed with:\n"
+                f"{previous_error}\n"
+                f"Fix this error in your new query."
             )
 
         prompt = SQL_PROMPT.format(
             table_name=table_name,
             columns=columns,
-            samples=samples,
+            samples=samples_str,
             question=query,
             max_results=self._config.max_table_results,
         )
@@ -295,26 +252,6 @@ class TableQueryHandler:
             lines.append(f"\n... and {len(rows) - max_results} more rows")
 
         return "\n".join(lines)
-
-    def _parse_json_list(self, response: str, fallback: list[str]) -> list[str]:
-        """Parse JSON list from LLM response."""
-        try:
-            text = response.strip()
-            if text.startswith("```"):
-                parts = text.split("```")
-                if len(parts) >= 2:
-                    text = parts[1].strip()
-                    if text.startswith("json"):
-                        text = text[4:].strip()
-
-            result = json.loads(text)
-            if isinstance(result, list):
-                return [str(item) for item in result]
-        except (json.JSONDecodeError, ValueError):
-            pass
-
-        logger.warning("Failed to parse column selection, using all columns")
-        return fallback
 
     def _extract_sql(self, response: str) -> str:
         """Extract SQL from LLM response."""

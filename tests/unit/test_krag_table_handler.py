@@ -14,7 +14,7 @@ from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
 
 
 def _make_handler(
-    chat_response: str | list[str] = '["col1", "col2"]',
+    chat_response: str | list[str] = 'SELECT "col1", "col2" FROM "tbl_sales" LIMIT 100',
     execute_result: tuple | None = (["col1", "col2"], [["a", "b"], ["c", "d"]]),
     table_name: str = "tbl_sales",
     columns: tuple | None = (["col1", "col2"], ["Col 1", "Col 2"]),
@@ -104,29 +104,24 @@ class TestTableQueryHandler:
 
     def test_process_generates_sql(self):
         """TABLE result triggers SQL generation + execution."""
-        # Chat returns: 1) column selection, 2) SQL generation
-        responses = [
-            '["col1", "col2"]',
-            'SELECT "col1", "col2" FROM "tbl_sales" LIMIT 100',
-        ]
-        handler, chat, pg_store = _make_handler(chat_response=responses)
+        handler, chat, pg_store = _make_handler(
+            chat_response='SELECT "col1", "col2" FROM "tbl_sales" LIMIT 100'
+        )
         table_result = _make_table_read_result()
 
         results = handler.process("what are the top sales?", [table_result])
 
         assert len(results) == 1
-        # Chat called at least twice (column select + SQL generation)
-        assert chat.chat.call_count >= 2
+        # Chat called once (combined SQL generation)
+        assert chat.chat.call_count >= 1
         # execute_query called for sample data + validation + final execution
         assert pg_store.execute_query.call_count >= 1
 
     def test_process_augments_content(self):
         """Content is replaced with SQL results."""
-        responses = [
-            '["col1", "col2"]',
-            'SELECT "col1" FROM "tbl_sales" LIMIT 100',
-        ]
-        handler, _, _ = _make_handler(chat_response=responses)
+        handler, _, _ = _make_handler(
+            chat_response='SELECT "col1" FROM "tbl_sales" LIMIT 100'
+        )
         table_result = _make_table_read_result()
 
         results = handler.process("query", [table_result])
@@ -139,8 +134,9 @@ class TestTableQueryHandler:
 
     def test_process_mixed_results(self):
         """Mix of TABLE and non-TABLE results handled correctly."""
-        responses = ['["col1"]', 'SELECT "col1" FROM "tbl_sales"']
-        handler, _, _ = _make_handler(chat_response=responses)
+        handler, _, _ = _make_handler(
+            chat_response='SELECT "col1" FROM "tbl_sales"'
+        )
 
         non_table = _make_non_table_result()
         table_result = _make_table_read_result()

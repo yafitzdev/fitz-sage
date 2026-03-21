@@ -162,7 +162,7 @@ class FitzKragEngine:
         with ThreadPoolExecutor(max_workers=3) as pool:
             chat_future = pool.submit(
                 get_chat,
-                self._config.chat_smart,
+                self._config.chat_balanced,
             )
             embed_future = pool.submit(
                 get_embedder,
@@ -261,25 +261,21 @@ class FitzKragEngine:
         # Chat factory (shared by detection, rewriter, HyDE, multi-hop, enrichment)
         from fitz_ai.llm.factory import get_chat_factory
 
+        # Use balanced tier for all LLM calls. Running a single model eliminates
+        # ollama model swapping (fast/balanced/smart = 3 models = constant eviction).
+        # With one model, only embed ↔ chat swap remains (~4GB total fits in VRAM).
         self._chat_factory = get_chat_factory(
             {
-                "fast": self._config.chat_fast,
+                "fast": self._config.chat_balanced,
                 "balanced": self._config.chat_balanced,
-                "smart": self._config.chat_smart,
+                "smart": self._config.chat_balanced,
             }
         )
 
-        # Pre-load chat models sequentially: fast first (guardrails/detection),
-        # then smart (generation). Sequential avoids VRAM contention on ollama.
+        # Pre-load the single chat model. Using one tier (balanced) for all
+        # LLM calls eliminates model swapping on ollama.
         def _warmup_chat():
             print("  Loading LLM models (first run may take a moment)...", end="", flush=True)
-            try:
-                self._chat_factory("fast").chat(
-                    [{"role": "user", "content": "hi"}],
-                    max_tokens=1,
-                )
-            except Exception:
-                pass
             try:
                 self._chat.chat(
                     [{"role": "user", "content": "hi"}],
@@ -294,7 +290,7 @@ class FitzKragEngine:
         # Query Analysis
         from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalyzer
 
-        self._query_analyzer = QueryAnalyzer(self._chat_factory("fast"))
+        self._query_analyzer = QueryAnalyzer(self._chat_factory("balanced"))
 
         # Context + Generation
         from fitz_ai.engines.fitz_krag.context.assembler import ContextAssembler
@@ -311,7 +307,7 @@ class FitzKragEngine:
             from fitz_ai.governance.decider import GovernanceDecider
 
             self._constraints = create_default_constraints(
-                chat=self._chat_factory("fast"),
+                chat=self._chat_factory("balanced"),
                 chat_balanced=self._chat_factory("balanced"),
                 embedder=self._embedder,
             )
@@ -330,7 +326,9 @@ class FitzKragEngine:
         # Table query handler
         from fitz_ai.engines.fitz_krag.retrieval.table_handler import TableQueryHandler
 
-        self._table_handler = TableQueryHandler(self._chat, self._pg_table_store, self._config)
+        self._table_handler = TableQueryHandler(
+            self._chat_factory("balanced"), self._pg_table_store, self._config
+        )
 
         # Shared detection
         self._detection_orchestrator: Any = None
@@ -660,24 +658,32 @@ class FitzKragEngine:
             timings: list[tuple[str, float]] = []
             pipeline_start = time.perf_counter()
 
-            # 1. Rewrite-first pipeline:
-            #    Step 1: Rewrite query (if configured)
-            #    Step 2: Batch(Analysis + Detection) on rewritten query + Embed (parallel)
+            # 1. Embed-first pipeline:
+            #    Step 1: Embed query (tiny model, instant, no swap contention)
+            #    Step 2: Rewrite query (chat model loads, stays for all remaining calls)
+            #    Step 3: Batch(Analysis + Detection) on rewritten query
             #
-            # Rewriting runs first so analysis and detection classify the
-            # cleaned-up query (noise removed, pronouns resolved). The batch
-            # combines analysis + detection into 1 LLM call to avoid model-swap
-            # overhead on local providers like ollama.
+            # Embedding first eliminates the mid-pipeline model swap on ollama:
+            # embed (274MB) finishes fast, then chat model loads once and stays
+            # for rewrite → classify → table handler → guardrails → synthesis.
             _progress("Analyzing query...")
             t0 = time.perf_counter()
-            from concurrent.futures import ThreadPoolExecutor
-
             from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
 
             retrieval_query = sanitized
             rewrite_result = None
 
-            # Step 1: Rewrite (individual LLM call, runs first)
+            # Step 1: Embed query first (nomic-embed-text is tiny, loads fast)
+            precomputed_query_vector = None
+            try:
+                precomputed_vectors = self._embedder.embed_batch(
+                    [sanitized], task_type="query"
+                )
+                precomputed_query_vector = dict(zip([sanitized], precomputed_vectors))
+            except Exception:
+                pass
+
+            # Step 2: Rewrite (chat model loads here, stays loaded for everything after)
             if self._query_rewriter:
                 try:
                     rewrite_result = self._query_rewriter.rewrite(sanitized)
@@ -691,8 +697,8 @@ class FitzKragEngine:
                 except Exception as e:
                     logger.warning("Query rewriting failed, using original", error=str(e))
 
-            # Step 2: Analysis + Detection on rewritten query, + Embedding
-            classify_query = retrieval_query  # classify the rewritten query
+            # Step 3: Analysis + Detection on rewritten query
+            classify_query = retrieval_query
             fast_analysis = self._fast_analyze(classify_query)
             need_llm_analysis = fast_analysis is None
             need_detection = bool(
@@ -709,10 +715,8 @@ class FitzKragEngine:
                     detection_limit_to = flagged
 
             if need_llm_analysis or need_detection:
-                # Batch analysis + detection in one LLM call, embed in parallel
-                with ThreadPoolExecutor(max_workers=2) as pool:
-                    batch_future = pool.submit(
-                        self._query_batcher.batch_classify,
+                try:
+                    batch_result = self._query_batcher.batch_classify(
                         classify_query,
                         include_analysis=need_llm_analysis,
                         include_detection=need_detection,
@@ -720,45 +724,29 @@ class FitzKragEngine:
                         include_rewriting=False,
                         include_extended=True,
                     )
-                    embed_future = pool.submit(self._embedder.embed_batch, [sanitized])
-
-                    try:
-                        batch_result = batch_future.result()
-                        analysis = (
-                            batch_result.analysis if batch_result.analysis else fast_analysis
+                    analysis = (
+                        batch_result.analysis if batch_result.analysis else fast_analysis
+                    )
+                    detection = (
+                        self._build_detection_summary(
+                            batch_result.detection_results, classify_query
                         )
-                        detection = (
-                            self._build_detection_summary(
-                                batch_result.detection_results, classify_query
-                            )
-                            if need_detection and batch_result.detection_results is not None
-                            else None
-                        )
-                    except Exception as e:
-                        logger.warning(f"Batched query intelligence failed: {e}")
-                        analysis = fast_analysis or QueryAnalysis(
-                            primary_type=QueryType.GENERAL,
-                            confidence=0.3,
-                            refined_query=sanitized,
-                        )
-                        detection = None
-                        batch_result = None
-
-                    try:
-                        precomputed_vectors = embed_future.result()
-                        precomputed_query_vector = dict(zip([sanitized], precomputed_vectors))
-                    except Exception:
-                        precomputed_query_vector = None
+                        if need_detection and batch_result.detection_results is not None
+                        else None
+                    )
+                except Exception as e:
+                    logger.warning(f"Batched query intelligence failed: {e}")
+                    analysis = fast_analysis or QueryAnalysis(
+                        primary_type=QueryType.GENERAL,
+                        confidence=0.3,
+                        refined_query=sanitized,
+                    )
+                    detection = None
+                    batch_result = None
             else:
-                # No LLM needed: fast_analyze succeeded, no detection needed
                 analysis = fast_analysis
                 detection = None
                 batch_result = None
-                try:
-                    precomputed_vectors = self._embedder.embed_batch([sanitized], task_type="query")
-                    precomputed_query_vector = dict(zip([sanitized], precomputed_vectors))
-                except Exception:
-                    precomputed_query_vector = None
             timings.append(("Analysis + Detection", time.perf_counter() - t0))
 
             # Build retrieval profile — single object with all gates and signals
