@@ -656,30 +656,25 @@ class FitzKragEngine:
             timings: list[tuple[str, float]] = []
             pipeline_start = time.perf_counter()
 
-            # 1. Embed-first pipeline:
-            #    Step 1: Embed query (tiny model, instant, no swap contention)
-            #    Step 2: Rewrite query (chat model loads, stays for all remaining calls)
-            #    Step 3: Batch(Analysis + Detection) on rewritten query
+            # 1. Rewrite-first pipeline with parallel embed:
+            #    Step 1: Rewrite query (if configured)
+            #    Step 2: Batch(Analysis + Detection) on rewritten query + Embed (parallel)
             #
-            # Embedding first eliminates the mid-pipeline model swap on ollama:
-            # embed (274MB) finishes fast, then chat model loads once and stays
-            # for rewrite → classify → table handler → guardrails → synthesis.
+            # Rewriting runs first so analysis and detection classify the
+            # cleaned-up query. Embed runs in parallel with classify since
+            # nomic-embed-text (595MB) + chat_balanced (3.4GB) both fit in
+            # VRAM — no model swap on ollama. Single chat tier eliminates
+            # the old fast/balanced/smart swap problem.
             _progress("Analyzing query...")
             t0 = time.perf_counter()
+            from concurrent.futures import ThreadPoolExecutor
+
             from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
 
             retrieval_query = sanitized
             rewrite_result = None
 
-            # Step 1: Embed query first (nomic-embed-text is tiny, loads fast)
-            precomputed_query_vector = None
-            try:
-                precomputed_vectors = self._embedder.embed_batch([sanitized], task_type="query")
-                precomputed_query_vector = dict(zip([sanitized], precomputed_vectors))
-            except Exception:
-                pass
-
-            # Step 2: Rewrite (chat model loads here, stays loaded for everything after)
+            # Step 1: Rewrite (individual LLM call, runs first)
             if self._query_rewriter:
                 try:
                     rewrite_result = self._query_rewriter.rewrite(sanitized)
@@ -693,7 +688,7 @@ class FitzKragEngine:
                 except Exception as e:
                     logger.warning("Query rewriting failed, using original", error=str(e))
 
-            # Step 3: Analysis + Detection on rewritten query
+            # Step 2: Analysis + Detection on rewritten query, + Embedding in parallel
             classify_query = retrieval_query
             fast_analysis = self._fast_analyze(classify_query)
             need_llm_analysis = fast_analysis is None
@@ -711,8 +706,10 @@ class FitzKragEngine:
                     detection_limit_to = flagged
 
             if need_llm_analysis or need_detection:
-                try:
-                    batch_result = self._query_batcher.batch_classify(
+                # Batch analysis + detection in one LLM call, embed in parallel
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    batch_future = pool.submit(
+                        self._query_batcher.batch_classify,
                         classify_query,
                         include_analysis=need_llm_analysis,
                         include_detection=need_detection,
@@ -720,27 +717,43 @@ class FitzKragEngine:
                         include_rewriting=False,
                         include_extended=True,
                     )
-                    analysis = batch_result.analysis if batch_result.analysis else fast_analysis
-                    detection = (
-                        self._build_detection_summary(
-                            batch_result.detection_results, classify_query
+                    embed_future = pool.submit(self._embedder.embed_batch, [sanitized])
+
+                    try:
+                        batch_result = batch_future.result()
+                        analysis = batch_result.analysis if batch_result.analysis else fast_analysis
+                        detection = (
+                            self._build_detection_summary(
+                                batch_result.detection_results, classify_query
+                            )
+                            if need_detection and batch_result.detection_results is not None
+                            else None
                         )
-                        if need_detection and batch_result.detection_results is not None
-                        else None
-                    )
-                except Exception as e:
-                    logger.warning(f"Batched query intelligence failed: {e}")
-                    analysis = fast_analysis or QueryAnalysis(
-                        primary_type=QueryType.GENERAL,
-                        confidence=0.3,
-                        refined_query=sanitized,
-                    )
-                    detection = None
-                    batch_result = None
+                    except Exception as e:
+                        logger.warning(f"Batched query intelligence failed: {e}")
+                        analysis = fast_analysis or QueryAnalysis(
+                            primary_type=QueryType.GENERAL,
+                            confidence=0.3,
+                            refined_query=sanitized,
+                        )
+                        detection = None
+                        batch_result = None
+
+                    try:
+                        precomputed_vectors = embed_future.result()
+                        precomputed_query_vector = dict(zip([sanitized], precomputed_vectors))
+                    except Exception:
+                        precomputed_query_vector = None
             else:
+                # No LLM needed: fast_analyze succeeded, no detection needed
                 analysis = fast_analysis
                 detection = None
                 batch_result = None
+                try:
+                    precomputed_vectors = self._embedder.embed_batch([sanitized], task_type="query")
+                    precomputed_query_vector = dict(zip([sanitized], precomputed_vectors))
+                except Exception:
+                    precomputed_query_vector = None
             timings.append(("Analysis + Detection", time.perf_counter() - t0))
 
             # Build retrieval profile — single object with all gates and signals
