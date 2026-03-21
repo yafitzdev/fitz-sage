@@ -1,6 +1,9 @@
 # tests/load/test_scalability.py
 """
-Scalability tests for corpus size and concurrent queries.
+Scalability tests — concurrent queries and stability under load.
+
+Tests here verify the harness handles concurrent access correctly and
+doesn't degrade. They do NOT assert absolute throughput (hardware-dependent).
 
 Run with: pytest tests/load/test_scalability.py -v -s --tb=short -m scalability
 """
@@ -8,80 +11,13 @@ Run with: pytest tests/load/test_scalability.py -v -s --tb=short -m scalability
 from __future__ import annotations
 
 import concurrent.futures
-import gc
-import tempfile
 import time
-from pathlib import Path
 
-import psutil
 import pytest
 
 from fitz_ai.core import Query
 
 pytestmark = pytest.mark.scalability
-
-
-class TestCorpusScalability:
-    """Test behavior with varying corpus sizes."""
-
-    def generate_documents(self, count: int, tmp_dir: Path) -> list[Path]:
-        """Generate synthetic documents for testing."""
-        docs = []
-        for i in range(count):
-            doc_path = tmp_dir / f"doc_{i:05d}.md"
-            content = f"""# Document {i}
-
-## Section A
-This is synthetic document number {i} for scalability testing.
-It contains information about topic_{i % 100} and category_{i % 10}.
-
-## Section B
-The quick brown fox jumps over the lazy dog. This sentence contains
-every letter of the alphabet and is used for testing purposes.
-
-## Data
-- ID: DOC-{i:05d}
-- Category: cat_{i % 10}
-- Topic: topic_{i % 100}
-- Value: {i * 1.5:.2f}
-"""
-            doc_path.write_text(content)
-            docs.append(doc_path)
-        return docs
-
-    @pytest.mark.parametrize("doc_count", [100, 500, 1000])
-    def test_ingestion_scalability(self, doc_count):
-        """Test ingestion time scales reasonably with corpus size."""
-        pytest.skip("Ingestion scalability test requires full ingestion pipeline setup")
-        # Note: This test would need to set up embedder, vector DB, chunking, etc.
-        # Skipping for now as it requires significant infrastructure
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = Path(tmp_dir)
-            _docs = self.generate_documents(doc_count, tmp_path)
-
-            gc.collect()
-            mem_before = psutil.Process().memory_info().rss / 1024 / 1024
-            start = time.perf_counter()
-
-            # Ingest to a test collection
-            _collection_name = f"scale_test_{doc_count}"
-            # Would need to call run_diff_ingest with full setup
-            pass
-
-            elapsed = time.perf_counter() - start
-            mem_after = psutil.Process().memory_info().rss / 1024 / 1024
-
-            docs_per_sec = doc_count / elapsed
-            mem_per_doc = (mem_after - mem_before) / doc_count
-
-            print(f"\nIngestion Scalability ({doc_count} docs):")
-            print(f"  Time: {elapsed:.1f}s ({docs_per_sec:.1f} docs/sec)")
-            print(f"  Memory: {mem_after - mem_before:.1f}MB ({mem_per_doc:.2f}MB/doc)")
-
-            # Assertions
-            assert docs_per_sec > 1, f"Ingestion too slow: {docs_per_sec:.2f} docs/sec"
-            assert mem_per_doc < 10, f"Memory per doc too high: {mem_per_doc:.1f}MB"
 
 
 class TestConcurrentQueries:
@@ -91,8 +27,8 @@ class TestConcurrentQueries:
     def setup_pipeline(self, krag_e2e_runner):
         self.runner = krag_e2e_runner
 
-    def test_concurrent_queries(self):
-        """Multiple concurrent queries should not fail."""
+    def test_concurrent_queries_all_succeed(self):
+        """Multiple concurrent queries should not crash or deadlock."""
         queries = [
             "Where is TechCorp headquartered?",
             "What is the price of Model Y200?",
@@ -111,7 +47,6 @@ class TestConcurrentQueries:
                 elapsed = time.perf_counter() - start
                 return (query, elapsed, False)
 
-        # Run queries concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(run_query, q) for q in queries]
             results = [f.result() for f in concurrent.futures.as_completed(futures)]
@@ -128,23 +63,32 @@ class TestConcurrentQueries:
             queries
         ), f"Only {successes}/{len(queries)} concurrent queries succeeded"
 
-    @pytest.mark.parametrize("num_queries", [5, 10, 25])
-    def test_sequential_throughput(self, num_queries):
-        """Measure queries per second throughput."""
+    def test_sequential_throughput_consistent(self):
+        """Throughput should not degrade over sequential queries.
+
+        Measures whether the 5th query is significantly slower than
+        the 1st — catches resource leaks, connection pool exhaustion, etc.
+        """
         query = "Where is TechCorp headquartered?"
+        times = []
 
-        start = time.perf_counter()
-        for _ in range(num_queries):
+        for _ in range(5):
+            start = time.perf_counter()
             self.runner.engine.answer(Query(text=query))
-        elapsed = time.perf_counter() - start
+            times.append(time.perf_counter() - start)
 
-        qps = num_queries / elapsed
+        first = times[0]
+        last = times[-1]
+        ratio = last / first if first > 0 else float("inf")
 
-        print(f"\nSequential Throughput ({num_queries} queries):")
-        print(f"  Total time: {elapsed:.1f}s")
-        print(f"  Throughput: {qps:.2f} queries/sec")
+        print(f"\nSequential Consistency (5 queries):")
+        print(f"  First: {first:.1f}s, Last: {last:.1f}s, Ratio: {ratio:.2f}x")
+        for i, t in enumerate(times):
+            print(f"  Query {i + 1}: {t:.1f}s")
 
-        # Throughput depends on LLM latency:
-        # - Local LLM (Ollama): ~30-40s per query with embed-first pipeline -> ~0.025 qps
-        # - Cloud LLM (Cohere fallback): ~5-10s per query -> 0.1-0.2 qps
-        assert qps > 0.02, f"Throughput too low: {qps:.2f} qps"
+        # Last query should not be more than 2x slower than first
+        # (allows for GC pauses but catches degradation)
+        assert ratio < 2.0, (
+            f"Throughput degraded: query 5 is {ratio:.1f}x slower than query 1 "
+            f"({last:.1f}s vs {first:.1f}s)"
+        )

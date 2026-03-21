@@ -2,8 +2,8 @@
 """
 Performance test fixtures.
 
-These tests measure latency, memory usage, and throughput
-under normal (single-user) conditions.
+These tests measure pipeline harness overhead and memory stability,
+NOT hardware-dependent LLM generation speed.
 
 Imports e2e fixtures directly (not via root conftest to avoid parallel execution issues).
 """
@@ -99,26 +99,3 @@ def measure_perf() -> Callable:
         return metrics
 
     return _measure
-
-
-# Performance thresholds (adjust based on your requirements)
-# Note: These thresholds account for:
-# - Cloud LLM latency (Cohere API: ~2-5s per call)
-# - Cloud embedding latency (~500ms per call, multiple calls for query expansion)
-# - Network variance in CI environments
-#
-# Retrieval pipeline work includes:
-# - Query rewriting (skipped for simple queries via heuristics)
-# - Synonym/acronym expansion (creates 2-4 query variations)
-# - Embedding each variation (cloud API calls - main latency source)
-# - Hybrid search (dense + sparse with RRF fusion)
-# - Entity graph expansion
-# - Keyword filtering
-#
-# Optimization opportunity: Use batch embeddings to reduce API round-trips
-PERF_THRESHOLDS = {
-    "query_p95_ms": 50000,  # 50s for p95 (local ollama 4b: ~38s typical + variance)
-    "query_p99_ms": 100000,  # 100s for p99 (complex/multi-hop on local 4b)
-    "ingestion_mb_per_doc": 50,  # Max 50MB memory per document
-    "retrieval_p95_ms": 80000,  # 80s for retrieval (includes analyze LLM call on local 4b)
-}
