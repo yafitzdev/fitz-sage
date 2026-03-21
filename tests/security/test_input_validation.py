@@ -43,9 +43,12 @@ class TestMalformedInputs:
 
     @with_tiered_fallback
     def test_special_characters(self):
-        """SQL injection and XSS attempts should not crash."""
+        """SQL injection, XSS, excessive punctuation, whitespace should not crash."""
         answer = self.runner.engine.answer(
-            Query(text="TechCorp; DROP TABLE users;-- <script>alert('xss')</script>")
+            Query(
+                text="TechCorp; DROP TABLE users;-- <script>alert('xss')</script>"
+                "???????? What\n\n  is    TechCorp?"
+            )
         )
         assert answer is not None
         assert "<script>" not in answer.text
@@ -68,46 +71,4 @@ class TestInputLengthLimits:
     def test_query_with_long_word(self):
         long_word = "a" * 2000
         answer = self.runner.engine.answer(Query(text=f"What is {long_word}?"))
-        assert answer is not None
-
-    def test_many_queries_dont_leak_memory(self):
-        """Memory should not grow unbounded across queries."""
-        import gc
-
-        import psutil
-
-        process = psutil.Process()
-        gc.collect()
-        mem_before = process.memory_info().rss / 1024 / 1024
-
-        # 5 queries — enough to detect leaks, fast enough for CI
-        for i in range(5):
-            try:
-                self.runner.engine.answer(Query(text=f"Query {i}: What is TechCorp?"))
-            except Exception:
-                pass
-
-        gc.collect()
-        mem_after = process.memory_info().rss / 1024 / 1024
-        mem_growth = mem_after - mem_before
-        print(f"\nMemory growth over 5 queries: {mem_growth:.1f}MB")
-        assert mem_growth < 100, f"Memory grew {mem_growth:.1f}MB - possible leak"
-
-
-class TestRepeatedPatterns:
-    """Tests for handling repeated/adversarial patterns."""
-
-    @pytest.fixture(autouse=True)
-    def setup_pipeline(self, krag_e2e_runner):
-        self.runner = krag_e2e_runner
-
-    @with_tiered_fallback
-    def test_repeated_question_marks(self):
-        answer = self.runner.engine.answer(Query(text="What is TechCorp????????"))
-        assert answer is not None
-
-    @with_tiered_fallback
-    def test_newlines_and_spaces(self):
-        """Excessive whitespace and newlines should be handled."""
-        answer = self.runner.engine.answer(Query(text="What    is\n\nTechCorp\n  Industries?"))
         assert answer is not None

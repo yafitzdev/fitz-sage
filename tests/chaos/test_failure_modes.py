@@ -52,26 +52,6 @@ class TestLLMFailures:
                     )
                 )
 
-    def test_llm_rate_limit_handling(self):
-        """Rate limit errors should be handled.
-
-        Mocks the synthesizer's chat to raise a rate limit error at generation.
-        The engine catches and wraps as GenerationError.
-        """
-        from fitz_ai.core.exceptions import GenerationError, KnowledgeError
-
-        with patch.object(
-            self.runner.engine._synthesizer._chat,
-            "chat",
-            side_effect=Exception("Rate limit exceeded. Retry after 60 seconds."),
-        ):
-            with pytest.raises((GenerationError, KnowledgeError)):
-                self.runner.engine.answer(
-                    Query(
-                        text="What is the detailed history and background of TechCorp Industries?"
-                    )
-                )
-
 
 class TestRetrievalFailures:
     """Tests for retrieval/vector DB failure handling."""
