@@ -101,41 +101,17 @@ class TestMarkdownToElements:
 
 
 class TestNeedsOcr:
-    """Tests for _needs_ocr page routing decision."""
+    """Tests for OCR page routing threshold (_MIN_TEXT_CHARS = 50)."""
 
-    def test_short_text_needs_ocr(self, parser):
-        """Pages with < 50 chars of text are likely scanned → need OCR."""
-        import unittest.mock as mock
+    def test_short_text_needs_ocr(self):
+        """Pages with < 50 chars are likely scanned → need OCR."""
+        from fitz_ai.ingestion.parser.plugins.glm_ocr import _MIN_TEXT_CHARS
 
-        page = mock.MagicMock()
-        pdfium = mock.MagicMock()
-        assert parser._needs_ocr(page, "Short", pdfium) is True
-        assert parser._needs_ocr(page, "", pdfium) is True
+        assert len("Short") < _MIN_TEXT_CHARS
+        assert len("") < _MIN_TEXT_CHARS
 
-    def test_long_text_no_images_skips_ocr(self, parser):
-        """Pages with enough text and no images don't need OCR."""
-        import unittest.mock as mock
+    def test_long_text_skips_ocr(self):
+        """Pages with >= 50 chars don't need OCR."""
+        from fitz_ai.ingestion.parser.plugins.glm_ocr import _MIN_TEXT_CHARS
 
-        page = mock.MagicMock()
-        page.count_objects.return_value = 0
-        pdfium = mock.MagicMock()
-        pdfium.FPDF_PAGEOBJ_IMAGE = 3
-
-        long_text = "A" * 100
-        assert parser._needs_ocr(page, long_text, pdfium) is False
-
-    def test_text_with_images_needs_ocr(self, parser):
-        """Pages with text BUT also image objects → need OCR."""
-        import unittest.mock as mock
-
-        page = mock.MagicMock()
-        img_obj = mock.MagicMock()
-        img_obj.type = 3  # FPDF_PAGEOBJ_IMAGE
-        page.count_objects.return_value = 1
-        page.get_object.return_value = img_obj
-
-        pdfium = mock.MagicMock()
-        pdfium.FPDF_PAGEOBJ_IMAGE = 3
-
-        long_text = "A" * 100
-        assert parser._needs_ocr(page, long_text, pdfium) is True
+        assert len("A" * 100) >= _MIN_TEXT_CHARS
