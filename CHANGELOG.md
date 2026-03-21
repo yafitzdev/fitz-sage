@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🚀 Performance
 
 - **Local/cloud tier split** — local ollama: all tiers → `chat_balanced` (zero VRAM swaps); cloud: use configured fast/balanced/smart (`8130ddd`)
+- **Parallel embed + classify** — embed runs in parallel with batch classify since embed model + chat model both fit in VRAM (`a73a22b`)
+- **Single chat tier on local** — map fast/balanced/smart all to `chat_balanced`, eliminating 5 model swaps per query on Ollama (`a7904d2`)
 - **Combined SQL generation** — merged column selection + SQL gen into 1 LLM call in TableQueryHandler (`a7904d2`)
 - **Rewrite-first dispatch** — rewrite query before classification for better analysis accuracy (`9e09793`)
 - **Eliminated double SQL execution** — table handler reuses validated SQL result instead of executing twice (`3f483ba`)
