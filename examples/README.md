@@ -128,46 +128,29 @@ python examples/05_advanced_queries.py
 ## CLI Quick Reference
 
 ```bash
-# One-liner RAG
-fitz quickstart ./docs "What is this about?"
-
-# Step-by-step
-fitz init                    # Interactive setup
-fitz ingest ./docs           # Ingest documents
-fitz query "Your question"   # Query
-fitz chat                    # Interactive chat
+# Query
+fitz query "Your question" --source ./docs
 
 # Management
 fitz collections             # Manage collections
-fitz keywords list           # View extracted keywords
-fitz doctor                  # System diagnostics
+fitz serve                   # Start API server
+fitz reset                   # Reset data
 ```
 
 ## Configuration
 
-Fitz works out of the box, but you can customize via `~/.fitz/config/fitz_krag.yaml`:
+Fitz works out of the box. Customize via `.fitz/config.yaml`:
 
 ```yaml
-# LLM provider
-chat:
-  plugin_name: cohere  # or openai, anthropic, local_ollama
-  kwargs:
-    models:
-      smart: command-a-03-2025
-      fast: command-r7b-12-2024
-
-# Embeddings
-embedding:
-  plugin_name: cohere
-  kwargs:
-    model: embed-english-v3.0
+# LLM providers (format: provider/model)
+chat_fast: ollama/qwen3.5:2b
+chat_balanced: ollama/qwen3.5:4b
+chat_smart: ollama/qwen3.5:9b
+embedding: ollama/nomic-embed-text
+rerank: null
 
 # Storage (always PostgreSQL)
 vector_db: pgvector
-vector_db_kwargs:
-  mode: local  # embedded PostgreSQL, zero config
-  # mode: external
-  # connection_string: postgresql://user:pass@host:5432/db
 ```
 
 ## More Resources

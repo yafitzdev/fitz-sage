@@ -28,9 +28,8 @@ Test the Fitz Cloud cache functionality end-to-end.
    ```
 
 4. **Configure Cloud Settings**:
-   - Copy `example_config_with_cache.yaml` to `.fitz/config/fitz_krag.yaml`
+   - Add cloud settings to `.fitz/config.yaml`
    - Fill in your `api_key` and `org_key`
-   - Update other settings (chat, embedding, vector_db) as needed
 
 5. **Ingest Test Documents**:
    ```bash
@@ -50,7 +49,7 @@ python tests/manual/test_cloud_cache.py
 CLOUD CACHE MANUAL TEST
 ================================================================================
 ✓ FITZ_ORG_ID: 12345678...
-✓ Config file: .fitz/config/fitz_krag.yaml
+✓ Config file: .fitz/config.yaml
 ✓ Cloud enabled in config
 ✓ FitzKragEngine initialized
 
