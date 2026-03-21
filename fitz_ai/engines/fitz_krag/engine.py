@@ -162,9 +162,11 @@ class FitzKragEngine:
         with ThreadPoolExecutor(max_workers=3) as pool:
             chat_future = pool.submit(
                 get_chat,
-                self._config.chat_balanced
-                if self._config.chat_balanced.startswith("ollama")
-                else self._config.chat_smart,
+                (
+                    self._config.chat_balanced
+                    if self._config.chat_balanced.startswith("ollama")
+                    else self._config.chat_smart
+                ),
             )
             embed_future = pool.submit(
                 get_embedder,
