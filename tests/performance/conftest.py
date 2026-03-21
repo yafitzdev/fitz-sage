@@ -117,8 +117,8 @@ def measure_perf() -> Callable:
 #
 # Optimization opportunity: Use batch embeddings to reduce API round-trips
 PERF_THRESHOLDS = {
-    "query_p95_ms": 45000,  # 45s max for p95 (local ollama: 2b fast + 4b synthesis + model swap)
-    "query_p99_ms": 45000,  # 45s max for p99 (multi-hop or complex queries)
+    "query_p95_ms": 50000,  # 50s for p95 (local ollama 4b: ~38s typical + variance)
+    "query_p99_ms": 100000,  # 100s for p99 (complex/multi-hop on local 4b)
     "ingestion_mb_per_doc": 50,  # Max 50MB memory per document
     "retrieval_p95_ms": 8000,  # 8s for retrieval (embedding API calls for query expansion)
 }

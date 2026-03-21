@@ -91,9 +91,12 @@ class TestRetrievalLatency:
         analyzer = self.runner.engine._query_analyzer
 
         def retrieve():
+            from fitz_ai.engines.fitz_krag.retrieval_profile import build_retrieval_profile
+
             query_text = "TechCorp electric vehicles"
             analysis = analyzer.analyze(query_text)
-            return self.runner.engine._retrieval_router.retrieve(query_text, analysis)
+            profile = build_retrieval_profile(analysis, None, self.runner.engine._config)
+            return self.runner.engine._retrieval_router.retrieve(query_text, profile)
 
         metrics = measure_perf(retrieve, iterations=10, warmup=2)
 
