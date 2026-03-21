@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🎉 Highlights
 
-**7x Faster Queries** — Eliminated model swapping on local Ollama. Embed-first pipeline runs the tiny embed model first, then all chat calls use a single model tier with zero swaps. Query wallclock dropped from ~180s to ~27s on local hardware.
+**Local/Cloud Optimization** — Local Ollama automatically maps all chat tiers to `chat_balanced` (one model, zero VRAM swaps). Cloud providers use all three tiers as configured (no swap cost with APIs).
 
 **Hybrid PDF Parser** — Replaced Docling (21 min for 113 pages) with pdfplumber + GLM-OCR hybrid parser (28s). Text pages parsed instantly via pdfplumber with font-size/bold heading detection; scanned pages routed to GLM-OCR.
 
@@ -30,10 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🚀 Performance
 
-- **Embed-first pipeline** — embed query before chat calls so chat model loads once and stays loaded for entire pipeline (`a7904d2`)
-- **Single chat tier** — map fast/balanced/smart all to `chat_balanced`, eliminating 5 model swaps per query on Ollama (`a7904d2`)
+- **Local/cloud tier split** — local ollama: all tiers → `chat_balanced` (zero VRAM swaps); cloud: use configured fast/balanced/smart (`8130ddd`)
 - **Combined SQL generation** — merged column selection + SQL gen into 1 LLM call in TableQueryHandler (`a7904d2`)
 - **Rewrite-first dispatch** — rewrite query before classification for better analysis accuracy (`9e09793`)
+- **Eliminated double SQL execution** — table handler reuses validated SQL result instead of executing twice (`3f483ba`)
 
 ### 🔄 Changed
 
@@ -48,6 +48,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SQL prompt: added GROUP BY rule for aggregate queries (`29cf080`)
 - SQL retry: feed actual PostgreSQL error messages to LLM instead of generic "Query execution failed" (`29cf080`)
 - SQL prompt: added rule to include ORDER BY/WHERE columns in SELECT (`29cf080`)
+- Removed dead `_text_to_elements` and `_parse_json_list` methods (`3f483ba`)
+
+### 🧪 Tests
+
+- Rewrote performance/load tests to measure harness overhead, not hardware-dependent LLM speed
+- Removed absolute latency/throughput thresholds — tests now check relative metrics (degradation ratio, memory stability)
+- Reduced tier 4 answer() calls from 96 to 36 (~9 min instead of 60+ min)
+- Updated chaos tests to mock synthesizer chat (pipeline no longer calls `_query_analyzer.analyze`)
+
+### 📝 Docs
+
+- Rewrote CONFIG.md for flat `provider/model` config format
+- Updated 12 docs: removed `plugin_name`/`kwargs`, `fitz_krag.yaml`, `local_ollama`, `fitz init` references
 
 ---
 
