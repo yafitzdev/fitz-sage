@@ -160,14 +160,9 @@ class FitzKragEngine:
 
         print("  Starting database and connecting to LLM providers...", end="", flush=True)
         with ThreadPoolExecutor(max_workers=3) as pool:
-            # self._chat is used for synthesis — smart tier (balanced on local)
             chat_future = pool.submit(
                 get_chat,
-                (
-                    self._config.chat_balanced
-                    if self._config.chat_balanced.startswith("ollama")
-                    else self._config.chat_smart
-                ),
+                self._config.chat_smart,
             )
             embed_future = pool.submit(
                 get_embedder,
@@ -266,31 +261,23 @@ class FitzKragEngine:
         # Chat factory (shared by detection, rewriter, HyDE, multi-hop, enrichment)
         from fitz_ai.llm.factory import get_chat_factory
 
-        is_local = self._config.chat_balanced.startswith("ollama")
-        if is_local:
-            # Local (ollama): single model for all tiers. Model swapping
-            # costs 10-15s per swap, which exceeds the speed gain from
-            # using a smaller model. One model = zero swaps.
-            self._chat_factory = get_chat_factory(
-                {
-                    "fast": self._config.chat_balanced,
-                    "balanced": self._config.chat_balanced,
-                    "smart": self._config.chat_balanced,
-                }
-            )
-        else:
-            # Cloud (API keys): use all three configured tiers. No swap cost,
-            # and fast models are cheaper/faster for lightweight tasks.
-            self._chat_factory = get_chat_factory(
-                {
-                    "fast": self._config.chat_fast,
-                    "balanced": self._config.chat_balanced,
-                    "smart": self._config.chat_smart,
-                }
-            )
+        self._chat_factory = get_chat_factory(
+            {
+                "fast": self._config.chat_fast,
+                "balanced": self._config.chat_balanced,
+                "smart": self._config.chat_smart,
+            }
+        )
 
         def _warmup_chat():
             print("  Loading LLM models (first run may take a moment)...", end="", flush=True)
+            try:
+                self._chat_factory("fast").chat(
+                    [{"role": "user", "content": "hi"}],
+                    max_tokens=1,
+                )
+            except Exception:
+                pass
             try:
                 self._chat.chat(
                     [{"role": "user", "content": "hi"}],

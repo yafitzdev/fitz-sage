@@ -12,7 +12,7 @@ tiers:
     chat: ollama
     chat_models:
       smart: qwen3.5:4b
-      fast: qwen3.5:4b
+      fast: qwen3.5:2b
       balanced: qwen3.5:4b
     embedding: ollama
     embedding_model: nomic-embed-text
