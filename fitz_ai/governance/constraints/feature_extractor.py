@@ -662,6 +662,22 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
         features["ctx_total_chars"] < 500 and features.get("vocab_overlap_ratio", 0) > 0.3
     )
 
+    # --- Q2 routing features: distinguish number-rich docs from real disputes ---
+    # High number density + low conflict ratio = data-rich, not disputed
+    features["ix_numrich_low_conflict"] = features["number_density"] * (
+        1 - features["conflict_to_number_ratio"]
+    )
+
+    # --- Q1/Q4 recovery: no constraints fired but good relevance signals ---
+    features["ix_no_constraint_good_signal"] = float(
+        features.get("num_constraints_fired", 0) == 0
+    ) * features.get("query_subject_partial", 0) * features.get("mean_vector_score", 0)
+
+    # --- Hedged disputes: hedged evidence + numerical divergence = dispute not abstain ---
+    features["ix_hedged_with_conflicts"] = (
+        1 - features.get("assertion_density", 0)
+    ) * float(features.get("has_cross_chunk_divergence", False))
+
 
 def _extract_numbers_from_text(text: str) -> list[float]:
     """Extract significant numbers from text, excluding years and trivial values."""

@@ -379,6 +379,24 @@ class GovernanceDecider:
             X["ix_ie_no_ca"] = X["ie_fired"] * (1 - X["ca_fired"])
             X["ix_ca_no_ie"] = X["ca_fired"] * (1 - X["ie_fired"])
 
+        # Q2 routing: number-rich docs are not disputes
+        if "number_density" in X.columns and "conflict_to_number_ratio" in X.columns:
+            X["ix_numrich_low_conflict"] = X["number_density"] * (
+                1 - X["conflict_to_number_ratio"]
+            )
+        # Q1/Q4 recovery: no constraints + good signals = answerable
+        if "num_constraints_fired" in X.columns and "query_subject_partial" in X.columns:
+            X["ix_no_constraint_good_signal"] = (
+                (X["num_constraints_fired"] == 0).astype(float)
+                * X.get("query_subject_partial", 0)
+                * X.get("mean_vector_score", 0)
+            )
+        # Hedged disputes: hedged evidence + divergence = dispute not abstain
+        if "assertion_density" in X.columns and "has_cross_chunk_divergence" in X.columns:
+            X["ix_hedged_with_conflicts"] = (
+                1 - X["assertion_density"]
+            ) * X["has_cross_chunk_divergence"]
+
         # Align columns to model's expected feature set
         missing = [c for c in self._feature_names if c not in X.columns]
         for col in missing:
