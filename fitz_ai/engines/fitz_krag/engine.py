@@ -867,14 +867,8 @@ class FitzKragEngine:
             answer_mode = AnswerMode.TRUSTWORTHY
             if self._constraints and self._governor:
                 t0 = time.perf_counter()
-                # Suppress noisy constraint warnings (embedding 400s, etc.)
-                # — constraints handle errors gracefully, warnings are just noise
-                import logging as _logging
-
                 from fitz_ai.governance import run_constraints
                 from fitz_ai.governance.constraints.feature_extractor import extract_features
-
-                _logging.getLogger("fitz_ai.governance.constraints").setLevel(_logging.ERROR)
 
                 constraint_results = run_constraints(sanitized, expanded, self._constraints)
                 # Build constraint_name -> result dict for feature extraction
@@ -902,11 +896,15 @@ class FitzKragEngine:
                 # but LLM code search already validated relevance via structural
                 # reasoning. Override ABSTAIN → TRUSTWORTHY so generation runs.
                 if answer_mode == AnswerMode.ABSTAIN and self._manifest is not None and expanded:
-                    logger.info(
-                        "Overriding ABSTAIN → TRUSTWORTHY in progressive mode "
-                        "(degraded guardrails features with code evidence)"
-                    )
-                    answer_mode = AnswerMode.TRUSTWORTHY
+                    # Only override if abstain was solely from insufficient_evidence
+                    # (expected in progressive mode due to degraded features).
+                    # Preserve abstain from other constraints (real relevance failures).
+                    if set(governance.triggered_constraints) <= {"insufficient_evidence"}:
+                        logger.info(
+                            "Overriding ABSTAIN → TRUSTWORTHY in progressive mode "
+                            "(IE-only abstain with code evidence)"
+                        )
+                        answer_mode = AnswerMode.TRUSTWORTHY
 
                 timings.append(("Guardrails", time.perf_counter() - t0))
 

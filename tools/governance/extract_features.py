@@ -193,14 +193,15 @@ def enrich_chunks_with_embeddings(
 
 
 def make_constraints(chat, chat_balanced=None, embedder=None) -> list:
-    """Create a fresh set of constraints (one set per worker thread)."""
+    """Create a fresh set of constraints (one set per worker thread).
+
+    Mirrors create_default_constraints() but adds adaptive=True for conflict detection.
+    """
     return [
         InsufficientEvidenceConstraint(chat=chat, embedder=embedder),
-        CausalAttributionConstraint(),
-        SpecificInfoTypeConstraint(),
-        ConflictAwareConstraint(
-            chat=chat, adaptive=True, embedder=embedder.embed if embedder else None
-        ),
+        CausalAttributionConstraint(embedder=embedder),
+        SpecificInfoTypeConstraint(embedder=embedder),
+        ConflictAwareConstraint(chat=chat, adaptive=True, embedder=embedder),
         AnswerVerificationConstraint(chat=chat, chat_balanced=chat_balanced),
     ]
 
@@ -334,14 +335,18 @@ def main():
     print("Loading fitz-ai config...")
     cfg = load_engine_config("fitz_krag")
 
-    chat_spec = args.chat or cfg.chat_smart
-    chat_factory = get_chat_factory(
-        {
+    # Chat provider: --chat overrides ALL tiers (fast/balanced/smart)
+    if args.chat:
+        chat_spec = args.chat
+        tier_specs = {"fast": chat_spec, "balanced": chat_spec, "smart": chat_spec}
+    else:
+        chat_spec = cfg.chat_smart
+        tier_specs = {
             "fast": cfg.chat_fast,
             "balanced": cfg.chat_balanced,
             "smart": cfg.chat_smart,
         }
-    )
+    chat_factory = get_chat_factory(tier_specs)
     chat = chat_factory("fast")
     chat_balanced = chat_factory("balanced")
     model_name = getattr(chat, "_model", "unknown")
@@ -369,17 +374,50 @@ def main():
         cases = cases[: args.limit]
     print(f"Loaded {len(cases)} cases")
 
-    # Process cases
-    all_rows: list[dict[str, Any]] = []
+    # Resume support: load already-completed case IDs from output CSV
+    completed_ids: set[str] = set()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    if args.output.exists() and args.output.stat().st_size > 0:
+        with args.output.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if "case_id" in row:
+                    completed_ids.add(row["case_id"])
+        if completed_ids:
+            print(f"Resuming: {len(completed_ids)} cases already completed, skipping them")
+
+    remaining_cases = [c for c in cases if c["id"] not in completed_ids]
+    print(f"Processing {len(remaining_cases)} remaining cases ({len(completed_ids)} skipped)")
+
+    # Process cases with incremental CSV writing
     errors = 0
+    written = 0
     start_time = time.time()
+    write_lock = threading.Lock()
+    _fieldnames: list[str] | None = None
+
+    def _write_row(row: dict[str, Any]) -> None:
+        nonlocal _fieldnames, written
+        with write_lock:
+            if _fieldnames is None:
+                _fieldnames = list(row.keys())
+                # Write header + first row together (atomic)
+                with args.output.open("w", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fieldnames=_fieldnames)
+                    writer.writeheader()
+                    writer.writerow(row)
+            else:
+                with args.output.open("a", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fieldnames=_fieldnames)
+                    writer.writerow(row)
+            written += 1
 
     if args.workers <= 1:
-        for case in tqdm(cases, desc="Extracting features"):
+        for case in tqdm(remaining_cases, desc="Extracting features"):
             try:
                 row = process_case(case, chat, chat_balanced, embedder, detection_orchestrator)
                 if row:
-                    all_rows.append(row)
+                    _write_row(row)
             except Exception as e:
                 errors += 1
                 print(f"\n  ERROR on case {case['id']}: {e}", file=sys.stderr)
@@ -389,7 +427,7 @@ def main():
                 executor.submit(
                     process_case, case, chat, chat_balanced, embedder, detection_orchestrator
                 ): case["id"]
-                for case in cases
+                for case in remaining_cases
             }
             for future in tqdm(
                 as_completed(futures), total=len(futures), desc="Extracting features"
@@ -398,25 +436,28 @@ def main():
                 try:
                     row = future.result()
                     if row:
-                        all_rows.append(row)
+                        _write_row(row)
                 except Exception as e:
                     errors += 1
                     print(f"\n  ERROR on case {case_id}: {e}", file=sys.stderr)
 
     elapsed = time.time() - start_time
-    print(f"\nProcessed {len(all_rows)} cases in {elapsed:.1f}s ({errors} errors)")
-    print(f"Throughput: {len(all_rows)/elapsed:.1f} cases/sec")
+    total = written + len(completed_ids)
+    print(f"\nProcessed {written} cases in {elapsed:.1f}s ({errors} errors)")
+    print(f"Throughput: {written/elapsed:.1f} cases/sec")
+    print(f"Total rows in CSV: {total}")
 
-    if not all_rows:
-        print("No rows to write!", file=sys.stderr)
+    if total == 0:
+        print("No rows written!", file=sys.stderr)
         sys.exit(1)
 
-    # Sort by case_id for deterministic output
+    # Re-read and sort for deterministic output
+    all_rows = []
+    with args.output.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames
+        all_rows = list(reader)
     all_rows.sort(key=lambda r: r["case_id"])
-
-    # Write CSV
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = list(all_rows[0].keys())
     with args.output.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()

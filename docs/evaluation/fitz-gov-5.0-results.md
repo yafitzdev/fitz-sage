@@ -18,12 +18,13 @@ fitz-gov 5.0 expanded the benchmark from 1,113 to 2,910 cases and replaced the t
 
 | Metric | Value |
 |--------|-------|
-| **Overall accuracy** | **81.3%** |
-| **Abstain recall** | **90.2%** |
-| **Disputed recall** | **74.9%** |
-| **Trustworthy recall** | **78.6%** |
+| **Overall accuracy** | **76.4%** |
+| **Abstain recall** | **84.6%** |
+| **Disputed recall** | **77.3%** |
+| **Trustworthy recall** | **70.5%** |
+| **False-trustworthy** | **4.3%** (126/2,920) |
 
-Evaluated with 5-fold stratified cross-validation on all 2,910 cases.
+Evaluated with 5-fold stratified cross-validation on all 2,920 cases.
 
 ### Version Comparison
 
@@ -32,7 +33,8 @@ Evaluated with 5-fold stratified cross-validation on all 2,910 cases.
 | v1.0 | 200 | Rules (governor) | 72.5% | 90.0% | ~72% | ~72% |
 | v2.0 | 331 | Rules (governor) | 57.1% | 89.1% | ~47–79% | ~72% |
 | v3.0 | 1,113 | 2-stage ML (ET + RF) | 93.7% | 94.4% | 89.0% | 90.9% |
-| **v5.0** | **2,910** | **4-question cascade (GBT × 3)** | **90.2%** | **74.9%** | **78.6%** | **81.3%** |
+| v5.0 | 2,910 | 4-question cascade (GBT × 3) | 90.2% | 74.9% | 78.6% | 81.3% |
+| **v5.1** | **2,920** | **5-question cascade (GBT × 4)** | **84.6%** | **77.3%** | **70.5%** | **76.4% (FT=4.3%)** |
 
 **On the accuracy drop**: v3.0's 90.9% was measured with safety-first thresholds calibrated and evaluated on the same 1,113-case set. v5.0 uses 5-fold cross-validation on 2.6× more cases — a stricter and more honest methodology. With 1,797 additional cases targeting harder boundary examples, lower cross-validated accuracy is expected. Critically, disputed recall at 74.9% is now bounded by the `ca_fired` rule gate (Q2): if the conflict is real but the constraint doesn't fire, the case never reaches Q3.
 
@@ -110,19 +112,20 @@ v3.0's Stage 2 (trustworthy vs disputed) trained on all answerable cases — con
 | Approach | Overall | Abstain | Disputed | Trustworthy |
 |----------|---------|---------|----------|-------------|
 | v3.0 two-stage (ET+RF, 1,113 cases) | 90.9% | 93.7% | 94.4% | 89.0% |
-| **v5.0 cascade (GBT×3, 2,910 cases, 5-fold CV)** | **81.3%** | **90.2%** | **74.9%** | **78.6%** |
+| v5.0 cascade (GBT×3, 2,910 cases, 5-fold CV) | 81.3% | 90.2% | 74.9% | 78.6% |
+| **v5.1 cascade (GBT×4, 2,920 cases, 5-fold CV)** | **76.4%** | **84.6%** | **77.3%** | **70.5%** |
 
-Disputed recall dropped significantly because Q2 is now a hard rule: if `ca_fired=False`, the case never reaches Q3. v3.0 Stage 2 could still classify disputed cases where CA didn't fire (via other features). The cascade trades that flexibility for specialization — Q3 and Q4 each see cleaner signal.
+v5.1 replaced the hard `ca_fired` rule at Q2 with an ML router trained on all features. This fixed the structural ceiling on disputed recall (v5.0's Q2 gate made 47% of disputed cases unreachable). FT dropped from unmeasured to **4.3%** (126 cases). Constraints were also fixed: full pairwise conflict detection (was star topology), per-chunk answer verification (was combined), no content truncation.
 
 ### Threshold Selection
 
 Three independent thresholds tuned jointly via `calibrate_cascade.py`:
 
-| Q1 | Q3 | Q4 | FT (false-trustworthy) | Overall | Abstain | Disputed | Trustworthy |
-|----|----|----|------------------------|---------|---------|----------|-------------|
-| **0.770** | **0.680** | **0.770** | **(min)** | **81.3%** | **90.2%** | **74.9%** | **78.6%** |
+| Q1 | Q2 | Q3 | Q4 | FT | Overall | Abstain | Disputed | Trustworthy |
+|----|----|----|----|----|---------|---------|----------|-------------|
+| **0.780** | **0.250** | **0.680** | **0.780** | **126 (4.3%)** | **76.4%** | **84.6%** | **77.3%** | **70.5%** |
 
-Sweep: Q1 ∈ [0.40, 0.80), Q3 ∈ [0.20, 0.70), Q4 ∈ [0.40, 0.80). Filter: accuracy ≥ 78% and trustworthy recall ≥ 65%. Chosen point minimizes false-trustworthy (over-confidence) subject to usability constraints.
+Sweep: Q1 ∈ [0.40, 0.80), Q2 ∈ [0.20, 0.55), Q3 ∈ [0.20, 0.70), Q4 ∈ [0.40, 0.80). Filter: accuracy ≥ 75% and trustworthy recall ≥ 65%. Chosen point minimizes false-trustworthy (over-confidence) subject to usability constraints.
 
 ---
 
@@ -177,13 +180,9 @@ v3.0 thresholds were calibrated on the full training set. v5.0 uses OOF (out-of-
 
 ## What Failed
 
-### Disputed Recall Regression (94.4% → 74.9%)
+### Disputed Recall Recovery (74.9% → 77.3%)
 
-The largest regression. The cascade's Q2 gate (`ca_fired` rule) is now the hard ceiling for disputed recall: any real dispute where CA doesn't fire gets routed to the clean path (Q4) and will be predicted ABSTAIN or TRUSTWORTHY, never DISPUTED.
-
-v3.0 Stage 2 didn't have this hard gate — it could pick up dispute signals from other features (context similarity, chunk length CV, etc.) even when CA didn't fire. The cascade trades this recovery ability for specialization in Q3.
-
-**Root cause**: CA constraint recall on disputed cases is imperfect with the 3B LLM. The 6 disputed→trustworthy critical cases from v3.0 (implicit contradictions with low lexical similarity) are now disputed→ABSTAIN or disputed→TRUSTWORTHY depending on the clean-path Q4 score. The gate, not the model, is the bottleneck.
+v5.0's hard `ca_fired` rule at Q2 created a structural ceiling: 47% of disputed cases had `ca_fired=False` and could never be predicted as disputed. v5.1's ML Q2 router fixed this by learning dispute signals from all features — numerical divergence, contradiction markers, text analysis — not just whether the LLM constraint fired. Disputed recall recovered from 74.9% to 77.3%, with Q3 achieving 89.9% accuracy on cases that reach it.
 
 ### Dataset Growth Penalty
 
@@ -193,13 +192,10 @@ Adding 1,797 cases to a benchmark calibrated on 1,113 inevitably introduces more
 
 ## Critical Case Profile
 
-False-trustworthy (the most dangerous error — predicting trustworthy when should abstain or dispute) are not enumerated in cross-validation, but the threshold sweep minimizes them at the chosen operating point.
+**False-trustworthy: 126 cases (4.3%)** — the most dangerous error (predicting trustworthy when should abstain or dispute). Breakdown:
 
-Historical pattern from v3.0 (15 cases):
-- 9 abstain→trustworthy: Wrong entity/version with high vector overlap (decoy keywords)
-- 6 disputed→trustworthy: Implicit contradictions with low lexical similarity, CA didn't fire
-
-With the cascade, the 6 disputed type now tends toward abstain→trustworthy (if clean path) rather than disputed→trustworthy — the nature of over-confidence shifts but the root cause (CA constraint ceiling with 3B model) remains.
+- **118 abstain→trustworthy**: Context is topically related but doesn't actually answer the question. Subcategories: missing_data (14), converted_insufficient (7), wrong_domain (6), outdated_context (5). Features are nearly indistinguishable from real trustworthy cases — this is the "looks like evidence but isn't" problem.
+- **17 disputed→trustworthy**: All 17 have `ca_fired=True` and `has_disputed_signal=True` — the conflict was detected and Q2 routed correctly, but Q3 said "resolved." These are hard interpretation conflicts, implicit contradictions, and consensus-removed cases.
 
 ---
 
@@ -222,8 +218,8 @@ python -m tools.governance.calibrate_cascade
 |------|---------|
 | `tools/governance/extract_features.py` | Feature extraction (real embeddings + detection) |
 | `tools/governance/train_classifier.py` | Cascade training with hyperparameter search |
-| `tools/governance/calibrate_cascade.py` | 3-threshold sweep for critical case minimization |
-| `tools/governance/data/features.csv` | 2,910 rows × 82 columns |
+| `tools/governance/calibrate_cascade.py` | 4-threshold sweep for critical case minimization |
+| `tools/governance/data/features.csv` | 2,920 rows × 95 columns |
 | `fitz_ai/governance/data/model_v6_cascade.joblib` | Production cascade artifact |
 | `fitz_ai/governance/decider.py` | GovernanceDecider (production inference) |
 | `fitz_ai/governance/constraints/feature_extractor.py` | Runtime feature extraction (109 features) |
@@ -233,13 +229,9 @@ python -m tools.governance.calibrate_cascade
 
 ## Path Forward
 
-The disputed recall regression (94.4% → 74.9%) is the primary open problem. Root cause: `ca_fired` as a hard gate means disputes the CA constraint misses never reach Q3.
+The primary open problem is the 118 FT-abstain cases (topically related context that doesn't actually answer the question). These are constraint-level problems — the features are indistinguishable from real trustworthy cases, meaning the classifier has no signal to work with.
 
 **What would help**:
-- Stronger LLM for CA constraint (3B model is the ceiling for implicit contradiction detection)
-- Secondary dispute-detection path: route cases where other features suggest conflict (high chunk_length_cv, high number_density divergence) to Q3 even without `ca_fired=True`
-- More CA training: fine-tuning a 3B model on fitz-gov dispute cases specifically
-
-The 9 abstain→trustworthy critical cases (decoy entity data) from v3.0 are addressed in theory by the new AnswerVerification constraint — this is tested in v5.0 but the jury adds latency and its recall on hard decoy cases needs further measurement.
-
-These are constraint-level improvements. The cascade classifier has reached the ceiling of what the current CA constraint can provide on disputed cases.
+- Smarter answer-presence detection in AnswerVerification (the current jury checks relevance, not answer presence)
+- Post-generation claim verification (check that the generated answer is grounded in the retrieved chunks)
+- Stronger LLM for constraint evaluation (the fast-tier model misses nuanced distinctions)

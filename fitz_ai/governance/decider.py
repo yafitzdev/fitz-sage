@@ -67,19 +67,27 @@ class GovernanceDecider:
             if mode == "cascade":
                 self._mode = "cascade"
                 self._q1_model = artifact["q1_model"]
+                self._q2_model = artifact.get("q2_model")  # ML router (None in legacy)
                 self._q3_model = artifact["q3_model"]
                 self._q4_model = artifact["q4_model"]
                 self._q1_threshold = artifact.get("q1_threshold", 0.5)
+                self._q2_threshold = artifact.get("q2_threshold", 0.5)
                 self._q3_threshold = artifact.get("q3_threshold", 0.5)
                 self._q4_threshold = artifact.get("q4_threshold", 0.5)
                 self._conflict_feature = artifact.get("conflict_feature", "ca_fired")
                 self._encoders = artifact.get("encoders", {})
                 self._feature_names = artifact["feature_names"]
                 self._available = True
+                q2_desc = (
+                    f"q2={self._q2_threshold:.2f}"
+                    if self._q2_model is not None
+                    else f"q2=rule({self._conflict_feature})"
+                )
                 logger.info(
                     f"GovernanceDecider: loaded cascade model from {path} "
-                    f"(q1={self._q1_threshold:.2f}, q3={self._q3_threshold:.2f}, "
-                    f"q4={self._q4_threshold:.2f}, {len(self._feature_names)} features)"
+                    f"(q1={self._q1_threshold:.2f}, {q2_desc}, "
+                    f"q3={self._q3_threshold:.2f}, q4={self._q4_threshold:.2f}, "
+                    f"{len(self._feature_names)} features)"
                 )
             else:
                 self._mode = "twostage"
@@ -168,8 +176,18 @@ class GovernanceDecider:
         if p_answerable < self._q1_threshold:
             return "abstain", 1.0 - p_answerable
 
-        # Q2: Is there material conflict? (rule)
-        has_conflict = bool(features.get(self._conflict_feature, False))
+        # Q2: Is there material conflict? (ML router or legacy rule fallback)
+        if self._q2_model is not None:
+            q2_probas = self._q2_model.predict_proba(X)
+            q2_classes = list(self._q2_model.classes_)
+            try:
+                conflict_idx = q2_classes.index(1)
+            except ValueError:
+                conflict_idx = q2_classes.index("conflict")
+            has_conflict = float(q2_probas[0, conflict_idx]) >= self._q2_threshold
+        else:
+            # Legacy fallback: hard rule on ca_fired
+            has_conflict = bool(features.get(self._conflict_feature, False))
 
         if has_conflict:
             # Q3: Is the conflict resolved?

@@ -106,7 +106,6 @@ class AnswerVerificationConstraint:
     chat: "ChatProvider | None" = None
     chat_balanced: "ChatProvider | None" = None
     enabled: bool = True
-    max_context_chars: int = 1000
     _cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     @staticmethod
@@ -181,12 +180,13 @@ class AnswerVerificationConstraint:
 
     def apply(self, query: str, chunks: Sequence[EvidenceItem]) -> ConstraintResult:
         """
-        Check if chunks are relevant to query using fast jury + balanced confirmation.
+        Check if chunks are relevant to query using per-chunk fast jury + balanced confirmation.
 
         Flow:
-          1. Run 3 fast-tier prompts
-          2. If 2+/3 say NO -> run balanced confirmation
-          3. If balanced also says NO -> fire "qualified" signal
+          1. For each chunk, run 3 fast-tier jury prompts
+          2. If any chunk passes (< 2 NO votes) -> allow (early exit)
+          3. If all chunks fail -> run balanced confirmation on best chunk
+          4. If balanced also says NO -> fire "qualified" signal
 
         Args:
             query: User query
@@ -205,59 +205,55 @@ class AnswerVerificationConstraint:
             logger.debug(f"{PIPELINE} AnswerVerificationConstraint: no chat provider, skipping")
             return ConstraintResult.allow()
 
-        # Combine top chunks for verification
-        context_parts = []
-        total_chars = 0
-        for chunk in chunks[:3]:
-            remaining = self.max_context_chars - total_chars
-            if remaining <= 0:
-                break
-            content = chunk.content[:remaining]
-            context_parts.append(content)
-            total_chars += len(content)
+        # Verify per-chunk to avoid relevant chunks masking irrelevant ones.
+        # Early exit: if any chunk passes jury, evidence is relevant.
+        chunk_results: list[tuple[int, list[str]]] = []
+        for idx, chunk in enumerate(chunks[:3]):
+            no_votes, responses = self._run_jury(query, chunk.content)
+            chunk_results.append((no_votes, responses))
 
-        context = "\n\n---\n\n".join(context_parts)
+            logger.debug(
+                f"{PIPELINE} AnswerVerificationConstraint jury (chunk {idx + 1}): "
+                f"no_votes={no_votes}/3, responses={responses}"
+            )
 
-        # Stage 1: Fast jury
-        no_votes, responses = self._run_jury(query, context)
-
-        logger.debug(
-            f"{PIPELINE} AnswerVerificationConstraint jury: "
-            f"no_votes={no_votes}/3, responses={responses}"
-        )
-
-        # Stage 2: Balanced confirmation when 2+/3 fast say NO
-        if no_votes >= 2:
-            confirmed = self._run_balanced_confirm(query, context)
-
-            if confirmed:
-                logger.info(
-                    f"{PIPELINE} AnswerVerificationConstraint: fast jury {no_votes}/3 NO, "
-                    f"balanced confirmed -> firing"
-                )
-                return ConstraintResult.deny(
-                    reason="Retrieved content may not directly answer the question",
-                    signal="qualified",
-                    av_jury_votes_no=no_votes,
-                    av_jury_responses=responses,
-                    av_balanced_confirmed=True,
-                )
-            else:
-                logger.debug(
-                    f"{PIPELINE} AnswerVerificationConstraint: fast jury {no_votes}/3 NO, "
-                    f"balanced rejected -> allowing"
-                )
+            # Chunk passes jury — evidence is relevant enough
+            if no_votes < 2:
+                max_no = max(r[0] for r in chunk_results)
                 return ConstraintResult.allow(
-                    av_jury_votes_no=no_votes,
+                    av_jury_votes_no=max_no,
                     av_jury_responses=responses,
-                    av_balanced_confirmed=False,
                 )
 
-        # Less than 2/3 fast NO -> allow
-        return ConstraintResult.allow(
-            av_jury_votes_no=no_votes,
-            av_jury_responses=responses,
-        )
+        # All chunks failed jury — confirm with balanced on the best chunk
+        max_no = max(r[0] for r in chunk_results)
+        best_idx = min(range(len(chunk_results)), key=lambda i: chunk_results[i][0])
+        best_content = chunks[best_idx].content
+
+        confirmed = self._run_balanced_confirm(query, best_content)
+
+        if confirmed:
+            logger.info(
+                f"{PIPELINE} AnswerVerificationConstraint: all {len(chunk_results)} chunks "
+                f"failed jury, balanced confirmed -> firing"
+            )
+            return ConstraintResult.deny(
+                reason="Retrieved content may not directly answer the question",
+                signal="qualified",
+                av_jury_votes_no=max_no,
+                av_jury_responses=chunk_results[-1][1],
+                av_balanced_confirmed=True,
+            )
+        else:
+            logger.debug(
+                f"{PIPELINE} AnswerVerificationConstraint: all chunks failed jury, "
+                f"balanced rejected -> allowing"
+            )
+            return ConstraintResult.allow(
+                av_jury_votes_no=max_no,
+                av_jury_responses=chunk_results[-1][1],
+                av_balanced_confirmed=False,
+            )
 
 
 __all__ = ["AnswerVerificationConstraint"]

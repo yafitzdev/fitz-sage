@@ -171,7 +171,7 @@ ConstraintResult(
 
 ### Signal resolution
 
-Constraint signals are used as **features** for a two-stage ML classifier (GovernanceDecider), not as direct priority rules. The classifier predicts one of 3 classes:
+Constraint signals are used as **features** for a 5-question cascade ML classifier (GovernanceDecider), not as direct priority rules. The classifier predicts one of 3 classes:
 
 | Classifier Output | AnswerMode | Condition |
 |-------------------|------------|-----------|
@@ -181,7 +181,7 @@ Constraint signals are used as **features** for a two-stage ML classifier (Gover
 
 The AnswerGovernor still exists as a fallback when the GovernanceDecider model is not available, but GovernanceDecider is the primary decision path.
 
-See [governance benchmarking](features/governance/governance-benchmarking.md) for details on the two-stage classifier.
+See [governance benchmarking](features/governance/governance-benchmarking.md) for details on the cascade classifier (76.4% accuracy, 4.3% false-trustworthy rate).
 
 ---
 

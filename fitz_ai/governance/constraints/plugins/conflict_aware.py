@@ -186,7 +186,7 @@ class ConflictAwareConstraint:
             return True  # No embedder = assume relevant
 
         try:
-            chunk_embedding = self.embedder.embed(chunk.content[:500], task_type="query")
+            chunk_embedding = self.embedder.embed(chunk.content, task_type="query")
             sim = self._cosine_similarity(query_embedding, chunk_embedding)
             return sim >= self.relevance_threshold
         except Exception as e:
@@ -244,8 +244,8 @@ class ConflictAwareConstraint:
         if not self.chat:
             return False
 
-        text1 = chunk1.content[:800] if len(chunk1.content) > 800 else chunk1.content
-        text2 = chunk2.content[:800] if len(chunk2.content) > 800 else chunk2.content
+        text1 = chunk1.content
+        text2 = chunk2.content
 
         # Check for numerical variance BEFORE LLM call
         is_variance, reason = self._numerical_detector.check_chunk_pair_variance(text1, text2)
@@ -289,8 +289,8 @@ class ConflictAwareConstraint:
         if not self.chat:
             return False
 
-        text1 = chunk1.content[:800] if len(chunk1.content) > 800 else chunk1.content
-        text2 = chunk2.content[:800] if len(chunk2.content) > 800 else chunk2.content
+        text1 = chunk1.content
+        text2 = chunk2.content
 
         # Check for numerical variance BEFORE LLM calls
         is_variance, reason = self._numerical_detector.check_chunk_pair_variance(text1, text2)
@@ -408,15 +408,16 @@ class ConflictAwareConstraint:
         if len(chunks_to_check) < 2:
             return ConstraintResult.allow(**ca_diag)
 
-        first_chunk = chunks_to_check[0]
-
-        # Classify evidence character for the first chunk (reused across pairs)
-        first_char = (
-            self._semantic_matcher.classify_evidence_character(first_chunk.content)
-            if self._semantic_matcher is not None
-            else "assertive"
-        )
-        ca_diag["ca_first_evidence_char"] = first_char
+        # Pre-compute evidence character for each chunk
+        chunk_chars = []
+        for chunk in chunks_to_check:
+            char = (
+                self._semantic_matcher.classify_evidence_character(chunk.content)
+                if self._semantic_matcher is not None
+                else "assertive"
+            )
+            chunk_chars.append(char)
+        ca_diag["ca_first_evidence_char"] = chunk_chars[0]
 
         # Choose base detection method based on settings
         if self.adaptive:
@@ -446,77 +447,62 @@ class ConflictAwareConstraint:
 
         evidence_chars_seen = []
 
-        for other_chunk in chunks_to_check[1:]:
-            other_char = (
-                self._semantic_matcher.classify_evidence_character(other_chunk.content)
-                if self._semantic_matcher is not None
-                else "assertive"
-            )
-            evidence_chars_seen.append(f"{first_char}_vs_{other_char}")
+        # Full pairwise comparison — all (i, j) pairs, not just first vs rest
+        for i in range(len(chunks_to_check)):
+            for j in range(i + 1, len(chunks_to_check)):
+                chunk_i = chunks_to_check[i]
+                chunk_j = chunks_to_check[j]
+                char_i = chunk_chars[i]
+                char_j = chunk_chars[j]
+                evidence_chars_seen.append(f"{char_i}_vs_{char_j}")
 
-            # Pair-level evidence character: combine both chunks' text
-            # to catch hedging distributed across chunks (e.g., "may" in
-            # chunk A + "preliminary" in chunk B = hedged pair)
-            pair_char = (
-                self._semantic_matcher.classify_evidence_character(
-                    first_chunk.content + " " + other_chunk.content
+                # Pair-level evidence character: combine both chunks' text
+                # to catch hedging distributed across chunks
+                pair_char = (
+                    self._semantic_matcher.classify_evidence_character(
+                        chunk_i.content + " " + chunk_j.content
+                    )
+                    if self._semantic_matcher is not None
+                    else "assertive"
                 )
-                if self._semantic_matcher is not None
-                else "assertive"
-            )
 
-            # Evidence character gating (pair-conditioned truth table):
-            # hedged vs hedged OR pair-level hedged → skip
-            if (first_char == "hedged" and other_char == "hedged") or pair_char == "hedged":
-                ca_diag["ca_skipped_hedged_pairs"] += 1
-                logger.debug(
-                    f"{PIPELINE} ConflictAwareConstraint: skipping hedged pair "
-                    f"({first_char} vs {other_char}, pair={pair_char})"
+                ca_diag["ca_pairs_checked"] += 1
+
+                # Track numerical variance for classifier feature extraction
+                is_var, _ = self._numerical_detector.check_chunk_pair_variance(
+                    chunk_i.content, chunk_j.content
                 )
-                continue
+                if is_var:
+                    ca_diag["ca_numerical_variance_detected"] = True
 
-            ca_diag["ca_pairs_checked"] += 1
+                # Evidence character gating: hedged pairs use fusion (higher bar)
+                # rather than being skipped — disputes can exist between hedged sources
+                if char_i == "assertive" and char_j == "assertive" and pair_char == "assertive":
+                    check_method = base_method
+                    method_name = base_method_name
+                else:
+                    check_method = self._check_pairwise_fusion
+                    method_name = f"{base_method_name}+evidence-gate-fusion"
 
-            # Track numerical variance (checked again inside pairwise methods, but
-            # tracked here for classifier feature extraction)
-            text1 = (
-                first_chunk.content[:800] if len(first_chunk.content) > 800 else first_chunk.content
-            )
-            text2 = (
-                other_chunk.content[:800] if len(other_chunk.content) > 800 else other_chunk.content
-            )
-            is_var, _ = self._numerical_detector.check_chunk_pair_variance(text1, text2)
-            if is_var:
-                ca_diag["ca_numerical_variance_detected"] = True
-
-            # assertive vs assertive → standard method (likely real contradictions)
-            # any hedged/mixed involved → use fusion for higher bar
-            if first_char == "assertive" and other_char == "assertive" and pair_char == "assertive":
-                check_method = base_method
-                method_name = base_method_name
-            else:
-                check_method = self._check_pairwise_fusion
-                method_name = f"{base_method_name}+evidence-gate-fusion"
-
-            if check_method(query, first_chunk, other_chunk):
-                logger.info(
-                    f"{PIPELINE} ConflictAwareConstraint ({method_name}): contradiction detected "
-                    f"between chunks (chars: {first_char} vs {other_char})"
-                )
-                # Store conflicting excerpts for actionable DISPUTED messages
-                source_a = getattr(first_chunk, "file_path", None) or "Source A"
-                source_b = getattr(other_chunk, "file_path", None) or "Source B"
-                return ConstraintResult.deny(
-                    reason="Retrieved chunks contain contradictory information",
-                    signal="disputed",
-                    method=method_name,
-                    ca_evidence_characters=f"{first_char}_vs_{other_char}",
-                    ca_conflict_source_a=source_a,
-                    ca_conflict_source_b=source_b,
-                    ca_conflict_excerpt_a=first_chunk.content[:300],
-                    ca_conflict_excerpt_b=other_chunk.content[:300],
-                    **ca_diag,
-                )
+                if check_method(query, chunk_i, chunk_j):
+                    logger.info(
+                        f"{PIPELINE} ConflictAwareConstraint ({method_name}): "
+                        f"contradiction detected between chunks "
+                        f"(chars: {char_i} vs {char_j})"
+                    )
+                    source_a = getattr(chunk_i, "file_path", None) or "Source A"
+                    source_b = getattr(chunk_j, "file_path", None) or "Source B"
+                    return ConstraintResult.deny(
+                        reason="Retrieved chunks contain contradictory information",
+                        signal="disputed",
+                        method=method_name,
+                        ca_evidence_characters=f"{char_i}_vs_{char_j}",
+                        ca_conflict_source_a=source_a,
+                        ca_conflict_source_b=source_b,
+                        ca_conflict_excerpt_a=chunk_i.content[:300],
+                        ca_conflict_excerpt_b=chunk_j.content[:300],
+                        **ca_diag,
+                    )
 
         # Expose evidence characters even on allow path for classifier features
         ca_diag["ca_evidence_characters"] = (

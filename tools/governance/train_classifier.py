@@ -1690,7 +1690,7 @@ def train_cascade(
     """
     y_3class = _collapse_to_3class(y_4class)
 
-    time_per_q = time_budget // 3  # Q1, Q3, Q4 each get a share
+    time_per_q = time_budget // 4  # Q1, Q2, Q3, Q4 each get a share
 
     # ================================================================
     # Q1: Is evidence sufficient? (abstain vs answerable)
@@ -1714,20 +1714,39 @@ def train_cascade(
     )
 
     # ================================================================
-    # Q2: Is there material conflict? (rule: ca_fired)
+    # Q2: Is there material conflict? (ML router replaces hard ca_fired rule)
     # ================================================================
     print(f"\n{'='*60}")
-    print(f"Q2: Is there material conflict? (rule: {_CONFLICT_FEATURE})")
+    print("Q2: Is there material conflict? (ML router)")
     print(f"{'='*60}")
 
-    has_conflict = X[_CONFLICT_FEATURE].astype(int).values == 1
+    # Train Q2 as a binary classifier: disputed cases = conflict, others = clean.
+    # This lets the model learn dispute signals beyond just ca_fired (numerical
+    # divergence, contradiction markers, opposing conclusions, etc.)
+    y_q2 = np.where(y_3class == "disputed", 1, 0)
+    print(f"  Total: {sum(y_q2 == 1)} conflict (disputed), {sum(y_q2 == 0)} clean (abstain+trustworthy)")
+    print(f"  (ca_fired baseline: {X[_CONFLICT_FEATURE].astype(int).sum()} cases)")
 
-    print(f"  Conflict: {has_conflict.sum()}, clean: {(~has_conflict).sum()}")
+    q2_model, q2_threshold, q2_name, q2_oof = _train_binary_stage_cv(
+        "Q2",
+        X,
+        y_q2,
+        feature_names,
+        time_per_q,
+        seed,
+        class_labels=("clean", "conflict"),
+        optimize_recall_class=1,  # optimize conflict (disputed) recall
+    )
+
+    # Use Q2 OOF predictions for routing (not hard ca_fired rule)
+    has_conflict = q2_oof[:, 1] >= q2_threshold
+
+    print(f"  ML router: {has_conflict.sum()} conflict, {(~has_conflict).sum()} clean")
 
     # Show class distribution in each path
     for path_name, mask in [("Conflict", has_conflict), ("Clean", ~has_conflict)]:
         dist = {lbl: (y_3class[mask] == lbl).sum() for lbl in _3CLASS_LABELS}
-        print(f"  {path_name} path — {dist}")
+        print(f"  {path_name} path -- {dist}")
 
     # ================================================================
     # Q3: Is the conflict resolved? (trustworthy vs disputed, conflict path)
@@ -1736,9 +1755,13 @@ def train_cascade(
     print("Q3: Is the conflict resolved? (conflict path: trustworthy vs disputed)")
     print(f"{'='*60}")
 
-    # Q3: conflict cases, trustworthy=1 (resolved) vs disputed=0 (unresolved)
-    # Exclude abstain cases from Q3 — they are noise (lack evidence, not unresolved conflicts)
-    q3_mask = has_conflict & (y_3class != "abstain")
+    # Q3 trains on ALL cases that could be disputes (ground truth), not just
+    # Q2-routed cases. This gives Q3 maximum training signal. Q2 routing is
+    # only used for the combined evaluation below.
+    gt_has_conflict = y_3class == "disputed"
+    # Also include cases where ca_fired detected conflict (even if not labeled disputed)
+    gt_has_conflict = gt_has_conflict | (X[_CONFLICT_FEATURE].astype(int).values == 1)
+    q3_mask = gt_has_conflict & (y_3class != "abstain")
     X_q3 = X[q3_mask]
     y_q3 = np.where(y_3class[q3_mask] == "trustworthy", 1, 0)
 
@@ -1766,9 +1789,9 @@ def train_cascade(
     print("Q4: Is evidence truly solid? (clean path: trustworthy vs abstain)")
     print(f"{'='*60}")
 
-    # Q4: clean cases, label trustworthy=1 (solid), abstain=0 (insufficient)
-    # Disputed cases in clean path get labeled 0 (insufficient → safe fallback to abstain)
-    q4_mask = ~has_conflict
+    # Q4 trains on all non-disputed cases (ground truth clean path).
+    # Disputed cases in clean path get labeled 0 (insufficient -- safe fallback to abstain)
+    q4_mask = ~gt_has_conflict
     X_q4 = X[q4_mask]
     y_q4 = np.where(y_3class[q4_mask] == "trustworthy", 1, 0)
 
@@ -1871,6 +1894,9 @@ def train_cascade(
         "q1_model": q1_model,
         "q1_name": f"{q1_name} (tuned)",
         "q1_threshold": q1_threshold,
+        "q2_model": q2_model,
+        "q2_name": f"{q2_name} (tuned)",
+        "q2_threshold": q2_threshold,
         "q3_model": q3_model,
         "q3_name": f"{q3_name} (tuned)",
         "q3_threshold": q3_threshold,
@@ -1890,7 +1916,7 @@ def train_cascade(
     joblib.dump(artifact, output_path)
     print(f"\nCascade model saved to {output_path}")
     print(f"  Q1: {q1_name} (t={q1_threshold:.3f}) — evidence sufficient?")
-    print(f"  Q2: rule ({_CONFLICT_FEATURE}) — material conflict?")
+    print(f"  Q2: {q2_name} (t={q2_threshold:.3f}) — material conflict?")
     print(f"  Q3: {q3_name} (t={q3_threshold:.3f}) — conflict resolved?")
     print(f"  Q4: {q4_name} (t={q4_threshold:.3f}) — evidence solid?")
     print(f"  Combined (OOF): {combined_acc:.4f}")
