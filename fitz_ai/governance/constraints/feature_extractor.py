@@ -856,6 +856,122 @@ def _extract_text_answer_features(
     features["best_span_length"] = float(best_span_len)
     features["answer_span_coverage"] = best_span_coverage
 
+    # DISABLED — entity phrase matching (rejected 2026-03-23)
+    # Reason: fires on 72% of trustworthy cases (too noisy). At 70% trustworthy recall,
+    # FT increased from 165→199. The entity name usually IS in the chunks even for FT
+    # cases — the mismatch is semantic (wrong granularity/jurisdiction/time), not lexical.
+    # May become useful with >5000 training cases.
+    #
+    # phrase_match, modifier_missing = _compute_entity_phrase_features(query, ctx_joined_lower)
+    # features["query_entity_phrase_match"] = phrase_match
+    # features["query_modifier_missing"] = modifier_missing
+
+
+# ── Disabled feature implementations (kept for future reference) ──
+
+
+_PHRASE_CONNECTORS = {"of", "per", "for", "in", "on", "at", "to", "from", "by", "with"}
+
+
+def _extract_entity_phrase(query: str) -> list[str]:
+    """Extract contiguous noun phrases (subject phrases) from a query.
+
+    DISABLED — see comment above. Kept for future use with larger datasets.
+
+    Returns candidate phrases ordered longest-first. Strips leading question
+    words and trailing punctuation, then extracts contiguous runs of content
+    words as phrase candidates. Short prepositions ("of", "per", "for") are
+    kept as connectors within phrases to preserve entities like "capital of
+    France" or "carbon footprint per kilowatt-hour".
+    """
+    q = query.lower().strip().rstrip("?.,!")
+    q = re.sub(
+        r"^(what|how|why|when|where|who|which|is|are|was|were|does|do|did|can|could|should|will|would)\s+"
+        r"(is|are|was|were|the|a|an|does|do|did)?\s*",
+        "",
+        q,
+    )
+
+    words = q.split()
+    phrases: list[str] = []
+    current: list[str] = []
+    for w in words:
+        clean = w.strip("?.,!;:()[]\"'")
+        if not clean:
+            continue
+        is_content = clean not in _STOP_WORDS
+        is_connector = clean in _PHRASE_CONNECTORS
+        if is_content:
+            current.append(clean)
+        elif is_connector and current:
+            current.append(clean)
+        else:
+            while current and current[-1] in _PHRASE_CONNECTORS:
+                current.pop()
+            if len(current) >= 2:
+                phrases.append(" ".join(current))
+            current = []
+    while current and current[-1] in _PHRASE_CONNECTORS:
+        current.pop()
+    if len(current) >= 2:
+        phrases.append(" ".join(current))
+
+    # Generate sub-phrases from long phrases (sliding window, length >= 2 words)
+    all_phrases: list[str] = list(phrases)
+    for phrase in phrases:
+        words_p = phrase.split()
+        if len(words_p) >= 4:
+            for length in range(len(words_p) - 1, 1, -1):
+                for start in range(len(words_p) - length + 1):
+                    sub = " ".join(words_p[start : start + length])
+                    if sub not in all_phrases:
+                        all_phrases.append(sub)
+
+    all_phrases.sort(key=len, reverse=True)
+    return all_phrases
+
+
+def _compute_entity_phrase_features(query: str, ctx_lower: str) -> tuple[float, float]:
+    """Compute entity phrase match features.
+
+    DISABLED — see comment in _extract_text_answer_features. Kept for future use.
+
+    Returns:
+        (phrase_match, modifier_missing) where:
+        - phrase_match: best match ratio across all candidate phrases. 1.0 if
+          any phrase appears in context, otherwise the best sub-phrase coverage.
+        - modifier_missing: 1.0 if a shorter sub-phrase of the longest phrase
+          matches but the full phrase does not (e.g. "Pro" matches but "Pro Max"
+          does not — indicates a missing qualifier).
+    """
+    phrases = _extract_entity_phrase(query)
+    if not phrases:
+        return 1.0, 0.0
+
+    longest = phrases[0]
+
+    best_match = 0.0
+    longest_matched = False
+    any_shorter_matched = False
+
+    for phrase in phrases:
+        if phrase in ctx_lower:
+            word_count = len(phrase.split())
+            longest_words = len(longest.split())
+            ratio = word_count / longest_words if longest_words > 0 else 1.0
+            if ratio > best_match:
+                best_match = ratio
+            if phrase == longest:
+                longest_matched = True
+            else:
+                any_shorter_matched = True
+            if best_match >= 1.0:
+                break
+
+    modifier_missing = 1.0 if (any_shorter_matched and not longest_matched) else 0.0
+
+    return best_match, modifier_missing
+
 
 def _extract_detection_features(features: dict[str, Any], detection_summary: Any | None) -> None:
     """Extract features from DetectionSummary (Tier 3)."""
