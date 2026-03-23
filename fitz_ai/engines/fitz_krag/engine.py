@@ -330,6 +330,10 @@ class FitzKragEngine:
                 chat_balanced=self._chat_factory("balanced"),
                 embedder=self._embedder,
             )
+            # LLM judge disabled — requires a model capable of nuanced semantic
+            # reasoning about query-evidence specificity. 7B models (command-r7b,
+            # qwen2.5:7b) are too small and degrade accuracy. Enable by passing
+            # chat=self._chat_factory("smart") when a capable model is available.
             self._governor = GovernanceDecider()
 
         # Cloud cache
@@ -888,7 +892,9 @@ class FitzKragEngine:
                     features["mean_vector_score"] = ie_sim
                     features["max_vector_score"] = ie_sim
                     features["min_vector_score"] = ie_sim
-                governance = self._governor.decide(constraint_results, features=features)
+                governance = self._governor.decide(
+                    constraint_results, features=features, query=sanitized, chunks=expanded
+                )
                 answer_mode = governance.mode
 
                 # Progressive mode override: guardrails features are degraded

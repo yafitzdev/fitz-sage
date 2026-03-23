@@ -1,16 +1,19 @@
 # fitz_ai/governance/decider.py
 """
-ML-based governance decider using a 4-question atomic cascade classifier.
-
-Replaces hand-coded AnswerGovernor priority rules with trained classifiers
-that predict governance mode from constraint features. Falls back to
-AnswerGovernor on any error (fail-open).
+ML-based governance decider using a 4-question atomic cascade classifier
+with an optional LLM judge for post-classifier correction.
 
 4-question cascade:
   Q1: Is evidence sufficient?      → No = ABSTAIN  (ML)
   Q2: Is there material conflict?  → routes Q3/Q4  (rule: ca_fired)
   Q3: Is the conflict resolved?    → Yes=TRUSTWORTHY, No=DISPUTED (ML)
   Q4: Is evidence truly solid?     → Yes=TRUSTWORTHY, No=ABSTAIN  (ML)
+
+LLM judge (post-classifier):
+  Classifier says TRUSTWORTHY → judge says NO  → demote to ABSTAIN
+  Classifier says ABSTAIN     → judge says YES → promote to TRUSTWORTHY
+  (Disputed is never overridden — dispute detection is evidence-vs-evidence,
+   not query-vs-evidence, so the judge can't help there.)
 
 3-class output mapped to AnswerMode:
   abstain → ABSTAIN
@@ -30,8 +33,22 @@ from fitz_ai.governance.governor import AnswerGovernor, GovernanceDecision
 
 if TYPE_CHECKING:
     from fitz_ai.governance.constraints.base import ConstraintResult
+    from fitz_ai.governance.protocol import EvidenceItem
+    from fitz_ai.llm.providers.base import ChatProvider
 
 logger = logging.getLogger(__name__)
+
+_JUDGE_PROMPT = """Given this question and retrieved evidence, does the evidence DIRECTLY answer the SPECIFIC question asked?
+
+Consider:
+- Does it answer THIS EXACT question, or a related but different one?
+- Does it cover the specific entity, model, version, or scope asked about?
+- Is the data specific enough (not just general category when a specific item is asked)?
+
+Question: {query}
+Evidence: {evidence}
+
+Answer only YES or NO, then a one-sentence reason."""
 
 # Feature type sets derived from constraint schemas (single source of truth)
 _CATEGORICAL_FEATURES, _BOOL_FEATURES = get_feature_type_sets()
@@ -49,9 +66,14 @@ def _find_model_path() -> Path | None:
 class GovernanceDecider:
     """ML-based governance decider with fail-open fallback to AnswerGovernor."""
 
-    def __init__(self, model_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        model_path: Path | None = None,
+        chat: "ChatProvider | None" = None,
+    ) -> None:
         self._available = False
         self._governor = AnswerGovernor()
+        self._chat = chat  # For LLM judge (optional)
 
         path = model_path or _find_model_path()
         if path is None:
@@ -115,8 +137,14 @@ class GovernanceDecider:
         self,
         constraint_results: Sequence[ConstraintResult],
         features: dict[str, Any] | None = None,
+        query: str | None = None,
+        chunks: Sequence["EvidenceItem"] | None = None,
     ) -> GovernanceDecision:
-        """Produce a governance decision using the ML classifier.
+        """Produce a governance decision using the ML classifier + optional LLM judge.
+
+        The LLM judge corrects the classifier on the trustworthy/abstain boundary:
+        - Classifier says TRUSTWORTHY → judge says NO → demote to ABSTAIN
+        - Classifier says ABSTAIN → judge says YES → promote to TRUSTWORTHY
 
         Falls back to AnswerGovernor if the model is unavailable or prediction fails.
         """
@@ -141,12 +169,63 @@ class GovernanceDecider:
         # Map 3-class label to AnswerMode
         mode = self._map_to_answer_mode(label, triggered)
 
+        # LLM judge: correct trustworthy/abstain boundary
+        if self._chat and query and chunks:
+            mode = self._apply_llm_judge(mode, query, chunks)
+
         return GovernanceDecision(
             mode=mode,
             triggered_constraints=tuple(triggered),
             reasons=tuple(reasons),
             signals=frozenset(signals),
         )
+
+    def _apply_llm_judge(
+        self,
+        mode: AnswerMode,
+        query: str,
+        chunks: Sequence["EvidenceItem"],
+    ) -> AnswerMode:
+        """Apply LLM judge to correct trustworthy/abstain boundary.
+
+        - TRUSTWORTHY + judge says NO → ABSTAIN (catch false-trustworthy)
+        - ABSTAIN + judge says YES → TRUSTWORTHY (recover false-abstain)
+        - DISPUTED is never overridden (dispute is evidence-vs-evidence)
+        """
+        if mode == AnswerMode.DISPUTED:
+            return mode
+
+        if not chunks:
+            return mode
+
+        evidence = chunks[0].content[:500]
+        try:
+            response = self._chat.chat(
+                [{"role": "user", "content": _JUDGE_PROMPT.format(query=query, evidence=evidence)}],
+                temperature=0.0,
+                max_tokens=50,
+            )
+            word = response.strip().upper().split()[0] if response.strip() else ""
+            judge_says_yes = word.startswith("YES")
+        except Exception as e:
+            logger.warning(f"GovernanceDecider: LLM judge failed, keeping ML prediction: {e}")
+            return mode
+
+        if mode == AnswerMode.TRUSTWORTHY and not judge_says_yes:
+            logger.info(
+                "GovernanceDecider: LLM judge demoted TRUSTWORTHY → ABSTAIN "
+                "(evidence does not directly answer the specific question)"
+            )
+            return AnswerMode.ABSTAIN
+
+        if mode == AnswerMode.ABSTAIN and judge_says_yes:
+            logger.info(
+                "GovernanceDecider: LLM judge promoted ABSTAIN → TRUSTWORTHY "
+                "(evidence directly answers the question despite classifier doubt)"
+            )
+            return AnswerMode.TRUSTWORTHY
+
+        return mode
 
     def _predict(self, features: dict[str, Any]) -> tuple[str, float]:
         """Run prediction. Dispatches to cascade or twostage based on model type."""
