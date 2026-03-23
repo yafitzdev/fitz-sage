@@ -90,7 +90,17 @@ _CATEGORICAL_FEATURES, _BOOL_FEATURES = get_feature_type_sets()
 # num_unique_sources: always 1 in fitz-gov (single doc_id per case)
 # ie_max_similarity: 100% identical to max_vector_score (redundant)
 # ie_summary_overlap: always False (fitz-gov chunks lack enrichment metadata)
-_DEAD_FEATURES = {"num_unique_sources", "ie_max_similarity", "ie_summary_overlap"}
+# year_count: noisy — ablation shows +0.92% accuracy when removed
+# ie_query_aspect: noisy — ablation shows +0.79% accuracy when removed
+# num_strong_denials: noisy — ablation shows +0.79% accuracy when removed
+_DEAD_FEATURES = {
+    "num_unique_sources",
+    "ie_max_similarity",
+    "ie_summary_overlap",
+    "year_count",
+    "ie_query_aspect",
+    "num_strong_denials",
+}
 
 # Markers for context feature extraction
 _CONTRADICTION_MARKERS = [
