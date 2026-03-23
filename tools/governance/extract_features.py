@@ -18,6 +18,7 @@ import argparse
 import csv
 import json
 import math
+import sqlite3
 import sys
 import threading
 import time
@@ -376,42 +377,37 @@ def main():
         cases = cases[: args.limit]
     print(f"Loaded {len(cases)} cases")
 
-    # Resume support: load already-completed case IDs from output CSV
-    completed_ids: set[str] = set()
+    # SQLite checkpoint store — each row committed individually, crash-safe.
+    # CSV is only written as final export after all cases complete.
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    if args.output.exists() and args.output.stat().st_size > 0:
-        with args.output.open("r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if "case_id" in row:
-                    completed_ids.add(row["case_id"])
-        if completed_ids:
-            print(f"Resuming: {len(completed_ids)} cases already completed, skipping them")
+    db_path = args.output.with_suffix(".db")
+    db = sqlite3.connect(str(db_path), check_same_thread=False)
+    db.execute("CREATE TABLE IF NOT EXISTS features (case_id TEXT PRIMARY KEY, data TEXT)")
+    db.commit()
+
+    completed_ids: set[str] = set()
+    for (cid,) in db.execute("SELECT case_id FROM features").fetchall():
+        completed_ids.add(cid)
+    if completed_ids:
+        print(f"Resuming: {len(completed_ids)} cases already completed, skipping them")
 
     remaining_cases = [c for c in cases if c["id"] not in completed_ids]
     print(f"Processing {len(remaining_cases)} remaining cases ({len(completed_ids)} skipped)")
 
-    # Process cases with incremental CSV writing
     errors = 0
     written = 0
     start_time = time.time()
     write_lock = threading.Lock()
-    _fieldnames: list[str] | None = None
 
     def _write_row(row: dict[str, Any]) -> None:
-        nonlocal _fieldnames, written
+        nonlocal written
+        case_id = row["case_id"]
         with write_lock:
-            if _fieldnames is None:
-                _fieldnames = list(row.keys())
-                # Write header + first row together (atomic)
-                with args.output.open("w", newline="", encoding="utf-8") as f:
-                    writer = csv.DictWriter(f, fieldnames=_fieldnames)
-                    writer.writeheader()
-                    writer.writerow(row)
-            else:
-                with args.output.open("a", newline="", encoding="utf-8") as f:
-                    writer = csv.DictWriter(f, fieldnames=_fieldnames)
-                    writer.writerow(row)
+            db.execute(
+                "INSERT OR REPLACE INTO features (case_id, data) VALUES (?, ?)",
+                (case_id, json.dumps(row)),
+            )
+            db.commit()
             written += 1
 
     if args.workers <= 1:
@@ -444,22 +440,23 @@ def main():
                     print(f"\n  ERROR on case {case_id}: {e}", file=sys.stderr)
 
     elapsed = time.time() - start_time
-    total = written + len(completed_ids)
+    total_in_db = db.execute("SELECT COUNT(*) FROM features").fetchone()[0]
     print(f"\nProcessed {written} cases in {elapsed:.1f}s ({errors} errors)")
     print(f"Throughput: {written/elapsed:.1f} cases/sec")
-    print(f"Total rows in CSV: {total}")
+    print(f"Total rows in DB: {total_in_db}")
 
-    if total == 0:
+    if total_in_db == 0:
         print("No rows written!", file=sys.stderr)
+        db.close()
         sys.exit(1)
 
-    # Re-read and sort for deterministic output
+    # Export SQLite → CSV (sorted, deterministic)
     all_rows = []
-    with args.output.open("r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        fieldnames = reader.fieldnames
-        all_rows = list(reader)
-    all_rows.sort(key=lambda r: r["case_id"])
+    for (data,) in db.execute("SELECT data FROM features ORDER BY case_id"):
+        all_rows.append(json.loads(data))
+    db.close()
+
+    fieldnames = list(all_rows[0].keys())
     with args.output.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
