@@ -181,7 +181,7 @@ Constraint signals are used as **features** for a 5-question cascade ML classifi
 
 The AnswerGovernor still exists as a fallback when the GovernanceDecider model is not available, but GovernanceDecider is the primary decision path.
 
-See [governance benchmarking](features/governance/governance-benchmarking.md) for details on the cascade classifier (76.4% accuracy, 4.3% false-trustworthy rate).
+See [governance benchmarking](features/governance/governance-benchmarking.md) for details on the cascade classifier (78.7% accuracy, 5.7% false-trustworthy rate).
 
 ---
 

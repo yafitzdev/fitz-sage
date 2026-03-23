@@ -71,11 +71,11 @@ Five constraints run on every query, each contributing diagnostic signals:
 | **ConflictAware** | Pairwise contradictions between sources | Contradiction signal, evidence character, numerical variance |
 | **CausalAttribution** | Causal/predictive/speculative query types | Query type, evidence presence |
 | **SpecificInfoType** | Missing specific information | Info type requested, entity mismatch |
-| **AnswerVerification** | LLM jury assessment (3-prompt vote) | Jury votes |
+| **AnswerVerification** | Citation-grounded verification (quote + string match) | Citation quality, count |
 
 Additionally, embedding-based features (vector scores, score distributions), inter-chunk text features (pairwise overlap, assertion density, TF-IDF similarity), and query classification features (temporal, comparison, aggregation detection) feed into the classifier. Detection signals use the ML+keyword `DetectionClassifier` (temporal 90.6% recall, comparison 90.2% recall).
 
-**Total: 109 features** (after one-hot encoding of categorical constraint outputs) across constraint metadata, retrieval scores, text analysis, and query classification.
+**Total: 108 features** (after one-hot encoding of categorical constraint outputs, 3 noisy features pruned in v6) across constraint metadata, retrieval scores, text analysis, and query classification.
 
 ### Layer 2: 5-Question Cascade (Decision)
 
@@ -87,17 +87,17 @@ Q1: Evidence sufficient? (GBT, t=0.780)
     → NO  → ABSTAIN
     → YES → Q2
 
-Q2: Material conflict? (GBT, t=0.250)
+Q2: Material conflict? (GBT, t=0.200)
     "Do features suggest a dispute exists?"
     → YES → Q3 (conflict path)
     → NO  → Q4 (clean path)
 
-Q3: Conflict resolved? (GBT, t=0.680) — conflict path only
+Q3: Conflict resolved? (GBT, t=0.720) — conflict path only
     "Can we resolve the detected contradiction?"
     → NO  → DISPUTED
     → YES → TRUSTWORTHY
 
-Q4: Evidence solid? (GBT, t=0.780) — clean path only
+Q4: Evidence solid? (GBT, t=0.730) — clean path only
     "Is the non-conflicting evidence truly sufficient?"
     → NO  → ABSTAIN
     → YES → TRUSTWORTHY
@@ -118,24 +118,24 @@ The cascade artifact is ~5MB, runs in microseconds, and adds zero latency to the
 
 | Decision | Meaning | Recall |
 |----------|---------|--------|
-| **ABSTAIN** | Evidence doesn't answer the question | **84.6%** |
-| **DISPUTED** | Sources contradict each other | **77.3%** |
-| **TRUSTWORTHY** | Consistent, sufficient evidence | **70.5%** |
+| **ABSTAIN** | Evidence doesn't answer the question | **86.5%** |
+| **DISPUTED** | Sources contradict each other | **86.1%** |
+| **TRUSTWORTHY** | Consistent, sufficient evidence | **70.0%** |
 
-**Overall accuracy: 76.4%** | **False-trustworthy: 4.3%** (126/2,920)
+**Overall accuracy: 78.7%** | **False-trustworthy: 5.7%** (165/2,920)
 
-For comparison, the rule-based governor achieves 63.4% accuracy on the same test set.
+For comparison, the rule-based governor achieves 63.9% accuracy on the same test set.
 
 ### Safety-First Threshold Tuning
 
 Four thresholds tuned jointly to minimize false-trustworthy predictions (over-confidence):
 
 - **Q1=0.780** — answerability gate. Conservative: routes ambiguous cases to ABSTAIN rather than forward.
-- **Q2=0.250** — conflict router. Low threshold: routes more cases to the conflict path to catch disputes. False routing is handled by Q3.
-- **Q3=0.680** — conflict-resolution gate. Lower threshold allows more disputed cases through; Q3 is already on the conflict path.
-- **Q4=0.780** — clean-path sufficiency gate. Conservative: if evidence isn't clearly solid, ABSTAIN.
+- **Q2=0.200** — conflict router. Low threshold: routes more cases to the conflict path to catch disputes. False routing is handled by Q3.
+- **Q3=0.720** — conflict-resolution gate. Lower threshold allows more disputed cases through; Q3 is already on the conflict path.
+- **Q4=0.730** — clean-path sufficiency gate. Conservative: if evidence isn't clearly solid, ABSTAIN.
 
-The most common error is over-hedging: predicting ABSTAIN or DISPUTED when the answer is actually TRUSTWORTHY. This is annoying but harmless. The opposite (over-confidence) is dangerous but rare — **4.3% false-trustworthy rate** (126/2,920 cases).
+The most common error is over-hedging: predicting ABSTAIN or DISPUTED when the answer is actually TRUSTWORTHY. This is annoying but harmless. The opposite (over-confidence) is dangerous but rare — **5.7% false-trustworthy rate** (165/2,920 cases).
 
 ### Training History
 
@@ -151,7 +151,8 @@ The most common error is over-hedging: predicting ABSTAIN or DISPUTED when the a
 | 8 (inter-chunk features) | 1113, 51 features | 82.1% | TF-IDF similarity, assertion density, length CV |
 | 9 (feature parity fix) | 1113, 50 features | **90.9%** | Fixed embedding distribution — v3.0 production result |
 | 10 (cascade + expanded data) | 2910, 109 features, 5-fold CV | 81.3% | 4-question cascade, GBT×3, ML DetectionClassifier |
-| 11 (ML Q2 router + constraint fixes) | 2920, 109 features, 5-fold CV | **76.4%** (FT=4.3%) | 5-question cascade, GBT×4, full pairwise conflict detection, per-chunk verification, ML Q2 router replaces hard ca_fired rule |
+| 11 (ML Q2 router + constraint fixes) | 2920, 109 features, 5-fold CV | 76.4% (FT=4.3%) | 5-question cascade, GBT×4, full pairwise conflict detection, per-chunk verification, ML Q2 router replaces hard ca_fired rule |
+| 12 (citation-grounded AV + feature pruning) | 2920, 108 features, 5-fold CV | **78.7%** (FT=5.7%) | Citation-grounded AV replaces jury YES/NO, 3 noisy features pruned, `av_citation_quality` is top feature, `ix_av_no_ie` is #1 in Q1 |
 
 ### Why These Numbers Are Honest
 
@@ -159,8 +160,8 @@ We could report higher numbers. Training on easier cases, using a smaller test s
 
 - **92% of test cases are hard** — boundary cases, not softballs
 - **5-fold cross-validated** — all reported numbers are out-of-fold; no threshold calibration on the training set
-- **We report per-class recall** — a system that gets 90% overall by ignoring the disputed class is worse than one that gets 76% with balanced performance
-- **We report false-trustworthy rate** — the most dangerous error (confidently answering when it shouldn't). Our FT rate of 4.3% means 95.7% of trustworthy predictions are correct.
+- **We report per-class recall** — a system that gets 90% overall by ignoring the disputed class is worse than one that gets 78% with balanced performance
+- **We report false-trustworthy rate** — the most dangerous error (confidently answering when it shouldn't). Our FT rate of 5.7% means 94.3% of trustworthy predictions are correct.
 - **Safety-first calibration** — thresholds are chosen to minimize false-trustworthy, not to maximize overall accuracy
 
 ## Key Techniques
@@ -185,8 +186,8 @@ Classify the rhetorical stance of each source: "assertive" (states facts), "hedg
 ### 4. Inter-Chunk Text Features
 Deterministic features computed from chunk text without LLM calls: pairwise TF-IDF cosine similarity, assertion density, numerical variance, chunk length coefficient of variation. These features were introduced in v3.0 and improved Stage 2 accuracy by +10.5pp at the time.
 
-### 5. LLM Jury Verification
-Three independent prompts assess evidence sufficiency. Unanimous agreement that context doesn't answer the query triggers qualification — a safety net against false confidence.
+### 5. Citation-Grounded Verification
+The LLM quotes the exact passage that answers the question, then fuzzy string matching verifies the citation. If no valid citation is found, the case is flagged. `av_citation_quality` (best match score across chunks) is the top feature in the v6 model.
 
 ## Feature Importance
 
@@ -228,7 +229,7 @@ python -m tools.governance.calibrate_cascade
 |------|---------|
 | **Test cases** | [fitz-gov](https://github.com/yafitzdev/fitz-gov) (2,900+ cases) |
 | **Constraints** | `fitz_ai/governance/constraints/plugins/` (IE, CA, CAA, SIT, AV) |
-| **Feature extraction** | `fitz_ai/governance/constraints/feature_extractor.py` (109 features) |
+| **Feature extraction** | `fitz_ai/governance/constraints/feature_extractor.py` (108 features) |
 | **GovernanceDecider** | `fitz_ai/governance/decider.py` (4-question cascade) |
 | **Governor fallback** | `fitz_ai/governance/governor.py` (AnswerGovernor rule-based) |
 | **Training pipeline** | `tools/governance/train_classifier.py` |
@@ -242,7 +243,7 @@ For the full experimental record with training history, ablation results, and wh
 
 **[fitz-gov 3.0 results](../evaluation/fitz-gov-3.0-results.md)** — How we got from 26.9% (rules) to 90.9% (two-stage ML)
 
-**[fitz-gov 5.0 results](../evaluation/fitz-gov-5.0-results.md)** — 5-question cascade, 2,920 cases, 76.4% accuracy, 4.3% FT (5-fold CV)
+**[fitz-gov 5.0 results](../evaluation/fitz-gov-5.0-results.md)** — 5-question cascade, 2,920 cases, 78.7% accuracy, 5.7% FT (v6, 5-fold CV)
 
 ## Why This Matters
 

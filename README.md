@@ -86,7 +86,7 @@ Existing RAG tools hallucinate. When the answer isn't in your documents, they in
 
 The retrieval architecture is [KRAG (Knowledge Routing Augmented Generation)](docs/features/platform/krag.md) — documents are parsed into typed units (code symbols, sections, tables) and each query is routed to the right search strategy, rather than searching flat chunks uniformly.
 
-Honesty is enforced by an [ML governance classifier](docs/features/governance/governance-benchmarking.md) that decides when to answer, hedge, refuse — validated against [fitz-gov](https://github.com/yafitzdev/fitz-gov), a purpose-built benchmark of 2,920 adversarial test cases (4.3% false-trustworthy rate).
+Honesty is enforced by an [ML governance classifier](docs/features/governance/governance-benchmarking.md) that decides when to answer, hedge, refuse — validated against [fitz-gov](https://github.com/yafitzdev/fitz-gov), a purpose-built benchmark of 2,920 adversarial test cases (5.7% false-trustworthy rate).
 
 It runs in production today and powers [fitz-graveyard](https://github.com/yafitzdev/fitz-graveyard).
 
@@ -179,7 +179,7 @@ You trade flexibility for a pipeline that handles temporal queries, comparison q
 **Honest answers ✅** → [Governance Benchmark](docs/features/governance/governance-benchmarking.md)
 > Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."
 >
-> → Fitz detects when to abstain at **84.6% recall** on [fitz-gov 5.0](https://github.com/yafitzdev/fitz-gov), a 2,920 case benchmark for epistemic honesty (62.7% hard difficulty). False-trustworthy rate: **4.3%**.
+> → Fitz detects when to abstain at **86.5% recall** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 2,920 case benchmark for epistemic honesty (62.7% hard difficulty). False-trustworthy rate: **5.7%**.
 
 **Actionable failures 🔍**
 > When Fitz can't answer, it doesn't just refuse — it explains what it searched for, shows related topics that *do* exist, and suggests what documents to add. When sources conflict, Fitz tells you exactly which sources disagree and what the disagreement is about. Every failure mode is a feedback signal, not a dead end.
@@ -276,7 +276,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
   │ 5 Constraints       │     Contradiction detection, evidence sufficiency,
   │ (epistemic sensors) │     causal attribution, answer verification, specific info type
   └──────────┬──────────┘
-             │ 109 features extracted
+             │ 108 features extracted
              ▼
   ┌─────────────────────┐
   │ Q1: Evidence        │     Is the evidence sufficient?
@@ -307,11 +307,11 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 
 | Decision | Meaning                              | Recall    |
 |----------|--------------------------------------|-----------|
-| **ABSTAIN** | Evidence doesn't answer the question | **84.6%** |
-| **DISPUTED** | Sources contradict each other        | **77.3%** |
-| **TRUSTWORTHY** | Consistent, sufficient evidence      | **70.5%** |
+| **ABSTAIN** | Evidence doesn't answer the question | **86.5%** |
+| **DISPUTED** | Sources contradict each other        | **86.1%** |
+| **TRUSTWORTHY** | Consistent, sufficient evidence      | **70.0%** |
 
-**Overall accuracy: 76.4%** | **False-trustworthy: 4.3%** on fitz-gov 5.0 (2,920 cases, 5-fold cross-validated, 62.7% hard difficulty)
+**Overall accuracy: 78.7%** | **False-trustworthy: 5.7%** on fitz-gov (2,920 cases, 5-fold cross-validated, 62.7% hard difficulty)
 
 <br>
 
