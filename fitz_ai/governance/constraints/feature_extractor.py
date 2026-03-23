@@ -108,9 +108,8 @@ def _extract_constraint_features(
                     result.metadata.get(spec.name, spec.default) if result else spec.default
                 )
 
-    # AV-specific derived feature: strong denial (2+ jury votes)
-    av_votes = features.get("av_jury_votes_no")
-    features["av_strong_denial"] = (av_votes or 0) >= 2
+    # AV-specific derived feature: av_fired when no citation found
+    features["av_fired"] = not features.get("av_citation_found", True)
 
 
 def _extract_aggregate_signals(
@@ -900,7 +899,6 @@ _AGGREGATE_BOOL_FEATURES = {
     "has_disputed_signal",
     "has_qualified_signal",
     "has_any_denial",
-    "av_strong_denial",
 }
 _TIER2_CATEGORICAL_FEATURES = {"query_question_type"}
 

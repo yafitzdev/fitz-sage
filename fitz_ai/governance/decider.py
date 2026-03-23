@@ -308,24 +308,24 @@ class GovernanceDecider:
             X["ix_ca_pairs_x_disputed"] = X["ca_pairs_checked"] * X["has_disputed_signal"]
         if "ie_max_similarity" in X.columns and "ie_fired" in X.columns:
             X["ix_ie_sim_x_fired"] = X["ie_max_similarity"] * X["ie_fired"]
-        if "av_jury_votes_no" in X.columns and "mean_vector_score" in X.columns:
-            X["ix_av_votes_x_vector"] = X["av_jury_votes_no"] * X["mean_vector_score"]
-        if "has_disputed_signal" in X.columns and "av_jury_votes_no" in X.columns:
-            X["ix_disputed_x_av"] = X["has_disputed_signal"] * X["av_jury_votes_no"]
+        if "av_citation_quality" in X.columns and "mean_vector_score" in X.columns:
+            X["ix_citation_x_vector"] = X["av_citation_quality"] * X["mean_vector_score"]
+        if "has_disputed_signal" in X.columns and "av_citation_found" in X.columns:
+            X["ix_disputed_x_av"] = X["has_disputed_signal"] * (1 - X["av_citation_found"])
         if "ctx_max_pairwise_sim" in X.columns and "ctx_min_pairwise_sim" in X.columns:
             X["ix_ctx_sim_spread"] = X["ctx_max_pairwise_sim"] - X["ctx_min_pairwise_sim"]
         if "mean_vector_score" in X.columns and "ctx_contradiction_count" in X.columns:
             X["ix_vector_x_contradiction"] = X["mean_vector_score"] * X["ctx_contradiction_count"]
         if "av_fired" in X.columns and "ie_fired" in X.columns:
             X["ix_av_no_ie"] = X["av_fired"] * (1 - X["ie_fired"])
-        if "av_strong_denial" in X.columns and "ie_fired" in X.columns:
-            X["ix_av_strong_no_ie"] = X["av_strong_denial"] * (1 - X["ie_fired"])
+        if "av_citation_found" in X.columns and "ie_fired" in X.columns:
+            X["ix_av_nocite_no_ie"] = (1 - X["av_citation_found"]) * (1 - X["ie_fired"])
         if "num_constraints_fired" in X.columns:
             X["ix_multi_denial"] = (X["num_constraints_fired"] >= 2).astype(int)
         if "has_any_denial" in X.columns and "mean_vector_score" in X.columns:
             X["ix_denial_low_vector"] = X["has_any_denial"] * (1 - X["mean_vector_score"])
-        if "av_jury_votes_no" in X.columns and "has_abstain_signal" in X.columns:
-            X["ix_av_x_abstain"] = X["av_jury_votes_no"] * X["has_abstain_signal"]
+        if "av_citation_found" in X.columns and "has_abstain_signal" in X.columns:
+            X["ix_av_x_abstain"] = (1 - X["av_citation_found"]) * X["has_abstain_signal"]
         if "has_cross_chunk_divergence" in X.columns and "ca_fired" in X.columns:
             X["ix_divergence_no_ca"] = X["has_cross_chunk_divergence"] * (1 - X["ca_fired"])
         if "has_within_chunk_divergence" in X.columns and "ca_fired" in X.columns:

@@ -321,7 +321,7 @@ class FitzGovBenchmark:
                     adaptive=self._adaptive,
                     embedder=embedder,
                 ),
-                AnswerVerificationConstraint(chat=fast_chat, chat_balanced=balanced_chat),
+                AnswerVerificationConstraint(chat=fast_chat),
             ]
             constraint_results = run_constraints(query.text, chunks, constraints)
         else:

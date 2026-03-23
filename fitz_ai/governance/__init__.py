@@ -53,7 +53,7 @@ def create_default_constraints(
 
     Args:
         chat: Fast-tier ChatProvider for LLM-based detection
-        chat_balanced: Balanced-tier ChatProvider for AV confirmation (optional)
+        chat_balanced: Balanced-tier ChatProvider (reserved for future use)
         embedder: Embedder for IE similarity checks (enables entity/aspect detection)
 
     Returns:
@@ -66,8 +66,8 @@ def create_default_constraints(
         CausalAttributionConstraint(embedder=embedder),
         # LLM pairwise comparison: detect contradictions + semantic evidence character
         ConflictAwareConstraint(chat=chat, embedder=embedder),
-        # LLM jury + balanced confirmation: verify chunks answer the query
-        AnswerVerificationConstraint(chat=chat, chat_balanced=chat_balanced),
+        # Citation-grounded verification: verify chunks answer the query
+        AnswerVerificationConstraint(chat=chat),
         # Specific info type detection (semantic when embedder available)
         SpecificInfoTypeConstraint(embedder=embedder),
     ]

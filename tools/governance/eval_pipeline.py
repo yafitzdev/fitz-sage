@@ -78,6 +78,8 @@ _BOOL_FEATURES = {
     "sit_entity_mismatch",
     "sit_has_specific_info",
     "av_fired",
+    "av_citation_found",
+    "av_contradicting_citations",
     "has_abstain_signal",
     "has_disputed_signal",
     "has_qualified_signal",
@@ -95,7 +97,8 @@ _NUMERIC_FEATURES = {
     "ie_max_similarity",
     "ca_pairs_checked",
     "ca_relevance_filtered_count",
-    "av_jury_votes_no",
+    "av_citation_quality",
+    "av_citations_count",
     "num_constraints_fired",
     "query_word_count",
     "num_chunks",
@@ -230,7 +233,7 @@ def make_constraints(chat, chat_balanced=None, embedder=None) -> list:
         CausalAttributionConstraint(),
         SpecificInfoTypeConstraint(),
         ConflictAwareConstraint(chat=chat),
-        AnswerVerificationConstraint(chat=chat, chat_balanced=chat_balanced),
+        AnswerVerificationConstraint(chat=chat),
     ]
 
 

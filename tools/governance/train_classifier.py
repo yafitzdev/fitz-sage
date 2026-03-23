@@ -415,12 +415,12 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
     # New: IE similarity * IE fired — strong abstain signal
     if "ie_max_similarity" in X.columns and "ie_fired" in X.columns:
         X["ix_ie_sim_x_fired"] = X["ie_max_similarity"] * X["ie_fired"]
-    # New: AV votes * vector score — qualified signal
-    if "av_jury_votes_no" in X.columns and "mean_vector_score" in X.columns:
-        X["ix_av_votes_x_vector"] = X["av_jury_votes_no"] * X["mean_vector_score"]
-    # New: disputed signal * av votes — strong disputed indicator
-    if "has_disputed_signal" in X.columns and "av_jury_votes_no" in X.columns:
-        X["ix_disputed_x_av"] = X["has_disputed_signal"] * X["av_jury_votes_no"]
+    # New: citation quality * vector score — grounded answer signal
+    if "av_citation_quality" in X.columns and "mean_vector_score" in X.columns:
+        X["ix_citation_x_vector"] = X["av_citation_quality"] * X["mean_vector_score"]
+    # New: disputed signal * no citation — strong disputed indicator
+    if "has_disputed_signal" in X.columns and "av_citation_found" in X.columns:
+        X["ix_disputed_x_av"] = X["has_disputed_signal"] * (1 - X["av_citation_found"])
     # New: context similarity spread — conflicting contexts signal disputed
     if "ctx_max_pairwise_sim" in X.columns and "ctx_min_pairwise_sim" in X.columns:
         X["ix_ctx_sim_spread"] = X["ctx_max_pairwise_sim"] - X["ctx_min_pairwise_sim"]
@@ -430,18 +430,18 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
     # New: AV fires but IE doesn't — abstain signal missed by IE (helps Stage 1)
     if "av_fired" in X.columns and "ie_fired" in X.columns:
         X["ix_av_no_ie"] = X["av_fired"] * (1 - X["ie_fired"])
-    # New: Strong AV denial without IE — strong abstain indicator
-    if "av_strong_denial" in X.columns and "ie_fired" in X.columns:
-        X["ix_av_strong_no_ie"] = X["av_strong_denial"] * (1 - X["ie_fired"])
+    # New: No citation without IE — strong abstain indicator
+    if "av_citation_found" in X.columns and "ie_fired" in X.columns:
+        X["ix_av_nocite_no_ie"] = (1 - X["av_citation_found"]) * (1 - X["ie_fired"])
     # New: Multiple constraints fire — compound caution signal
     if "num_constraints_fired" in X.columns:
         X["ix_multi_denial"] = (X["num_constraints_fired"] >= 2).astype(int)
     # New: Any denial with low vector score — irrelevant retrieval
     if "has_any_denial" in X.columns and "mean_vector_score" in X.columns:
         X["ix_denial_low_vector"] = X["has_any_denial"] * (1 - X["mean_vector_score"])
-    # New: AV jury votes * abstain signal — reinforced abstain
-    if "av_jury_votes_no" in X.columns and "has_abstain_signal" in X.columns:
-        X["ix_av_x_abstain"] = X["av_jury_votes_no"] * X["has_abstain_signal"]
+    # New: No citation * abstain signal — reinforced abstain
+    if "av_citation_found" in X.columns and "has_abstain_signal" in X.columns:
+        X["ix_av_x_abstain"] = (1 - X["av_citation_found"]) * X["has_abstain_signal"]
     # New: cross-chunk divergence * no CA fire — numeric conflict CA missed
     if "has_cross_chunk_divergence" in X.columns and "ca_fired" in X.columns:
         X["ix_divergence_no_ca"] = X["has_cross_chunk_divergence"] * (1 - X["ca_fired"])

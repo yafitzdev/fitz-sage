@@ -468,15 +468,15 @@ class TestAcceptanceCriteria:
 
 
 # =============================================================================
-# Tests: AnswerVerificationConstraint (Jury-based)
+# Tests: AnswerVerificationConstraint (Citation-grounded)
 # =============================================================================
 
 
 class TestAnswerVerificationConstraint:
-    """Test the jury-based answer verification constraint.
+    """Test the citation-grounded answer verification constraint.
 
-    This constraint uses 3-prompt LLM jury to verify chunks actually answer
-    the query. Requires 2+ NO votes to qualify (conservative).
+    This constraint asks the LLM to quote the exact passage that answers
+    the question, then verifies with string matching.
     """
 
     def test_no_chat_allows_answer(self):
@@ -515,81 +515,111 @@ class TestAnswerVerificationConstraint:
         assert result.allow_decisive_answer is True
         mock_chat.chat.assert_not_called()
 
-    def test_jury_unanimous_yes_allows_answer(self):
-        """Should allow when all 3 jury prompts say context is relevant."""
+    def test_exact_citation_allows_answer(self):
+        """Should allow when LLM quotes an exact substring from the context."""
         from fitz_ai.governance import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
-        # All 3 prompts: YES (context is relevant)
-        mock_chat.chat.side_effect = ["YES", "YES", "YES"]
+        # LLM returns an exact quote from the chunk
+        mock_chat.chat.return_value = "Paris is the capital of France."
         constraint = AnswerVerificationConstraint(chat=mock_chat)
 
         chunks = [make_chunk("1", "Paris is the capital of France.")]
         result = constraint.apply("What is the capital of France?", chunks)
 
         assert result.allow_decisive_answer is True
-        assert mock_chat.chat.call_count == 3
+        assert result.metadata["av_citation_found"] is True
+        assert result.metadata["av_citation_quality"] == 1.0
 
-    def test_jury_2no_balanced_confirms_qualifies(self):
-        """Should qualify when 2/3 fast say NO and balanced confirms."""
+    def test_no_citation_qualifies(self):
+        """Should fire qualified signal when LLM returns NONE."""
         from fitz_ai.governance import AnswerVerificationConstraint
 
-        mock_fast = MagicMock()
-        mock_balanced = MagicMock()
-        # 2/3 fast say NO, balanced confirms NO
-        mock_fast.chat.side_effect = ["NO", "NO", "YES"]
-        mock_balanced.chat.return_value = "NO"
-        constraint = AnswerVerificationConstraint(chat=mock_fast, chat_balanced=mock_balanced)
+        mock_chat = MagicMock()
+        mock_chat.chat.return_value = "NONE"
+        constraint = AnswerVerificationConstraint(chat=mock_chat)
 
         chunks = [make_chunk("1", "France has 67 million people.")]
         result = constraint.apply("What is the capital of France?", chunks)
 
         assert result.allow_decisive_answer is False
         assert result.signal == "qualified"
-        assert mock_balanced.chat.call_count == 1
+        assert result.metadata["av_citation_found"] is False
 
-    def test_jury_2no_balanced_rejects_allows(self):
-        """Should allow when 2/3 fast say NO but balanced says YES (overrides)."""
+    def test_fuzzy_citation_allows(self):
+        """Should allow when LLM returns a close-enough citation (fuzzy match)."""
         from fitz_ai.governance import AnswerVerificationConstraint
 
-        mock_fast = MagicMock()
-        mock_balanced = MagicMock()
-        # 2/3 fast say NO, but balanced says YES (context is relevant)
-        mock_fast.chat.side_effect = ["NO", "NO", "YES"]
-        mock_balanced.chat.return_value = "YES"
-        constraint = AnswerVerificationConstraint(chat=mock_fast, chat_balanced=mock_balanced)
+        mock_chat = MagicMock()
+        # Citation with minor variation but high overlap
+        mock_chat.chat.return_value = "Paris is the capital of France"
+        constraint = AnswerVerificationConstraint(chat=mock_chat)
 
-        chunks = [make_chunk("1", "France is in Europe.")]
+        chunks = [make_chunk("1", "Paris is the capital of France, located in Europe.")]
         result = constraint.apply("What is the capital of France?", chunks)
 
         assert result.allow_decisive_answer is True
+        assert result.metadata["av_citation_found"] is True
 
-    def test_jury_1_no_vote_allows(self):
-        """Should allow when only 1/3 fast say NO (no balanced call needed)."""
+    def test_fabricated_citation_qualifies(self):
+        """Should fire when LLM fabricates a quote not in the context."""
         from fitz_ai.governance import AnswerVerificationConstraint
 
-        mock_fast = MagicMock()
-        mock_balanced = MagicMock()
-        mock_fast.chat.side_effect = ["YES", "NO", "YES"]
-        constraint = AnswerVerificationConstraint(chat=mock_fast, chat_balanced=mock_balanced)
+        mock_chat = MagicMock()
+        # Quote not present in context at all
+        mock_chat.chat.return_value = "The capital of France is Lyon."
+        constraint = AnswerVerificationConstraint(chat=mock_chat)
 
-        chunks = [make_chunk("1", "Paris is the capital of France.")]
+        chunks = [make_chunk("1", "France has beautiful countryside and vineyards.")]
+        result = constraint.apply("What is the capital of France?", chunks)
+
+        assert result.allow_decisive_answer is False
+        assert result.signal == "qualified"
+
+    def test_multiple_chunks_early_exit_on_strong(self):
+        """Should early exit when first chunk produces a strong citation."""
+        from fitz_ai.governance import AnswerVerificationConstraint
+
+        mock_chat = MagicMock()
+        # First chunk returns exact match — should not call for more chunks
+        mock_chat.chat.return_value = "Paris is the capital of France."
+        constraint = AnswerVerificationConstraint(chat=mock_chat)
+
+        chunks = [
+            make_chunk("1", "Paris is the capital of France."),
+            make_chunk("2", "France has 67 million people."),
+            make_chunk("3", "The Eiffel Tower is in Paris."),
+        ]
         result = constraint.apply("What is the capital of France?", chunks)
 
         assert result.allow_decisive_answer is True
-        # Balanced should NOT be called when <2 fast NO votes
-        mock_balanced.chat.assert_not_called()
+        # Only 1 LLM call needed (early exit)
+        assert mock_chat.chat.call_count == 1
 
-    def test_jury_error_counted_as_abstain(self):
+    def test_llm_error_gracefully_handles(self):
         """Should handle LLM errors gracefully."""
         from fitz_ai.governance import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
-        # First two succeed, third errors - only 1 NO vote
-        mock_chat.chat.side_effect = ["YES", "NO", Exception("LLM error")]
+        mock_chat.chat.side_effect = Exception("LLM error")
         constraint = AnswerVerificationConstraint(chat=mock_chat)
 
         chunks = [make_chunk("1", "Some content.")]
         result = constraint.apply("Any question?", chunks)
 
-        assert result.allow_decisive_answer is True
+        # Error returns score 0 → no citation → fires
+        assert result.allow_decisive_answer is False
+        assert result.signal == "qualified"
+
+    def test_feature_schema_declares_citation_features(self):
+        """Should declare citation-based features in schema."""
+        from fitz_ai.governance import AnswerVerificationConstraint
+
+        schema = AnswerVerificationConstraint.feature_schema()
+        names = {s.name for s in schema}
+
+        assert "av_fired" in names
+        assert "av_citation_found" in names
+        assert "av_citation_quality" in names
+        assert "av_citations_count" in names
+        assert "av_contradicting_citations" in names
