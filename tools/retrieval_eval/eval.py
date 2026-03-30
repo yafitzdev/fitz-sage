@@ -39,15 +39,14 @@ def run_retrieval(
 ) -> list[str]:
     """Run retrieval pipeline and return selected file paths."""
     from fitz_ai.code import CodeRetriever
-    from fitz_ai.llm.factory import get_chat_factory
+    from fitz_ai.llm.providers.enterprise import EnterpriseChat
 
-    # Provider spec format: "lmstudio/model-name" or just "lmstudio"
-    spec = f"{provider}/{model}" if model else provider
-    config = {"timeout": 300}
-    if base_url:
-        config["base_url"] = base_url
+    # Create chat client directly (no auth needed for local LM Studio)
+    client = EnterpriseChat(auth=None, base_url=base_url, model=model, timeout=300)
 
-    chat_factory = get_chat_factory(spec, config)
+    # chat_factory: tier -> client (same client for all tiers)
+    def chat_factory(tier: str = "smart") -> EnterpriseChat:
+        return client
 
     retriever = CodeRetriever(
         source_dir=source_dir,
