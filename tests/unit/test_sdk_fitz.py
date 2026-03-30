@@ -25,7 +25,7 @@ class TestFitzInit:
 
     def test_default_collection(self):
         """Test default collection name."""
-        from fitz_ai.sdk import fitz
+        from fitz_sage.sdk import fitz
 
         f = fitz()
 
@@ -33,7 +33,7 @@ class TestFitzInit:
 
     def test_custom_collection(self):
         """Test custom collection name."""
-        from fitz_ai.sdk import fitz
+        from fitz_sage.sdk import fitz
 
         f = fitz(collection="my_collection")
 
@@ -41,7 +41,7 @@ class TestFitzInit:
 
     def test_custom_config_path(self, tmp_path):
         """Test custom config path."""
-        from fitz_ai.sdk import fitz
+        from fitz_sage.sdk import fitz
 
         config_path = tmp_path / "custom.yaml"
         f = fitz(config_path=config_path)
@@ -50,7 +50,7 @@ class TestFitzInit:
 
     def test_auto_init_default_true(self):
         """Test auto_init defaults to True."""
-        from fitz_ai.sdk import fitz
+        from fitz_sage.sdk import fitz
 
         f = fitz()
         # auto_init is an internal attribute
@@ -62,7 +62,7 @@ class TestFitzConfigCreation:
 
     def test_ensure_config_skips_when_exists(self, tmp_path):
         """Test that _ensure_config does nothing when config exists."""
-        from fitz_ai.sdk import fitz
+        from fitz_sage.sdk import fitz
 
         config_path = tmp_path / "config.yaml"
         _write_test_config(config_path)
@@ -74,8 +74,8 @@ class TestFitzConfigCreation:
 
     def test_raises_without_auto_init(self, tmp_path):
         """Test that ConfigurationError is raised when auto_init=False and no config."""
-        from fitz_ai.core import ConfigurationError
-        from fitz_ai.sdk import fitz
+        from fitz_sage.core import ConfigurationError
+        from fitz_sage.sdk import fitz
 
         config_path = tmp_path / "nonexistent.yaml"
         f = fitz(config_path=config_path, auto_init=False)
@@ -89,8 +89,8 @@ class TestFitzQuery:
 
     def test_raises_on_empty_question(self, tmp_path):
         """Test that QueryError is raised for empty question."""
-        from fitz_ai.sdk import fitz
-        from fitz_ai.services.fitz_service import QueryError
+        from fitz_sage.sdk import fitz
+        from fitz_sage.services.fitz_service import QueryError
 
         config_path = tmp_path / "config.yaml"
         _write_test_config(config_path)
@@ -101,8 +101,8 @@ class TestFitzQuery:
 
     def test_raises_on_whitespace_question(self, tmp_path):
         """Test that QueryError is raised for whitespace-only question."""
-        from fitz_ai.sdk import fitz
-        from fitz_ai.services.fitz_service import QueryError
+        from fitz_sage.sdk import fitz
+        from fitz_sage.services.fitz_service import QueryError
 
         config_path = tmp_path / "config.yaml"
         _write_test_config(config_path)
@@ -116,20 +116,20 @@ class TestFitzExports:
     """Tests for SDK exports."""
 
     def test_fitz_exported_from_sdk(self):
-        """Test fitz is exported from fitz_ai.sdk."""
-        from fitz_ai.sdk import fitz
+        """Test fitz is exported from fitz_sage.sdk."""
+        from fitz_sage.sdk import fitz
 
         assert fitz is not None
 
     def test_fitz_exported_from_top_level(self):
-        """Test fitz is exported from fitz_ai."""
-        from fitz_ai import fitz
+        """Test fitz is exported from fitz_sage."""
+        from fitz_sage import fitz
 
         assert fitz is not None
 
     def test_module_level_query_exported(self):
         """Test module-level query() is exported."""
-        import fitz_ai
+        import fitz_sage
 
-        assert hasattr(fitz_ai, "query")
-        assert callable(fitz_ai.query)
+        assert hasattr(fitz_sage, "query")
+        assert callable(fitz_sage.query)

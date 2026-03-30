@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fitz_ai.core.exceptions import GenerationError
+from fitz_sage.core.exceptions import GenerationError
 
 
 class TestLocalLLMRuntimeConfig:
@@ -17,7 +17,7 @@ class TestLocalLLMRuntimeConfig:
 
     def test_default_values(self):
         """Test default configuration values."""
-        from fitz_ai.backends.local_llm.runtime import LocalLLMRuntimeConfig
+        from fitz_sage.backends.local_llm.runtime import LocalLLMRuntimeConfig
 
         cfg = LocalLLMRuntimeConfig()
 
@@ -26,7 +26,7 @@ class TestLocalLLMRuntimeConfig:
 
     def test_custom_values(self):
         """Test custom configuration values."""
-        from fitz_ai.backends.local_llm.runtime import LocalLLMRuntimeConfig
+        from fitz_sage.backends.local_llm.runtime import LocalLLMRuntimeConfig
 
         cfg = LocalLLMRuntimeConfig(model="mistral:7b", verbose=True)
 
@@ -35,7 +35,7 @@ class TestLocalLLMRuntimeConfig:
 
     def test_config_is_frozen(self):
         """Test that config is immutable."""
-        from fitz_ai.backends.local_llm.runtime import LocalLLMRuntimeConfig
+        from fitz_sage.backends.local_llm.runtime import LocalLLMRuntimeConfig
 
         cfg = LocalLLMRuntimeConfig()
 
@@ -49,7 +49,7 @@ class TestOllamaAdapter:
     def test_adapter_init_without_ollama_raises(self):
         """Test that adapter raises helpful error when ollama not installed."""
         with patch.dict("sys.modules", {"ollama": None}):
-            from fitz_ai.backends.local_llm.runtime import _OllamaAdapter
+            from fitz_sage.backends.local_llm.runtime import _OllamaAdapter
 
             with pytest.raises(GenerationError) as exc_info:
                 _OllamaAdapter("model", verbose=False)
@@ -61,7 +61,7 @@ class TestOllamaAdapter:
         mock_ollama = MagicMock()
 
         with patch.dict("sys.modules", {"ollama": mock_ollama}):
-            from fitz_ai.backends.local_llm.runtime import _OllamaAdapter
+            from fitz_sage.backends.local_llm.runtime import _OllamaAdapter
 
             adapter = _OllamaAdapter("test-model", verbose=True)
 
@@ -74,7 +74,7 @@ class TestOllamaAdapter:
         mock_ollama.chat.return_value = {"message": {"content": "Hello!"}}
 
         with patch.dict("sys.modules", {"ollama": mock_ollama}):
-            from fitz_ai.backends.local_llm.runtime import _OllamaAdapter
+            from fitz_sage.backends.local_llm.runtime import _OllamaAdapter
 
             adapter = _OllamaAdapter("model", verbose=False)
             result = adapter.chat([{"role": "user", "content": "Hi"}])
@@ -88,7 +88,7 @@ class TestOllamaAdapter:
         mock_ollama.chat.side_effect = Exception("Connection failed")
 
         with patch.dict("sys.modules", {"ollama": mock_ollama}):
-            from fitz_ai.backends.local_llm.runtime import _OllamaAdapter
+            from fitz_sage.backends.local_llm.runtime import _OllamaAdapter
 
             adapter = _OllamaAdapter("model", verbose=False)
 
@@ -101,7 +101,7 @@ class TestOllamaAdapter:
         mock_ollama.embeddings.return_value = {"embedding": [0.1, 0.2, 0.3]}
 
         with patch.dict("sys.modules", {"ollama": mock_ollama}):
-            from fitz_ai.backends.local_llm.runtime import _OllamaAdapter
+            from fitz_sage.backends.local_llm.runtime import _OllamaAdapter
 
             adapter = _OllamaAdapter("model", verbose=False)
             result = adapter.embed("test text")
@@ -115,7 +115,7 @@ class TestOllamaAdapter:
         mock_ollama.embeddings.side_effect = Exception("Embedding failed")
 
         with patch.dict("sys.modules", {"ollama": mock_ollama}):
-            from fitz_ai.backends.local_llm.runtime import _OllamaAdapter
+            from fitz_sage.backends.local_llm.runtime import _OllamaAdapter
 
             adapter = _OllamaAdapter("model", verbose=False)
 
@@ -128,7 +128,7 @@ class TestLocalLLMRuntime:
 
     def test_runtime_init_default_config(self):
         """Test runtime initializes with default config."""
-        from fitz_ai.backends.local_llm.runtime import LocalLLMRuntime
+        from fitz_sage.backends.local_llm.runtime import LocalLLMRuntime
 
         runtime = LocalLLMRuntime()
 
@@ -137,7 +137,7 @@ class TestLocalLLMRuntime:
 
     def test_runtime_init_custom_config(self):
         """Test runtime initializes with custom config."""
-        from fitz_ai.backends.local_llm.runtime import (
+        from fitz_sage.backends.local_llm.runtime import (
             LocalLLMRuntime,
             LocalLLMRuntimeConfig,
         )
@@ -152,7 +152,7 @@ class TestLocalLLMRuntime:
         mock_ollama = MagicMock()
 
         with patch.dict("sys.modules", {"ollama": mock_ollama}):
-            from fitz_ai.backends.local_llm.runtime import LocalLLMRuntime
+            from fitz_sage.backends.local_llm.runtime import LocalLLMRuntime
 
             runtime = LocalLLMRuntime()
 
@@ -165,7 +165,7 @@ class TestLocalLLMRuntime:
     def test_runtime_llama_raises_llm_error_on_failure(self):
         """Test llama() raises GenerationError on adapter failure."""
         with patch.dict("sys.modules", {"ollama": None}):
-            from fitz_ai.backends.local_llm.runtime import LocalLLMRuntime
+            from fitz_sage.backends.local_llm.runtime import LocalLLMRuntime
 
             runtime = LocalLLMRuntime()
 
@@ -178,7 +178,7 @@ class TestFallbackHelp:
 
     def test_fallback_help_contains_instructions(self):
         """Test that fallback help message contains setup instructions."""
-        from fitz_ai.backends.local_llm.runtime import _LOCAL_FALLBACK_HELP
+        from fitz_sage.backends.local_llm.runtime import _LOCAL_FALLBACK_HELP
 
         assert "ollama" in _LOCAL_FALLBACK_HELP.lower()
         assert "pull" in _LOCAL_FALLBACK_HELP.lower()

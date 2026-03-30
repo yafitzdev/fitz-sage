@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from fitz_ai.engines.fitz_krag.retrieval.expander import CodeExpander
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
+from fitz_sage.engines.fitz_krag.retrieval.expander import CodeExpander
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind, ReadResult
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -140,14 +140,14 @@ def _make_expander(
 class TestPipelineEntityGraphIntegration:
     """Tests that the pipeline populates entity graph during ingestion."""
 
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ensure_schema")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.RawFileStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SymbolStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ImportGraphStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SectionStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TableStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.ensure_schema")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.RawFileStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.SymbolStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.ImportGraphStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.SectionStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.TableStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy")
     def test_calls_add_chunk_entities_during_ingestion(
         self,
         mock_doc_strat,
@@ -160,8 +160,8 @@ class TestPipelineEntityGraphIntegration:
         mock_ensure_schema,
     ):
         """Pipeline calls entity_graph_store.add_chunk_entities for enriched items."""
-        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-        from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+        from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+        from fitz_sage.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
 
         config = FitzKragConfig(collection="test_col", enable_enrichment=False)
         chat = MagicMock()
@@ -217,14 +217,14 @@ class TestPipelineEntityGraphIntegration:
         assert second_call[0][0] == "sym-002"
         assert second_call[0][1] == [("Redis", "technology")]
 
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ensure_schema")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.RawFileStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SymbolStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ImportGraphStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SectionStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TableStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.ensure_schema")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.RawFileStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.SymbolStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.ImportGraphStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.SectionStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.TableStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy")
     def test_graceful_failure_on_entity_graph_errors(
         self,
         mock_doc_strat,
@@ -237,8 +237,8 @@ class TestPipelineEntityGraphIntegration:
         mock_ensure_schema,
     ):
         """Pipeline catches entity graph errors without crashing."""
-        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-        from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+        from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+        from fitz_sage.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
 
         config = FitzKragConfig(collection="test_col", enable_enrichment=False)
         chat = MagicMock()

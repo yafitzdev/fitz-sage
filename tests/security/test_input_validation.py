@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from fitz_ai.core import Query
+from fitz_sage.core import Query
 
 from .conftest import with_tiered_fallback
 

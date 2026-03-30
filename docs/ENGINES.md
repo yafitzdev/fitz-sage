@@ -23,13 +23,13 @@ Query → Embed → Vector Search → Rerank → Context Build → LLM → Answe
 
 ## Core Contracts
 
-All engines implement the same interface, defined in `fitz_ai/core/`:
+All engines implement the same interface, defined in `fitz_sage/core/`:
 
 ### KnowledgeEngine Protocol
 
 ```python
 from typing import Protocol
-from fitz_ai.core import Query, Answer
+from fitz_sage.core import Query, Answer
 
 class KnowledgeEngine(Protocol):
     """Protocol that all knowledge engines must implement."""
@@ -73,12 +73,12 @@ class Provenance:
 
 ## Fitz KRAG Engine
 
-**Location**: `fitz_ai/engines/fitz_krag/`
+**Location**: `fitz_sage/engines/fitz_krag/`
 
 ### Usage
 
 ```python
-from fitz_ai.engines.fitz_krag import run_fitz_krag
+from fitz_sage.engines.fitz_krag import run_fitz_krag
 
 answer = run_fitz_krag("What is quantum computing?")
 print(answer.text)
@@ -118,7 +118,7 @@ vector_db_kwargs:
 Fitz supports a pluggable engine architecture. You can swap engines via configuration:
 
 ```python
-from fitz_ai import run
+from fitz_sage import run
 
 # Default: Fitz KRAG
 answer = run("What is X?", engine="fitz_krag")
@@ -142,8 +142,8 @@ Custom engines can be registered via the engine registry. See [CUSTOM_ENGINES.md
 You can create your own engine. See [CUSTOM_ENGINES.md](CUSTOM_ENGINES.md) for details.
 
 ```python
-from fitz_ai.core import Query, Answer
-from fitz_ai.runtime import EngineRegistry
+from fitz_sage.core import Query, Answer
+from fitz_sage.runtime import EngineRegistry
 
 class MyEngine:
     def answer(self, query: Query) -> Answer:
@@ -158,14 +158,14 @@ EngineRegistry.get_global().register("my_engine", lambda c: MyEngine())
 
 ## Standalone Code Retrieval
 
-For code-only retrieval without the full KRAG stack, fitz-ai provides a lightweight `CodeRetriever`:
+For code-only retrieval without the full KRAG stack, fitz-sage provides a lightweight `CodeRetriever`:
 
 ```bash
-pip install fitz-ai[code]
+pip install fitz-sage[code]
 ```
 
 ```python
-from fitz_ai.code import CodeRetriever
+from fitz_sage.code import CodeRetriever
 
 retriever = CodeRetriever(source_dir="./myproject", chat_factory=my_factory)
 results = retriever.retrieve("How does authentication work?")
@@ -177,9 +177,9 @@ No PostgreSQL, no pgvector, no docling. See [KRAG docs](features/platform/krag.m
 
 | Component | Path |
 |-----------|------|
-| CodeRetriever | `fitz_ai/code/retriever.py` |
-| Indexer (file list, AST index, import graph) | `fitz_ai/code/indexer.py` |
-| LLM prompts | `fitz_ai/code/prompts.py` |
+| CodeRetriever | `fitz_sage/code/retriever.py` |
+| Indexer (file list, AST index, import graph) | `fitz_sage/code/indexer.py` |
+| LLM prompts | `fitz_sage/code/prompts.py` |
 
 ---
 

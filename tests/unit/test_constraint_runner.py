@@ -2,8 +2,8 @@
 """Tests for constraint runner."""
 
 
-from fitz_ai.governance.constraints.base import ConstraintResult
-from fitz_ai.governance.constraints.runner import run_constraints
+from fitz_sage.governance.constraints.base import ConstraintResult
+from fitz_sage.governance.constraints.runner import run_constraints
 
 
 class MockConstraint:

@@ -9,7 +9,7 @@ that mutations would break.
 
 import pytest
 
-from fitz_ai.core.math import cosine_similarity, mean_vector
+from fitz_sage.core.math import cosine_similarity, mean_vector
 
 
 class TestCosineSimilarity:

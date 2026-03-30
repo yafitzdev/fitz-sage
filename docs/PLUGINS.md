@@ -51,14 +51,14 @@ Fitz uses two types of plugins:
 
 | Type | Format | Location | Purpose |
 |------|--------|----------|---------|
-| Chat | Python | `fitz_ai/llm/providers/` | LLM chat/completion |
-| Embedding | Python | `fitz_ai/llm/providers/` | Text embeddings |
-| Rerank | Python | `fitz_ai/llm/providers/` | Document reranking |
-| Vision | Python | `fitz_ai/llm/providers/` | VLM for image description |
-| Retrieval | YAML | `fitz_ai/engines/fitz_krag/retrieval/plugins/` | Retrieval strategies |
-| Chunking | Python | `fitz_ai/ingestion/chunking/plugins/` | Document chunking |
-| Parser | Python | `fitz_ai/ingestion/parser/plugins/` | Document parsing |
-| Guardrail | Python | `fitz_ai/core/guardrails/plugins/` | Epistemic safety |
+| Chat | Python | `fitz_sage/llm/providers/` | LLM chat/completion |
+| Embedding | Python | `fitz_sage/llm/providers/` | Text embeddings |
+| Rerank | Python | `fitz_sage/llm/providers/` | Document reranking |
+| Vision | Python | `fitz_sage/llm/providers/` | VLM for image description |
+| Retrieval | YAML | `fitz_sage/engines/fitz_krag/retrieval/plugins/` | Retrieval strategies |
+| Chunking | Python | `fitz_sage/ingestion/chunking/plugins/` | Document chunking |
+| Parser | Python | `fitz_sage/ingestion/parser/plugins/` | Document parsing |
+| Guardrail | Python | `fitz_sage/core/guardrails/plugins/` | Epistemic safety |
 
 **Note:** Vector storage uses PostgreSQL + pgvector (built-in, not pluggable). See [Unified Storage](features/platform/unified-storage.md).
 
@@ -84,7 +84,7 @@ LLM providers are Python classes that implement protocol interfaces (`ChatProvid
 Providers are selected using a `provider/model` string:
 
 ```python
-from fitz_ai.llm import get_chat, get_embedder, get_reranker, get_vision
+from fitz_sage.llm import get_chat, get_embedder, get_reranker, get_vision
 
 # Provider only (uses default model for tier)
 chat = get_chat("cohere")
@@ -234,7 +234,7 @@ vector_db_kwargs:
 In code:
 
 ```python
-from fitz_ai.llm import get_chat, get_embedder, get_reranker, get_vision
+from fitz_sage.llm import get_chat, get_embedder, get_reranker, get_vision
 
 chat = get_chat("cohere", tier="smart")
 response = chat.chat([{"role": "user", "content": "Hello"}])

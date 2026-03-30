@@ -14,8 +14,8 @@ _mock_ts_java = MagicMock()
 sys.modules.setdefault("tree_sitter", _mock_ts)
 sys.modules.setdefault("tree_sitter_java", _mock_ts_java)
 
-import fitz_ai.engines.fitz_krag.ingestion.strategies.java as _java_mod  # noqa: E402
-from fitz_ai.engines.fitz_krag.ingestion.strategies.java import (  # noqa: E402
+import fitz_sage.engines.fitz_krag.ingestion.strategies.java as _java_mod  # noqa: E402
+from fitz_sage.engines.fitz_krag.ingestion.strategies.java import (  # noqa: E402
     JavaIngestStrategy,
     _extract_import,
     _extract_package,

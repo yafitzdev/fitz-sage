@@ -25,7 +25,7 @@ if not POSTGRES_DEPS_AVAILABLE:
 # Mark all tests in this module as postgres and tier2
 pytestmark = [pytest.mark.postgres, pytest.mark.tier2]
 
-from fitz_ai.tabular.store.postgres import (
+from fitz_sage.tabular.store.postgres import (
     PostgresTableStore,
     _sanitize_column_name,
     _sanitize_table_name,
@@ -148,7 +148,7 @@ def mock_connection(mock_connection_manager):
 def table_store(mock_connection_manager):
     """Create PostgresTableStore with mocked connection manager."""
     with patch(
-        "fitz_ai.tabular.store.postgres.get_connection_manager",
+        "fitz_sage.tabular.store.postgres.get_connection_manager",
         return_value=mock_connection_manager,
     ):
         store = PostgresTableStore("test_collection")

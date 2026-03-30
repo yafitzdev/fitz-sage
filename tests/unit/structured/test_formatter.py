@@ -7,13 +7,13 @@ from typing import Any
 
 import pytest
 
-from fitz_ai.structured.executor import ExecutionResult
-from fitz_ai.structured.formatter import (
+from fitz_sage.structured.executor import ExecutionResult
+from fitz_sage.structured.formatter import (
     FormattedResult,
     ResultFormatter,
     format_multiple_results,
 )
-from fitz_ai.structured.sql_generator import SQLQuery
+from fitz_sage.structured.sql_generator import SQLQuery
 
 
 class MockChatClient:

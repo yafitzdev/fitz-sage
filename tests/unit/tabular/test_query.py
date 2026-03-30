@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fitz_ai.core.chunk import Chunk
-from fitz_ai.tabular.models import ParsedTable, create_schema_chunk
-from fitz_ai.tabular.query import TableQueryStep
+from fitz_sage.core.chunk import Chunk
+from fitz_sage.tabular.models import ParsedTable, create_schema_chunk
+from fitz_sage.tabular.query import TableQueryStep
 
 
 def create_mock_chat_factory():

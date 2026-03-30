@@ -3,7 +3,7 @@
 
 import pytest
 
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind, ReadResult
 
 
 class TestAddressKind:

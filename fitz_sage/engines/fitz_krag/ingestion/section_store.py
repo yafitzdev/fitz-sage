@@ -1,0 +1,318 @@
+# fitz_sage/engines/fitz_krag/ingestion/section_store.py
+"""CRUD operations for krag_section_index table with BM25 + vector search."""
+
+from __future__ import annotations
+
+import json
+import logging
+from typing import TYPE_CHECKING, Any
+
+from fitz_sage.engines.fitz_krag.ingestion.schema import TABLE_PREFIX
+
+if TYPE_CHECKING:
+    from fitz_sage.storage.postgres import PostgresConnectionManager
+
+logger = logging.getLogger(__name__)
+
+TABLE = f"{TABLE_PREFIX}section_index"
+
+
+class SectionStore:
+    """CRUD for the section index."""
+
+    def __init__(self, connection_manager: "PostgresConnectionManager", collection: str):
+        self._cm = connection_manager
+        self._collection = collection
+
+    def upsert_batch(self, sections: list[dict[str, Any]]) -> None:
+        """Insert or update a batch of sections."""
+        if not sections:
+            return
+
+        sql = f"""
+            INSERT INTO {TABLE}
+                ("id", "raw_file_id", "title", "level", "page_start", "page_end",
+                 "content", "summary", "summary_vector", "parent_section_id",
+                 "position", "keywords", "entities", "metadata")
+            VALUES
+                (%s, %s, %s, %s, %s, %s,
+                 %s, %s, %s::vector, %s,
+                 %s, %s, %s::jsonb, %s::jsonb)
+            ON CONFLICT ("id") DO UPDATE SET
+                "title" = EXCLUDED."title",
+                "level" = EXCLUDED."level",
+                "page_start" = EXCLUDED."page_start",
+                "page_end" = EXCLUDED."page_end",
+                "content" = EXCLUDED."content",
+                "summary" = EXCLUDED."summary",
+                "summary_vector" = EXCLUDED."summary_vector",
+                "parent_section_id" = EXCLUDED."parent_section_id",
+                "position" = EXCLUDED."position",
+                "keywords" = EXCLUDED."keywords",
+                "entities" = EXCLUDED."entities",
+                "metadata" = EXCLUDED."metadata"
+        """
+        with self._cm.connection(self._collection) as conn:
+            for sec in sections:
+                vector_str = _vector_to_pg(sec.get("summary_vector"))
+                conn.execute(
+                    sql,
+                    (
+                        sec["id"],
+                        sec["raw_file_id"],
+                        sec["title"],
+                        sec["level"],
+                        sec.get("page_start"),
+                        sec.get("page_end"),
+                        sec["content"],
+                        sec.get("summary"),
+                        vector_str,
+                        sec.get("parent_section_id"),
+                        sec["position"],
+                        sec.get("keywords", []),
+                        json.dumps(sec.get("entities", [])),
+                        json.dumps(sec.get("metadata", {})),
+                    ),
+                )
+            conn.commit()
+
+    def search_bm25(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Full-text search using ts_rank on content_tsv with parent context.
+
+        Joins child sections with their parent so that subsection searches
+        inherit the parent's terms (e.g. "Model Y200" context flows into
+        the child "Specifications" section).  Uses per-term OR matching in
+        the WHERE clause so sections matching *any* query term are candidates,
+        while ts_rank naturally ranks sections with more matching terms higher.
+        """
+        sql = f"""
+            SELECT s."id", s."raw_file_id", s."title", s."level",
+                   s."page_start", s."page_end", s."content", s."summary",
+                   s."parent_section_id", s."position", s."metadata",
+                   ts_rank(
+                       s."content_tsv" || COALESCE(p."content_tsv", ''::tsvector),
+                       to_tsquery(
+                           replace(plainto_tsquery('english', %s)::text, ' & ', ' | ')
+                       )
+                   ) AS "rank"
+            FROM {TABLE} s
+            LEFT JOIN {TABLE} p ON s."parent_section_id" = p."id"
+            WHERE (s."content_tsv" || COALESCE(p."content_tsv", ''::tsvector))
+                  @@ to_tsquery(
+                      replace(plainto_tsquery('english', %s)::text, ' & ', ' | ')
+                  )
+            ORDER BY "rank" DESC
+            LIMIT %s
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, (query, query, limit)).fetchall()
+        results = []
+        for row in rows:
+            d = _row_to_dict(row[:11])
+            d["bm25_score"] = float(row[11]) if row[11] is not None else 0.0
+            results.append(d)
+        return results
+
+    def search_by_vector(self, vector: list[float], limit: int = 20) -> list[dict[str, Any]]:
+        """Semantic search using cosine distance on summary_vector.
+
+        Sets hnsw.ef_search=200 for the duration of the query to improve ANN
+        recall on large corpora. The default of 40 misses relevant neighbours;
+        200 recovers near-exact recall with acceptable latency overhead.
+        """
+        vector_str = _vector_to_pg(vector)
+        if not vector_str:
+            return []
+
+        sql = f"""
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata",
+                   1 - ("summary_vector" <=> %s::vector) AS "score"
+            FROM {TABLE}
+            WHERE "summary_vector" IS NOT NULL
+            ORDER BY "summary_vector" <=> %s::vector
+            LIMIT %s
+        """
+        with self._cm.connection(self._collection) as conn:
+            conn.execute("SET LOCAL hnsw.ef_search = 200")
+            rows = conn.execute(sql, (vector_str, vector_str, limit)).fetchall()
+        results = []
+        for row in rows:
+            d = _row_to_dict(row[:11])
+            d["score"] = float(row[11]) if row[11] is not None else 0.0
+            results.append(d)
+        return results
+
+    def get(self, section_id: str) -> dict[str, Any] | None:
+        """Get a section by ID."""
+        sql = f"""
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata"
+            FROM {TABLE} WHERE "id" = %s
+        """
+        with self._cm.connection(self._collection) as conn:
+            row = conn.execute(sql, (section_id,)).fetchone()
+        if not row:
+            return None
+        return _row_to_dict(row)
+
+    def get_by_file(self, raw_file_id: str) -> list[dict[str, Any]]:
+        """Get all sections for a file, ordered by position."""
+        sql = f"""
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata"
+            FROM {TABLE}
+            WHERE "raw_file_id" = %s
+            ORDER BY "position"
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, (raw_file_id,)).fetchall()
+        return [_row_to_dict(row) for row in rows]
+
+    def search_by_keywords(self, terms: list[str], limit: int = 20) -> list[dict[str, Any]]:
+        """Find sections with matching enriched keywords (array overlap)."""
+        if not terms:
+            return []
+        sql = f"""
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata"
+            FROM {TABLE}
+            WHERE "keywords" && %s
+            LIMIT %s
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, (terms, limit)).fetchall()
+        return [_row_to_dict(row) for row in rows]
+
+    def get_children(self, section_id: str) -> list[dict[str, Any]]:
+        """Get child sections of a parent."""
+        sql = f"""
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata"
+            FROM {TABLE}
+            WHERE "parent_section_id" = %s
+            ORDER BY "position"
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, (section_id,)).fetchall()
+        return [_row_to_dict(row) for row in rows]
+
+    def get_siblings(self, section_id: str) -> list[dict[str, Any]]:
+        """Get sibling sections (same parent)."""
+        section = self.get(section_id)
+        if not section:
+            return []
+        parent_id = section.get("parent_section_id")
+        if parent_id:
+            return self.get_children(parent_id)
+        # Top-level sections: get all level-1 sections for same file
+        sql = f"""
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata"
+            FROM {TABLE}
+            WHERE "raw_file_id" = %s AND "parent_section_id" IS NULL
+            ORDER BY "position"
+        """
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(sql, (section["raw_file_id"],)).fetchall()
+        return [_row_to_dict(row) for row in rows]
+
+    def update_summaries_by_file(self, raw_file_id: str, summaries: list[str]) -> None:
+        """Update summaries for all sections in a file, in position order."""
+        ids_sql = f"""
+            SELECT "id" FROM {TABLE}
+            WHERE "raw_file_id" = %s
+            ORDER BY "position"
+        """
+        update_sql = f'UPDATE {TABLE} SET "summary" = %s WHERE "id" = %s'
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(ids_sql, (raw_file_id,)).fetchall()
+            for i, row in enumerate(rows):
+                if i < len(summaries):
+                    conn.execute(update_sql, (summaries[i], row[0]))
+            conn.commit()
+
+    def update_enrichment_by_file(
+        self, raw_file_id: str, enriched_dicts: list[dict[str, Any]]
+    ) -> None:
+        """Update keywords, entities, and metadata for sections in a file."""
+        sql = (
+            f'UPDATE {TABLE} SET "keywords" = %s, "entities" = %s::jsonb,'
+            f' "metadata" = %s::jsonb WHERE "id" = %s'
+        )
+        with self._cm.connection(self._collection) as conn:
+            for item in enriched_dicts:
+                conn.execute(
+                    sql,
+                    (
+                        item.get("keywords", []),
+                        json.dumps(item.get("entities", [])),
+                        json.dumps(item.get("metadata", {})),
+                        item["id"],
+                    ),
+                )
+            conn.commit()
+
+    def update_vectors_by_file(self, raw_file_id: str, vectors: list[list[float]]) -> None:
+        """Update summary_vector for all sections in a file, in position order."""
+        ids_sql = f"""
+            SELECT "id" FROM {TABLE}
+            WHERE "raw_file_id" = %s
+            ORDER BY "position"
+        """
+        update_sql = f'UPDATE {TABLE} SET "summary_vector" = %s::vector WHERE "id" = %s'
+        with self._cm.connection(self._collection) as conn:
+            rows = conn.execute(ids_sql, (raw_file_id,)).fetchall()
+            for i, row in enumerate(rows):
+                if i < len(vectors):
+                    vector_str = _vector_to_pg(vectors[i])
+                    conn.execute(update_sql, (vector_str, row[0]))
+            conn.commit()
+
+    def get_corpus_summaries(self) -> list[dict[str, Any]]:
+        """Fetch all L2 corpus-level summary chunks for this collection."""
+        sql = f"""
+            SELECT "id", "raw_file_id", "title", "level", "page_start", "page_end",
+                   "content", "summary", "parent_section_id", "position", "metadata"
+            FROM {TABLE}
+            WHERE "metadata"->>'is_corpus_summary' = 'true'
+        """
+        with self._cm.connection(self._collection) as conn:
+            cursor = conn.execute(sql)
+            return [_row_to_dict(row) for row in cursor.fetchall()]
+
+    def delete_by_file(self, raw_file_id: str) -> None:
+        """Delete all sections for a file."""
+        sql = f'DELETE FROM {TABLE} WHERE "raw_file_id" = %s'
+        with self._cm.connection(self._collection) as conn:
+            conn.execute(sql, (raw_file_id,))
+            conn.commit()
+
+
+def _vector_to_pg(vector: list[float] | None) -> str | None:
+    """Convert a float list to pgvector string format."""
+    if not vector:
+        return None
+    return "[" + ",".join(str(v) for v in vector) + "]"
+
+
+def _row_to_dict(row: tuple) -> dict[str, Any]:
+    """Convert a query row to dict."""
+    meta = row[10]
+    if isinstance(meta, str):
+        meta = json.loads(meta)
+    elif meta is None:
+        meta = {}
+    return {
+        "id": row[0],
+        "raw_file_id": row[1],
+        "title": row[2],
+        "level": row[3],
+        "page_start": row[4],
+        "page_end": row[5],
+        "content": row[6],
+        "summary": row[7],
+        "parent_section_id": row[8],
+        "position": row[9],
+        "metadata": meta,
+    }

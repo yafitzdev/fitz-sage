@@ -3,15 +3,15 @@
 Tests for the centralized plugin registry system.
 
 Architecture:
-- Python-based registries use fitz_ai.core.registry.PluginRegistry
-- LLM providers use fitz_ai.llm (direct provider wrappers)
-- Vector DB plugins use fitz_ai.vector_db.registry (YAML-based)
-- Chunking plugins use fitz_ai.core.registry.CHUNKING_REGISTRY
+- Python-based registries use fitz_sage.core.registry.PluginRegistry
+- LLM providers use fitz_sage.llm (direct provider wrappers)
+- Vector DB plugins use fitz_sage.vector_db.registry (YAML-based)
+- Chunking plugins use fitz_sage.core.registry.CHUNKING_REGISTRY
 """
 
 import pytest
 
-from fitz_ai.core.registry import PluginNotFoundError, get_chunking_plugin
+from fitz_sage.core.registry import PluginNotFoundError, get_chunking_plugin
 
 
 def test_chunking_registry_returns_correct_plugin():
@@ -38,7 +38,7 @@ def test_registry_error_message_is_helpful():
 
 def test_vector_db_and_chunking_registries_follow_pattern():
     """Plugin registries should follow the same error pattern."""
-    from fitz_ai.vector_db.registry import get_vector_db_plugin
+    from fitz_sage.vector_db.registry import get_vector_db_plugin
 
     # Vector DB raises ValueError (from loader)
     with pytest.raises(ValueError):
@@ -51,7 +51,7 @@ def test_vector_db_and_chunking_registries_follow_pattern():
 
 def test_llm_providers_raise_on_unknown():
     """LLM config should raise ValueError for unknown providers."""
-    from fitz_ai.llm.config import create_chat_provider
+    from fitz_sage.llm.config import create_chat_provider
 
     with pytest.raises(ValueError) as exc_info:
         create_chat_provider("__fake__")

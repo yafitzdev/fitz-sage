@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fitz_ai.logging.logger import get_logger
+from fitz_sage.logging.logger import get_logger
 
 logger = get_logger(__name__)
 

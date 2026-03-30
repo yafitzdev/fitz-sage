@@ -18,8 +18,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fitz_ai.storage.config import StorageConfig, StorageMode
-from fitz_ai.storage.postgres import (
+from fitz_sage.storage.config import StorageConfig, StorageMode
+from fitz_sage.storage.postgres import (
     PostgresConnectionManager,
     _force_remove_pgdata,
     _kill_zombie_postgres_processes,
@@ -107,7 +107,7 @@ class TestForceRemovePgdata:
                 return original_rmtree(path, *args, **kwargs)
 
             with patch("shutil.rmtree", side_effect=mock_rmtree):
-                with patch("fitz_ai.storage.postgres._kill_zombie_postgres_processes"):
+                with patch("fitz_sage.storage.postgres._kill_zombie_postgres_processes"):
                     _force_remove_pgdata(data_dir, max_retries=5)
 
             # Should have retried and eventually succeeded

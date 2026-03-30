@@ -14,8 +14,8 @@ _mock_ts_go = MagicMock()
 sys.modules.setdefault("tree_sitter", _mock_ts)
 sys.modules.setdefault("tree_sitter_go", _mock_ts_go)
 
-import fitz_ai.engines.fitz_krag.ingestion.strategies.go as _go_mod  # noqa: E402
-from fitz_ai.engines.fitz_krag.ingestion.strategies.go import (  # noqa: E402
+import fitz_sage.engines.fitz_krag.ingestion.strategies.go as _go_mod  # noqa: E402
+from fitz_sage.engines.fitz_krag.ingestion.strategies.go import (  # noqa: E402
     GoIngestStrategy,
     _extract_imports,
     _extract_package,

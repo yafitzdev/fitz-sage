@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-from fitz_ai.logging.logger import get_logger
+from fitz_sage.logging.logger import get_logger
 from tests.e2e_krag.cache import ResponseCache
 from tests.e2e_krag.config import get_cache_config, get_tier_config, get_tier_names, load_e2e_config
 from tests.e2e_krag.scenarios import SCENARIOS, TestScenario
@@ -187,8 +187,8 @@ class KragE2ERunner:
         Returns:
             Duration of ingestion in seconds
         """
-        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-        from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
+        from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+        from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
 
         logger.info(f"KRAG E2E Setup: Creating collection '{self._base_collection}'")
 
@@ -298,8 +298,8 @@ class KragE2ERunner:
         if self.engine:
             self.engine._connection_manager.close_pool(self.engine._config.collection)
 
-        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-        from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
+        from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+        from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
 
         e2e_config = load_e2e_config()
         tier_config = get_tier_config(tier_name, e2e_config)
@@ -359,7 +359,7 @@ class KragE2ERunner:
     @staticmethod
     def _run_ingest_pipeline(engine: Any, fixtures_dir: Path) -> dict[str, Any]:
         """Run KragIngestPipeline using the engine's initialized components."""
-        from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+        from fitz_sage.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
 
         pipeline = KragIngestPipeline(
             config=engine._config,
@@ -395,7 +395,7 @@ class KragE2ERunner:
         """Drop PostgreSQL tables and vector data for a test collection."""
         collection = collection or self._base_collection
 
-        from fitz_ai.storage.postgres import PostgresConnectionManager
+        from fitz_sage.storage.postgres import PostgresConnectionManager
 
         try:
             conn_mgr = PostgresConnectionManager.get_instance()
@@ -421,7 +421,7 @@ class KragE2ERunner:
         if not self._setup_complete:
             raise RuntimeError("KRAG E2E runner not set up. Call setup() first.")
 
-        from fitz_ai.core import Query
+        from fitz_sage.core import Query
 
         logger.debug(f"Running scenario {scenario.id}: {scenario.name}")
 

@@ -7,8 +7,8 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from fitz_ai.engines.fitz_krag.progressive.manifest import FileState, ManifestEntry
-from fitz_ai.engines.fitz_krag.progressive.worker import BackgroundIngestWorker
+from fitz_sage.engines.fitz_krag.progressive.manifest import FileState, ManifestEntry
+from fitz_sage.engines.fitz_krag.progressive.worker import BackgroundIngestWorker
 
 
 def _make_entry(

@@ -3,8 +3,8 @@
 
 import pytest
 
-from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
-from fitz_ai.tabular.extractor import TableExtractor
+from fitz_sage.core.document import DocumentElement, ElementType, ParsedDocument
+from fitz_sage.tabular.extractor import TableExtractor
 
 
 class TestTableExtractor:

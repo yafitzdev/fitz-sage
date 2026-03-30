@@ -259,8 +259,8 @@ python -m tools.governance.calibrate_thresholds --mode twostage
 | `tools/governance/calibrate_thresholds.py` | Threshold sweep for critical case minimization |
 | `tools/governance/data/features.csv` | 1113 rows x 50 columns |
 | `tools/governance/data/model_v5_calibrated.joblib` | Production model artifact |
-| `fitz_ai/governance/decider.py` | GovernanceDecider (production inference) |
-| `fitz_ai/governance/constraints/feature_extractor.py` | Runtime feature extraction |
+| `fitz_sage/governance/decider.py` | GovernanceDecider (production inference) |
+| `fitz_sage/governance/constraints/feature_extractor.py` | Runtime feature extraction |
 
 ---
 

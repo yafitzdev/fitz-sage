@@ -1,14 +1,14 @@
 ## Code Generation Rules (MANDATORY)
 
 1. **Never alter unrelated code** - Touch only code directly related to the requested change
-2. **File path comment required** - First line: `# fitz_ai/engines/fitz_krag/engine.py`
+2. **File path comment required** - First line: `# fitz_sage/engines/fitz_krag/engine.py`
 3. **No legacy code** - No backwards compatibility, no deprecated code, no shims. Delete completely when removing
 4. **Tests follow architecture** - Fix tests to match new architecture, never compromise code quality for tests
 5. **Always use .venv for pip** - `.venv/Scripts/pip install <package>` (Windows) or `.venv/bin/pip install <package>` (Unix)
 
 ## Project Overview
 
-**fitz-ai** - Local-first, modular RAG knowledge engine platform with epistemic honesty and full provenance.
+**fitz-sage** - Local-first, modular RAG knowledge engine platform with epistemic honesty and full provenance.
 
 ```bash
 pip install -e ".[dev]"   # Install for development
@@ -20,7 +20,7 @@ python -m tools.contract_map --fail-on-errors  # Check architecture
 ## Architecture
 
 ```
-fitz_ai/
+fitz_sage/
 ├── core/          # Paradigm-agnostic (Query, Answer, Provenance, Constraints)
 ├── engines/fitz_krag/   # KRAG: retrieval/, generation/, pipeline/
 ├── retrieval/     # SHARED intelligence (detection, sparse, entity_graph, hyde, rewriter)
@@ -67,7 +67,7 @@ fitz_ai/
 ```bash
 pytest                      # All tests
 pytest -m "not slow"        # Skip slow
-pytest --cov=fitz_ai        # With coverage
+pytest --cov=fitz_sage        # With coverage
 pytest tests/unit/          # Unit only
 ```
 

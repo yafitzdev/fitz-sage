@@ -60,10 +60,10 @@ def mock_connection(mock_connection_manager):
 def pgvector_db(mock_connection_manager):
     """Create PgVectorDB instance with mocked connection manager."""
     with patch(
-        "fitz_ai.backends.local_vector_db.pgvector.get_connection_manager",
+        "fitz_sage.backends.local_vector_db.pgvector.get_connection_manager",
         return_value=mock_connection_manager,
     ):
-        from fitz_ai.backends.local_vector_db.pgvector import PgVectorDB
+        from fitz_sage.backends.local_vector_db.pgvector import PgVectorDB
 
         db = PgVectorDB(mode="local")
         return db
@@ -877,11 +877,11 @@ class TestImportErrorHandling:
         # This tests the behavior when register_vector import fails
         with patch.dict("sys.modules", {"pgvector.psycopg": None}):
             with patch(
-                "fitz_ai.backends.local_vector_db.pgvector.get_connection_manager"
+                "fitz_sage.backends.local_vector_db.pgvector.get_connection_manager"
             ) as mock_mgr:
                 mock_mgr.return_value = MagicMock()
 
-                from fitz_ai.backends.local_vector_db.pgvector import PgVectorDB
+                from fitz_sage.backends.local_vector_db.pgvector import PgVectorDB
 
                 db = PgVectorDB(mode="local")
                 db._initialized_collections["test"] = 384

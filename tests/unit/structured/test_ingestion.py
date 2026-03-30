@@ -7,20 +7,20 @@ from typing import Any
 
 import pytest
 
-from fitz_ai.structured.constants import (
+from fitz_sage.structured.constants import (
     FIELD_PRIMARY_KEY,
     FIELD_ROW_DATA,
     FIELD_TABLE,
     MAX_SCAN_ROWS,
     get_tables_collection,
 )
-from fitz_ai.structured.ingestion import (
+from fitz_sage.structured.ingestion import (
     MissingPrimaryKeyError,
     StructuredIngester,
     TableTooLargeError,
 )
-from fitz_ai.structured.schema import SchemaStore
-from fitz_ai.structured.types import TYPE_NUMBER, TYPE_STRING
+from fitz_sage.structured.schema import SchemaStore
+from fitz_sage.structured.types import TYPE_NUMBER, TYPE_STRING
 
 
 # Mock implementations

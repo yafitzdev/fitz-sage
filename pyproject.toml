@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 
 [project]
-name = "fitz-ai"
+name = "fitz-sage"
 version = "0.11.0"
 description = "Intelligent, honest knowledge retrieval in 5 minutes. No infrastructure. No boilerplate."
 readme = "README.md"
@@ -117,24 +117,24 @@ dev = [
 
 
 [project.urls]
-Homepage = "https://github.com/yafitzdev/fitz-ai"
-Repository = "https://github.com/yafitzdev/fitz-ai"
-Documentation = "https://github.com/yafitzdev/fitz-ai#readme"
-Issues = "https://github.com/yafitzdev/fitz-ai/issues"
-Changelog = "https://github.com/yafitzdev/fitz-ai/blob/main/CHANGELOG.md"
-"Source Code" = "https://github.com/yafitzdev/fitz-ai"
+Homepage = "https://github.com/yafitzdev/fitz-sage"
+Repository = "https://github.com/yafitzdev/fitz-sage"
+Documentation = "https://github.com/yafitzdev/fitz-sage#readme"
+Issues = "https://github.com/yafitzdev/fitz-sage/issues"
+Changelog = "https://github.com/yafitzdev/fitz-sage/blob/main/CHANGELOG.md"
+"Source Code" = "https://github.com/yafitzdev/fitz-sage"
 
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["fitz_ai*"]
+include = ["fitz_sage*"]
 exclude = ["tests*", "tools*", "examples*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.yml", "*.joblib"]
 
 [project.scripts]
-fitz = "fitz_ai.cli.cli:app"
+fitz = "fitz_sage.cli.cli:app"
 
 
 [tool.black]
@@ -196,7 +196,7 @@ markers = [
 
 [tool.mutmut]
 # Full mutation testing - run overnight locally or in weekly CI
-paths_to_mutate = "fitz_ai/core/"
+paths_to_mutate = "fitz_sage/core/"
 # Run unit + integration tests for thorough coverage
 runner = "python -m pytest tests/unit/ tests/integration/ -x -q --tb=no --ignore=tests/unit/test_postgres_recovery.py"
 # Test execution timeout (generous for full suite)

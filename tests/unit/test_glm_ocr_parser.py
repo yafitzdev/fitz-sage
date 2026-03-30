@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from fitz_ai.core.document import ElementType
-from fitz_ai.ingestion.parser.plugins.glm_ocr import GlmOcrParser
+from fitz_sage.core.document import ElementType
+from fitz_sage.ingestion.parser.plugins.glm_ocr import GlmOcrParser
 
 
 @pytest.fixture
@@ -105,13 +105,13 @@ class TestNeedsOcr:
 
     def test_short_text_needs_ocr(self):
         """Pages with < 50 chars are likely scanned → need OCR."""
-        from fitz_ai.ingestion.parser.plugins.glm_ocr import _MIN_TEXT_CHARS
+        from fitz_sage.ingestion.parser.plugins.glm_ocr import _MIN_TEXT_CHARS
 
         assert len("Short") < _MIN_TEXT_CHARS
         assert len("") < _MIN_TEXT_CHARS
 
     def test_long_text_skips_ocr(self):
         """Pages with >= 50 chars don't need OCR."""
-        from fitz_ai.ingestion.parser.plugins.glm_ocr import _MIN_TEXT_CHARS
+        from fitz_sage.ingestion.parser.plugins.glm_ocr import _MIN_TEXT_CHARS
 
         assert len("A" * 100) >= _MIN_TEXT_CHARS

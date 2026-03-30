@@ -1,12 +1,12 @@
 # API Reference
 
-Core data models and protocols for fitz-ai.
+Core data models and protocols for fitz-sage.
 
 ## Core Models
 
 ### Chunk
 
-The fundamental unit of knowledge in fitz-ai. All engines, ingestion pipelines, and vector stores work with chunks.
+The fundamental unit of knowledge in fitz-sage. All engines, ingestion pipelines, and vector stores work with chunks.
 
 **Definition:**
 ```python
@@ -111,7 +111,7 @@ answer = Answer(
 
 Answer with epistemic mode:
 ```python
-from fitz_ai.core.answer_mode import AnswerMode
+from fitz_sage.core.answer_mode import AnswerMode
 
 answer = Answer(
     text="Sources disagree on this classification...",

@@ -16,14 +16,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.evaluation.models import (
+from fitz_sage.core.answer_mode import AnswerMode
+from fitz_sage.evaluation.models import (
     AbstainTrend,
     ConstraintFrequency,
     GovernanceFlip,
     ModeDistribution,
 )
-from fitz_ai.governance import GovernanceDecision, GovernanceLog
+from fitz_sage.governance import GovernanceDecision, GovernanceLog
 
 # =============================================================================
 # GovernanceLog Tests
@@ -516,7 +516,7 @@ class TestGovernanceLogger:
 
     def test_logger_buffers_entries(self):
         """Logger should buffer entries until batch size reached."""
-        from fitz_ai.evaluation.logger import GovernanceLogger
+        from fitz_sage.evaluation.logger import GovernanceLogger
 
         mock_pool = MagicMock()
         logger = GovernanceLogger(
@@ -538,7 +538,7 @@ class TestGovernanceLogger:
 
     def test_logger_flushes_at_batch_size(self):
         """Logger should auto-flush when batch size is reached."""
-        from fitz_ai.evaluation.logger import GovernanceLogger
+        from fitz_sage.evaluation.logger import GovernanceLogger
 
         mock_pool = MagicMock()
         mock_conn = MagicMock()
@@ -569,7 +569,7 @@ class TestGovernanceLogger:
 
     def test_logger_explicit_flush(self):
         """flush() should persist all buffered entries."""
-        from fitz_ai.evaluation.logger import GovernanceLogger
+        from fitz_sage.evaluation.logger import GovernanceLogger
 
         mock_pool = MagicMock()
         mock_conn = MagicMock()
@@ -603,7 +603,7 @@ class TestGovernanceLogger:
 
     def test_logger_flush_empty_buffer(self):
         """flush() with empty buffer should return 0."""
-        from fitz_ai.evaluation.logger import GovernanceLogger
+        from fitz_sage.evaluation.logger import GovernanceLogger
 
         mock_pool = MagicMock()
         logger = GovernanceLogger(pool=mock_pool, collection="test")
@@ -614,7 +614,7 @@ class TestGovernanceLogger:
 
     def test_logger_creates_correct_log_entry(self):
         """Logger should create GovernanceLog with correct fields."""
-        from fitz_ai.evaluation.logger import GovernanceLogger
+        from fitz_sage.evaluation.logger import GovernanceLogger
 
         mock_pool = MagicMock()
         logger = GovernanceLogger(
@@ -646,14 +646,14 @@ class TestGovernanceLogger:
         assert log_entry.triggered_constraints == ("c1",)
 
     def test_logger_uses_fitz_version_as_default(self):
-        """Logger should use fitz_ai.__version__ as default pipeline_version."""
-        import fitz_ai
-        from fitz_ai.evaluation.logger import GovernanceLogger
+        """Logger should use fitz_sage.__version__ as default pipeline_version."""
+        import fitz_sage
+        from fitz_sage.evaluation.logger import GovernanceLogger
 
         mock_pool = MagicMock()
         logger = GovernanceLogger(pool=mock_pool, collection="test")
 
-        assert logger.pipeline_version == fitz_ai.__version__
+        assert logger.pipeline_version == fitz_sage.__version__
 
 
 # =============================================================================
@@ -688,8 +688,8 @@ class TestGovernanceLogIntegration:
 
     def test_full_round_trip(self):
         """Test creating decision -> log -> dict -> verify."""
-        from fitz_ai.governance import AnswerGovernor
-        from fitz_ai.governance.constraints.base import ConstraintResult
+        from fitz_sage.governance import AnswerGovernor
+        from fitz_sage.governance.constraints.base import ConstraintResult
 
         # Create constraint results
         results = [

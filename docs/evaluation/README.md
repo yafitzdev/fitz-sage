@@ -1,6 +1,6 @@
 # docs/evaluation/
 
-Benchmark results and analysis for fitz-ai retrieval and governance.
+Benchmark results and analysis for fitz-sage retrieval and governance.
 
 | File | Contents |
 |---|---|

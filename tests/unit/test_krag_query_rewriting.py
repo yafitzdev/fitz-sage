@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from fitz_ai.core import Answer, Provenance
-from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
+from fitz_sage.core import Answer, Provenance
+from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -69,9 +69,9 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._hyde_generator = None
 
     # Configure batcher to return sensible defaults so batched dispatch works
-    from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
-    from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
-    from fitz_ai.retrieval.rewriter.types import RewriteResult, RewriteType
+    from fitz_sage.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
+    from fitz_sage.engines.fitz_krag.query_batcher import BatchResult
+    from fitz_sage.retrieval.rewriter.types import RewriteResult, RewriteType
 
     def _default_batch_classify(query, **kwargs):
         return BatchResult(
@@ -140,7 +140,7 @@ class TestQueryRewriting:
         )
 
         # Enable rewriter and configure it to return a real RewriteResult
-        from fitz_ai.retrieval.rewriter.types import RewriteResult, RewriteType
+        from fitz_sage.retrieval.rewriter.types import RewriteResult, RewriteType
 
         rewritten = "authentication module implementation for secure user login session handling"
         rewrite_result = RewriteResult(
@@ -179,7 +179,7 @@ class TestQueryRewriting:
         query = _make_query("What is the login function and how does it validate user credentials?")
 
         # Rewriter returns the original text unchanged
-        from fitz_ai.retrieval.rewriter.types import RewriteResult, RewriteType
+        from fitz_sage.retrieval.rewriter.types import RewriteResult, RewriteType
 
         rewrite_result = RewriteResult(
             original_query=query.text,

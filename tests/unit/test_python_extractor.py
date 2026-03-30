@@ -3,7 +3,7 @@
 
 import pytest
 
-from fitz_ai.engines.fitz_krag.ingestion.strategies.python_code import (
+from fitz_sage.engines.fitz_krag.ingestion.strategies.python_code import (
     PythonCodeIngestStrategy,
 )
 
@@ -171,10 +171,10 @@ class TestImportExtraction:
 
     def test_absolute_import_unchanged(self, strategy):
         """Absolute imports still work as before."""
-        source = "from fitz_ai.core import Query\n"
+        source = "from fitz_sage.core import Query\n"
         result = strategy.extract(source, "src/engine.py")
         assert len(result.imports) == 1
-        assert result.imports[0].target_module == "fitz_ai.core"
+        assert result.imports[0].target_module == "fitz_sage.core"
 
 
 class TestSyntaxError:
@@ -190,9 +190,9 @@ class TestSyntaxError:
 class TestModulePath:
     def test_path_to_module(self, strategy):
         source = "def func(): pass\n"
-        result = strategy.extract(source, "fitz_ai/engines/krag/engine.py")
+        result = strategy.extract(source, "fitz_sage/engines/krag/engine.py")
         sym = result.symbols[0]
-        assert sym.qualified_name == "fitz_ai.engines.krag.engine.func"
+        assert sym.qualified_name == "fitz_sage.engines.krag.engine.func"
 
     def test_init_path(self, strategy):
         source = "X = 1\n"

@@ -3,7 +3,7 @@
 
 import json
 
-from fitz_ai.tabular.models import ParsedTable, create_schema_chunk
+from fitz_sage.tabular.models import ParsedTable, create_schema_chunk
 
 
 class TestParsedTable:

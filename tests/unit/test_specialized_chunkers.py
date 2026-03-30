@@ -10,10 +10,10 @@ Tests:
 
 import pytest
 
-from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
-from fitz_ai.ingestion.chunking.plugins.markdown import MarkdownChunker
-from fitz_ai.ingestion.chunking.plugins.pdf_sections import PdfSectionChunker
-from fitz_ai.ingestion.chunking.plugins.python_code import PythonCodeChunker
+from fitz_sage.core.document import DocumentElement, ElementType, ParsedDocument
+from fitz_sage.ingestion.chunking.plugins.markdown import MarkdownChunker
+from fitz_sage.ingestion.chunking.plugins.pdf_sections import PdfSectionChunker
+from fitz_sage.ingestion.chunking.plugins.python_code import PythonCodeChunker
 
 
 def make_document(text: str, doc_id: str = "test", **extra_meta) -> ParsedDocument:

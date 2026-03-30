@@ -30,9 +30,9 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from fitz_ai.core import Query  # noqa: E402
-from fitz_ai.engines.fitz_krag.config import FitzKragConfig  # noqa: E402
-from fitz_ai.engines.fitz_krag.engine import FitzKragEngine  # noqa: E402
+from fitz_sage.core import Query  # noqa: E402
+from fitz_sage.engines.fitz_krag.config import FitzKragConfig  # noqa: E402
+from fitz_sage.engines.fitz_krag.engine import FitzKragEngine  # noqa: E402
 
 
 def test_cache_flow():
@@ -84,7 +84,7 @@ def test_cache_flow():
     enabled: true
     api_key: "fitz_xxx..."
     org_key: "64-char-hex-string"
-    base_url: "https://api.fitz-ai.cloud/v1"
+    base_url: "https://api.fitz-sage.cloud/v1"
         """
         )
         return False

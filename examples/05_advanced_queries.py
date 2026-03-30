@@ -9,7 +9,7 @@ Fitz has built-in intelligence for different query types:
 - Comparison queries (A vs B)
 
 Requirements:
-    pip install fitz-ai
+    pip install fitz-sage
     export COHERE_API_KEY="your-key"
 
 Run:
@@ -19,7 +19,7 @@ Run:
 import tempfile
 from pathlib import Path
 
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 # =============================================================================
 # Setup: Create documents with identifiers

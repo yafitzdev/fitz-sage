@@ -5,15 +5,15 @@
 class TestKragRegistration:
     def test_engine_registers_in_global_registry(self):
         # Importing runtime triggers auto-registration
-        import fitz_ai.engines.fitz_krag.runtime  # noqa: F401
-        from fitz_ai.runtime.registry import EngineRegistry
+        import fitz_sage.engines.fitz_krag.runtime  # noqa: F401
+        from fitz_sage.runtime.registry import EngineRegistry
 
         registry = EngineRegistry.get_global()
         assert "fitz_krag" in registry.list()
 
     def test_engine_capabilities(self):
-        import fitz_ai.engines.fitz_krag.runtime  # noqa: F401
-        from fitz_ai.runtime.registry import EngineRegistry
+        import fitz_sage.engines.fitz_krag.runtime  # noqa: F401
+        from fitz_sage.runtime.registry import EngineRegistry
 
         registry = EngineRegistry.get_global()
         caps = registry.get_capabilities("fitz_krag")
@@ -23,8 +23,8 @@ class TestKragRegistration:
         assert caps.requires_config is True
 
     def test_config_loader_registered(self):
-        import fitz_ai.engines.fitz_krag.runtime  # noqa: F401
-        from fitz_ai.runtime.registry import EngineRegistry
+        import fitz_sage.engines.fitz_krag.runtime  # noqa: F401
+        from fitz_sage.runtime.registry import EngineRegistry
 
         registry = EngineRegistry.get_global()
         info = registry.get_info("fitz_krag")
@@ -32,8 +32,8 @@ class TestKragRegistration:
         assert info.config_type is not None
 
     def test_default_config_path_registered(self):
-        import fitz_ai.engines.fitz_krag.runtime  # noqa: F401
-        from fitz_ai.runtime.registry import EngineRegistry
+        import fitz_sage.engines.fitz_krag.runtime  # noqa: F401
+        from fitz_sage.runtime.registry import EngineRegistry
 
         registry = EngineRegistry.get_global()
         path = registry.get_default_config_path("fitz_krag")
@@ -41,8 +41,8 @@ class TestKragRegistration:
         assert path.exists()
 
     def test_config_loader_loads_defaults(self):
-        from fitz_ai.config.loader import load_engine_config
-        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
+        from fitz_sage.config.loader import load_engine_config
+        from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
 
         config = load_engine_config("fitz_krag")
         assert isinstance(config, FitzKragConfig)

@@ -105,7 +105,7 @@ def pytest_configure(config):
     Gracefully skips if postgres dependencies aren't installed.
     """
     try:
-        from fitz_ai.storage.postgres import _force_remove_pgdata
+        from fitz_sage.storage.postgres import _force_remove_pgdata
     except ImportError:
         # Postgres dependencies not installed - skip pgdata cleanup
         return
@@ -135,7 +135,7 @@ def load_test_config() -> dict:
 
 def get_test_embedder():
     """Get embedder configured for tests (from first tier)."""
-    from fitz_ai.llm import get_embedder
+    from fitz_sage.llm import get_embedder
 
     config = load_test_config()
     # Get embedding config from first tier
@@ -154,7 +154,7 @@ def get_test_chat(tier: str = "smart"):
     Args:
         tier: Model tier - "smart", "fast", or "balanced"
     """
-    from fitz_ai.llm import get_chat
+    from fitz_sage.llm import get_chat
 
     config = load_test_config()
     # Get chat config from first tier (local)

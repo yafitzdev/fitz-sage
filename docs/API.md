@@ -9,7 +9,7 @@ Complete reference for the Fitz REST API.
 
 ```bash
 # Install with API support
-pip install fitz-ai[api]
+pip install fitz-sage[api]
 
 # Start the server
 fitz serve

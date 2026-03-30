@@ -1,13 +1,13 @@
 # tests/integration/test_cloud_cache_e2e.py
 """
-End-to-end integration tests for fitz-ai + fitz-ai-cloud cache flow.
+End-to-end integration tests for fitz-sage + fitz-sage-cloud cache flow.
 
 Tests the full integration:
 1. Ingest documents -> Query -> Cache MISS -> LLM generates answer -> Store in cloud
 2. Same query -> Cache HIT -> Return cached answer (no LLM call)
 
 Prerequisites:
-- fitz-ai-cloud API running (default: localhost:8000)
+- fitz-sage-cloud API running (default: localhost:8000)
 - Ollama running with nomic-embed-text and qwen2.5:1.5b
 - Test organization with starter+ tier (free tier can't use cache)
 - Environment variables:
@@ -27,8 +27,8 @@ import uuid
 
 import pytest
 
-from fitz_ai.cloud.cache_key import CacheVersions, compute_cache_key
-from fitz_ai.core import Answer
+from fitz_sage.cloud.cache_key import CacheVersions, compute_cache_key
+from fitz_sage.core import Answer
 
 from .cloud_fixtures import (
     cloud_available,
@@ -220,7 +220,7 @@ class TestCloudCacheIntegration:
 
     def test_different_llm_model_is_cache_miss(self, cloud_client, unique_collection_name):
         """Same query with different LLM model version should miss."""
-        import fitz_ai
+        import fitz_sage
 
         test_id = uuid.uuid4().hex[:8]
         query_text = f"model version test {test_id}"
@@ -232,7 +232,7 @@ class TestCloudCacheIntegration:
         # Versions with model A
         versions_a = CacheVersions(
             optimizer="1.0.0",
-            engine=fitz_ai.__version__,
+            engine=fitz_sage.__version__,
             collection=unique_collection_name,
             llm_model="ollama:qwen2.5:1.5b",
             prompt_template="default",
@@ -251,7 +251,7 @@ class TestCloudCacheIntegration:
         # Versions with model B
         versions_b = CacheVersions(
             optimizer="1.0.0",
-            engine=fitz_ai.__version__,
+            engine=fitz_sage.__version__,
             collection=unique_collection_name,
             llm_model="ollama:llama3:8b",  # Different model
             prompt_template="default",
@@ -277,7 +277,7 @@ class TestCloudCacheFailOpen:
 
     def test_lookup_returns_miss_on_network_error(self, cloud_config, cloud_org_id):
         """Cache lookup should gracefully return miss on network error."""
-        from fitz_ai.cloud import CloudClient, CloudConfig
+        from fitz_sage.cloud import CloudClient, CloudConfig
 
         # Create config pointing to non-existent server
         bad_config = CloudConfig(
@@ -291,11 +291,11 @@ class TestCloudCacheFailOpen:
         client = CloudClient(config=bad_config, org_id=cloud_org_id)
 
         try:
-            import fitz_ai
+            import fitz_sage
 
             versions = CacheVersions(
                 optimizer="1.0.0",
-                engine=fitz_ai.__version__,
+                engine=fitz_sage.__version__,
                 collection="test",
                 llm_model="test",
                 prompt_template="default",
@@ -315,7 +315,7 @@ class TestCloudCacheFailOpen:
 
     def test_store_returns_false_on_network_error(self, cloud_config, cloud_org_id):
         """Cache store should gracefully return False on network error."""
-        from fitz_ai.cloud import CloudClient, CloudConfig
+        from fitz_sage.cloud import CloudClient, CloudConfig
 
         bad_config = CloudConfig(
             enabled=True,
@@ -328,11 +328,11 @@ class TestCloudCacheFailOpen:
         client = CloudClient(config=bad_config, org_id=cloud_org_id)
 
         try:
-            import fitz_ai
+            import fitz_sage
 
             versions = CacheVersions(
                 optimizer="1.0.0",
-                engine=fitz_ai.__version__,
+                engine=fitz_sage.__version__,
                 collection="test",
                 llm_model="test",
                 prompt_template="default",
@@ -355,7 +355,7 @@ class TestCloudCacheFailOpen:
 
     def test_disabled_cloud_returns_miss(self, cloud_org_id):
         """Disabled cloud config should return miss without network calls."""
-        from fitz_ai.cloud import CloudClient, CloudConfig
+        from fitz_sage.cloud import CloudClient, CloudConfig
 
         disabled_config = CloudConfig(
             enabled=False,  # Disabled
@@ -367,11 +367,11 @@ class TestCloudCacheFailOpen:
         client = CloudClient(config=disabled_config, org_id=cloud_org_id)
 
         try:
-            import fitz_ai
+            import fitz_sage
 
             versions = CacheVersions(
                 optimizer="1.0.0",
-                engine=fitz_ai.__version__,
+                engine=fitz_sage.__version__,
                 collection="test",
                 llm_model="test",
                 prompt_template="default",
@@ -522,11 +522,11 @@ class TestCacheKeyDeterminism:
 
     def test_same_inputs_same_key(self):
         """Same inputs should produce same cache key."""
-        import fitz_ai
+        import fitz_sage
 
         versions = CacheVersions(
             optimizer="1.0.0",
-            engine=fitz_ai.__version__,
+            engine=fitz_sage.__version__,
             collection="test_collection",
             llm_model="openai:gpt-4",
             prompt_template="default",
@@ -539,11 +539,11 @@ class TestCacheKeyDeterminism:
 
     def test_different_query_different_key(self):
         """Different query text should produce different cache key."""
-        import fitz_ai
+        import fitz_sage
 
         versions = CacheVersions(
             optimizer="1.0.0",
-            engine=fitz_ai.__version__,
+            engine=fitz_sage.__version__,
             collection="test_collection",
             llm_model="openai:gpt-4",
             prompt_template="default",
@@ -556,11 +556,11 @@ class TestCacheKeyDeterminism:
 
     def test_different_fingerprint_different_key(self):
         """Different retrieval fingerprint should produce different cache key."""
-        import fitz_ai
+        import fitz_sage
 
         versions = CacheVersions(
             optimizer="1.0.0",
-            engine=fitz_ai.__version__,
+            engine=fitz_sage.__version__,
             collection="test_collection",
             llm_model="openai:gpt-4",
             prompt_template="default",
@@ -573,11 +573,11 @@ class TestCacheKeyDeterminism:
 
     def test_different_collection_different_key(self):
         """Different collection version should produce different cache key."""
-        import fitz_ai
+        import fitz_sage
 
         versions1 = CacheVersions(
             optimizer="1.0.0",
-            engine=fitz_ai.__version__,
+            engine=fitz_sage.__version__,
             collection="collection_v1",
             llm_model="openai:gpt-4",
             prompt_template="default",
@@ -585,7 +585,7 @@ class TestCacheKeyDeterminism:
 
         versions2 = CacheVersions(
             optimizer="1.0.0",
-            engine=fitz_ai.__version__,
+            engine=fitz_sage.__version__,
             collection="collection_v2",
             llm_model="openai:gpt-4",
             prompt_template="default",

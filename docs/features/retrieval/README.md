@@ -1,6 +1,6 @@
 # docs/features/retrieval/
 
-Deep-dive documentation for fitz-ai's retrieval intelligence modules. All of these run automatically — none require configuration to enable.
+Deep-dive documentation for fitz-sage's retrieval intelligence modules. All of these run automatically — none require configuration to enable.
 
 | File | Feature |
 |---|---|
@@ -20,4 +20,4 @@ Deep-dive documentation for fitz-ai's retrieval intelligence modules. All of the
 | `aggregation-queries.md` | Detection and handling of aggregation queries |
 | `freshness-authority.md` | Source freshness and authority scoring |
 
-For the implementation, see `fitz_ai/retrieval/` and `fitz_ai/engines/fitz_krag/retrieval/`.
+For the implementation, see `fitz_sage/retrieval/` and `fitz_sage/engines/fitz_krag/retrieval/`.

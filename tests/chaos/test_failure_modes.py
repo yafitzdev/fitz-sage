@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 import pytest
 
-from fitz_ai.core import Query
+from fitz_sage.core import Query
 
 pytestmark = pytest.mark.chaos
 
@@ -38,7 +38,7 @@ class TestLLMFailures:
         """
         import asyncio
 
-        from fitz_ai.core.exceptions import GenerationError, KnowledgeError
+        from fitz_sage.core.exceptions import GenerationError, KnowledgeError
 
         with patch.object(
             self.runner.engine._synthesizer._chat,
@@ -89,7 +89,7 @@ class TestRetrievalFailures:
 
     def test_retrieval_exception_handling(self):
         """Retrieval exception should be handled gracefully."""
-        from fitz_ai.core.exceptions import KnowledgeError
+        from fitz_sage.core.exceptions import KnowledgeError
 
         with patch.object(
             self.runner.engine._retrieval_router,
@@ -134,7 +134,7 @@ class TestPartialFailures:
 
     def test_handles_malformed_llm_response(self):
         """Malformed LLM response should be handled."""
-        from fitz_ai.core.exceptions import GenerationError, KnowledgeError
+        from fitz_sage.core.exceptions import GenerationError, KnowledgeError
 
         with patch.object(
             self.runner.engine._chat,

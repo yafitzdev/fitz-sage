@@ -20,14 +20,14 @@ from unittest.mock import MagicMock, patch
 
 # Shared patch targets for pipeline construction
 _PIPELINE_PATCHES = [
-    "fitz_ai.engines.fitz_krag.ingestion.pipeline.ensure_schema",
-    "fitz_ai.engines.fitz_krag.ingestion.pipeline.RawFileStore",
-    "fitz_ai.engines.fitz_krag.ingestion.pipeline.SymbolStore",
-    "fitz_ai.engines.fitz_krag.ingestion.pipeline.ImportGraphStore",
-    "fitz_ai.engines.fitz_krag.ingestion.pipeline.SectionStore",
-    "fitz_ai.engines.fitz_krag.ingestion.pipeline.TableStore",
-    "fitz_ai.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy",
-    "fitz_ai.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy",
+    "fitz_sage.engines.fitz_krag.ingestion.pipeline.ensure_schema",
+    "fitz_sage.engines.fitz_krag.ingestion.pipeline.RawFileStore",
+    "fitz_sage.engines.fitz_krag.ingestion.pipeline.SymbolStore",
+    "fitz_sage.engines.fitz_krag.ingestion.pipeline.ImportGraphStore",
+    "fitz_sage.engines.fitz_krag.ingestion.pipeline.SectionStore",
+    "fitz_sage.engines.fitz_krag.ingestion.pipeline.TableStore",
+    "fitz_sage.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy",
+    "fitz_sage.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy",
 ]
 
 
@@ -37,8 +37,8 @@ def _make_pipeline(
     chat_side_effect=None,
 ):
     """Create a KragIngestPipeline with all stores mocked."""
-    from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-    from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+    from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+    from fitz_sage.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
 
     config = FitzKragConfig(
         collection="test_col",

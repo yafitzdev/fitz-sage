@@ -14,7 +14,7 @@ import time
 
 import pytest
 
-from fitz_ai.core import Query
+from fitz_sage.core import Query
 
 pytestmark = pytest.mark.scalability
 

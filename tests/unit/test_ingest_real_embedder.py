@@ -19,8 +19,8 @@ import pytest
 # Mark as tier3 (requires real embeddings service) and integration
 pytestmark = [pytest.mark.tier3, pytest.mark.integration, pytest.mark.embeddings]
 
-from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
-from fitz_ai.ingestion.source.base import SourceFile
+from fitz_sage.core.document import DocumentElement, ElementType, ParsedDocument
+from fitz_sage.ingestion.source.base import SourceFile
 
 
 def _ollama_available() -> bool:
@@ -100,10 +100,10 @@ def test_with_real_embedder(tmp_path: Path, test_files):
 
     Run: pytest tests/unit/test_ingest_real_embedder.py::test_with_real_embedder -v -s --log-cli-level=INFO
     """
-    from fitz_ai.ingestion.chunking.plugins.default.recursive import RecursiveChunker
-    from fitz_ai.ingestion.chunking.router import ChunkingRouter
-    from fitz_ai.ingestion.diff.executor import DiffIngestExecutor
-    from fitz_ai.ingestion.state import IngestStateManager
+    from fitz_sage.ingestion.chunking.plugins.default.recursive import RecursiveChunker
+    from fitz_sage.ingestion.chunking.router import ChunkingRouter
+    from fitz_sage.ingestion.diff.executor import DiffIngestExecutor
+    from fitz_sage.ingestion.state import IngestStateManager
 
     source_path, files = test_files
 

@@ -5,7 +5,7 @@ Test Fitz Cloud cache integration with local API.
 Run with: python tests/manual/test_cloud_cache_local.py
 
 Prerequisites:
-- fitz-ai-cloud API running at localhost:8000
+- fitz-sage-cloud API running at localhost:8000
 - OpenAI API key in environment (OPENAI_API_KEY)
 """
 
@@ -15,10 +15,10 @@ import sys
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from fitz_ai.cloud.cache_key import CacheVersions
-from fitz_ai.cloud.client import CloudClient
-from fitz_ai.cloud.config import CloudConfig
-from fitz_ai.core import Answer, Provenance
+from fitz_sage.cloud.cache_key import CacheVersions
+from fitz_sage.cloud.client import CloudClient
+from fitz_sage.cloud.config import CloudConfig
+from fitz_sage.core import Answer, Provenance
 
 
 def get_embedding(text: str) -> list[float]:
@@ -155,8 +155,8 @@ def main():
 
     import httpx
 
-    from fitz_ai.cloud.cache_key import compute_cache_key
-    from fitz_ai.cloud.crypto import CacheEncryption
+    from fitz_sage.cloud.cache_key import compute_cache_key
+    from fitz_sage.cloud.crypto import CacheEncryption
 
     cache_key = compute_cache_key(query_text, retrieval_fingerprint, versions)
     print(f"    Cache key: {cache_key[:32]}...")

@@ -20,8 +20,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from fitz_ai.llm.auth import M2MAuth
-from fitz_ai.llm.auth.certificates import (
+from fitz_sage.llm.auth import M2MAuth
+from fitz_sage.llm.auth.certificates import (
     CertificateError,
     validate_certificate_file,
     validate_key_file,

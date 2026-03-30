@@ -15,7 +15,7 @@ from tests.conftest import POSTGRES_DEPS_AVAILABLE, SKIP_POSTGRES_REASON
 if not POSTGRES_DEPS_AVAILABLE:
     pytest.skip(SKIP_POSTGRES_REASON, allow_module_level=True)
 
-from fitz_ai.tabular.direct_query import (
+from fitz_sage.tabular.direct_query import (
     DirectTableQuery,
     compute_file_hash,
     is_table_file,

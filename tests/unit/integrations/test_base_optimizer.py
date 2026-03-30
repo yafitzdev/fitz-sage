@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fitz_ai.integrations.base import FitzOptimizer, OptimizationResult
+from fitz_sage.integrations.base import FitzOptimizer, OptimizationResult
 
 
 class TestOptimizationResult:
@@ -51,7 +51,7 @@ class TestFitzOptimizer:
         # Valid UUID format
         assert len(org_id1) == 36  # UUID format
 
-    @patch("fitz_ai.integrations.base.CloudClient")
+    @patch("fitz_sage.integrations.base.CloudClient")
     def test_lookup_accepts_any_dimension(self, mock_client_class):
         """Any embedding dimension is accepted (non-indexed just logs warning)."""
         # Setup mock
@@ -81,7 +81,7 @@ class TestFitzOptimizer:
         # Lookup should proceed regardless of dimension
         mock_client.lookup_cache.assert_called_once()
 
-    @patch("fitz_ai.integrations.base.CloudClient")
+    @patch("fitz_sage.integrations.base.CloudClient")
     def test_lookup_cache_hit(self, mock_client_class):
         """Cache hit returns decrypted answer."""
         # Setup mock
@@ -112,7 +112,7 @@ class TestFitzOptimizer:
         assert result.answer == "Cached answer"
         mock_client.lookup_cache.assert_called_once()
 
-    @patch("fitz_ai.integrations.base.CloudClient")
+    @patch("fitz_sage.integrations.base.CloudClient")
     def test_lookup_cache_miss_with_routing(self, mock_client_class):
         """Cache miss returns routing advice."""
         # Setup mock
@@ -147,7 +147,7 @@ class TestFitzOptimizer:
         assert result.routing_advice["complexity"] == "simple"
         assert result.routing_advice["dedup_chunks"] == [1, 3]
 
-    @patch("fitz_ai.integrations.base.CloudClient")
+    @patch("fitz_sage.integrations.base.CloudClient")
     def test_store_accepts_any_dimension(self, mock_client_class):
         """Any embedding dimension is accepted for store."""
         # Setup mock
@@ -172,7 +172,7 @@ class TestFitzOptimizer:
         assert stored is True
         mock_client.store_cache.assert_called_once()
 
-    @patch("fitz_ai.integrations.base.CloudClient")
+    @patch("fitz_sage.integrations.base.CloudClient")
     def test_store_success(self, mock_client_class):
         """Successful store returns True."""
         # Setup mock
@@ -197,7 +197,7 @@ class TestFitzOptimizer:
         assert stored is True
         mock_client.store_cache.assert_called_once()
 
-    @patch("fitz_ai.integrations.base.CloudClient")
+    @patch("fitz_sage.integrations.base.CloudClient")
     def test_embed_query_no_function(self, mock_client_class):
         """No embedding function returns None."""
         optimizer = FitzOptimizer(
@@ -209,7 +209,7 @@ class TestFitzOptimizer:
         result = optimizer.embed_query("test query")
         assert result is None
 
-    @patch("fitz_ai.integrations.base.CloudClient")
+    @patch("fitz_sage.integrations.base.CloudClient")
     def test_embed_query_success(self, mock_client_class):
         """Successful embedding returns vector."""
         mock_embed_fn = MagicMock(return_value=[1.0] * 1536)
@@ -226,7 +226,7 @@ class TestFitzOptimizer:
         assert len(result) == 1536
         mock_embed_fn.assert_called_once_with("test query")
 
-    @patch("fitz_ai.integrations.base.CloudClient")
+    @patch("fitz_sage.integrations.base.CloudClient")
     def test_context_manager(self, mock_client_class):
         """Context manager closes client."""
         mock_client = MagicMock()

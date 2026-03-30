@@ -65,10 +65,10 @@ Hypothetical documents are written in document style, not question style:
 
 ## Files
 
-- **Generator module:** `fitz_ai/retrieval/hyde/`
-- **Prompt template:** `fitz_ai/retrieval/hyde/prompts/hypothesis.txt`
-- **Integration:** `fitz_ai/engines/fitz_krag/retrieval/steps/strategies/semantic.py`
-- **Wiring:** `fitz_ai/engines/fitz_krag/retrieval/steps/vector_search.py`
+- **Generator module:** `fitz_sage/retrieval/hyde/`
+- **Prompt template:** `fitz_sage/retrieval/hyde/prompts/hypothesis.txt`
+- **Integration:** `fitz_sage/engines/fitz_krag/retrieval/steps/strategies/semantic.py`
+- **Wiring:** `fitz_sage/engines/fitz_krag/retrieval/steps/vector_search.py`
 
 ## Benefits
 
@@ -102,7 +102,7 @@ Typical overhead: ~500ms for hypothesis generation + 3x embedding/search. Worth 
 ## Dependencies
 
 - Requires chat client configured (fast tier used)
-- No additional packages beyond core fitz-ai
+- No additional packages beyond core fitz-sage
 
 ## Related Features
 

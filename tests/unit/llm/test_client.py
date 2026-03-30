@@ -13,8 +13,8 @@ from unittest.mock import patch
 
 import pytest
 
-from fitz_ai.llm.client import get_chat, get_embedder, get_reranker, get_vision
-from fitz_ai.llm.providers import ChatProvider, EmbeddingProvider, RerankProvider
+from fitz_sage.llm.client import get_chat, get_embedder, get_reranker, get_vision
+from fitz_sage.llm.providers import ChatProvider, EmbeddingProvider, RerankProvider
 
 # Check for optional SDKs
 HAS_COHERE = importlib.util.find_spec("cohere") is not None
@@ -108,7 +108,7 @@ class TestOpenAIProviders:
 
     def test_openai_vision(self) -> None:
         """OpenAI vision provider works."""
-        from fitz_ai.llm.providers import VisionProvider
+        from fitz_sage.llm.providers import VisionProvider
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             with patch("openai.OpenAI"):
@@ -130,7 +130,7 @@ class TestAnthropicProviders:
 
     def test_anthropic_vision(self) -> None:
         """Anthropic vision provider works."""
-        from fitz_ai.llm.providers import VisionProvider
+        from fitz_sage.llm.providers import VisionProvider
 
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
             with patch("anthropic.Anthropic"):

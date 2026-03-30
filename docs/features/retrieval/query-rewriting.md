@@ -84,11 +84,11 @@ All interpretations are searched and results are merged.
 
 ## Files
 
-- **Rewriter module:** `fitz_ai/retrieval/rewriter/`
+- **Rewriter module:** `fitz_sage/retrieval/rewriter/`
   - `rewriter.py` - QueryRewriter class
   - `types.py` - RewriteResult, ConversationContext
   - `prompts/rewrite.txt` - LLM prompt template
-- **Integration:** `fitz_ai/engines/fitz_krag/retrieval/steps/vector_search.py`
+- **Integration:** `fitz_sage/engines/fitz_krag/retrieval/steps/vector_search.py`
 
 ## Benefits
 

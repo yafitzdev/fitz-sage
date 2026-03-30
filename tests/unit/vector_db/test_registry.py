@@ -9,7 +9,7 @@ import pytest
 
 pytestmark = pytest.mark.tier1
 
-from fitz_ai.vector_db.registry import available_vector_db_plugins, get_vector_db_plugin
+from fitz_sage.vector_db.registry import available_vector_db_plugins, get_vector_db_plugin
 
 
 class TestGetVectorDbPlugin:
@@ -21,8 +21,8 @@ class TestGetVectorDbPlugin:
         with pytest.raises(ValueError, match="Unsupported vector_db plugin"):
             get_vector_db_plugin("")
 
-    @patch("fitz_ai.vector_db.registry.create_vector_db_plugin")
-    @patch("fitz_ai.vector_db.registry.maybe_wrap")
+    @patch("fitz_sage.vector_db.registry.create_vector_db_plugin")
+    @patch("fitz_sage.vector_db.registry.maybe_wrap")
     def test_creates_and_wraps_pgvector(self, mock_wrap, mock_create):
         mock_plugin = MagicMock()
         mock_create.return_value = mock_plugin
@@ -38,8 +38,8 @@ class TestGetVectorDbPlugin:
             methods_to_track={"search", "upsert", "delete", "count", "list_collections"},
         )
 
-    @patch("fitz_ai.vector_db.registry.create_vector_db_plugin")
-    @patch("fitz_ai.vector_db.registry.maybe_wrap")
+    @patch("fitz_sage.vector_db.registry.create_vector_db_plugin")
+    @patch("fitz_sage.vector_db.registry.maybe_wrap")
     def test_default_plugin_is_pgvector(self, mock_wrap, mock_create):
         mock_create.return_value = MagicMock()
         mock_wrap.return_value = mock_create.return_value

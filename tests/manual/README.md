@@ -8,7 +8,7 @@ Test the Fitz Cloud cache functionality end-to-end.
 
 ### Prerequisites
 
-1. **Fitz Cloud Account**: Sign up at https://fitz-ai.cloud (or use your deployed Railway instance)
+1. **Fitz Cloud Account**: Sign up at https://fitz-sage.cloud (or use your deployed Railway instance)
 
 2. **Generate Encryption Key**:
    ```bash
@@ -105,7 +105,7 @@ MANUAL TEST COMPLETE
 4. **Version Tracking**: Verify cache invalidates when:
    - Documents are re-ingested (collection version changes)
    - Model is changed in config (llm_model version changes)
-   - fitz-ai is upgraded (engine version changes)
+   - fitz-sage is upgraded (engine version changes)
 
 ### Troubleshooting
 

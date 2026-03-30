@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from fitz_ai.ingestion.enrichment import (
+from fitz_sage.ingestion.enrichment import (
     EnrichmentConfig,
     EnrichmentPipeline,
 )
@@ -75,7 +75,7 @@ class TestArtifactPluginDiscovery:
 
     def test_plugins_discovered(self):
         """Test that all expected plugins are discovered."""
-        from fitz_ai.ingestion.enrichment.artifacts.registry import get_artifact_registry
+        from fitz_sage.ingestion.enrichment.artifacts.registry import get_artifact_registry
 
         registry = get_artifact_registry()
         plugin_names = registry.list_plugin_names()

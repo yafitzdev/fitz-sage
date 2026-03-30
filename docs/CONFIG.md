@@ -87,14 +87,14 @@ Data lives in `.fitz/pgdata/`. Collections are managed via `fitz collections`.
 
 ```yaml
 parser: glm_ocr    # Hybrid: pdfplumber + GLM-OCR for scanned pages
-# parser: docling  # Docling (requires pip install fitz-ai[docs])
+# parser: docling  # Docling (requires pip install fitz-sage[docs])
 ```
 
 | Parser | Speed | Scanned pages | Install |
 |--------|-------|---------------|---------|
 | `glm_ocr` | Fast (28s/100pg) | GLM-OCR via ollama | Base install |
-| `docling` | Slow (21min/100pg) | No | `pip install fitz-ai[docs]` |
-| `docling_vision` | Slow | VLM figure descriptions | `pip install fitz-ai[docs]` + `vision:` |
+| `docling` | Slow (21min/100pg) | No | `pip install fitz-sage[docs]` |
+| `docling_vision` | Slow | VLM figure descriptions | `pip install fitz-sage[docs]` + `vision:` |
 
 ---
 

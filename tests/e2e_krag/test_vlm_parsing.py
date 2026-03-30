@@ -118,9 +118,9 @@ def vlm_krag_engine(set_workspace):
     Creates a unique collection, ingests fixtures_parser/ with docling_vision
     parser and Ollama vision provider, then yields the engine for querying.
     """
-    from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-    from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
-    from fitz_ai.storage.postgres import PostgresConnectionManager
+    from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+    from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
+    from fitz_sage.storage.postgres import PostgresConnectionManager
     from tests.e2e_krag.config import get_tier_config, get_tier_names, load_e2e_config
 
     collection = f"e2e_vlm_{uuid.uuid4().hex[:8]}"
@@ -168,7 +168,7 @@ def vlm_krag_engine(set_workspace):
     engine = FitzKragEngine(cfg)
 
     # Ingest fixtures with VLM-powered parsing via KragIngestPipeline
-    from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+    from fitz_sage.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
 
     pipeline = KragIngestPipeline(
         config=engine._config,
@@ -219,7 +219,7 @@ def test_vlm_figure_scenario(vlm_krag_engine, scenario):
     Validates that VLM-described figure content is retrievable and
     contains expected data values.
     """
-    from fitz_ai.core import Query
+    from fitz_sage.core import Query
 
     from .validators import validate_answer
 

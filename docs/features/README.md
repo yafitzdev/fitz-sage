@@ -1,6 +1,6 @@
 # docs/features/
 
-In-depth design and implementation documentation for individual fitz-ai features.
+In-depth design and implementation documentation for individual fitz-sage features.
 
 | Directory | Contents |
 |---|---|

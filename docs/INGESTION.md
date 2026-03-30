@@ -359,19 +359,19 @@ fitz query "Explain entanglement"
 ## Python API
 
 ```python
-import fitz_ai
+import fitz_sage
 
 # Query with source (ingestion happens in background)
-answer = fitz_ai.query("What is quantum computing?", source="./docs")
+answer = fitz_sage.query("What is quantum computing?", source="./docs")
 ```
 
 ### Advanced usage
 
 ```python
-from fitz_ai.ingestion.diff.executor import DiffIngestExecutor
-from fitz_ai.ingestion.parser import ParserRouter
-from fitz_ai.ingestion.chunking.router import ChunkingRouter
-from fitz_ai.ingestion.state import IngestStateManager
+from fitz_sage.ingestion.diff.executor import DiffIngestExecutor
+from fitz_sage.ingestion.parser import ParserRouter
+from fitz_sage.ingestion.chunking.router import ChunkingRouter
+from fitz_sage.ingestion.state import IngestStateManager
 
 # Build components
 parser_router = ParserRouter(docling_parser="docling_vision")
@@ -400,12 +400,12 @@ print(f"Ingested {summary.ingested} files")
 
 | File | Purpose |
 |------|---------|
-| `fitz_ai/ingestion/diff/executor.py` | Main orchestrator |
-| `fitz_ai/ingestion/parser/router.py` | Parser selection |
-| `fitz_ai/ingestion/chunking/router.py` | Chunker selection |
-| `fitz_ai/ingestion/state/manager.py` | State persistence |
-| `fitz_ai/ingestion/enrichment/pipeline.py` | Enrichment orchestrator |
-| `fitz_ai/cli/commands/query.py` | CLI command (--source triggers ingestion) |
+| `fitz_sage/ingestion/diff/executor.py` | Main orchestrator |
+| `fitz_sage/ingestion/parser/router.py` | Parser selection |
+| `fitz_sage/ingestion/chunking/router.py` | Chunker selection |
+| `fitz_sage/ingestion/state/manager.py` | State persistence |
+| `fitz_sage/ingestion/enrichment/pipeline.py` | Enrichment orchestrator |
+| `fitz_sage/cli/commands/query.py` | CLI command (--source triggers ingestion) |
 
 ---
 

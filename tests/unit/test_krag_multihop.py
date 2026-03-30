@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from fitz_ai.engines.fitz_krag.retrieval.multihop import KragHopController
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
+from fitz_sage.engines.fitz_krag.retrieval.multihop import KragHopController
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind, ReadResult
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -425,7 +425,7 @@ class TestDeduplication:
         reader = _make_reader([[result1]])
         factory = _make_chat_factory(is_sufficient=True)
 
-        from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
+        from fitz_sage.engines.fitz_krag.retrieval_profile import RetrievalProfile
 
         profile = RetrievalProfile()
 

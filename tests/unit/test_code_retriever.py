@@ -1,5 +1,5 @@
 # tests/unit/test_code_retriever.py
-"""Tests for standalone CodeRetriever (fitz-ai[code])."""
+"""Tests for standalone CodeRetriever (fitz-sage[code])."""
 
 from __future__ import annotations
 
@@ -8,13 +8,13 @@ import sys
 import textwrap
 from unittest.mock import MagicMock
 
-from fitz_ai.code.indexer import (
+from fitz_sage.code.indexer import (
     build_file_list,
     build_import_graph,
     build_structural_index,
 )
-from fitz_ai.code.retriever import CodeRetriever
-from fitz_ai.engines.fitz_krag.types import AddressKind
+from fitz_sage.code.retriever import CodeRetriever
+from fitz_sage.engines.fitz_krag.types import AddressKind
 
 # ---------------------------------------------------------------------------
 # Indexer tests
@@ -276,7 +276,7 @@ class TestCodeRetriever:
 
 class TestNoHeavyImports:
     def test_code_module_does_not_import_heavy_deps(self):
-        """Verify fitz_ai.code doesn't transitively import psycopg/pgvector/docling.
+        """Verify fitz_sage.code doesn't transitively import psycopg/pgvector/docling.
 
         Runs in a subprocess to avoid contamination from other tests that
         load heavy modules earlier in the suite.
@@ -288,7 +288,7 @@ class TestNoHeavyImports:
                 sys.executable,
                 "-c",
                 (
-                    "import fitz_ai.code; import sys; "
+                    "import fitz_sage.code; import sys; "
                     "heavy = ['psycopg', 'pgvector', 'docling', 'fitz_pgserver']; "
                     "loaded = [m for m in heavy if any(k.startswith(m) for k in sys.modules)]; "
                     "assert not loaded, f'Heavy modules loaded: {loaded}'"
@@ -297,4 +297,4 @@ class TestNoHeavyImports:
             capture_output=True,
             text=True,
         )
-        assert result.returncode == 0, f"Heavy deps imported by fitz_ai.code:\n{result.stderr}"
+        assert result.returncode == 0, f"Heavy deps imported by fitz_sage.code:\n{result.stderr}"

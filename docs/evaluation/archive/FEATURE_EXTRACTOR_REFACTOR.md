@@ -1,6 +1,6 @@
 # Feature Extractor Refactor — Deferred
 
-Current implementation: `fitz_ai/core/guardrails/feature_extractor.py`
+Current implementation: `fitz_sage/core/guardrails/feature_extractor.py`
 
 Works for classifier v1 training. These problems should be addressed if the classifier proves valuable and we need to maintain/extend the feature set.
 

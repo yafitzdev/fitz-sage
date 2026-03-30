@@ -15,7 +15,7 @@ class TestLocalRerankerConfig:
 
     def test_default_values(self):
         """Test default configuration values."""
-        from fitz_ai.backends.local_llm.rerank import LocalRerankerConfig
+        from fitz_sage.backends.local_llm.rerank import LocalRerankerConfig
 
         cfg = LocalRerankerConfig()
 
@@ -23,7 +23,7 @@ class TestLocalRerankerConfig:
 
     def test_custom_values(self):
         """Test custom configuration values."""
-        from fitz_ai.backends.local_llm.rerank import LocalRerankerConfig
+        from fitz_sage.backends.local_llm.rerank import LocalRerankerConfig
 
         cfg = LocalRerankerConfig(top_k=5)
 
@@ -31,7 +31,7 @@ class TestLocalRerankerConfig:
 
     def test_config_is_frozen(self):
         """Test that config is immutable."""
-        from fitz_ai.backends.local_llm.rerank import LocalRerankerConfig
+        from fitz_sage.backends.local_llm.rerank import LocalRerankerConfig
 
         cfg = LocalRerankerConfig()
 
@@ -44,7 +44,7 @@ class TestCosineFunction:
 
     def test_cosine_identical_vectors(self):
         """Test cosine similarity of identical normalized vectors."""
-        from fitz_ai.backends.local_llm.rerank import _cosine
+        from fitz_sage.backends.local_llm.rerank import _cosine
 
         # Normalized unit vector
         v = [1.0, 0.0, 0.0]
@@ -54,7 +54,7 @@ class TestCosineFunction:
 
     def test_cosine_orthogonal_vectors(self):
         """Test cosine similarity of orthogonal vectors."""
-        from fitz_ai.backends.local_llm.rerank import _cosine
+        from fitz_sage.backends.local_llm.rerank import _cosine
 
         v1 = [1.0, 0.0, 0.0]
         v2 = [0.0, 1.0, 0.0]
@@ -64,7 +64,7 @@ class TestCosineFunction:
 
     def test_cosine_opposite_vectors(self):
         """Test cosine similarity of opposite vectors."""
-        from fitz_ai.backends.local_llm.rerank import _cosine
+        from fitz_sage.backends.local_llm.rerank import _cosine
 
         v1 = [1.0, 0.0]
         v2 = [-1.0, 0.0]
@@ -74,7 +74,7 @@ class TestCosineFunction:
 
     def test_cosine_similar_vectors(self):
         """Test cosine similarity of similar vectors."""
-        from fitz_ai.backends.local_llm.rerank import _cosine
+        from fitz_sage.backends.local_llm.rerank import _cosine
 
         v1 = [0.8, 0.6, 0.0]
         v2 = [0.7, 0.7, 0.14]
@@ -85,7 +85,7 @@ class TestCosineFunction:
 
     def test_cosine_different_lengths(self):
         """Test cosine handles different length vectors."""
-        from fitz_ai.backends.local_llm.rerank import _cosine
+        from fitz_sage.backends.local_llm.rerank import _cosine
 
         v1 = [1.0, 0.5, 0.3]
         v2 = [1.0, 0.5]  # Shorter
@@ -97,7 +97,7 @@ class TestCosineFunction:
 
     def test_cosine_empty_vectors(self):
         """Test cosine with empty vectors."""
-        from fitz_ai.backends.local_llm.rerank import _cosine
+        from fitz_sage.backends.local_llm.rerank import _cosine
 
         result = _cosine([], [])
 
@@ -109,7 +109,7 @@ class TestLocalReranker:
 
     def test_init_default_config(self):
         """Test initialization with default config."""
-        from fitz_ai.backends.local_llm.rerank import LocalReranker
+        from fitz_sage.backends.local_llm.rerank import LocalReranker
 
         mock_embedder = MagicMock()
         reranker = LocalReranker(mock_embedder)
@@ -119,7 +119,7 @@ class TestLocalReranker:
 
     def test_init_custom_config(self):
         """Test initialization with custom config."""
-        from fitz_ai.backends.local_llm.rerank import LocalReranker, LocalRerankerConfig
+        from fitz_sage.backends.local_llm.rerank import LocalReranker, LocalRerankerConfig
 
         mock_embedder = MagicMock()
         cfg = LocalRerankerConfig(top_k=3)
@@ -129,7 +129,7 @@ class TestLocalReranker:
 
     def test_rerank_empty_candidates(self):
         """Test rerank with empty candidates returns empty."""
-        from fitz_ai.backends.local_llm.rerank import LocalReranker
+        from fitz_sage.backends.local_llm.rerank import LocalReranker
 
         mock_embedder = MagicMock()
         reranker = LocalReranker(mock_embedder)
@@ -140,7 +140,7 @@ class TestLocalReranker:
 
     def test_rerank_returns_sorted_by_score(self):
         """Test rerank returns candidates sorted by similarity score."""
-        from fitz_ai.backends.local_llm.rerank import LocalReranker
+        from fitz_sage.backends.local_llm.rerank import LocalReranker
 
         mock_embedder = MagicMock()
         # Query embedding
@@ -171,7 +171,7 @@ class TestLocalReranker:
 
     def test_rerank_respects_top_k(self):
         """Test rerank limits results to top_k."""
-        from fitz_ai.backends.local_llm.rerank import LocalReranker, LocalRerankerConfig
+        from fitz_sage.backends.local_llm.rerank import LocalReranker, LocalRerankerConfig
 
         mock_embedder = MagicMock()
         mock_embedder.embed_texts.side_effect = [
@@ -188,7 +188,7 @@ class TestLocalReranker:
 
     def test_rerank_calls_embedder(self):
         """Test rerank calls embedder.embed_texts correctly."""
-        from fitz_ai.backends.local_llm.rerank import LocalReranker
+        from fitz_sage.backends.local_llm.rerank import LocalReranker
 
         mock_embedder = MagicMock()
         mock_embedder.embed_texts.side_effect = [
@@ -206,7 +206,7 @@ class TestLocalReranker:
 
     def test_rerank_single_candidate(self):
         """Test rerank with single candidate."""
-        from fitz_ai.backends.local_llm.rerank import LocalReranker
+        from fitz_sage.backends.local_llm.rerank import LocalReranker
 
         mock_embedder = MagicMock()
         mock_embedder.embed_texts.side_effect = [
@@ -223,7 +223,7 @@ class TestLocalReranker:
 
     def test_rerank_returns_tuples_of_index_score(self):
         """Test rerank returns list of (index, score) tuples."""
-        from fitz_ai.backends.local_llm.rerank import LocalReranker
+        from fitz_sage.backends.local_llm.rerank import LocalReranker
 
         mock_embedder = MagicMock()
         mock_embedder.embed_texts.side_effect = [

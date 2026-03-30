@@ -12,8 +12,8 @@ from unittest.mock import patch
 
 import pytest
 
-from fitz_ai.llm.auth import ApiKeyAuth, M2MAuth
-from fitz_ai.llm.config import (
+from fitz_sage.llm.auth import ApiKeyAuth, M2MAuth
+from fitz_sage.llm.config import (
     create_chat_provider,
     create_embedding_provider,
     create_rerank_provider,

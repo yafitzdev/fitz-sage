@@ -1,6 +1,6 @@
 # tools/mutation_test.py
 """
-Mutation testing runner for fitz-ai.
+Mutation testing runner for fitz-sage.
 
 Usage:
     python tools/mutation_test.py           # Run mutation tests on all targets
@@ -63,8 +63,8 @@ def main() -> int:
             "-m",
             "mutmut",
             "run",
-            "--paths-to-mutate=fitz_ai/core/",
-            "--paths-to-exclude=__init__.py,fitz_ai/core/paths.py,fitz_ai/core/constants.py",
+            "--paths-to-mutate=fitz_sage/core/",
+            "--paths-to-exclude=__init__.py,fitz_sage/core/paths.py,fitz_sage/core/constants.py",
         ]
         desc = "Running mutation tests (quick mode - core/ only)"
     else:

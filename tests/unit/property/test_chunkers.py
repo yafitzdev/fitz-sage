@@ -4,17 +4,17 @@ Property-based tests for SimpleChunker and RecursiveChunker.
 
 Tests pure, deterministic properties of chunking logic.
 Targets:
-    - fitz_ai/ingestion/chunking/plugins/default/simple.py
-    - fitz_ai/ingestion/chunking/plugins/default/recursive.py
+    - fitz_sage/ingestion/chunking/plugins/default/simple.py
+    - fitz_sage/ingestion/chunking/plugins/default/recursive.py
 """
 
 import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
-from fitz_ai.ingestion.chunking.plugins.default.recursive import RecursiveChunker
-from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
+from fitz_sage.core.document import DocumentElement, ElementType, ParsedDocument
+from fitz_sage.ingestion.chunking.plugins.default.recursive import RecursiveChunker
+from fitz_sage.ingestion.chunking.plugins.default.simple import SimpleChunker
 
 from .strategies import chunk_params, document_text
 

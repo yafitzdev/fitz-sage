@@ -2,7 +2,7 @@
 """Tests for table storage backends."""
 
 
-from fitz_ai.tabular.store.base import compress_csv, compute_hash, decompress_csv
+from fitz_sage.tabular.store.base import compress_csv, compute_hash, decompress_csv
 
 
 class TestCompressionUtils:

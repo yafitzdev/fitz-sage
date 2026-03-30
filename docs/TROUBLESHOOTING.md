@@ -23,7 +23,7 @@ ConfigNotFoundError: Config file not found: .fitz/config.yaml
 
 Edit `.fitz/config.yaml` (auto-created on first run). Or with auto-init in Python:
 ```python
-from fitz_ai import fitz
+from fitz_sage import fitz
 f = fitz(auto_init=True)  # Creates default config
 ```
 
@@ -257,7 +257,7 @@ fitz query --source ./docs "test query"
 
 Or in Python:
 ```python
-fitz_ai.query("test query", source="./docs")
+fitz_sage.query("test query", source="./docs")
 ```
 
 ---
@@ -334,19 +334,19 @@ cat .fitz/ingest_state.json | python -m json.tool
 
 ```python
 # Test embedding
-from fitz_ai.llm import get_embedder
+from fitz_sage.llm import get_embedder
 embedder = get_embedder("cohere/embed-v4.0")
 vector = embedder.embed("test")
 print(f"Embedding dim: {len(vector)}")
 
 # Test vector DB
-from fitz_ai.vector_db.registry import get_vector_db_plugin
+from fitz_sage.vector_db.registry import get_vector_db_plugin
 vdb = get_vector_db_plugin("pgvector")
 collections = vdb.list_collections()
 print(f"Collections: {collections}")
 
 # Test chat
-from fitz_ai.llm import get_chat
+from fitz_sage.llm import get_chat
 chat = get_chat("cohere", tier="smart")
 response = chat.chat([{"role": "user", "content": "Hello"}])
 print(f"Response: {response}")
@@ -395,10 +395,10 @@ ConfigError
 
 1. **Check config:** Verify `.fitz/config.yaml` is correct
 2. **Check logs:** Enable DEBUG level
-3. **Report issues:** [GitHub Issues](https://github.com/yafitzdev/fitz-ai/issues)
+3. **Report issues:** [GitHub Issues](https://github.com/yafitzdev/fitz-sage/issues)
 
 When reporting issues, include:
-- Fitz version: `pip show fitz-ai`
+- Fitz version: `pip show fitz-sage`
 - Python version: `python --version`
 - OS: Windows/macOS/Linux
 - Full error traceback

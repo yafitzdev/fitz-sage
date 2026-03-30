@@ -39,8 +39,8 @@ Be respectful, inclusive, and constructive. We're all here to build something us
 
 ```bash
 # Clone your fork
-git clone https://github.com/yafitzdev/fitz-ai.git
-cd fitz-ai
+git clone https://github.com/yafitzdev/fitz-sage.git
+cd fitz-sage
 
 # Create virtual environment
 python -m venv .venv
@@ -63,7 +63,7 @@ Fitz follows strict architectural principles. Please respect these when contribu
 ### Project Structure
 
 ```
-fitz_ai/
+fitz_sage/
 ├── core/              # Paradigm-agnostic contracts (Query, Answer, Provenance)
 ├── engines/           # Engine implementations
 │   └── fitz_krag/     # KRAG with retrieval intelligence
@@ -108,7 +108,7 @@ python -m tools.contract_map --fail-on-errors
 All engines implement the same protocol:
 
 ```python
-from fitz_ai.core import KnowledgeEngine, Query, Answer
+from fitz_sage.core import KnowledgeEngine, Query, Answer
 
 class MyEngine(KnowledgeEngine):
     def answer(self, query: Query) -> Answer:
@@ -173,7 +173,7 @@ Open an issue with:
    isort .
    
    # Type check
-   mypy fitz_ai
+   mypy fitz_sage
 
    # Run tests
    pytest
@@ -210,7 +210,7 @@ Engines are the core abstraction in Fitz. Each engine is a complete implementati
 
 1. **Create the engine directory**
    ```
-   fitz_ai/engines/my_engine/
+   fitz_sage/engines/my_engine/
    ├── __init__.py      # Public API exports
    ├── engine.py        # KnowledgeEngine implementation
    ├── runtime.py       # Convenience functions (run_my_engine, create_my_engine)
@@ -222,8 +222,8 @@ Engines are the core abstraction in Fitz. Each engine is a complete implementati
 
 2. **Implement the KnowledgeEngine protocol**
    ```python
-   # fitz_ai/engines/my_engine/engine.py
-   from fitz_ai.core import KnowledgeEngine, Query, Answer, Provenance
+   # fitz_sage/engines/my_engine/engine.py
+   from fitz_sage.core import KnowledgeEngine, Query, Answer, Provenance
    
    class MyEngine:
        """My custom knowledge engine."""
@@ -242,8 +242,8 @@ Engines are the core abstraction in Fitz. Each engine is a complete implementati
 
 3. **Register with the engine registry**
    ```python
-   # fitz_ai/engines/my_engine/__init__.py
-   from fitz_ai.runtime import EngineRegistry
+   # fitz_sage/engines/my_engine/__init__.py
+   from fitz_sage.runtime import EngineRegistry
    
    def _register():
        registry = EngineRegistry.get_global()
@@ -258,8 +258,8 @@ Engines are the core abstraction in Fitz. Each engine is a complete implementati
 
 4. **Add convenience functions**
    ```python
-   # fitz_ai/engines/my_engine/runtime.py
-   from fitz_ai.core import Answer
+   # fitz_sage/engines/my_engine/runtime.py
+   from fitz_sage.core import Answer
    
    def run_my_engine(query: str, **kwargs) -> Answer:
        """Execute a query with MyEngine."""
@@ -289,7 +289,7 @@ Plugins extend functionality within engines (LLM providers, vector DBs, etc.).
 
 2. **Create the plugin file**:
    ```python
-   # fitz_ai/llm/chat/plugins/my_provider.py
+   # fitz_sage/llm/chat/plugins/my_provider.py
    
    class MyProviderChatClient:
        plugin_name = "my_provider"
@@ -338,7 +338,7 @@ Plugins extend functionality within engines (LLM providers, vector DBs, etc.).
 pytest
 
 # With coverage
-pytest --cov=fitz_ai
+pytest --cov=fitz_sage
 
 # Specific module
 pytest tests/engines/test_fitz_krag.py
@@ -407,8 +407,8 @@ from typing import Any
 from pydantic import BaseModel
 
 # Local imports (absolute)
-from fitz_ai.core import Answer, Query
-from fitz_ai.logging.logger import get_logger
+from fitz_sage.core import Answer, Query
+from fitz_sage.logging.logger import get_logger
 
 logger = get_logger(__name__)
 

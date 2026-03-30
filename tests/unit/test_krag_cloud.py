@@ -11,12 +11,12 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from fitz_ai.cloud.cache_key import CacheVersions
-from fitz_ai.cloud.client import CacheLookupResult
-from fitz_ai.core import Answer, Provenance
-from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind
+from fitz_sage.cloud.cache_key import CacheVersions
+from fitz_sage.cloud.client import CacheLookupResult
+from fitz_sage.core import Answer, Provenance
+from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -130,36 +130,36 @@ class TestCloudClientInit:
         mock_cloud_config_instance.org_id = "org-123"
 
         patches = [
-            patch("fitz_ai.llm.client.get_chat", return_value=MagicMock()),
-            patch("fitz_ai.llm.client.get_embedder", return_value=MagicMock(dimensions=1024)),
+            patch("fitz_sage.llm.client.get_chat", return_value=MagicMock()),
+            patch("fitz_sage.llm.client.get_embedder", return_value=MagicMock(dimensions=1024)),
             patch(
-                "fitz_ai.storage.postgres.PostgresConnectionManager.get_instance",
+                "fitz_sage.storage.postgres.PostgresConnectionManager.get_instance",
                 return_value=MagicMock(),
             ),
-            patch("fitz_ai.engines.fitz_krag.ingestion.raw_file_store.RawFileStore"),
-            patch("fitz_ai.engines.fitz_krag.ingestion.symbol_store.SymbolStore"),
-            patch("fitz_ai.engines.fitz_krag.ingestion.import_graph_store.ImportGraphStore"),
-            patch("fitz_ai.engines.fitz_krag.ingestion.section_store.SectionStore"),
-            patch("fitz_ai.engines.fitz_krag.ingestion.table_store.TableStore"),
-            patch("fitz_ai.engines.fitz_krag.ingestion.schema.ensure_schema"),
-            patch("fitz_ai.engines.fitz_krag.retrieval.strategies.code_search.CodeSearchStrategy"),
+            patch("fitz_sage.engines.fitz_krag.ingestion.raw_file_store.RawFileStore"),
+            patch("fitz_sage.engines.fitz_krag.ingestion.symbol_store.SymbolStore"),
+            patch("fitz_sage.engines.fitz_krag.ingestion.import_graph_store.ImportGraphStore"),
+            patch("fitz_sage.engines.fitz_krag.ingestion.section_store.SectionStore"),
+            patch("fitz_sage.engines.fitz_krag.ingestion.table_store.TableStore"),
+            patch("fitz_sage.engines.fitz_krag.ingestion.schema.ensure_schema"),
+            patch("fitz_sage.engines.fitz_krag.retrieval.strategies.code_search.CodeSearchStrategy"),
             patch(
-                "fitz_ai.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy"
+                "fitz_sage.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy"
             ),
             patch(
-                "fitz_ai.engines.fitz_krag.retrieval.strategies.table_search.TableSearchStrategy"
+                "fitz_sage.engines.fitz_krag.retrieval.strategies.table_search.TableSearchStrategy"
             ),
-            patch("fitz_ai.engines.fitz_krag.retrieval.router.RetrievalRouter"),
-            patch("fitz_ai.engines.fitz_krag.retrieval.reader.ContentReader"),
-            patch("fitz_ai.engines.fitz_krag.retrieval.expander.CodeExpander"),
-            patch("fitz_ai.engines.fitz_krag.retrieval.table_handler.TableQueryHandler"),
-            patch("fitz_ai.engines.fitz_krag.query_analyzer.QueryAnalyzer"),
-            patch("fitz_ai.engines.fitz_krag.context.assembler.ContextAssembler"),
-            patch("fitz_ai.engines.fitz_krag.generation.synthesizer.CodeSynthesizer"),
-            patch("fitz_ai.tabular.store.postgres.PostgresTableStore"),
-            patch("fitz_ai.llm.factory.get_chat_factory"),
-            patch("fitz_ai.cloud.client.CloudClient", mock_cloud_client_cls),
-            patch("fitz_ai.cloud.config.CloudConfig", mock_cloud_config_cls),
+            patch("fitz_sage.engines.fitz_krag.retrieval.router.RetrievalRouter"),
+            patch("fitz_sage.engines.fitz_krag.retrieval.reader.ContentReader"),
+            patch("fitz_sage.engines.fitz_krag.retrieval.expander.CodeExpander"),
+            patch("fitz_sage.engines.fitz_krag.retrieval.table_handler.TableQueryHandler"),
+            patch("fitz_sage.engines.fitz_krag.query_analyzer.QueryAnalyzer"),
+            patch("fitz_sage.engines.fitz_krag.context.assembler.ContextAssembler"),
+            patch("fitz_sage.engines.fitz_krag.generation.synthesizer.CodeSynthesizer"),
+            patch("fitz_sage.tabular.store.postgres.PostgresTableStore"),
+            patch("fitz_sage.llm.factory.get_chat_factory"),
+            patch("fitz_sage.cloud.client.CloudClient", mock_cloud_client_cls),
+            patch("fitz_sage.cloud.config.CloudConfig", mock_cloud_config_cls),
         ]
 
         with ExitStack() as stack:

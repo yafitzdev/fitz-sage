@@ -15,7 +15,7 @@ class TestLocalChatConfig:
 
     def test_default_values(self):
         """Test default configuration values."""
-        from fitz_ai.backends.local_llm.chat import LocalChatConfig
+        from fitz_sage.backends.local_llm.chat import LocalChatConfig
 
         cfg = LocalChatConfig()
 
@@ -24,7 +24,7 @@ class TestLocalChatConfig:
 
     def test_custom_values(self):
         """Test custom configuration values."""
-        from fitz_ai.backends.local_llm.chat import LocalChatConfig
+        from fitz_sage.backends.local_llm.chat import LocalChatConfig
 
         cfg = LocalChatConfig(max_tokens=512, temperature=0.7)
 
@@ -33,7 +33,7 @@ class TestLocalChatConfig:
 
     def test_config_is_frozen(self):
         """Test that config is immutable."""
-        from fitz_ai.backends.local_llm.chat import LocalChatConfig
+        from fitz_sage.backends.local_llm.chat import LocalChatConfig
 
         cfg = LocalChatConfig()
 
@@ -46,7 +46,7 @@ class TestLocalChatLLM:
 
     def test_init_default_config(self):
         """Test initialization with default config."""
-        from fitz_ai.backends.local_llm.chat import LocalChatLLM
+        from fitz_sage.backends.local_llm.chat import LocalChatLLM
 
         mock_runtime = MagicMock()
         chat = LocalChatLLM(mock_runtime)
@@ -56,7 +56,7 @@ class TestLocalChatLLM:
 
     def test_init_custom_config(self):
         """Test initialization with custom config."""
-        from fitz_ai.backends.local_llm.chat import LocalChatConfig, LocalChatLLM
+        from fitz_sage.backends.local_llm.chat import LocalChatConfig, LocalChatLLM
 
         mock_runtime = MagicMock()
         cfg = LocalChatConfig(max_tokens=1024)
@@ -66,7 +66,7 @@ class TestLocalChatLLM:
 
     def test_chat_calls_runtime(self):
         """Test chat method calls runtime adapter."""
-        from fitz_ai.backends.local_llm.chat import LocalChatLLM
+        from fitz_sage.backends.local_llm.chat import LocalChatLLM
 
         mock_adapter = MagicMock()
         mock_adapter.chat.return_value = {"message": {"content": "Response"}}
@@ -93,7 +93,7 @@ class TestLocalChatLLM:
 
     def test_chat_handles_missing_role(self):
         """Test chat handles messages without explicit role."""
-        from fitz_ai.backends.local_llm.chat import LocalChatLLM
+        from fitz_sage.backends.local_llm.chat import LocalChatLLM
 
         mock_adapter = MagicMock()
         mock_adapter.chat.return_value = {"message": {"content": "Response"}}
@@ -111,7 +111,7 @@ class TestLocalChatLLM:
 
     def test_chat_handles_missing_content(self):
         """Test chat handles messages without content."""
-        from fitz_ai.backends.local_llm.chat import LocalChatLLM
+        from fitz_sage.backends.local_llm.chat import LocalChatLLM
 
         mock_adapter = MagicMock()
         mock_adapter.chat.return_value = {"message": {"content": "Response"}}
@@ -133,7 +133,7 @@ class TestExtractText:
 
     def test_extract_text_from_dict(self):
         """Test extracting text from standard response dict."""
-        from fitz_ai.backends.local_llm.chat import _extract_text
+        from fitz_sage.backends.local_llm.chat import _extract_text
 
         resp = {"message": {"content": "Hello, world!"}}
         result = _extract_text(resp)
@@ -142,7 +142,7 @@ class TestExtractText:
 
     def test_extract_text_missing_message(self):
         """Test extraction when message key is missing."""
-        from fitz_ai.backends.local_llm.chat import _extract_text
+        from fitz_sage.backends.local_llm.chat import _extract_text
 
         resp = {"other": "data"}
         result = _extract_text(resp)
@@ -151,7 +151,7 @@ class TestExtractText:
 
     def test_extract_text_missing_content(self):
         """Test extraction when content key is missing."""
-        from fitz_ai.backends.local_llm.chat import _extract_text
+        from fitz_sage.backends.local_llm.chat import _extract_text
 
         resp = {"message": {"role": "assistant"}}
         result = _extract_text(resp)
@@ -160,7 +160,7 @@ class TestExtractText:
 
     def test_extract_text_none_message(self):
         """Test extraction when message is None."""
-        from fitz_ai.backends.local_llm.chat import _extract_text
+        from fitz_sage.backends.local_llm.chat import _extract_text
 
         resp = {"message": None}
         result = _extract_text(resp)
@@ -169,7 +169,7 @@ class TestExtractText:
 
     def test_extract_text_non_dict_response(self):
         """Test extraction falls back to str() for non-dict."""
-        from fitz_ai.backends.local_llm.chat import _extract_text
+        from fitz_sage.backends.local_llm.chat import _extract_text
 
         resp = "plain string response"
         result = _extract_text(resp)
@@ -178,7 +178,7 @@ class TestExtractText:
 
     def test_extract_text_exception_fallback(self):
         """Test extraction uses str() on exception."""
-        from fitz_ai.backends.local_llm.chat import _extract_text
+        from fitz_sage.backends.local_llm.chat import _extract_text
 
         # Object that raises on .get()
         class BadObj:

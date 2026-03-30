@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fitz_ai.evaluation.benchmarks.beir import (
+from fitz_sage.evaluation.benchmarks.beir import (
     ALL_DATASETS,
     TIER1_DATASETS,
     TIER2_DATASETS,
@@ -357,7 +357,7 @@ class TestFitzBEIRRetriever:
         return engine
 
     def _make_address(self, source_id: str, score: float):
-        from fitz_ai.engines.fitz_krag.types import Address, AddressKind
+        from fitz_sage.engines.fitz_krag.types import Address, AddressKind
 
         return Address(
             kind=AddressKind.SECTION,
@@ -379,7 +379,7 @@ class TestFitzBEIRRetriever:
         ]
 
         with patch(
-            "fitz_ai.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy.retrieve",
+            "fitz_sage.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy.retrieve",
             return_value=mock_addresses,
         ):
             results = retriever.search(
@@ -404,7 +404,7 @@ class TestFitzBEIRRetriever:
         ]
 
         with patch(
-            "fitz_ai.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy.retrieve",
+            "fitz_sage.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy.retrieve",
             return_value=mock_addresses,
         ):
             results = retriever.search(corpus={}, queries={"q1": "query"}, top_k=10)
@@ -423,7 +423,7 @@ class TestFitzBEIRRetriever:
         ]
 
         with patch(
-            "fitz_ai.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy.retrieve",
+            "fitz_sage.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy.retrieve",
             return_value=mock_addresses,
         ):
             results = retriever.search(corpus={}, queries={"q1": "query"}, top_k=10)
@@ -437,7 +437,7 @@ class TestFitzBEIRRetriever:
         engine._embedder.embed.side_effect = RuntimeError("embed failed")
         retriever = FitzBEIRRetriever(engine, "beir_test_col")
 
-        with patch("fitz_ai.engines.fitz_krag.ingestion.section_store.SectionStore"):
+        with patch("fitz_sage.engines.fitz_krag.ingestion.section_store.SectionStore"):
             results = retriever.search(corpus={}, queries={"q1": "query"}, top_k=10)
 
         assert results["q1"] == {}
@@ -458,7 +458,7 @@ class TestFitzBEIRRetriever:
         search_side_effect.count = 0
 
         with patch(
-            "fitz_ai.engines.fitz_krag.ingestion.section_store.SectionStore"
+            "fitz_sage.engines.fitz_krag.ingestion.section_store.SectionStore"
         ) as MockSectionStore:
             MockSectionStore.return_value.search_by_vector.side_effect = search_side_effect
 
@@ -490,7 +490,7 @@ class TestFitzBEIRRetriever:
         retriever = FitzBEIRRetriever(engine, "beir_mycollection_abc123")
 
         with patch(
-            "fitz_ai.engines.fitz_krag.ingestion.section_store.SectionStore"
+            "fitz_sage.engines.fitz_krag.ingestion.section_store.SectionStore"
         ) as MockSectionStore:
             MockSectionStore.return_value.search_by_vector.return_value = []
             retriever.search(corpus={}, queries={"q1": "query"}, top_k=5)

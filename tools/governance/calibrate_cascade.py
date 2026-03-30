@@ -19,7 +19,7 @@ from tools.governance.train_classifier import (
 DATA_DIR = Path(__file__).resolve().parent / "data"
 MODEL_PATH = (
     Path(__file__).resolve().parents[2]
-    / "fitz_ai"
+    / "fitz_sage"
     / "governance"
     / "data"
     / "model_v6_cascade.joblib"

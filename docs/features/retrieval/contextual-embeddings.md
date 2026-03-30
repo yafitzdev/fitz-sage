@@ -74,9 +74,9 @@ vectors = [self.embedder.embed(self._get_embedding_text(c)) for c in chunks]
 
 ## Files
 
-- **Implementation:** `fitz_ai/ingestion/pipeline/ingestion_pipeline.py`
-- **Diff executor:** `fitz_ai/ingestion/diff/executor.py`
-- **Summary generation:** `fitz_ai/ingestion/enrichment/modules/chunk/summary.py`
+- **Implementation:** `fitz_sage/ingestion/pipeline/ingestion_pipeline.py`
+- **Diff executor:** `fitz_sage/ingestion/diff/executor.py`
+- **Summary generation:** `fitz_sage/ingestion/enrichment/modules/chunk/summary.py`
 
 ## Benefits
 

@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fitz_ai.engines.fitz_krag.ingestion.import_graph_store import ImportGraphStore
-from fitz_ai.engines.fitz_krag.ingestion.raw_file_store import RawFileStore
-from fitz_ai.engines.fitz_krag.ingestion.symbol_store import SymbolStore
+from fitz_sage.engines.fitz_krag.ingestion.import_graph_store import ImportGraphStore
+from fitz_sage.engines.fitz_krag.ingestion.raw_file_store import RawFileStore
+from fitz_sage.engines.fitz_krag.ingestion.symbol_store import SymbolStore
 
 
 @pytest.fixture

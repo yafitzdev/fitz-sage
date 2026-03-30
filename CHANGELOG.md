@@ -85,9 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Flat Config** — Single config file (`.fitz/config.yaml`) with flat `provider/model` keys. No nested `chat_kwargs`, no engine-specific config directory. `chat_fast: ollama/qwen3.5:0.6b` is the entire config for a chat tier. Auto-created on first run.
 
-**Zero-Friction First Run** — `pip install fitz-ai` then `fitz query "Q" --source ./docs` just works. Auto-detects Ollama models, classifies into tiers, writes config. If models are missing, prompts to pull them. Fallback chain: Ollama → LM Studio → API keys → clear instructions.
+**Zero-Friction First Run** — `pip install fitz-sage` then `fitz query "Q" --source ./docs` just works. Auto-detects Ollama models, classifies into tiers, writes config. If models are missing, prompts to pull them. Fallback chain: Ollama → LM Studio → API keys → clear instructions.
 
-**Lightweight Install** — `docling` moved to optional extra (`pip install fitz-ai[docs]`). Base install includes lightweight PDF/DOCX/PPTX parsers via pypdfium2, python-docx, python-pptx (~25MB instead of ~5GB).
+**Lightweight Install** — `docling` moved to optional extra (`pip install fitz-sage[docs]`). Base install includes lightweight PDF/DOCX/PPTX parsers via pypdfium2, python-docx, python-pptx (~25MB instead of ~5GB).
 
 **Simplified CLI** — Removed `fitz init`, `fitz config`, `fitz eval` from public CLI. Config is auto-created and users edit `.fitz/config.yaml` directly. Four commands remain: `query`, `collections`, `serve`, `reset`.
 
@@ -139,7 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🎉 Highlights
 
-**Standalone Code Retrieval (`fitz-ai[code]`)** — New `fitz_ai/code/` module provides LLM-powered code retrieval without PostgreSQL, pgvector, or docling. Point at a directory, ask a question — CodeRetriever builds a structural index from AST, selects relevant files via LLM, expands via import graph and neighbor directories, and returns compressed results. Zero heavy dependencies.
+**Standalone Code Retrieval (`fitz-sage[code]`)** — New `fitz_sage/code/` module provides LLM-powered code retrieval without PostgreSQL, pgvector, or docling. Point at a directory, ask a question — CodeRetriever builds a structural index from AST, selects relevant files via LLM, expands via import graph and neighbor directories, and returns compressed results. Zero heavy dependencies.
 
 **LlmCodeSearchStrategy Overhaul** — Rewrote the DB-backed code search strategy: FILE-level addresses instead of per-symbol, combined query expansion + file selection in one LLM call (better targeting), import graph expansion, neighbor directory expansion, and flat origin-based scoring (1.0/0.9/0.8). The combined prompt produces more targeted file selections by letting the LLM reason about expansion terms and files holistically.
 
@@ -149,9 +149,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🚀 Added
 
-- `fitz_ai/code/` standalone module: `CodeRetriever`, `indexer`, `prompts` (`f4ec70b`)
+- `fitz_sage/code/` standalone module: `CodeRetriever`, `indexer`, `prompts` (`f4ec70b`)
 - `CodeRetriever` class: index → LLM select → import expand → neighbor expand → read → compress pipeline (`f4ec70b`)
-- `build_file_list()`, `build_structural_index()`, `build_import_graph()` in `fitz_ai/code/indexer.py` (`f4ec70b`)
+- `build_file_list()`, `build_structural_index()`, `build_import_graph()` in `fitz_sage/code/indexer.py` (`f4ec70b`)
 - `get_file_paths()` and `get_structural_index()` public accessors on `CodeRetriever` (`1ab902c`)
 - Configurable `llm_tier` parameter on `CodeRetriever` — consumers choose which model tier does file selection (`010de5a`)
 - `[code]` extras group in pyproject.toml for dependency documentation (`f4ec70b`)
@@ -252,7 +252,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Progressive KRAG with Agentic Search** — Query any file or folder instantly without pre-ingestion. `fitz query --source ./docs "question"` parses documents on-demand, indexes in the background, and serves answers immediately. Agentic search discovers relevant files from a manifest, parses only what's needed, and retrieves with full KRAG intelligence.
 
-**4-Question Cascade Governance Classifier** — Replaced the two-stage ML classifier with a 4-question cascade architecture: Q1 (evidence sufficient? ML) → Q2 (conflict? rule: ca_fired) → Q3 (conflict resolved? ML) → Q4 (evidence solid? ML). Achieves 79.1% accuracy with 90.0% abstain recall and 76.2% disputed recall. Model now ships with `pip install fitz-ai`.
+**4-Question Cascade Governance Classifier** — Replaced the two-stage ML classifier with a 4-question cascade architecture: Q1 (evidence sufficient? ML) → Q2 (conflict? rule: ca_fired) → Q3 (conflict resolved? ML) → Q4 (evidence solid? ML). Achieves 79.1% accuracy with 90.0% abstain recall and 76.2% disputed recall. Model now ships with `pip install fitz-sage`.
 
 **40% Pipeline Speedup** — Smart retrieval gating skips unnecessary LLM calls for simple queries, overlapped embedding fetches dimensions during component init, parallel strategy execution, and pre-warmed LLM/embedding models eliminate cold-start latency.
 
@@ -276,7 +276,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ~21 missing governance features added, InsufficientEvidence constraint re-enabled
 - Numerical divergence features for cross-chunk analysis
 - Safety-focused threshold calibration with vectorized sweep
-- Model artifact shipped with package (`fitz_ai/governance/data/model_v6_cascade.joblib`)
+- Model artifact shipped with package (`fitz_sage/governance/data/model_v6_cascade.joblib`)
 
 #### Retrieval Intelligence
 - Retrieval intelligence fully wired through KRAG pipeline
@@ -303,7 +303,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`fitz query --source`**: Consolidates `fitz point` and `fitz quickstart` into single command
 - **Governance classifier**: Two-stage RF→ET replaced by 4-question cascade (Q1=0.62, Q3=0.56, Q4=0.51)
 - **Governance data**: 199 "trustworthy-with-gap" cases relabeled to abstain in fitz-gov benchmark (context genuinely doesn't answer the question)
-- **GovernanceDecider**: Model loaded exclusively from package directory (`fitz_ai/governance/data/`)
+- **GovernanceDecider**: Model loaded exclusively from package directory (`fitz_sage/governance/data/`)
 
 ### 🔧 Fixed
 
@@ -347,7 +347,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🚀 Added
 
-#### KRAG Engine (`fitz_ai/engines/fitz_krag/`)
+#### KRAG Engine (`fitz_sage/engines/fitz_krag/`)
 - `FitzKragEngine` — Full `KnowledgeEngine` implementation with multi-strategy retrieval
 - `QueryAnalyzer` — LLM-based query classification into code/documentation/data/cross/general types
 - `QueryAnalysis` — Frozen dataclass with `strategy_weights` for weighted retrieval routing
@@ -391,16 +391,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🗑️ Removed
 
 #### fitz_rag Engine (replaced by fitz_krag)
-- `fitz_ai/engines/fitz_rag/` — Entire engine directory deleted
-- `fitz_ai/engines/fitz_rag/retrieval/` — RAG pipeline, steps, strategies
-- `fitz_ai/engines/fitz_rag/generation/` — RGS answer generation
-- `fitz_ai/engines/fitz_rag/config/` — Engine configuration
+- `fitz_sage/engines/fitz_rag/` — Entire engine directory deleted
+- `fitz_sage/engines/fitz_rag/retrieval/` — RAG pipeline, steps, strategies
+- `fitz_sage/engines/fitz_rag/generation/` — RGS answer generation
+- `fitz_sage/engines/fitz_rag/config/` — Engine configuration
 - All `fitz_rag` imports, references, and CLI assumptions removed across codebase
 
 #### Other Removals
 - `LLMError` compatibility shim — Direct imports only
 - `BasePluginConfig` / `PluginKwargs` duplicates — Extracted to `core/config.py`
-- Governance guardrails moved from `core/` to shared `fitz_ai/governance/`
+- Governance guardrails moved from `core/` to shared `fitz_sage/governance/`
 
 ### 🔧 Fixed
 
@@ -423,7 +423,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This is a **breaking release**. The `fitz_rag` engine no longer exists.
 
-- **Import paths**: Replace all `fitz_ai.engines.fitz_rag` imports with `fitz_ai.engines.fitz_krag`
+- **Import paths**: Replace all `fitz_sage.engines.fitz_rag` imports with `fitz_sage.engines.fitz_krag`
 - **Engine name**: Replace `engine="fitz_rag"` with `engine="fitz_krag"` in all API/SDK calls
 - **Config files**: Engine config is now at `engines/fitz_krag/config/default.yaml`
 - **No compatibility layer**: There are no shims or deprecation warnings — update all references
@@ -545,7 +545,7 @@ This is a **breaking release**. The `fitz_rag` engine no longer exists.
 
 ### 🚀 Added
 
-#### Enterprise Authentication (`fitz_ai/llm/auth/`)
+#### Enterprise Authentication (`fitz_sage/llm/auth/`)
 - `DynamicHttpxAuth` - Dynamic token refresh with callback support for httpx clients
 - `TokenProviderAdapter` - Adapter pattern for OAuth2/API key providers
 - `CompositeAuth` - Multi-header authentication for complex scenarios
@@ -605,7 +605,7 @@ This is a **breaking release**. The `fitz_rag` engine no longer exists.
 
 ### 🚀 Added
 
-#### PostgreSQL Storage System (`fitz_ai/storage/`)
+#### PostgreSQL Storage System (`fitz_sage/storage/`)
 - `PostgresConnectionManager` - Singleton connection manager with pgserver lifecycle
 - `StorageConfig` - Pydantic config for local/external PostgreSQL modes
 - Per-collection database isolation (one DB per collection)
@@ -614,7 +614,7 @@ This is a **breaking release**. The `fitz_rag` engine no longer exists.
 - pgserver graceful shutdown with file handle cleanup on Windows
 - Auto-recovery on corrupted data directories
 
-#### pgvector Backend (`fitz_ai/backends/local_vector_db/pgvector.py`)
+#### pgvector Backend (`fitz_sage/backends/local_vector_db/pgvector.py`)
 - `PgVectorDB` - Full VectorDBPlugin implementation
 - HNSW indexing with configurable `m` and `ef_construction`
 - Hybrid search combining vector similarity + full-text search (tsvector)
@@ -622,13 +622,13 @@ This is a **breaking release**. The `fitz_rag` engine no longer exists.
 - `scroll()` and `scroll_with_vectors()` for batch iteration
 - Automatic schema creation on first use
 
-#### PostgreSQL Table Store (`fitz_ai/tabular/store/postgres.py`)
+#### PostgreSQL Table Store (`fitz_sage/tabular/store/postgres.py`)
 - `PostgresTableStore` - Native PostgreSQL storage for tabular data
 - Gzip-compressed CSV storage in BYTEA column
 - Hash-based deduplication
 - Automatic schema inference and column tracking
 
-#### LLM Factory (`fitz_ai/llm/chat/factory.py`)
+#### LLM Factory (`fitz_sage/llm/chat/factory.py`)
 - `chat_factory()` - Clean factory function for chat client instantiation
 - Proper dependency injection pattern
 - Tier-based model selection (smart/fast)
@@ -651,15 +651,15 @@ This is a **breaking release**. The `fitz_rag` engine no longer exists.
 ### 🗑️ Removed
 
 #### Legacy Storage Backends
-- `fitz_ai/backends/local_vector_db/faiss.py` - Replaced by pgvector
-- `fitz_ai/vector_db/plugins/local_faiss.yaml` - Replaced by pgvector.yaml
-- `fitz_ai/tabular/store/sqlite.py` - Replaced by postgres.py
-- `fitz_ai/tabular/store/generic.py` - Replaced by postgres.py
-- `fitz_ai/tabular/store/qdrant.py` - Replaced by postgres.py
-- `fitz_ai/tabular/store/cache.py` - No longer needed
+- `fitz_sage/backends/local_vector_db/faiss.py` - Replaced by pgvector
+- `fitz_sage/vector_db/plugins/local_faiss.yaml` - Replaced by pgvector.yaml
+- `fitz_sage/tabular/store/sqlite.py` - Replaced by postgres.py
+- `fitz_sage/tabular/store/generic.py` - Replaced by postgres.py
+- `fitz_sage/tabular/store/qdrant.py` - Replaced by postgres.py
+- `fitz_sage/tabular/store/cache.py` - No longer needed
 
 #### Knowledge Map Module
-- `fitz_ai/map/` - Experimental module removed (not production-ready)
+- `fitz_sage/map/` - Experimental module removed (not production-ready)
 - `fitz map` CLI command removed
 
 #### Deprecated Path Helpers
@@ -699,7 +699,7 @@ Removed:
 
 ### 🚀 Added
 
-#### Unified Detection System (`fitz_ai/retrieval/detection/`)
+#### Unified Detection System (`fitz_sage/retrieval/detection/`)
 - `LLMClassifier` - Combines all detection modules into one LLM call
 - `DetectionOrchestrator` - Unified registry with `DetectionSummary` result
 - `DetectionModule` ABC - Modular detection with `prompt_fragment()` and `parse_result()`
@@ -717,10 +717,10 @@ Removed:
 ### 🗑️ Removed
 
 #### Legacy Detection Systems (consolidated into unified detection)
-- `fitz_ai/retrieval/aggregation/` - Replaced by `detection/modules/aggregation.py`
-- `fitz_ai/retrieval/temporal/` - Replaced by `detection/modules/temporal.py`
-- `fitz_ai/retrieval/expansion/` - Replaced by `detection/detectors/expansion.py`
-- `fitz_ai/engines/fitz_rag/retrieval/steps/freshness.py` - Replaced by `detection/modules/freshness.py`
+- `fitz_sage/retrieval/aggregation/` - Replaced by `detection/modules/aggregation.py`
+- `fitz_sage/retrieval/temporal/` - Replaced by `detection/modules/temporal.py`
+- `fitz_sage/retrieval/expansion/` - Replaced by `detection/detectors/expansion.py`
+- `fitz_sage/engines/fitz_rag/retrieval/steps/freshness.py` - Replaced by `detection/modules/freshness.py`
 
 ### 📚 Documentation
 
@@ -743,7 +743,7 @@ Removed:
 
 ### 🚀 Added
 
-#### HyDE - Hypothetical Document Embeddings (`fitz_ai/retrieval/hyde/`)
+#### HyDE - Hypothetical Document Embeddings (`fitz_sage/retrieval/hyde/`)
 - `HypothesisGenerator` - Generates 3 hypothetical document passages per query
 - Single fast-tier LLM call for all hypotheses
 - Hypotheses embedded and searched alongside original query
@@ -754,14 +754,14 @@ Removed:
 - Documentation: `docs/features/hyde.md`
 - E2E test scenarios for HyDE validation
 
-#### Contextual Embeddings (`fitz_ai/ingestion/`)
+#### Contextual Embeddings (`fitz_sage/ingestion/`)
 - Summary-prefixed embedding: chunks are embedded as `f"{summary}\n\n{content}"` instead of just content
 - Zero additional LLM calls - uses summaries already generated by enrichment pipeline
 - Graceful fallback when no summary exists
 - Implemented in both `IngestionPipeline` and `DiffIngestExecutor`
 - Documentation: `docs/features/contextual-embeddings.md`
 
-#### Query Rewriting (`fitz_ai/retrieval/rewriter/`)
+#### Query Rewriting (`fitz_sage/retrieval/rewriter/`)
 - `QueryRewriter` - LLM-powered query transformation with conversation context
 - `RewriteResult` - Structured result with rewritten query, confidence, and reasoning
 - `ConversationContext` - Typed conversation history for pronoun resolution
@@ -774,9 +774,9 @@ Removed:
 - Comprehensive test suite: `tests/unit/test_rewriter.py` (469 lines)
 
 #### Conversational Context for SDK & API
-- `fitz_ai/sdk/fitz.py` - `query()` now accepts `conversation_history` parameter
-- `fitz_ai/api/routes/query.py` - POST `/query` accepts `conversation_history` in request body
-- `fitz_ai/api/models/schemas.py` - Added conversation history to query schema
+- `fitz_sage/sdk/fitz.py` - `query()` now accepts `conversation_history` parameter
+- `fitz_sage/api/routes/query.py` - POST `/query` accepts `conversation_history` in request body
+- `fitz_sage/api/models/schemas.py` - Added conversation history to query schema
 - Enables context-aware retrieval in programmatic use cases
 
 #### Small Chunk Enrichment Skipper
@@ -793,10 +793,10 @@ Removed:
 ### 🗑️ Removed
 
 #### Dead Code Cleanup
-- `fitz_ai/ingestion/enrichment/cache.py` - Unused summary cache (replaced by content-hash in state)
-- `fitz_ai/ingestion/enrichment/router.py` - Unused enrichment router
-- `fitz_ai/ingestion/enrichment/base.py` - Unused base class
-- `fitz_ai/ingestion/enrichment/python_context.py` - Unused Python-specific context builder
+- `fitz_sage/ingestion/enrichment/cache.py` - Unused summary cache (replaced by content-hash in state)
+- `fitz_sage/ingestion/enrichment/router.py` - Unused enrichment router
+- `fitz_sage/ingestion/enrichment/base.py` - Unused base class
+- `fitz_sage/ingestion/enrichment/python_context.py` - Unused Python-specific context builder
 
 ### 🐛 Fixed
 
@@ -826,7 +826,7 @@ Removed:
 
 ### 🚀 Added
 
-#### Structured Data Module (`fitz_ai/structured/`)
+#### Structured Data Module (`fitz_sage/structured/`)
 - `schema.py` - Schema detection and field type inference (458 lines)
 - `sql_generator.py` - Natural language to SQL translation (415 lines)
 - `executor.py` - Safe SQL execution with sandboxing (404 lines)
@@ -840,13 +840,13 @@ Removed:
 - Structured E2E test suite (989 lines)
 - Vector search integration for derived fields
 
-#### Direct Text Ingestion (`fitz_ai/cli/commands/ingest_direct.py`)
+#### Direct Text Ingestion (`fitz_sage/cli/commands/ingest_direct.py`)
 - `ingest_direct_text()` - Ingest text strings directly
 - `is_direct_text()` - Auto-detect text vs file path
 - `fitz ingest "Your text here"` - CLI support
 - Automatic doc_id generation
 
-#### Fitz Cloud (`fitz_ai/cloud/`)
+#### Fitz Cloud (`fitz_sage/cloud/`)
 - `CloudClient` - HTTP client for Fitz Cloud API
 - Query-time RAG optimizer integration
 - Model routing from cloud configuration
@@ -854,7 +854,7 @@ Removed:
 - `retrieval_fingerprint` for deterministic cache keys
 - `X-API-Key` header authentication
 
-#### VLM Figure Description (`fitz_ai/ingestion/parser/plugins/docling.py`)
+#### VLM Figure Description (`fitz_sage/ingestion/parser/plugins/docling.py`)
 - `_describe_image_with_vlm()` - Sends detected figures to VLM for description
 - `generate_picture_images=True` option in Docling pipeline
 - PIL image extraction via `item.get_image(doc)`
@@ -936,7 +936,7 @@ Removed:
 
 ### 📦 Configuration
 
-#### VLM Configuration (`fitz_ai/llm/vision/local_ollama.yaml`)
+#### VLM Configuration (`fitz_sage/llm/vision/local_ollama.yaml`)
 - Increased endpoint timeout from 180s to 300s for VLM model loading
 - Recommended model: `minicpm-v` for 16GB VRAM GPUs
 
@@ -956,21 +956,21 @@ Removed:
 
 ### 🚀 Added
 
-#### Multi-Hop Reasoning (`fitz_ai/engines/fitz_rag/retrieval/multihop/`)
+#### Multi-Hop Reasoning (`fitz_sage/engines/fitz_rag/retrieval/multihop/`)
 - `MultiHopController` - Orchestrates iterative retrieval with termination logic
 - `InfoExtractor` - Extracts key information from intermediate results
 - `CompletionEvaluator` - Determines when sufficient information has been gathered
 - Configurable max hops and answer quality thresholds
 - Multi-hop config in `FitzRagConfig` schema
 
-#### Entity Graph System (`fitz_ai/ingestion/entity_graph/`)
+#### Entity Graph System (`fitz_sage/ingestion/entity_graph/`)
 - `EntityGraphStore` - Persistent storage for entity relationships
 - Entity linking during ingestion enrichment
 - Graph expansion step in retrieval pipeline
 - Automatic retrieval of chunks sharing entities with top results
 - Graph stored per collection in `.fitz/graphs/`
 
-#### Retrieval Intelligence Suite (`fitz_ai/retrieval/`)
+#### Retrieval Intelligence Suite (`fitz_sage/retrieval/`)
 - **Temporal Queries** (`temporal/detector.py`) - Detects time-based comparisons and period filters
 - **Query Expansion** (`expansion/expander.py`) - Generates synonym/acronym variations
 - **Hybrid Search** (`sparse/index.py`) - BM25 sparse index with RRF fusion
@@ -998,7 +998,7 @@ Removed:
 
 ### 🔄 Changed
 
-- **Module Organization**: Moved `vocabulary` and `entity_graph` modules from `fitz_ai/ingestion/` to `fitz_ai/retrieval/` for clearer separation of concerns
+- **Module Organization**: Moved `vocabulary` and `entity_graph` modules from `fitz_sage/ingestion/` to `fitz_sage/retrieval/` for clearer separation of concerns
 - **VectorSearchStep**: Now includes temporal handling, query expansion, hybrid search, multi-query expansion, and aggregation detection
 - **EnrichmentPipeline**: Integrated entity graph construction during ingestion
 - **Collection Delete**: Now cleans up entity graphs and vocabulary stores
@@ -1047,7 +1047,7 @@ Removed:
 
 ### 🚀 Added
 
-#### ChunkEnricher (`fitz_ai/ingestion/enrichment/chunk/`)
+#### ChunkEnricher (`fitz_sage/ingestion/enrichment/chunk/`)
 - `ChunkEnricher` - Unified enrichment bus with extensible module architecture
 - `EnrichmentModule` - Abstract base class for pluggable enrichment types
 - `SummaryModule` - Generates searchable per-chunk summaries
@@ -1056,18 +1056,18 @@ Removed:
 - Batched processing (~15 chunks per LLM call) for cost efficiency
 - Keywords automatically saved to `VocabularyStore` for exact-match retrieval
 
-#### Keyword Matching (`fitz_ai/engines/fitz_rag/retrieval/`)
+#### Keyword Matching (`fitz_sage/engines/fitz_rag/retrieval/`)
 - `KeywordMatcher` - Matches query terms against ingested vocabulary
 - `VocabularyStore` - Persists auto-detected keywords per collection
 - Keyword filtering in `VectorSearchStep` - filters results to chunks containing matched keywords
 
-#### Multi-Query Expansion (`fitz_ai/engines/fitz_rag/retrieval/steps/vector_search.py`)
+#### Multi-Query Expansion (`fitz_sage/engines/fitz_rag/retrieval/steps/vector_search.py`)
 - Automatic query expansion for queries > 300 characters
 - Comparison query detection (vs, compare, difference between)
 - Comparison-aware expansion ensures both compared entities are retrieved
 - Deduplication across expanded queries
 
-#### Table Registry (`fitz_ai/tabular/registry.py`)
+#### Table Registry (`fitz_sage/tabular/registry.py`)
 - `add_table_id()` / `get_table_ids()` - Store and retrieve table chunk IDs per collection
 - Table IDs registered at ingestion time for reliable retrieval
 - `retrieve()` method added to `VectorClient` protocol
@@ -1107,14 +1107,14 @@ Removed:
 
 ### 🚀 Added
 
-#### Plugin Generator (`fitz_ai/plugin_gen/`)
+#### Plugin Generator (`fitz_sage/plugin_gen/`)
 - `fitz plugin generate` - Interactive plugin scaffolding wizard
 - Template-based generation for all plugin types
 - Library context awareness (detects installed packages)
 - Validation and review workflow
 - Templates for: `chunker`, `constraint`, `llm_chat`, `llm_embedding`, `llm_rerank`, `reader`, `retrieval`, `vector_db`
 
-#### Parser Plugin System (`fitz_ai/ingestion/parser/`)
+#### Parser Plugin System (`fitz_sage/ingestion/parser/`)
 - `ParserRouter` - Routes files to appropriate parsers by extension
 - `Parser` protocol with `can_parse()` and `parse()` methods
 - `PlainTextParser` - Handles .txt, .md, .py, .json, etc.
@@ -1122,7 +1122,7 @@ Removed:
 - `DoclingVisionParser` - Docling + VLM for figure description
 - `ParsedDocument` with typed `DocumentElement` structure
 
-#### Vision Plugin System (`fitz_ai/llm/vision/`)
+#### Vision Plugin System (`fitz_sage/llm/vision/`)
 - YAML-based vision plugins matching chat/embedding pattern
 - `cohere.yaml` - Cohere vision (command-a-vision-07-2025)
 - `openai.yaml` - OpenAI vision (gpt-4o)
@@ -1131,7 +1131,7 @@ Removed:
 - Vision plugin schema (`vision_plugin_schema.yaml`)
 - Message transforms for vision requests
 
-#### Source Abstraction (`fitz_ai/ingestion/source/`)
+#### Source Abstraction (`fitz_sage/ingestion/source/`)
 - `Source` protocol for file discovery
 - `SourceFile` dataclass with URI, local path, metadata
 - `FileSystemSource` plugin for local files
@@ -1154,7 +1154,7 @@ Removed:
 
 ### 🔄 Changed
 
-- **Parser replaces Reader**: `fitz_ai/ingestion/reader/` removed, replaced by `fitz_ai/ingestion/parser/`
+- **Parser replaces Reader**: `fitz_sage/ingestion/reader/` removed, replaced by `fitz_sage/ingestion/parser/`
 - **Config schema**: `ExtensionChunkerConfig` now includes `parser` field for VLM control
 - **Chunking router**: Now accepts parser selection via config
 - **Init wizard**: Reordered sections (Chat → Embedding → Rerank → Vision → VectorDB)
@@ -1167,8 +1167,8 @@ Removed:
 
 ### 🗑️ Removed
 
-- `fitz_ai/ingestion/reader/` module (replaced by parser system)
-- `fitz_ai/ingestion/chunking/engine.py` (consolidated into router)
+- `fitz_sage/ingestion/reader/` module (replaced by parser system)
+- `fitz_sage/ingestion/chunking/engine.py` (consolidated into router)
 
 ---
 
@@ -1184,7 +1184,7 @@ Removed:
 
 ### 🚀 Added
 
-#### Zero-Friction Quickstart (`fitz_ai/cli/commands/quickstart.py`)
+#### Zero-Friction Quickstart (`fitz_sage/cli/commands/quickstart.py`)
 - **Auto-detection cascade**: Ollama → COHERE_API_KEY → OPENAI_API_KEY → guided signup
 - `_resolve_provider()` - Detects best available LLM provider automatically
 - `_check_ollama()` - Detects running Ollama with required models (llama3.2, nomic-embed-text)
@@ -1192,7 +1192,7 @@ Removed:
 - `_save_api_key_to_env()` - Cross-platform API key persistence (Windows: `.fitz/.env`, Unix: `.bashrc`/`.zshrc`)
 - Removed engine selection prompt—quickstart now focuses on fitz_rag for simplicity
 
-#### CLIContext (`fitz_ai/cli/context.py`)
+#### CLIContext (`fitz_sage/cli/context.py`)
 - Centralized context for all CLI commands
 - Guaranteed configuration values (package defaults always loaded)
 - `get_collections()`, `require_collections()` - Collection discovery
@@ -1201,24 +1201,24 @@ Removed:
 - `require_typed_config()` - Typed config with error handling
 - `info_line()` - Single-line status display for commands
 
-#### Config Loader (`fitz_ai/config/loader.py`)
+#### Config Loader (`fitz_sage/config/loader.py`)
 - `load_engine_config()` - Loads merged config (package defaults + user overrides)
 - `get_config_source()` - Returns config source for debugging
-- Package defaults in `fitz_ai/engines/<engine>/config/default.yaml`
+- Package defaults in `fitz_sage/engines/<engine>/config/default.yaml`
 
-#### Collection Existence Warnings (`fitz_ai/cli/commands/query.py`)
+#### Collection Existence Warnings (`fitz_sage/cli/commands/query.py`)
 - `_warn_if_collection_missing()` - Checks collection before query
 - Warns when no collections exist: "Run 'fitz ingest ./docs' first"
 - Warns when specified collection not found with available alternatives
 - Warns when collection is empty (0 documents)
 
-#### Engine Command (`fitz_ai/cli/commands/engine.py`)
+#### Engine Command (`fitz_sage/cli/commands/engine.py`)
 - `fitz engine` - View or set default engine
 - `fitz engine --list` - List all available engines
 - Interactive selection with card-based UI
 - Persists default engine to `.fitz/config.yaml`
 
-#### Instrumentation System (`fitz_ai/core/instrumentation.py`)
+#### Instrumentation System (`fitz_sage/core/instrumentation.py`)
 - `BenchmarkHook` protocol for plugin performance measurement
 - `register_hook()` / `unregister_hook()` - Thread-safe hook management
 - `instrument()` decorator for method-level timing
@@ -1226,10 +1226,10 @@ Removed:
 - Zero overhead when no hooks registered
 - Tracks: layer, plugin name, method, duration, errors
 
-#### Enterprise Plugin Discovery (`fitz_ai/cli/cli.py`)
-- Auto-discovers `fitz-ai-enterprise` package when installed
+#### Enterprise Plugin Discovery (`fitz_sage/cli/cli.py`)
+- Auto-discovers `fitz-sage-enterprise` package when installed
 - Adds `fitz benchmark` command from enterprise module
-- Clean separation: core features in `fitz-ai`, advanced features in enterprise
+- Clean separation: core features in `fitz-sage`, advanced features in enterprise
 
 #### CLI Map Tool (`tools/cli_map/`)
 - New tool for analyzing CLI command structure
@@ -1265,7 +1265,7 @@ Removed:
 
 ### 🚀 Added
 
-#### GraphRAG Engine (`fitz_ai/engines/graphrag/`)
+#### GraphRAG Engine (`fitz_sage/engines/graphrag/`)
 - `GraphRAGEngine` - Knowledge graph-based retrieval engine
 - Entity and relationship extraction via LLM (`graph/extraction.py`)
 - Knowledge graph storage with NetworkX backend (`graph/storage.py`)
@@ -1275,16 +1275,16 @@ Removed:
 - Global search - query across community summaries (`search/global_search.py`)
 - Hybrid search - combine local and global approaches
 - Persistent storage via JSON serialization
-- `fitz_ai/engines/graphrag/config/schema.py` - Full configuration schema
+- `fitz_sage/engines/graphrag/config/schema.py` - Full configuration schema
 
-#### Semantic Matching (`fitz_ai/core/guardrails/semantic.py`)
+#### Semantic Matching (`fitz_sage/core/guardrails/semantic.py`)
 - `SemanticMatcher` class for embedding-based concept detection
 - Language-agnostic causal query detection
 - Semantic conflict detection across chunks
 - Configurable similarity thresholds
 - Works with any embedding provider
 
-#### CLI UI Modules (`fitz_ai/cli/ui/`)
+#### CLI UI Modules (`fitz_sage/cli/ui/`)
 - `console.py` - Shared Rich console instance
 - `display.py` - Answer and result display formatting
 - `engine_selection.py` - Interactive engine selection UI
@@ -1293,13 +1293,13 @@ Removed:
 - `prompts.py` - User input prompts and confirmations
 
 #### Other
-- `fitz_ai/cli/utils.py` - Shared CLI utilities
+- `fitz_sage/cli/utils.py` - Shared CLI utilities
 - `examples/clara_demo.py` - CLaRa engine demonstration
 - `tests/test_graphrag_engine.py` - Comprehensive GraphRAG tests
 
 ### 🔄 Changed
 
-- **CLaRa engine**: Major refactoring of `fitz_ai/engines/clara/engine.py` with improved architecture
+- **CLaRa engine**: Major refactoring of `fitz_sage/engines/clara/engine.py` with improved architecture
 - **CLI commands**: Enhanced `chat`, `ingest`, `init`, `query`, `quickstart` with new UI modules
 - **Constraint plugins**: Refactored to use `SemanticMatcher` instead of regex patterns
   - `CausalAttributionConstraint` - Now uses semantic causal evidence detection
@@ -1322,36 +1322,36 @@ Removed:
 
 **REST API** - New `fitz serve` command launches a FastAPI server with endpoints for query, ingest, and collection management. Build integrations without touching Python.
 
-**SDK Module** - New `fitz_ai.sdk` provides a simplified high-level API for programmatic use. Import `from fitz_ai import Fitz` for quick access.
+**SDK Module** - New `fitz_sage.sdk` provides a simplified high-level API for programmatic use. Import `from fitz_sage import Fitz` for quick access.
 
-**Package Rename** - `fitz_ai/ingest/` renamed to `fitz_ai/ingestion/` for clearer naming. Adds new `reader` module for document reading abstraction.
+**Package Rename** - `fitz_sage/ingest/` renamed to `fitz_sage/ingestion/` for clearer naming. Adds new `reader` module for document reading abstraction.
 
 ### 🚀 Added
 
-#### REST API (`fitz_ai/api/`)
+#### REST API (`fitz_sage/api/`)
 - `fitz serve` - Launch FastAPI server for HTTP access
 - `POST /query` - Query the knowledge base
 - `POST /ingest` - Ingest documents
 - `GET /collections` - List collections
 - `GET /health` - Health check endpoint
-- Dependency injection via `fitz_ai/api/dependencies.py`
-- Pydantic schemas in `fitz_ai/api/models/schemas.py`
+- Dependency injection via `fitz_sage/api/dependencies.py`
+- Pydantic schemas in `fitz_sage/api/models/schemas.py`
 
-#### SDK Module (`fitz_ai/sdk/`)
+#### SDK Module (`fitz_sage/sdk/`)
 - `Fitz` class as unified entry point
-- Re-exported from `fitz_ai` package root
+- Re-exported from `fitz_sage` package root
 - Simplified API for common operations
 
-#### Reader Module (`fitz_ai/ingestion/reader/`)
+#### Reader Module (`fitz_sage/ingestion/reader/`)
 - `ReaderEngine` for document loading
 - Plugin-based reader system
 - `local_fs` plugin for local file reading
 
 ### 🔄 Changed
 
-- **Package rename**: `fitz_ai/ingest/` → `fitz_ai/ingestion/`
-- **Chunk model**: Moved from `fitz_ai/engines/fitz_rag/models/chunk.py` to `fitz_ai/core/chunk.py` for shared use across engines
-- **Core exports**: `Chunk` now exported from `fitz_ai.core`
+- **Package rename**: `fitz_sage/ingest/` → `fitz_sage/ingestion/`
+- **Chunk model**: Moved from `fitz_sage/engines/fitz_rag/models/chunk.py` to `fitz_sage/core/chunk.py` for shared use across engines
+- **Core exports**: `Chunk` now exported from `fitz_sage.core`
 
 ---
 
@@ -1367,7 +1367,7 @@ Removed:
 
 ### 🚀 Added
 
-#### Knowledge Map Visualization (`fitz_ai/map/`)
+#### Knowledge Map Visualization (`fitz_sage/map/`)
 - `fitz map` - Generates interactive HTML knowledge graph
 - Automatic clustering of related content
 - Gap detection to identify missing coverage
@@ -1377,15 +1377,15 @@ Removed:
 - `--rebuild` to force fresh embedding fetch
 - `--no-open` to skip browser launch
 
-#### Hierarchical Enrichment (`fitz_ai/ingest/enrichment/hierarchy/`)
+#### Hierarchical Enrichment (`fitz_sage/ingest/enrichment/hierarchy/`)
 - **HierarchyEnricher**: Generates multi-level summaries from chunks
 - **ChunkGrouper**: Groups chunks by source file or custom rules
 - **ChunkMatcher**: Filters chunks by path patterns
 - Simple mode (zero-config) with smart defaults
 - Rules mode for power-users with custom configuration
-- Centralized prompts in `fitz_ai/prompts/hierarchy/`
+- Centralized prompts in `fitz_sage/prompts/hierarchy/`
 
-#### Content Type Detection (`fitz_ai/ingest/detection.py`)
+#### Content Type Detection (`fitz_sage/ingest/detection.py`)
 - Auto-detects codebase vs document corpus
 - Recognizes project markers (pyproject.toml, package.json, Cargo.toml, etc.)
 - Selects appropriate enrichment strategy automatically
@@ -1443,7 +1443,7 @@ Removed:
 
 ### 🚀 Added
 
-#### Enrichment System (`fitz_ai/ingest/enrichment/`)
+#### Enrichment System (`fitz_sage/ingest/enrichment/`)
 - **EnrichmentPipeline**: Unified entry point for all enrichment operations
 - **ChunkSummarizer**: LLM-generated descriptions for each chunk to improve search
 - **Artifact Generation**: Project-level insights stored and retrieved with queries
@@ -1476,7 +1476,7 @@ Removed:
 
 #### CLI Improvements
 - `fitz collections` - Interactive collection management
-- Enhanced `fitz_ai/cli/ui.py` with Rich console utilities
+- Enhanced `fitz_sage/cli/ui.py` with Rich console utilities
 - Improved ingest command with enrichment support
 
 #### Retrieval Pipeline
@@ -1495,7 +1495,7 @@ Removed:
 
 ### 🎉 Highlights
 
-**Quickstart Command** - Zero-friction entry point for new users. Get a working RAG system in ~5 minutes with just `pip install fitz-ai` and `fitz quickstart`.
+**Quickstart Command** - Zero-friction entry point for new users. Get a working RAG system in ~5 minutes with just `pip install fitz-sage` and `fitz quickstart`.
 
 **Incremental Ingestion** - Content-hash-based incremental ingestion that skips unchanged files. State-file-authoritative architecture enables user-implemented vector DB plugins without requiring scroll/filter APIs.
 
@@ -1586,18 +1586,18 @@ Removed:
 
 ### 🚀 Added
 - **Master schema files** for plugin validation and defaults
-  - `fitz_ai/llm/schemas/chat_plugin_schema.yaml`
-  - `fitz_ai/llm/schemas/embedding_plugin_schema.yaml`
-  - `fitz_ai/llm/schemas/rerank_plugin_schema.yaml`
-  - `fitz_ai/vector_db/schemas/vector_db_plugin_schema.yaml` - documents all YAML fields for vector DB plugins
-- **Schema defaults loader** `fitz_ai/llm/schema_defaults.py` - reads defaults from YAML schemas instead of hardcoding in Python
+  - `fitz_sage/llm/schemas/chat_plugin_schema.yaml`
+  - `fitz_sage/llm/schemas/embedding_plugin_schema.yaml`
+  - `fitz_sage/llm/schemas/rerank_plugin_schema.yaml`
+  - `fitz_sage/vector_db/schemas/vector_db_plugin_schema.yaml` - documents all YAML fields for vector DB plugins
+- **Schema defaults loader** `fitz_sage/llm/schema_defaults.py` - reads defaults from YAML schemas instead of hardcoding in Python
 - **FAISS admin methods** - `list_collections()`, `get_collection_stats()`, `scroll()` for feature parity with HTTP-based vector DBs
-- **Azure OpenAI embedding plugin** `fitz_ai/llm/embedding/azure_openai.yaml`
+- **Azure OpenAI embedding plugin** `fitz_sage/llm/embedding/azure_openai.yaml`
 - **New vector DB plugins** (YAML-only, no Python needed):
-  - `fitz_ai/vector_db/plugins/pinecone.yaml` - Pinecone cloud vector DB
-  - `fitz_ai/vector_db/plugins/weaviate.yaml` - Weaviate vector DB
-  - `fitz_ai/vector_db/plugins/milvus.yaml` - Milvus vector DB
-- **Vector DB base class for local plugins** `fitz_ai/vector_db/base_local.py` - reduces boilerplate when implementing local vector DBs
+  - `fitz_sage/vector_db/plugins/pinecone.yaml` - Pinecone cloud vector DB
+  - `fitz_sage/vector_db/plugins/weaviate.yaml` - Weaviate vector DB
+  - `fitz_sage/vector_db/plugins/milvus.yaml` - Milvus vector DB
+- **Vector DB base class for local plugins** `fitz_sage/vector_db/base_local.py` - reduces boilerplate when implementing local vector DBs
 - **Comprehensive plugin tests** `tests/test_plugin_system.py` covering chat, embedding, rerank, and FAISS
 - **Vector DB plugin tests** `tests/test_generic_vector_db_plugin.py` - validates YAML loading, HTTP operations, point transformation, UUID conversion, and auth handling
 
@@ -1637,7 +1637,7 @@ Removed:
 
 ### 🎉 Pypi-Release
 
-**https://pypi.org/project/fitz-ai/**
+**https://pypi.org/project/fitz-sage/**
 
 ---
 
@@ -1650,13 +1650,13 @@ Removed:
 ### 🚀 Added
 
 - **YAML-based LLM plugins**: Chat, Embedding, and Rerank plugins now use YAML specs
-  - `fitz_ai/llm/chat/*.yaml` - Chat plugins (OpenAI, Cohere, Anthropic, Azure, Ollama)
-  - `fitz_ai/llm/embedding/*.yaml` - Embedding plugins  
-  - `fitz_ai/llm/rerank/*.yaml` - Rerank plugins
+  - `fitz_sage/llm/chat/*.yaml` - Chat plugins (OpenAI, Cohere, Anthropic, Azure, Ollama)
+  - `fitz_sage/llm/embedding/*.yaml` - Embedding plugins  
+  - `fitz_sage/llm/rerank/*.yaml` - Rerank plugins
 - **YAML-based Vector DB plugins**: Vector databases now use YAML specs
-  - `fitz_ai/vector_db/plugins/qdrant.yaml`
-  - `fitz_ai/vector_db/plugins/pinecone.yaml`
-  - `fitz_ai/vector_db/plugins/local_faiss.yaml`
+  - `fitz_sage/vector_db/plugins/qdrant.yaml`
+  - `fitz_sage/vector_db/plugins/pinecone.yaml`
+  - `fitz_sage/vector_db/plugins/local_faiss.yaml`
 - **Generic plugin runtime**: `GenericVectorDBPlugin` and `YAMLPluginBase` execute YAML specs at runtime
 - **Provider-agnostic features**: YAML `features` section for provider-specific behavior
   - `requires_uuid_ids`: Auto-convert string IDs to UUIDs
@@ -1669,13 +1669,13 @@ Removed:
 - **LLM plugins**: Migrated from Python classes to YAML specifications
 - **Vector DB plugins**: Migrated from Python classes to YAML specifications  
 - **Plugin discovery**: Now scans `*.yaml` files instead of `*.py` modules
-- **fitz_ai/core/registry.py**: Single source of truth for all plugin access
+- **fitz_sage/core/registry.py**: Single source of truth for all plugin access
 
 ### 🐛 Fixed
 
 - **Qdrant 400 Bad Request**: String IDs now converted to UUIDs automatically
 - **Auto-create collection**: Collections created on first upsert (handles 404)
-- **Import errors in CLI**: Fixed by adding re-exports to `fitz_ai/core/registry.py`
+- **Import errors in CLI**: Fixed by adding re-exports to `fitz_sage/core/registry.py`
 
 ---
 
@@ -1707,7 +1707,7 @@ Removed:
 ### 🐛 Fixed
 
 - **CLI Import Error**: Fixed misleading error messages when internal fitz modules fail to import
-- **Detection Module**: Moved `fitz_ai/cli/detect.py` to `fitz_ai/core/detect.py` as single source of truth for service detection
+- **Detection Module**: Moved `fitz_sage/cli/detect.py` to `fitz_sage/core/detect.py` as single source of truth for service detection
 - **FAISS Detection**: `SystemStatus.faiss` now returns `ServiceStatus` instead of boolean for consistent API
 - **Registry Exceptions**: `LLMRegistryError` now inherits from `PluginNotFoundError` for consistent exception handling
 - **Invalid Plugin Type**: `get_llm_plugin()` now raises `ValueError` for invalid plugin types (not just unknown plugins)
@@ -1716,9 +1716,9 @@ Removed:
 
 ### 🔄 Changed
 
-- `fitz_ai/core/detect.py` is now the canonical location for all service detection (Ollama, Qdrant, FAISS, API keys)
+- `fitz_sage/core/detect.py` is now the canonical location for all service detection (Ollama, Qdrant, FAISS, API keys)
 - `SystemStatus` now has `best_llm`, `best_embedding`, `best_vector_db` helper properties
-- CLI modules (`doctor.py`, `init.py`) now import from `fitz_ai.core.detect` instead of `fitz_ai.cli.detect`
+- CLI modules (`doctor.py`, `init.py`) now import from `fitz_sage.core.detect` instead of `fitz_sage.cli.detect`
 
 ---
 
@@ -1737,7 +1737,7 @@ Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine kn
 
 ### 🚀 Added
 
-#### Core Contracts (`fitz_ai/core/`)
+#### Core Contracts (`fitz_sage/core/`)
 - `KnowledgeEngine` protocol for paradigm-agnostic engine interface
 - `Query` dataclass for standardized query representation with constraints
 - `Answer` dataclass for standardized response with provenance
@@ -1745,14 +1745,14 @@ Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine kn
 - `Constraints` dataclass for query-time limits (max_sources, filters)
 - Exception hierarchy: `QueryError`, `KnowledgeError`, `GenerationError`, `ConfigurationError`
 
-#### Universal Runtime (`fitz_ai/runtime/`)
+#### Universal Runtime (`fitz_sage/runtime/`)
 - `run(query, engine="...")` universal entry point
 - `EngineRegistry` for global engine discovery and registration
 - `create_engine(engine="...")` factory for engine instances
 - `list_engines()` to discover available engines
 - `list_engines_with_info()` for engines with descriptions
 
-#### CLaRa Engine (`fitz_ai/engines/clara/`)
+#### CLaRa Engine (`fitz_sage/engines/clara/`)
 - `ClaraEngine` full implementation of CLaRa paradigm
 - `run_clara()` convenience function for quick queries
 - `create_clara_engine()` factory for reusable instances
@@ -1760,7 +1760,7 @@ Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine kn
 - Auto-registration with global engine registry
 - 17 passing tests covering all functionality
 
-#### Fitz RAG Engine (`fitz_ai/engines/fitz_rag/`)
+#### Fitz RAG Engine (`fitz_sage/engines/fitz_rag/`)
 - `FitzRagEngine` wrapper implementing `KnowledgeEngine`
 - `run_fitz_rag()` convenience function
 - `create_fitz_rag_engine()` factory function
@@ -1778,14 +1778,14 @@ Fitz v0.3.0 transforms the project from a RAG framework into a **multi-engine kn
 #### Directory Structure
 ```
 OLD (v0.2.x):
-fitz_ai/
+fitz_sage/
 ├── pipeline/          # RAG-specific
 ├── retrieval/         # RAG-specific
 ├── generation/        # RAG-specific
 └── core/              # Mixed concerns
 
 NEW (v0.3.0):
-fitz_ai/
+fitz_sage/
 ├── core/              # Paradigm-agnostic contracts
 ├── engines/
 │   ├── fitz_rag/   # Traditional RAG
@@ -1897,36 +1897,36 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-ai/compare/v0.11.0...HEAD
-[0.11.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.4...v0.11.0
-[0.10.4]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.3...v0.10.4
-[0.10.3]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.2...v0.10.3
-[0.10.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.1...v0.10.2
-[0.10.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.10.0...v0.10.1
-[0.10.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.9.0...v0.10.0
-[0.9.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.8.1...v0.9.0
-[0.8.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.8.0...v0.8.1
-[0.8.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.7.1...v0.8.0
-[0.7.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.7.0...v0.7.1
-[0.7.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.2...v0.7.0
-[0.6.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.1...v0.6.2
-[0.6.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.6.0...v0.6.1
-[0.6.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.2...v0.6.0
-[0.5.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.1...v0.5.2
-[0.5.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.5.0...v0.5.1
-[0.5.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.5...v0.5.0
-[0.4.5]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.4...v0.4.5
-[0.4.4]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.3...v0.4.4
-[0.4.3]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.2...v0.4.3
-[0.4.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.1...v0.4.2
-[0.4.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.6...v0.4.0
-[0.3.6]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.5...v0.3.6
-[0.3.5]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.4...v0.3.5
-[0.3.4]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.3...v0.3.4
-[0.3.3]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.2...v0.3.3
-[0.3.2]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.1...v0.3.2
-[0.3.1]: https://github.com/yafitzdev/fitz-ai/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/yafitzdev/fitz-ai/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/yafitzdev/fitz-ai/releases/tag/v0.1.0
+[Unreleased]: https://github.com/yafitzdev/fitz-sage/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.10.4...v0.11.0
+[0.10.4]: https://github.com/yafitzdev/fitz-sage/compare/v0.10.3...v0.10.4
+[0.10.3]: https://github.com/yafitzdev/fitz-sage/compare/v0.10.2...v0.10.3
+[0.10.2]: https://github.com/yafitzdev/fitz-sage/compare/v0.10.1...v0.10.2
+[0.10.1]: https://github.com/yafitzdev/fitz-sage/compare/v0.10.0...v0.10.1
+[0.10.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.8.1...v0.9.0
+[0.8.1]: https://github.com/yafitzdev/fitz-sage/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.7.1...v0.8.0
+[0.7.1]: https://github.com/yafitzdev/fitz-sage/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.6.2...v0.7.0
+[0.6.2]: https://github.com/yafitzdev/fitz-sage/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/yafitzdev/fitz-sage/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.5.2...v0.6.0
+[0.5.2]: https://github.com/yafitzdev/fitz-sage/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/yafitzdev/fitz-sage/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.4.5...v0.5.0
+[0.4.5]: https://github.com/yafitzdev/fitz-sage/compare/v0.4.4...v0.4.5
+[0.4.4]: https://github.com/yafitzdev/fitz-sage/compare/v0.4.3...v0.4.4
+[0.4.3]: https://github.com/yafitzdev/fitz-sage/compare/v0.4.2...v0.4.3
+[0.4.2]: https://github.com/yafitzdev/fitz-sage/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/yafitzdev/fitz-sage/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.3.6...v0.4.0
+[0.3.6]: https://github.com/yafitzdev/fitz-sage/compare/v0.3.5...v0.3.6
+[0.3.5]: https://github.com/yafitzdev/fitz-sage/compare/v0.3.4...v0.3.5
+[0.3.4]: https://github.com/yafitzdev/fitz-sage/compare/v0.3.3...v0.3.4
+[0.3.3]: https://github.com/yafitzdev/fitz-sage/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/yafitzdev/fitz-sage/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/yafitzdev/fitz-sage/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/yafitzdev/fitz-sage/releases/tag/v0.1.0

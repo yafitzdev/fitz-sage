@@ -15,7 +15,7 @@ class TestLocalEmbedderConfig:
 
     def test_default_config(self):
         """Test default configuration."""
-        from fitz_ai.backends.local_llm.embedding import LocalEmbedderConfig
+        from fitz_sage.backends.local_llm.embedding import LocalEmbedderConfig
 
         cfg = LocalEmbedderConfig()
 
@@ -24,7 +24,7 @@ class TestLocalEmbedderConfig:
 
     def test_config_is_frozen(self):
         """Test that config is immutable."""
-        from fitz_ai.backends.local_llm.embedding import LocalEmbedderConfig
+        from fitz_sage.backends.local_llm.embedding import LocalEmbedderConfig
 
         cfg = LocalEmbedderConfig()
 
@@ -37,7 +37,7 @@ class TestLocalEmbedder:
 
     def test_init_default_config(self):
         """Test initialization with default config."""
-        from fitz_ai.backends.local_llm.embedding import LocalEmbedder
+        from fitz_sage.backends.local_llm.embedding import LocalEmbedder
 
         mock_runtime = MagicMock()
         embedder = LocalEmbedder(mock_runtime)
@@ -47,7 +47,7 @@ class TestLocalEmbedder:
 
     def test_init_custom_config(self):
         """Test initialization with custom config."""
-        from fitz_ai.backends.local_llm.embedding import (
+        from fitz_sage.backends.local_llm.embedding import (
             LocalEmbedder,
             LocalEmbedderConfig,
         )
@@ -60,7 +60,7 @@ class TestLocalEmbedder:
 
     def test_embed_returns_vector(self):
         """Test embed returns float vector."""
-        from fitz_ai.backends.local_llm.embedding import LocalEmbedder
+        from fitz_sage.backends.local_llm.embedding import LocalEmbedder
 
         mock_adapter = MagicMock()
         mock_adapter.embed.return_value = [0.1, 0.2, 0.3, 0.4]
@@ -76,7 +76,7 @@ class TestLocalEmbedder:
 
     def test_embed_raises_on_non_list(self):
         """Test embed raises TypeError for non-list response."""
-        from fitz_ai.backends.local_llm.embedding import LocalEmbedder
+        from fitz_sage.backends.local_llm.embedding import LocalEmbedder
 
         mock_adapter = MagicMock()
         mock_adapter.embed.return_value = "not a list"
@@ -91,7 +91,7 @@ class TestLocalEmbedder:
 
     def test_embed_raises_on_dict(self):
         """Test embed raises TypeError for dict response."""
-        from fitz_ai.backends.local_llm.embedding import LocalEmbedder
+        from fitz_sage.backends.local_llm.embedding import LocalEmbedder
 
         mock_adapter = MagicMock()
         mock_adapter.embed.return_value = {"embedding": [0.1, 0.2]}
@@ -106,7 +106,7 @@ class TestLocalEmbedder:
 
     def test_embed_texts_single(self):
         """Test embed_texts with single text."""
-        from fitz_ai.backends.local_llm.embedding import LocalEmbedder
+        from fitz_sage.backends.local_llm.embedding import LocalEmbedder
 
         mock_adapter = MagicMock()
         mock_adapter.embed.return_value = [0.1, 0.2, 0.3]
@@ -122,7 +122,7 @@ class TestLocalEmbedder:
 
     def test_embed_texts_multiple(self):
         """Test embed_texts with multiple texts."""
-        from fitz_ai.backends.local_llm.embedding import LocalEmbedder
+        from fitz_sage.backends.local_llm.embedding import LocalEmbedder
 
         mock_adapter = MagicMock()
         # Return different vectors for each call
@@ -145,7 +145,7 @@ class TestLocalEmbedder:
 
     def test_embed_texts_empty(self):
         """Test embed_texts with empty list."""
-        from fitz_ai.backends.local_llm.embedding import LocalEmbedder
+        from fitz_sage.backends.local_llm.embedding import LocalEmbedder
 
         mock_runtime = MagicMock()
         embedder = LocalEmbedder(mock_runtime)
@@ -156,7 +156,7 @@ class TestLocalEmbedder:
 
     def test_embed_calls_runtime_llama(self):
         """Test that embed calls runtime.llama() to get adapter."""
-        from fitz_ai.backends.local_llm.embedding import LocalEmbedder
+        from fitz_sage.backends.local_llm.embedding import LocalEmbedder
 
         mock_adapter = MagicMock()
         mock_adapter.embed.return_value = [0.1]

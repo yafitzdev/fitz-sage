@@ -1,6 +1,6 @@
 # tests/unit/property/strategies.py
 """
-Custom Hypothesis strategies for fitz-ai property tests.
+Custom Hypothesis strategies for fitz-sage property tests.
 
 Provides domain-specific strategies for generating:
 - Query text (realistic search queries)

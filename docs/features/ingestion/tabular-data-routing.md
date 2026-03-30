@@ -90,10 +90,10 @@ Internal parameters:
 
 ## Files
 
-- **Table store:** `fitz_ai/ingestion/tables/table_store.py`
-- **Table detection:** `fitz_ai/ingestion/parser/` (CSV, Markdown, Docling parsers)
-- **SQL generation:** `fitz_ai/engines/fitz_krag/answering/table_query.py`
-- **Table routing step:** `fitz_ai/engines/fitz_krag/retrieval/steps/table_query.py`
+- **Table store:** `fitz_sage/ingestion/tables/table_store.py`
+- **Table detection:** `fitz_sage/ingestion/parser/` (CSV, Markdown, Docling parsers)
+- **SQL generation:** `fitz_sage/engines/fitz_krag/answering/table_query.py`
+- **Table routing step:** `fitz_sage/engines/fitz_krag/retrieval/steps/table_query.py`
 
 ## Benefits
 

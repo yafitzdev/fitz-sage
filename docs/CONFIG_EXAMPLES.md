@@ -160,7 +160,7 @@ Plugins use a simple string format:
 Just use defaults from `default.yaml`:
 
 ```python
-from fitz_ai.engines.fitz_krag import FitzKragEngine
+from fitz_sage.engines.fitz_krag import FitzKragEngine
 
 # Uses all defaults from default.yaml
 engine = FitzKragEngine()

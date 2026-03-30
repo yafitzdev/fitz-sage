@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fitz_ai.engines.fitz_krag.query_analyzer import (
+from fitz_sage.engines.fitz_krag.query_analyzer import (
     QueryAnalysis,
     QueryAnalyzer,
     QueryType,

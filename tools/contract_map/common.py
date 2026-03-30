@@ -50,7 +50,7 @@ def _discover_fitz_subpackages() -> set[str]:
     Discover logical top-level packages inside the main package directory.
 
     Example:
-        fitz_ai/
+        fitz_sage/
           core/
           pipeline/
           ingest/

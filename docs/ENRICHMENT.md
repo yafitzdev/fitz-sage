@@ -322,11 +322,11 @@ enrichment:
 
 | File | Purpose |
 |------|---------|
-| `fitz_ai/ingestion/enrichment/bus.py` | ChunkEnricher bus and modules |
-| `fitz_ai/ingestion/enrichment/pipeline.py` | Main orchestrator |
-| `fitz_ai/ingestion/enrichment/config.py` | Configuration schema |
-| `fitz_ai/ingestion/enrichment/hierarchy/enricher.py` | Hierarchy generation |
-| `fitz_ai/retrieval/vocabulary/store.py` | Keyword vocabulary storage (PostgreSQL) |
+| `fitz_sage/ingestion/enrichment/bus.py` | ChunkEnricher bus and modules |
+| `fitz_sage/ingestion/enrichment/pipeline.py` | Main orchestrator |
+| `fitz_sage/ingestion/enrichment/config.py` | Configuration schema |
+| `fitz_sage/ingestion/enrichment/hierarchy/enricher.py` | Hierarchy generation |
+| `fitz_sage/retrieval/vocabulary/store.py` | Keyword vocabulary storage (PostgreSQL) |
 
 ---
 

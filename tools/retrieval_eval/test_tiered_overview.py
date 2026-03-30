@@ -13,7 +13,7 @@ from pathlib import Path
 import httpx
 
 # ── Config ──────────────────────────────────────────────────────────────
-SOURCE_DIR = Path("C:/Users/yanfi/PycharmProjects/fitz-ai")
+SOURCE_DIR = Path("C:/Users/yanfi/PycharmProjects/fitz-sage")
 MODEL = "qwen3-coder-30b-a3b-instruct"
 BASE_URL = "http://localhost:1234/v1"
 QUERY = "Add token usage tracking so I can see how many LLM tokens each query uses"
@@ -32,7 +32,7 @@ def build_indexes():
         extract_library_signatures,
     )
 
-    from fitz_ai.code.indexer import build_file_list
+    from fitz_sage.code.indexer import build_file_list
 
     all_files = build_file_list(SOURCE_DIR, 2000)
     py_files = [f for f in all_files if f.endswith(".py")][:NUM_FILES]
@@ -136,7 +136,7 @@ def extract_signals(text: str) -> dict:
         "has_adrs": "adr" in text_lower or "decision record" in text_lower,
         "has_components": "component" in text_lower,
         "has_data_model": "data model" in text_lower or "data_model" in text_lower,
-        "file_refs": sorted(set(re.findall(r"fitz_ai/[\w/]+\.py", text))),
+        "file_refs": sorted(set(re.findall(r"fitz_sage/[\w/]+\.py", text))),
     }
 
 

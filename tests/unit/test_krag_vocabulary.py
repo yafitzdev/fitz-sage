@@ -15,9 +15,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fitz_ai.engines.fitz_krag.retrieval.router import RetrievalRouter
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind
-from fitz_ai.retrieval.vocabulary.models import Keyword
+from fitz_sage.engines.fitz_krag.retrieval.router import RetrievalRouter
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind
+from fitz_sage.retrieval.vocabulary.models import Keyword
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -95,14 +95,14 @@ def _make_router(
 class TestPipelineVocabularyIntegration:
     """Tests that the pipeline saves keywords to VocabularyStore."""
 
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ensure_schema")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.RawFileStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SymbolStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ImportGraphStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SectionStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TableStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.ensure_schema")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.RawFileStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.SymbolStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.ImportGraphStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.SectionStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.TableStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy")
     def test_saves_keywords_after_enrichment(
         self,
         mock_doc_strat,
@@ -115,8 +115,8 @@ class TestPipelineVocabularyIntegration:
         mock_ensure_schema,
     ):
         """Pipeline calls vocabulary_store.merge_and_save with extracted keywords."""
-        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-        from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+        from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+        from fitz_sage.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
 
         config = FitzKragConfig(collection="test_col", enable_enrichment=False)
         chat = MagicMock()
@@ -149,14 +149,14 @@ class TestPipelineVocabularyIntegration:
         # 3 unique keywords: auth, login, hash
         assert len(keywords) == 3
 
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ensure_schema")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.RawFileStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SymbolStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ImportGraphStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SectionStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TableStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.ensure_schema")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.RawFileStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.SymbolStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.ImportGraphStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.SectionStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.TableStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy")
     def test_no_save_without_vocabulary_store(
         self,
         mock_doc_strat,
@@ -169,8 +169,8 @@ class TestPipelineVocabularyIntegration:
         mock_ensure_schema,
     ):
         """Pipeline does not attempt vocabulary save when vocabulary_store is None."""
-        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-        from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+        from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+        from fitz_sage.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
 
         config = FitzKragConfig(collection="test_col", enable_enrichment=False)
         chat = MagicMock()
@@ -190,14 +190,14 @@ class TestPipelineVocabularyIntegration:
         # Confirm _vocabulary_store is None
         assert pipeline._vocabulary_store is None
 
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ensure_schema")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.RawFileStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SymbolStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.ImportGraphStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.SectionStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TableStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.ensure_schema")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.RawFileStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.SymbolStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.ImportGraphStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.SectionStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.TableStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.PythonCodeIngestStrategy")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.pipeline.TechnicalDocIngestStrategy")
     def test_deduplicates_keywords(
         self,
         mock_doc_strat,
@@ -210,8 +210,8 @@ class TestPipelineVocabularyIntegration:
         mock_ensure_schema,
     ):
         """Duplicate keywords (case-insensitive) are deduplicated before saving."""
-        from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-        from fitz_ai.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
+        from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+        from fitz_sage.engines.fitz_krag.ingestion.pipeline import KragIngestPipeline
 
         config = FitzKragConfig(collection="test_col", enable_enrichment=False)
         chat = MagicMock()

@@ -3,13 +3,13 @@
 
 **Status:** Proposed
 **Target:** v0.11.0
-**Impact:** Transformational — turns fitz-ai from best RAG pipeline into first autonomous knowledge agent with epistemic integrity
+**Impact:** Transformational — turns fitz-sage from best RAG pipeline into first autonomous knowledge agent with epistemic integrity
 
 ---
 
 ## Problem
 
-fitz-ai has the most sophisticated retrieval intelligence stack of any RAG system: typed retrieval units (symbols, sections, tables), ML-gated detection, multi-strategy dispatch, multi-hop reasoning, governance cascade. But it's all hardcoded into a **single-shot pipeline**. The LLM gets one chance with whatever the pipeline retrieved.
+fitz-sage has the most sophisticated retrieval intelligence stack of any RAG system: typed retrieval units (symbols, sections, tables), ML-gated detection, multi-strategy dispatch, multi-hop reasoning, governance cascade. But it's all hardcoded into a **single-shot pipeline**. The LLM gets one chance with whatever the pipeline retrieved.
 
 Every component is a *tool* waiting to be used by an agent. The pipeline is an agent that doesn't know it's an agent.
 

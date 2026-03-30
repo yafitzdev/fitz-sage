@@ -5,14 +5,14 @@ Quickstart - The simplest way to use Fitz.
 This is the 90% use case: ingest docs, ask questions, get answers with sources.
 
 Requirements:
-    pip install fitz-ai
+    pip install fitz-sage
     export COHERE_API_KEY="your-key"  # or OPENAI_API_KEY
 
 Run:
     python examples/01_quickstart.py
 """
 
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 # =============================================================================
 # Setup: Create a Fitz instance

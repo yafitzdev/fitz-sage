@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 
-from fitz_ai.structured.constants import FIELD_ROW_DATA, FIELD_TABLE
-from fitz_ai.structured.executor import (
+from fitz_sage.structured.constants import FIELD_ROW_DATA, FIELD_TABLE
+from fitz_sage.structured.executor import (
     QueryLimitExceededError,
     StructuredExecutor,
     _aggregate_avg,
@@ -21,7 +21,7 @@ from fitz_ai.structured.executor import (
     _build_scroll_filter,
     _condition_to_filter,
 )
-from fitz_ai.structured.sql_generator import SQLQuery
+from fitz_sage.structured.sql_generator import SQLQuery
 
 
 @dataclass

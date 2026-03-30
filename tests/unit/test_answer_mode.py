@@ -10,9 +10,9 @@ These tests verify:
 
 from __future__ import annotations
 
-from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.governance import AnswerGovernor, ConstraintResult
-from fitz_ai.governance.instructions import (
+from fitz_sage.core.answer_mode import AnswerMode
+from fitz_sage.governance import AnswerGovernor, ConstraintResult
+from fitz_sage.governance.instructions import (
     MODE_INSTRUCTIONS,
     get_mode_instruction,
 )

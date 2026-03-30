@@ -25,8 +25,8 @@ if not POSTGRES_DEPS_AVAILABLE:
 # Mark all tests in this module as postgres and tier2
 pytestmark = [pytest.mark.postgres, pytest.mark.tier2]
 
-from fitz_ai.storage.config import StorageConfig, StorageMode
-from fitz_ai.storage.postgres import (
+from fitz_sage.storage.config import StorageConfig, StorageMode
+from fitz_sage.storage.postgres import (
     PostgresConnectionManager,
     _replace_database_in_uri,
     _sanitize_collection_name,
@@ -133,7 +133,7 @@ class TestSingletonPattern:
 
         # Patch both __init__ and atexit to prevent broken handlers being registered
         with patch.object(PostgresConnectionManager, "__init__", return_value=None):
-            with patch("fitz_ai.storage.postgres.atexit.register"):
+            with patch("fitz_sage.storage.postgres.atexit.register"):
                 instance1 = PostgresConnectionManager.get_instance(config)
                 instance2 = PostgresConnectionManager.get_instance()
 
@@ -147,7 +147,7 @@ class TestSingletonPattern:
 
         # Patch both __init__ and atexit to prevent broken handlers being registered
         with patch.object(PostgresConnectionManager, "__init__", return_value=None):
-            with patch("fitz_ai.storage.postgres.atexit.register"):
+            with patch("fitz_sage.storage.postgres.atexit.register"):
                 with patch.object(PostgresConnectionManager, "stop"):
                     instance1 = PostgresConnectionManager.get_instance(config)
                     PostgresConnectionManager.reset_instance()
@@ -209,10 +209,10 @@ class TestAutoRecovery:
         # Directly clear singleton without calling stop() to avoid hanging
         PostgresConnectionManager._instance = None
 
-    @patch("fitz_ai.storage.postgres._kill_zombie_postgres_processes")
-    @patch("fitz_ai.storage.postgres.time.sleep")
-    @patch("fitz_ai.storage.postgres.shutil.rmtree")
-    @patch("fitz_ai.storage.postgres.FitzPaths.ensure_pgdata")
+    @patch("fitz_sage.storage.postgres._kill_zombie_postgres_processes")
+    @patch("fitz_sage.storage.postgres.time.sleep")
+    @patch("fitz_sage.storage.postgres.shutil.rmtree")
+    @patch("fitz_sage.storage.postgres.FitzPaths.ensure_pgdata")
     def test_recovery_deletes_pgdata_on_failure(
         self, mock_ensure_pgdata, mock_rmtree, mock_sleep, mock_kill
     ):
@@ -251,9 +251,9 @@ class TestAutoRecovery:
         # Verify rmtree was called for nuclear recovery
         assert mock_rmtree.called
 
-    @patch("fitz_ai.storage.postgres._kill_zombie_postgres_processes")
-    @patch("fitz_ai.storage.postgres.time.sleep")
-    @patch("fitz_ai.storage.postgres.FitzPaths.ensure_pgdata")
+    @patch("fitz_sage.storage.postgres._kill_zombie_postgres_processes")
+    @patch("fitz_sage.storage.postgres.time.sleep")
+    @patch("fitz_sage.storage.postgres.FitzPaths.ensure_pgdata")
     def test_patient_retry_succeeds_without_nuclear(
         self, mock_ensure_pgdata, mock_sleep, mock_kill
     ):
@@ -374,7 +374,7 @@ class TestGracefulShutdown:
 
         # Patch both __init__ and atexit to prevent broken handlers being registered
         with patch.object(PostgresConnectionManager, "__init__", return_value=None):
-            with patch("fitz_ai.storage.postgres.atexit.register"):
+            with patch("fitz_sage.storage.postgres.atexit.register"):
                 instance = PostgresConnectionManager.get_instance(config)
                 instance._started = True
                 instance._pools = {}
@@ -397,7 +397,7 @@ class TestConnectionPool:
 
     def teardown_method(self):
         """Reset singleton and module-level globals after each test."""
-        import fitz_ai.storage.postgres as pg_module
+        import fitz_sage.storage.postgres as pg_module
 
         # Reset singleton
         PostgresConnectionManager._instance = None
@@ -445,7 +445,7 @@ class TestConnectionPool:
         mock_pool_class = MagicMock(return_value=mock_pool)
 
         with patch.object(manager, "_ensure_database", return_value="fitz_coll"):
-            with patch("fitz_ai.storage.postgres._get_psycopg_pool", return_value=mock_pool_class):
+            with patch("fitz_sage.storage.postgres._get_psycopg_pool", return_value=mock_pool_class):
                 pool1 = manager.get_pool("my_collection")
                 pool2 = manager.get_pool("my_collection")
 
@@ -490,7 +490,7 @@ class TestDatabaseCreation:
         mock_psycopg.connect.return_value.__enter__ = Mock(return_value=mock_conn)
         mock_psycopg.connect.return_value.__exit__ = Mock(return_value=False)
 
-        with patch("fitz_ai.storage.postgres._get_psycopg", return_value=mock_psycopg):
+        with patch("fitz_sage.storage.postgres._get_psycopg", return_value=mock_psycopg):
             db_name = manager._ensure_database("my_collection")
 
         assert db_name == "fitz_my_collection"
@@ -773,7 +773,7 @@ class TestConcurrentPoolCreation:
             try:
                 with patch.object(manager, "_ensure_database", return_value="fitz_shared"):
                     with patch(
-                        "fitz_ai.storage.postgres._get_psycopg_pool",
+                        "fitz_sage.storage.postgres._get_psycopg_pool",
                         return_value=mock_pool_class,
                     ):
                         pool = manager.get_pool("shared_collection")

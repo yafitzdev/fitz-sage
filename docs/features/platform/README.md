@@ -1,6 +1,6 @@
 # docs/features/platform/
 
-Documentation for fitz-ai platform-level features.
+Documentation for fitz-sage platform-level features.
 
 | File | Contents |
 |---|---|

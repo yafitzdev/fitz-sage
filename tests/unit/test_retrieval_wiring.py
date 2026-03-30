@@ -11,13 +11,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fitz_ai.engines.fitz_krag.retrieval.router import RetrievalRouter
-from fitz_ai.engines.fitz_krag.retrieval.strategies.code_search import CodeSearchStrategy
-from fitz_ai.engines.fitz_krag.retrieval.strategies.section_search import (
+from fitz_sage.engines.fitz_krag.retrieval.router import RetrievalRouter
+from fitz_sage.engines.fitz_krag.retrieval.strategies.code_search import CodeSearchStrategy
+from fitz_sage.engines.fitz_krag.retrieval.strategies.section_search import (
     SectionSearchStrategy,
 )
-from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind
+from fitz_sage.engines.fitz_krag.retrieval_profile import RetrievalProfile
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind
 
 # ---------------------------------------------------------------------------
 # Helpers

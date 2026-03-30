@@ -12,13 +12,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from fitz_ai.engines.fitz_krag.retrieval.strategies.agentic_search import (
+from fitz_sage.engines.fitz_krag.retrieval.strategies.agentic_search import (
     _BM25_PREFILTER_THRESHOLD,
     AgenticSearchStrategy,
     _entry_to_text,
     _tokenize,
 )
-from fitz_ai.engines.fitz_krag.types import AddressKind
+from fitz_sage.engines.fitz_krag.types import AddressKind
 
 # ---------------------------------------------------------------------------
 # Helpers: lightweight stand-ins for ManifestEntry, ManifestSymbol, ManifestHeading

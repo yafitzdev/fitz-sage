@@ -84,10 +84,10 @@ Internal parameters:
 
 ## Files
 
-- **Detection module:** `fitz_ai/retrieval/detection/modules/comparison.py`
-- **Orchestrator:** `fitz_ai/retrieval/detection/registry.py`
-- **Strategy:** `fitz_ai/engines/fitz_krag/retrieval/steps/strategies/comparison.py`
-- **Integration:** `fitz_ai/engines/fitz_krag/retrieval/steps/vector_search.py`
+- **Detection module:** `fitz_sage/retrieval/detection/modules/comparison.py`
+- **Orchestrator:** `fitz_sage/retrieval/detection/registry.py`
+- **Strategy:** `fitz_sage/engines/fitz_krag/retrieval/steps/strategies/comparison.py`
+- **Integration:** `fitz_sage/engines/fitz_krag/retrieval/steps/vector_search.py`
 
 Detection is now LLM-based via the unified `DetectionOrchestrator`. The `ComparisonModule` extracts entities and generates entity-specific sub-queries.
 

@@ -1,6 +1,6 @@
 # tools/
 
-Developer and CI tooling for fitz-ai. Not part of the importable package.
+Developer and CI tooling for fitz-sage. Not part of the importable package.
 
 | Directory / File | Purpose |
 |---|---|

@@ -2,7 +2,7 @@
 """
 Performance tests for the pipeline harness — NOT LLM speed.
 
-Tests here measure overhead added by fitz-ai's pipeline around LLM calls:
+Tests here measure overhead added by fitz-sage's pipeline around LLM calls:
 routing, retrieval, context assembly, memory stability. They mock LLM calls
 to isolate harness performance from hardware-dependent generation speed.
 
@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from fitz_ai.core import Query
+from fitz_sage.core import Query
 
 pytestmark = pytest.mark.performance
 
@@ -33,7 +33,7 @@ class TestHarnessOverhead:
         Disables all LLM-backed features (HyDE, multi-query, agentic) and
         pre-embeds the query to measure only the retrieval harness.
         """
-        from fitz_ai.engines.fitz_krag.retrieval_profile import build_retrieval_profile
+        from fitz_sage.engines.fitz_krag.retrieval_profile import build_retrieval_profile
 
         engine = self.runner.engine
         router = engine._retrieval_router

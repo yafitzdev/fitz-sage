@@ -113,9 +113,9 @@ Internal parameters:
 
 ## Files
 
-- **Sparse index:** `fitz_ai/retrieval/sparse/index.py`
-- **Hybrid integration:** `fitz_ai/engines/fitz_krag/retrieval/steps/vector_search.py`
-- **Schema:** `fitz_ai/vector_db/plugins/pgvector.py` (tsvector column definition)
+- **Sparse index:** `fitz_sage/retrieval/sparse/index.py`
+- **Hybrid integration:** `fitz_sage/engines/fitz_krag/retrieval/steps/vector_search.py`
+- **Schema:** `fitz_sage/vector_db/plugins/pgvector.py` (tsvector column definition)
 
 ## Benefits
 

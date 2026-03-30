@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from fitz_ai.structured.derived import (
+from fitz_sage.structured.derived import (
     FIELD_CONTENT,
     FIELD_DERIVED,
     FIELD_GENERATED_AT,

@@ -300,7 +300,7 @@ def render_live_output(minimal: bool = False) -> str:
     Run systematic interactive CLI tests following a 12-step test plan.
 
     Tests all interactive CLI workflows without using CLI flags.
-    Focus on testing fitz-ai features: epistemic honesty, citations,
+    Focus on testing fitz-sage features: epistemic honesty, citations,
     hierarchical RAG, multi-source synthesis, and grounding.
 
     Args:
@@ -470,7 +470,7 @@ def render_live_output(minimal: bool = False) -> str:
             "Installation Instructions\n"
             "=========================\n\n"
             "To install Fitz, run:\n"
-            "  pip install fitz-ai\n\n"
+            "  pip install fitz-sage\n\n"
             "Requirements:\n"
             "- Python 3.10 or higher\n"
             "- 8GB RAM recommended\n"
@@ -521,7 +521,7 @@ def render_live_output(minimal: bool = False) -> str:
         # =====================================================================
         # Interactive query on quickstart collection
         # Flow: question first, then collection selection (Enter for default)
-        from fitz_ai.cli.context import CLIContext
+        from fitz_sage.cli.context import CLIContext
 
         ctx = CLIContext.load()
         client = ctx.get_vector_db_client()
@@ -590,7 +590,7 @@ def render_live_output(minimal: bool = False) -> str:
         collections = sorted(client.list_collections())
 
         if docs_collection in collections:
-            # Chat questions designed to test fitz-ai features
+            # Chat questions designed to test fitz-sage features
             chat_questions = [
                 "What are the core features of Fitz?",  # Basic retrieval
                 "What is the weather in Tokyo?",  # Epistemic honesty (not in docs)
@@ -824,7 +824,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Import the CLI app
     try:
-        from fitz_ai.cli import app
+        from fitz_sage.cli import app
     except ImportError as e:
         print(f"Error: Could not import CLI app: {e}", file=sys.stderr)
         return 1

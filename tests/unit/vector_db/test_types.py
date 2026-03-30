@@ -7,7 +7,7 @@ import pytest
 
 pytestmark = pytest.mark.tier1
 
-from fitz_ai.vector_db.types import (
+from fitz_sage.vector_db.types import (
     CollectionInfo,
     CollectionStats,
     ScrollResponse,

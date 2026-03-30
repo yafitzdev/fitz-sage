@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fitz_ai.engines.fitz_krag.ingestion.section_store import SectionStore, _row_to_dict
+from fitz_sage.engines.fitz_krag.ingestion.section_store import SectionStore, _row_to_dict
 
 
 @pytest.fixture

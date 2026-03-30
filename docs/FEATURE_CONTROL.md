@@ -85,10 +85,10 @@ vision: cohere          # or openai, anthropic, ollama
 
 | File | Purpose |
 |------|---------|
-| `fitz_ai/ingestion/parser/router.py` | Routes files to parsers based on config |
-| `fitz_ai/ingestion/parser/plugins/docling.py` | Standard parser (no VLM) |
-| `fitz_ai/ingestion/parser/plugins/docling_vision.py` | VLM-enabled parser |
-| `fitz_ai/cli/commands/ingest.py` | Reads `chunking.default.parser` config |
+| `fitz_sage/ingestion/parser/router.py` | Routes files to parsers based on config |
+| `fitz_sage/ingestion/parser/plugins/docling.py` | Standard parser (no VLM) |
+| `fitz_sage/ingestion/parser/plugins/docling_vision.py` | VLM-enabled parser |
+| `fitz_sage/cli/commands/ingest.py` | Reads `chunking.default.parser` config |
 
 ---
 
@@ -115,9 +115,9 @@ rerank: cohere/rerank-v3.5      # ← Reranking enabled
 
 | File | Purpose |
 |------|---------|
-| `fitz_ai/engines/fitz_krag/retrieval/plugins/dense.yaml` | Retrieval pipeline (rerank steps have `enabled_if: reranker`) |
-| `fitz_ai/engines/fitz_krag/retrieval/loader.py` | Skips rerank steps when no reranker provided |
-| `fitz_ai/llm/providers/cohere.py` | Cohere rerank implementation |
+| `fitz_sage/engines/fitz_krag/retrieval/plugins/dense.yaml` | Retrieval pipeline (rerank steps have `enabled_if: reranker`) |
+| `fitz_sage/engines/fitz_krag/retrieval/loader.py` | Skips rerank steps when no reranker provided |
+| `fitz_sage/llm/providers/cohere.py` | Cohere rerank implementation |
 
 ---
 

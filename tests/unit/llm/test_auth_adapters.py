@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from fitz_ai.llm.auth import (
+from fitz_sage.llm.auth import (
     ApiKeyAuth,
     AuthProvider,
     DynamicHttpxAuth,

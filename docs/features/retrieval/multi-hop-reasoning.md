@@ -96,10 +96,10 @@ Internal parameters in `HopController`:
 
 ## Files
 
-- **Hop controller:** `fitz_ai/engines/fitz_krag/retrieval/multihop/controller.py`
-- **Evidence evaluator:** `fitz_ai/engines/fitz_krag/retrieval/multihop/evaluator.py`
-- **Bridge extractor:** `fitz_ai/engines/fitz_krag/retrieval/multihop/extractor.py`
-- **Integration:** `fitz_ai/engines/fitz_krag/retrieval/pipeline.py` (called from retrieval steps)
+- **Hop controller:** `fitz_sage/engines/fitz_krag/retrieval/multihop/controller.py`
+- **Evidence evaluator:** `fitz_sage/engines/fitz_krag/retrieval/multihop/evaluator.py`
+- **Bridge extractor:** `fitz_sage/engines/fitz_krag/retrieval/multihop/extractor.py`
+- **Integration:** `fitz_sage/engines/fitz_krag/retrieval/pipeline.py` (called from retrieval steps)
 
 ## Benefits
 

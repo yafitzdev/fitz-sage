@@ -2,8 +2,8 @@
 """Tests for staged constraint pipeline."""
 
 
-from fitz_ai.governance.constraints.base import ConstraintResult
-from fitz_ai.governance.constraints.staged import (
+from fitz_sage.governance.constraints.base import ConstraintResult
+from fitz_sage.governance.constraints.staged import (
     ConstraintStage,
     StageContext,
     StagedConstraintPipeline,

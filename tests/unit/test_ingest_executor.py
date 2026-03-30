@@ -1,6 +1,6 @@
 # tests/unit/test_ingest_executor.py
 """
-Tests for fitz_ai.ingestion.diff.executor module.
+Tests for fitz_sage.ingestion.diff.executor module.
 
 Key tests verify that:
 1. State is updated only on successful ingestion
@@ -22,16 +22,16 @@ from tests.conftest import POSTGRES_DEPS_AVAILABLE, SKIP_POSTGRES_REASON
 if not POSTGRES_DEPS_AVAILABLE:
     pytest.skip(SKIP_POSTGRES_REASON, allow_module_level=True)
 
-from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
-from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
-from fitz_ai.ingestion.chunking.router import ChunkingRouter
-from fitz_ai.ingestion.diff.executor import (
+from fitz_sage.core.document import DocumentElement, ElementType, ParsedDocument
+from fitz_sage.ingestion.chunking.plugins.default.simple import SimpleChunker
+from fitz_sage.ingestion.chunking.router import ChunkingRouter
+from fitz_sage.ingestion.diff.executor import (
     DiffIngestExecutor,
     IngestSummary,
     run_diff_ingest,
 )
-from fitz_ai.ingestion.source.base import SourceFile
-from fitz_ai.ingestion.state import IngestStateManager
+from fitz_sage.ingestion.source.base import SourceFile
+from fitz_sage.ingestion.state import IngestStateManager
 
 
 class MockVectorDBWriter:
@@ -130,7 +130,7 @@ class TestDiffIngestExecutor:
         state_manager.load()
 
         # Create a router with recursive chunker (better than simple)
-        from fitz_ai.ingestion.chunking.plugins.default.recursive import RecursiveChunker
+        from fitz_sage.ingestion.chunking.plugins.default.recursive import RecursiveChunker
 
         router = ChunkingRouter(
             chunker_map={},
@@ -166,7 +166,7 @@ class TestDiffIngestExecutor:
         test_file = tmp_path / "existing.txt"
         test_file.write_text("Already indexed content")
 
-        from fitz_ai.ingestion.hashing import compute_content_hash
+        from fitz_sage.ingestion.hashing import compute_content_hash
 
         content_hash = compute_content_hash(test_file)
 
@@ -243,7 +243,7 @@ class TestDiffIngestExecutor:
         test_file = tmp_path / "existing.txt"
         test_file.write_text("Already indexed content")
 
-        from fitz_ai.ingestion.hashing import compute_content_hash
+        from fitz_sage.ingestion.hashing import compute_content_hash
 
         content_hash = compute_content_hash(test_file)
 

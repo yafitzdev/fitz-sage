@@ -1,0 +1,213 @@
+# fitz_sage/engines/fitz_krag/ingestion/strategies/technical_doc.py
+"""
+Technical document ingestion strategy.
+
+Extracts sections from parsed documents (PDFs, DOCX, Markdown) using
+the existing Docling/PlainText parser's structural elements. Sections
+are grouped by HEADING elements into a hierarchical tree.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+from typing import Any
+
+from fitz_sage.core.document import DocumentElement, ElementType, ParsedDocument
+
+logger = logging.getLogger(__name__)
+
+# File extensions this strategy handles
+DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".html", ".md", ".rst", ".txt", ".sql"}
+
+
+@dataclass
+class SectionEntry:
+    """A document section extracted from a parsed document."""
+
+    title: str
+    level: int
+    content: str
+    page_start: int | None = None
+    page_end: int | None = None
+    parent_id: str | None = None
+    position: int = 0
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class DocIngestResult:
+    """Result of extracting sections from a document."""
+
+    sections: list[SectionEntry] = field(default_factory=list)
+
+
+class TechnicalDocIngestStrategy:
+    """Extracts sections from technical documents using parsed document elements."""
+
+    def content_types(self) -> set[str]:
+        return DOC_EXTENSIONS
+
+    def extract(self, parsed_doc: ParsedDocument, file_path: str) -> DocIngestResult:
+        """
+        Extract sections from a parsed document.
+
+        Groups elements between HEADING markers into sections.
+        Builds hierarchical tree from heading levels (H1 > H2 > H3).
+        """
+        elements = parsed_doc.elements
+        if not elements:
+            return DocIngestResult()
+
+        # Check if document has any headings
+        headings = [el for el in elements if el.type == ElementType.HEADING]
+
+        if not headings:
+            # No headings — treat entire document as one section
+            full_text = "\n\n".join(el.content for el in elements if el.content)
+            if not full_text.strip():
+                return DocIngestResult()
+            return DocIngestResult(
+                sections=[
+                    SectionEntry(
+                        title=_title_from_path(file_path),
+                        level=1,
+                        content=full_text,
+                        page_start=_first_page(elements),
+                        page_end=_last_page(elements),
+                        position=0,
+                    )
+                ]
+            )
+
+        # Build sections from heading structure
+        sections = self._build_sections(elements)
+        return DocIngestResult(sections=sections)
+
+    def _build_sections(self, elements: list[DocumentElement]) -> list[SectionEntry]:
+        """Build section list from document elements."""
+        sections: list[SectionEntry] = []
+        current_title: str | None = None
+        current_level: int = 1
+        current_content_parts: list[str] = []
+        current_page_start: int | None = None
+        current_page_end: int | None = None
+        position = 0
+
+        # Collect pre-heading content
+        preamble_parts: list[str] = []
+
+        for el in elements:
+            if el.type == ElementType.HEADING:
+                # Save previous section
+                if current_title is not None:
+                    content = "\n\n".join(current_content_parts).strip()
+                    if content:
+                        sections.append(
+                            SectionEntry(
+                                title=current_title,
+                                level=current_level,
+                                content=content,
+                                page_start=current_page_start,
+                                page_end=current_page_end,
+                                position=position,
+                            )
+                        )
+                        position += 1
+                elif preamble_parts:
+                    # Content before first heading
+                    content = "\n\n".join(preamble_parts).strip()
+                    if content:
+                        sections.append(
+                            SectionEntry(
+                                title="Introduction",
+                                level=1,
+                                content=content,
+                                page_start=_first_page_of(preamble_parts, elements),
+                                position=position,
+                            )
+                        )
+                        position += 1
+
+                # Start new section
+                current_title = el.content.strip()
+                current_level = el.level or 1
+                current_content_parts = []
+                current_page_start = el.page
+                current_page_end = el.page
+            else:
+                if el.content and el.content.strip():
+                    if current_title is None:
+                        preamble_parts.append(el.content)
+                    else:
+                        current_content_parts.append(el.content)
+                        if el.page is not None:
+                            current_page_end = el.page
+
+        # Save last section
+        if current_title is not None:
+            content = "\n\n".join(current_content_parts).strip()
+            if content:
+                sections.append(
+                    SectionEntry(
+                        title=current_title,
+                        level=current_level,
+                        content=content,
+                        page_start=current_page_start,
+                        page_end=current_page_end,
+                        position=position,
+                    )
+                )
+
+        # Build parent-child hierarchy
+        self._assign_parents(sections)
+
+        return sections
+
+    def _assign_parents(self, sections: list[SectionEntry]) -> None:
+        """Assign parent IDs based on heading levels."""
+        # Use a stack of (level, section_index) to track hierarchy
+        parent_stack: list[tuple[int, int]] = []
+
+        for i, section in enumerate(sections):
+            # Pop stack until we find a parent with lower level
+            while parent_stack and parent_stack[-1][0] >= section.level:
+                parent_stack.pop()
+
+            if parent_stack:
+                # Parent is the top of the stack
+                parent_idx = parent_stack[-1][1]
+                section.parent_id = f"_parent_{parent_idx}"
+                # This is a placeholder — actual IDs assigned during storage
+
+            parent_stack.append((section.level, i))
+
+
+def _title_from_path(file_path: str) -> str:
+    """Generate a title from file path when no headings exist."""
+    import os
+
+    name = os.path.basename(file_path)
+    name = os.path.splitext(name)[0]
+    return name.replace("_", " ").replace("-", " ").title()
+
+
+def _first_page(elements: list[DocumentElement]) -> int | None:
+    """Get the first page number from elements."""
+    for el in elements:
+        if el.page is not None:
+            return el.page
+    return None
+
+
+def _last_page(elements: list[DocumentElement]) -> int | None:
+    """Get the last page number from elements."""
+    for el in reversed(elements):
+        if el.page is not None:
+            return el.page
+    return None
+
+
+def _first_page_of(parts: list[str], elements: list[DocumentElement]) -> int | None:
+    """Get first page for preamble content."""
+    return _first_page(elements)

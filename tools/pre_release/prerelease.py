@@ -1,6 +1,6 @@
 # tools/pre_release/prerelease.py
 """
-Pre-release validation script for fitz-ai.
+Pre-release validation script for fitz-sage.
 
 Runs ALL checks before tagging a release:
 - Git status (uncommitted changes warning)
@@ -47,7 +47,7 @@ from pathlib import Path
 # CONFIGURATION
 # =============================================================================
 
-LINT_PATHS = ["fitz_ai", "tests", "tools"]
+LINT_PATHS = ["fitz_sage", "tests", "tools"]
 DEFAULT_PYTEST_MARKERS = "not slow and not e2e and not e2e_parser and not integration"
 
 
@@ -361,7 +361,7 @@ def print_summary(results: list[CheckResult], total_duration: float) -> None:
 def parse_args() -> PreReleaseConfig:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Pre-release validation for fitz-ai",
+        description="Pre-release validation for fitz-sage",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

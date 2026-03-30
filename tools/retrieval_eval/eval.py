@@ -2,7 +2,7 @@
 """
 Evaluate retrieval quality against ground truth.
 
-Uses fitz-ai's own ChatFactory — no fitz-graveyard dependency.
+Uses fitz-sage's own ChatFactory — no fitz-graveyard dependency.
 
 Usage:
     python tools/retrieval_eval/eval.py --source-dir .
@@ -38,8 +38,8 @@ def run_retrieval(
     limit: int = 30,
 ) -> list[str]:
     """Run retrieval pipeline and return selected file paths."""
-    from fitz_ai.code import CodeRetriever
-    from fitz_ai.llm.providers.enterprise import EnterpriseChat
+    from fitz_sage.code import CodeRetriever
+    from fitz_sage.llm.providers.enterprise import EnterpriseChat
 
     # Create chat client directly (no auth needed for local LM Studio)
     client = EnterpriseChat(auth=None, base_url=base_url, model=model, timeout=300)

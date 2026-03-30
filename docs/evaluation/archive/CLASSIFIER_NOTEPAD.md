@@ -1404,7 +1404,7 @@ The 28pp gap between disputed (98%) and trustworthy (70%) is the ONLY discrimina
 | `tools/governance/data/model_v4_ca_continuous.joblib` | RF tuned on v3 features (67.3% — regression, reference only) |
 | `tools/governance/calibrate_thresholds.py` | Per-class threshold calibration (Step 1) |
 | `tools/governance/data/model_v3_calibrated.joblib` | GBT with per-class calibrated thresholds (70.0%) |
-| `fitz_ai/core/guardrails/governance_decider.py` | GovernanceDecider — two-pass ML governance (Step 2b) |
+| `fitz_sage/core/guardrails/governance_decider.py` | GovernanceDecider — two-pass ML governance (Step 2b) |
 | `tools/governance/data/eval_results_v4.csv` | 1113 rows with Step 2b binary CA features (short-circuit restored) |
 | `tools/governance/data/model_v5_twostage.joblib` | Two-stage ET+RF trained on real embeddings (1113 cases, 50 features) |
 | `tools/governance/data/model_v5_calibrated.joblib` | Calibrated model with s1=0.55, s2=0.79 (15 critical cases) |
@@ -1434,7 +1434,7 @@ The 28pp gap between disputed (98%) and trustworthy (70%) is the ONLY discrimina
 6. **Ship GBT model_v3** — Integrate into pipeline, replace AnswerGovernor.decide().
 
 ### Medium-term (integration)
-6. **Integration prototype** — `fitz_ai/core/guardrails/classifier.py` wrapper that loads model artifact, runs at inference time.
+6. **Integration prototype** — `fitz_sage/core/guardrails/classifier.py` wrapper that loads model artifact, runs at inference time.
 7. ~~**Full pipeline eval**~~ DONE — Exp 4 completed. Distribution shift identified.
 8. **A/B comparison** — Run both governor and classifier on same queries, compare decisions.
 

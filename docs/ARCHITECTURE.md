@@ -187,7 +187,7 @@ Verify with: `python -m tools.contract_map --fail-on-errors`
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  Factory (fitz_ai/llm/config.py)                                            │
+│  Factory (fitz_sage/llm/config.py)                                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  create_chat_provider(spec="cohere/command-a-03-2025")                      │
 │                                                                             │
@@ -322,7 +322,7 @@ vector_db_kwargs:
 ## Directory Structure
 
 ```
-fitz_ai/
+fitz_sage/
 ├── core/                        # Foundation layer
 │   ├── types.py                 # Query, Answer, Chunk
 │   ├── protocols.py             # KnowledgeEngine protocol

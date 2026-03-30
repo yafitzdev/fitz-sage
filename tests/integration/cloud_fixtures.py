@@ -22,8 +22,8 @@ from typing import Generator
 import httpx
 import pytest
 
-from fitz_ai.cloud import CloudClient, CloudConfig
-from fitz_ai.cloud.cache_key import CacheVersions
+from fitz_sage.cloud import CloudClient, CloudConfig
+from fitz_sage.cloud.cache_key import CacheVersions
 
 # Path to test fixtures (reuse from e2e)
 FIXTURES_DIR = Path(__file__).parent.parent / "e2e" / "fixtures_rag"
@@ -132,11 +132,11 @@ def unique_collection_name() -> str:
 @pytest.fixture
 def cache_versions(unique_collection_name: str) -> CacheVersions:
     """Create CacheVersions for testing."""
-    import fitz_ai
+    import fitz_sage
 
     return CacheVersions(
         optimizer="1.0.0",
-        engine=fitz_ai.__version__,
+        engine=fitz_sage.__version__,
         collection=unique_collection_name,
         llm_model="ollama:qwen2.5:1.5b",
         prompt_template="default",
@@ -162,20 +162,20 @@ def cloud_pipeline(
     - nomic-embed-text (embeddings)
     - qwen2.5:1.5b or similar (LLM)
 
-    Also requires PostgreSQL with pgvector (fitz-ai uses pgvector exclusively).
+    Also requires PostgreSQL with pgvector (fitz-sage uses pgvector exclusively).
     """
-    from fitz_ai.engines.fitz_krag.config import FitzKragConfig
-    from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
-    from fitz_ai.ingestion.chunking.config import (
+    from fitz_sage.engines.fitz_krag.config import FitzKragConfig
+    from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
+    from fitz_sage.ingestion.chunking.config import (
         ChunkingRouterConfig,
         ExtensionChunkerConfig,
     )
-    from fitz_ai.ingestion.chunking.router import ChunkingRouter
-    from fitz_ai.ingestion.diff import run_diff_ingest
-    from fitz_ai.ingestion.parser import ParserRouter
-    from fitz_ai.ingestion.state import IngestStateManager
-    from fitz_ai.llm import get_embedder
-    from fitz_ai.vector_db.registry import get_vector_db_plugin
+    from fitz_sage.ingestion.chunking.router import ChunkingRouter
+    from fitz_sage.ingestion.diff import run_diff_ingest
+    from fitz_sage.ingestion.parser import ParserRouter
+    from fitz_sage.ingestion.state import IngestStateManager
+    from fitz_sage.llm import get_embedder
+    from fitz_sage.vector_db.registry import get_vector_db_plugin
 
     # Check if cloud is reachable
     if not check_cloud_reachable(cloud_config.base_url):
@@ -183,7 +183,7 @@ def cloud_pipeline(
 
     collection = unique_collection_name
 
-    # Initialize vector DB (pgvector - fitz-ai uses PostgreSQL + pgvector exclusively)
+    # Initialize vector DB (pgvector - fitz-sage uses PostgreSQL + pgvector exclusively)
     try:
         vector_client = get_vector_db_plugin("pgvector")
     except Exception as e:

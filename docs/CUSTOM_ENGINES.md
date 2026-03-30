@@ -21,8 +21,8 @@ Fitz's pluggable architecture makes it easy to add custom engines. You just need
 ```python
 # my_engine.py
 
-from fitz_ai.core import Query, Answer, Provenance
-from fitz_ai.runtime import EngineRegistry
+from fitz_sage.core import Query, Answer, Provenance
+from fitz_sage.runtime import EngineRegistry
 
 class MySimpleEngine:
     """A minimal custom engine."""
@@ -78,7 +78,7 @@ registry.register(
 ### Using Your Engine
 
 ```python
-from fitz_ai import run
+from fitz_sage import run
 
 # Use via universal runtime
 answer = run("What is Python?", engine="my_simple")
@@ -101,7 +101,7 @@ Let's build a more complete engine with proper structure.
 ### Directory Structure
 
 ```
-fitz_ai/engines/my_engine/
+fitz_sage/engines/my_engine/
 ├── __init__.py          # Package exports + registration
 ├── engine.py            # Main engine class
 ├── runtime.py           # Convenience functions
@@ -113,7 +113,7 @@ fitz_ai/engines/my_engine/
 ### Step 1: Configuration (`config/schema.py`)
 
 ```python
-# fitz_ai/engines/my_engine/config/schema.py
+# fitz_sage/engines/my_engine/config/schema.py
 
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
@@ -164,12 +164,12 @@ def load_my_engine_config(config_path: Optional[str] = None) -> MyEngineConfig:
 ### Step 2: Engine Class (`engine.py`)
 
 ```python
-# fitz_ai/engines/my_engine/engine.py
+# fitz_sage/engines/my_engine/engine.py
 
 from typing import Optional, Dict, Any, List
 import logging
 
-from fitz_ai.core import (
+from fitz_sage.core import (
     Query,
     Answer,
     Provenance,
@@ -178,7 +178,7 @@ from fitz_ai.core import (
     GenerationError,
     ConfigurationError,
 )
-from fitz_ai.engines.my_engine.config.schema import MyEngineConfig
+from fitz_sage.engines.my_engine.config.schema import MyEngineConfig
 
 logger = logging.getLogger(__name__)
 
@@ -364,13 +364,13 @@ class MyEngine:
 ### Step 3: Runtime Functions (`runtime.py`)
 
 ```python
-# fitz_ai/engines/my_engine/runtime.py
+# fitz_sage/engines/my_engine/runtime.py
 
 from typing import Optional, Union, List
 from pathlib import Path
 
-from fitz_ai.core import Query, Answer, Constraints
-from fitz_ai.engines.my_engine.config.schema import (
+from fitz_sage.core import Query, Answer, Constraints
+from fitz_sage.engines.my_engine.config.schema import (
     MyEngineConfig,
     load_my_engine_config,
 )
@@ -403,7 +403,7 @@ def run_my_engine(
     global _cached_engine, _cached_config_path
     
     # Import here to avoid circular imports
-    from fitz_ai.engines.my_engine.engine import MyEngine
+    from fitz_sage.engines.my_engine.engine import MyEngine
     
     # Reuse cached engine if config unchanged
     current_path = str(config_path) if config_path else None
@@ -434,7 +434,7 @@ def create_my_engine(
     config_path: Optional[Union[str, Path]] = None,
 ) -> "MyEngine":
     """Create a reusable MyEngine instance."""
-    from fitz_ai.engines.my_engine.engine import MyEngine
+    from fitz_sage.engines.my_engine.engine import MyEngine
     
     if config is None:
         config = load_my_engine_config(str(config_path) if config_path else None)
@@ -452,18 +452,18 @@ def clear_engine_cache() -> None:
 ### Step 4: Package Init (`__init__.py`)
 
 ```python
-# fitz_ai/engines/my_engine/__init__.py
+# fitz_sage/engines/my_engine/__init__.py
 
 """
 MyEngine - Custom knowledge engine for Fitz.
 
 Usage:
-    >>> from fitz_ai.engines.my_engine import run_my_engine
+    >>> from fitz_sage.engines.my_engine import run_my_engine
     >>> answer = run_my_engine("What is X?", documents=["..."])
 """
 
 # Configuration
-from fitz_ai.engines.my_engine.config.schema import (
+from fitz_sage.engines.my_engine.config.schema import (
     MyEngineConfig,
     MyEngineModelConfig,
     MyEngineRetrievalConfig,
@@ -471,10 +471,10 @@ from fitz_ai.engines.my_engine.config.schema import (
 )
 
 # Engine
-from fitz_ai.engines.my_engine.engine import MyEngine
+from fitz_sage.engines.my_engine.engine import MyEngine
 
 # Runtime
-from fitz_ai.engines.my_engine.runtime import (
+from fitz_sage.engines.my_engine.runtime import (
     run_my_engine,
     create_my_engine,
     clear_engine_cache,
@@ -494,7 +494,7 @@ __all__ = [
 
 # Register with global registry
 def _register_engine():
-    from fitz_ai.runtime import EngineRegistry
+    from fitz_sage.runtime import EngineRegistry
     
     registry = EngineRegistry.get_global()
     
@@ -518,13 +518,13 @@ _register_engine()
 # tests/test_my_engine.py
 
 import pytest
-from fitz_ai.core import Query, Answer, Provenance, QueryError, KnowledgeError
+from fitz_sage.core import Query, Answer, Provenance, QueryError, KnowledgeError
 
 class TestMyEngine:
     
     @pytest.fixture
     def engine(self):
-        from fitz_ai.engines.my_engine import MyEngine, MyEngineConfig
+        from fitz_sage.engines.my_engine import MyEngine, MyEngineConfig
         return MyEngine(MyEngineConfig())
     
     def test_implements_protocol(self, engine):
@@ -557,8 +557,8 @@ class TestMyEngine:
 
 ```python
 def test_my_engine_via_universal_runtime():
-    from fitz_ai import run
-    from fitz_ai.runtime import list_engines
+    from fitz_sage import run
+    from fitz_sage.runtime import list_engines
     
     # Verify registration
     assert "my_engine" in list_engines()
@@ -576,7 +576,7 @@ def test_my_engine_via_universal_runtime():
 Use Fitz's exception hierarchy:
 
 ```python
-from fitz_ai.core import QueryError, KnowledgeError, GenerationError, ConfigurationError
+from fitz_sage.core import QueryError, KnowledgeError, GenerationError, ConfigurationError
 
 # Configuration issues
 raise ConfigurationError("Invalid model path")
@@ -663,24 +663,24 @@ class MyEngine:
 2. Add entry point in `pyproject.toml`:
 
 ```toml
-[project.entry-points."fitz_ai.engines"]
+[project.entry-points."fitz_sage.engines"]
 my_engine = "fitz_my_engine:register"
 ```
 
 3. Users install and use:
 
 ```bash
-pip install fitz_ai-my-engine
+pip install fitz_sage-my-engine
 ```
 
 ```python
-from fitz_ai import run
+from fitz_sage import run
 answer = run("Question?", engine="my_engine")
 ```
 
 ### Contributing to Fitz
 
-1. Add engine to `fitz_ai/engines/`
+1. Add engine to `fitz_sage/engines/`
 2. Add tests to `tests/`
 3. Update documentation
 4. Submit PR

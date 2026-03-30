@@ -160,31 +160,31 @@ The pattern: use the LLM for *classification* and *generation*, but use *structu
 
 | Component | Path |
 |-----------|------|
-| Engine | `fitz_ai/engines/fitz_krag/engine.py` |
-| Config | `fitz_ai/engines/fitz_krag/config/schema.py` |
-| Query analyzer | `fitz_ai/engines/fitz_krag/query_analyzer.py` |
-| Retrieval router | `fitz_ai/engines/fitz_krag/retrieval/router.py` |
-| Code search (hybrid) | `fitz_ai/engines/fitz_krag/retrieval/strategies/code_search.py` |
-| Code search (LLM structural) | `fitz_ai/engines/fitz_krag/retrieval/strategies/llm_code_search.py` |
-| Standalone code retrieval | `fitz_ai/code/retriever.py` |
-| Section search | `fitz_ai/engines/fitz_krag/retrieval/strategies/section_search.py` |
-| Table handler | `fitz_ai/engines/fitz_krag/retrieval/table_handler.py` |
-| Context expander | `fitz_ai/engines/fitz_krag/retrieval/expander.py` |
-| Reranker | `fitz_ai/engines/fitz_krag/retrieval/reranker.py` |
-| Multi-hop | `fitz_ai/engines/fitz_krag/retrieval/multihop.py` |
-| Symbol store | `fitz_ai/engines/fitz_krag/ingestion/symbol_store.py` |
-| Section store | `fitz_ai/engines/fitz_krag/ingestion/section_store.py` |
-| Table store | `fitz_ai/engines/fitz_krag/ingestion/table_store.py` |
-| Import graph | `fitz_ai/engines/fitz_krag/ingestion/import_graph_store.py` |
-| Ingestion pipeline | `fitz_ai/engines/fitz_krag/ingestion/pipeline.py` |
+| Engine | `fitz_sage/engines/fitz_krag/engine.py` |
+| Config | `fitz_sage/engines/fitz_krag/config/schema.py` |
+| Query analyzer | `fitz_sage/engines/fitz_krag/query_analyzer.py` |
+| Retrieval router | `fitz_sage/engines/fitz_krag/retrieval/router.py` |
+| Code search (hybrid) | `fitz_sage/engines/fitz_krag/retrieval/strategies/code_search.py` |
+| Code search (LLM structural) | `fitz_sage/engines/fitz_krag/retrieval/strategies/llm_code_search.py` |
+| Standalone code retrieval | `fitz_sage/code/retriever.py` |
+| Section search | `fitz_sage/engines/fitz_krag/retrieval/strategies/section_search.py` |
+| Table handler | `fitz_sage/engines/fitz_krag/retrieval/table_handler.py` |
+| Context expander | `fitz_sage/engines/fitz_krag/retrieval/expander.py` |
+| Reranker | `fitz_sage/engines/fitz_krag/retrieval/reranker.py` |
+| Multi-hop | `fitz_sage/engines/fitz_krag/retrieval/multihop.py` |
+| Symbol store | `fitz_sage/engines/fitz_krag/ingestion/symbol_store.py` |
+| Section store | `fitz_sage/engines/fitz_krag/ingestion/section_store.py` |
+| Table store | `fitz_sage/engines/fitz_krag/ingestion/table_store.py` |
+| Import graph | `fitz_sage/engines/fitz_krag/ingestion/import_graph_store.py` |
+| Ingestion pipeline | `fitz_sage/engines/fitz_krag/ingestion/pipeline.py` |
 
 ## Standalone Code Retrieval
 
-For code-only use cases that don't need PostgreSQL, pgvector, or docling, fitz-ai provides a standalone `CodeRetriever` (`pip install fitz-ai[code]`):
+For code-only use cases that don't need PostgreSQL, pgvector, or docling, fitz-sage provides a standalone `CodeRetriever` (`pip install fitz-sage[code]`):
 
 ```python
-from fitz_ai.code import CodeRetriever
-from fitz_ai.llm.factory import get_chat_factory
+from fitz_sage.code import CodeRetriever
+from fitz_sage.llm.factory import get_chat_factory
 
 retriever = CodeRetriever(
     source_dir="./myproject",
@@ -195,7 +195,7 @@ results = retriever.retrieve("How does authentication work?")
 
 `CodeRetriever` uses the same retrieval algorithm as KRAG's `LlmCodeSearchStrategy` — AST structural index, combined query expansion + file selection, import graph expansion, neighbor directory expansion — but reads files directly from disk instead of PostgreSQL. No database, no embeddings, no ingestion step.
 
-See `fitz_ai/code/` for implementation.
+See `fitz_sage/code/` for implementation.
 
 ## Related Features
 

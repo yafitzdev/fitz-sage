@@ -15,9 +15,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List
 
-from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
-from fitz_ai.ingestion.source.base import SourceFile
+from fitz_sage.core.document import DocumentElement, ElementType, ParsedDocument
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind, ReadResult
+from fitz_sage.ingestion.source.base import SourceFile
 
 # =============================================================================
 # Common Test Data Builders
@@ -368,7 +368,7 @@ class CollectionInfoBuilder:
         return self
 
     def build(self):
-        from fitz_ai.services.fitz_service import CollectionInfo
+        from fitz_sage.services.fitz_service import CollectionInfo
 
         return CollectionInfo(
             name=self._name,

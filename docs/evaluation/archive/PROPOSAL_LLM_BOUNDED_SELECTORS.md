@@ -81,9 +81,9 @@ Targets 23 remaining `abstain→confident` and `qualified→confident` failures 
 
 ### Files to Modify
 
-- `fitz_ai/core/guardrails/plugins/specific_info_type.py` — add `chat` param, LLM verification in `_check_for_info_type()`
-- `fitz_ai/core/guardrails/__init__.py` — pass `chat` to SIT in factory
-- `fitz_ai/evaluation/benchmarks/fitz_gov.py` — pass `fast_chat` to SIT
+- `fitz_sage/core/guardrails/plugins/specific_info_type.py` — add `chat` param, LLM verification in `_check_for_info_type()`
+- `fitz_sage/core/guardrails/__init__.py` — pass `chat` to SIT in factory
+- `fitz_sage/evaluation/benchmarks/fitz_gov.py` — pass `fast_chat` to SIT
 - `run_targeted_benchmark.py` — pass `fast_chat` to SIT
 
 ---
@@ -139,8 +139,8 @@ Net **+9 to +10 cases**. Qualification category 55.9% → ~70%.
 
 ### Files to Modify
 
-- `fitz_ai/core/guardrails/plugins/conflict_aware.py` — include compared texts in result metadata
-- `fitz_ai/core/governance.py` — add LLM disambiguation in `_resolve_mode()`
+- `fitz_sage/core/guardrails/plugins/conflict_aware.py` — include compared texts in result metadata
+- `fitz_sage/core/governance.py` — add LLM disambiguation in `_resolve_mode()`
 - Multiple factory/benchmark files for `chat` wiring
 
 ---
@@ -198,7 +198,7 @@ Enables aspect mismatch detection for queries currently falling through to GENER
 
 ### Files to Modify
 
-- `fitz_ai/core/guardrails/aspect_classifier.py` — add `chat` param, LLM fallback
+- `fitz_sage/core/guardrails/aspect_classifier.py` — add `chat` param, LLM fallback
 - IE already uses `_aspect_classifier` — just needs the classifier to accept chat
 
 ---
@@ -233,7 +233,7 @@ only shift between `qualified` and `confident` — lowest severity boundary.
 
 ### Files to Modify
 
-- `fitz_ai/core/guardrails/plugins/causal_attribution.py` — add `chat` param, LLM fallback
+- `fitz_sage/core/guardrails/plugins/causal_attribution.py` — add `chat` param, LLM fallback
 
 ---
 
@@ -371,5 +371,5 @@ trying to generalize candidates, prompts, triggers, or fallback behavior. Each p
 still owns its own prompt template, candidate generation, trigger condition, and what
 to do with the result.
 
-This helper could live in `fitz_ai/core/guardrails/llm_helpers.py` or similar.
+This helper could live in `fitz_sage/core/guardrails/llm_helpers.py` or similar.
 But even this is optional — it's ~15 lines and only saves ~8 lines per use.

@@ -10,8 +10,8 @@ import pytest
 
 pytestmark = pytest.mark.tier1
 
-from fitz_ai.vector_db.base import SearchResult
-from fitz_ai.vector_db.custom import CustomVectorDB, _extract_path, _substitute_vars
+from fitz_sage.vector_db.base import SearchResult
+from fitz_sage.vector_db.custom import CustomVectorDB, _extract_path, _substitute_vars
 
 # ---------------------------------------------------------------------------
 # Pure functions

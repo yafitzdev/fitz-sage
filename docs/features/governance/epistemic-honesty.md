@@ -67,12 +67,12 @@ constraints:
 
 ## Files
 
-- **Constraint plugins:** `fitz_ai/governance/constraints/plugins/`
+- **Constraint plugins:** `fitz_sage/governance/constraints/plugins/`
   - `conflict_aware.py` - Detects contradictions across sources
   - `insufficient_evidence.py` - Blocks confident answers without evidence
   - `causal_attribution.py` - Prevents hallucinated causality
-- **Constraint runner:** `fitz_ai/engines/fitz_krag/answering/constraints.py`
-- **Answer modes:** `fitz_ai/core/answer.py` (AnswerMode enum)
+- **Constraint runner:** `fitz_sage/engines/fitz_krag/answering/constraints.py`
+- **Answer modes:** `fitz_sage/core/answer.py` (AnswerMode enum)
 
 ## Benefits
 

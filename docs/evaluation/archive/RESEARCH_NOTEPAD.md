@@ -189,7 +189,7 @@ Modified `InsufficientEvidenceConstraint.apply()` to distinguish:
 - Governance decision: `qualified` (correct!)
 
 **Patch Details**:
-- File: `fitz_ai/core/guardrails/plugins/insufficient_evidence.py`
+- File: `fitz_sage/core/guardrails/plugins/insufficient_evidence.py`
 - Line: ~621 in apply() method
 - Change: Added conditional to return `qualified` when similarity is high but entity missing
 
@@ -655,20 +655,20 @@ Using `diagnose_failures.py` for per-case constraint tracing. Also using `run_ta
 ### Fixes Applied
 
 #### Fix 1: SpecificInfoTypeConstraint Tightening (MAJOR IMPACT)
-- **File**: `fitz_ai/core/guardrails/plugins/specific_info_type.py`
+- **File**: `fitz_sage/core/guardrails/plugins/specific_info_type.py`
 - **Change**: Rewrote `_identify_info_type` to use strict regex patterns instead of broad keyword matching. Removed categories: causal, procedural, capability, location, performance, medical, certification. Kept: pricing, quantity, temporal, specification, measurement, warranty, decision.
 - **Change**: Made `_check_for_info_type` more generous - any plausible evidence counts.
 - **Result**: Constraint now fires on ~30 cases instead of 136 (41% -> ~9%)
 - **Category impact**: Confidence 63.5% -> **84.1%** (+20.6pp)
 
 #### Fix 2: AnswerGovernor Dispute Subordination (MODEST IMPACT)
-- **File**: `fitz_ai/core/governance.py`
+- **File**: `fitz_sage/core/governance.py`
 - **Change**: Added constraint-signal tracking. When IE signals abstain, final mode is abstain regardless of disputes. When 2+ constraints signal qualified vs 1 dispute, qualified wins.
 - **Result**: Qualification +1 case (54.4%), zero regressions
 - **Limitation**: Most qualified->disputed failures have ONLY conflict_aware firing with no competing signal, so governance-layer fix has limited reach.
 
 #### Fix 3: InsufficientEvidence Threshold Raise (TRADEOFF)
-- **File**: `fitz_ai/core/guardrails/plugins/insufficient_evidence.py`
+- **File**: `fitz_sage/core/guardrails/plugins/insufficient_evidence.py`
 - **Change**: Raised "qualified" fallback threshold from 0.50 to 0.57
 - **Also**: Added similarity-aware dispute subordination in governance.py (disputes suppressed when IE similarity < 0.70)
 - **Result**: Abstention +1 case, but relevance dropped (tradeoff discovered)
@@ -1015,7 +1015,7 @@ list[ConstraintResult] → AnswerGovernor.decide() (unchanged)
 
 ### Implementation
 
-**New file**: `fitz_ai/core/guardrails/staged.py`
+**New file**: `fitz_sage/core/guardrails/staged.py`
 
 Key components:
 - **`StageContext`** dataclass — accumulated context passed between stages (relevance_confirmed, max_similarity, relevance_signal, evidence_gaps, etc.)
@@ -1023,7 +1023,7 @@ Key components:
 - **`StagedConstraintPipeline`** class — executes stages in order, passes context forward, short-circuits when Stage 1 emits "abstain"
 - **`run_staged_constraints()`** free function — drop-in replacement for `run_constraints()`, auto-classifies constraints into stages by their `.name` property
 
-**Modified**: `fitz_ai/core/guardrails/runner.py` — `run_constraints()` now delegates to `run_staged_constraints()`. Flat logic preserved as `_run_constraints_flat()`.
+**Modified**: `fitz_sage/core/guardrails/runner.py` — `run_constraints()` now delegates to `run_staged_constraints()`. Flat logic preserved as `_run_constraints_flat()`.
 
 **Stage classification** (by constraint name):
 | Constraint | Stage |
@@ -1360,7 +1360,7 @@ Based on external analysis: regex is safe as a **confidence brake** when it only
 
 ### Change 1: Move SIT to Stage 2 (Sufficiency)
 
-**File**: `fitz_ai/core/guardrails/staged.py` — changed `_STAGE_MAP["specific_info_type"]` from `STAGE_RELEVANCE` to `STAGE_SUFFICIENCY`.
+**File**: `fitz_sage/core/guardrails/staged.py` — changed `_STAGE_MAP["specific_info_type"]` from `STAGE_RELEVANCE` to `STAGE_SUFFICIENCY`.
 
 **Benchmark Impact**: Zero. Identical 70.3% (175/249). Expected — the move changes *when* SIT runs (after IE) but not *whether* it runs. The only behavioral difference: if IE short-circuits with `abstain`, SIT is now skipped (correct — no point checking info types in irrelevant content).
 
@@ -1449,9 +1449,9 @@ Query → _extract_specific_entities() → (specific, critical, primary)
 
 ### Files Modified
 
-- `fitz_ai/core/guardrails/plugins/insufficient_evidence.py` — added `_PRIMARY_ENTITY_PROMPT`, `_LLM_PRIMARY_REJECT`, `_llm_rank_primary_entity()`, `chat` parameter on dataclass, LLM fallback in `_check_embedding_relevance()`
-- `fitz_ai/core/guardrails/__init__.py` — `create_default_constraints()` now passes `chat` to IE
-- `fitz_ai/evaluation/benchmarks/fitz_gov.py` — benchmark passes `fast_chat` to IE
+- `fitz_sage/core/guardrails/plugins/insufficient_evidence.py` — added `_PRIMARY_ENTITY_PROMPT`, `_LLM_PRIMARY_REJECT`, `_llm_rank_primary_entity()`, `chat` parameter on dataclass, LLM fallback in `_check_embedding_relevance()`
+- `fitz_sage/core/guardrails/__init__.py` — `create_default_constraints()` now passes `chat` to IE
+- `fitz_sage/evaluation/benchmarks/fitz_gov.py` — benchmark passes `fast_chat` to IE
 - `run_targeted_benchmark.py` — targeted benchmark passes `fast_chat` to IE
 
 ### Benchmark Results
@@ -1843,7 +1843,7 @@ Root cause traced to two mechanisms:
 
 ### Changes
 
-**File**: `fitz_ai/core/guardrails/plugins/insufficient_evidence.py`
+**File**: `fitz_sage/core/guardrails/plugins/insufficient_evidence.py`
 
 1. **Skip ALL-CAPS words** (lines 396-398): Added check `if clean_word == clean_word.upper() and len(clean_word) > 1: continue`. ALL-CAPS = emphasis markers (e.g., "PRICING"), not proper nouns. Proper nouns use Title Case (e.g., "Tesla", "iPhone").
 

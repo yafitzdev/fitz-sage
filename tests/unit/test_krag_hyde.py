@@ -18,8 +18,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fitz_ai.engines.fitz_krag.retrieval.strategies.code_search import CodeSearchStrategy
-from fitz_ai.engines.fitz_krag.retrieval.strategies.section_search import (
+from fitz_sage.engines.fitz_krag.retrieval.strategies.code_search import CodeSearchStrategy
+from fitz_sage.engines.fitz_krag.retrieval.strategies.section_search import (
     SectionSearchStrategy,
 )
 

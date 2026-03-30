@@ -58,7 +58,7 @@ config_path.write_text(config_content)
 # Step 2: Use Fitz with local config
 # =============================================================================
 
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 # Create instance with local config
 f = fitz(collection="local_demo", config_path=config_path)

@@ -196,7 +196,7 @@ fitz eval fitz-gov --enrich --model ollama/qwen2.5:3b
 ### Python API
 
 ```python
-from fitz_ai.evaluation.benchmarks import FitzGovBenchmark
+from fitz_sage.evaluation.benchmarks import FitzGovBenchmark
 
 benchmark = FitzGovBenchmark(
     model_override="ollama/qwen2.5:3b",
@@ -212,8 +212,8 @@ results = benchmark.evaluate(engine)
 
 | Component | Location |
 |-----------|----------|
-| Benchmark runner | `fitz_ai/evaluation/benchmarks/fitz_gov.py` |
-| Constraint runner | `fitz_ai/core/guardrails/runner.py` |
+| Benchmark runner | `fitz_sage/evaluation/benchmarks/fitz_gov.py` |
+| Constraint runner | `fitz_sage/core/guardrails/runner.py` |
 | **Constraints:** | |
 | InsufficientEvidence | `core/guardrails/plugins/insufficient_evidence.py` |
 | ConflictAware | `core/guardrails/plugins/conflict_aware.py` |

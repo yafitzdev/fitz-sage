@@ -88,9 +88,9 @@ Default weights:
 
 ## Implementation
 
-- **Detection module:** `fitz_ai/retrieval/detection/modules/freshness.py`
-- **Metadata ingestion:** `fitz_ai/ingestion/source/plugins/filesystem.py`
-- **Orchestrator:** `fitz_ai/retrieval/detection/registry.py`
+- **Detection module:** `fitz_sage/retrieval/detection/modules/freshness.py`
+- **Metadata ingestion:** `fitz_sage/ingestion/source/plugins/filesystem.py`
+- **Orchestrator:** `fitz_sage/retrieval/detection/registry.py`
 
 Detection is now LLM-based via the unified `DetectionOrchestrator`. The `FreshnessModule` determines `boost_recency` and `boost_authority` flags from query intent.
 

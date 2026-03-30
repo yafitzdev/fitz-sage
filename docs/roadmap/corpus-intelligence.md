@@ -3,13 +3,13 @@
 
 **Status:** Proposed
 **Target:** v0.11.0
-**Impact:** Transformational — turns fitz-ai from "RAG library that gives answers" into "RAG library that understands its own knowledge"
+**Impact:** Transformational — turns fitz-sage from "RAG library that gives answers" into "RAG library that understands its own knowledge"
 
 ---
 
 ## Problem
 
-fitz-ai's intelligence stack is massive but invisible. The governance cascade extracts 103+ features, runs 5 constraint plugins, produces structured metadata about evidence sufficiency, conflict detection, entity overlap, aspect compatibility, and jury votes. The entity graph maps every extracted entity to every chunk. The detection system classifies query types. Enrichment extracts summaries, keywords, entities.
+fitz-sage's intelligence stack is massive but invisible. The governance cascade extracts 103+ features, runs 5 constraint plugins, produces structured metadata about evidence sufficiency, conflict detection, entity overlap, aspect compatibility, and jury votes. The entity graph maps every extracted entity to every chunk. The detection system classifies query types. Enrichment extracts summaries, keywords, entities.
 
 All of this collapses into three things the developer sees:
 
@@ -27,7 +27,7 @@ Worse: when the system ABSTAINs, it says "I don't have enough information to ans
 
 ## Core Thesis
 
-For a plug-and-play library, **trust matters more than quality**. A 5% retrieval improvement that's invisible doesn't get fitz-ai adopted. Quality intelligence that proves the library works, explains failures, and tells you how to improve — that gets it shipped to production.
+For a plug-and-play library, **trust matters more than quality**. A 5% retrieval improvement that's invisible doesn't get fitz-sage adopted. Quality intelligence that proves the library works, explains failures, and tells you how to improve — that gets it shipped to production.
 
 ---
 
@@ -36,7 +36,7 @@ For a plug-and-play library, **trust matters more than quality**. A 5% retrieval
 ### Per-Answer Quality Signals
 
 ```python
-answer = fitz_ai.query("What is the refund policy?")
+answer = fitz_sage.query("What is the refund policy?")
 answer.confidence      # 0.91
 answer.mode            # TRUSTWORTHY
 answer.explanation     # "Supported by 3 sources from Customer Policy Guide.
@@ -75,7 +75,7 @@ This turns every failed query into a **feedback signal** that improves the knowl
 ### Corpus Health Report
 
 ```python
-report = fitz_ai.health()
+report = fitz_sage.health()
 # {
 #   "coverage": {
 #     "strong": ["refund policy", "API endpoints", "authentication"],
@@ -168,7 +168,7 @@ class GapAnalysis:
 
 **Developer usage:**
 ```python
-answer = fitz_ai.query("...")
+answer = fitz_sage.query("...")
 if answer.confidence > 0.8:
     show_answer(answer.text)
 elif answer.confidence > 0.5:
@@ -202,7 +202,7 @@ else:
 
 ### Phase 4: Corpus Health Report
 
-**Goal:** `fitz_ai.health()` returns a quality assessment of the indexed knowledge base.
+**Goal:** `fitz_sage.health()` returns a quality assessment of the indexed knowledge base.
 
 **What changes:**
 - New `health()` method on SDK that analyzes corpus composition and quality
@@ -299,7 +299,7 @@ Gap Analyzer outputs:
 1. ABSTAIN responses include specific gap analysis (what's missing, what's related, what to add)
 2. `answer.confidence` correlates with actual answer quality (≥0.8 should be correct ≥90% of the time)
 3. `answer.explanation` is human-readable and accurate to constraint results
-4. `fitz_ai.health()` returns meaningful corpus assessment in <2s
+4. `fitz_sage.health()` returns meaningful corpus assessment in <2s
 5. Zero additional LLM calls for Phases 1-3 (Phase 1 reuses existing generation call)
 6. Zero regression on pipeline latency for TRUSTWORTHY/DISPUTED answers
 
@@ -309,10 +309,10 @@ Gap Analyzer outputs:
 
 | Alternative | Why Corpus Intelligence wins |
 |---|---|
-| More retrieval features (GraphRAG, HyDE improvements) | Diminishing returns. fitz-ai already has extensive retrieval. |
+| More retrieval features (GraphRAG, HyDE improvements) | Diminishing returns. fitz-sage already has extensive retrieval. |
 | Context optimization (dedup, compress, reorder) | Invisible to developer. Doesn't build trust. |
 | KRAG Agent (retrieval-as-tools) | Adds latency. Library users want fast, not agentic. |
 | Auto-calibration (benchmark + tune) | Expensive (synthetic Q&A = many LLM calls during ingestion). |
 | Type-aware generation | Prompt engineering. Depends heavily on model quality. |
 
-**The core argument:** fitz-ai's retrieval is strong. The gap is between what the system KNOWS about its own quality and what the developer can SEE. Closing that gap is the highest-leverage addition for a library product.
+**The core argument:** fitz-sage's retrieval is strong. The gap is between what the system KNOWS about its own quality and what the developer can SEE. Closing that gap is the highest-leverage addition for a library product.

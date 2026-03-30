@@ -6,7 +6,7 @@ Unlike other RAG systems that chunk CSVs into fragments, Fitz stores tables
 natively in PostgreSQL. You can run real SQL queries and get computed answers.
 
 Requirements:
-    pip install fitz-ai
+    pip install fitz-sage
     export COHERE_API_KEY="your-key"
 
 Run:
@@ -16,7 +16,7 @@ Run:
 import tempfile
 from pathlib import Path
 
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 # =============================================================================
 # Setup: Create sample CSV data

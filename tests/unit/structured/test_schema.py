@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from fitz_ai.structured.schema import (
+from fitz_sage.structured.schema import (
     SCHEMA_COLLECTION_SUFFIX,
     ColumnSchema,
     SchemaSearchResult,

@@ -9,8 +9,8 @@ import pytest
 
 pytestmark = pytest.mark.tier1
 
-from fitz_ai.core.chunk import Chunk
-from fitz_ai.vector_db.writer import (
+from fitz_sage.core.chunk import Chunk
+from fitz_sage.vector_db.writer import (
     VectorDBWriter,
     chunks_to_points,
     compute_chunk_hash,

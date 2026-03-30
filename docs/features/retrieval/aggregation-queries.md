@@ -66,7 +66,7 @@ Query: "List all the people mentioned in the documents"
 
 ## Technical Details
 
-- **Module**: `fitz_ai/retrieval/detection/modules/aggregation.py`
+- **Module**: `fitz_sage/retrieval/detection/modules/aggregation.py`
 - **Integration**: Part of unified `DetectionOrchestrator` in `VectorSearchStep`
 - **No configuration**: Always active, no opt-out
 

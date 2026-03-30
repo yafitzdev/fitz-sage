@@ -1,12 +1,12 @@
 # tests/unit/test_context_compressor.py
 """Tests for AST-based code compression."""
 
-from fitz_ai.engines.fitz_krag.context.compressor import (
+from fitz_sage.engines.fitz_krag.context.compressor import (
     _strip_comments_and_blanks,
     compress_python,
     compress_results,
 )
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind, ReadResult
 
 
 def _make_result(content: str, kind=AddressKind.SYMBOL, path="foo.py") -> ReadResult:

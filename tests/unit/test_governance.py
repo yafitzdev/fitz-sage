@@ -3,9 +3,9 @@
 
 import pytest
 
-from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.governance import AnswerGovernor, GovernanceDecision
-from fitz_ai.governance.constraints.base import ConstraintResult
+from fitz_sage.core.answer_mode import AnswerMode
+from fitz_sage.governance import AnswerGovernor, GovernanceDecision
+from fitz_sage.governance.constraints.base import ConstraintResult
 
 
 class TestGovernanceDecision:

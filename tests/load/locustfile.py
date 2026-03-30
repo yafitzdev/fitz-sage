@@ -22,7 +22,7 @@ from pathlib import Path
 
 from locust import User, between, task
 
-from fitz_ai.core import Query
+from fitz_sage.core import Query
 
 # Sample queries for load testing
 QUERIES = [
@@ -54,9 +54,9 @@ class DirectRAGUser(User):
     def on_start(self):
         """Initialize pipeline once per user."""
         if DirectRAGUser._pipeline is None:
-            from fitz_ai.core.paths import FitzPaths
-            from fitz_ai.engines.fitz_krag.config import FitzKragConfig
-            from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
+            from fitz_sage.core.paths import FitzPaths
+            from fitz_sage.engines.fitz_krag.config import FitzKragConfig
+            from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
 
             # Set workspace
             project_root = Path(__file__).parent.parent.parent

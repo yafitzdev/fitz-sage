@@ -207,11 +207,11 @@ Model strings are passed verbatim to the gateway. Common formats:
 
 ## Files
 
-- **Enterprise provider:** `fitz_ai/llm/providers/enterprise.py`
-- **M2M authentication:** `fitz_ai/llm/auth/m2m.py`
-- **Composite auth:** `fitz_ai/llm/auth/composite.py`
-- **Config parser:** `fitz_ai/llm/config.py`
-- **Certificate validation:** `fitz_ai/llm/auth/certificates.py`
+- **Enterprise provider:** `fitz_sage/llm/providers/enterprise.py`
+- **M2M authentication:** `fitz_sage/llm/auth/m2m.py`
+- **Composite auth:** `fitz_sage/llm/auth/composite.py`
+- **Config parser:** `fitz_sage/llm/config.py`
+- **Certificate validation:** `fitz_sage/llm/auth/certificates.py`
 
 ## Example: Full Enterprise Setup
 

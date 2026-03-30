@@ -1,5 +1,5 @@
 # docs/roadmap/README.md
-# fitz-ai Roadmap
+# fitz-sage Roadmap
 
 ---
 
@@ -7,14 +7,14 @@
 
 **[Corpus Intelligence — Self-Aware RAG with Actionable Quality Signals](./corpus-intelligence.md)**
 
-Surface fitz-ai's hidden intelligence to developers. Actionable ABSTAIN (explains gaps, suggests documents to add), confidence scores, answer explanations, and corpus health reports. Zero new LLM calls — exposes signals already computed by governance and entity graph.
+Surface fitz-sage's hidden intelligence to developers. Actionable ABSTAIN (explains gaps, suggests documents to add), confidence scores, answer explanations, and corpus health reports. Zero new LLM calls — exposes signals already computed by governance and entity graph.
 
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1 | Actionable ABSTAIN (gap analysis in answer text) | **Done** |
 | 2 | Confidence score on every Answer | Proposed |
 | 3 | Answer explanation from constraint metadata | Proposed |
-| 4 | Corpus health report (`fitz_ai.health()`) | Proposed |
+| 4 | Corpus health report (`fitz_sage.health()`) | Proposed |
 | 5 | ABSTAIN-driven ingestion suggestions | Proposed |
 
 ---
@@ -36,7 +36,7 @@ Reorder query preprocessing: rewrite first, then batch analysis + detection on t
 
 **[KRAG Agent — Retrieval-as-Tools with Epistemic Self-Verification](./krag-agent.md)**
 
-Transform the pipeline into an autonomous agent using retrieval strategies as composable tools. Better suited if fitz-ai expands beyond library into research/investigation use cases.
+Transform the pipeline into an autonomous agent using retrieval strategies as composable tools. Better suited if fitz-sage expands beyond library into research/investigation use cases.
 
 | Phase | Description | Status |
 |-------|-------------|--------|

@@ -220,7 +220,7 @@ python -m tools.governance.train_classifier --mode cascade --time-budget 200
 # Calibrate thresholds (minimizes false-trustworthy)
 python -m tools.governance.calibrate_cascade
 
-# Output: fitz_ai/governance/data/model_v6_cascade.joblib
+# Output: fitz_sage/governance/data/model_v6_cascade.joblib
 ```
 
 ## Files
@@ -228,14 +228,14 @@ python -m tools.governance.calibrate_cascade
 | File | Purpose |
 |------|---------|
 | **Test cases** | [fitz-gov](https://github.com/yafitzdev/fitz-gov) (2,900+ cases) |
-| **Constraints** | `fitz_ai/governance/constraints/plugins/` (IE, CA, CAA, SIT, AV) |
-| **Feature extraction** | `fitz_ai/governance/constraints/feature_extractor.py` (108 features) |
-| **GovernanceDecider** | `fitz_ai/governance/decider.py` (4-question cascade) |
-| **Governor fallback** | `fitz_ai/governance/governor.py` (AnswerGovernor rule-based) |
+| **Constraints** | `fitz_sage/governance/constraints/plugins/` (IE, CA, CAA, SIT, AV) |
+| **Feature extraction** | `fitz_sage/governance/constraints/feature_extractor.py` (108 features) |
+| **GovernanceDecider** | `fitz_sage/governance/decider.py` (4-question cascade) |
+| **Governor fallback** | `fitz_sage/governance/governor.py` (AnswerGovernor rule-based) |
 | **Training pipeline** | `tools/governance/train_classifier.py` |
 | **Threshold calibration** | `tools/governance/calibrate_cascade.py` |
 | **Evaluation pipeline** | `tools/governance/eval_pipeline.py` |
-| **Model artifact** | `fitz_ai/governance/data/model_v6_cascade.joblib` |
+| **Model artifact** | `fitz_sage/governance/data/model_v6_cascade.joblib` |
 
 ## Technical Specification
 

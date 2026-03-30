@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fitz_ai.engines.fitz_krag.retrieval.reader import ContentReader
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind
+from fitz_sage.engines.fitz_krag.retrieval.reader import ContentReader
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind
 
 
 @pytest.fixture

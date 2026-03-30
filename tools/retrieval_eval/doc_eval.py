@@ -10,7 +10,7 @@ Tests the RETRIEVAL pipeline in isolation:
 
 Skips: synthesis, governance, cloud cache, context expansion.
 
-Uses fitz-ai's own engine with config from ~/.fitz/config.yaml
+Uses fitz-sage's own engine with config from ~/.fitz/config.yaml
 (ollama/qwen3.5 + nomic-embed-text by default).
 
 Usage:
@@ -181,7 +181,7 @@ def _clean_collection(collection: str) -> None:
     """Delete stale manifest + parsed cache so point() re-indexes from scratch."""
     import shutil
 
-    from fitz_ai.core.paths import FitzPaths
+    from fitz_sage.core.paths import FitzPaths
 
     col_dir = FitzPaths.workspace() / "collections" / collection
     if col_dir.exists():
@@ -337,7 +337,7 @@ def run_retrieval(engine, query_text: str, top_k: int = 15):
             precomputed = None
 
     # 2. Build retrieval profile and retrieve addresses
-    from fitz_ai.engines.fitz_krag.retrieval_profile import build_retrieval_profile
+    from fitz_sage.engines.fitz_krag.retrieval_profile import build_retrieval_profile
 
     profile = build_retrieval_profile(analysis, detection, engine._config)
 
@@ -384,7 +384,7 @@ def run_eval(
     skip_ingest: bool = False,
 ):
     """Run full document retrieval evaluation."""
-    from fitz_ai.runtime import create_engine
+    from fitz_sage.runtime import create_engine
 
     corpus_dir = Path(corpus_dir)
     if not corpus_dir.exists():

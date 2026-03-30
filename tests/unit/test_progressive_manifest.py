@@ -6,7 +6,7 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-from fitz_ai.engines.fitz_krag.progressive.manifest import (
+from fitz_sage.engines.fitz_krag.progressive.manifest import (
     FileManifest,
     FileState,
     ManifestEntry,

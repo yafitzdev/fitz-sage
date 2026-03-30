@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
-from fitz_ai.cli.cli import app
-from fitz_ai.services.fitz_service import CollectionInfo
+from fitz_sage.cli.cli import app
+from fitz_sage.services.fitz_service import CollectionInfo
 
 runner = CliRunner()
 
@@ -31,7 +31,7 @@ class TestCollectionsCommand:
         mock_service = MagicMock()
         mock_service.list_collections.return_value = []
 
-        with patch("fitz_ai.cli.commands.collections.FitzService", return_value=mock_service):
+        with patch("fitz_sage.cli.commands.collections.FitzService", return_value=mock_service):
             result = runner.invoke(app, ["collections"])
 
         # Should succeed (no collections found message)
@@ -47,8 +47,8 @@ class TestCollectionsHelpers:
         mock_ctx = MagicMock()
         mock_ctx.vector_db_plugin = "pgvector"
 
-        with patch("fitz_ai.cli.context.CLIContext.load", return_value=mock_ctx):
-            from fitz_ai.cli.context import CLIContext
+        with patch("fitz_sage.cli.context.CLIContext.load", return_value=mock_ctx):
+            from fitz_sage.cli.context import CLIContext
 
             ctx = CLIContext.load()
 
@@ -61,8 +61,8 @@ class TestDisplayCollectionsTable:
 
     def test_display_collections_table_plain(self, capsys):
         """Test _display_collections_table outputs table."""
-        with patch("fitz_ai.cli.commands.collections.RICH", False):
-            from fitz_ai.cli.commands.collections import _display_collections_table
+        with patch("fitz_sage.cli.commands.collections.RICH", False):
+            from fitz_sage.cli.commands.collections import _display_collections_table
 
             collections = [
                 {"name": "docs", "count": 100},
@@ -83,8 +83,8 @@ class TestDisplayCollectionInfo:
 
     def test_display_collection_info_plain(self, capsys):
         """Test _display_collection_info shows stats."""
-        with patch("fitz_ai.cli.commands.collections.RICH", False):
-            from fitz_ai.cli.commands.collections import _display_collection_info
+        with patch("fitz_sage.cli.commands.collections.RICH", False):
+            from fitz_sage.cli.commands.collections import _display_collection_info
 
             _display_collection_info(
                 name="my_collection",
@@ -99,8 +99,8 @@ class TestDisplayCollectionInfo:
 
     def test_display_collection_info_vectors_count(self, capsys):
         """Test _display_collection_info handles vectors_count key."""
-        with patch("fitz_ai.cli.commands.collections.RICH", False):
-            from fitz_ai.cli.commands.collections import _display_collection_info
+        with patch("fitz_sage.cli.commands.collections.RICH", False):
+            from fitz_sage.cli.commands.collections import _display_collection_info
 
             _display_collection_info(
                 name="test",
@@ -120,7 +120,7 @@ class TestCollectionsNoCollections:
         mock_service = MagicMock()
         mock_service.list_collections.return_value = []
 
-        with patch("fitz_ai.cli.commands.collections.FitzService", return_value=mock_service):
+        with patch("fitz_sage.cli.commands.collections.FitzService", return_value=mock_service):
             result = runner.invoke(app, ["collections"])
 
         assert "no collection" in result.output.lower() or "ingest" in result.output.lower()
@@ -137,7 +137,7 @@ class TestCollectionsWithData:
             CollectionInfo(name="code", chunk_count=50),
         ]
 
-        with patch("fitz_ai.cli.commands.collections.FitzService", return_value=mock_service):
+        with patch("fitz_sage.cli.commands.collections.FitzService", return_value=mock_service):
             # Select "Exit" (option 3 - after docs, code)
             result = runner.invoke(app, ["collections"], input="3\n")
 
@@ -156,7 +156,7 @@ class TestCollectionsWithData:
             metadata={"vector_size": 768},
         )
 
-        with patch("fitz_ai.cli.commands.collections.FitzService", return_value=mock_service):
+        with patch("fitz_sage.cli.commands.collections.FitzService", return_value=mock_service):
             # Select first collection, then Exit
             result = runner.invoke(app, ["collections"], input="1\n3\n")
 
@@ -178,7 +178,7 @@ class TestCollectionsDelete:
             metadata={},
         )
 
-        with patch("fitz_ai.cli.commands.collections.FitzService", return_value=mock_service):
+        with patch("fitz_sage.cli.commands.collections.FitzService", return_value=mock_service):
             # Menu ordering (UI puts default first):
             # [1] docs (default) [2] Exit -> select 1 (docs)
             # [1] Back to list (default) [2] Delete collection [3] Exit -> select 2 (delete)

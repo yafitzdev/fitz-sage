@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from fitz_ai.tabular.parser.csv_parser import (
+from fitz_sage.tabular.parser.csv_parser import (
     can_parse,
     get_sample_rows,
     parse_csv,

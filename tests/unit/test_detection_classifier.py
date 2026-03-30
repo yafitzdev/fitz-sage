@@ -22,9 +22,9 @@ try:
 except ImportError:
     _has_scipy = False
 
-from fitz_ai.retrieval.detection.classifier import DetectionClassifier
-from fitz_ai.retrieval.detection.protocol import DetectionCategory, DetectionResult
-from fitz_ai.retrieval.detection.registry import DetectionOrchestrator
+from fitz_sage.retrieval.detection.classifier import DetectionClassifier
+from fitz_sage.retrieval.detection.protocol import DetectionCategory, DetectionResult
+from fitz_sage.retrieval.detection.registry import DetectionOrchestrator
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -99,7 +99,7 @@ class TestDetectionClassifierLoading:
     def test_unavailable_when_model_missing(self, tmp_path):
         """Classifier marks itself unavailable when joblib file is not found."""
         with patch(
-            "fitz_ai.retrieval.detection.classifier._MODEL_PATH",
+            "fitz_sage.retrieval.detection.classifier._MODEL_PATH",
             tmp_path / "nonexistent.joblib",
         ):
             clf = DetectionClassifier()

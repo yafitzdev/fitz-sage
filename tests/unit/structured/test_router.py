@@ -9,14 +9,14 @@ from typing import Any
 
 import pytest
 
-from fitz_ai.structured.router import (
+from fitz_sage.structured.router import (
     QueryRouter,
     SemanticRoute,
     StructuredRoute,
     _format_schemas_for_prompt,
     _parse_classification_response,
 )
-from fitz_ai.structured.schema import ColumnSchema, SchemaStore, TableSchema
+from fitz_sage.structured.schema import ColumnSchema, SchemaStore, TableSchema
 
 
 # Mock implementations

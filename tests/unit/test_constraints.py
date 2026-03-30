@@ -17,19 +17,19 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fitz_ai.core.answer_mode import AnswerMode
+from fitz_sage.core.answer_mode import AnswerMode
 
 # Pure logic tests - run on every commit
 pytestmark = pytest.mark.tier1
 
-from fitz_ai.core.chunk import Chunk
-from fitz_ai.governance import (
+from fitz_sage.core.chunk import Chunk
+from fitz_sage.governance import (
     AnswerGovernor,
     ConflictAwareConstraint,
     ConstraintResult,
     run_constraints,
 )
-from fitz_ai.governance.constraints.semantic import RESOLUTION_QUERY_CONCEPTS
+from fitz_sage.governance.constraints.semantic import RESOLUTION_QUERY_CONCEPTS
 
 # =============================================================================
 # Mock Embedder (for resolution query detection)
@@ -481,7 +481,7 @@ class TestAnswerVerificationConstraint:
 
     def test_no_chat_allows_answer(self):
         """Should allow when no chat provider available."""
-        from fitz_ai.governance import AnswerVerificationConstraint
+        from fitz_sage.governance import AnswerVerificationConstraint
 
         constraint = AnswerVerificationConstraint(chat=None)
 
@@ -492,7 +492,7 @@ class TestAnswerVerificationConstraint:
 
     def test_empty_chunks_allows_answer(self):
         """Should allow when no chunks (handled by InsufficientEvidence)."""
-        from fitz_ai.governance import AnswerVerificationConstraint
+        from fitz_sage.governance import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         constraint = AnswerVerificationConstraint(chat=mock_chat)
@@ -504,7 +504,7 @@ class TestAnswerVerificationConstraint:
 
     def test_disabled_constraint_allows_answer(self):
         """Should allow when constraint is disabled."""
-        from fitz_ai.governance import AnswerVerificationConstraint
+        from fitz_sage.governance import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         constraint = AnswerVerificationConstraint(chat=mock_chat, enabled=False)
@@ -517,7 +517,7 @@ class TestAnswerVerificationConstraint:
 
     def test_exact_citation_allows_answer(self):
         """Should allow when LLM quotes an exact substring from the context."""
-        from fitz_ai.governance import AnswerVerificationConstraint
+        from fitz_sage.governance import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         # LLM returns an exact quote from the chunk
@@ -533,7 +533,7 @@ class TestAnswerVerificationConstraint:
 
     def test_no_citation_qualifies(self):
         """Should fire qualified signal when LLM returns NONE."""
-        from fitz_ai.governance import AnswerVerificationConstraint
+        from fitz_sage.governance import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         mock_chat.chat.return_value = "NONE"
@@ -548,7 +548,7 @@ class TestAnswerVerificationConstraint:
 
     def test_fuzzy_citation_allows(self):
         """Should allow when LLM returns a close-enough citation (fuzzy match)."""
-        from fitz_ai.governance import AnswerVerificationConstraint
+        from fitz_sage.governance import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         # Citation with minor variation but high overlap
@@ -563,7 +563,7 @@ class TestAnswerVerificationConstraint:
 
     def test_fabricated_citation_qualifies(self):
         """Should fire when LLM fabricates a quote not in the context."""
-        from fitz_ai.governance import AnswerVerificationConstraint
+        from fitz_sage.governance import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         # Quote not present in context at all
@@ -578,7 +578,7 @@ class TestAnswerVerificationConstraint:
 
     def test_multiple_chunks_early_exit_on_strong(self):
         """Should early exit when first chunk produces a strong citation."""
-        from fitz_ai.governance import AnswerVerificationConstraint
+        from fitz_sage.governance import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         # First chunk returns exact match — should not call for more chunks
@@ -598,7 +598,7 @@ class TestAnswerVerificationConstraint:
 
     def test_llm_error_gracefully_handles(self):
         """Should handle LLM errors gracefully."""
-        from fitz_ai.governance import AnswerVerificationConstraint
+        from fitz_sage.governance import AnswerVerificationConstraint
 
         mock_chat = MagicMock()
         mock_chat.chat.side_effect = Exception("LLM error")
@@ -613,7 +613,7 @@ class TestAnswerVerificationConstraint:
 
     def test_feature_schema_declares_citation_features(self):
         """Should declare citation-based features in schema."""
-        from fitz_ai.governance import AnswerVerificationConstraint
+        from fitz_sage.governance import AnswerVerificationConstraint
 
         schema = AnswerVerificationConstraint.feature_schema()
         names = {s.name for s in schema}

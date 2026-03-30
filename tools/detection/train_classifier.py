@@ -1,12 +1,12 @@
 # tools/detection/train_classifier.py
 """
-Training script for the fitz-ai ML detection classifier.
+Training script for the fitz-sage ML detection classifier.
 
 Loads tier1_core JSON files from fitz-gov, derives binary labels for
 temporal, comparison, aggregation, and freshness query types, trains a
 MultiOutputClassifier backed by LogisticRegression, calibrates per-label
 recall thresholds to >= 0.90, and saves the final artifact to:
-    fitz_ai/retrieval/detection/data/model_v1_detection.joblib
+    fitz_sage/retrieval/detection/data/model_v1_detection.joblib
 
 Usage:
     python -m tools.detection.train_classifier
@@ -34,7 +34,7 @@ from sklearn.multioutput import MultiOutputClassifier
 _SCRIPT_DIR = Path(__file__).parent
 _DATA_DIR = _SCRIPT_DIR / "../../../../fitz-gov/data/tier1_core"
 _OUTPUT_PATH = (
-    _SCRIPT_DIR / "../../fitz_ai/retrieval/detection/data/model_v1_detection.joblib"
+    _SCRIPT_DIR / "../../fitz_sage/retrieval/detection/data/model_v1_detection.joblib"
 ).resolve()
 
 _TIER1_GLOB = "*.json"

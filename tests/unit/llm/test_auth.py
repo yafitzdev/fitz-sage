@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from fitz_ai.llm.auth import ApiKeyAuth, AuthProvider, CompositeAuth, M2MAuth
-from fitz_ai.llm.config import resolve_auth
+from fitz_sage.llm.auth import ApiKeyAuth, AuthProvider, CompositeAuth, M2MAuth
+from fitz_sage.llm.config import resolve_auth
 
 
 class TestAuthProvider:

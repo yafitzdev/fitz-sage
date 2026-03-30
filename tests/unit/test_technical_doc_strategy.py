@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import pytest
 
-from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
-from fitz_ai.engines.fitz_krag.ingestion.strategies.technical_doc import (
+from fitz_sage.core.document import DocumentElement, ElementType, ParsedDocument
+from fitz_sage.engines.fitz_krag.ingestion.strategies.technical_doc import (
     DOC_EXTENSIONS,
     TechnicalDocIngestStrategy,
 )

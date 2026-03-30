@@ -3,19 +3,19 @@
 Property-based tests for ExpansionDetector.
 
 Tests pure, deterministic properties of query expansion logic.
-Target: fitz_ai/retrieval/detection/detectors/expansion.py
+Target: fitz_sage/retrieval/detection/detectors/expansion.py
 """
 
 import pytest
 from hypothesis import given, settings
 
-from fitz_ai.retrieval.detection.detectors.expansion import (
+from fitz_sage.retrieval.detection.detectors.expansion import (
     ACRONYMS,
     MAX_VARIATIONS,
     SYNONYMS,
     ExpansionDetector,
 )
-from fitz_ai.retrieval.detection.protocol import DetectionCategory
+from fitz_sage.retrieval.detection.protocol import DetectionCategory
 
 from .strategies import (
     non_empty_text,

@@ -16,8 +16,8 @@ _orig_ts_lang = sys.modules.get("tree_sitter_typescript")
 sys.modules["tree_sitter"] = _mock_ts
 sys.modules["tree_sitter_typescript"] = _mock_ts_lang
 
-import fitz_ai.engines.fitz_krag.ingestion.strategies.typescript as _ts_mod  # noqa: E402
-from fitz_ai.engines.fitz_krag.ingestion.strategies.typescript import (  # noqa: E402
+import fitz_sage.engines.fitz_krag.ingestion.strategies.typescript as _ts_mod  # noqa: E402
+from fitz_sage.engines.fitz_krag.ingestion.strategies.typescript import (  # noqa: E402
     TypeScriptIngestStrategy,
     _extract_import,
     _node_text,

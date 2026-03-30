@@ -76,14 +76,14 @@ def find_yaml_plugin_dirs(repo_root: Path, pkg_name: str) -> List[Tuple[str, str
         # Infer plugin type from path
         parts = rel_path.split("/")
         if "plugins" in parts:
-            # e.g., fitz_ai/vector_db/plugins -> vector_db
+            # e.g., fitz_sage/vector_db/plugins -> vector_db
             idx = parts.index("plugins")
             if idx > 0:
                 plugin_type = parts[idx - 1]
             else:
                 plugin_type = "plugins"
         else:
-            # e.g., fitz_ai/llm/chat -> chat
+            # e.g., fitz_sage/llm/chat -> chat
             plugin_type = parts[-1] if parts else "unknown"
 
         if (rel_path, plugin_type) not in results:

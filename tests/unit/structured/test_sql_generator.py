@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 
-from fitz_ai.structured.schema import ColumnSchema, TableSchema
-from fitz_ai.structured.sql_generator import (
+from fitz_sage.structured.schema import ColumnSchema, TableSchema
+from fitz_sage.structured.sql_generator import (
     SQLGenerator,
     SQLQuery,
     _parse_group_by,

@@ -1,6 +1,6 @@
 # tests/unit/test_rewriter.py
 """
-Tests for fitz_ai.retrieval.rewriter module.
+Tests for fitz_sage.retrieval.rewriter module.
 
 Tests cover:
 1. QueryRewriter - query rewriting with LLM
@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from fitz_ai.retrieval.rewriter import (
+from fitz_sage.retrieval.rewriter import (
     ConversationContext,
     ConversationMessage,
     QueryRewriter,

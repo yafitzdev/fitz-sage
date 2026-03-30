@@ -1,6 +1,6 @@
 # tools/pre_release/lint.py
 """
-Pre-release lint script for fitz-ai.
+Pre-release lint script for fitz-sage.
 
 Runs code quality checks before tagging a release.
 
@@ -15,7 +15,7 @@ Requirements:
     pip install ruff black isort
 
 Ruff unsafe fix:
-    ruff check --fix --unsafe-fixes fitz_ai tests tools
+    ruff check --fix --unsafe-fixes fitz_sage tests tools
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ from pathlib import Path
 DEFAULT_FIX_MODE = True
 
 # Paths to lint (relative to project root)
-LINT_PATHS = ["fitz_ai", "tests", "tools"]
+LINT_PATHS = ["fitz_sage", "tests", "tools"]
 
 # Set to True to skip isort (if you use ruff's import sorting instead)
 SKIP_ISORT = False

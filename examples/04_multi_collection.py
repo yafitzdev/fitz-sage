@@ -9,7 +9,7 @@ stored in separate PostgreSQL databases. Perfect for:
 - A/B testing different document sets
 
 Requirements:
-    pip install fitz-ai
+    pip install fitz-sage
     export COHERE_API_KEY="your-key"
 
 Run:
@@ -19,7 +19,7 @@ Run:
 import tempfile
 from pathlib import Path
 
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 # =============================================================================
 # Setup: Create documents for different domains
@@ -165,7 +165,7 @@ CLI commands for managing collections:
 
 Or programmatically via the vector DB:
 
-  from fitz_ai.vector_db import get_vector_db
+  from fitz_sage.vector_db import get_vector_db
   vdb = get_vector_db()
   collections = vdb.list_collections()
   vdb.delete_collection("old_collection")

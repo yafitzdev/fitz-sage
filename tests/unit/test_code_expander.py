@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-from fitz_ai.engines.fitz_krag.retrieval.expander import CodeExpander
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
+from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+from fitz_sage.engines.fitz_krag.retrieval.expander import CodeExpander
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind, ReadResult
 
 
 @pytest.fixture

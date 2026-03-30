@@ -13,10 +13,10 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
-from fitz_ai.core.chunk import Chunk
-from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
-from fitz_ai.ingestion.enrichment.config import HierarchyConfig
-from fitz_ai.ingestion.enrichment.hierarchy import (
+from fitz_sage.core.chunk import Chunk
+from fitz_sage.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
+from fitz_sage.ingestion.enrichment.config import HierarchyConfig
+from fitz_sage.ingestion.enrichment.hierarchy import (
     EmbeddingProvider,
     HierarchyEnricher,
     SemanticGrouper,

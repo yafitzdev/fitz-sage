@@ -79,7 +79,7 @@ def tiered_pipeline(krag_e2e_runner):
 
     Returns a callable that runs a query and assertion with tiered fallback.
     """
-    from fitz_ai.core import Query
+    from fitz_sage.core import Query
 
     config = load_e2e_config()
     tier_names = get_tier_names(config)

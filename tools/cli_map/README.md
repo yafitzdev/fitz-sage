@@ -2,7 +2,7 @@
 
 Generates the CLI command reference used in `docs/CLI.md`.
 
-Introspects Click command groups registered under `fitz_ai/cli/` and emits structured documentation.
+Introspects Click command groups registered under `fitz_sage/cli/` and emits structured documentation.
 
 ## Usage
 

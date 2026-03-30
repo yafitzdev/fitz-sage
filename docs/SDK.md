@@ -7,9 +7,9 @@ Complete reference for the Fitz Python SDK (v0.10.0).
 ## Quick Start
 
 ```python
-import fitz_ai
+import fitz_sage
 
-answer = fitz_ai.query("What is the refund policy?", source="./docs")
+answer = fitz_sage.query("What is the refund policy?", source="./docs")
 print(answer.text)
 ```
 
@@ -19,12 +19,12 @@ print(answer.text)
 
 The simplest way to use Fitz - matches CLI behavior.
 
-### fitz_ai.query()
+### fitz_sage.query()
 
 Query the knowledge base.
 
 ```python
-fitz_ai.query(
+fitz_sage.query(
     question: str,             # The question to ask
     top_k: int = None          # Override chunk count
 ) -> Answer
@@ -35,7 +35,7 @@ fitz_ai.query(
 **Examples:**
 
 ```python
-answer = fitz_ai.query("What is the refund policy?")
+answer = fitz_sage.query("What is the refund policy?")
 print(answer.text)
 print(answer.mode)  # TRUSTWORTHY, DISPUTED, or ABSTAIN
 
@@ -54,7 +54,7 @@ For advanced usage with multiple collections or custom configuration.
 ### Constructor
 
 ```python
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 f = fitz(
     collection: str = "default",     # Collection name
@@ -93,7 +93,7 @@ f.query(
 ### Examples
 
 ```python
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 # Multiple collections
 physics = fitz(collection="physics")
@@ -118,7 +118,7 @@ f = fitz(auto_init=False)  # Raises if no config
 The response from a query.
 
 ```python
-from fitz_ai import Answer
+from fitz_sage import Answer
 
 class Answer:
     text: str                    # The answer text
@@ -140,7 +140,7 @@ class Answer:
 Source attribution for an answer.
 
 ```python
-from fitz_ai import Provenance
+from fitz_sage import Provenance
 
 class Provenance:
     source_id: str    # Unique source identifier
@@ -153,7 +153,7 @@ class Provenance:
 Input to the engine (for advanced usage).
 
 ```python
-from fitz_ai import Query
+from fitz_sage import Query
 
 query = Query(
     text="What is X?",
@@ -167,7 +167,7 @@ query = Query(
 Query-time constraints (for advanced usage).
 
 ```python
-from fitz_ai import Constraints
+from fitz_sage import Constraints
 
 constraints = Constraints(
     max_sources: int = None,     # Limit source count
@@ -183,7 +183,7 @@ constraints = Constraints(
 ### Direct Engine Access
 
 ```python
-from fitz_ai import create_engine, Query
+from fitz_sage import create_engine, Query
 
 # Create engine instance
 engine = create_engine("fitz_krag")
@@ -198,7 +198,7 @@ answer = engine.answer(query)
 ### Engine Selection
 
 ```python
-from fitz_ai import run, list_engines
+from fitz_sage import run, list_engines
 
 # List available engines
 engines = list_engines()
@@ -211,7 +211,7 @@ answer = run("What is X?", engine="fitz_krag")
 ### Fitz KRAG Specific
 
 ```python
-from fitz_ai import run_fitz_krag, create_fitz_krag_engine
+from fitz_sage import run_fitz_krag, create_fitz_krag_engine
 
 # KRAG-specific entry point
 answer = run_fitz_krag("What is X?")
@@ -225,7 +225,7 @@ engine = create_fitz_krag_engine()
 ## Error Handling
 
 ```python
-from fitz_ai import (
+from fitz_sage import (
     ConfigurationError,
     EngineError,
     QueryError,
@@ -234,7 +234,7 @@ from fitz_ai import (
 )
 
 try:
-    answer = fitz_ai.query("What is X?")
+    answer = fitz_sage.query("What is X?")
 except ConfigurationError as e:
     print(f"Config issue: {e}")
 except QueryError as e:

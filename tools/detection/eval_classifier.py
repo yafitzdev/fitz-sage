@@ -69,8 +69,8 @@ def main() -> None:
     print(f"Loaded {len(cases)} cases from {data_dir}")
 
     # Import here to ensure the installed package is used
-    from fitz_ai.retrieval.detection.classifier import DetectionClassifier
-    from fitz_ai.retrieval.detection.protocol import DetectionCategory
+    from fitz_sage.retrieval.detection.classifier import DetectionClassifier
+    from fitz_sage.retrieval.detection.protocol import DetectionCategory
 
     clf = DetectionClassifier()
     if not clf.available:

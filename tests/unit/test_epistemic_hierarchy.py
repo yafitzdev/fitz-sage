@@ -12,14 +12,14 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from fitz_ai.core.chunk import Chunk
-from fitz_ai.ingestion.enrichment.config import HierarchyConfig
-from fitz_ai.ingestion.enrichment.hierarchy import (
+from fitz_sage.core.chunk import Chunk
+from fitz_sage.ingestion.enrichment.config import HierarchyConfig
+from fitz_sage.ingestion.enrichment.hierarchy import (
     EpistemicAssessment,
     HierarchyEnricher,
     assess_chunk_group,
 )
-from fitz_ai.prompts.hierarchy import (
+from fitz_sage.prompts.hierarchy import (
     build_epistemic_corpus_prompt,
     build_epistemic_group_prompt,
 )
@@ -66,7 +66,7 @@ class TestEpistemicAssessment:
         detection was unreliable. Conflicts are now detected at query time using
         LLM-based analysis in ConflictAwareConstraint.
         """
-        from fitz_ai.governance import SemanticMatcher
+        from fitz_sage.governance import SemanticMatcher
 
         from .mock_embedder import create_deterministic_embedder
 
@@ -284,7 +284,7 @@ class TestHierarchyEnricherEpistemic:
         still adds epistemic metadata (evidence density, chunk count, etc.)
         but does not detect conflicts at ingest time.
         """
-        from fitz_ai.governance import SemanticMatcher
+        from fitz_sage.governance import SemanticMatcher
 
         from .mock_embedder import create_deterministic_embedder
 
@@ -383,7 +383,7 @@ class TestSingleSourceOfTruth:
         This test verifies the constraint returns expected behavior without LLM,
         and the epistemic assessment handles conflict detection independently.
         """
-        from fitz_ai.governance import ConflictAwareConstraint, SemanticMatcher
+        from fitz_sage.governance import ConflictAwareConstraint, SemanticMatcher
 
         from .mock_embedder import create_deterministic_embedder
 

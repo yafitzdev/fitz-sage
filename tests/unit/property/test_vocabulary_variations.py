@@ -3,13 +3,13 @@
 Property-based tests for vocabulary variation generation.
 
 Tests pure, deterministic properties of variation generation and normalization.
-Target: fitz_ai/retrieval/vocabulary/variations.py
+Target: fitz_sage/retrieval/vocabulary/variations.py
 """
 
 import pytest
 from hypothesis import assume, given
 
-from fitz_ai.retrieval.vocabulary.variations import (
+from fitz_sage.retrieval.vocabulary.variations import (
     generate_variations,
     normalize_for_matching,
 )

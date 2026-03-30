@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fitz_ai.core import (
+from fitz_sage.core import (
     Answer,
     ConfigurationError,
     GenerationError,
@@ -20,9 +20,9 @@ from fitz_ai.core import (
     Provenance,
     QueryError,
 )
-from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
+from fitz_sage.core.answer_mode import AnswerMode
+from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -78,8 +78,8 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._source_dir = None
     engine._hyde_generator = None
     # Configure batcher to return sensible defaults so batched dispatch works
-    from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
-    from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
+    from fitz_sage.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
+    from fitz_sage.engines.fitz_krag.query_batcher import BatchResult
 
     def _default_batch_classify(query, **kwargs):
         return BatchResult(
@@ -112,7 +112,7 @@ class TestEngineInit:
 
     # All lazy imports inside _init_components must be patched at the
     # location where they are imported (the engine module's namespace).
-    _ENGINE_MOD = "fitz_ai.engines.fitz_krag.engine"
+    _ENGINE_MOD = "fitz_sage.engines.fitz_krag.engine"
 
     @pytest.fixture()
     def _patches(self):
@@ -122,48 +122,48 @@ class TestEngineInit:
         """
         names = {
             # llm
-            "get_chat": "fitz_ai.llm.client.get_chat",
-            "get_embedder": "fitz_ai.llm.client.get_embedder",
+            "get_chat": "fitz_sage.llm.client.get_chat",
+            "get_embedder": "fitz_sage.llm.client.get_embedder",
             # storage
-            "PostgresConnectionManager": ("fitz_ai.storage.postgres.PostgresConnectionManager"),
+            "PostgresConnectionManager": ("fitz_sage.storage.postgres.PostgresConnectionManager"),
             # stores
-            "RawFileStore": ("fitz_ai.engines.fitz_krag.ingestion" ".raw_file_store.RawFileStore"),
-            "SymbolStore": ("fitz_ai.engines.fitz_krag.ingestion" ".symbol_store.SymbolStore"),
+            "RawFileStore": ("fitz_sage.engines.fitz_krag.ingestion" ".raw_file_store.RawFileStore"),
+            "SymbolStore": ("fitz_sage.engines.fitz_krag.ingestion" ".symbol_store.SymbolStore"),
             "ImportGraphStore": (
-                "fitz_ai.engines.fitz_krag.ingestion" ".import_graph_store.ImportGraphStore"
+                "fitz_sage.engines.fitz_krag.ingestion" ".import_graph_store.ImportGraphStore"
             ),
-            "SectionStore": ("fitz_ai.engines.fitz_krag.ingestion" ".section_store.SectionStore"),
-            "TableStoreKrag": ("fitz_ai.engines.fitz_krag.ingestion" ".table_store.TableStore"),
-            "ensure_schema": ("fitz_ai.engines.fitz_krag.ingestion" ".schema.ensure_schema"),
+            "SectionStore": ("fitz_sage.engines.fitz_krag.ingestion" ".section_store.SectionStore"),
+            "TableStoreKrag": ("fitz_sage.engines.fitz_krag.ingestion" ".table_store.TableStore"),
+            "ensure_schema": ("fitz_sage.engines.fitz_krag.ingestion" ".schema.ensure_schema"),
             # strategies
             "CodeSearchStrategy": (
-                "fitz_ai.engines.fitz_krag.retrieval" ".strategies.code_search.CodeSearchStrategy"
+                "fitz_sage.engines.fitz_krag.retrieval" ".strategies.code_search.CodeSearchStrategy"
             ),
             "SectionSearchStrategy": (
-                "fitz_ai.engines.fitz_krag.retrieval"
+                "fitz_sage.engines.fitz_krag.retrieval"
                 ".strategies.section_search.SectionSearchStrategy"
             ),
             "TableSearchStrategy": (
-                "fitz_ai.engines.fitz_krag.retrieval" ".strategies.table_search.TableSearchStrategy"
+                "fitz_sage.engines.fitz_krag.retrieval" ".strategies.table_search.TableSearchStrategy"
             ),
             # retrieval
-            "RetrievalRouter": ("fitz_ai.engines.fitz_krag.retrieval" ".router.RetrievalRouter"),
-            "ContentReader": ("fitz_ai.engines.fitz_krag.retrieval" ".reader.ContentReader"),
-            "CodeExpander": ("fitz_ai.engines.fitz_krag.retrieval" ".expander.CodeExpander"),
+            "RetrievalRouter": ("fitz_sage.engines.fitz_krag.retrieval" ".router.RetrievalRouter"),
+            "ContentReader": ("fitz_sage.engines.fitz_krag.retrieval" ".reader.ContentReader"),
+            "CodeExpander": ("fitz_sage.engines.fitz_krag.retrieval" ".expander.CodeExpander"),
             "TableQueryHandler": (
-                "fitz_ai.engines.fitz_krag.retrieval" ".table_handler.TableQueryHandler"
+                "fitz_sage.engines.fitz_krag.retrieval" ".table_handler.TableQueryHandler"
             ),
             # query analysis
-            "QueryAnalyzer": ("fitz_ai.engines.fitz_krag" ".query_analyzer.QueryAnalyzer"),
+            "QueryAnalyzer": ("fitz_sage.engines.fitz_krag" ".query_analyzer.QueryAnalyzer"),
             # context + generation
-            "ContextAssembler": ("fitz_ai.engines.fitz_krag.context" ".assembler.ContextAssembler"),
+            "ContextAssembler": ("fitz_sage.engines.fitz_krag.context" ".assembler.ContextAssembler"),
             "CodeSynthesizer": (
-                "fitz_ai.engines.fitz_krag.generation" ".synthesizer.CodeSynthesizer"
+                "fitz_sage.engines.fitz_krag.generation" ".synthesizer.CodeSynthesizer"
             ),
             # shared tabular
-            "PostgresTableStore": ("fitz_ai.tabular.store.postgres.PostgresTableStore"),
+            "PostgresTableStore": ("fitz_sage.tabular.store.postgres.PostgresTableStore"),
             # factory
-            "get_chat_factory": "fitz_ai.llm.factory.get_chat_factory",
+            "get_chat_factory": "fitz_sage.llm.factory.get_chat_factory",
         }
 
         patchers = {key: patch(target) for key, target in names.items()}
@@ -275,7 +275,7 @@ class TestAnswer:
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
         assert call_args[0][0] == query.text
-        from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
+        from fitz_sage.engines.fitz_krag.retrieval_profile import RetrievalProfile
 
         assert isinstance(call_args[0][1], RetrievalProfile)
         assert call_args[1]["rewrite_result"] is None
@@ -289,7 +289,7 @@ class TestAnswer:
             query.text,
             expanded,
         )
-        from fitz_ai.core.answer_mode import AnswerMode
+        from fitz_sage.core.answer_mode import AnswerMode
 
         engine._synthesizer.generate.assert_called_once_with(
             query.text,

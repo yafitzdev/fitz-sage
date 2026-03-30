@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fitz_ai.structured.types import (
+from fitz_sage.structured.types import (
     TYPE_BOOLEAN,
     TYPE_DATE,
     TYPE_NUMBER,

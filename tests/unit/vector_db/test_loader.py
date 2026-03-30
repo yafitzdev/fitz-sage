@@ -12,8 +12,8 @@ import yaml
 
 pytestmark = pytest.mark.tier1
 
-from fitz_ai.vector_db.base import SearchResult
-from fitz_ai.vector_db.loader import (
+from fitz_sage.vector_db.base import SearchResult
+from fitz_sage.vector_db.loader import (
     GenericVectorDBPlugin,
     VectorDBSpec,
     _string_to_uuid,

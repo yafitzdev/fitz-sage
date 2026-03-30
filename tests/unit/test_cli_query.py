@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-from fitz_ai.cli.cli import app
-from fitz_ai.core import Answer
+from fitz_sage.cli.cli import app
+from fitz_sage.core import Answer
 
 runner = CliRunner()
 
@@ -19,7 +19,7 @@ runner = CliRunner()
 @pytest.fixture(autouse=True)
 def _skip_firstrun():
     """Skip first-run detection in all query CLI tests."""
-    with patch("fitz_ai.core.firstrun.needs_firstrun", return_value=False):
+    with patch("fitz_sage.core.firstrun.needs_firstrun", return_value=False):
         yield
 
 
@@ -45,8 +45,8 @@ class TestQueryCommand:
         mock_registry.get_list_collections.return_value = []
 
         with (
-            patch("fitz_ai.cli.commands.query.get_engine_registry", return_value=mock_registry),
-            patch("fitz_ai.cli.commands.query.get_default_engine", return_value="fitz_krag"),
+            patch("fitz_sage.cli.commands.query.get_engine_registry", return_value=mock_registry),
+            patch("fitz_sage.cli.commands.query.get_default_engine", return_value="fitz_krag"),
         ):
             result = runner.invoke(app, ["query", "test question"])
 
@@ -60,7 +60,7 @@ class TestQueryHelpers:
         """Test CLIContext.load() returns raw and typed config."""
         import yaml
 
-        from fitz_ai.cli.context import CLIContext
+        from fitz_sage.cli.context import CLIContext
 
         # Create flat config file
         config_path = tmp_path / "config.yaml"
@@ -75,7 +75,7 @@ class TestQueryHelpers:
         config_path.write_text(yaml.dump(config))
 
         with patch(
-            "fitz_ai.cli.context.FitzPaths.config",
+            "fitz_sage.cli.context.FitzPaths.config",
             return_value=config_path,
         ):
             ctx = CLIContext.load(engine="fitz_krag")
@@ -88,7 +88,7 @@ class TestQueryHelpers:
         mock_ctx = MagicMock()
         mock_ctx.get_collections.return_value = ["coll_a", "coll_b"]
 
-        from fitz_ai.cli.utils import get_collections
+        from fitz_sage.cli.utils import get_collections
 
         collections = get_collections(mock_ctx)
 
@@ -99,7 +99,7 @@ class TestQueryHelpers:
         mock_ctx = MagicMock()
         mock_ctx.get_collections.return_value = []
 
-        from fitz_ai.cli.utils import get_collections
+        from fitz_sage.cli.utils import get_collections
 
         collections = get_collections(mock_ctx)
 
@@ -129,9 +129,9 @@ class TestQueryExecution:
         mock_registry.get_list_collections.return_value = ["test"]
 
         with (
-            patch("fitz_ai.cli.commands.query.get_engine_registry", return_value=mock_registry),
-            patch("fitz_ai.cli.commands.query.get_default_engine", return_value="fitz_krag"),
-            patch("fitz_ai.cli.commands.query.create_engine", return_value=mock_engine),
+            patch("fitz_sage.cli.commands.query.get_engine_registry", return_value=mock_registry),
+            patch("fitz_sage.cli.commands.query.get_default_engine", return_value="fitz_krag"),
+            patch("fitz_sage.cli.commands.query.create_engine", return_value=mock_engine),
         ):
             result = runner.invoke(app, ["query", "What is RAG?"])
 
@@ -152,9 +152,9 @@ class TestQueryExecution:
         mock_registry.get_list_collections.return_value = ["test"]
 
         with (
-            patch("fitz_ai.cli.commands.query.get_engine_registry", return_value=mock_registry),
-            patch("fitz_ai.cli.commands.query.get_default_engine", return_value="fitz_krag"),
-            patch("fitz_ai.cli.commands.query.create_engine", return_value=mock_engine),
+            patch("fitz_sage.cli.commands.query.get_engine_registry", return_value=mock_registry),
+            patch("fitz_sage.cli.commands.query.get_default_engine", return_value="fitz_krag"),
+            patch("fitz_sage.cli.commands.query.create_engine", return_value=mock_engine),
         ):
             result = runner.invoke(app, ["query", "What is RAG?"])
 
@@ -185,9 +185,9 @@ class TestQueryOptions:
         mock_registry.get_list_collections.return_value = ["custom"]
 
         with (
-            patch("fitz_ai.cli.commands.query.get_engine_registry", return_value=mock_registry),
-            patch("fitz_ai.cli.commands.query.get_default_engine", return_value="fitz_krag"),
-            patch("fitz_ai.cli.commands.query.create_engine", return_value=mock_engine),
+            patch("fitz_sage.cli.commands.query.get_engine_registry", return_value=mock_registry),
+            patch("fitz_sage.cli.commands.query.get_default_engine", return_value="fitz_krag"),
+            patch("fitz_sage.cli.commands.query.create_engine", return_value=mock_engine),
         ):
             runner.invoke(app, ["query", "question", "-c", "custom"])
 
@@ -205,8 +205,8 @@ class TestQueryOptions:
         mock_registry.get_list_collections.return_value = ["other"]
 
         with (
-            patch("fitz_ai.cli.commands.query.get_engine_registry", return_value=mock_registry),
-            patch("fitz_ai.cli.commands.query.get_default_engine", return_value="fitz_krag"),
+            patch("fitz_sage.cli.commands.query.get_engine_registry", return_value=mock_registry),
+            patch("fitz_sage.cli.commands.query.get_default_engine", return_value="fitz_krag"),
         ):
             result = runner.invoke(app, ["query", "question", "-c", "nonexistent"])
 

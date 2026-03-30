@@ -25,7 +25,7 @@ Replaces `fitz ingest` entirely. The `ingest` command, its CLI subcommands, and 
 ### SDK
 
 ```python
-from fitz_ai.sdk import Fitz
+from fitz_sage.sdk import Fitz
 
 fitz = Fitz()
 answer = fitz.query("how does X work?", source="./docs")  # works immediately

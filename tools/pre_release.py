@@ -94,12 +94,12 @@ def main() -> int:
 
     # These are the imports CI tests - they must work with minimal deps
     critical_imports = [
-        ("fitz_ai", "Package root"),
-        ("fitz_ai.core", "Core module"),
-        ("fitz_ai.core.Query", "Query class"),
-        ("fitz_ai.core.Answer", "Answer class"),
-        ("fitz_ai.llm", "LLM module"),
-        ("fitz_ai.llm.auth", "Auth module"),
+        ("fitz_sage", "Package root"),
+        ("fitz_sage.core", "Core module"),
+        ("fitz_sage.core.Query", "Query class"),
+        ("fitz_sage.core.Answer", "Answer class"),
+        ("fitz_sage.llm", "LLM module"),
+        ("fitz_sage.llm.auth", "Auth module"),
     ]
 
     for import_path, desc in critical_imports:

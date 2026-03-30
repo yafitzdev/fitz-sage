@@ -6,9 +6,9 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
-from fitz_ai.core.chunk import Chunk
-from fitz_ai.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
-from fitz_ai.ingestion.enrichment.config import HierarchyConfig
+from fitz_sage.core.chunk import Chunk
+from fitz_sage.ingestion.enrichment import EnrichmentConfig, EnrichmentPipeline
+from fitz_sage.ingestion.enrichment.config import HierarchyConfig
 
 
 def create_mock_chat_factory(mock_chat):

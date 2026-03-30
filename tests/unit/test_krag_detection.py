@@ -11,11 +11,11 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
-from fitz_ai.engines.fitz_krag.retrieval.router import RetrievalRouter
-from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind
+from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
+from fitz_sage.engines.fitz_krag.retrieval.router import RetrievalRouter
+from fitz_sage.engines.fitz_krag.retrieval_profile import RetrievalProfile
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -73,8 +73,8 @@ def _make_engine(**config_overrides) -> FitzKragEngine:
     engine._source_dir = None
     engine._hyde_generator = None
 
-    from fitz_ai.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
-    from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
+    from fitz_sage.engines.fitz_krag.query_analyzer import QueryAnalysis, QueryType
+    from fitz_sage.engines.fitz_krag.query_batcher import BatchResult
 
     def _default_batch_classify(query, **kwargs):
         return BatchResult(
@@ -160,24 +160,24 @@ class TestEngineDetectionInit:
 
         assert engine._detection_orchestrator is None
 
-    @patch("fitz_ai.retrieval.detection.registry.DetectionOrchestrator")
-    @patch("fitz_ai.llm.factory.get_chat_factory")
-    @patch("fitz_ai.llm.client.get_chat")
-    @patch("fitz_ai.llm.client.get_embedder")
-    @patch("fitz_ai.storage.postgres.PostgresConnectionManager")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.raw_file_store.RawFileStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.symbol_store.SymbolStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.import_graph_store.ImportGraphStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.section_store.SectionStore")
-    @patch("fitz_ai.engines.fitz_krag.ingestion.schema.ensure_schema")
-    @patch("fitz_ai.engines.fitz_krag.retrieval.strategies.code_search.CodeSearchStrategy")
-    @patch("fitz_ai.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy")
-    @patch("fitz_ai.engines.fitz_krag.retrieval.router.RetrievalRouter")
-    @patch("fitz_ai.engines.fitz_krag.retrieval.reader.ContentReader")
-    @patch("fitz_ai.engines.fitz_krag.retrieval.expander.CodeExpander")
-    @patch("fitz_ai.engines.fitz_krag.query_analyzer.QueryAnalyzer")
-    @patch("fitz_ai.engines.fitz_krag.context.assembler.ContextAssembler")
-    @patch("fitz_ai.engines.fitz_krag.generation.synthesizer.CodeSynthesizer")
+    @patch("fitz_sage.retrieval.detection.registry.DetectionOrchestrator")
+    @patch("fitz_sage.llm.factory.get_chat_factory")
+    @patch("fitz_sage.llm.client.get_chat")
+    @patch("fitz_sage.llm.client.get_embedder")
+    @patch("fitz_sage.storage.postgres.PostgresConnectionManager")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.raw_file_store.RawFileStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.symbol_store.SymbolStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.import_graph_store.ImportGraphStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.section_store.SectionStore")
+    @patch("fitz_sage.engines.fitz_krag.ingestion.schema.ensure_schema")
+    @patch("fitz_sage.engines.fitz_krag.retrieval.strategies.code_search.CodeSearchStrategy")
+    @patch("fitz_sage.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy")
+    @patch("fitz_sage.engines.fitz_krag.retrieval.router.RetrievalRouter")
+    @patch("fitz_sage.engines.fitz_krag.retrieval.reader.ContentReader")
+    @patch("fitz_sage.engines.fitz_krag.retrieval.expander.CodeExpander")
+    @patch("fitz_sage.engines.fitz_krag.query_analyzer.QueryAnalyzer")
+    @patch("fitz_sage.engines.fitz_krag.context.assembler.ContextAssembler")
+    @patch("fitz_sage.engines.fitz_krag.generation.synthesizer.CodeSynthesizer")
     def test_detection_enabled_creates_orchestrator(
         self,
         _synth,
@@ -398,8 +398,8 @@ class TestEngineAnswerDetectionFlow:
         engine._detection_orchestrator = mock_orchestrator
 
         # Wire up batcher to return detection results
-        from fitz_ai.engines.fitz_krag.query_batcher import BatchResult
-        from fitz_ai.retrieval.detection.protocol import DetectionCategory, DetectionResult
+        from fitz_sage.engines.fitz_krag.query_batcher import BatchResult
+        from fitz_sage.retrieval.detection.protocol import DetectionCategory, DetectionResult
 
         mock_detection_results = {
             DetectionCategory.TEMPORAL: DetectionResult.not_detected(DetectionCategory.TEMPORAL),
@@ -431,7 +431,7 @@ class TestEngineAnswerDetectionFlow:
         # Router called with a RetrievalProfile (detection data baked in)
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
-        from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
+        from fitz_sage.engines.fitz_krag.retrieval_profile import RetrievalProfile
 
         assert isinstance(call_args[0][1], RetrievalProfile)
 
@@ -458,7 +458,7 @@ class TestEngineAnswerDetectionFlow:
         engine._retrieval_router.retrieve.assert_called_once()
         call_args = engine._retrieval_router.retrieve.call_args
         assert call_args[0][0] == query.text
-        from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
+        from fitz_sage.engines.fitz_krag.retrieval_profile import RetrievalProfile
 
         profile = call_args[0][1]
         assert isinstance(profile, RetrievalProfile)

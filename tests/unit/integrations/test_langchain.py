@@ -10,7 +10,7 @@ pytest.importorskip("langchain_core")
 
 from langchain_core.documents import Document
 
-from fitz_ai.integrations.langchain.runnable import FitzRAGChain
+from fitz_sage.integrations.langchain.runnable import FitzRAGChain
 
 
 class TestFitzRAGChain:
@@ -79,7 +79,7 @@ class TestFitzRAGChain:
 
         assert source["source_id"] == "file.pdf"
 
-    @patch("fitz_ai.integrations.langchain.runnable.FitzOptimizer")
+    @patch("fitz_sage.integrations.langchain.runnable.FitzOptimizer")
     def test_cache_hit_skips_llm(self, mock_optimizer_class):
         """Cache hit returns answer WITHOUT calling LLM."""
         # Setup: cache returns a hit
@@ -123,7 +123,7 @@ class TestFitzRAGChain:
         # Verify: retriever WAS called (we need docs for fingerprint)
         mock_retriever.invoke.assert_called_once()
 
-    @patch("fitz_ai.integrations.langchain.runnable.FitzOptimizer")
+    @patch("fitz_sage.integrations.langchain.runnable.FitzOptimizer")
     def test_cache_miss_runs_llm_and_stores(self, mock_optimizer_class):
         """Cache miss runs LLM and stores result."""
         # Setup mocks
@@ -176,7 +176,7 @@ class TestFitzRAGChain:
         assert result["answer"] == "LLM generated answer"
         assert result["_fitz_cache_hit"] is False
 
-    @patch("fitz_ai.integrations.langchain.runnable.FitzOptimizer")
+    @patch("fitz_sage.integrations.langchain.runnable.FitzOptimizer")
     def test_invoke_includes_routing_advice(self, mock_optimizer_class):
         """Invoke includes routing advice in result on cache miss."""
         # Setup mocks
@@ -219,7 +219,7 @@ class TestFitzRAGChain:
         assert result.get("_fitz_routing") is not None
         assert result["_fitz_routing"]["complexity"] == "simple"
 
-    @patch("fitz_ai.integrations.langchain.runnable.FitzOptimizer")
+    @patch("fitz_sage.integrations.langchain.runnable.FitzOptimizer")
     def test_invoke_empty_question_fallback(self, mock_optimizer_class):
         """Empty question falls back to uncached execution."""
         mock_optimizer = MagicMock()
@@ -252,7 +252,7 @@ class TestFitzRAGChain:
         # Cache was NOT checked
         mock_optimizer.lookup.assert_not_called()
 
-    @patch("fitz_ai.integrations.langchain.runnable.FitzOptimizer")
+    @patch("fitz_sage.integrations.langchain.runnable.FitzOptimizer")
     def test_was_cache_hit_property(self, mock_optimizer_class):
         """was_cache_hit property reflects last invocation."""
         mock_optimizer = MagicMock()
@@ -282,7 +282,7 @@ class TestFitzRAGChain:
 
         assert chain.was_cache_hit is True
 
-    @patch("fitz_ai.integrations.langchain.runnable.FitzOptimizer")
+    @patch("fitz_sage.integrations.langchain.runnable.FitzOptimizer")
     def test_context_manager(self, mock_optimizer_class):
         """Context manager closes optimizer."""
         mock_optimizer = MagicMock()
@@ -310,7 +310,7 @@ class TestFitzCacheRunnableAlias:
 
     def test_alias_exists(self):
         """FitzCacheRunnable is an alias for FitzRAGChain."""
-        from fitz_ai.integrations.langchain import FitzCacheRunnable, FitzRAGChain
+        from fitz_sage.integrations.langchain import FitzCacheRunnable, FitzRAGChain
 
         assert FitzCacheRunnable is FitzRAGChain
 

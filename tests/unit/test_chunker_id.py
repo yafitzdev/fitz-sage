@@ -10,8 +10,8 @@ Verifies:
 
 import pytest
 
-from fitz_ai.core.document import DocumentElement, ElementType, ParsedDocument
-from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
+from fitz_sage.core.document import DocumentElement, ElementType, ParsedDocument
+from fitz_sage.ingestion.chunking.plugins.default.simple import SimpleChunker
 
 
 def make_document(text: str, doc_id: str = "test", **extra_meta) -> ParsedDocument:

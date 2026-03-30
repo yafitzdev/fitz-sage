@@ -149,25 +149,25 @@ Each symbol gets summarized by the enrichment pipeline, embedded, and stored in 
 
 | Component | Path |
 |-----------|------|
-| Strategy protocol | `fitz_ai/engines/fitz_krag/ingestion/strategies/base.py` |
-| Python strategy | `fitz_ai/engines/fitz_krag/ingestion/strategies/python_code.py` |
-| TypeScript strategy | `fitz_ai/engines/fitz_krag/ingestion/strategies/typescript.py` |
-| Go strategy | `fitz_ai/engines/fitz_krag/ingestion/strategies/go.py` |
-| Java strategy | `fitz_ai/engines/fitz_krag/ingestion/strategies/java.py` |
-| Symbol store | `fitz_ai/engines/fitz_krag/ingestion/symbol_store.py` |
-| Import graph store | `fitz_ai/engines/fitz_krag/ingestion/import_graph_store.py` |
-| DB schema | `fitz_ai/engines/fitz_krag/ingestion/schema.py` |
+| Strategy protocol | `fitz_sage/engines/fitz_krag/ingestion/strategies/base.py` |
+| Python strategy | `fitz_sage/engines/fitz_krag/ingestion/strategies/python_code.py` |
+| TypeScript strategy | `fitz_sage/engines/fitz_krag/ingestion/strategies/typescript.py` |
+| Go strategy | `fitz_sage/engines/fitz_krag/ingestion/strategies/go.py` |
+| Java strategy | `fitz_sage/engines/fitz_krag/ingestion/strategies/java.py` |
+| Symbol store | `fitz_sage/engines/fitz_krag/ingestion/symbol_store.py` |
+| Import graph store | `fitz_sage/engines/fitz_krag/ingestion/import_graph_store.py` |
+| DB schema | `fitz_sage/engines/fitz_krag/ingestion/schema.py` |
 
 ## Standalone Code Retrieval
 
-For use cases that don't need the full KRAG pipeline (no PostgreSQL, no pgvector, no docling), see the standalone `CodeRetriever` in `fitz_ai/code/`:
+For use cases that don't need the full KRAG pipeline (no PostgreSQL, no pgvector, no docling), see the standalone `CodeRetriever` in `fitz_sage/code/`:
 
 ```bash
-pip install fitz-ai[code]
+pip install fitz-sage[code]
 ```
 
 ```python
-from fitz_ai.code import CodeRetriever
+from fitz_sage.code import CodeRetriever
 
 retriever = CodeRetriever(source_dir="./myproject", chat_factory=my_factory)
 results = retriever.retrieve("How does auth work?")

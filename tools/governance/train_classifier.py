@@ -82,7 +82,7 @@ _META_COLS = {
 }
 
 # Feature type sets derived from constraint schemas (single source of truth)
-from fitz_ai.governance.constraints.feature_extractor import get_feature_type_sets  # noqa: E402
+from fitz_sage.governance.constraints.feature_extractor import get_feature_type_sets  # noqa: E402
 
 _CATEGORICAL_FEATURES, _BOOL_FEATURES = get_feature_type_sets()
 
@@ -1294,7 +1294,7 @@ _CONFLICT_FEATURE = "ca_fired"
 
 _CASCADE_OUTPUT = (
     Path(__file__).resolve().parent.parent.parent
-    / "fitz_ai"
+    / "fitz_sage"
     / "governance"
     / "data"
     / "model_v6_cascade.joblib"

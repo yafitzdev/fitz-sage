@@ -90,11 +90,11 @@ Internal parameters:
 
 ## Files
 
-- **Hierarchical enricher:** `fitz_ai/ingestion/enrichment/hierarchy/enricher.py`
-- **Grouping strategies:** `fitz_ai/ingestion/enrichment/hierarchy/grouper.py`
-- **Semantic grouper:** `fitz_ai/ingestion/enrichment/hierarchy/semantic_grouper.py`
+- **Hierarchical enricher:** `fitz_sage/ingestion/enrichment/hierarchy/enricher.py`
+- **Grouping strategies:** `fitz_sage/ingestion/enrichment/hierarchy/grouper.py`
+- **Semantic grouper:** `fitz_sage/ingestion/enrichment/hierarchy/semantic_grouper.py`
 - **Summary storage:** L2 in vector DB (tagged with `hierarchy_level: 2`), L1 as metadata on L0
-- **Ingestion hook:** `fitz_ai/ingestion/enrichment/pipeline.py` (calls hierarchy enrichment)
+- **Ingestion hook:** `fitz_sage/ingestion/enrichment/pipeline.py` (calls hierarchy enrichment)
 
 ## Benefits
 

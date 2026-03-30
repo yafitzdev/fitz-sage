@@ -14,14 +14,14 @@ from typing import List
 
 import pytest
 
-from fitz_ai.core.chunk import Chunk
-from fitz_ai.core.document import ParsedDocument
-from fitz_ai.ingestion.chunking.config import (
+from fitz_sage.core.chunk import Chunk
+from fitz_sage.core.document import ParsedDocument
+from fitz_sage.ingestion.chunking.config import (
     ChunkingRouterConfig,
     ExtensionChunkerConfig,
 )
-from fitz_ai.ingestion.chunking.plugins.default.simple import SimpleChunker
-from fitz_ai.ingestion.chunking.router import ChunkingRouter
+from fitz_sage.ingestion.chunking.plugins.default.simple import SimpleChunker
+from fitz_sage.ingestion.chunking.router import ChunkingRouter
 
 # =============================================================================
 # Mock Chunkers for Testing
@@ -246,7 +246,7 @@ class TestDocumentChunking:
 
     def test_chunker_chunks_parsed_document(self):
         """Chunker correctly chunks a ParsedDocument."""
-        from fitz_ai.core.document import DocumentElement, ElementType
+        from fitz_sage.core.document import DocumentElement, ElementType
 
         router = ChunkingRouter(
             chunker_map={".md": MockMarkdownChunker()},
@@ -272,8 +272,8 @@ class TestDocumentChunking:
 
     def test_default_chunker_for_unknown_extension(self):
         """Default chunker is used for unknown extensions."""
-        from fitz_ai.core.document import DocumentElement, ElementType
-        from fitz_ai.ingestion.chunking.plugins.default.recursive import RecursiveChunker
+        from fitz_sage.core.document import DocumentElement, ElementType
+        from fitz_sage.ingestion.chunking.plugins.default.recursive import RecursiveChunker
 
         router = ChunkingRouter(
             chunker_map={},

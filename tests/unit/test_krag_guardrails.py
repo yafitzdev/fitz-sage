@@ -12,13 +12,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fitz_ai.core import Answer, Provenance
-from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
-from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
-from fitz_ai.governance.instructions import get_mode_instruction
-from fitz_ai.governance.protocol import EvidenceItem
+from fitz_sage.core import Answer, Provenance
+from fitz_sage.core.answer_mode import AnswerMode
+from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
+from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind, ReadResult
+from fitz_sage.governance.instructions import get_mode_instruction
+from fitz_sage.governance.protocol import EvidenceItem
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -148,7 +148,7 @@ class TestEngineGuardrailsInit:
         """With enable_guardrails=True, _constraints is non-empty and _governor is set."""
         engine = _make_engine(enable_guardrails=True)
         # Manually simulate what _init_components would do
-        from fitz_ai.governance import AnswerGovernor, create_default_constraints
+        from fitz_sage.governance import AnswerGovernor, create_default_constraints
 
         engine._constraints = create_default_constraints(chat=engine._chat)
         engine._governor = AnswerGovernor()
@@ -174,7 +174,7 @@ class TestAnswerModeSynthesizer:
 
     def test_abstain_skips_llm_call(self):
         """ABSTAIN mode returns a canned answer without calling the LLM."""
-        from fitz_ai.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
+        from fitz_sage.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
 
         chat = MagicMock(name="chat")
         config = _make_config()
@@ -190,7 +190,7 @@ class TestAnswerModeSynthesizer:
 
     def test_disputed_prepends_dispute_instruction(self):
         """DISPUTED mode prepends the dispute instruction to the system prompt."""
-        from fitz_ai.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
+        from fitz_sage.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
 
         chat = MagicMock(name="chat")
         chat.chat.return_value = "Sources disagree on this topic."
@@ -207,7 +207,7 @@ class TestAnswerModeSynthesizer:
 
     def test_trustworthy_prepends_default_instruction(self):
         """TRUSTWORTHY mode prepends the trustworthy instruction to the system prompt."""
-        from fitz_ai.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
+        from fitz_sage.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
 
         chat = MagicMock(name="chat")
         chat.chat.return_value = "Clear answer here."
@@ -231,10 +231,10 @@ class TestAnswerModeSynthesizer:
 class TestAnswerModePassthrough:
     """Verify answer_mode flows from guardrails into synthesizer.generate()."""
 
-    @patch("fitz_ai.governance.run_constraints")
+    @patch("fitz_sage.governance.run_constraints")
     def test_answer_mode_passed_to_synthesizer(self, mock_run):
         """When guardrails resolve to DISPUTED, synthesizer receives DISPUTED."""
-        from fitz_ai.governance import GovernanceDecision
+        from fitz_sage.governance import GovernanceDecision
 
         engine = _make_engine(enable_guardrails=True)
         engine._constraints = [MagicMock(name="constraint")]
@@ -273,7 +273,7 @@ class TestAnswerModePassthrough:
 class TestFailOpen:
     """Constraint errors must not crash the pipeline."""
 
-    @patch("fitz_ai.governance.run_constraints")
+    @patch("fitz_sage.governance.run_constraints")
     def test_constraint_failure_does_not_crash(self, mock_run):
         """If run_constraints raises, engine catches it and falls back to TRUSTWORTHY."""
         engine = _make_engine(enable_guardrails=True)
@@ -288,7 +288,7 @@ class TestFailOpen:
         # doesn't contain 'retriev', 'search', 'generat', or 'llm'.
         # The pipeline does NOT silently swallow arbitrary errors.
         # Verify it raises rather than silently corrupting the answer.
-        from fitz_ai.core import KnowledgeError
+        from fitz_sage.core import KnowledgeError
 
         with pytest.raises(KnowledgeError, match="KRAG pipeline error"):
             engine.answer(_make_query())
@@ -304,7 +304,7 @@ class TestAnswerModeMetadata:
 
     def test_abstain_mode_in_metadata(self):
         """ABSTAIN answer includes answer_mode in metadata."""
-        from fitz_ai.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
+        from fitz_sage.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
 
         chat = MagicMock(name="chat")
         config = _make_config()
@@ -316,7 +316,7 @@ class TestAnswerModeMetadata:
 
     def test_trustworthy_mode_in_metadata(self):
         """TRUSTWORTHY answer includes answer_mode in metadata."""
-        from fitz_ai.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
+        from fitz_sage.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
 
         chat = MagicMock(name="chat")
         chat.chat.return_value = "All good."
@@ -329,7 +329,7 @@ class TestAnswerModeMetadata:
 
     def test_disputed_mode_in_metadata(self):
         """DISPUTED answer includes answer_mode in metadata."""
-        from fitz_ai.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
+        from fitz_sage.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
 
         chat = MagicMock(name="chat")
         chat.chat.return_value = "Sources disagree."

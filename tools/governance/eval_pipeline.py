@@ -31,26 +31,26 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from fitz_ai.config import load_engine_config
-from fitz_ai.core.chunk import Chunk
-from fitz_ai.governance import AnswerGovernor
-from fitz_ai.governance.constraints.base import ConstraintResult
-from fitz_ai.governance.constraints.feature_extractor import extract_features
-from fitz_ai.governance.constraints.plugins.answer_verification import (
+from fitz_sage.config import load_engine_config
+from fitz_sage.core.chunk import Chunk
+from fitz_sage.governance import AnswerGovernor
+from fitz_sage.governance.constraints.base import ConstraintResult
+from fitz_sage.governance.constraints.feature_extractor import extract_features
+from fitz_sage.governance.constraints.plugins.answer_verification import (
     AnswerVerificationConstraint,
 )
-from fitz_ai.governance.constraints.plugins.causal_attribution import (
+from fitz_sage.governance.constraints.plugins.causal_attribution import (
     CausalAttributionConstraint,
 )
-from fitz_ai.governance.constraints.plugins.conflict_aware import ConflictAwareConstraint
-from fitz_ai.governance.constraints.plugins.insufficient_evidence import (
+from fitz_sage.governance.constraints.plugins.conflict_aware import ConflictAwareConstraint
+from fitz_sage.governance.constraints.plugins.insufficient_evidence import (
     InsufficientEvidenceConstraint,
 )
-from fitz_ai.governance.constraints.plugins.specific_info_type import (
+from fitz_sage.governance.constraints.plugins.specific_info_type import (
     SpecificInfoTypeConstraint,
 )
-from fitz_ai.llm import get_chat_factory, get_embedder
-from fitz_ai.retrieval.detection.registry import DetectionOrchestrator
+from fitz_sage.llm import get_chat_factory, get_embedder
+from fitz_sage.retrieval.detection.registry import DetectionOrchestrator
 
 # Paths
 _DEFAULT_DATA_DIR = (
@@ -565,7 +565,7 @@ def main():
     args = parser.parse_args()
 
     # Load config
-    print("Loading fitz-ai config...")
+    print("Loading fitz-sage config...")
     cfg = load_engine_config("fitz_krag")
 
     # Chat client

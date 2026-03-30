@@ -30,7 +30,7 @@ pytest -m chaos            # Failure handling
 pytest -m "not slow and not scalability"
 
 # Run with coverage
-pytest --cov=fitz_ai --cov-report=html
+pytest --cov=fitz_sage --cov-report=html
 ```
 
 ## Test Structure

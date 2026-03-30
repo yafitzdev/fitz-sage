@@ -10,7 +10,7 @@ Tests the full TABLE pipeline in isolation:
 
 Skips: synthesis, governance, cloud cache.
 
-Uses fitz-ai's own engine with config from ~/.fitz/config.yaml
+Uses fitz-sage's own engine with config from ~/.fitz/config.yaml
 (ollama/qwen3.5 + nomic-embed-text by default).
 
 Usage:
@@ -203,7 +203,7 @@ def _clean_collection(collection: str) -> None:
     """Delete stale manifest + parsed cache so point() re-indexes from scratch."""
     import shutil
 
-    from fitz_ai.core.paths import FitzPaths
+    from fitz_sage.core.paths import FitzPaths
 
     col_dir = FitzPaths.workspace() / "collections" / collection
     if col_dir.exists():
@@ -319,7 +319,7 @@ def run_eval(
     skip_ingest: bool = False,
 ):
     """Run full table retrieval evaluation."""
-    from fitz_ai.runtime import create_engine
+    from fitz_sage.runtime import create_engine
 
     corpus_dir = Path(corpus_dir)
     if not corpus_dir.exists():

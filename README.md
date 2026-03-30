@@ -2,17 +2,17 @@
 
 <div align="center">
 
-![fitz-ai logo](/docs/assets/logo.png)
+![fitz-sage logo](/docs/assets/logo.png)
 
 ### The RAG library that says "I don't know" instead of hallucinating.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![PyPI version](https://badge.fury.io/py/fitz-ai.svg)](https://pypi.org/project/fitz-ai/)
+[![PyPI version](https://badge.fury.io/py/fitz-sage.svg)](https://pypi.org/project/fitz-sage/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.11.0-green.svg)](CHANGELOG.md)
-[![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/yafitzdev/fitz-ai)
+[![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/yafitzdev/fitz-sage)
 
-[Why Fitz?](#why-fitz) • [Retrieval Intelligence](#retrieval-intelligence) • [Governance](#governance--know-what-you-dont-know) • [Documentation](#links) • [GitHub](https://github.com/yafitzdev/fitz-ai)
+[Why Fitz?](#why-fitz) • [Retrieval Intelligence](#retrieval-intelligence) • [Governance](#governance--know-what-you-dont-know) • [Documentation](#links) • [GitHub](https://github.com/yafitzdev/fitz-sage)
 
 </div>
 
@@ -37,7 +37,7 @@ A: "Germany won the 2024 FIFA World Cup,
 </pre>
     </td>
     <td align="center" width="50%">
-      <strong>🛡️ fitz-ai</strong>
+      <strong>🛡️ fitz-sage</strong>
 <pre>
 A: "I don't have enough information
     to answer this question.
@@ -67,7 +67,7 @@ A: "I don't have enough information
 > Requires [Ollama](https://ollama.ai) or a Cohere/OpenAI API key. Fitz auto-detects your setup on first run.
 
 ```bash
-pip install fitz-ai
+pip install fitz-sage
 
 fitz query "What is our refund policy?" --source ./docs
 ```
@@ -75,14 +75,14 @@ fitz query "What is our refund policy?" --source ./docs
 That's it. Your documents are now searchable with AI.
 
 
-![fitz-ai quickstart demo](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/quickstart_demo.gif)
-*Figure 1: Example of user experience for querying documents using fitz-ai.*
+![fitz-sage quickstart demo](https://raw.githubusercontent.com/yafitzdev/fitz-sage/main/docs/assets/quickstart_demo.gif)
+*Figure 1: Example of user experience for querying documents using fitz-sage.*
 
 ---
 
 ### About
 
-Existing RAG tools hallucinate. When the answer isn't in your documents, they invent one — confidently, fluently, wrongly. In production, that's not a minor inconvenience. It's the reason you can't trust the system. I built fitz-ai to solve that problem directly, while working as a Data Engineer in the automotive industry. No LangChain. No LlamaIndex. Every layer written from scratch.
+Existing RAG tools hallucinate. When the answer isn't in your documents, they invent one — confidently, fluently, wrongly. In production, that's not a minor inconvenience. It's the reason you can't trust the system. I built fitz-sage to solve that problem directly, while working as a Data Engineer in the automotive industry. No LangChain. No LlamaIndex. Every layer written from scratch.
 
 The retrieval architecture is [KRAG (Knowledge Routing Augmented Generation)](docs/features/platform/krag.md) — documents are parsed into typed units (code symbols, sections, tables) and each query is routed to the right search strategy, rather than searching flat chunks uniformly.
 
@@ -94,7 +94,7 @@ It runs in production today and powers [fitz-graveyard](https://github.com/yafit
 
 Yan Fitzner — ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev)).
 
-![fitz-ai honest_rag](https://raw.githubusercontent.com/yafitzdev/fitz-ai/main/docs/assets/honest_rag.jpg)
+![fitz-sage honest_rag](https://raw.githubusercontent.com/yafitzdev/fitz-sage/main/docs/assets/honest_rag.jpg)
 
 ---
 
@@ -160,7 +160,7 @@ You can—but you'll hit walls fast.
 
 <br>
 
-They're frameworks — you assemble the chunker, embedder, vector store, retriever, and prompt chain yourself. fitz-ai is a library — one function call that handles all of it with built-in intelligence.
+They're frameworks — you assemble the chunker, embedder, vector store, retriever, and prompt chain yourself. fitz-sage is a library — one function call that handles all of it with built-in intelligence.
 
 You trade flexibility for a pipeline that handles temporal queries, comparison queries, code symbol extraction, tabular SQL, and epistemic honesty out of the box — without configuration.
 
@@ -199,7 +199,7 @@ You trade flexibility for a pipeline that handles temporal queries, comparison q
 > Any questions left? Try fitz on itself:
 >
 > ```bash
-> fitz query "How does the retrieval pipeline work?" --source ./fitz_ai
+> fitz query "How does the retrieval pipeline work?" --source ./fitz_sage
 > ```
 >
 > The codebase speaks for itself.
@@ -338,7 +338,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 #### CLI
 >
 >```bash
->pip install fitz-ai
+>pip install fitz-sage
 >
 >fitz query "Your question here" --source ./docs
 >```
@@ -355,9 +355,9 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 #### Python SDK
 >
 >```python
->import fitz_ai
+>import fitz_sage
 >
->answer = fitz_ai.query("Your question here", source="./docs")
+>answer = fitz_sage.query("Your question here", source="./docs")
 >
 >print(answer.text)
 >for source in answer.provenance:
@@ -372,7 +372,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >
 >For advanced use (multiple collections), use the `fitz` class directly:
 >```python
->from fitz_ai import fitz
+>from fitz_sage import fitz
 >
 >physics = fitz(collection="physics")
 >answer = physics.query("Explain entanglement", source="./physics_papers")
@@ -383,7 +383,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 #### Fully Local (Ollama)
 >
 >```bash
->pip install fitz-ai[local]
+>pip install fitz-sage[local]
 >
 >ollama pull llama3.2
 >ollama pull nomic-embed-text
@@ -445,7 +445,7 @@ Fitz is a foundation. It handles document indexing and grounded retrieval—you 
 >
 > **Full KRAG** — tree-sitter parses your codebase into symbols (functions, classes, methods) with qualified names, references, and import graphs. No chunking—each symbol is a precise, addressable unit. Cross-file dependencies are tracked, so "what calls this function?" is a graph traversal, not a text search.
 >
-> **Standalone (`pip install fitz-ai[code]`)** — Zero-dependency code retrieval via `CodeRetriever`. Builds an AST structural index, uses an LLM to select relevant files, expands via import graph and neighbor directories, and returns compressed results. No PostgreSQL, no pgvector, no docling—just point at a directory and ask.
+> **Standalone (`pip install fitz-sage[code]`)** — Zero-dependency code retrieval via `CodeRetriever`. Builds an AST structural index, uses an LLM to select relevant files, expands via import graph and neighbor directories, and returns compressed results. No PostgreSQL, no pgvector, no docling—just point at a directory and ask.
 >
 > *Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They point fitz at the codebase and ask "Where is user authentication handled?" or "What depends on the billing module?" FitzKRAG returns specific functions with their callers and dependencies. New developers onboard in days instead of weeks.
 
@@ -461,11 +461,11 @@ Fitz is a foundation. It handles document indexing and grounded retrieval—you 
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│                         fitz-ai                               │
+│                         fitz-sage                               │
 ├───────────────────────────────────────────────────────────────┤
 │  User Interfaces                                              │
 │  CLI: query (--source) | init | collections | config | serve  │
-│  SDK: fitz_ai.query(source=...)                                │
+│  SDK: fitz_sage.query(source=...)                                │
 │  API: /query | /chat | /collections | /health                 │
 ├───────────────────────────────────────────────────────────────┤
 │  Engines                                                      │
@@ -526,9 +526,9 @@ Config: `.fitz/config.yaml` — auto-created on first run, edit to change models
 
 **Simple usage (module-level, matches CLI):**
 ```python
-import fitz_ai
+import fitz_sage
 
-answer = fitz_ai.query("What is the refund policy?", source="./docs")
+answer = fitz_sage.query("What is the refund policy?", source="./docs")
 print(answer.text)
 ```
 
@@ -536,7 +536,7 @@ print(answer.text)
 
 **Advanced usage (multiple collections):**
 ```python
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 # Create separate instances for different collections
 physics = fitz(collection="physics")
@@ -551,7 +551,7 @@ legal_answer = legal.query("What are the payment terms?", source="./contracts")
 
 **Working with answers:**
 ```python
-answer = fitz_ai.query("What is the refund policy?")
+answer = fitz_sage.query("What is the refund policy?")
 
 print(answer.text)
 print(answer.mode)  # TRUSTWORTHY, DISPUTED, or ABSTAIN
@@ -573,7 +573,7 @@ for source in answer.provenance:
 
 **Start the server:**
 ```bash
-pip install fitz-ai[api]
+pip install fitz-sage[api]
 
 fitz serve                    # localhost:8000
 fitz serve -p 3000            # custom port
@@ -616,10 +616,10 @@ curl -X POST http://localhost:8000/query \
 <br>
 
 **`fitz` command not found after install**
-> Your Python Scripts directory isn't on PATH. Use `python -m fitz_ai.cli.cli` instead, or add the Scripts directory to your system PATH.
+> Your Python Scripts directory isn't on PATH. Use `python -m fitz_sage.cli.cli` instead, or add the Scripts directory to your system PATH.
 
 **PDF/DOCX files are being skipped**
-> Document parsing requires docling, which is optional to keep the base install lightweight. Install it with: `pip install fitz-ai[docs]`
+> Document parsing requires docling, which is optional to keep the base install lightweight. Install it with: `pip install fitz-sage[docs]`
 
 **"Cannot connect to Ollama" error**
 > Ollama needs to be running as a background service. Start it with: `ollama serve`
@@ -664,8 +664,8 @@ MIT
 
 ### Links
 
-- [GitHub](https://github.com/yafitzdev/fitz-ai)
-- [PyPI](https://pypi.org/project/fitz-ai/)
+- [GitHub](https://github.com/yafitzdev/fitz-sage)
+- [PyPI](https://pypi.org/project/fitz-sage/)
 - [Changelog](CHANGELOG.md)
 
 **Documentation:**

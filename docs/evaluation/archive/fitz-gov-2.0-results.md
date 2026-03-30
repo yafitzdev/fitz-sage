@@ -172,7 +172,7 @@ See RESEARCH_NOTEPAD.md for full experiment details.
 pip install fitz-gov==2.0.0
 
 # Run governance benchmark (249 cases, ~2 min)
-python -m fitz_ai.evaluation.benchmarks.fitz_gov
+python -m fitz_sage.evaluation.benchmarks.fitz_gov
 ```
 
 ### Configuration Used

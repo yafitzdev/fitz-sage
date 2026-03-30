@@ -6,11 +6,11 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
-from fitz_ai.engines.fitz_krag.retrieval.strategies.llm_code_search import (
+from fitz_sage.engines.fitz_krag.retrieval.strategies.llm_code_search import (
     LlmCodeSearchStrategy,
     ManifestBuilder,
 )
-from fitz_ai.engines.fitz_krag.types import AddressKind
+from fitz_sage.engines.fitz_krag.types import AddressKind
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -131,7 +131,7 @@ def _make_config():
 
 
 def _make_fallback():
-    from fitz_ai.engines.fitz_krag.types import Address
+    from fitz_sage.engines.fitz_krag.types import Address
 
     fallback = MagicMock()
     fallback.retrieve.return_value = [

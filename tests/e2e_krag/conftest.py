@@ -43,7 +43,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 @pytest.fixture(scope="session", autouse=True)
 def set_workspace():
     """Set FitzPaths workspace to project root before any tests run."""
-    from fitz_ai.core.paths import FitzPaths
+    from fitz_sage.core.paths import FitzPaths
 
     FitzPaths.set_workspace(PROJECT_ROOT / ".fitz")
     yield

@@ -14,7 +14,7 @@ The goal: fit more files into the context window (especially 32K) to improve ret
 ## Baseline: 30B Model Retrieval Eval
 
 - **Model:** qwen3-coder-30b-a3b-instruct (MoE, 30B total, 3B active)
-- 40-query ground truth benchmark on fitz-ai codebase
+- 40-query ground truth benchmark on fitz-sage codebase
 - **Critical recall:** 89% avg (28/40 perfect)
 - **Total recall:** 74% avg
 - **Avg time:** 18.1s per query

@@ -5,13 +5,13 @@ from unittest.mock import patch
 
 import pytest
 
-from fitz_ai.config.loader import load_engine_config
+from fitz_sage.config.loader import load_engine_config
 
 
 def test_load_config_from_defaults():
     """Test loading config from default.yaml (isolated from user config)."""
     # Mock _load_user_config to return None, ensuring we only test defaults
-    with patch("fitz_ai.config.loader._load_user_config", return_value=None):
+    with patch("fitz_sage.config.loader._load_user_config", return_value=None):
         config = load_engine_config("fitz_krag")
 
     # Verify it's a Pydantic model with flat chat tier fields
@@ -39,7 +39,7 @@ def test_config_required_field():
     """Test that collection field is required."""
     from pydantic import ValidationError
 
-    from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
+    from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
 
     # Missing required 'collection' field
     with pytest.raises(ValidationError):
@@ -50,7 +50,7 @@ def test_config_validation():
     """Test config validation (Pydantic)."""
     from pydantic import ValidationError
 
-    from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
+    from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
 
     # Invalid top_addresses (must be >= 1)
     with pytest.raises(ValidationError):
@@ -65,7 +65,7 @@ def test_config_validation():
 
 def test_config_none_for_disabled():
     """Test that None properly disables optional features."""
-    from fitz_ai.engines.fitz_krag.config.schema import FitzKragConfig
+    from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
 
     config = FitzKragConfig(
         chat_smart="cohere",

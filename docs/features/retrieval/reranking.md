@@ -115,11 +115,11 @@ When reranking is enabled, the `dense` plugin automatically includes:
 
 ## Files
 
-- **RerankStep:** `fitz_ai/engines/fitz_krag/retrieval/steps/rerank.py`
-- **RerankProvider protocol:** `fitz_ai/llm/providers/base.py`
-- **Cohere implementation:** `fitz_ai/llm/providers/cohere.py`
-- **Plugin definition:** `fitz_ai/engines/fitz_krag/retrieval/plugins/dense.yaml` (uses `enabled_if: reranker`)
-- **Plugin loader:** `fitz_ai/engines/fitz_krag/retrieval/loader.py`
+- **RerankStep:** `fitz_sage/engines/fitz_krag/retrieval/steps/rerank.py`
+- **RerankProvider protocol:** `fitz_sage/llm/providers/base.py`
+- **Cohere implementation:** `fitz_sage/llm/providers/cohere.py`
+- **Plugin definition:** `fitz_sage/engines/fitz_krag/retrieval/plugins/dense.yaml` (uses `enabled_if: reranker`)
+- **Plugin loader:** `fitz_sage/engines/fitz_krag/retrieval/loader.py`
 
 ## Benefits
 

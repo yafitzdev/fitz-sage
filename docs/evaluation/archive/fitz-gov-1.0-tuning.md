@@ -285,7 +285,7 @@ Added:
 
 **Finding:** Aspect classification dramatically improves abstention (+17.5%) by catching "same entity, different aspect" failures. Minor regression in dispute/qualification due to more conservative relevance checking.
 
-**Files:** `fitz_ai/core/guardrails/aspect_classifier.py`
+**Files:** `fitz_sage/core/guardrails/aspect_classifier.py`
 
 ### Approach 10: Numerical Variance Detection
 
@@ -306,7 +306,7 @@ Added:
 
 **Finding:** Numerical variance detection improves qualification (+5%) by preventing false disputes on statistical variations. Confusion matrix shows qualified→disputed dropped from 9 to 6 cases.
 
-**Files:** `fitz_ai/core/guardrails/numerical_detector.py`, `fitz_ai/core/guardrails/plugins/conflict_aware.py`
+**Files:** `fitz_sage/core/guardrails/numerical_detector.py`, `fitz_sage/core/guardrails/plugins/conflict_aware.py`
 
 ### Approach 11: Answer Verification with LLM Jury
 
@@ -341,7 +341,7 @@ Added:
 
 **Design philosophy:** We don't chase metrics. The jury adds a sanity check that only fires on clear mismatches. A confident answer that's wrong damages trust more than a qualified answer that could have been confident.
 
-**Files:** `fitz_ai/core/guardrails/plugins/answer_verification.py`
+**Files:** `fitz_sage/core/guardrails/plugins/answer_verification.py`
 
 ### Approach 12: Enhanced Enrichment for Abstention (FAILED)
 
@@ -564,9 +564,9 @@ fitz eval fitz-gov --model ollama/qwen2.5:14b
 ### Python API
 
 ```python
-from fitz_ai.config.loader import load_engine_config
-from fitz_ai.engines.fitz_krag import FitzKragEngine
-from fitz_ai.evaluation.benchmarks import FitzGovBenchmark
+from fitz_sage.config.loader import load_engine_config
+from fitz_sage.engines.fitz_krag import FitzKragEngine
+from fitz_sage.evaluation.benchmarks import FitzGovBenchmark
 
 config = load_engine_config('fitz_krag')
 engine = FitzKragEngine(config)
@@ -586,15 +586,15 @@ print(results)
 
 | Component | Path |
 |-----------|------|
-| Benchmark runner | `fitz_ai/evaluation/benchmarks/fitz_gov.py` |
+| Benchmark runner | `fitz_sage/evaluation/benchmarks/fitz_gov.py` |
 | Test cases | [fitz-gov package](https://github.com/yafitzdev/fitz-gov) |
-| InsufficientEvidence constraint | `fitz_ai/core/guardrails/plugins/insufficient_evidence.py` |
-| ConflictAware constraint | `fitz_ai/core/guardrails/plugins/conflict_aware.py` |
-| CausalAttribution constraint | `fitz_ai/core/guardrails/plugins/causal_attribution.py` |
-| AnswerVerification constraint | `fitz_ai/core/guardrails/plugins/answer_verification.py` (jury-based, 3/3 threshold) |
-| Constraint runner | `fitz_ai/core/guardrails/runner.py` |
-| Aspect classifier | `fitz_ai/core/guardrails/aspect_classifier.py` |
-| Numerical variance detector | `fitz_ai/core/guardrails/numerical_detector.py` |
+| InsufficientEvidence constraint | `fitz_sage/core/guardrails/plugins/insufficient_evidence.py` |
+| ConflictAware constraint | `fitz_sage/core/guardrails/plugins/conflict_aware.py` |
+| CausalAttribution constraint | `fitz_sage/core/guardrails/plugins/causal_attribution.py` |
+| AnswerVerification constraint | `fitz_sage/core/guardrails/plugins/answer_verification.py` (jury-based, 3/3 threshold) |
+| Constraint runner | `fitz_sage/core/guardrails/runner.py` |
+| Aspect classifier | `fitz_sage/core/guardrails/aspect_classifier.py` |
+| Numerical variance detector | `fitz_sage/core/guardrails/numerical_detector.py` |
 
 ---
 

@@ -5,7 +5,7 @@
 import pytest
 import yaml
 
-from fitz_ai.engines.fitz_krag.config import FitzKragConfig, get_default_config_path
+from fitz_sage.engines.fitz_krag.config import FitzKragConfig, get_default_config_path
 
 
 class TestFitzKragConfig:

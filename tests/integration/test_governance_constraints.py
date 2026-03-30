@@ -16,14 +16,14 @@ from __future__ import annotations
 
 import pytest
 
-from fitz_ai.core.answer_mode import AnswerMode
-from fitz_ai.core.chunk import Chunk
-from fitz_ai.governance import AnswerGovernor, run_constraints
-from fitz_ai.governance.constraints.plugins.conflict_aware import ConflictAwareConstraint
-from fitz_ai.governance.constraints.plugins.insufficient_evidence import (
+from fitz_sage.core.answer_mode import AnswerMode
+from fitz_sage.core.chunk import Chunk
+from fitz_sage.governance import AnswerGovernor, run_constraints
+from fitz_sage.governance.constraints.plugins.conflict_aware import ConflictAwareConstraint
+from fitz_sage.governance.constraints.plugins.insufficient_evidence import (
     InsufficientEvidenceConstraint,
 )
-from fitz_ai.governance.constraints.semantic import SemanticMatcher
+from fitz_sage.governance.constraints.semantic import SemanticMatcher
 from tests.unit.mock_embedder import create_deterministic_embedder
 
 # =============================================================================
@@ -154,7 +154,7 @@ class TestRelevanceFiltering:
         """
         pytest.importorskip("ollama", reason="Requires Ollama for real embeddings")
 
-        from fitz_ai.llm import get_embedder
+        from fitz_sage.llm import get_embedder
 
         try:
             embedder = get_embedder("ollama", config={"model": "nomic-embed-text:latest"})
@@ -227,7 +227,7 @@ class TestCausalQueryDetection:
         """
         pytest.importorskip("ollama", reason="Requires Ollama for real embeddings")
 
-        from fitz_ai.llm import get_embedder
+        from fitz_sage.llm import get_embedder
 
         try:
             embedder = get_embedder("ollama", config={"model": "nomic-embed-text:latest"})
@@ -290,7 +290,7 @@ class TestConflictDetection:
         """
         pytest.importorskip("ollama", reason="Requires Ollama for real embeddings")
 
-        from fitz_ai.llm import get_chat_factory, get_embedder
+        from fitz_sage.llm import get_chat_factory, get_embedder
 
         try:
             embedder = get_embedder("ollama", config={"model": "nomic-embed-text:latest"})
@@ -405,7 +405,7 @@ class TestSignalPriority:
         even check for conflicts.)
         """
         # This tests the governor priority, not constraint interaction
-        from fitz_ai.governance.constraints.base import ConstraintResult
+        from fitz_sage.governance.constraints.base import ConstraintResult
 
         results = [
             ConstraintResult(

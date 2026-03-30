@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
-from fitz_ai.engines.fitz_krag.ingestion.enricher import KragEnricher
+from fitz_sage.engines.fitz_krag.ingestion.enricher import KragEnricher
 
 # ---------------------------------------------------------------------------
 # Helpers

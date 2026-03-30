@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from fitz_ai.core.instrumentation import (
+from fitz_sage.core.instrumentation import (
     _NO_CACHE,
     InstrumentedProxy,
     clear_hooks,

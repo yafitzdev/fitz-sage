@@ -1,6 +1,6 @@
 # Unified Storage with PostgreSQL + pgvector
 
-> Why fitz-ai uses PostgreSQL instead of a dedicated vector database.
+> Why fitz-sage uses PostgreSQL instead of a dedicated vector database.
 
 ---
 
@@ -21,7 +21,7 @@ Fitz uses **PostgreSQL + pgvector** for all storage—vectors, metadata, and str
 
 Dedicated vector databases (Pinecone, Weaviate, Qdrant, Milvus) are optimized for one thing: vector similarity search. They're excellent at scale—billions of vectors, millisecond latencies, distributed deployments.
 
-But for fitz-ai's use case, they introduce unnecessary complexity:
+But for fitz-sage's use case, they introduce unnecessary complexity:
 
 | Concern | Dedicated Vector DB | PostgreSQL + pgvector |
 |---------|--------------------|-----------------------|
@@ -45,14 +45,14 @@ Yes—by 2-5x for pure vector search. But here's what actually matters:
 
 Vector search is **less than 1% of total query time**. The LLM dominates. Optimizing vector search from 5ms to 15ms is imperceptible to users.
 
-For fitz-ai's target scale (<10M vectors per collection), pgvector with HNSW indexing provides:
+For fitz-sage's target scale (<10M vectors per collection), pgvector with HNSW indexing provides:
 - **99% recall** (same as dedicated DBs)
 - **<50ms latency** at 1M vectors
 - **Zero maintenance** (no index retraining)
 
 ### What We Gained
 
-By choosing PostgreSQL, fitz-ai gets capabilities that would require significant engineering with a dedicated vector DB:
+By choosing PostgreSQL, fitz-sage gets capabilities that would require significant engineering with a dedicated vector DB:
 
 **1. Real SQL for Structured Data**
 
@@ -88,7 +88,7 @@ Vectors, metadata, and tables are in one transaction. No eventual consistency is
 **4. Zero-Friction Local Development**
 
 ```bash
-pip install fitz-ai  # Includes pgserver
+pip install fitz-sage  # Includes pgserver
 fitz query "What is our refund policy?" --source ./docs
 # PostgreSQL starts automatically, invisibly
 ```
@@ -237,7 +237,7 @@ Fitz chose PostgreSQL + pgvector because:
 3. **One system** > multiple databases to sync
 4. **Zero friction** > infrastructure requirements
 
-For fitz-ai's scale and use case, this is the right trade-off. If you're building a system that needs to search billions of vectors with sub-millisecond latency, a dedicated vector database makes sense. For knowledge bases, codebases, and document collections—PostgreSQL is more than enough.
+For fitz-sage's scale and use case, this is the right trade-off. If you're building a system that needs to search billions of vectors with sub-millisecond latency, a dedicated vector database makes sense. For knowledge bases, codebases, and document collections—PostgreSQL is more than enough.
 
 ---
 

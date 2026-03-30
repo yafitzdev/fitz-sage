@@ -10,13 +10,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from fitz_ai.engines.fitz_krag.retrieval.ranker import (
+from fitz_sage.engines.fitz_krag.retrieval.ranker import (
     ENTITY_MATCH_BONUS,
     CrossStrategyRanker,
 )
-from fitz_ai.engines.fitz_krag.retrieval.router import RetrievalRouter
-from fitz_ai.engines.fitz_krag.retrieval_profile import RetrievalProfile
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind
+from fitz_sage.engines.fitz_krag.retrieval.router import RetrievalRouter
+from fitz_sage.engines.fitz_krag.retrieval_profile import RetrievalProfile
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind
 
 # ---------------------------------------------------------------------------
 # Helpers

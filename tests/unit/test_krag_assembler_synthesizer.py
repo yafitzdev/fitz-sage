@@ -12,17 +12,17 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fitz_ai.core import Answer, GenerationError
-from fitz_ai.engines.fitz_krag.context.assembler import (
+from fitz_sage.core import Answer, GenerationError
+from fitz_sage.engines.fitz_krag.context.assembler import (
     CHARS_PER_TOKEN,
     ContextAssembler,
 )
-from fitz_ai.engines.fitz_krag.generation.synthesizer import (
+from fitz_sage.engines.fitz_krag.generation.synthesizer import (
     SYSTEM_PROMPT_GROUNDED,
     SYSTEM_PROMPT_OPEN,
     CodeSynthesizer,
 )
-from fitz_ai.engines.fitz_krag.types import Address, AddressKind, ReadResult
+from fitz_sage.engines.fitz_krag.types import Address, AddressKind, ReadResult
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -1,6 +1,6 @@
 # tests/unit/test_hyde.py
 """
-Tests for fitz_ai.retrieval.hyde module.
+Tests for fitz_sage.retrieval.hyde module.
 
 Tests cover:
 1. HydeGenerator - hypothesis generation from queries
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fitz_ai.retrieval.hyde import HydeGenerator
+from fitz_sage.retrieval.hyde import HydeGenerator
 
 # ---------------------------------------------------------------------------
 # Test Fixtures

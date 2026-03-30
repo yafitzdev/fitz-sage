@@ -1,6 +1,6 @@
 # tests/unit/test_ingest_state.py
 """
-Tests for fitz_ai.ingestion.state module.
+Tests for fitz_sage.ingestion.state module.
 """
 
 import pytest
@@ -12,7 +12,7 @@ from tests.conftest import POSTGRES_DEPS_AVAILABLE, SKIP_POSTGRES_REASON
 if not POSTGRES_DEPS_AVAILABLE:
     pytest.skip(SKIP_POSTGRES_REASON, allow_module_level=True)
 
-from fitz_ai.ingestion.state import (
+from fitz_sage.ingestion.state import (
     EmbeddingConfig,
     FileEntry,
     FileStatus,

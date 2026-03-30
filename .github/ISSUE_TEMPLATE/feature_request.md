@@ -20,7 +20,7 @@ Describe the solution you'd like. Include API examples if applicable.
 
 ```python
 # Example usage
-from fitz_ai.new_module import NewFeature
+from fitz_sage.new_module import NewFeature
 
 feature = NewFeature(config)
 result = feature.do_something()

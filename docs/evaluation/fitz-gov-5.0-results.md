@@ -219,9 +219,9 @@ python -m tools.governance.calibrate_cascade
 | `tools/governance/train_classifier.py` | Cascade training with hyperparameter search |
 | `tools/governance/calibrate_cascade.py` | 4-threshold sweep for critical case minimization |
 | `tools/governance/data/features.csv` | 2,920 rows × 95 columns |
-| `fitz_ai/governance/data/model_v6_cascade.joblib` | Production cascade artifact |
-| `fitz_ai/governance/decider.py` | GovernanceDecider (production inference) |
-| `fitz_ai/governance/constraints/feature_extractor.py` | Runtime feature extraction (108 features) |
+| `fitz_sage/governance/data/model_v6_cascade.joblib` | Production cascade artifact |
+| `fitz_sage/governance/decider.py` | GovernanceDecider (production inference) |
+| `fitz_sage/governance/constraints/feature_extractor.py` | Runtime feature extraction (108 features) |
 | `retrieval/detection/registry.py` | DetectionOrchestrator with ML DetectionClassifier |
 
 ---

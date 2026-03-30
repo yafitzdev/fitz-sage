@@ -22,9 +22,9 @@ import pytest
 # Pure logic tests - run on every commit
 pytestmark = pytest.mark.tier1
 
-from fitz_ai.core.chunk import Chunk
-from fitz_ai.governance import CausalAttributionConstraint
-from fitz_ai.governance.constraints.semantic import (
+from fitz_sage.core.chunk import Chunk
+from fitz_sage.governance import CausalAttributionConstraint
+from fitz_sage.governance.constraints.semantic import (
     CAUSAL_CONCEPTS,
     CAUSAL_QUERY_CONCEPTS,
     HEDGE_EVIDENCE_CONCEPTS,

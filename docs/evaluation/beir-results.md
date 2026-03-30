@@ -143,7 +143,7 @@ With bge-m3 at `num_ctx=8192`, fiqa's 57,638-doc corpus takes ~90 minutes to ind
 
 ## Architecture
 
-The BEIR benchmark is implemented in `fitz_ai/evaluation/benchmarks/beir.py`.
+The BEIR benchmark is implemented in `fitz_sage/evaluation/benchmarks/beir.py`.
 
 **`FitzBEIRRetriever`** is the BEIR-compatible retriever wrapper:
 1. `index_corpus()` — creates a temp collection `beir_{dataset}_{uuid8}`, inserts raw file rows (FK requirement), upserts sections with vectors via `SectionStore.upsert_batch()`
@@ -157,9 +157,9 @@ The BEIR benchmark is implemented in `fitz_ai/evaluation/benchmarks/beir.py`.
 ## Running the Benchmark
 
 ```python
-from fitz_ai.config.loader import load_engine_config
-from fitz_ai.engines.fitz_krag.engine import FitzKragEngine
-from fitz_ai.evaluation.benchmarks import BEIRBenchmark
+from fitz_sage.config.loader import load_engine_config
+from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
+from fitz_sage.evaluation.benchmarks import BEIRBenchmark
 
 config = load_engine_config("fitz_krag")
 config.collection = "beir_scratch"  # avoid dim-check on existing collections

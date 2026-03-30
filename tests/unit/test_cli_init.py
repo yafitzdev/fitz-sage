@@ -16,7 +16,7 @@ class TestGenerateConfig:
         """Test generate_global_config produces valid YAML."""
         import yaml
 
-        from fitz_ai.cli.commands.init_config import generate_global_config
+        from fitz_sage.cli.commands.init_config import generate_global_config
 
         config_str = generate_global_config("fitz_krag")
         config = yaml.safe_load(config_str)
@@ -27,7 +27,7 @@ class TestGenerateConfig:
         """Test generate_fitz_krag_config produces valid YAML with flat format."""
         import yaml
 
-        from fitz_ai.cli.commands.init_config import generate_fitz_krag_config
+        from fitz_sage.cli.commands.init_config import generate_fitz_krag_config
 
         config_str = generate_fitz_krag_config(
             chat="cohere",
@@ -52,7 +52,7 @@ class TestGenerateConfig:
         """Test generate_fitz_krag_config includes rerank when provided."""
         import yaml
 
-        from fitz_ai.cli.commands.init_config import generate_fitz_krag_config
+        from fitz_sage.cli.commands.init_config import generate_fitz_krag_config
 
         config_str = generate_fitz_krag_config(
             chat="cohere",
@@ -74,7 +74,7 @@ class TestGenerateConfig:
         """Test generate_fitz_krag_config sets rerank to null when not provided."""
         import yaml
 
-        from fitz_ai.cli.commands.init_config import generate_fitz_krag_config
+        from fitz_sage.cli.commands.init_config import generate_fitz_krag_config
 
         config_str = generate_fitz_krag_config(
             chat="cohere",

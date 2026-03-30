@@ -5,7 +5,7 @@ Practical, copy-paste-ready examples for common use cases.
 ## Quick Start
 
 ```bash
-pip install fitz-ai
+pip install fitz-sage
 export COHERE_API_KEY="your-key"  # or use Ollama for local-only
 
 python examples/01_quickstart.py
@@ -24,7 +24,7 @@ python examples/01_quickstart.py
 ## Example 1: Quickstart (90% of use cases)
 
 ```python
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 f = fitz(collection="my_docs")
 f.ingest("./docs")
@@ -38,7 +38,7 @@ for source in answer.provenance:
 ## Example 2: Tabular Data
 
 ```python
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 f = fitz(collection="sales")
 f.ingest("./data/sales.csv")
@@ -57,7 +57,7 @@ ollama serve
 ```
 
 ```python
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 # Fitz auto-detects Ollama when no API keys are set
 f = fitz(collection="private_docs")
@@ -69,7 +69,7 @@ answer = f.ask("Summarize the key points")
 ## Example 4: Multiple Collections
 
 ```python
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 # Separate knowledge bases
 engineering = fitz(collection="engineering")
@@ -86,7 +86,7 @@ hr_answer = hr.ask("What's the PTO policy?")
 ## Example 5: Advanced Query Features
 
 ```python
-from fitz_ai import fitz
+from fitz_sage import fitz
 
 f = fitz(collection="bugs")
 f.ingest("./bug_reports")

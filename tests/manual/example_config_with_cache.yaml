@@ -29,15 +29,15 @@ retrieval:
 cloud:
   enabled: true
 
-  # API key from https://fitz-ai.cloud (replace with your key)
+  # API key from https://fitz-sage.cloud (replace with your key)
   api_key: "fitz_xxx_your_api_key_here"
 
   # Organization encryption key (NEVER shared with server)
   # Generate with: python -c "import os; print(os.urandom(32).hex())"
   org_key: "your_64_character_hex_encryption_key_here"
 
-  # API base URL (default: https://api.fitz-ai.cloud/v1)
-  base_url: "https://fitz-ai-cloud-production.up.railway.app/v1"
+  # API base URL (default: https://api.fitz-sage.cloud/v1)
+  base_url: "https://fitz-sage-cloud-production.up.railway.app/v1"
 
   # Request timeout in seconds
   timeout: 30

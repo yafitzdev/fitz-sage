@@ -1,6 +1,6 @@
 # tests/unit/test_vocabulary.py
 """
-Tests for fitz_ai.retrieval.vocabulary module.
+Tests for fitz_sage.retrieval.vocabulary module.
 
 Tests cover:
 1. Keyword model - serialization, matching, variations
@@ -25,22 +25,22 @@ from tests.conftest import POSTGRES_DEPS_AVAILABLE, SKIP_POSTGRES_REASON
 if not POSTGRES_DEPS_AVAILABLE:
     pytest.skip(SKIP_POSTGRES_REASON, allow_module_level=True)
 
-from fitz_ai.retrieval.vocabulary.detector import (
+from fitz_sage.retrieval.vocabulary.detector import (
     DetectorPattern,
     KeywordDetector,
     suggest_keywords,
 )
-from fitz_ai.retrieval.vocabulary.matcher import (
+from fitz_sage.retrieval.vocabulary.matcher import (
     KeywordMatcher,
     create_matcher_from_store,
 )
-from fitz_ai.retrieval.vocabulary.models import (
+from fitz_sage.retrieval.vocabulary.models import (
     Keyword,
     VocabularyConfig,
     VocabularyMetadata,
 )
-from fitz_ai.retrieval.vocabulary.store import VocabularyStore
-from fitz_ai.retrieval.vocabulary.variations import (
+from fitz_sage.retrieval.vocabulary.store import VocabularyStore
+from fitz_sage.retrieval.vocabulary.variations import (
     generate_variations,
     normalize_for_matching,
 )
@@ -1012,7 +1012,7 @@ class TestCreateMatcherFromStore:
 
     def test_create_from_existing_store(self, tmp_path: Path, monkeypatch):
         """Test creating matcher from existing store."""
-        from fitz_ai.core import paths
+        from fitz_sage.core import paths
 
         monkeypatch.setattr(paths.FitzPaths, "workspace", classmethod(lambda cls: tmp_path))
 
@@ -1032,7 +1032,7 @@ class TestCreateMatcherFromStore:
 
     def test_create_from_nonexistent_store(self, tmp_path: Path, monkeypatch):
         """Test that None is returned when store doesn't exist."""
-        from fitz_ai.core import paths
+        from fitz_sage.core import paths
 
         monkeypatch.setattr(paths.FitzPaths, "workspace", classmethod(lambda cls: tmp_path))
 
@@ -1042,7 +1042,7 @@ class TestCreateMatcherFromStore:
 
     def test_create_from_empty_store(self, tmp_path: Path, monkeypatch):
         """Test that None is returned when store is empty."""
-        from fitz_ai.core import paths
+        from fitz_sage.core import paths
 
         monkeypatch.setattr(paths.FitzPaths, "workspace", classmethod(lambda cls: tmp_path))
 
