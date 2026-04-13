@@ -1,40 +1,80 @@
 name: Release
 
+# Publishes fitz-sage to PyPI via trusted publishing (OIDC).
+#
+# Configuration required on PyPI once (https://pypi.org/manage/account/publishing/):
+#   Owner               yafitzdev
+#   Repository          fitz-sage
+#   Workflow name       release.yml        (this file)
+#   Environment         pypi               (matches the environment below)
+#
+# After the pending publisher is registered, pushing a GitHub Release for a
+# tag like v0.11.0 triggers this workflow: it builds the sdist + wheel in a
+# clean CI environment, exchanges a short-lived OIDC token with PyPI, and
+# uploads. No long-lived API tokens, no .pypirc, no secrets stored in the
+# repo or on any developer machine.
+#
+# To cut a release:
+#   1. Bump the version in pyproject.toml
+#   2. Commit, tag `git tag -a vX.Y.Z -m "..."`, push the tag
+#   3. Create a GitHub Release pointing at the tag (web UI or `gh release create`)
+#   4. Watch this workflow succeed at Actions -> Release
+
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [published]
 
 jobs:
-  release:
+  build:
+    name: build sdist + wheel
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
 
-      - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build twine
+      - name: Install build backend
+        run: python -m pip install --upgrade build twine
 
-      - name: Build package
+      - name: Build distributions
         run: python -m build
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      - name: Sanity-check the artifacts
+        run: python -m twine check dist/*
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          files: dist/*
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  publish:
+    name: publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/fitz-sage
+
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
