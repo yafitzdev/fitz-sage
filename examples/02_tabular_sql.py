@@ -82,7 +82,8 @@ for question in questions:
 
 # Add some documentation alongside the data
 docs_path = temp_dir / "sales_guide.md"
-docs_path.write_text("""
+docs_path.write_text(
+    """
 # Sales Performance Guide
 
 ## Regional Strategy
@@ -96,7 +97,8 @@ docs_path.write_text("""
 
 ## Q2 Goals
 Target 15% growth over Q1 in both regions.
-""")
+"""
+)
 
 # Re-ingest to include the markdown
 f.ingest(str(temp_dir))

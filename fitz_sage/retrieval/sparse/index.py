@@ -126,12 +126,14 @@ class SparseIndex:
         try:
             with self._manager.connection(self.collection) as conn:
                 # Check if chunks table exists
-                table_exists = conn.execute("""
+                table_exists = conn.execute(
+                    """
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables
                         WHERE table_name = 'chunks'
                     )
-                    """).fetchone()[0]
+                    """
+                ).fetchone()[0]
 
                 if not table_exists:
                     return []
@@ -175,12 +177,14 @@ class SparseIndex:
         try:
             with self._manager.connection(self.collection) as conn:
                 # Check if chunks table exists
-                table_exists = conn.execute("""
+                table_exists = conn.execute(
+                    """
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables
                         WHERE table_name = 'chunks'
                     )
-                    """).fetchone()[0]
+                    """
+                ).fetchone()[0]
 
                 if not table_exists:
                     return []
@@ -229,12 +233,14 @@ class SparseIndex:
         try:
             with self._manager.connection(self.collection) as conn:
                 # Check if chunks table exists
-                table_exists = conn.execute("""
+                table_exists = conn.execute(
+                    """
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables
                         WHERE table_name = 'chunks'
                     )
-                    """).fetchone()[0]
+                    """
+                ).fetchone()[0]
 
                 if not table_exists:
                     return []
@@ -264,12 +270,14 @@ class SparseIndex:
         """Check if index is ready for querying."""
         try:
             with self._manager.connection(self.collection) as conn:
-                result = conn.execute("""
+                result = conn.execute(
+                    """
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables
                         WHERE table_name = 'chunks'
                     )
-                    """).fetchone()
+                    """
+                ).fetchone()
                 return result[0] if result else False
         except Exception:
             return False

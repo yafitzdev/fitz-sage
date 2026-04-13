@@ -143,12 +143,14 @@ class IngestStateManager:
 
         with self._manager.connection(INGEST_STATE_COLLECTION) as conn:
             # Load project metadata
-            result = conn.execute("""
+            result = conn.execute(
+                """
                 SELECT project_id, embedding_provider, embedding_model,
                        embedding_dimension, embedding_id
                 FROM ingest_project
                 WHERE id = 1
-                """).fetchone()
+                """
+            ).fetchone()
 
             if result:
                 self._project_id = result[0]

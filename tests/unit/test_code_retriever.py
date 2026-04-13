@@ -59,14 +59,18 @@ class TestBuildFileList:
 
 class TestBuildStructuralIndex:
     def test_extracts_python_classes(self, tmp_path):
-        (tmp_path / "models.py").write_text(textwrap.dedent("""\
+        (tmp_path / "models.py").write_text(
+            textwrap.dedent(
+                """\
             class User:
                 def __init__(self, name: str) -> None:
                     self.name = name
 
                 def greet(self) -> str:
                     return f"Hello {self.name}"
-        """))
+        """
+            )
+        )
 
         index = build_structural_index(tmp_path, ["models.py"])
         assert "## models.py" in index
@@ -74,10 +78,14 @@ class TestBuildStructuralIndex:
         assert "classes:" in index
 
     def test_extracts_python_functions(self, tmp_path):
-        (tmp_path / "utils.py").write_text(textwrap.dedent("""\
+        (tmp_path / "utils.py").write_text(
+            textwrap.dedent(
+                """\
             def slugify(text: str) -> str:
                 return text.lower().replace(" ", "-")
-        """))
+        """
+            )
+        )
 
         index = build_structural_index(tmp_path, ["utils.py"])
         assert "slugify" in index
@@ -152,16 +160,24 @@ def _make_chat_factory(response=None):
 class TestCodeRetriever:
     def test_retrieve_end_to_end(self, tmp_path):
         (tmp_path / "app").mkdir()
-        (tmp_path / "app" / "main.py").write_text(textwrap.dedent("""\
+        (tmp_path / "app" / "main.py").write_text(
+            textwrap.dedent(
+                """\
             from app.utils import helper
 
             def run():
                 return helper()
-        """))
-        (tmp_path / "app" / "utils.py").write_text(textwrap.dedent("""\
+        """
+            )
+        )
+        (tmp_path / "app" / "utils.py").write_text(
+            textwrap.dedent(
+                """\
             def helper():
                 return "hello"
-        """))
+        """
+            )
+        )
         (tmp_path / "app" / "__init__.py").write_text("")
 
         response = json.dumps(
@@ -193,12 +209,14 @@ class TestCodeRetriever:
         assert results[0].address.kind == AddressKind.FILE
 
     def test_compresses_python(self, tmp_path):
-        source = textwrap.dedent('''\
+        source = textwrap.dedent(
+            '''\
             def foo():
                 """Long docstring that should be stripped."""
                 x = 1
                 return x
-        ''')
+        '''
+        )
         (tmp_path / "mod.py").write_text(source)
         response = json.dumps({"search_terms": [], "files": ["mod.py"]})
 

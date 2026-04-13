@@ -67,23 +67,27 @@ f = fitz(collection="local_demo", config_path=config_path)
 docs_dir = temp_dir / "docs"
 docs_dir.mkdir()
 
-(docs_dir / "privacy.md").write_text("""
+(docs_dir / "privacy.md").write_text(
+    """
 # Data Privacy Policy
 
 All data processing happens locally on your machine.
 No data is sent to external servers.
 Documents are stored in a local PostgreSQL database.
 Embeddings are generated using local Ollama models.
-""")
+"""
+)
 
-(docs_dir / "setup.md").write_text("""
+(docs_dir / "setup.md").write_text(
+    """
 # Local Setup Guide
 
 1. Install Ollama from ollama.ai
 2. Pull required models: llama3.2 and nomic-embed-text
 3. Run 'ollama serve' to start the local server
 4. Fitz will automatically use embedded PostgreSQL
-""")
+"""
+)
 
 # =============================================================================
 # Step 3: Ingest and query locally

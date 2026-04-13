@@ -28,7 +28,8 @@ from fitz_sage import fitz
 temp_dir = Path(tempfile.mkdtemp())
 
 # Bug reports with IDs
-(temp_dir / "bugs.md").write_text("""
+(temp_dir / "bugs.md").write_text(
+    """
 # Bug Reports
 
 ## BUG-1001: Login timeout on slow connections
@@ -46,10 +47,12 @@ Investigating performance optimization options.
 Status: Fixed in v2.3.2
 Notifications were batched hourly instead of sent immediately.
 Fix: Implemented real-time notification queue.
-""")
+"""
+)
 
 # Release notes with versions
-(temp_dir / "releases.md").write_text("""
+(temp_dir / "releases.md").write_text(
+    """
 # Release Notes
 
 ## v2.3.2 (2024-01-15)
@@ -66,10 +69,12 @@ Fix: Implemented real-time notification queue.
 - New: Dark mode support
 - New: Custom dashboard layouts
 - Improved: Search performance by 40%
-""")
+"""
+)
 
 # Feature comparison
-(temp_dir / "plans.md").write_text("""
+(temp_dir / "plans.md").write_text(
+    """
 # Pricing Plans
 
 ## Free Plan
@@ -91,7 +96,8 @@ Fix: Implemented real-time notification queue.
 - 24/7 dedicated support
 - Custom integrations
 - SLA guarantee
-""")
+"""
+)
 
 # =============================================================================
 # Step 1: Ingest documents

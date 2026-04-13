@@ -39,7 +39,8 @@ class TestEnrichmentPipeline:
         proj = tmp_path / "myproject"
         proj.mkdir()
         (proj / "__init__.py").write_text("")
-        (proj / "module.py").write_text('''
+        (proj / "module.py").write_text(
+            '''
 """A simple module."""
 
 class MyClass:
@@ -49,7 +50,8 @@ class MyClass:
 def my_func():
     """My function."""
     pass
-''')
+'''
+        )
 
         config = EnrichmentConfig()
         pipeline = EnrichmentPipeline(

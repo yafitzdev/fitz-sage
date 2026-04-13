@@ -238,7 +238,8 @@ def main():
     print("\n" + "=" * 60)
     print("TEST PASSED!")
     print("=" * 60)
-    print("""
+    print(
+        """
 What happened:
 1. Query embedding generated (any dimension supported)
 2. Cache lookup #1 -> MISS (no cached answer)
@@ -250,7 +251,8 @@ The cloud NEVER saw:
 - The query text (only embedding vector)
 - The answer text (only encrypted blob)
 - Your org_key (stays local)
-""")
+"""
+    )
 
     client.close()
 

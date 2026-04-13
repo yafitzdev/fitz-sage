@@ -27,14 +27,16 @@ from fitz_sage.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
-DEFAULT_PROMPT = ChatPromptTemplate.from_template("""Answer the question based on the context below.
+DEFAULT_PROMPT = ChatPromptTemplate.from_template(
+    """Answer the question based on the context below.
 
 Context:
 {context}
 
 Question: {question}
 
-Answer:""")
+Answer:"""
+)
 
 
 class FitzRAGChain(Runnable):

@@ -416,12 +416,14 @@ class EntityGraphStore:
             edges = conn.execute("SELECT COUNT(*) FROM entity_chunks").fetchone()[0]
 
             # Top entities by mention count
-            top_entities = conn.execute("""
+            top_entities = conn.execute(
+                """
                 SELECT display_name, mention_count
                 FROM entities
                 ORDER BY mention_count DESC
                 LIMIT 10
-                """).fetchall()
+                """
+            ).fetchall()
 
             return {
                 "entities": entities,
