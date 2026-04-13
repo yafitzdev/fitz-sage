@@ -305,10 +305,8 @@ class FitzGovBenchmark:
             # Use model override if specified, otherwise use engine's chat factory
             if self._chat_factory_override:
                 fast_chat = self._chat_factory_override("fast")
-                balanced_chat = self._chat_factory_override("balanced")
             else:
                 fast_chat = engine._chat_factory("fast")
-                balanced_chat = engine._chat_factory("balanced")
             # Get embedder from engine for semantic relevance checking
             embedder = engine._embedder
             constraints = [
