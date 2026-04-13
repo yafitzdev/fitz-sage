@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![fitz-sage logo](/docs/assets/logo.png)
+# fitz-sage
 
 ### The RAG library that says "I don't know" instead of hallucinating.
 
