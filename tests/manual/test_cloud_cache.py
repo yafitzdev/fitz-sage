@@ -78,15 +78,13 @@ def test_cache_flow():
     if not config.cloud or not config.cloud.enabled:
         print("❌ ERROR: Cloud is not enabled in config")
         print("   Add cloud section to config:")
-        print(
-            """
+        print("""
   cloud:
     enabled: true
     api_key: "fitz_xxx..."
     org_key: "64-char-hex-string"
     base_url: "https://api.fitz-sage.cloud/v1"
-        """
-        )
+        """)
         return False
 
     print("✓ Cloud enabled in config")

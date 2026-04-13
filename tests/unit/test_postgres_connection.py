@@ -445,7 +445,9 @@ class TestConnectionPool:
         mock_pool_class = MagicMock(return_value=mock_pool)
 
         with patch.object(manager, "_ensure_database", return_value="fitz_coll"):
-            with patch("fitz_sage.storage.postgres._get_psycopg_pool", return_value=mock_pool_class):
+            with patch(
+                "fitz_sage.storage.postgres._get_psycopg_pool", return_value=mock_pool_class
+            ):
                 pool1 = manager.get_pool("my_collection")
                 pool2 = manager.get_pool("my_collection")
 

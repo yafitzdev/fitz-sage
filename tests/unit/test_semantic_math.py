@@ -6,7 +6,6 @@ These tests kill mutation testing survivors by verifying edge cases
 that mutations would break.
 """
 
-
 import pytest
 
 from fitz_sage.core.math import cosine_similarity, mean_vector

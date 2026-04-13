@@ -7,6 +7,7 @@ Covers:
 - Router.retrieve behavior with and without detection
 - Detection summary flowing through engine.answer() to the router
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch

@@ -6,6 +6,7 @@ All dependencies are mocked. The engine is constructed via __new__ with
 mocked internals for answer/ingest/config tests. Only the init tests
 exercise the real __init__ with patched imports.
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -127,7 +128,9 @@ class TestEngineInit:
             # storage
             "PostgresConnectionManager": ("fitz_sage.storage.postgres.PostgresConnectionManager"),
             # stores
-            "RawFileStore": ("fitz_sage.engines.fitz_krag.ingestion" ".raw_file_store.RawFileStore"),
+            "RawFileStore": (
+                "fitz_sage.engines.fitz_krag.ingestion" ".raw_file_store.RawFileStore"
+            ),
             "SymbolStore": ("fitz_sage.engines.fitz_krag.ingestion" ".symbol_store.SymbolStore"),
             "ImportGraphStore": (
                 "fitz_sage.engines.fitz_krag.ingestion" ".import_graph_store.ImportGraphStore"
@@ -144,7 +147,8 @@ class TestEngineInit:
                 ".strategies.section_search.SectionSearchStrategy"
             ),
             "TableSearchStrategy": (
-                "fitz_sage.engines.fitz_krag.retrieval" ".strategies.table_search.TableSearchStrategy"
+                "fitz_sage.engines.fitz_krag.retrieval"
+                ".strategies.table_search.TableSearchStrategy"
             ),
             # retrieval
             "RetrievalRouter": ("fitz_sage.engines.fitz_krag.retrieval" ".router.RetrievalRouter"),
@@ -156,7 +160,9 @@ class TestEngineInit:
             # query analysis
             "QueryAnalyzer": ("fitz_sage.engines.fitz_krag" ".query_analyzer.QueryAnalyzer"),
             # context + generation
-            "ContextAssembler": ("fitz_sage.engines.fitz_krag.context" ".assembler.ContextAssembler"),
+            "ContextAssembler": (
+                "fitz_sage.engines.fitz_krag.context" ".assembler.ContextAssembler"
+            ),
             "CodeSynthesizer": (
                 "fitz_sage.engines.fitz_krag.generation" ".synthesizer.CodeSynthesizer"
             ),

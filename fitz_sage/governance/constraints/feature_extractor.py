@@ -25,7 +25,9 @@ from fitz_sage.governance.protocol import EvidenceItem
 if TYPE_CHECKING:
     from fitz_sage.governance.constraints.base import ConstraintResult
 
-from fitz_sage.governance.constraints.plugins.answer_verification import AnswerVerificationConstraint
+from fitz_sage.governance.constraints.plugins.answer_verification import (
+    AnswerVerificationConstraint,
+)
 from fitz_sage.governance.constraints.plugins.causal_attribution import CausalAttributionConstraint
 from fitz_sage.governance.constraints.plugins.conflict_aware import ConflictAwareConstraint
 from fitz_sage.governance.constraints.plugins.insufficient_evidence import (
@@ -668,14 +670,16 @@ def _extract_interchunk_features(features: dict[str, Any], chunks: Sequence[Evid
     )
 
     # --- Q1/Q4 recovery: no constraints fired but good relevance signals ---
-    features["ix_no_constraint_good_signal"] = float(
-        features.get("num_constraints_fired", 0) == 0
-    ) * features.get("query_subject_partial", 0) * features.get("mean_vector_score", 0)
+    features["ix_no_constraint_good_signal"] = (
+        float(features.get("num_constraints_fired", 0) == 0)
+        * features.get("query_subject_partial", 0)
+        * features.get("mean_vector_score", 0)
+    )
 
     # --- Hedged disputes: hedged evidence + numerical divergence = dispute not abstain ---
-    features["ix_hedged_with_conflicts"] = (
-        1 - features.get("assertion_density", 0)
-    ) * float(features.get("has_cross_chunk_divergence", False))
+    features["ix_hedged_with_conflicts"] = (1 - features.get("assertion_density", 0)) * float(
+        features.get("has_cross_chunk_divergence", False)
+    )
 
 
 def _extract_numbers_from_text(text: str) -> list[float]:

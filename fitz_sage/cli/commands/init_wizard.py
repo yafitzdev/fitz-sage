@@ -214,27 +214,23 @@ def _save_configs(
 def _show_next_steps() -> None:
     """Display next steps after successful configuration."""
     if RICH:
-        console.print(
-            """
+        console.print("""
 [green]Your configuration is ready![/green]
 
 Next steps:
   [cyan]fitz query "your question" --source ./docs[/cyan]  # Register + query
   [cyan]fitz query "your question"[/cyan]                  # Query existing collection
   [cyan]fitz config --doctor[/cyan]                        # Verify setup
-"""
-        )
+""")
     else:
-        print(
-            """
+        print("""
 Your configuration is ready!
 
 Next steps:
   fitz query "your question" --source ./docs  # Register + query
   fitz query "your question"                  # Query existing collection
   fitz config --doctor                        # Verify setup
-"""
-        )
+""")
 
 
 def command(

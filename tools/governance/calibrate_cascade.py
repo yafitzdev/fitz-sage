@@ -189,7 +189,9 @@ def main():
         "r_tru": (pred[y_3class == "trustworthy"] == "trustworthy").mean(),
     }
 
-    print(f"\n  Current operating point (Q1={old_q1_t:.3f} Q2={old_q2_t:.3f} Q3={old_q3_t:.3f} Q4={old_q4_t:.3f}):")
+    print(
+        f"\n  Current operating point (Q1={old_q1_t:.3f} Q2={old_q2_t:.3f} Q3={old_q3_t:.3f} Q4={old_q4_t:.3f}):"
+    )
     print(
         f"  FT={cur['ft']}  Acc={cur['acc']*100:.1f}%"
         f"  Abs={cur['r_abs']*100:.1f}%  Dis={cur['r_dis']*100:.1f}%  Tru={cur['r_tru']*100:.1f}%"

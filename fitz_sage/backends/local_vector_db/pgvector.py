@@ -146,25 +146,21 @@ class PgVectorDB:
             register_vector(conn)
 
             # Check if table exists first
-            table_exists = conn.execute(
-                """
+            table_exists = conn.execute("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables
                     WHERE table_name = 'chunks'
                 )
-                """
-            ).fetchone()[0]
+                """).fetchone()[0]
 
             if table_exists:
                 # Table exists, get and verify dimension
-                result = conn.execute(
-                    """
+                result = conn.execute("""
                     SELECT format_type(atttypid, atttypmod)
                     FROM pg_attribute
                     WHERE attrelid = 'chunks'::regclass
                     AND attname = 'vector'
-                    """
-                ).fetchone()
+                    """).fetchone()
 
                 if result:
                     match = re.search(r"vector\((\d+)\)", result[0])
@@ -538,15 +534,13 @@ class PgVectorDB:
             # Each collection is stored as database "fitz_{collection_name}"
             # Query postgres for databases starting with fitz_
             with self._manager.connection("postgres") as conn:
-                result = conn.execute(
-                    """
+                result = conn.execute("""
                     SELECT datname FROM pg_database
                     WHERE datistemplate = false
                     AND datname LIKE 'fitz_%'
                     AND datname NOT LIKE 'fitz_fitz_%'
                     ORDER BY datname
-                    """
-                ).fetchall()
+                    """).fetchall()
                 candidate_dbs = [row[0] for row in result]
 
             # Check each database for chunks table and extract collection name
@@ -562,13 +556,11 @@ class PgVectorDB:
                 try:
                     # Check if chunks table exists (use collection name, manager adds prefix)
                     with self._manager.connection(collection_name) as conn:
-                        result = conn.execute(
-                            """
+                        result = conn.execute("""
                             SELECT 1 FROM information_schema.tables
                             WHERE table_name = 'chunks' AND table_schema = 'public'
                             LIMIT 1
-                            """
-                        ).fetchone()
+                            """).fetchone()
                         if result:
                             collections.append(collection_name)
                             # Discover dimension if not already known
@@ -706,14 +698,12 @@ class PgVectorDB:
         try:
             with self._manager.connection(collection) as conn:
                 # Check if chunks table exists and get dimension
-                result = conn.execute(
-                    """
+                result = conn.execute("""
                     SELECT format_type(atttypid, atttypmod)
                     FROM pg_attribute
                     WHERE attrelid = 'chunks'::regclass
                     AND attname = 'vector'
-                    """
-                ).fetchone()
+                    """).fetchone()
 
                 if result:
                     match = re.search(r"vector\((\d+)\)", result[0])

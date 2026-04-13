@@ -6,6 +6,7 @@ Tests the epistemic governance path: ReadResult protocol conformance,
 constraint creation, answer mode routing through the pipeline, and
 fail-open behaviour on constraint errors.
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch

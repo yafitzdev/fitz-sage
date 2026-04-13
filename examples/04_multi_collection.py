@@ -30,8 +30,7 @@ temp_dir = Path(tempfile.mkdtemp())
 # Engineering docs
 eng_dir = temp_dir / "engineering"
 eng_dir.mkdir()
-(eng_dir / "architecture.md").write_text(
-    """
+(eng_dir / "architecture.md").write_text("""
 # System Architecture
 
 Our system uses a microservices architecture with:
@@ -41,25 +40,21 @@ Our system uses a microservices architecture with:
 - Kubernetes for orchestration
 
 Deployment happens via CI/CD pipeline with automated testing.
-"""
-)
+""")
 
-(eng_dir / "coding_standards.md").write_text(
-    """
+(eng_dir / "coding_standards.md").write_text("""
 # Coding Standards
 
 - Use Python 3.10+ with type hints
 - Follow PEP 8 style guide
 - Write unit tests for all new code
 - Document public APIs with docstrings
-"""
-)
+""")
 
 # HR docs
 hr_dir = temp_dir / "hr"
 hr_dir.mkdir()
-(hr_dir / "benefits.md").write_text(
-    """
+(hr_dir / "benefits.md").write_text("""
 # Employee Benefits
 
 - Health insurance (medical, dental, vision)
@@ -67,11 +62,9 @@ hr_dir.mkdir()
 - 20 days PTO + 10 holidays
 - Remote work flexibility
 - $1,500 annual learning budget
-"""
-)
+""")
 
-(hr_dir / "policies.md").write_text(
-    """
+(hr_dir / "policies.md").write_text("""
 # Company Policies
 
 ## Time Off
@@ -81,8 +74,7 @@ Sick days don't require advance notice.
 ## Remote Work
 Employees can work remotely up to 3 days per week.
 Core hours are 10am-3pm for meetings.
-"""
-)
+""")
 
 # =============================================================================
 # Step 1: Create separate collections
@@ -155,8 +147,7 @@ print("COLLECTION MANAGEMENT")
 print("=" * 60)
 
 # You can also use the CLI for collection management:
-print(
-    """
+print("""
 CLI commands for managing collections:
 
   fitz collections              # Interactive browser
@@ -169,8 +160,7 @@ Or programmatically via the vector DB:
   vdb = get_vector_db()
   collections = vdb.list_collections()
   vdb.delete_collection("old_collection")
-"""
-)
+""")
 
 # Cleanup
 import shutil

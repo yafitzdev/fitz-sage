@@ -216,12 +216,10 @@ class TestResponseParsing:
 
     def test_parse_invalid_json_falls_back(self):
         """Test fallback parsing when JSON is invalid."""
-        mock_chat = MockChatClient(
-            response="""Here are some hypothetical passages:
+        mock_chat = MockChatClient(response="""Here are some hypothetical passages:
 
 This is the first passage about the topic that provides useful context.
-This is the second passage with different perspective on the matter."""
-        )
+This is the second passage with different perspective on the matter.""")
         generator = HydeGenerator(
             chat_factory=create_mock_chat_factory(mock_chat), num_hypotheses=2
         )

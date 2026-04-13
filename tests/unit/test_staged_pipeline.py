@@ -1,7 +1,6 @@
 # tests/unit/test_staged_pipeline.py
 """Tests for staged constraint pipeline."""
 
-
 from fitz_sage.governance.constraints.base import ConstraintResult
 from fitz_sage.governance.constraints.staged import (
     ConstraintStage,

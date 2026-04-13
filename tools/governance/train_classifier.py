@@ -510,9 +510,7 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
 
     # Q2 routing: number-rich docs are not disputes
     if "number_density" in X.columns and "conflict_to_number_ratio" in X.columns:
-        X["ix_numrich_low_conflict"] = X["number_density"] * (
-            1 - X["conflict_to_number_ratio"]
-        )
+        X["ix_numrich_low_conflict"] = X["number_density"] * (1 - X["conflict_to_number_ratio"])
     # Q1/Q4 recovery: no constraints + good signals = answerable
     if "num_constraints_fired" in X.columns and "query_subject_partial" in X.columns:
         X["ix_no_constraint_good_signal"] = (
@@ -522,9 +520,9 @@ def prepare_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, LabelEnc
         )
     # Hedged disputes: hedged evidence + divergence = dispute not abstain
     if "assertion_density" in X.columns and "has_cross_chunk_divergence" in X.columns:
-        X["ix_hedged_with_conflicts"] = (
-            1 - X["assertion_density"]
-        ) * X["has_cross_chunk_divergence"]
+        X["ix_hedged_with_conflicts"] = (1 - X["assertion_density"]) * X[
+            "has_cross_chunk_divergence"
+        ]
 
     return X, encoders
 
@@ -1752,7 +1750,9 @@ def train_cascade(
     # This lets the model learn dispute signals beyond just ca_fired (numerical
     # divergence, contradiction markers, opposing conclusions, etc.)
     y_q2 = np.where(y_3class == "disputed", 1, 0)
-    print(f"  Total: {sum(y_q2 == 1)} conflict (disputed), {sum(y_q2 == 0)} clean (abstain+trustworthy)")
+    print(
+        f"  Total: {sum(y_q2 == 1)} conflict (disputed), {sum(y_q2 == 0)} clean (abstain+trustworthy)"
+    )
     print(f"  (ca_fired baseline: {X[_CONFLICT_FEATURE].astype(int).sum()} cases)")
 
     q2_model, q2_threshold, q2_name, q2_oof = _train_binary_stage_cv(

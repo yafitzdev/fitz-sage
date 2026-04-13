@@ -323,12 +323,9 @@ This is the conclusion.
     def test_splits_large_sections(self):
         """Test that large sections are split."""
         chunker = PdfSectionChunker(max_section_chars=100)
-        text = (
-            """INTRODUCTION
+        text = """INTRODUCTION
 
-"""
-            + "This is a very long paragraph. " * 50
-        )
+""" + "This is a very long paragraph. " * 50
 
         chunks = chunker.chunk(make_document(text, "test"))
 

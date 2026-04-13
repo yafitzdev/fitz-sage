@@ -113,14 +113,12 @@ class VocabularyStore:
 
         try:
             with self._manager.connection(self.collection) as conn:
-                cursor = conn.execute(
-                    """
+                cursor = conn.execute("""
                     SELECT id, category, match, occurrences, first_seen,
                            user_defined, auto_generated
                     FROM keywords
                     ORDER BY category, id
-                    """
-                )
+                    """)
 
                 keywords = []
                 for row in cursor.fetchall():
@@ -158,13 +156,11 @@ class VocabularyStore:
             keywords = self.load()
 
             with self._manager.connection(self.collection) as conn:
-                result = conn.execute(
-                    """
+                result = conn.execute("""
                     SELECT generated, source_docs, auto_detected, user_modified
                     FROM vocabulary_meta
                     WHERE id = 1
-                    """
-                ).fetchone()
+                    """).fetchone()
 
                 if result:
                     metadata = VocabularyMetadata(

@@ -1,7 +1,6 @@
 # tests/unit/test_constraint_runner.py
 """Tests for constraint runner."""
 
-
 from fitz_sage.governance.constraints.base import ConstraintResult
 from fitz_sage.governance.constraints.runner import run_constraints
 

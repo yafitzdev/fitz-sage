@@ -7,6 +7,7 @@ mocked internals. Tests cover cloud_client initialization, cache lookup
 (hit/miss/error), cache store (success/error), and the answer() early-return
 path on cache hit.
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -142,7 +143,9 @@ class TestCloudClientInit:
             patch("fitz_sage.engines.fitz_krag.ingestion.section_store.SectionStore"),
             patch("fitz_sage.engines.fitz_krag.ingestion.table_store.TableStore"),
             patch("fitz_sage.engines.fitz_krag.ingestion.schema.ensure_schema"),
-            patch("fitz_sage.engines.fitz_krag.retrieval.strategies.code_search.CodeSearchStrategy"),
+            patch(
+                "fitz_sage.engines.fitz_krag.retrieval.strategies.code_search.CodeSearchStrategy"
+            ),
             patch(
                 "fitz_sage.engines.fitz_krag.retrieval.strategies.section_search.SectionSearchStrategy"
             ),

@@ -1,5 +1,6 @@
 # fitz_sage/llm/auth/httpx_auth.py
 """httpx.Auth wrapper for dynamic token injection."""
+
 from __future__ import annotations
 
 import typing

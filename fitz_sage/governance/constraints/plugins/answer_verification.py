@@ -152,7 +152,9 @@ class AnswerVerificationConstraint:
             score = _score_citation(citation, context)
             return citation, score
         except Exception as e:
-            logger.warning(f"{PIPELINE} AnswerVerificationConstraint: citation extraction failed: {e}")
+            logger.warning(
+                f"{PIPELINE} AnswerVerificationConstraint: citation extraction failed: {e}"
+            )
             return "", 0.0
 
     def apply(self, query: str, chunks: Sequence[EvidenceItem]) -> ConstraintResult:
@@ -203,7 +205,9 @@ class AnswerVerificationConstraint:
                 )
 
         # Evaluate all citations
-        valid_citations = [(text, score) for text, score in citations if score >= _WEAK_MATCH_THRESHOLD]
+        valid_citations = [
+            (text, score) for text, score in citations if score >= _WEAK_MATCH_THRESHOLD
+        ]
         best_score = max((s for _, s in citations), default=0.0)
         citation_found = len(valid_citations) > 0
 

@@ -7,6 +7,7 @@ NEW: One-liner manifest (path + docstring) in prompt + inspect_files tool.
 
 10 runs each, temperature=0.
 """
+
 import json
 import re
 import sys

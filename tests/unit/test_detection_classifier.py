@@ -9,6 +9,7 @@ Covers:
 - Fail-open behaviour on prediction errors
 - DetectionOrchestrator gating: LLM skipped, subset called, all called
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch

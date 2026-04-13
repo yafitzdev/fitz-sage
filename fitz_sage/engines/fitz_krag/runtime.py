@@ -108,15 +108,13 @@ def _register_fitz_krag_engine():
                 manager.start()
 
             with manager.connection("postgres") as conn:
-                result = conn.execute(
-                    """
+                result = conn.execute("""
                     SELECT datname FROM pg_database
                     WHERE datistemplate = false
                     AND datname LIKE 'fitz_%'
                     AND datname NOT LIKE 'fitz_fitz_%'
                     ORDER BY datname
-                    """
-                ).fetchall()
+                    """).fetchall()
                 candidate_dbs = [row[0] for row in result]
 
             collections = []
@@ -126,13 +124,11 @@ def _register_fitz_krag_engine():
                     continue
                 try:
                     with manager.connection(collection_name) as conn:
-                        has_krag = conn.execute(
-                            """
+                        has_krag = conn.execute("""
                             SELECT 1 FROM information_schema.tables
                             WHERE table_name = 'krag_raw_files' AND table_schema = 'public'
                             LIMIT 1
-                            """
-                        ).fetchone()
+                            """).fetchone()
                         if has_krag:
                             collections.append(collection_name)
                 except Exception:

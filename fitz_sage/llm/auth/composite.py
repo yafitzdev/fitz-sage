@@ -1,5 +1,6 @@
 # fitz_sage/llm/auth/composite.py
 """Composite auth for multi-header scenarios (BMW enterprise gateway)."""
+
 from __future__ import annotations
 
 from typing import Any

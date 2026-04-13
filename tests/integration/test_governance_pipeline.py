@@ -1,7 +1,6 @@
 # tests/integration/test_governance_pipeline.py
 """Integration test for governance in the RAG pipeline."""
 
-
 from fitz_sage.core.answer_mode import AnswerMode
 from fitz_sage.governance import AnswerGovernor, ConstraintResult, run_constraints
 

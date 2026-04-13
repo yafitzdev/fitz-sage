@@ -1,5 +1,6 @@
 # fitz_sage/llm/auth/token_provider.py
 """Token provider adapter for OpenAI SDK azure_ad_token_provider pattern."""
+
 from __future__ import annotations
 
 from fitz_sage.llm.auth.base import AuthProvider

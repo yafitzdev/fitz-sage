@@ -199,26 +199,22 @@ def _validate_vector_dimensions(
     already exists. This check catches mismatches early with a clear error message.
     """
     with connection_manager.connection(collection) as conn:
-        table_exists = conn.execute(
-            """
+        table_exists = conn.execute("""
             SELECT EXISTS (
                 SELECT 1 FROM information_schema.tables
                 WHERE table_name = 'krag_section_index'
             )
-            """
-        ).fetchone()[0]
+            """).fetchone()[0]
 
         if not table_exists:
             return
 
-        result = conn.execute(
-            """
+        result = conn.execute("""
             SELECT format_type(atttypid, atttypmod)
             FROM pg_attribute
             WHERE attrelid = 'krag_section_index'::regclass
             AND attname = 'summary_vector'
-            """
-        ).fetchone()
+            """).fetchone()
 
         if result:
             match = re.search(r"vector\((\d+)\)", result[0])
