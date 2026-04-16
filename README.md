@@ -12,7 +12,7 @@
 [![Version](https://img.shields.io/badge/version-0.11.0-green.svg)](CHANGELOG.md)
 [![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/yafitzdev/fitz-sage)
 
-[Why Fitz?](#why-fitz) • [Retrieval Intelligence](#retrieval-intelligence) • [Governance](#governance--know-what-you-dont-know) • [Documentation](#links) • [GitHub](https://github.com/yafitzdev/fitz-sage)
+[Why `fitz-sage`?](#why-fitz) • [Retrieval Intelligence](#retrieval-intelligence) • [Governance](#governance--know-what-you-dont-know) • [Documentation](#links) • [GitHub](https://github.com/yafitzdev/fitz-sage)
 
 </div>
 
@@ -54,7 +54,7 @@ A: "I don't have enough information
 </table>
   → Uncalibrated RAG hallucinates confidently when the answer isn't in your documents. 
   
-  Fitz refuses, explains why, and tells you what to add.
+  `fitz-sage` refuses, explains why, and tells you what to add.
 </div>
 
 
@@ -64,7 +64,7 @@ A: "I don't have enough information
 ### Where to start 🚀
 
 > [!IMPORTANT]
-> Requires [Ollama](https://ollama.ai) or a Cohere/OpenAI API key. Fitz auto-detects your setup on first run.
+> Requires [Ollama](https://ollama.ai) or a Cohere/OpenAI API key. `fitz-sage` auto-detects your setup on first run.
 
 ```bash
 pip install fitz-sage
@@ -82,11 +82,14 @@ That's it. Your documents are now searchable with AI.
 
 ### About
 
-Existing RAG tools hallucinate. When the answer isn't in your documents, they invent one — confidently, fluently, wrongly. In production, that's not a minor inconvenience. It's the reason you can't trust the system. I built fitz-sage to solve that problem directly, while working as a Data Engineer in the automotive industry. No LangChain. No LlamaIndex. Every layer written from scratch.
+Existing RAG tools hallucinate. When the answer isn't in your documents, they invent one — confidently, fluently, wrongly. 
+In production, that's not a minor inconvenience. It's the reason you can't trust the system. I built fitz-sage to solve that problem directly, while working as a Data Engineer in the automotive industry. No LangChain. No LlamaIndex. Every layer written from scratch.
 
-The retrieval architecture is [KRAG (Knowledge Routing Augmented Generation)](docs/features/platform/krag.md) — documents are parsed into typed units (code symbols, sections, tables) and each query is routed to the right search strategy, rather than searching flat chunks uniformly.
+The retrieval architecture is [KRAG (Knowledge Routing Augmented Generation)](docs/features/platform/krag.md) — documents are parsed into typed units (
+code symbols, sections, tables) and each query is routed to the right search strategy, rather than searching flat chunks uniformly.
 
-Honesty is enforced by an [ML governance classifier](docs/features/governance/governance-benchmarking.md) that decides when to answer, hedge, refuse — validated against [fitz-gov](https://github.com/yafitzdev/fitz-gov), a purpose-built benchmark of 2,920 adversarial test cases (5.7% false-trustworthy rate).
+Honesty is enforced by an [ML governance classifier](docs/features/governance/governance-benchmarking.md) that decides when to answer, hedge, refuse — validated against 
+[fitz-gov](https://github.com/yafitzdev/fitz-gov), a purpose-built benchmark of 2,920 adversarial test cases (5.7% false-trustworthy rate).
 
 It runs in production today and powers [fitz-graveyard](https://github.com/yafitzdev/fitz-graveyard).
 
@@ -139,13 +142,16 @@ RAG approach:
 You can—but you'll hit walls fast.
 
 **Context window limits 🚨**
-> GPT-4 accepts ~128k tokens. That's roughly 300 pages. Your company wiki, codebase, or document archive is likely 10x-100x larger. You physically cannot paste it all.
+> GPT-4 accepts ~128k tokens. That's roughly 300 pages. Your company wiki, codebase, or document archive is likely 10x-100x 
+> larger. You physically cannot paste it all.
 
 **Cost explosion 💥**
-> Even if you could fit everything, you'd pay for every token on every query. Sending 100k tokens costs ~\$1-3 per question. Ask 50 questions a day? That's $50-150 daily—for one user.
+> Even if you could fit everything, you'd pay for every token on every query. Sending 100k tokens costs ~\$1-3 per question. 
+> Ask 50 questions a day? That's $50-150 daily—for one user.
 
 **No selective retrieval ❌**
-> When you paste documents, the model reads everything equally. It can't focus on what's relevant. Ask about refund policies and it's also processing your hiring guidelines, engineering specs, and meeting notes—wasting context and degrading answers.
+> When you paste documents, the model reads everything equally. It can't focus on what's relevant. Ask about refund policies 
+> and it's also processing your hiring guidelines, engineering specs, and meeting notes—wasting context and degrading answers.
 
 **No persistence 💢**
 > Every conversation starts fresh. You re-upload, re-paste, re-explain. There's no knowledge base that accumulates and improves.
@@ -160,35 +166,48 @@ You can—but you'll hit walls fast.
 
 <br>
 
-They're frameworks — you assemble the chunker, embedder, vector store, retriever, and prompt chain yourself. fitz-sage is a library — one function call that handles all of it with built-in intelligence.
+They're frameworks — you assemble the chunker, embedder, vector store, retriever, and prompt chain yourself. fitz-sage is 
+a library — one function call that handles all of it with built-in intelligence.
 
-You trade flexibility for a pipeline that handles temporal queries, comparison queries, code symbol extraction, tabular SQL, and epistemic honesty out of the box — without configuration.
+You trade flexibility for a pipeline that handles temporal queries, comparison queries, code symbol extraction, tabular 
+SQL, and epistemic honesty out of the box — without configuration.
 
 </details>
 
 ---
 
-### Why Fitz?
+### Why `fitz-sage`?
 
 **Asymmetric indexing 🗂️** → [KRAG (Knowledge Routing Augmented Generation)](docs/features/platform/krag.md)
-> Documents are parsed into typed retrieval units (symbols, sections, tables) with structural metadata, not flat chunks. Queries are routed to the right strategy per content type.
+> Documents are parsed into typed retrieval units (symbols, sections, tables) with structural metadata, not flat chunks. 
+> Queries are routed to the right strategy per content type.
 
 **Zero-wait querying 🐆** → [Progressive KRAG](docs/features/platform/progressive-krag-agentic-search.md)
-> Ask a question immediately — no ingestion step required. Fitz serves answers instantly via agentic search while a background worker indexes your files. Queries get faster over time as indexing completes, but they work from second one.
+> Ask a question immediately — no ingestion step required. `fitz-sage` serves answers instantly via agentic search while
+> a background worker indexes your files. Queries get faster over time as indexing completes, but they work from second one.
 
 **Honest answers ✅** → [Governance Benchmark](docs/features/governance/governance-benchmarking.md)
-> Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when your docs only cover Q1-Q3, and typical RAG hallucinates a number. Fitz says: *"I cannot find Q4 revenue figures in the provided documents."
+> Most RAG tools confidently answer even when the answer isn't in your documents. Ask "What was our Q4 revenue?" when 
+> your docs only cover Q1-Q3, and typical RAG hallucinates a number. `fitz-sage` says: *"I cannot find Q4 revenue figures 
+> in the provided documents."
 >
-> → Fitz detects when to abstain at **86.5% recall** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 2,920 case benchmark for epistemic honesty (62.7% hard difficulty). False-trustworthy rate: **5.7%**.
+> → Detects when to abstain at **86.5% recall** on [fitz-gov](https://github.com/yafitzdev/fitz-gov), a 2,920 case benchmark for epistemic honesty (62.7% hard difficulty). 
+> False-trustworthy rate: **5.7%**.
 
 **Actionable failures 🔍**
-> When Fitz can't answer, it doesn't just refuse — it explains what it searched for, shows related topics that *do* exist, and suggests what documents to add. When sources conflict, Fitz tells you exactly which sources disagree and what the disagreement is about. Every failure mode is a feedback signal, not a dead end.
+> When `fitz-sage` can't answer, it doesn't just refuse — it explains what it searched for, shows related topics that *do* 
+> exist, and suggests what documents to add. When sources conflict, it tells you exactly which sources disagree and 
+> what the disagreement is about. Every failure mode is a feedback signal, not a dead end.
 
 **Queries that actually work 📊**
-> Standard RAG fails silently on real queries. Fitz has built-in intelligence: hierarchical summaries for "What are the trends?", exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, address-based code retrieval with import graph traversal, and SQL execution for tabular data. No configuration—it just works.
+> Standard RAG fails silently on real queries. `fitz-sage` has built-in intelligence: hierarchical summaries for "What are the trends?", 
+> exact keyword matching for "Find TC-1000", multi-query decomposition for complex questions, address-based code retrieval with 
+> import graph traversal, and SQL execution for tabular data. No configuration—it just works.
 
 **Tabular data that is actually searchable 📈** → [Unified Storage](docs/features/platform/unified-storage.md)
-> CSV and table data is a nightmare in most RAG systems—chunked arbitrarily, structure lost, queries fail. Fitz stores tables natively in PostgreSQL alongside your vectors—same database, no sync issues. Auto-detects schema and runs real SQL. Ask "What's the average price by region?" and get an actual computed answer, not fragmented rows.
+> CSV and table data is a nightmare in most RAG systems—chunked arbitrarily, structure lost, queries fail. `fitz-sage` 
+> stores tables natively in PostgreSQL alongside your vectors—same database, no sync issues. Auto-detects schema and runs 
+> real SQL. Ask "What's the average price by region?" and get an actual computed answer, not fragmented rows.
 
 **Fully local execution possible 🏠**
 > Embedded PostgreSQL + Ollama/LM Studio. No API keys required to start.
@@ -208,7 +227,9 @@ You trade flexibility for a pipeline that handles temporal queries, comparison q
 
 ### What You Can Search
 
-Traditional RAG chops every document into flat text blocks and searches them the same way. [FitzKRAG](docs/features/platform/krag.md) parses each document by type — tree-sitter for code, heading hierarchy for docs, schema detection for CSVs — and produces typed retrieval units, each with its own storage format and search strategy.
+Traditional RAG chops every document into flat text blocks and searches them the same way. [FitzKRAG](docs/features/platform/krag.md) parses each 
+document by type — tree-sitter for code, heading hierarchy for docs, schema detection for CSVs — and produces typed retrieval 
+units, each with its own storage format and search strategy.
 
 <br>
 
@@ -223,17 +244,19 @@ Traditional RAG chops every document into flat text blocks and searches them the
 <br>
 
 > [!NOTE]
-> All retrieval units share the same retrieval intelligence (temporal handling, comparison queries, multi-hop reasoning, etc.) and the same enrichment pipeline (summaries, keywords, entities, hierarchical summaries).
+> All retrieval units share the same retrieval intelligence (temporal handling, comparison queries, multi-hop reasoning, etc.) 
+> and the same enrichment pipeline (summaries, keywords, entities, hierarchical summaries).
 
 ---
 
 ### Retrieval Intelligence
 
-Most RAG implementations are naive vector search—they fail silently on real-world queries. Fitz has [built-in intelligence](docs/features/retrieval) that handles edge cases automatically:
+Most RAG implementations are naive vector search—they fail silently on real-world queries. 
+`fitz-sage` has [built-in intelligence](docs/features/retrieval) that handles edge cases automatically:
 
 <br>
 
-| Feature | Query | Naive RAG Problem | Fitz Solution |
+| Feature | Query | Naive RAG Problem | `fitz-sage` Solution |
 |---------|-------|-------------------|------------------|
 | [**epistemic-honesty**](docs/features/governance/epistemic-honesty.md) | "What was our Q4 revenue?" | ❌ Hallucinated number — Info doesn't exist, but LLM won't admit it | ✅ "I don't know" |
 | [**keyword-vocabulary**](docs/features/retrieval/keyword-vocabulary.md) | "Find TC_1000" | ❌ Wrong test case — Embeddings see TC_1000 ≈ TC_2000 (semantically similar) | ✅ Exact keyword matching |
@@ -256,7 +279,7 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 <br>
 
 > [!IMPORTANT]
-> These features are **always on**—no configuration needed. Fitz automatically detects when to use each capability.
+> These features are **always on**—no configuration needed. `fitz-sage` automatically detects when to use each capability.
 
 ---
 
@@ -264,7 +287,8 @@ Most RAG implementations are naive vector search—they fail silently on real-wo
 
 [Feature docs](docs/features/governance/governance-benchmarking.md) • [fitz-gov benchmark](https://github.com/yafitzdev/fitz-gov)
 
-Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistemic honesty using a 5-question cascade ML classifier trained on 2,920 labeled cases from [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty.
+Most RAG systems hallucinate confidently. `fitz-sage` **measures and enforces** epistemic honesty using a 5-question cascade ML 
+classifier trained on 2,920 labeled cases from [fitz-gov](https://github.com/yafitzdev/fitz-gov), a benchmark for epistemic honesty.
 
 <br>
 
@@ -316,16 +340,21 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 <br>
 
 > [!NOTE]
-> Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge the answer, or trust the consensus?" That's a judgment call even humans disagree on.
+> Governance asks "given three relevant documents that partially contradict each other, should you flag a dispute, hedge 
+> the answer, or trust the consensus?" That's a judgment call even humans disagree on.
 
 <strong>The system fails safe 🛡️</strong>
-> The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — annoying but harmless. Over-confidence ("trustworthy" instead of "disputed") is the rarest error mode.
+> The safety-first threshold is tuned so that when the classifier is wrong, it over-hedges ("disputed" instead of "trustworthy") — 
+> annoying but harmless. Over-confidence ("trustworthy" instead of "disputed") is the rarest error mode.
 
 <strong>These scores are a floor, not a ceiling 👣</strong>
-> All benchmarks were measured using `qwen2.5:3b` — a 3B parameter local model. The governance constraints run on the fast-tier LLM to keep latency low. Stronger models produce better constraint signals, which feed better features into the classifier. Upgrading your chat provider should improve governance accuracy for free.
+> All benchmarks were measured using `qwen2.5:3b` — a 3B parameter local model. The governance constraints run on the 
+> fast-tier LLM to keep latency low. Stronger models produce better constraint signals, which feed better features into the classifier. 
+> Upgrading your chat provider should improve governance accuracy for free.
 
 <strong>Zero extra latency ⏱️</strong>
-> The constraints already run as part of the pipeline. The ML classifier just replaces hand-coded rules with a local sklearn model — inference takes microseconds, no additional API calls.
+> The constraints already run as part of the pipeline. The ML classifier just replaces hand-coded rules with a local sklearn model — 
+> inference takes microseconds, no additional API calls.
 
 ---
 
@@ -343,7 +372,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >fitz query "Your question here" --source ./docs
 >```
 >
->Fitz auto-detects your LLM provider:
+>`fitz-sage` auto-detects your LLM provider:
 >1. **Ollama running?** → Uses it automatically (fully local)
 >2. **`COHERE_API_KEY` or `OPENAI_API_KEY` set?** → Uses it automatically
 >3. **First time?** → Guides you through free Cohere signup (2 minutes)
@@ -391,7 +420,7 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 >fitz query "Your question here" --source ./docs
 >```
 >
->Fitz auto-detects Ollama when running. No API keys needed—no data leaves your machine.
+>`fitz-sage` auto-detects Ollama when running. No API keys needed—no data leaves your machine.
 
 </details>
 
@@ -403,39 +432,48 @@ Most RAG systems hallucinate confidently. Fitz **measures and enforces** epistem
 
 <br>
 
-Fitz is a foundation. It handles document indexing and grounded retrieval—you build whatever sits on top: chatbots, dashboards, alerts, or automation.
+`fitz-sage` is a foundation. It handles document indexing and grounded retrieval—you build whatever sits on top: chatbots, dashboards, alerts, or automation.
 
 <br>
 
 <strong>Chatbot Backend 🤖</strong>
 
-> Connect fitz to Slack, Discord, Teams, or your own UI. One function call returns an answer with sources—no hallucinations, full provenance. You handle the conversation flow; fitz handles the knowledge.
+> Connect fitz to Slack, Discord, Teams, or your own UI. One function call returns an answer with sources—no 
+> hallucinations, full provenance. You handle the conversation flow; fitz handles the knowledge.
 >
-> *Example:* A SaaS company plugs fitz into their support bot. Tier-1 questions like "How do I reset my password?" get instant answers. Their support team focuses on edge cases while fitz deflects 60% of incoming tickets.
+> *Example:* A SaaS company plugs fitz into their support bot. Tier-1 questions like "How do I reset my password?" get 
+> instant answers. Their support team focuses on edge cases while fitz deflects 60% of incoming tickets.
 
 <br>
 
 <strong>Internal Knowledge Base 📖</strong>
 
-> Point fitz at your company's wiki, policies, and runbooks. Employees ask natural language questions instead of hunting through folders or pinging colleagues on Slack.
+> Point fitz at your company's wiki, policies, and runbooks. Employees ask natural language questions instead of hunting 
+> through folders or pinging colleagues on Slack.
 >
-> *Example:* A 200-person startup points fitz at their Notion workspace and compliance docs. New hires find answers to "How do I request PTO?" on day one—no more waiting for someone in HR to respond.
+> *Example:* A 200-person startup points fitz at their Notion workspace and compliance docs. New hires find answers to 
+> "How do I request PTO?" on day one—no more waiting for someone in HR to respond.
 
 <br>
 
 <strong>Continuous Intelligence & Alerting (Watchdog) 🐶</strong>
 
-> Pair fitz with cron, Airflow, or Lambda. Point at data on a schedule, run queries automatically, trigger alerts when conditions match. Fitz provides the retrieval primitive; you wire the automation.
+> Pair fitz with cron, Airflow, or Lambda. Point at data on a schedule, run queries automatically, trigger alerts when 
+> conditions match. `fitz-sage` provides the retrieval primitive; you wire the automation.
 >
-> *Example:* A security team points fitz at SIEM logs nightly. Every morning, a scheduled job asks "Were there failed logins from unusual locations?" If fitz finds evidence, an alert fires to the on-call channel before anyone checks email.
+> *Example:* A security team points fitz at SIEM logs nightly. Every morning, a scheduled job asks "Were there failed 
+> logins from unusual locations?" If fitz finds evidence, an alert fires to the on-call channel before anyone checks email.
 
 <br>
 
 <strong>Web Knowledge Base 🌎</strong>
 
-> Scrape the web with Scrapy, BeautifulSoup, or Playwright. Save to disk, point fitz at it. The web becomes a queryable knowledge base.
+> Scrape the web with Scrapy, BeautifulSoup, or Playwright. Save to disk, point fitz at it. The web becomes a queryable 
+> knowledge base.
 >
-> *Example:* A football analytics hobbyist scrapes Premier League match reports. They point fitz at the folder and ask "How did Arsenal perform against top 6 teams?" or "What tactics did Liverpool use in away games?"—insights that would take hours to compile manually.
+> *Example:* A football analytics hobbyist scrapes Premier League match reports. They point fitz at the folder and ask 
+> "How did Arsenal perform against top 6 teams?" or "What tactics did Liverpool use in away games?"—insights that would 
+> take hours to compile manually.
 
 <br>
 
@@ -443,11 +481,17 @@ Fitz is a foundation. It handles document indexing and grounded retrieval—you 
 
 > **Two modes of code retrieval:**
 >
-> **Full KRAG** — tree-sitter parses your codebase into symbols (functions, classes, methods) with qualified names, references, and import graphs. No chunking—each symbol is a precise, addressable unit. Cross-file dependencies are tracked, so "what calls this function?" is a graph traversal, not a text search.
+> **Full KRAG** — tree-sitter parses your codebase into symbols (functions, classes, methods) with qualified names, 
+> references, and import graphs. No chunking—each symbol is a precise, addressable unit. Cross-file dependencies are 
+> tracked, so "what calls this function?" is a graph traversal, not a text search.
 >
-> **Standalone (`pip install fitz-sage[code]`)** — Zero-dependency code retrieval via `CodeRetriever`. Builds an AST structural index, uses an LLM to select relevant files, expands via import graph and neighbor directories, and returns compressed results. No PostgreSQL, no pgvector, no docling—just point at a directory and ask.
+> **Standalone (`pip install fitz-sage[code]`)** — Zero-dependency code retrieval via `CodeRetriever`. Builds an AST 
+> structural index, uses an LLM to select relevant files, expands via import graph and neighbor directories, and returns 
+> compressed results. No PostgreSQL, no pgvector, no docling—just point at a directory and ask.
 >
-> *Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They point fitz at the codebase and ask "Where is user authentication handled?" or "What depends on the billing module?" FitzKRAG returns specific functions with their callers and dependencies. New developers onboard in days instead of weeks.
+> *Example:* A team inherits a legacy Django monolith—200k lines, sparse docs. They point fitz at the codebase and ask 
+> "Where is user authentication handled?" or "What depends on the billing module?" FitzKRAG returns specific functions with 
+> their callers and dependencies. New developers onboard in days instead of weeks.
 
 </details>
 
@@ -616,19 +660,23 @@ curl -X POST http://localhost:8000/query \
 <br>
 
 **`fitz` command not found after install**
-> Your Python Scripts directory isn't on PATH. Use `python -m fitz_sage.cli.cli` instead, or add the Scripts directory to your system PATH.
+> Your Python Scripts directory isn't on PATH. Use `python -m fitz_sage.cli.cli` instead, or add the Scripts directory 
+> to your system PATH.
 
 **PDF/DOCX files are being skipped**
-> Document parsing requires docling, which is optional to keep the base install lightweight. Install it with: `pip install fitz-sage[docs]`
+> Document parsing requires docling, which is optional to keep the base install lightweight. Install it with: 
+> `pip install fitz-sage[docs]`
 
 **"Cannot connect to Ollama" error**
 > Ollama needs to be running as a background service. Start it with: `ollama serve`
 
 **"Model not found" error**
-> The configured model isn't pulled in Ollama. Pull it with: `ollama pull <model-name>`. Check your config at `.fitz/config.yaml` to see which models are configured.
+> The configured model isn't pulled in Ollama. Pull it with: `ollama pull <model-name>`. Check your config at 
+> `.fitz/config.yaml` to see which models are configured.
 
 **First query is slow**
-> First run initializes the database and loads LLM models into memory. Subsequent queries are much faster. For Ollama, larger models take longer to load — use a smaller model like `qwen3.5:0.6b` for faster startup.
+> First run initializes the database and loads LLM models into memory. Subsequent queries are much faster. For Ollama, 
+> larger models take longer to load — use a smaller model like `qwen3.5:0.6b` for faster startup.
 
 **How do I change my LLM models?**
 > Edit `.fitz/config.yaml`. The config uses `provider/model` format:
