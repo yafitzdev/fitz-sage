@@ -91,7 +91,7 @@ code symbols, sections, tables) and each query is routed to the right search str
 Honesty is enforced by an [ML governance classifier](docs/features/governance/governance-benchmarking.md) that decides when to answer, hedge, refuse — validated against 
 [fitz-gov](https://github.com/yafitzdev/fitz-gov), a purpose-built benchmark of 2,920 adversarial test cases (5.7% false-trustworthy rate).
 
-It runs in production today and powers [fitz-graveyard](https://github.com/yafitzdev/fitz-graveyard).
+It runs in production today and powers [fitz-forge](https://github.com/yafitzdev/fitz-forge).
 
 ~55k lines of Python. 2,000+ tests. 99% coverage.
 
