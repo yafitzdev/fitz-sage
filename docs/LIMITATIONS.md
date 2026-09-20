@@ -11,7 +11,7 @@ reinterpret a user's domain data.
 | Corpus preparation | The user chooses and prepares the indexed corpus | `user` |
 | Raw logs and scans | Raw logs need compression or rewriting; image-only or complex files may need OCR or vision parsing | `user` |
 | Private vocabulary | Undocumented acronym, synonym, and identifier mappings are not inferred | `user` |
-| Identifier equivalence | The user decides which differently written identifiers are equivalent | `user` |
+| Identifier forms and equivalence | Observed mechanical spellings can expand recall; the user decides whether differently written identifiers are equivalent | `user` + `fitz-sage` |
 | Query rewriting | Conversational, ambiguous, or context-dependent questions must be rewritten before submission | `user` |
 | Secrets and unwanted documents | The user removes material that must not be indexed | `user` |
 | Long or unrelated requests | Query scope, retrieval budgets, and evidence sufficiency interact | `user` + `fitz-sage` + `pyrrho` |
@@ -24,19 +24,27 @@ matches that are difficult to audit.
 
 ## Identifier Matching
 
-Identifier equivalence is literal by contract. Fitz-Sage does not declare these
-forms equivalent:
+The collection term graph derives mechanical spelling variants from identifiers
+observed in source. For example, a query for `AuthService` can add candidate
+evidence written as `Auth Service`, `auth_service`, or `auth/service`, and the
+reverse direction is also supported.
+
+This expansion is a broad-recall aid, not an equivalence declaration. Exact
+identifier anchoring, evidence compilation, and governance still use the
+literal identifier from the submitted query. Fitz-Sage therefore does not
+declare these forms interchangeable for final evidence:
 
 - `AX-156`, `AX_156`, `AX 156`, and `AX156`;
 - `MOD_88X` and `MOD-88X`;
 - a private abbreviation and its undocumented expansion.
 
-FTS tokenization can still make variants share lexical pieces and therefore
-enter the same broad recall pool. Exact identifier anchoring prevents that
-lexical overlap from becoming a package-level equivalence claim.
+FTS tokenization and the collection term graph can put mechanically related
+forms in the same broad recall pool. Exact identifier anchoring prevents that
+recall relationship from becoming a package-level equivalence claim.
 
 If two forms are aliases in a user's domain, normalize them before ingestion or
-put explicit alias evidence in the corpus. There is no public mapping hook.
+put explicit alias evidence in the corpus. The graph can learn that evidence,
+but there is no public mapping hook for declaring private equivalences.
 
 ## Semantic Query Terms
 
