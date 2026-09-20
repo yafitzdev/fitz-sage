@@ -11,7 +11,6 @@ and [Retrieval Pipeline](../../RETRIEVAL_PIPELINE.md) for the end-to-end flow.
 | `evidence-signals.md`      | Pre-retrieval planning and post-retrieval evidence signals       |
 | `sparse-search.md`         | FTS5 + native `bm25()` over typed-unit stores                    |
 | `reranking.md`             | INT8 ONNX cross-encoder reranker (gte-reranker-modernbert-base)  |
-| `query-rewriting.md`       | Optional query-intelligence reformulation (pronouns, typos, intent) |
 | `query-expansion.md`       | Dynamic corpus term graph and evidence lifecycle                 |
 | `multi-query-rag.md`       | Bounded decomposition and coverage for compound queries          |
 | `keyword-vocabulary.md`    | Exact-match identifier vocabulary (TC-123, AuthService, …)       |

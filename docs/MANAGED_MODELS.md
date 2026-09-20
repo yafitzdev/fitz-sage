@@ -70,8 +70,7 @@ cache and set `HF_HUB_OFFLINE=1`.
 
 ## Optional Chat Work
 
-Query intelligence, entity extraction, hierarchy summaries, and answer
-synthesis can use a configured chat provider. These features are optional and
-separate from standard query expansion. Without a chat tier, `point()` marks
-background enrichment not applicable and the complete retrieval path remains
-available.
+Entity extraction, hierarchy summaries, and answer synthesis can use a
+configured chat provider. These features are optional and separate from
+standard query expansion. Without a chat tier, `point()` marks background
+enrichment not applicable and the complete retrieval path remains available.

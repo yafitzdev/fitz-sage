@@ -1,8 +1,8 @@
 # BEIR Component Ablation (2026-07-30)
 
-This is the current external retrieval-component measurement for Fitz-Sage.
-The run used commit `2893be4f35cacb67c8ca8627b20f08cf1dfd9817` from a
-clean worktree.
+This is a historical external retrieval-component measurement for Fitz-Sage.
+It measures the pre-term-graph Qwen expansion path. The run used commit
+`2893be4f35cacb67c8ca8627b20f08cf1dfd9817` from a clean worktree.
 
 ## Method
 
@@ -102,7 +102,7 @@ query.
 
 The required follow-up is now recorded in the
 [BEIR Semantic Holdout](beir-semantic-holdout-2026-07-30.md). That frozen
-ArguAna/Quora run found that the current Qwen path did not earn its cost on
+ArguAna/Quora run found that the then-current Qwen path did not earn its cost on
 those tasks. It does not decide whether query expansion belongs in the default
 company-document retrieval path, where BM25 still has no semantic matching of
 its own.

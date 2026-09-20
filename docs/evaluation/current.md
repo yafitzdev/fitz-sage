@@ -40,11 +40,13 @@ The measurements below cover the removed generative expansion path. They
 remain useful historical baselines, but they do not measure the current term
 graph.
 
-- The broad NFCorpus, FiQA, and SciFact ablation measures literal retrieval,
-  managed Qwen expansion, and INT8 reranking over all 1,271 judged queries.
-- The frozen ArguAna/Quora semantic holdout measures 240 queries across low,
-  medium, and high lexical-overlap strata. It found no consistent low-overlap
-  recall gain from the current Qwen path and a conclusive Quora regression.
+- The broad NFCorpus, FiQA, and SciFact ablation is a historical measurement of
+  literal retrieval, removed Qwen expansion, and INT8 reranking over all 1,271
+  judged queries.
+- The historical ArguAna/Quora semantic holdout measures 240 queries across
+  low, medium, and high lexical-overlap strata. It found no consistent low-
+  overlap recall gain from the removed Qwen path and a conclusive Quora
+  regression.
 - The frozen EnterpriseRAG-Bench holdout measures 328 untouched questions over
   511,961 source files. It identifies pointwise multi-document ranking and
   repeated evidence closure as the clearest current architecture weaknesses.

@@ -13,9 +13,9 @@ The deterministic planner recognizes explicit forms such as:
 - `difference between X and Y`;
 - `what changed between X and Y`.
 
-It extracts sides only when the wording provides a bounded parse. Optional
-`query_intelligence` can contribute additional structured detection, but the
-standard behavior does not require a chat endpoint.
+It extracts sides only when the wording provides a bounded parse. State both
+comparison sides and the property to compare directly; the package does not use
+an LLM to infer omitted entities or rewrite conversational wording.
 
 ## Retrieval Behavior
 

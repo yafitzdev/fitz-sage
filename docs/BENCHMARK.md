@@ -119,7 +119,7 @@ the slowest required query took 7.20 seconds.
 These 2026-07-28 runs used unchanged, SHA-256-verified files from NapierOne.
 They measured parsing, immediate source indexing, SQLite storage, no-change
 re-pointing, and hard-crash recovery. They did not measure retrieval relevance
-or optional Qwen enrichment.
+or optional background-chat enrichment.
 
 ### Clean Runs
 
@@ -366,9 +366,9 @@ per-dataset effects were inconclusive.
 Qwen generated 951 ArguAna phrases and 890 Quora phrases. A new token that
 also appeared in a judged-relevant document occurred in 6.5% and 6.3% of
 phrases respectively; 36/120 ArguAna queries and 22/120 Quora queries had any
-such bridge token. The current model did not earn its cost on these two BEIR
-tasks. The package still keeps semantic expansion as a best-effort broad
-semantic-to-lexical bridge because BM25 alone remains lexical.
+such bridge token. The removed model did not earn its cost on these two BEIR
+tasks. The current package uses the SQLite term graph as its bounded,
+source-backed semantic-to-lexical bridge.
 
 Without Qwen, the INT8 reranker changed final nDCG@10 by +0.0149 on ArguAna
 (95% interval [-0.0504, +0.0799], +4.95 seconds) and +0.0518 on Quora (95%

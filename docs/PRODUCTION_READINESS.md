@@ -15,7 +15,7 @@ Fitz-Sage owns:
 
 - recursive discovery and explicit supported/unsupported/failure states;
 - parsing into searchable sections, symbols, and native tables;
-- literal and managed semantic query recall;
+- literal and corpus-backed semantic query recall;
 - temporal, comparison, aggregation, and other general query-shape handling;
 - BM25 recall, reranking, source reading, evidence closure, and compilation;
 - provenance and inspectable retrieval-run records;
@@ -27,6 +27,7 @@ The user owns:
 - raw-log compression, rewriting, and domain cleanup;
 - private acronym, synonym, and identifier mappings;
 - deciding whether differently written identifiers are equivalent;
+- rewriting conversational, ambiguous, or context-dependent queries before submission;
 - removing secrets and documents that must not be indexed;
 - application-specific synthesis, UI, and workflow policy.
 
@@ -75,21 +76,21 @@ The accepted matrix records:
 
 | Metric | Result |
 |---|---:|
-| Required compiled retrieval | 190/192 (99.0%) |
-| Required governed evidence delivery | 172/192 (89.6%) |
+| Required compiled retrieval | 189/192 (98.4%) |
+| Required governed evidence delivery | 175/192 (91.1%) |
 | Query-shape recognition | 60/60 (100%) |
-| Combined package capability | 250/252 (99.2%) |
-| Full contract including exact accepted Pyrrho modes | 189/252 (75.0%) |
+| Combined package capability | 249/252 (98.8%) |
+| Full contract including exact accepted Pyrrho modes | 192/252 (76.2%) |
 | Core retrieval after 80 near-neighbor documents | 20/20 |
 | Reload stability | 100% retrieval, delivery, and mode identity |
 | Required-suite ingestion | 209/209 files |
 | Production gate | pass |
 
-The two required compiled-retrieval misses are false-positive evidence in
-negative budget queries. Of 20 required delivery misses, 19 stop after Pyrrho
-returns a terminal verdict before later expected evidence enters the prefix;
-one exhausts a prefix containing a false-positive candidate. They remain
-visible instead of receiving Fitz-side verdict overrides.
+Two required retrieval misses are false-positive evidence in negative budget
+queries. The third is a TypeScript content-extraction miss under the default
+regex fallback because the optional tree-sitter TypeScript parser was absent.
+Delivery misses remain visible instead of receiving Fitz-side verdict
+overrides.
 
 ## Ingestion Evidence
 
@@ -113,7 +114,7 @@ a forced process exit and resume, with no orphan raw-file records. The 5,005-fil
 scale index measured a 2.78x SQLite/source storage ratio.
 
 These runs measure parsing, storage, and recovery, not retrieval relevance.
-Optional background Qwen time is excluded.
+Optional background-chat time is excluded.
 
 ## External Retrieval Evidence
 
@@ -131,14 +132,25 @@ The full pipeline ran over 66,454 NFCorpus, FiQA, and SciFact documents and all
 The INT8 reranker produced clear paired gains on NFCorpus and FiQA; its SciFact
 effect was inconclusive. Full macro delivered nDCG@10 was `0.4239`.
 
-### Frozen Semantic Holdout
+### Current ArguAna Term-Graph Ablation
 
-The 240-query ArguAna/Quora holdout measured full macro final nDCG@10 `0.6586`
-and delivered nDCG@10 `0.6519`. The current Qwen path did not show a consistent
-low-overlap gain on these tasks and added roughly two seconds with reranking.
-The holdout remains frozen and is not a tuning set.
+The v0.16.1 term-graph ablation measured 8,674 ArguAna documents and 120
+frozen queries. Final nDCG@10 was `0.4413` for literal retrieval, `0.4413`
+with the term graph, `0.4562` with reranking alone, and `0.4563` with both.
+Delivered nDCG@10 was `0.2929`, `0.3023`, `0.3357`, and `0.3357` respectively.
+The graph's internal work averaged `0.05-0.07s` per query. Quora was verified
+and projected but left unscored because its 522,931-file build projected to
+several hours.
 
-### EnterpriseRAG-Bench
+### Historical Frozen Semantic Holdout
+
+The historical 240-query ArguAna/Quora holdout measured full macro final nDCG@10
+`0.6586` and delivered nDCG@10 `0.6519`. Its removed Qwen expansion path added
+roughly two seconds with reranking. These results are retained as historical
+measurements and do not describe the current term graph. The holdout remains
+frozen and is not a tuning set.
+
+### Historical EnterpriseRAG-Bench
 
 The untouched 328-query holdout used 511,961 source files without source
 rewriting or document enrichment:
@@ -157,7 +169,12 @@ closure with request-local terms; matched warm probes measured `13.092s` and
 
 ## Query Latency
 
-The current matched 60-query SciFact run measured:
+The current source-only production matrix measured 252 required queries at
+`1.19s` mean, `0.77s` p50, and `3.35s` p95. The term graph contributed only
+`0.05-0.07s` internally in the frozen ArguAna ablation. Reranking, Pyrrho, and
+evidence closure remain the larger query-time components.
+
+The older matched 60-query SciFact run measured:
 
 | Metric | Result |
 |---|---:|
@@ -181,8 +198,8 @@ remain explicit:
 1. Pointwise reranking is weak on some multi-document/set questions.
 2. Re-pointing hundreds of thousands of unchanged tiny files still walks and
    hashes every file.
-3. The new corpus term graph needs a fresh quality evaluation on the frozen
-   external tasks and application-shaped abbreviation/error queries.
+3. The term graph still needs a full Quora run and a larger application-shaped
+   evaluation of abbreviation, alias, identifier, and error/component queries.
 4. Optional background-chat throughput and very large individual documents need
    broader capacity measurements.
 5. Pyrrho's current 2,048-token governance context is a separate model boundary.

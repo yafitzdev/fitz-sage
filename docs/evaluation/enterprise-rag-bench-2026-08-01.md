@@ -1,15 +1,16 @@
 # EnterpriseRAG-Bench Holdout (2026-08-01)
 
-This is Fitz-Sage's first frozen, full-corpus enterprise retrieval evaluation.
+This is a historical frozen, full-corpus enterprise retrieval evaluation.
 It measures the real source-folder-to-evidence pipeline over more than half a
 million documents from nine common company source types. It does not score
 answer prose, data cleanup, or Pyrrho's governance quality.
 
 The result is useful but mixed. The INT8 reranker produced a repeatable quality
-gain. The full pipeline improved delivered nDCG@10 over literal Fitz-Sage, but
-the corresponding final-ranking gain was not conclusive on the holdout. Managed
-Qwen expansion broadened the search as designed, but did not improve aggregate
-quality on this corpus. Multi-document project questions remain a genuine
+gain. The historical full pipeline improved delivered nDCG@10 over literal
+Fitz-Sage, but the corresponding final-ranking gain was not conclusive on the
+holdout. Managed Qwen expansion broadened the search as designed, but did not
+improve aggregate quality on this corpus. The current package uses a bounded
+SQLite term graph instead. Multi-document project questions remain a genuine
 ranking weakness, and repeated evidence-closure recall is the dominant latency
 cost.
 
@@ -310,8 +311,8 @@ It also establishes these current limitations:
 - Repeated evidence-closure recall, not model inference, is the main latency
   cost.
 - Pointwise reranking is weak on multi-document project questions.
-- Managed Qwen's aggregate quality benefit is unproven on this corpus, though
-  its broad semantic-recall role remains intentional.
+- Managed Qwen's aggregate quality benefit was unproven on this corpus. The
+  current package uses a bounded SQLite term graph for source-backed expansion.
 - Semantic questions remain the weakest absolute category.
 
 ## What This Does Not Establish
@@ -329,9 +330,10 @@ It also establishes these current limitations:
   quality. Governance improvements belong in Pyrrho.
 - Local latency and storage observations are not an SLA.
 
-## Decision
+## Historical Decision
 
-- Keep managed Qwen as the intentional broad semantic recall leg.
+- The historical release retained managed Qwen as a broad semantic recall leg.
+- The current package uses the source-backed SQLite term graph instead.
 - Keep the INT8 reranker; its holdout gain generalized.
 - Do not add source-specific normalization, alias heuristics, or local
   governance safeguards.

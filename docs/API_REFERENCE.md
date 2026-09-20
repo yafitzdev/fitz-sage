@@ -100,8 +100,8 @@ query = Query(
 **Metadata Usage:**
 
 The `metadata` field allows passing engine-specific parameters without breaking the paradigm-agnostic interface:
-- **Fitz KRAG** reads `top_k` and `conversation_context` (the latter is used
-  by configured query intelligence for conversational resolution).
+- **Fitz KRAG** reads `top_k`; conversational context does not rewrite the
+  retrieval query.
 - Custom engines can define their own metadata keys
 
 Engines should ignore unknown metadata keys gracefully.

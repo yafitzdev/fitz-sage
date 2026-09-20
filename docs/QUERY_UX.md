@@ -50,7 +50,7 @@ enrichment state. Only changed files are reparsed.
 | `Discovered N supported file(s).` | Scanning and hashing completed. |
 | `Indexing N changed file(s)...` | Changed source is being parsed and stored. |
 | `Searchable source index ready (N/N changed files).` | `point()` has reached its query-ready boundary. |
-| `Analyzing query...` | Query profile and semantic keywords are being prepared. |
+| `Analyzing query...` | Deterministic query profile and corpus terms are being prepared. |
 | `Retrieving relevant sources...` | Recall, reranking, evidence compilation, and Pyrrho are running. |
 | `Enrichment pending: X/Y` | Source retrieval works while optional entity/hierarchy work remains. |
 

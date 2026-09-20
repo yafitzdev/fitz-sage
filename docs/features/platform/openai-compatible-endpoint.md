@@ -3,8 +3,8 @@
 
 **Status:** the optional endpoint/cloud chat path. Standard semantic query
 terms come from the SQLite corpus graph; endpoint chat is for optional
-synthesis, query intelligence, background enrichment, vision, and explicitly
-configured chat-tier enhancements.
+synthesis, background enrichment, vision, and explicitly configured chat-tier
+enhancements.
 
 ## TL;DR
 
@@ -63,8 +63,8 @@ rerank: onnx                   # INT8 ONNX cross-encoder, local on CPU
 collection: default
 ```
 
-Use role-specific provider fields (`query_intelligence`, `vision`, and
-`synthesizer`) to mix local and cloud models. Chat tiers may also provide
+Use role-specific provider fields (`vision` and `synthesizer`) to mix local and
+cloud models. Chat tiers may also provide
 optional entity and hierarchy enrichment.
 
 ## Cloud quick reference

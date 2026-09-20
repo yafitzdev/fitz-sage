@@ -191,7 +191,6 @@ collection: default
 parser: cpu
 rerank: onnx
 governance: pyrrho
-query_intelligence: null
 synthesizer: null
 chat_base_url: http://127.0.0.1:8080/v1
 ```
@@ -209,8 +208,8 @@ See [CONFIG.md](CONFIG.md) for every key and
 ## Environment Variables
 
 API keys are needed only for optional endpoint-backed roles such as answer
-synthesis, query intelligence, or vision parsing. The CLI looks up the variable
-name from `chat_api_key_env` or from the `--api-key-env` flag.
+synthesis or vision parsing. The CLI looks up the variable name from
+`chat_api_key_env` or from the `--api-key-env` flag.
 
 ```bash
 # OpenAI

@@ -62,20 +62,12 @@ original query
 The package does not create placeholder evidence for a leg that found nothing,
 and it does not increase the configured result budget to force coverage.
 
-## Optional Query Intelligence
+## Query Wording Boundary
 
-Configure `query_intelligence:` when implicit, conversational, or structurally
-messy compound questions need model-assisted decomposition. A valid
-model-provided decomposition takes precedence. If the model returns no
-decomposition, deterministic explicit clauses remain active alongside any
-model rewrite.
-
-```yaml
-query_intelligence: endpoint/qwen2.5-7b-instruct
-chat_base_url: http://localhost:8080/v1
-```
-
-Leave `query_intelligence: null` for the default local path.
+The package decomposes explicit clauses deterministically. It does not infer
+implicit conversational references, resolve pronouns, or rewrite a structurally
+messy compound question. Rewrite those queries before submitting them so each
+required topic or comparison is stated directly.
 
 ## Boundaries
 
@@ -89,7 +81,7 @@ not guess how an implicit multi-topic sentence should be decomposed.
 
 ## Related
 
-- [Semantic Query Keywords](query-expansion.md) - managed-Qwen recall-term
+- [Semantic Query Keywords](query-expansion.md) - collection-backed recall-term
   expansion
 - [Sparse Search](sparse-search.md) - FTS5 and `bm25()` used for each query leg
 - [Reranking](reranking.md) - the bounded ONNX cross-encoder precision stage

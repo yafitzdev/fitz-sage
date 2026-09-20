@@ -113,7 +113,7 @@ source attribution. The selected collection config must include a
 | `question` | string | Yes | - | The question to ask |
 | `source` | string | No | null | Allowed server-local file or directory. If provided, registers it and waits until the query surface is ready. |
 | `collection` | string | No | `"default"` | Collection to query |
-| `conversation_history` | array | No | `[]` | History made available to configured query intelligence; otherwise retrieval uses the current question. |
+| `conversation_history` | array | No | `[]` | Client-provided context for optional answer synthesis; it does not rewrite the retrieval query. |
 
 ### Response
 
@@ -175,7 +175,7 @@ equivalent of `fitz retrieve` and `fitz_sage.evidence()`.
 | `question` | string | Yes | - | The question to retrieve evidence for |
 | `source` | string | No | null | Allowed server-local file or directory. If provided, registers it and waits until the query surface is ready. |
 | `collection` | string | No | `"default"` | Collection to query |
-| `conversation_history` | array | No | `[]` | History made available to configured query intelligence; otherwise retrieval uses the current question. |
+| `conversation_history` | array | No | `[]` | Client-provided context for optional answer synthesis; it does not rewrite the retrieval query. |
 
 ### Response
 
@@ -224,9 +224,9 @@ Multi-turn conversation with the knowledge base.
 Like `/answer`, this endpoint requires a configured `synthesizer`.
 
 The server is **stateless** - the client must manage and send conversation
-history. A configured `query_intelligence` provider can use that history to
-rewrite conversational references; the deterministic default does not claim
-automatic pronoun resolution.
+history. Retrieval uses the submitted message as written. Rewrite references
+such as pronouns in the message before sending it; history may still be passed
+to the optional synthesizer as answer context.
 
 ### Request
 

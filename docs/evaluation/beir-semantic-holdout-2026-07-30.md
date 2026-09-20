@@ -1,15 +1,14 @@
 # BEIR Semantic Holdout (2026-07-30)
 
-This is the first frozen external measurement aimed specifically at managed
-semantic query expansion. Low lexical overlap is used as a proxy for ordinary
-paraphrase and vocabulary mismatch; this is not a synonym-only dataset and
-does not test identifier normalization.
+This is a historical frozen external measurement of the removed managed
+semantic query expansion path. Low lexical overlap is used as a proxy for
+ordinary paraphrase and vocabulary mismatch; this is not a synonym-only dataset
+and does not test identifier normalization.
 
-The current expansion path did not earn its cost on these two BEIR tasks. That
-is not a product-wide decision about Qwen: BM25 remains lexical, so query-side
-expansion still has a valid architectural role as a general-language
-semantic-to-lexical bridge. The INT8 reranker remains useful overall, but its
-value and cost depend strongly on query and document shape.
+The removed expansion path did not earn its cost on these two BEIR tasks. The
+current package uses a bounded, source-backed SQLite term graph instead. The
+INT8 reranker remains useful overall, but its value and cost depend strongly on
+query and document shape.
 
 ## Run Identity
 
@@ -138,9 +137,9 @@ some literal-tail candidates, or expansion cannot broaden the pool. The Quora
 decrease says the substitutions did not help its judged targets; it does not
 identify candidate competition as an architecture defect.
 
-The current managed Qwen path was not a reliable semantic bridge on this
+The then-current managed Qwen path was not a reliable semantic bridge on this
 holdout, and its cost did not pay for itself on these datasets. This conclusion
-applies only to the measured BEIR tasks under the current model, prompt, and
+applies only to the measured BEIR tasks under the then-current model, prompt, and
 retrieval configuration. It neither shows that semantic query expansion is
 generally useless nor answers whether Qwen helps ordinary company-document
 queries.

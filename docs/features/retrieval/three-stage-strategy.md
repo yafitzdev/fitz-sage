@@ -13,7 +13,6 @@ The query plan combines:
 - deterministic temporal, comparison, aggregation, and modality shape;
 - Pyrrho query-only PRE obligations;
 - SQLite corpus semantic query terms;
-- optional endpoint-backed query intelligence;
 - explicit multi-clause and query-shape variations.
 
 The router searches eligible source surfaces:

@@ -20,7 +20,6 @@ collection: default
 parser: cpu
 rerank: onnx
 governance: pyrrho
-query_intelligence: null
 synthesizer: null
 chat_base_url: http://127.0.0.1:8080/v1
 ```
@@ -53,7 +52,6 @@ Role-specific provider fields bind LLM-backed stages:
 
 | Key                  | Typical use                                      |
 | -------------------- | ------------------------------------------------ |
-| `query_intelligence` | Optional query-prep enhancement                  |
 | `synthesizer`        | Optional answer generation                       |
 
 Default semantic query keywords come from the collection's SQLite term graph.
@@ -78,8 +76,8 @@ retrieval remains available without them.
 
 ## Chat provider model
 
-Semantic query expansion is model-free. Optional synthesis, query intelligence,
-background enrichment, and vision can use **`endpoint`** or the
+Semantic query expansion is model-free. Optional synthesis, background
+enrichment, and vision can use **`endpoint`** or the
 cloud/enterprise presets:
 
 | Spec form                       | Resolves to                                              |
@@ -108,7 +106,6 @@ not boolean flags:
 | Background enrichment | starts after source indexing when a chat tier is configured | not applicable without a chat tier |
 | ONNX reranker      | `rerank: onnx` (default)                 | not disabled                        |
 | Governance         | `governance: pyrrho` uses the accepted pinned model; custom model optional | not disabled |
-| Query intelligence | `query_intelligence: <provider/model>`   | `query_intelligence: null`          |
 | Answer synthesis   | `synthesizer: <provider/model>`          | `synthesizer: null`                 |
 | VLM in parser      | `parser: docling_vision` + `vision:` set | `parser: cpu`, `parser: docling`, or `parser: glm_ocr` |
 
@@ -186,9 +183,10 @@ governance: pyrrho
 rerank: onnx
 ```
 
-Query intelligence defaults to deterministic detection plus collection-derived
-semantic keywords. Set `query_intelligence:` only when you want an optional
-endpoint-backed rewrite/analyze/detect bus.
+Query preparation is deterministic. The planner detects supported query shapes,
+uses explicit clauses from the submitted query, and adds collection-derived
+terms from the SQLite graph. Conversational or ambiguous queries must be
+rewritten by the caller before retrieval.
 
 ---
 

@@ -1,8 +1,8 @@
 # Temporal Queries
 
 Fitz-Sage treats explicit time scope as query shape. The standard path detects
-it deterministically; an optional `query_intelligence` provider can add richer
-analysis but is not required.
+it deterministically. State the relevant period or freshness requirement in the
+submitted query; the package does not rewrite an underspecified temporal request.
 
 ## Detection
 

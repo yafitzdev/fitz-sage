@@ -101,7 +101,6 @@ the ranked evidence enters progressive Pyrrho delivery.
 
 ```
 1  Query prep      deterministic plan, explicit clauses, corpus term expansions
-                   optional query_intelligence rewrite/analyze/detect
 2  Broad recall    symbol / section / table BM25 and intent fanout
 3  Fuse            merge across strategies and deduplicate
 4  Rerank          ONNX cross-encoder (gte-reranker-modernbert-base)
@@ -270,7 +269,6 @@ collection: default
 parser: cpu
 rerank: onnx
 governance: pyrrho
-query_intelligence: null
 synthesizer: null
 chat_base_url: http://127.0.0.1:8080/v1
 ```
@@ -300,7 +298,6 @@ fitz_sage/
 ├── retrieval/           # SHARED retrieval intelligence
 │   ├── detection/       # deterministic modules + optional LLM parsing
 │   ├── entity_graph/    # Entity-based linking
-│   └── rewriter/        # optional query-intelligence rewrite types
 ├── llm/                 # Managed ONNX scoring/governance + optional endpoints
 │   ├── providers/       # endpoint, enterprise, onnx_reranker
 │   ├── auth/            # ApiKeyAuth, M2MAuth, CompositeAuth

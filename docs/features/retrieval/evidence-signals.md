@@ -41,7 +41,7 @@ flowchart LR
 ## Retrieval Profile
 
 Before retrieval, Fitz builds a query profile from deterministic query analysis,
-the SQLite corpus term graph, and optional query intelligence.
+the SQLite corpus term graph, and explicit clauses in the submitted query.
 
 | Signal | Meaning | Retrieval effect |
 |---|---|---|

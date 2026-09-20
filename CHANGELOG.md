@@ -1563,7 +1563,8 @@ Removed:
 - Single fast-tier LLM call per query (~100-200ms overhead)
 - Graceful degradation on LLM failure (uses original query)
 - `prompts/rewrite.txt` - Externalized prompt template
-- Documentation: `docs/features/query-rewriting.md`
+- Historical documentation: the query-rewriting page was removed from the
+  current architecture; see `docs/LIMITATIONS.md` for the current boundary.
 - Comprehensive test suite: `tests/unit/test_rewriter.py` (469 lines)
 
 #### Conversational Context for SDK & API

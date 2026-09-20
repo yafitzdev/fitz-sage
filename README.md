@@ -66,8 +66,8 @@ A: "I don't have enough information
 > `fitz retrieve` runs locally by default. SQLite stores the index and
 > collection term graph; local ONNX models handle reranking and `pyrrho`
 > governance. An OpenAI-compatible endpoint is only needed for explicitly
-> configured features such as synthesis, query intelligence, vision, or
-> optional background enrichment.
+> configured features such as synthesis, vision, or optional background
+> enrichment.
 
 ```bash
 pip install fitz-sage
@@ -207,7 +207,6 @@ summaries, entity links, and broader context expansion.
 | ✅ [**aggregation-queries**](docs/features/retrieval/aggregation-queries.md) | "List all the test cases that failed" | Exhaustive/list query handling |
 | ✅ [**freshness-authority**](docs/features/retrieval/freshness-authority.md) | "What's the latest status on feature X?" | Content-grounded temporal scope; no filesystem-age scoring |
 | ✅ [**semantic-keywords**](docs/features/retrieval/query-expansion.md) | "What does SLA require?" | Collection-local SQLite term graph; literal query retained |
-| ✅ [**query-rewriting**](docs/features/retrieval/query-rewriting.md) | "Tell me more about it" *(after discussing TechCorp)* | Configured query-intelligence provider plus caller-supplied history |
 | ✅ [**reranking**](docs/features/retrieval/reranking.md) | "What's the battery warranty?" | ONNX cross-encoder reranker |
 
 <br>
@@ -215,6 +214,10 @@ summaries, entity links, and broader context expansion.
 > [!IMPORTANT]
 > Retrieval intelligence is baked in. Configuration declares providers; the engine decides which retrieval capabilities a
 > query needs.
+
+Fitz-Sage does not rewrite conversational or ambiguous queries. Rewrite those
+queries before submitting them when the question depends on context that is not
+present in the query itself. See [Limitations](docs/LIMITATIONS.md).
 
 ---
 
@@ -234,9 +237,12 @@ and latency separately.
 | Area | Scale | Current measurement |
 |------|------:|---------------------|
 | Production retrieval and delivery | 192 required contracts | 189/192 compiled; 175/192 delivered |
+| Production capability | 252 cases | 249/252 (98.8%); gate passed |
 | Query-shape recognition | 60 cases | 60/60 |
 | Intentional limitations | 52 evidence-asserted cases | 51/52 compiled; 48/52 delivered |
-| Frozen ArguAna term-graph ablation | 8,674 documents, 120 queries | 0.4563 final; 0.3357 delivered nDCG@10 |
+| Frozen ArguAna term-graph ablation | 8,674 documents, 120 queries | literal 0.4413; graph 0.4413; reranker 0.4562; full 0.4563 final / 0.3357 delivered nDCG@10 |
+| Production query latency | 252 queries | 1.19s mean; 0.77s p50; 3.35s p95 |
+| Term-graph query overhead | 120 ArguAna queries | 0.05–0.07s internal mean |
 | Historical broad BEIR (pre-term-graph) | 66,454 documents, 1,271 queries | 0.4239 delivered nDCG@10 |
 | Historical EnterpriseRAG-Bench (pre-term-graph) | 511,961 documents, 328 holdout queries | 0.5780 delivered nDCG@10 |
 | Local source indexing | 18 core / 93 mixed files | 60.8 / 51.6 files/s |
@@ -273,7 +279,7 @@ after retrieval.
 #### Pre-retrieval 🔎
 
 Before retrieval, `fitz-sage` builds a search plan from deterministic query analysis,
-the collection term graph, and optional query intelligence.
+the collection term graph, and explicit query clauses.
 
 | Signal | What it means | Why it matters |
 |--------|---------------|----------------|
@@ -492,8 +498,8 @@ and case-level evidence are in [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 >
 >With the default retrieval-only config, reranking, governance, query-time
 >expansion, and optional background enrichment run locally, so `fitz retrieve`
->does not send data to an endpoint. Explicitly configured query intelligence,
->chat tiers, or vision parsing can send query or source content to that endpoint.
+>does not send data to an endpoint. Explicitly configured synthesis, background
+>enrichment, or vision parsing can send source content to that endpoint.
 >
 >Optional synthesis can use [vLLM](https://github.com/vllm-project/vllm), [LM Studio](https://lmstudio.ai),
 >[Ollama](https://ollama.ai) in `/v1/` mode, [TabbyAPI](https://github.com/theroyallab/tabbyAPI), OpenAI, Together,
@@ -598,7 +604,7 @@ build on source evidence.
 │  SQLite + FTS5, one .db per collection                          │
 ├─────────────────────────────────────────────────────────────────┤
 │  Optional OpenAI-Compatible Endpoint                            │
-│  answer synthesis | query intelligence | vision                 │
+│  answer synthesis | background enrichment | vision              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -621,8 +627,8 @@ fitz collections                          # List and delete knowledge collection
 fitz serve                                # Start REST API server
 ```
 
-Config: `.fitz/config.yaml` in the current workspace - auto-created on first run. Edit it for optional synthesis, query intelligence,
-vision, or custom model/provider choices.
+Config: `.fitz/config.yaml` in the current workspace - auto-created on first run. Edit it for optional synthesis, vision, or custom
+model/provider choices.
 
 </details>
 
@@ -743,7 +749,7 @@ curl -X POST http://localhost:8000/answer \
 > Docling parser.
 
 **"Connection refused at localhost:8080" error**
-> This applies to optional endpoint-backed synthesis or query intelligence. `fitz retrieve "..."` returns evidence without an
+> This applies to optional endpoint-backed synthesis or vision parsing. `fitz retrieve "..."` returns evidence without an
 > endpoint server. For generated prose:
 > `fitz answer "..." --synthesizer openai/gpt-4o`.
 

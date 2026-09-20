@@ -69,7 +69,6 @@ queries to the right strategy.
 ```
 Query
  ├─► Query prep (deterministic signals, explicit clauses, corpus term graph)
- ├─► Optional query intelligence (rewrite / analyze / detect)
  ├─► Router (symbol search · section search · table metadata)
 │    └─► FTS5 + bm25() over per-collection .db
  ├─► OnnxReranker (bounded INT8 ONNX cross-encoder)
@@ -122,9 +121,9 @@ with provenance and score), skipping evidence packaging and optional synthesis.
 ### Configuration
 
 See [CONFIG.md](CONFIG.md) for every key. The minimum is `collection:`.
-Chat providers are optional and only needed for synthesized answers, optional
-query intelligence, background enrichment, or vision parsing. Semantic query
-terms come from the collection database.
+Chat providers are optional and only needed for synthesized answers, background
+enrichment, or vision parsing. Semantic query terms come from the collection
+database. Conversational and ambiguous queries must be rewritten by the caller.
 
 ### Built-in features
 

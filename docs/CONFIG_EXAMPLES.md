@@ -6,8 +6,7 @@ Working configs for the managed-ONNX / SQLite world. The schema rules:
 - **String specs** instead of nested dicts (`synthesizer: endpoint/gpt-4o`,
   not a provider block).
 - **Provider presence** controls optional endpoint-backed features
-  (`synthesizer: null` means no generated answer; `query_intelligence: null`
-  means deterministic query prep plus corpus-derived semantic keywords).
+  (`synthesizer: null` means no generated answer).
 - **Governance is mandatory** — bare `pyrrho` uses the accepted immutable
   default; advanced users can select a local or commit-pinned package.
 - **Sensible defaults** — `collection` is the only required field. Selected
@@ -24,7 +23,6 @@ collection: my_docs
 parser: cpu
 rerank: onnx
 governance: pyrrho
-query_intelligence: null
 synthesizer: null
 chat_base_url: http://127.0.0.1:8080/v1
 ```
@@ -102,14 +100,12 @@ chat_api_key_env: MISTRAL_API_KEY
 
 ## Mixed local + cloud
 
-Local SQLite query expansion, optional endpoint query intelligence, and
-a cloud model for optional synthesis:
+Local SQLite query expansion and a cloud model for optional synthesis:
 
 ```yaml
 collection: my_docs
 chat_base_url: http://localhost:8080/v1
 
-query_intelligence: endpoint/qwen2.5-7b-instruct
 synthesizer: openai/gpt-4o
 ```
 
@@ -169,7 +165,6 @@ index.
 ```yaml
 collection: production_docs
 synthesizer: enterprise/openai/gpt-4o
-query_intelligence: enterprise/openai/gpt-4o-mini
 chat_base_url: https://llm.corp.internal/v1
 
 auth:
@@ -221,7 +216,6 @@ from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
 cfg = FitzKragConfig(
     collection="my_docs",
     synthesizer=None,
-    query_intelligence=None,
 )
 engine = FitzKragEngine(cfg)
 engine.point(Path("./docs"), start_worker=False)

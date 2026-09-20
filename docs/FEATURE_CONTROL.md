@@ -1,7 +1,7 @@
 # Feature Control Architecture
 
-How provider-backed features (VLM in the parser, optional synthesis, optional
-query intelligence, and advanced model swaps) are declared in fitz-sage.
+How provider-backed features (VLM in the parser, optional synthesis, background
+enrichment, and advanced model swaps) are declared in fitz-sage.
 
 ---
 
@@ -49,8 +49,6 @@ can drift out of sync with the actual provider config.
 │  Optional endpoint-backed roles:                                 │
 │    synthesizer: null       → no generated answer                 │
 │    synthesizer: endpoint/X → fitz answer can synthesize          │
-│    query_intelligence: null       → deterministic query prep     │
-│    query_intelligence: endpoint/X → optional rewrite/analyze bus │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -168,8 +166,8 @@ status without weakening the stored source index.
 
 Every documented key must exist in `FitzKragConfig`. Parser behavior is
 selected by `parser`; optional endpoint-backed behavior is controlled by the
-existing role keys (`query_intelligence`, `synthesizer`, `vision`, and the
-three chat tiers). Do not add illustrative or dormant config keys.
+existing role keys (`synthesizer`, `vision`, and the three chat tiers). Do not
+add illustrative or dormant config keys.
 
 ---
 
@@ -182,7 +180,6 @@ three chat tiers). Do not add illustrative or dormant config keys.
 | Pyrrho governance | `governance:` | accepted immutable default |
 | ONNX reranker | `rerank:` | `rerank: onnx` |
 | Answer synthesis | `synthesizer:` | `null`, enabled only by explicit provider |
-| Query intelligence | `query_intelligence:` | `null`, deterministic prep + corpus terms |
 | VLM in parser | `parser:` + `vision:` | off unless `parser: docling_vision` + `vision:` |
 
 ---

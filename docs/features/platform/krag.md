@@ -30,7 +30,6 @@ runs afterward and never defines query readiness.
 user query
   -> deterministic query shape + Pyrrho PRE obligations
   -> SQLite corpus term-graph expansion
-  -> optional query-intelligence rewrite/analyze/detect
   -> section / symbol / table recall
   -> cross-strategy fusion and exact deduplication
   -> bounded INT8 ONNX reranking

@@ -13,6 +13,7 @@ reinterpret a user's domain data.
 | Literal and evidence-backed semantic query recall | Undocumented acronym, synonym, and ID mappings |
 | General query shapes such as temporal, comparison, and aggregation | Deciding which identifier forms are equivalent |
 | Reranking, source reading, evidence compilation, and provenance | OCR/parser selection for image-only or complex inputs |
+| Deterministic planning from the submitted query | Rewriting conversational, ambiguous, or context-dependent questions |
 | Exact transport of Pyrrho planning and governance output | Removing secrets and documents that must not be indexed |
 
 The boundary is intentionally explicit. Domain-specific cleanup differs by
@@ -50,6 +51,18 @@ Only relationships observed in the indexed corpus are available. An acronym or
 alias that is never defined cannot be recovered from general world knowledge.
 Weak co-occurrence may also introduce noisy expansions, so explicit alias and
 abbreviation evidence receives more weight and expansion is bounded.
+
+## Query Rewriting
+
+Fitz-Sage does not use an LLM to rewrite user queries, resolve pronouns, infer
+unstated references, or decompose implicit conversational questions. The
+deterministic planner can recognize supported query shapes only when the
+submitted wording states the relevant entities, clauses, and time scope.
+
+Rewrite context-dependent questions before retrieval. For example, replace
+`What about that one?` with `What is the refund policy for enterprise plans?`
+when the earlier conversation is not present in the query itself. The original
+submitted query remains the authoritative user request.
 
 ## Temporal Scope And Authority
 
@@ -157,14 +170,15 @@ These values are observations, not SLAs or universal accuracy percentages:
 
 | Area | Current measurement | Interpretation |
 |---|---|---|
-| Required production retrieval | 190/192 compiled; 172/192 delivered | Early terminal Pyrrho verdicts can stop before later ranked evidence |
+| Required production retrieval | 189/192 compiled; 175/192 delivered | Early terminal Pyrrho verdicts can stop before later ranked evidence |
 | Query-shape suite | 60/60 | Measured deterministic shape coverage |
 | Intentional limitation suite | 51/52 compiled; 48/52 delivered; 31/60 complete | Retrieval, delivery, and Pyrrho boundaries are reported separately |
+| Current ArguAna term graph | 0.4563 final; 0.3357 delivered nDCG@10 | 120 frozen queries; graph overhead 0.05-0.07s internally |
 | Local source indexing | 60.8 files/s core; 51.6 files/s mixed | Small local fixture corpora, source-only |
 | NapierOne scale indexing | 4,994/5,005 at 7.27 files/s | Eleven malformed/ultra-wide CSV failures were explicit |
 | Broad BEIR | 0.4239 delivered macro nDCG@10 | Biomedical, financial, and scientific tasks |
-| Frozen semantic BEIR | 0.6519 delivered macro nDCG@10 | ArguAna/Quora task boundary |
-| Enterprise holdout | 0.5780 delivered nDCG@10 | Multi-document ranking is the clearest quality weakness |
+| Historical frozen semantic BEIR | 0.6519 delivered macro nDCG@10 | Pre-term-graph ArguAna/Quora task boundary |
+| Historical enterprise holdout | 0.5780 delivered nDCG@10 | Multi-document ranking is the clearest quality weakness |
 | Matched SciFact latency | 7.43s mean; 6.77s p50; 12.56s p95 | Local benchmark machine, warm matched sample |
 | Enterprise warm probes | 13.092s and 19.889s | 511,961-file source index after closure fixes |
 

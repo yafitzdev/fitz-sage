@@ -15,8 +15,8 @@ The deterministic planner recognizes bounded forms including:
 - plural set questions such as `which services are affected`.
 
 Scalar measurements such as "how many seconds is the timeout" are excluded
-from count intent. Optional `query_intelligence` can add analysis, but the
-standard detector does not require an endpoint.
+from count intent. The standard detector does not use an endpoint; state the
+requested set or count explicitly in the submitted query.
 
 ## Retrieval Behavior
 

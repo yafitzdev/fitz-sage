@@ -28,7 +28,6 @@ explicitly failed. It does not wait for optional entity or hierarchy enrichment.
 matters only when the config enables a role such as:
 
 ```yaml
-query_intelligence: endpoint/qwen2.5-7b-instruct
 synthesizer: endpoint/qwen2.5-7b-instruct
 vision: endpoint/gpt-4o
 ```

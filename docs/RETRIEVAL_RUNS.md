@@ -70,8 +70,7 @@ A version 2 record contains:
 
 - original, sanitized, and effective retrieval queries;
 - query shape and stable planning fields;
-- retrieval terms with `literal`, `deterministic`, `query_intelligence`, or
-  `semantic` origin;
+- retrieval terms with `literal`, `deterministic`, or `semantic` origin;
 - retrieval strategy calls and result counts;
 - ordered candidate identities and scores at recall, rerank, and final stages;
 - the complete ranked evidence after evidence compilation;

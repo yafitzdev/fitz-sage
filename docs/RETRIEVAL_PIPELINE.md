@@ -83,7 +83,6 @@ flowchart TD
 
     P --> P1["Deterministic terms, query type, intent detection"]
     P --> P2["SQLite corpus term graph"]
-    P --> P3["Optional query_intelligence rewrite / analysis / detection"]
 
     R --> R1["Section BM25 over FTS5"]
     R --> R2["Code symbol BM25 / name search"]
@@ -207,9 +206,9 @@ the configured synthesizer. This is separate from the retrieval package default.
 |----------|------|
 | Sparse BM25 / literal source terms | Broad recall backbone. |
 | SQLite semantic query terms | Evidence-backed, collection-specific recall expansion in the default no-endpoint path. |
-| Query rewriting | Optional `query_intelligence` enhancement for conversational context or ambiguous phrasing. |
-| Multi-query decomposition | Deterministic explicit-clause fanout; optional `query_intelligence` handles implicit or conversational compounds. |
-| Comparison / temporal / aggregation / freshness detection | Deterministic default signals, optionally improved by query intelligence. |
+| Query rewriting | User responsibility for conversational context, ambiguity, and unstated references. |
+| Multi-query decomposition | Deterministic explicit-clause fanout; implicit or conversational compounds require a user-rewritten query. |
+| Comparison / temporal / aggregation / freshness detection | Deterministic query-shape signals from the submitted query. |
 | Entity graph | Context expansion when the relevant files have entity metadata. |
 | Hierarchical summaries | Optional injected context for broad analytical questions. |
 | ONNX reranker | Precision stage before governance. |
@@ -229,6 +228,6 @@ the query contract/profile calls for a representative corpus overview.
 | SQLite corpus term graph | standard for query expansion | semantic keywords with relation and support evidence |
 | ONNX reranker | default | candidate precision after broad recall |
 | Reviewed local Pyrrho v2 model | required product governance | native evidence verdict, failure mode, retrieval intents, and evidence-kind metadata |
-| OpenAI-compatible endpoint | optional | answer synthesis, optional query intelligence, optional vision parser |
+| OpenAI-compatible endpoint | optional | answer synthesis, optional background enrichment, optional vision parser |
 
 No dense embedding model and no vector database are used.
