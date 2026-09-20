@@ -11,7 +11,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/fitz-sage.svg)](https://pypi.org/project/fitz-sage/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.16.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.16.1-green.svg)](CHANGELOG.md)
 [![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/yafitzdev/fitz-sage)
 
 [Benchmarks](#benchmarks) • [EvidencePack](#evidencepack) • [Why `fitz-sage`?](#why-fitz-sage) • [Retrieval Intelligence](#retrieval-intelligence) • [Governance](#governance--pyrrho) • [Limitations](#limitations) • [Documentation](#links) • [GitHub](https://github.com/yafitzdev/fitz-sage)
@@ -63,10 +63,11 @@ A: "I don't have enough information
 ### Where to start 🚀
 
 > [!IMPORTANT]
-> `fitz retrieve` runs locally by default. SQLite stores the index; local models
-> handle semantic query terms, reranking, Pyrrho governance, and optional
-> background enrichment. An OpenAI-compatible endpoint is only needed for an
-> explicitly configured endpoint-backed role such as generated prose.
+> `fitz retrieve` runs locally by default. SQLite stores the index and
+> collection term graph; local ONNX models handle reranking and `pyrrho`
+> governance. An OpenAI-compatible endpoint is only needed for explicitly
+> configured features such as synthesis, query intelligence, vision, or
+> optional background enrichment.
 
 ```bash
 pip install fitz-sage
@@ -90,8 +91,8 @@ inspect, display, store, or pass to a synthesizer.
 as symbols, documents as sections, and tables as SQLite-backed data. Queries are routed across those
 typed surfaces with retrieval strategies that match the source structure.
 
-⭐ Governance is enforced by [Pyrrho](https://huggingface.co/yafitzdev) in local CPU forward passes. Fitz starts with the
-first three ranked sources and adds two only while Pyrrho returns `INSUFFICIENT`.
+⭐ Governance is enforced by [`pyrrho`](https://huggingface.co/yafitzdev) in local CPU forward passes. `fitz-sage` starts with the
+first three ranked sources and adds two only while `pyrrho` returns `INSUFFICIENT`.
 
 Yan Fitzner — ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev), [HuggingFace](https://huggingface.co/yafitzdev)).
 
@@ -113,8 +114,12 @@ Yan Fitzner — ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](
 > `point()` parses and stores supported files before returning. Retrieval can start immediately afterward while the
 > background worker adds optional entity and hierarchy metadata.
 
+**Keyword expansion from your corpus 🧩** → [Semantic Query Expansion](docs/features/retrieval/query-expansion.md)
+> Each collection learns its own abbreviations, explicit aliases, identifier forms, and related terms. `fitz-sage` keeps the
+> literal query and adds only source-backed terms to BM25 recall—without an LLM or global synonym list.
+
 **Pyrrho-governed retrieval 🧭** → [Pyrrho docs](docs/CONSTRAINTS.md)
-> Fitz combines deterministic query shape with Pyrrho PRE obligations before retrieval, then Pyrrho judges the selected evidence after reranking. The retrieval profile,
+> `fitz-sage` combines deterministic query shape with `pyrrho` PRE obligations before retrieval, then `pyrrho` judges the selected evidence after reranking. The retrieval profile,
 > reasons, and missing-evidence signals travel with the `EvidencePack`, so callers know whether to answer, show conflict,
 > retrieve more, or ask for more source material.
 
@@ -128,7 +133,7 @@ Yan Fitzner — ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](
 > for one retrieved table. Embedded document tables remain section text.
 
 **Fully local execution possible 🏠**
-> SQLite storage, corpus-derived semantic expansion, ONNX reranking, and ONNX Pyrrho governance all run locally. Optional synthesis can use
+> SQLite storage, corpus-derived semantic expansion, ONNX reranking, and ONNX `pyrrho` governance all run locally. Optional synthesis can use
 > any local or cloud OpenAI-compatible endpoint.
 
 ####
@@ -159,7 +164,7 @@ and retrieval.
 
 > [!NOTE]
 > All retrieval units share the same retrieval intelligence: query profiling, temporal handling, comparisons,
-> aggregation, keyword expansion, reranking, progressive evidence delivery, and Pyrrho governance.
+> aggregation, keyword expansion, reranking, progressive evidence delivery, and `pyrrho` governance.
 
 ---
 
@@ -189,9 +194,9 @@ summaries, entity links, and broader context expansion.
 
 <br>
 
-| Feature | Query | What Fitz Uses |
+| Feature | Query | What `fitz-sage` Uses |
 |---------|-------|----------------|
-| ✅ [**epistemic-honesty**](docs/features/governance/epistemic-honesty.md) | "What was our Q4 revenue?" | Pyrrho verdict and insufficient-evidence reasons |
+| ✅ [**epistemic-honesty**](docs/features/governance/epistemic-honesty.md) | "What was our Q4 revenue?" | `pyrrho` verdict and insufficient-evidence reasons |
 | ✅ [**keyword-vocabulary**](docs/features/retrieval/keyword-vocabulary.md) | "Find TC_1000" | Literal identifier search |
 | ✅ [**sparse-search**](docs/features/retrieval/sparse-search.md) | "error code E_AUTH_401" | SQLite FTS5 + native `bm25()` |
 | ✅ [**hierarchical-rag**](docs/features/ingestion/hierarchical-rag.md) | "What are the design principles?" | Hierarchical summaries when enrichment has produced them |
@@ -201,7 +206,7 @@ summaries, entity links, and broader context expansion.
 | ✅ [**temporal-queries**](docs/features/retrieval/temporal-queries.md) | "What changed between Q1 and Q2?" | Temporal scope detection |
 | ✅ [**aggregation-queries**](docs/features/retrieval/aggregation-queries.md) | "List all the test cases that failed" | Exhaustive/list query handling |
 | ✅ [**freshness-authority**](docs/features/retrieval/freshness-authority.md) | "What's the latest status on feature X?" | Content-grounded temporal scope; no filesystem-age scoring |
-| ✅ [**semantic-keywords**](docs/features/retrieval/query-expansion.md) | "What does SLA require?" | Corpus-derived abbreviations and related terms merged with literal query terms |
+| ✅ [**semantic-keywords**](docs/features/retrieval/query-expansion.md) | "What does SLA require?" | Collection-local SQLite term graph; literal query retained |
 | ✅ [**query-rewriting**](docs/features/retrieval/query-rewriting.md) | "Tell me more about it" *(after discussing TechCorp)* | Configured query-intelligence provider plus caller-supplied history |
 | ✅ [**reranking**](docs/features/retrieval/reranking.md) | "What's the battery warranty?" | ONNX cross-encoder reranker |
 
@@ -262,12 +267,12 @@ and latency separately.
 It gives you the relevant sources and the governance signals around them. You can show it directly, pass it to a model,
 trigger a workflow from it, or store it as an audit artifact.
 
-The source items are the evidence. The signals around them explain how Fitz searched before retrieval and what Pyrrho judged
+The source items are the evidence. The signals around them explain how `fitz-sage` searched before retrieval and what `pyrrho` judged
 after retrieval.
 
 #### Pre-retrieval 🔎
 
-Before retrieval, Fitz builds a search plan from deterministic query analysis,
+Before retrieval, `fitz-sage` builds a search plan from deterministic query analysis,
 the collection term graph, and optional query intelligence.
 
 | Signal | What it means | Why it matters |
@@ -275,20 +280,20 @@ the collection term graph, and optional query intelligence.
 | `query_type` / `analysis_type` | Narrow lookup, comparison, temporal, aggregation, broad overview, or general query shape. | Sets recall breadth and evidence coverage. |
 | `keywords` | Evidence-backed collection expansions and literal deterministic query terms. | Adds collection-specific lexical candidates without embeddings. |
 | `strategy_weights` | Relative weight for code, section, and table retrieval. | Makes the first pass search the right evidence surfaces. |
-| `top_k` / `top_read` | How much candidate evidence Fitz should collect and read. | Keeps narrow lookups fast while giving broad or comparative questions enough coverage. |
+| `top_k` / `top_read` | How much candidate evidence `fitz-sage` should collect and read. | Keeps narrow lookups fast while giving broad or comparative questions enough coverage. |
 | `rerank_candidates` | How many recalled candidates the cross-encoder scores. | Bounds neural CPU cost without shrinking the BM25 recall pool used by evidence rescue. |
 
 #### Post-retrieval 🛡️
 
-After retrieval, reranking, closure, and compilation, Fitz sends Pyrrho the
+After retrieval, reranking, closure, and compilation, `fitz-sage` sends `pyrrho` the
 first three ranked items. An exact `INSUFFICIENT` verdict adds the next two;
 `SUFFICIENT` or `DISPUTED` stops immediately. These signals tell you whether
 the result is usable.
 
 | Signal | What it means | What you can do with it |
 |--------|---------------|-------------------------|
-| `mode` | Mechanical Fitz-Sage mapping of Pyrrho's `SUFFICIENT`, `DISPUTED`, or `INSUFFICIENT` verdict. | Gate generated answers, UI display, automation, or human review. |
-| `reasons` | Plain-language explanation for the verdict. | Show users why Fitz judged evidence sufficient, disputed, or insufficient. |
+| `mode` | Mechanical `fitz-sage` mapping of `pyrrho`'s `SUFFICIENT`, `DISPUTED`, or `INSUFFICIENT` verdict. | Gate generated answers, UI display, automation, or human review. |
+| `reasons` | Plain-language explanation for the verdict. | Show users why `fitz-sage` judged evidence sufficient, disputed, or insufficient. |
 | `evidence_verdict` | Verdict: `SUFFICIENT`, `DISPUTED`, or `INSUFFICIENT`. | Inspect the evidence judgment. |
 | `failure_mode` | Reason when evidence is insufficient or disputed. | Explain why the evidence cannot safely support a clean answer. |
 | `retrieval_intents` | Evidence intent metadata such as lookup, temporal resolution, comparison, or broad coverage. | Decide whether another retrieval pass should focus on coverage, time, lookup, or comparison. |
@@ -301,7 +306,7 @@ next action.
 
 When an `EvidencePack` is not enough to diagnose a result, `RetrievalRun`
 records the actual query plan, term origins, candidate stages, compiled ranking,
-evaluated evidence prefixes, exact Pyrrho outputs, and runtime fingerprints
+evaluated evidence prefixes, exact `pyrrho` outputs, and runtime fingerprints
 from the same execution.
 
 ```bash
@@ -310,7 +315,7 @@ fitz explain run.json
 ```
 
 Trace exports redact source bodies by default. Content-bearing traces are an
-explicit opt-in and enable Pyrrho-only replay over frozen evidence. See
+explicit opt-in and enable `pyrrho`-only replay over frozen evidence. See
 [Retrieval Execution Records](docs/RETRIEVAL_RUNS.md).
 
 </details>
@@ -325,12 +330,12 @@ explicit opt-in and enable Pyrrho-only replay over frozen evidence. See
 
 <br>
 
-[Feature docs](docs/CONSTRAINTS.md) • [Pyrrho on Hugging Face](https://huggingface.co/yafitzdev) • [fitz-gov on Hugging Face](https://huggingface.co/datasets/yafitzdev/fitz-gov-v2)
+[Feature docs](docs/CONSTRAINTS.md) • [`pyrrho` on Hugging Face](https://huggingface.co/yafitzdev) • [`fitz-gov` on Hugging Face](https://huggingface.co/datasets/yafitzdev/fitz-gov-v2)
 
-Pyrrho is the local governance model behind `fitz-sage`. Its default CPU-local
+`pyrrho` is the local governance model behind `fitz-sage`. Its default CPU-local
 ONNX ModernBERT model
 [`yafitzdev/pyrrho-v2-nano-g1`](https://huggingface.co/yafitzdev/pyrrho-v2-nano-g1)
-is pinned to an immutable Hub revision and cached by Fitz-Sage through the
+is pinned to an immutable Hub revision and cached by `fitz-sage` through the
 standard Hugging Face cache.
 
 <br>
@@ -362,7 +367,7 @@ standard Hugging Face cache.
 | `retrieval_intents` | Evidence intent metadata, such as lookup, temporal resolution, comparison, or broad coverage. |
 | `evidence_kinds` | Evidence-surface metadata, such as text, table, code, config, logs, or document layout. |
 
-Fitz-Sage passes every ranked prefix to Pyrrho unchanged. Its managed ONNX
+`fitz-sage` passes every ranked prefix to `pyrrho` unchanged. Its managed ONNX
 adapter applies the model's fixed input and head-decoding contract, maps the
 resulting verdict into `AnswerMode`, and returns the stopping prefix plus the
 exact serialized decisions with the `EvidencePack`. Applications can answer,
@@ -371,18 +376,18 @@ retry, show conflict, or request more source material.
 <br>
 
 > [!NOTE]
-> Governance is a source-evidence judgment. Pyrrho is trained to decide whether retrieved evidence is sufficient,
-> disputed, or insufficient, and Fitz records that judgment in the returned metadata.
+> Governance is a source-evidence judgment. `pyrrho` is trained to decide whether retrieved evidence is sufficient,
+> disputed, or insufficient, and `fitz-sage` records that judgment in the returned metadata.
 
 <strong>The model adapter fails closed on known contract violations 🛡️</strong>
-> Fitz-Sage's managed Pyrrho adapter checks the model artifact, label order, ONNX
+> `fitz-sage`'s managed `pyrrho` adapter checks the model artifact, label order, ONNX
 > width, token limits, graph parity, and verdict/failure compatibility before
 > or during inference. These
 > checks reduce unsafe failure modes; they are not a substitute for clean-data
 > evaluation or threshold calibration.
 
 <strong>No LLM on the governance path ⏱️</strong>
-> Pyrrho is a local encoder forward pass. Governance does not require an external chat model.
+> `pyrrho` is a local encoder forward pass. Governance does not require an external chat model.
 
 </details>
 
@@ -396,18 +401,18 @@ retry, show conflict, or request more source material.
 
 <br>
 
-Fitz-Sage targets reasonably clean, supported documents. The complete contract
+`fitz-sage` targets reasonably clean, supported documents. The complete contract
 and case-level evidence are in [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 
 | Boundary | Current behavior | Responsibility |
 |----------|------------------|----------------|
-| Identifier variants | `ATX-123`, `ATX_123`, and `ATX 123` remain distinct | User data preparation |
-| Private vocabulary | Managed semantic terms are best effort; private mappings are not inferred | User data preparation |
+| Identifier forms | Observed identifiers gain mechanical forms such as `AuthService` ↔ `Auth Service` | `fitz-sage` |
+| Private vocabulary | Corpus-stated aliases are learned; undocumented mappings are not inferred | User data preparation |
 | Raw logs and scans | Logs need compression; scans need an OCR/vision parser | User input pipeline |
 | Long or unrelated requests | Retrieval and evidence budgets are finite | Shared boundary |
-| Multi-document ranking | Weaker than single-document ranking on the enterprise holdout | Fitz-Sage |
-| Extreme file counts | Public re-pointing still walks and hashes every source file | Fitz-Sage |
-| Governance context | Pyrrho currently accepts up to 2,048 tokens | Pyrrho |
+| Multi-document ranking | Weaker than single-document ranking on the enterprise holdout | `fitz-sage` |
+| Extreme file counts | Public re-pointing still walks and hashes every source file | `fitz-sage` |
+| Governance context | `pyrrho` currently accepts up to 2,048 tokens | `pyrrho` |
 
 </details>
 
@@ -432,10 +437,9 @@ and case-level evidence are in [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 >```
 >
 >`fitz-sage` creates a local retrieval config on first run:
->1. **SQLite storage** for collections.
->2. **Managed local models** for semantic query terms, reranking, governance,
->   and optional background enrichment.
->3. **Pyrrho query planning** plus one authoritative evidence decision.
+>1. **SQLite storage** and a collection-local term graph.
+>2. **Managed local models** for reranking and `pyrrho` governance.
+>3. **Optional configured providers** for enrichment and generated features.
 >
 >For generated prose from the governed evidence:
 >
@@ -454,7 +458,7 @@ and case-level evidence are in [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 >```python
 >import fitz_sage
 >
->pack = fitz_sage.evidence("Where is Pyrrho governance implemented?", source="./fitz_sage")
+>pack = fitz_sage.evidence("Where is pyrrho governance implemented?", source="./fitz_sage")
 >
 >print(pack.mode)
 >for item in pack.items:
@@ -506,7 +510,7 @@ and case-level evidence are in [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 <br>
 
 `fitz-sage` is a retrieval foundation. It manages indexing, search, reranking,
-Pyrrho integration, and provenance so products can
+`pyrrho` integration, and provenance so products can
 build on source evidence.
 
 <br>
@@ -514,7 +518,7 @@ build on source evidence.
 <strong>Chatbot Backend 🤖</strong>
 
 > Connect fitz to Slack, Discord, Teams, or your own UI. The bot can show source-backed evidence, ask for more documents
-> when Pyrrho marks evidence insufficient, or call `fitz answer` for generated prose.
+> when `pyrrho` marks evidence insufficient, or call `fitz answer` for generated prose.
 >
 > *Example:* A support bot retrieves policy sections, shows links to the relevant docs, and only synthesizes when the
 > evidence verdict is sufficient.
@@ -657,7 +661,7 @@ legal_pack = legal.evidence("What are the payment terms?", source="./contracts")
 
 **Working with evidence:**
 ```python
-pack = fitz_sage.evidence("Where is Pyrrho governance implemented?", source="./fitz_sage")
+pack = fitz_sage.evidence("Where is pyrrho governance implemented?", source="./fitz_sage")
 
 print(pack.mode)  # runtime AnswerMode: SUFFICIENT, DISPUTED, or INSUFFICIENT
 print(pack.reasons)

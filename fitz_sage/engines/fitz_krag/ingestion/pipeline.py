@@ -540,6 +540,7 @@ class KragIngestPipeline:
 
     def _summarize_section_dicts(self, sections: list[dict[str, Any]]) -> list[str]:
         """Generate section summaries, batched, preserving input order."""
+        summarizer = self._require_summarizer()
         summaries: list[str] = []
         batch_size = self._config.summary_batch_size
 
@@ -548,7 +549,7 @@ class KragIngestPipeline:
             prompt = self._build_section_summary_prompt(batch)
 
             try:
-                response = self._summarizer_chat.chat(
+                response = summarizer.chat(
                     [
                         {
                             "role": "system",
@@ -589,6 +590,7 @@ class KragIngestPipeline:
 
     def _summarize_table_record(self, record: dict[str, Any]) -> str:
         """Generate a 1-2 sentence schema description for a single table."""
+        summarizer = self._require_summarizer()
         cols = ", ".join(record["columns"][:20])
         samples = record.get("metadata", {}).get("sample_rows", [])
         sample_str = ""
@@ -607,7 +609,7 @@ class KragIngestPipeline:
         )
 
         try:
-            response = self._summarizer_chat.chat(
+            response = summarizer.chat(
                 [
                     {
                         "role": "system",
@@ -638,10 +640,10 @@ class KragIngestPipeline:
             "but no chat provider is available."
         )
 
-    def _require_summarizer(self) -> None:
+    def _require_summarizer(self) -> "ChatProvider":
         """Fail closed when hierarchy/table summarization cannot run."""
         if self._summarizer_chat:
-            return
+            return self._summarizer_chat
         raise ConfigurationError(
             "Hierarchy summarization requires a configured balanced chat tier, "
             "but no chat provider is available."
@@ -709,6 +711,8 @@ class KragIngestPipeline:
         structure (imports, AST), so symbol-level hierarchy summaries are
         redundant for code.
         """
+        summarizer = self._require_summarizer()
+
         # L1 reads raw section content, not summaries: summarization is demand-driven
         content = "\n".join(
             f"- {s.get('title', '')}: {(s.get('content') or '')[:300]}"
@@ -718,7 +722,7 @@ class KragIngestPipeline:
         if not content:
             return
 
-        group_summary = self._summarizer_chat.chat(
+        group_summary = summarizer.chat(
             [
                 {
                     "role": "system",
@@ -760,8 +764,9 @@ class KragIngestPipeline:
 
     def _generate_corpus_summary(self, l1_summaries: list[str]) -> str:
         """Generate the L2 corpus-level summary from L1 summaries."""
+        summarizer = self._require_summarizer()
         content = "\n".join(f"- {s}" for s in l1_summaries[:20])
-        return self._summarizer_chat.chat(
+        return summarizer.chat(
             [
                 {
                     "role": "system",

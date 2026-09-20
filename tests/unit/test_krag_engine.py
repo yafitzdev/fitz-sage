@@ -30,8 +30,8 @@ from fitz_sage.engines.fitz_krag.progressive.write_lock import (
     CollectionWriteLock,
 )
 from fitz_sage.engines.fitz_krag.query_batcher import BatchResult
-from fitz_sage.engines.fitz_krag.semantic_index import SemanticExpansion
 from fitz_sage.engines.fitz_krag.retrieval.router import RetrievalRouterResponse
+from fitz_sage.engines.fitz_krag.semantic_index import SemanticExpansion
 from fitz_sage.engines.fitz_krag.types import Address, AddressKind, ReadResult
 from tests.unit.mock_engine import build_mock_engine
 

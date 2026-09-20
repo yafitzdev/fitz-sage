@@ -191,7 +191,7 @@ class SemanticIndex:
                         (raw_file_id, unit.key, term_ids[term.key]),
                     )
 
-                for fact in unit.forms:
+                for form_fact in unit.forms:
                     conn.execute(
                         f"""
                         INSERT OR REPLACE INTO {_FORMS}
@@ -202,18 +202,18 @@ class SemanticIndex:
                         (
                             raw_file_id,
                             unit.key,
-                            term_ids[fact.term.key],
-                            fact.surface,
-                            _normalize(fact.surface),
-                            fact.form_type,
-                            fact.confidence,
-                            fact.extractor,
+                            term_ids[form_fact.term.key],
+                            form_fact.surface,
+                            _normalize(form_fact.surface),
+                            form_fact.form_type,
+                            form_fact.confidence,
+                            form_fact.extractor,
                         ),
                     )
 
-                for fact in unit.relations:
-                    source_id = term_ids[fact.source.key]
-                    target_id = term_ids[fact.target.key]
+                for relation_fact in unit.relations:
+                    source_id = term_ids[relation_fact.source.key]
+                    target_id = term_ids[relation_fact.target.key]
                     if source_id == target_id:
                         continue
                     conn.execute(
@@ -228,9 +228,9 @@ class SemanticIndex:
                             unit.key,
                             source_id,
                             target_id,
-                            fact.relation_type,
-                            fact.confidence,
-                            fact.extractor,
+                            relation_fact.relation_type,
+                            relation_fact.confidence,
+                            relation_fact.extractor,
                         ),
                     )
 

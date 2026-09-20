@@ -9,15 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+## [0.16.1] - 2026-09-20
 
-- Replaced managed generative query expansion with an evidence-backed SQLite
-  term graph built from each collection. It records abbreviations, aliases,
-  identifier variants, error/component relationships, phrases, and
-  co-occurrence clusters, and retracts evidence when files change or disappear.
+### 🚀 Added
+
+- Added a deterministic, collection-local SQLite term graph for semantic query
+  expansion. Foreground ingestion records source-backed abbreviations, explicit
+  aliases and renames, mechanical identifier forms, error context, repeated
+  phrases, and supported term relationships.
+- Added explainable expansion traces containing the emitted term, relationship,
+  matched source form, score, and supporting-document count.
+
+### 🔄 Changed
+
+- Replaced managed Qwen query expansion with the corpus term graph. Retrieval
+  keeps the literal query, adds at most six ranked graph terms, and continues
+  without expansion if the graph is unavailable.
 - Background entity and hierarchy enrichment now runs only when a chat tier is
   explicitly configured. Standard ingestion and retrieval require no
   generative model.
+- Removed the managed ONNX chat runtime and its model-specific dependency and
+  configuration surface from the default installation.
+
+### 🔧 Fixed
+
+- Reindexing and deletion now retract a file's stale semantic forms,
+  occurrences, and relationships before graph aggregates are rebuilt.
+- Kept the graph sparse by restricting incidental phrase relationships and
+  weak one-document error associations.
+- Added indexed term-form lookup and bidirectional PascalCase identifier forms,
+  including `AuthService` and `Auth Service`.
 
 ## [0.16.0] - 2026-08-08
 
@@ -2669,7 +2690,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-sage/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-sage/compare/v0.16.1...HEAD
+[0.16.1]: https://github.com/yafitzdev/fitz-sage/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/yafitzdev/fitz-sage/compare/v0.14.0...v0.14.1
