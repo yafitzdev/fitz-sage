@@ -235,7 +235,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--index-mode",
         choices=("source", "complete", "progressive"),
-        default="complete",
+        default="source",
         help=(
             "Query the source index only, wait for full enrichment, or query "
             "while background enrichment runs."

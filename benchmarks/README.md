@@ -45,7 +45,7 @@ Defaults:
 - JSON report: `benchmarks/results/latest.json`
 - Markdown summary: `benchmarks/results/latest.md`
 - workspace: `.bench_workspace/<collection>`
-- index mode: `complete` (use `source` to measure retrieval without enrichment)
+- index mode: `source` (use `complete` only with an explicitly configured chat tier)
 - report detail: `compact`
 - gate: all assertions, including governance
 
@@ -182,9 +182,9 @@ The ablation runs four query-side configurations against the same reusable
 indexes:
 
 - `literal`: deterministic query planning and typed lexical recall, with
-  managed Qwen keywords disabled and cross-encoder scoring replaced by stable
+  corpus term expansion disabled and cross-encoder scoring replaced by stable
   top-k selection
-- `expansion`: `literal` plus managed Qwen semantic query keywords
+- `expansion`: `literal` plus source-backed SQLite corpus terms
 - `reranker`: `literal` plus the canonical INT8 cross-encoder
 - `full`: the canonical pipeline with both components
 
@@ -303,12 +303,31 @@ mapping. This avoids repeating a full no-change `point()` traversal for every
 variant without accepting mismatched or partial persisted state.
 
 The aggregate report gives the same paired component effects as the broad
-suite and additionally reports Qwen effects separately for the frozen low,
-medium, and high lexical-overlap strata.
+suite and additionally reports term-graph effects separately for the frozen
+low, medium, and high lexical-overlap strata.
 
-The completed run evaluated all 240 queries under all four variants. All child
-operational gates and the paired-integrity gate passed, with no resumed
-queries.
+The 2026-09-20 run evaluated all 120 ArguAna queries under all four variants.
+All child operational gates and the paired-integrity gate passed, with no
+resumed queries.
+
+| Dataset | Plain BM25 | `literal` | `expansion` | `reranker` | `full` |
+|---|---:|---:|---:|---:|---:|
+| ArguAna final nDCG@10 | 0.4652 | 0.4413 | 0.4413 | 0.4562 | 0.4563 |
+| ArguAna delivered nDCG@10 | n/a | 0.2929 | 0.3023 | 0.3357 | 0.3357 |
+
+Without reranking, the term graph changed final nDCG@10 by -0.0000 with a
+paired 95% interval of [-0.0090, +0.0094]. With reranking, it changed final
+nDCG@10 by +0.0001 [-0.0098, +0.0083]. Its internal work averaged 0.05-0.07
+seconds per query. These effects are inconclusive: ArguAna does not strongly
+exercise the abbreviation and cluster bridges the graph is designed to learn.
+
+The Quora corpus was verified and projected, but a fresh build over its 522,931
+tiny files projected to roughly 6.5 hours before query execution. That run was
+stopped and no current Quora score is reported. Full methodology, paired
+intervals, and operational findings are recorded in
+[`docs/evaluation/beir-term-graph-arguana-2026-09-20.md`](../docs/evaluation/beir-term-graph-arguana-2026-09-20.md).
+
+The historical 2026-07-30 managed-expansion run evaluated both datasets:
 
 | Dataset | `literal` final nDCG@10 | `expansion` | `reranker` | `full` |
 |---|---:|---:|---:|---:|
@@ -325,12 +344,10 @@ Without Qwen, the reranker improved Quora final nDCG@10 by 0.0518 for 0.45
 seconds. Its ArguAna gain was inconclusive and cost 4.95 seconds, showing why
 reranker quality and latency must be reported by query shape.
 
-The current managed expansion path did not earn its cost on these two BEIR
-tasks. This is not a product-wide reason to disable Qwen: BM25 remains lexical,
-and the holdout is a proxy rather than an application-shaped company-document
-test. Candidate competition remains intentional broad-recall behavior; it
-must not be narrowed to optimize this frozen holdout. Full methodology, paired
-intervals, per-query diagnostics, and operational findings are recorded in
+That removed expansion path did not earn its cost on these two BEIR tasks. The
+holdout is a proxy rather than an application-shaped company-document test.
+Full historical methodology, paired intervals, per-query diagnostics, and
+operational findings are recorded in
 [`docs/evaluation/beir-semantic-holdout-2026-07-30.md`](../docs/evaluation/beir-semantic-holdout-2026-07-30.md).
 
 ### Measured BEIR Baseline
@@ -615,8 +632,8 @@ python -m benchmarks.fitz_bench.runner \
 ```
 
 The runner prints one progress line per completed case. The full limitations
-suite exercises managed Qwen, reranking, evidence closure, and Pyrrho for every
-query, so it is a release-gate run rather than a fast smoke test.
+suite exercises corpus term expansion, reranking, evidence closure, and Pyrrho
+for every query, so it is a release-gate run rather than a fast smoke test.
 
 ## Production Matrix
 

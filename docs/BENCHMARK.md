@@ -1,11 +1,11 @@
 # Fitz-Sage Benchmarks
 
 This is the canonical benchmark report for the current Fitz-Sage retrieval
-architecture. Last consolidated: 2026-08-02.
+architecture. Last consolidated: 2026-09-20.
 
-> The consolidated results predate the SQLite corpus term graph. Sections that
-> name Qwen are retained as historical measurements of the removed expansion
-> component; a fresh expansion ablation is required for the current system.
+> The production matrix and frozen ArguAna ablation measure the SQLite corpus
+> term graph in v0.16.1. Sections that name Qwen are retained as historical
+> measurements of the removed expansion component.
 
 It records accepted measurements, methodology, component ablations, and the
 diagnostics that explain current design decisions. Smoke runs, interrupted
@@ -26,9 +26,8 @@ one release-candidate scorecard.
 - Timings are observations from the local six-core benchmark machine, not an
   SLA. A complete hardware fingerprint was not retained in the committed
   summaries.
-- Qwen candidates competing with literal candidates inside a bounded pool is
-  intentional broad-recall behavior. A fixed-cutoff regression does not by
-  itself identify candidate competition as a package defect.
+- The term graph retains the literal query and adds only source-backed terms.
+  Historical Qwen results do not measure the current expansion component.
 - User-owned data cleanup remains outside the package contract, including OCR,
   raw-log compression, private vocabulary mappings, and identifier
   normalization.
@@ -37,29 +36,30 @@ one release-candidate scorecard.
 
 | Area | Measured scale | Headline result |
 |---|---:|---|
-| Required production matrix | 252 capability contracts | 250/252 (99.2%) package capability; gate passed |
+| Required production matrix | 252 capability contracts | 249/252 (98.8%) package capability; gate passed |
 | Query-shape suite | 60 cases | 60/60 (100%) |
 | Limitation suite | 60 cases | 51/52 compiled; 48/52 delivered; 31/60 complete |
 | Local source indexing | 18 core / 93 mixed files | 60.8 / 51.6 files/s |
 | NapierOne source indexing | up to 5,005 real files | 7.27 files/s at scale; recovery gate passed |
-| Broad BEIR ablation | 66,454 docs, 1,271 queries | full macro final nDCG@10 0.4365 |
-| Semantic BEIR holdout | 531,605 docs, 240 queries | full macro final nDCG@10 0.6586 |
-| Enterprise retrieval holdout | 511,961 docs, 328 queries | full delivered nDCG@10 0.5780; reranker-only 0.5876 |
+| Frozen ArguAna term-graph ablation | 8,674 docs, 120 queries | full final nDCG@10 0.4563; delivered 0.3357 |
+| Historical broad BEIR ablation | 66,454 docs, 1,271 queries | Qwen full macro final nDCG@10 0.4365 |
+| Historical Enterprise holdout | 511,961 docs, 328 queries | Qwen full delivered nDCG@10 0.5780 |
 | SciFact query latency | matched 60-query sample | 7.43s mean; 6.77s p50; 12.56s p95 |
 | Enterprise warm query probes | 511,961-file index | 13.092s and 19.889s |
 
 ## Internal Production Matrix
 
-The accepted local matrix was run on 2026-08-02 from fresh fixture folders and
-isolated workspaces.
+The current local matrix was run on 2026-09-20 against v0.16.1 source from
+fresh fixture folders and isolated source-only workspaces. Optional chat
+enrichment was not configured.
 
 | Metric | Result |
 |---|---:|
-| Required compiled retrieval | 190/192 (99.0%) |
-| Required governed evidence delivery | 172/192 (89.6%) |
+| Required compiled retrieval | 189/192 (98.4%) |
+| Required governed evidence delivery | 175/192 (91.1%) |
 | Query-shape recognition | 60/60 (100%) |
-| Combined package capability | 250/252 (99.2%) |
-| Full contract including diagnostic Pyrrho modes | 189/252 (75.0%) |
+| Combined package capability | 249/252 (98.8%) |
+| Full contract including diagnostic Pyrrho modes | 192/252 (76.2%) |
 | Core retrieval after adding 80 near-neighbor documents | 20/20 |
 | Reload stability | 100% retrieval, delivery, and mode identity |
 | Required-suite ingestion | 209/209 files |
@@ -70,22 +70,21 @@ Suite-level results:
 | Suite | Retrieval or shape | Delivery | Purpose |
 |---|---:|---:|---|
 | Core | 19/20 | 16/20 | baseline behavior |
-| Holdout | 49/50 | 45/50 | first unseen corpus |
-| Holdout 2 | 50/50 | 46/50 | second unseen corpus |
+| Holdout | 49/50 | 47/50 | first unseen corpus |
+| Holdout 2 | 50/50 | 47/50 | second unseen corpus |
 | Core plus 80 noise documents | 20/20 | 17/20 | near-neighbor robustness |
 | Query shapes | 60/60 | n/a | temporal, comparison, aggregation, narrow |
-| PDF/DOCX/PPTX | 24/24 | 21/24 | rich-document facts |
-| SQL/Go/Java/TypeScript/PPTX | 17/17 | 16/17 | code and base formats |
+| PDF/DOCX/PPTX | 24/24 | 23/24 | rich-document facts |
+| SQL/Go/Java/TypeScript/PPTX | 16/17 | 14/17 | default regex fallbacks; tree-sitter extras absent |
 | XLSX, optional parser | n/a | n/a | optional parser not enabled in this run |
 | Hardened boundaries | 11/11 | 11/11 | long-document, bridge, precision, structured cases |
 | Limitations, non-gating | 51/52 | 48/52 | cases with explicit evidence assertions |
 
-The two required compiled-retrieval misses are false-positive evidence in
-negative budget queries. Of 20 required delivery misses, 19 contain expected
-evidence later in the compiled ranking but stop after an earlier terminal
-Pyrrho verdict; one exhausts a negative-query prefix containing a false-positive
-candidate. They remain visible rather than receiving Fitz-side verdict
-overrides.
+Two required retrieval misses are false-positive evidence in negative budget
+queries. The third is a TypeScript content-extraction miss under the default
+regex fallback; the optional tree-sitter TypeScript parser was not installed.
+All 17 delivery misses remain visible rather than receiving Fitz-side verdict
+overrides. Every required suite remained above its configured gate.
 
 ### Intentional Limitation Suite
 
@@ -94,7 +93,7 @@ overrides.
   passed governed delivery.
 - Required recall was 100%; one forbidden candidate remained in the compiled
   ranking and stopping prefix.
-- 31/60 complete contracts passed; exact Pyrrho modes matched 35/60.
+- 31/60 complete contracts passed; exact Pyrrho modes matched 34/60.
 - Three delivery failures stopped on an early terminal Pyrrho verdict. The
   fourth exhausted the prefix with a forbidden false-positive candidate.
 - The run used `pyrrho-v2-nano-g1` at its current 2,048-token contract.
@@ -111,12 +110,9 @@ The source-only core run passed 20/20 retrieval, delivery, and package
 capability contracts, with 100% required recall and no forbidden evidence. It
 passed 14/20 full contracts; the six failures were accepted Pyrrho outputs.
 
-The current enrichment-complete matrix took 1,498.7 seconds. That figure
-includes model-backed keyword, entity, and hierarchy work and is not
-source-index throughput.
-
-Required-suite queries averaged 3.11 seconds with a 2.76-second median and a
-5.19-second p95. The slowest limitation query took 11.81 seconds.
+The current source-only matrix completed in 448.94 seconds. Required-suite
+queries averaged 1.19 seconds with a 0.77-second median and a 3.35-second p95;
+the slowest required query took 7.20 seconds.
 
 ## NapierOne Real-File Ingestion
 
@@ -171,7 +167,7 @@ finished in about 5.5 seconds. The latter is not public product behavior; this
 remains an extreme-file-count startup limitation rather than a query-latency
 measurement.
 
-## Broad BEIR Component Ablation
+## Historical Broad BEIR Component Ablation
 
 Run date: 2026-07-30. Git commit:
 `2893be4f35cacb67c8ca8627b20f08cf1dfd9817` from a clean worktree.
@@ -276,7 +272,43 @@ Operational boundaries observed in the run:
   identifier. Identifier and abbreviation equivalence remains user-owned.
 - Compiled and delivered rankings were identical on all three datasets.
 
-## Frozen BEIR Semantic Holdout
+## v0.16.1 Frozen ArguAna Term-Graph Ablation
+
+Run date: 2026-09-20. Run ID: `1789904444-15b97a44`. Product commit:
+`6248b2922cf0f8aa8210244904c467144ce2183c` (`v0.16.1`).
+
+- Frozen `beir-semantic-vocabulary-holdout-v1` manifest.
+- 8,674 ArguAna documents and 120 queries: 40 each from low, medium, and high
+  lexical-overlap strata.
+- Source-only index shared across four paired variants.
+- 2,000-sample deterministic paired percentile bootstrap.
+- All operational and measurement-integrity gates passed with no resumed
+  queries.
+
+| Variant | Recall nDCG@10 | Final nDCG@10 | Delivered nDCG@10 | Recall@50 | Mean latency |
+|---|---:|---:|---:|---:|---:|
+| `literal` | 0.4509 | 0.4413 | 0.2929 | 0.9000 | 5.00s |
+| `expansion` | 0.4510 | 0.4413 | 0.3023 | 0.8917 | 5.17s |
+| `reranker` | 0.4509 | 0.4562 | 0.3357 | 0.9000 | 9.85s |
+| `full` | 0.4510 | 0.4563 | 0.3357 | 0.8917 | 9.34s |
+
+Plain whole-document BM25 scored 0.4652 nDCG@10 and 0.9250 Recall@50.
+
+The term graph changed final nDCG@10 by -0.0000 [-0.0090, +0.0094] without
+reranking and +0.0001 [-0.0098, +0.0083] with reranking. Its internal work
+averaged 0.05-0.07 seconds per query. The broad quality effects are
+inconclusive. ArguAna does not strongly exercise the company-document
+abbreviation, alias, identifier, and error/component bridges the graph targets.
+The internal hardened-boundary suite passed all 11 retrieval and delivery
+contracts, including its application-shaped bridge cases.
+
+Quora was downloaded, verified, and projected, but the 522,931-file source
+build projected to roughly 6.5 hours before paired query execution. It was
+stopped without producing a score. See
+[`evaluation/beir-term-graph-arguana-2026-09-20.md`](evaluation/beir-term-graph-arguana-2026-09-20.md)
+for the paired intervals, overlap strata, and operational record.
+
+## Historical Frozen BEIR Semantic Holdout
 
 Run date: 2026-07-30. Run ID: `1785447318-d0a05a18`. Git commit:
 `d855e4bec89b7f74959902e3859b5647b564230d` from a clean worktree.
@@ -531,7 +563,7 @@ rather than hidden.
   company-document quality or universal Qwen usefulness.
 - The limitation suite is intentionally non-green at the full-contract level.
 - Current Pyrrho results are not an independent governance-quality benchmark.
-- Background Qwen document enrichment throughput, very large individual
+- Optional background-chat document enrichment throughput, very large individual
   documents, OCR, and a fast validated no-change re-point path remain to be
   measured or implemented separately.
 
@@ -540,6 +572,7 @@ rather than hidden.
 - [Production readiness](PRODUCTION_READINESS.md)
 - [Limitations and benchmark interpretation](LIMITATIONS.md)
 - [Benchmark runner and reranker validation](../benchmarks/README.md)
+- [Current ArguAna term-graph ablation](evaluation/beir-term-graph-arguana-2026-09-20.md)
 - [BEIR component ablation](evaluation/beir-component-ablation-2026-07-30.md)
 - [Frozen BEIR semantic holdout](evaluation/beir-semantic-holdout-2026-07-30.md)
 - [Frozen EnterpriseRAG-Bench holdout](evaluation/enterprise-rag-bench-2026-08-01.md)

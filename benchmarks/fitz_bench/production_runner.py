@@ -47,6 +47,8 @@ def main(argv: list[str] | None = None) -> int:
             str(report_markdown),
             "--report-detail",
             "compact",
+            "--index-mode",
+            str(suite.get("index_mode", "source")),
             "--gate",
             str(suite.get("gate", "retrieval")),
             "--minimum-pass-rate",

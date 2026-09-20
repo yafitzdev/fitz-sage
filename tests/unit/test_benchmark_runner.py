@@ -144,6 +144,13 @@ def test_select_cases_rejects_unknown_id():
         runner._select_cases(cases, ["missing"])
 
 
+def test_benchmark_defaults_to_source_index() -> None:
+    """The standard benchmark must not require optional chat enrichment."""
+    from benchmarks.fitz_bench import runner
+
+    assert runner._parse_args([]).index_mode == "source"
+
+
 def test_record_summary_separates_retrieval_and_governance() -> None:
     from benchmarks.fitz_bench import runner
 

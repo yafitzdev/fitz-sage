@@ -29,9 +29,16 @@ architecture.
 
 ## Completed External Measurements
 
-The expansion measurements below cover the removed generative expansion path.
-They remain useful historical baselines, but they do not measure the current
-SQLite corpus term graph.
+The current frozen ArguAna ablation measured the SQLite corpus term graph on
+8,674 documents and 120 queries. Its effect was quality-neutral within paired
+95% intervals: final nDCG@10 changed by -0.0000 without reranking and +0.0001
+with reranking. The graph itself averaged 0.05-0.07 seconds per query. Quora
+was projected but left unscored because rebuilding the 522,931-file index would
+take several hours on this machine.
+
+The measurements below cover the removed generative expansion path. They
+remain useful historical baselines, but they do not measure the current term
+graph.
 
 - The broad NFCorpus, FiQA, and SciFact ablation measures literal retrieval,
   managed Qwen expansion, and INT8 reranking over all 1,271 judged queries.
@@ -46,8 +53,10 @@ SQLite corpus term graph.
 
 ## Gaps To Fill
 
-1. Evaluate the SQLite corpus term graph on abbreviation, alias, identifier,
-   error/component, and frozen external retrieval sets.
+1. Build an application-shaped external term-graph set for abbreviations,
+   aliases, identifiers, and error/component clusters. The internal hardened
+   boundary suite covers these cases, while ArguAna does not exercise them
+   strongly.
 2. Set-aware coverage experiments after pointwise reranking, evaluated on the
    frozen enterprise categories without tuning on the holdout.
 3. A full matched enterprise rerun after the closure modality and section-FTS
@@ -55,8 +64,8 @@ SQLite corpus term graph.
 4. A separate, application-shaped non-BEIR semantic-expansion development set
    for extraction, weighting, and expansion-policy experiments. It must directly
    exercise ordinary semantic-to-lexical bridges without relying on private
-   aliases or identifier normalization. The frozen ArguAna/Quora holdout must
-   remain evaluation-only and should be rerun against the corpus term graph.
+   aliases or identifier normalization. The frozen holdout must remain
+   evaluation-only; Quora still needs a dedicated long term-graph run.
 5. Cross-modality integration cases that preserve the exact accepted Pyrrho
    output without treating it as Fitz retrieval quality. Pyrrho owns
    false-sufficient, class-recall, and calibration evaluation.
@@ -72,6 +81,7 @@ SQLite corpus term graph.
 - [Evidence Pack](../EVIDENCE_PACK.md)
 - [Three-Stage Retrieval Strategy](../features/retrieval/three-stage-strategy.md)
 - [Governance Modality Boundaries](../features/governance/modality-boundaries.md)
+- [Current ArguAna Term-Graph Ablation](beir-term-graph-arguana-2026-09-20.md)
 - [BEIR Component Ablation](beir-component-ablation-2026-07-30.md)
 - [BEIR Semantic Holdout](beir-semantic-holdout-2026-07-30.md)
 - [EnterpriseRAG-Bench Holdout](enterprise-rag-bench-2026-08-01.md)

@@ -233,12 +233,12 @@ and latency separately.
 
 | Area | Scale | Current measurement |
 |------|------:|---------------------|
-| Production retrieval and delivery | 192 required contracts | 190/192 compiled; 172/192 delivered |
+| Production retrieval and delivery | 192 required contracts | 189/192 compiled; 175/192 delivered |
 | Query-shape recognition | 60 cases | 60/60 |
 | Intentional limitations | 52 evidence-asserted cases | 51/52 compiled; 48/52 delivered |
-| Broad BEIR | 66,454 documents, 1,271 queries | 0.4239 delivered nDCG@10 |
-| Frozen semantic BEIR | 531,605 documents, 240 queries | 0.6519 delivered nDCG@10 |
-| EnterpriseRAG-Bench | 511,961 documents, 328 holdout queries | 0.5780 delivered nDCG@10 |
+| Frozen ArguAna term-graph ablation | 8,674 documents, 120 queries | 0.4563 final; 0.3357 delivered nDCG@10 |
+| Historical broad BEIR (pre-term-graph) | 66,454 documents, 1,271 queries | 0.4239 delivered nDCG@10 |
+| Historical EnterpriseRAG-Bench (pre-term-graph) | 511,961 documents, 328 holdout queries | 0.5780 delivered nDCG@10 |
 | Local source indexing | 18 core / 93 mixed files | 60.8 / 51.6 files/s |
 | NapierOne scale ingestion | 5,005 real files | 4,994 indexed at 7.27 files/s; recovery passed |
 | SciFact query latency | 60 matched queries | 7.43s mean; 6.77s p50; 12.56s p95 |

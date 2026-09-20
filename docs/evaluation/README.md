@@ -8,6 +8,7 @@ scorecard and interpretation.
 | File | Contents |
 |---|---|
 | `current.md` | Current retrieval-first measurement plan |
-| `beir-component-ablation-2026-07-30.md` | Current paired BEIR component measurement |
-| `beir-semantic-holdout-2026-07-30.md` | Frozen semantic-expansion holdout |
-| `enterprise-rag-bench-2026-08-01.md` | Frozen full-corpus enterprise retrieval holdout |
+| `beir-term-graph-arguana-2026-09-20.md` | Current frozen term-graph ablation |
+| `beir-component-ablation-2026-07-30.md` | Historical paired BEIR component measurement |
+| `beir-semantic-holdout-2026-07-30.md` | Historical frozen semantic-expansion holdout |
+| `enterprise-rag-bench-2026-08-01.md` | Historical frozen full-corpus enterprise holdout |
