@@ -12,7 +12,7 @@
 [![PyPI version](https://badge.fury.io/py/fitz-sage.svg)](https://pypi.org/project/fitz-sage/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.16.1-green.svg)](CHANGELOG.md)
-[![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/yafitzdev/fitz-sage)
+[![Coverage](https://img.shields.io/badge/coverage-78%25-yellow)](https://github.com/yafitzdev/fitz-sage)
 
 [Benchmarks](#benchmarks) • [EvidencePack](#evidencepack) • [Why `fitz-sage`?](#why-fitz-sage) • [Retrieval Intelligence](#retrieval-intelligence) • [Governance](#governance--pyrrho) • [Limitations](#limitations) • [Documentation](#links) • [GitHub](https://github.com/yafitzdev/fitz-sage)
 
