@@ -93,7 +93,24 @@ def test_builds_contextual_error_cluster(tmp_path):
 
     assert "windows installer" in normalized
     assert "custom action" in normalized
+    assert "installation fail" not in normalized
     assert semantic_index.stats()["clusters"] >= 1
+
+
+def test_expands_identifier_spelling_variants_in_both_directions(tmp_path):
+    _manager, raw_store, semantic_index = _index(tmp_path)
+    _store(
+        raw_store,
+        semantic_index,
+        "auth",
+        "AuthService processes session tokens.",
+    )
+
+    spaced = {item.term for item in semantic_index.expand("AuthService")}
+    compact = {item.term for item in semantic_index.expand("Auth Service")}
+
+    assert "Auth Service" in spaced
+    assert "AuthService" in compact
 
 
 def test_reindex_removes_stale_semantic_evidence(tmp_path):

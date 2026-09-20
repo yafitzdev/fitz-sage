@@ -216,6 +216,8 @@ def _semantic_index_ddl() -> str:
     );
     CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}semantic_forms_surface
         ON {TABLE_PREFIX}semantic_forms(normalized_surface);
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}semantic_forms_term
+        ON {TABLE_PREFIX}semantic_forms(term_id);
 
     CREATE TABLE IF NOT EXISTS {TABLE_PREFIX}semantic_occurrences (
         raw_file_id TEXT NOT NULL REFERENCES {TABLE_PREFIX}raw_files(id) ON DELETE CASCADE,

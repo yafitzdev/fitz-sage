@@ -39,7 +39,7 @@ _ERROR_RE = re.compile(
 )
 _IDENTIFIER_RE = re.compile(
     r"\b(?:[A-Za-z][A-Za-z0-9]*[_./:-][A-Za-z0-9_./:-]+|"
-    r"[a-z][A-Za-z0-9]*[A-Z][A-Za-z0-9]*)\b"
+    r"[A-Za-z][A-Za-z0-9]*[A-Z][A-Za-z0-9]*)\b"
 )
 _CAPITALIZED_PHRASE_RE = re.compile(r"\b(?:[A-Z][A-Za-z0-9-]+\s+){1,4}[A-Z][A-Za-z0-9-]+\b")
 _ALIAS_RE = re.compile(
@@ -251,13 +251,14 @@ class SemanticIndex:
         query_phrases = _query_phrases(query)
         if not query_phrases:
             return []
+        query_surfaces = _query_surface_phrases(query)
 
         with self._cm.connection(self._collection) as conn:
             self._materialize_if_dirty(conn)
             matches = self._matched_terms(conn, query_phrases)
             if not matches:
                 return []
-            candidates = self._form_candidates(conn, matches, query_phrases)
+            candidates = self._form_candidates(conn, matches, query_surfaces)
             self._relation_candidates(conn, matches, query_phrases, candidates)
             self._cluster_candidates(conn, matches, query_phrases, candidates)
 
@@ -377,7 +378,12 @@ class SemanticIndex:
             f"""
             SELECT source_term_id, target_term_id, weight, relation_type
             FROM {_RELATIONS}
-            WHERE weight >= 0.62 OR relation_type != 'cooccurs_with'
+            WHERE weight >= 0.62
+               OR relation_type IN (
+                   'abbreviation_of', 'alias_of', 'renamed_to',
+                   'identifier_variant_of'
+               )
+               OR (relation_type = 'error_of' AND supporting_documents >= 2)
             """
         ).fetchall()
         parent: dict[int, int] = {}
@@ -461,7 +467,7 @@ class SemanticIndex:
     def _form_candidates(
         conn: "sqlite3.Connection",
         matches: dict[int, tuple[str, str, float, int]],
-        query_phrases: set[str],
+        query_surfaces: set[str],
     ) -> dict[str, SemanticExpansion]:
         candidates: dict[str, SemanticExpansion] = {}
         placeholders = ",".join("?" for _ in matches)
@@ -477,7 +483,7 @@ class SemanticIndex:
             tuple(matches),
         ).fetchall()
         for term_id, surface, normalized, form_type, confidence, documents in rows:
-            if str(normalized) in query_phrases or str(form_type) == "identity":
+            if _surface_key(str(surface)) in query_surfaces:
                 continue
             source = matches[int(term_id)][0]
             _add_candidate(
@@ -492,7 +498,7 @@ class SemanticIndex:
             )
 
         for canonical, form_type, confidence, documents in matches.values():
-            if _normalize(canonical) in query_phrases or form_type in {"identity", "literal"}:
+            if _surface_key(canonical) in query_surfaces:
                 continue
             _add_candidate(
                 candidates,
@@ -544,6 +550,8 @@ class SemanticIndex:
             target_df,
         ) in rows:
             source_id, target_id = int(source_id), int(target_id)
+            if str(relation) == "error_of" and float(weight) < 0.65 and int(documents) < 2:
+                continue
             if source_id in matches:
                 candidate_id, candidate, candidate_df = target_id, str(target), int(target_df)
                 matched_source = matches[source_id][0]
@@ -721,7 +729,7 @@ def _extract_unit(text: str, unit_key: str, phrase_counts: Counter[str]) -> _Uni
         if term:
             strong_terms.add(term)
         split = _clean_surface(" ".join(_IDENT_SPLIT_RE.split(surface)))
-        if term and _normalize(split) != _normalize(surface) and _useful_term(split):
+        if term and _surface_key(split) != _surface_key(surface) and _useful_term(split):
             forms.append(
                 _FormFact(
                     term=term,
@@ -736,7 +744,12 @@ def _extract_unit(text: str, unit_key: str, phrase_counts: Counter[str]) -> _Uni
     phrases = _candidate_phrases(text)
     ranked_phrases = sorted(
         phrases,
-        key=lambda phrase: (phrase_counts[phrase], len(phrase.split()), len(phrase)),
+        key=lambda phrase: (
+            phrase_counts[phrase],
+            len(phrase.split()),
+            len(phrase),
+            phrase.casefold(),
+        ),
         reverse=True,
     )
     for phrase in ranked_phrases[:12]:
@@ -760,10 +773,24 @@ def _extract_unit(text: str, unit_key: str, phrase_counts: Counter[str]) -> _Uni
                 context_term = target if source in error_terms else source
                 confidence = 0.82 if context_term in strong_terms else 0.55
                 extractor = "error_context"
-            else:
+            elif source in strong_terms and target in strong_terms:
                 relation_type = "cooccurs_with"
                 confidence = 0.42
                 extractor = "sentence_cooccurrence"
+            elif source not in strong_terms and target not in strong_terms:
+                if (
+                    min(
+                        phrase_counts.get(source.canonical, 0),
+                        phrase_counts.get(target.canonical, 0),
+                    )
+                    < 2
+                ):
+                    continue
+                relation_type = "cooccurs_with"
+                confidence = 0.52
+                extractor = "repeated_phrase_cooccurrence"
+            else:
+                continue
             relations.append(_RelationFact(source, target, relation_type, confidence, extractor))
 
     return _UnitFacts(unit_key, set(ordered_terms), forms, relations)
@@ -833,6 +860,15 @@ def _query_phrases(query: str) -> set[str]:
     return phrases
 
 
+def _query_surface_phrases(query: str) -> set[str]:
+    tokens = _WORD_RE.findall(query)
+    phrases: set[str] = set()
+    for size in range(1, min(5, len(tokens)) + 1):
+        for index in range(len(tokens) - size + 1):
+            phrases.add(_surface_key(" ".join(tokens[index : index + size])))
+    return phrases
+
+
 def _clean_surface(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip(" \t\r\n,;:.-")
 
@@ -842,6 +878,11 @@ def _normalize(value: str) -> str:
     normalized = " ".join(part for part in _IDENT_SPLIT_RE.split(normalized) if part)
     normalized = re.sub(r"[^\w]+", " ", normalized, flags=re.UNICODE)
     return re.sub(r"\s+", " ", normalized).strip().casefold()
+
+
+def _surface_key(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value)
+    return re.sub(r"\s+", " ", normalized).strip(" \t\r\n,;:.-").casefold()
 
 
 def _useful_term(value: str) -> bool:
