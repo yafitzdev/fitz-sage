@@ -6,15 +6,17 @@ reinterpret a user's domain data.
 
 ## Responsibility Boundary
 
-| Fitz-Sage owns | The user owns |
-|---|---|
-| Supported-file discovery and visible failures | Choosing and preparing the corpus |
-| Parsing into sections, symbols, and native tables | Raw-log compression or rewriting |
-| Literal and evidence-backed semantic query recall | Undocumented acronym, synonym, and ID mappings |
-| General query shapes such as temporal, comparison, and aggregation | Deciding which identifier forms are equivalent |
-| Reranking, source reading, evidence compilation, and provenance | OCR/parser selection for image-only or complex inputs |
-| Deterministic planning from the submitted query | Rewriting conversational, ambiguous, or context-dependent questions |
-| Exact transport of Pyrrho planning and governance output | Removing secrets and documents that must not be indexed |
+| Boundary | Current behavior | Responsibility |
+|---|---|---|
+| Corpus preparation | The user chooses and prepares the indexed corpus | `user` |
+| Raw logs and scans | Raw logs need compression or rewriting; image-only or complex files may need OCR or vision parsing | `user` |
+| Private vocabulary | Undocumented acronym, synonym, and identifier mappings are not inferred | `user` |
+| Identifier equivalence | The user decides which differently written identifiers are equivalent | `user` |
+| Query rewriting | Conversational, ambiguous, or context-dependent questions must be rewritten before submission | `user` |
+| Secrets and unwanted documents | The user removes material that must not be indexed | `user` |
+| Long or unrelated requests | Query scope, retrieval budgets, and evidence sufficiency interact | `user` + `fitz-sage` + `pyrrho` |
+| Governance context and verdicts | Pyrrho owns the governance decision and currently accepts up to 2,048 tokens | `pyrrho` |
+| Retrieval and evidence pipeline | Fitz-Sage owns supported-file discovery, parsing, query planning, recall, reranking, reading, compilation, and provenance | `fitz-sage` |
 
 The boundary is intentionally explicit. Domain-specific cleanup differs by
 company and corpus; hiding it inside a universal package would create false
