@@ -23,6 +23,7 @@ def test_delete_files_not_in_paths_removes_stale_rows_only() -> None:
     pipeline._table_store = MagicMock()
     pipeline._table_store.get_by_file.return_value = []
     pipeline._sqlite_table_store = None
+    pipeline._semantic_index = MagicMock()
 
     deleted = pipeline.delete_files_not_in_paths({"README.md"})
 
@@ -45,6 +46,7 @@ def test_code_without_finer_symbols_gets_file_module_address(tmp_path) -> None:
     pipeline._raw_store = MagicMock()
     pipeline._symbol_store = MagicMock()
     pipeline._import_store = MagicMock()
+    pipeline._semantic_index = MagicMock()
 
     count = pipeline._parse_code_file("db/migration.js", source, "file-id")
 

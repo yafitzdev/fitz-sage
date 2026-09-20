@@ -49,7 +49,7 @@ def timing_group(name: str) -> str | None:
         return None
     if name == "Query prep":
         return "query_prep"
-    if name == "Qwen query keywords":
+    if name == "Semantic term graph":
         return "semantic_expansion"
     if name == "Pyrrho pre":
         return "pyrrho_planning"

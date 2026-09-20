@@ -166,8 +166,8 @@ The current matched 60-query SciFact run measured:
 | p95 | 12.56s |
 | Queries with delivered relevant evidence | 47/60 |
 
-Managed Qwen, reranking, Pyrrho, and repeated evidence closure dominate query
-time; lexical recall is usually the smaller component. Enterprise-scale section
+Reranking, Pyrrho, and repeated evidence closure dominate query time; lexical
+and SQLite term-graph recall are usually the smaller components. Enterprise-scale section
 recall and closure remain the most important latency boundary.
 
 Timings are observations from the benchmark machine, not an SLA. Corpus shape,
@@ -181,10 +181,10 @@ remain explicit:
 1. Pointwise reranking is weak on some multi-document/set questions.
 2. Re-pointing hundreds of thousands of unchanged tiny files still walks and
    hashes every file.
-3. Managed Qwen expansion has inconclusive aggregate value on the frozen
-   external tasks while adding latency.
-4. Background Qwen throughput and very large individual documents need broader
-   capacity measurements.
+3. The new corpus term graph needs a fresh quality evaluation on the frozen
+   external tasks and application-shaped abbreviation/error queries.
+4. Optional background-chat throughput and very large individual documents need
+   broader capacity measurements.
 5. Pyrrho's current 2,048-token governance context is a separate model boundary.
 
 ## Reproduce

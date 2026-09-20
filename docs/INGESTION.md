@@ -8,8 +8,9 @@ manifest = engine.point(source, collection="docs")
 ```
 
 When `point()` returns, every supported file is either searchable through the
-ordinary SQLite/FTS5 retrieval path or listed as an indexing failure. Query
-readiness never depends on Qwen, model download, entity extraction, or summary
+ordinary SQLite/FTS5 retrieval path or listed as an indexing failure. The same
+foreground pass records collection-specific semantic term evidence. Query
+readiness never depends on a generative model, entity extraction, or summary
 generation.
 
 The CLI calls the same operation automatically:

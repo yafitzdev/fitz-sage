@@ -3,7 +3,7 @@
 This is an integration smoke, not a quality benchmark. It verifies that the
 standard local path can initialize and execute:
 
-- managed Qwen ONNX GenAI query keywords and optional background enrichment
+- collection-derived SQLite semantic query expansion
 - ONNX reranking
 - ONNX Pyrrho governance
 
@@ -23,7 +23,6 @@ from pathlib import Path
 from fitz_sage import Query
 from fitz_sage.engines.fitz_krag.config import FitzKragConfig
 from fitz_sage.engines.fitz_krag.engine import FitzKragEngine
-from fitz_sage.llm.providers.onnx_chat import OnnxChat
 
 
 def main() -> int:
@@ -67,20 +66,10 @@ def main() -> int:
     )
 
     try:
-        qwen_info = OnnxChat().model_info()
-        print(f"managed_qwen={qwen_info.repo_id} {qwen_info.onnx_file} {qwen_info.revision[:12]}")
-
         progress: list[str] = []
         engine = FitzKragEngine(config)
         engine.point(docs, progress=progress.append, start_worker=False)
-
-        t0 = time.perf_counter()
-        engine.continue_enrichment()
-        print(f"enrichment_seconds={time.perf_counter() - t0:.2f}")
-
-        for message in progress:
-            if "Qwen" in message or "Managed Qwen" in message:
-                print(f"progress={message}")
+        print(f"semantic_index={engine._semantic_index.stats()}")
 
         for name, text in _smoke_queries().items():
             pack = engine.evidence(Query(text=text), top_k=4)
@@ -122,6 +111,7 @@ def _write_smoke_docs(docs: Path) -> None:
         "\n".join(
             [
                 "# Operations Handbook",
+                "A Service Level Agreement (SLA) defines the response target.",
                 "Escalated refund requests go to the support manager.",
                 "Shipping incidents use ticket code OPS-17.",
             ]

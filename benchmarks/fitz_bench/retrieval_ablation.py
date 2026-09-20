@@ -37,7 +37,7 @@ ABLATIONS = {
         cross_encoder_reranking=False,
         description=(
             "Deterministic Fitz-Sage query planning and typed lexical recall; "
-            "managed Qwen keywords are disabled and cross-encoder scoring is "
+            "corpus term expansion is disabled and cross-encoder scoring is "
             "replaced by stable top-k selection."
         ),
     ),
@@ -46,7 +46,7 @@ ABLATIONS = {
         semantic_expansion=True,
         cross_encoder_reranking=False,
         description=(
-            "Literal variant plus managed Qwen semantic query keywords; "
+            "Literal variant plus SQLite corpus semantic query terms; "
             "cross-encoder scoring is replaced by stable top-k selection."
         ),
     ),
@@ -56,14 +56,14 @@ ABLATIONS = {
         cross_encoder_reranking=True,
         description=(
             "Literal variant plus the canonical INT8 cross-encoder reranker; "
-            "managed Qwen semantic query keywords are disabled."
+            "corpus semantic query expansion is disabled."
         ),
     ),
     "full": RetrievalAblation(
         name="full",
         semantic_expansion=True,
         cross_encoder_reranking=True,
-        description="Canonical Fitz-Sage query pipeline with Qwen keywords and reranking.",
+        description="Canonical Fitz-Sage query pipeline with corpus term expansion and reranking.",
     ),
 }
 
@@ -87,9 +87,9 @@ def apply_ablation(engine: Any, ablation: RetrievalAblation) -> None:
     retrieval_pass = _required_attribute(engine, "_retrieval_pass")
 
     if not ablation.semantic_expansion:
-        _required_attribute(query_pipeline, "_semantic_keyword_batcher")
-        engine._semantic_keyword_batcher = None
-        query_pipeline._semantic_keyword_batcher = None
+        _required_attribute(query_pipeline, "_semantic_index")
+        engine._semantic_index = None
+        query_pipeline._semantic_index = None
 
     if not ablation.cross_encoder_reranking:
         _required_attribute(retrieval_pass, "_reranker")

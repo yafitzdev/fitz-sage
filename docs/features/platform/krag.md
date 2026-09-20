@@ -21,7 +21,7 @@ are retained so retrieval reads the original evidence, not a generated summary
 as a substitute.
 
 When `point()` returns, every supported file is searchable or explicitly
-reported as failed. Optional Qwen entity, hierarchy, and demand-summary work
+reported as failed. Optional chat-backed entity, hierarchy, and demand-summary work
 runs afterward and never defines query readiness.
 
 ## Query Flow
@@ -29,7 +29,7 @@ runs afterward and never defines query readiness.
 ```text
 user query
   -> deterministic query shape + Pyrrho PRE obligations
-  -> managed Qwen semantic query terms
+  -> SQLite corpus term-graph expansion
   -> optional query-intelligence rewrite/analyze/detect
   -> section / symbol / table recall
   -> cross-strategy fusion and exact deduplication
@@ -42,7 +42,7 @@ user query
   -> optional synthesizer -> Answer
 ```
 
-Broad recall is intentionally permissive. Literal terms and Qwen terms compete
+Broad recall is intentionally permissive. Literal terms and corpus expansions compete
 inside one bounded pool so alternate vocabulary has room to enter. Reranking
 and evidence compilation handle precision; semantic terms do not assert synonym
 or identifier equivalence.

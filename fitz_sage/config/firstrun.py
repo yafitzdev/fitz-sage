@@ -2,10 +2,10 @@
 """
 First-run experience for fitz-sage.
 
-Writes ``.fitz/config.yaml`` for user-configurable providers. Required
-enrichment always uses the managed Qwen ONNX runtime and is not written as
-configuration. If an OpenAI-compatible LLM endpoint is already available,
-optional synthesis providers are configured too.
+Writes ``.fitz/config.yaml`` for user-configurable providers. Semantic query
+expansion is derived from each collection and stored in SQLite. If an
+OpenAI-compatible LLM endpoint is already available, optional synthesis and
+background enrichment providers are configured too.
 
 Detection order:
 
@@ -14,12 +14,10 @@ Detection order:
    server wins; we read its ``/models`` listing to choose a chat model.
 2. **OpenAI cloud** — falls back to ``openai/gpt-4o-mini`` if
    ``OPENAI_API_KEY`` is set, again for optional synthesis only.
-3. **No provider** — writes a minimal config. The first model-backed operation
-   downloads Qwen3.5 0.8B Q4F16 ONNX into the Hugging Face cache and runs it locally.
+3. **No provider** — writes a minimal retrieval-only config.
 
-There is no Ollama-specific enrichment path; Ollama is only an optional
-OpenAI-compatible endpoint for synthesis. fitz-sage uses no embeddings;
-ingestion enrichment is mandatory.
+There is no Ollama-specific path; Ollama is an optional OpenAI-compatible
+endpoint for synthesis and background enrichment. fitz-sage uses no embeddings.
 """
 
 from __future__ import annotations
@@ -29,7 +27,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fitz_sage.config.defaults import DEFAULT_ENRICHMENT_MODEL, DEFAULT_LOCAL_LLM_BASE_URL
+from fitz_sage.config.defaults import DEFAULT_LOCAL_LLM_BASE_URL
 from fitz_sage.core.paths import FitzPaths
 
 logger = logging.getLogger(__name__)
@@ -145,11 +143,11 @@ def write_config(
     return config_path
 
 
-def write_local_enrichment_config(
+def write_minimal_config(
     *,
     chat_base_url: str = DEFAULT_LOCAL_LLM_BASE_URL,
 ) -> Path:
-    """Write a default config; enrichment is managed internally."""
+    """Write a retrieval-only config with no chat provider."""
     config_path = FitzPaths.config()
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -157,13 +155,13 @@ def write_local_enrichment_config(
         "# Fitz Configuration",
         "# Docs: https://github.com/yafitzdev/fitz-sage/blob/main/docs/CONFIG.md",
         "",
-        "# Query terms and optional background enrichment use managed ONNX Qwen.",
+        "# Semantic query expansion is derived from this collection in SQLite.",
         "collection: default",
         "parser: cpu",
         "rerank: onnx",
         "# Pyrrho resolves its accepted default to an immutable model revision.",
         "governance: pyrrho",
-        "# Optional endpoint providers use chat_base_url; managed Qwen ignores it.",
+        "# Optional endpoint providers use chat_base_url.",
         f"chat_base_url: {chat_base_url}",
         "",
         "query_intelligence: null",
@@ -191,15 +189,12 @@ def _configure_from_endpoint(endpoint: DetectedEndpoint) -> bool:
 
     chat_model = _pick_chat_model(endpoint)
     if chat_model is None:
-        config_path = write_local_enrichment_config(chat_base_url=endpoint.base_url)
+        config_path = write_minimal_config(chat_base_url=endpoint.base_url)
         print(
             f"\n  Detected an OpenAI-compatible server at {endpoint.base_url}, "
             f"but it lists no chat models."
         )
-        print(
-            "  Wrote minimal config; semantic query terms and optional background "
-            f"work use managed {DEFAULT_ENRICHMENT_MODEL}."
-        )
+        print("  Wrote a retrieval-only config with local SQLite semantic expansion.")
         print(f"\n  Config: {config_path}\n")
         return True
 
@@ -213,7 +208,7 @@ def _configure_from_endpoint(endpoint: DetectedEndpoint) -> bool:
 
     print(f"\n  Auto-configured from {endpoint.base_url}:")
     print(f"    chat:       {chat_model}")
-    print(f"    query/background: {DEFAULT_ENRICHMENT_MODEL} (managed ONNX)")
+    print("    semantic expansion: collection-local SQLite")
     print(f"\n  Config: {config_path}\n")
     return True
 
@@ -231,23 +226,16 @@ def _configure_from_openai_key() -> bool:
     print("\n  Configured from OPENAI_API_KEY:")
     print("    chat (smart):    gpt-4o")
     print("    chat (fast/bal): gpt-4o-mini")
-    print(f"    query/background: {DEFAULT_ENRICHMENT_MODEL} (managed ONNX)")
+    print("    semantic expansion: collection-local SQLite")
     print(f"\n  Config: {config_path}\n")
     return True
 
 
-def _configure_local_enrichment_required() -> bool:
+def _configure_without_chat() -> bool:
     """Write config when no optional chat endpoint is available."""
-    config_path = write_local_enrichment_config()
+    config_path = write_minimal_config()
     print("\n  No optional chat endpoint found.")
-    print(
-        "  Wrote minimal config; semantic query terms and optional background "
-        f"work use managed {DEFAULT_ENRICHMENT_MODEL}."
-    )
-    print(
-        "  The first model-backed query or enrichment operation downloads the "
-        "managed Qwen3.5 0.8B Q4F16 ONNX weights locally."
-    )
+    print("  Wrote a retrieval-only config with local SQLite semantic expansion.")
     print(f"\n  Config: {config_path}\n")
     return True
 
@@ -268,6 +256,5 @@ def run_firstrun_setup() -> bool:
     if os.getenv("OPENAI_API_KEY"):
         return _configure_from_openai_key()
 
-    # 3. Nothing reachable — write the required local runtime config and
-    # tell the user how to satisfy it before ingestion.
-    return _configure_local_enrichment_required()
+    # 3. Nothing reachable — write a retrieval-only local config.
+    return _configure_without_chat()

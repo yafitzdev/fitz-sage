@@ -8,7 +8,7 @@ first query.
 
 During background enrichment:
 
-- code-symbol entities and temporal metadata are proposed by managed Qwen;
+- code-symbol entities and temporal metadata may be proposed by a configured chat tier;
 - document-section entities are derived deterministically from section text or
   an available summary;
 - entity-to-unit edges are stored in the collection database.

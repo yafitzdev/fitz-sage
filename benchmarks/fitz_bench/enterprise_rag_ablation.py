@@ -24,10 +24,10 @@ _EFFECTS = (
     ("full_vs_literal", "literal", "full"),
 )
 _EFFECT_LABELS = {
-    "expansion_without_reranker": "Qwen, no reranker",
-    "reranker_without_expansion": "Reranker, no Qwen",
-    "expansion_with_reranker": "Qwen, reranker on",
-    "reranker_with_expansion": "Reranker, Qwen on",
+    "expansion_without_reranker": "Term graph, no reranker",
+    "reranker_without_expansion": "Reranker, no term graph",
+    "expansion_with_reranker": "Term graph, reranker on",
+    "reranker_with_expansion": "Reranker, term graph on",
     "full_vs_literal": "Both vs literal",
 }
 

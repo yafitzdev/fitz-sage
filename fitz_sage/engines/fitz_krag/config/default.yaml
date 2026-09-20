@@ -11,16 +11,15 @@
 
 fitz_krag:
 
-  # Optional chat models by tier. Query intelligence and answer synthesis stay
-  # provider-driven. Standard semantic query terms and optional background
-  # enrichment use Fitz's managed Qwen ONNX runtime and are not configurable.
+  # Optional chat models by tier. Query intelligence, answer synthesis, and
+  # background entity/summary enrichment stay provider-driven. Standard
+  # semantic query expansion comes from the collection's SQLite term graph.
   chat_fast: null
   chat_balanced: null
   chat_smart: null
   query_intelligence: null
 
-  # HTTP endpoint for optional endpoint providers. Managed Qwen ONNX ignores
-  # this field.
+  # HTTP endpoint for optional endpoint providers.
   chat_base_url: http://127.0.0.1:8080/v1
   vision_base_url: null
   chat_api_key_env: null

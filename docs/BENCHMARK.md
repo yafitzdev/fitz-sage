@@ -3,6 +3,10 @@
 This is the canonical benchmark report for the current Fitz-Sage retrieval
 architecture. Last consolidated: 2026-08-02.
 
+> The consolidated results predate the SQLite corpus term graph. Sections that
+> name Qwen are retained as historical measurements of the removed expansion
+> component; a fresh expansion ablation is required for the current system.
+
 It records accepted measurements, methodology, component ablations, and the
 diagnostics that explain current design decisions. Smoke runs, interrupted
 runs, and superseded intermediate reports are excluded. Measurements were made
@@ -15,7 +19,7 @@ one release-candidate scorecard.
   decisions are separate measurements. The Pyrrho figures must not be
   described as Fitz-Sage retrieval quality.
 - `source-only` means parsed source is query-ready while optional document
-  enrichment remains pending. NapierOne ingestion timings exclude Qwen
+  enrichment remains pending. NapierOne ingestion timings exclude chat-backed
   enrichment.
 - BEIR scores compare systems only within the stated dataset and run. They are
   not an official leaderboard submission.

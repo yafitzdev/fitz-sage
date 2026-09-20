@@ -5,10 +5,10 @@ High-level system design of fitz-sage.
 
 The architecture has three load-bearing decisions:
 
-1. **Immediate source index, deferred enrichment.** `point()` parses and stores
-   searchable source without loading Qwen. Managed Qwen supplies standard
-   query-time semantic keywords and optional background entity, hierarchy, and
-   demand-summary work. Optional synthesis, query intelligence, and vision use
+1. **Immediate source and semantic index, deferred enrichment.** `point()`
+   parses source and records corpus term relationships in SQLite. Optional
+   background entity, hierarchy, and demand-summary work, synthesis, query
+   intelligence, and vision use
    OpenAI-compatible HTTP endpoints or cloud/enterprise presets.
 2. **No embeddings.** Retrieval is BM25 over SQLite FTS5 + KRAG
    typed-unit routing (symbols, sections, tables) + an ONNX cross-encoder
@@ -40,7 +40,7 @@ The architecture has three load-bearing decisions:
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  Engine: FitzKRAG                                                           │
-│  - Deterministic planner + managed Qwen semantic keywords                   │
+│  - Deterministic planner + SQLite corpus term graph                         │
 │  - Optional query-intelligence provider                                     │
 │  - Router: symbol search · section search · table metadata / rows           │
 │  - Expander (import graph, entity links, same-file refs, hierarchy)         │
@@ -52,12 +52,12 @@ The architecture has three load-bearing decisions:
           ┌─────────────────────────┼─────────────────────────┐
           ▼                         ▼                         ▼
 ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────────┐
-│  LLM / ONNX         │  │  Storage (SQLite)   │  │  Ingestion Pipeline     │
+│  Optional LLM/ONNX  │  │  Storage (SQLite)   │  │  Ingestion Pipeline     │
 ├─────────────────────┤  ├─────────────────────┤  ├─────────────────────────┤
-│  Qwen query terms + │  │  WAL + FTS5         │  │  Parse (CPU / Docling)  │
-│  optional background│  │  one .db per        │  │  typed units: symbols,  │
-│  work; endpoint chat│  │  collection         │  │  sections, tables       │
-│  is explicit        │  │  bm25() ranking     │  │  index first, enrich    │
+│  reranking, Pyrrho,  │  │  WAL + FTS5 +      │  │  Parse (CPU / Docling)  │
+│  optional endpoint  │  │  corpus term graph  │  │  typed units: symbols,  │
+│  chat               │  │  per collection     │  │  sections, tables       │
+│                     │  │  bm25() ranking     │  │  index first, enrich    │
 │                     │  │  json_each, json1   │  │  independently          │
 └─────────────────────┘  └─────────────────────┘  └─────────────────────────┘
           │
@@ -100,7 +100,7 @@ contract-driven evidence closure may issue bounded follow-up retrieval before
 the ranked evidence enters progressive Pyrrho delivery.
 
 ```
-1  Query prep      deterministic plan, explicit clauses, Qwen semantic keywords
+1  Query prep      deterministic plan, explicit clauses, corpus term expansions
                    optional query_intelligence rewrite/analyze/detect
 2  Broad recall    symbol / section / table BM25 and intent fanout
 3  Fuse            merge across strategies and deduplicate
@@ -127,6 +127,7 @@ Files → Register manifest
       → Parse (CPU parser by default, Docling/vision/OCR optional,
         tree-sitter/AST for code, native table parsers)
       → Store typed units (symbols, sections, tables) in SQLite + FTS5
+      → Record abbreviation, alias, identifier, phrase, and co-occurrence facts
       → Resolve imports
       → Searchable source index ready
       → Optional background enrichment:
@@ -138,13 +139,11 @@ Files → Register manifest
 
 ## Chat Provider Model
 
-The LLM layer has one managed local Qwen runtime for semantic query terms and
-optional background work, plus one canonical optional endpoint provider —
-**`endpoint`**:
+The LLM layer has one canonical optional endpoint provider — **`endpoint`**.
+Semantic query expansion does not use this layer:
 
 | Spec                                   | Resolves to                                              |
 | -------------------------------------- | -------------------------------------------------------- |
-| `onnx/qwen3.5-0.8b`                   | managed Qwen3.5 0.8B Q4F16 ONNX generation on CPU        |
 | `endpoint/<model>`                    | model plus `chat_base_url` and optional API-key env       |
 | `openai/<model>`                       | endpoint pointing at `https://api.openai.com/v1`         |
 | `azure_openai/<deployment>`            | endpoint with Azure deployment URL                       |
@@ -198,9 +197,9 @@ for schema and runtime details.
 ## Feature Control
 
 Optional endpoint-backed features are controlled by **provider presence**, not
-boolean flags. Query-time Qwen semantic expansion is standard engine behavior.
-Background enrichment starts independently after the source index is ready and
-does not have a public provider knob.
+boolean flags. Query-time SQLite semantic expansion is standard engine
+behavior. Background enrichment starts after the source index is ready when a
+chat tier is configured.
 
 ```yaml
 # ENABLED — a provider is named
@@ -302,8 +301,8 @@ fitz_sage/
 │   ├── detection/       # deterministic modules + optional LLM parsing
 │   ├── entity_graph/    # Entity-based linking
 │   └── rewriter/        # optional query-intelligence rewrite types
-├── llm/                 # Managed ONNX query/background work + optional endpoints
-│   ├── providers/       # onnx_chat, endpoint, enterprise, onnx_reranker
+├── llm/                 # Managed ONNX scoring/governance + optional endpoints
+│   ├── providers/       # endpoint, enterprise, onnx_reranker
 │   ├── auth/            # ApiKeyAuth, M2MAuth, CompositeAuth
 │   ├── config.py        # provider-spec → instance factory
 │   └── client.py        # get_chat, ...
@@ -322,8 +321,8 @@ fitz_sage/
 ## Design Principles
 
 1. **Explicit over clever.** No magic. Read the config; know what happens.
-2. **Managed local models.** Query expansion uses local Qwen ONNX; background
-   Qwen work is optional, and endpoint chat roles remain explicit.
+2. **Evidence-backed query expansion.** Corpus term relationships live beside
+   source evidence in SQLite; endpoint chat roles remain explicit and optional.
 3. **Structure-first retrieval.** Parse code/docs into typed units at
    ingest; route to the right strategy at query time.
 4. **No embeddings.** BM25 + KRAG routing + ONNX rerank is the retrieval
@@ -331,7 +330,7 @@ fitz_sage/
 5. **Honest over helpful.** Mark evidence insufficient instead of hallucinating.
 6. **Narrow extension points.** Provider and parser implementations are wired
    explicitly; source cleanup stays outside the package.
-7. **Local-first.** SQLite and managed ONNX query/background work run locally
+7. **Local-first.** SQLite and managed ONNX scoring/governance run locally
    after models are cached; explicitly selected endpoint and OCR servers remain
    optional deployment dependencies.
 8. **KRAG provenance.** KRAG answers trace back to source addresses; custom

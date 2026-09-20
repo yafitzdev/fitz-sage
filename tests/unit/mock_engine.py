@@ -108,8 +108,8 @@ def build_mock_engine(**config_overrides) -> FitzKragEngine:
 
     engine._query_batcher = MagicMock(name="query_batcher")
     engine._query_batcher.batch_classify.side_effect = _default_batch_classify
-    engine._semantic_keyword_batcher = MagicMock(name="semantic_keyword_batcher")
-    engine._semantic_keyword_batcher.batch_classify.return_value = BatchResult(keywords=[])
+    engine._semantic_index = MagicMock(name="semantic_index")
+    engine._semantic_index.expand.return_value = []
 
     return engine
 

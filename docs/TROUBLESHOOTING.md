@@ -19,8 +19,8 @@ client.point("./docs")
 print(client.indexing_status())
 ```
 
-`point()` returns after supported files are indexed or explicitly failed. It
-does not wait for Qwen entity or hierarchy enrichment.
+`point()` returns after supported files and corpus term evidence are indexed or
+explicitly failed. It does not wait for optional entity or hierarchy enrichment.
 
 ## Endpoint Connection Errors
 
@@ -69,7 +69,6 @@ The managed components load lazily:
 
 | Component | First trigger | Failure behavior |
 |---|---|---|
-| Qwen | semantic query terms or background enrichment | query expansion falls back to literal plan; background failure is reported |
 | ONNX reranker | a retrieval pool large enough to rerank | query fails because reranking is part of the product path |
 | Pyrrho | PRE planning or final evidence decision | query fails because governance is mandatory |
 
@@ -153,7 +152,7 @@ fitz retrieve "question" --source ./docs --trace run.json
 fitz explain run.json
 ```
 
-Common costs are managed Qwen query expansion, cross-encoder reranking, Pyrrho,
+Common costs are cross-encoder reranking, Pyrrho,
 and repeated evidence closure. On very large section indexes, closure recall can
 dominate. Lowering `rerank_candidates`, `top_addresses`, or `top_read` trades
 coverage for latency; compare evidence quality before keeping that change.

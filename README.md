@@ -128,7 +128,7 @@ Yan Fitzner — ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](
 > for one retrieved table. Embedded document tables remain section text.
 
 **Fully local execution possible 🏠**
-> SQLite storage, ONNX reranking, managed Qwen query/background work, and ONNX Pyrrho governance all run locally. Optional synthesis can use
+> SQLite storage, corpus-derived semantic expansion, ONNX reranking, and ONNX Pyrrho governance all run locally. Optional synthesis can use
 > any local or cloud OpenAI-compatible endpoint.
 
 ####
@@ -181,8 +181,8 @@ and retrieval.
 
 <br>
 
-The query-ready path is keyword-first: exact query terms, Qwen semantic
-keywords, and BM25. Enriched collections can additionally use hierarchy
+The query-ready path is keyword-first: exact query terms, collection-derived
+semantic terms, and BM25. Enriched collections can additionally use hierarchy
 summaries, entity links, and broader context expansion.
 
 [Built-in intelligence](docs/features/retrieval) handles the edge cases that break simple search:
@@ -201,7 +201,7 @@ summaries, entity links, and broader context expansion.
 | ✅ [**temporal-queries**](docs/features/retrieval/temporal-queries.md) | "What changed between Q1 and Q2?" | Temporal scope detection |
 | ✅ [**aggregation-queries**](docs/features/retrieval/aggregation-queries.md) | "List all the test cases that failed" | Exhaustive/list query handling |
 | ✅ [**freshness-authority**](docs/features/retrieval/freshness-authority.md) | "What's the latest status on feature X?" | Content-grounded temporal scope; no filesystem-age scoring |
-| ✅ [**semantic-keywords**](docs/features/retrieval/query-expansion.md) | "How do I fetch the db config?" | Managed-Qwen recall terms merged with literal query terms |
+| ✅ [**semantic-keywords**](docs/features/retrieval/query-expansion.md) | "What does SLA require?" | Corpus-derived abbreviations and related terms merged with literal query terms |
 | ✅ [**query-rewriting**](docs/features/retrieval/query-rewriting.md) | "Tell me more about it" *(after discussing TechCorp)* | Configured query-intelligence provider plus caller-supplied history |
 | ✅ [**reranking**](docs/features/retrieval/reranking.md) | "What's the battery warranty?" | ONNX cross-encoder reranker |
 
@@ -268,12 +268,12 @@ after retrieval.
 #### Pre-retrieval 🔎
 
 Before retrieval, Fitz builds a search plan from deterministic query analysis,
-managed Qwen query keywords, and optional query intelligence.
+the collection term graph, and optional query intelligence.
 
 | Signal | What it means | Why it matters |
 |--------|---------------|----------------|
 | `query_type` / `analysis_type` | Narrow lookup, comparison, temporal, aggregation, broad overview, or general query shape. | Sets recall breadth and evidence coverage. |
-| `keywords` | Managed Qwen suggestions and literal deterministic query terms. | Adds best-effort lexical candidates without embeddings. |
+| `keywords` | Evidence-backed collection expansions and literal deterministic query terms. | Adds collection-specific lexical candidates without embeddings. |
 | `strategy_weights` | Relative weight for code, section, and table retrieval. | Makes the first pass search the right evidence surfaces. |
 | `top_k` / `top_read` | How much candidate evidence Fitz should collect and read. | Keeps narrow lookups fast while giving broad or comparative questions enough coverage. |
 | `rerank_candidates` | How many recalled candidates the cross-encoder scores. | Bounds neural CPU cost without shrinking the BM25 recall pool used by evidence rescue. |
@@ -588,7 +588,7 @@ build on source evidence.
 │  evidence verdict | failure mode | evidence metadata            │
 ├─────────────────────────────────────────────────────────────────┤
 │  Local CPU Models                                               │
-│  ONNX reranker | managed Qwen query/background | Pyrrho         │
+│  ONNX reranker | SQLite semantic term graph | Pyrrho           │
 ├─────────────────────────────────────────────────────────────────┤
 │  Storage                                                        │
 │  SQLite + FTS5, one .db per collection                          │

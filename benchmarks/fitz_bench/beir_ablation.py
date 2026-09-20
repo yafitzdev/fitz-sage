@@ -1,4 +1,4 @@
-"""Run paired BEIR ablations for Qwen query expansion and reranking."""
+"""Run paired BEIR ablations for corpus query expansion and reranking."""
 
 from __future__ import annotations
 
@@ -33,10 +33,10 @@ _EFFECTS = (
     ("full_vs_literal", "literal", "full"),
 )
 _EFFECT_LABELS = {
-    "expansion_without_reranker": "Qwen, no reranker",
-    "reranker_without_expansion": "Reranker, no Qwen",
-    "expansion_with_reranker": "Qwen, reranker on",
-    "reranker_with_expansion": "Reranker, Qwen on",
+    "expansion_without_reranker": "Term graph, no reranker",
+    "reranker_without_expansion": "Reranker, no term graph",
+    "expansion_with_reranker": "Term graph, reranker on",
+    "reranker_with_expansion": "Reranker, term graph on",
     "full_vs_literal": "Both vs literal",
 }
 
@@ -674,7 +674,7 @@ def _dataset_markdown(dataset: dict[str, Any]) -> list[str]:
         (
             f"| Variant | Recall nDCG@{ranking_cutoff} | Final nDCG@{ranking_cutoff} | "
             f"Delivered nDCG@{ranking_cutoff} | Recall@{recall_cutoff} | "
-            "Mean latency | p95 | Qwen mean | Rerank mean |"
+            "Mean latency | p95 | Term-graph mean | Rerank mean |"
         ),
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
@@ -683,7 +683,7 @@ def _dataset_markdown(dataset: dict[str, Any]) -> list[str]:
         timing = variant.get("timing", {}).get("stage_groups", {})
         lines.append(
             "| {name} | {recall:.4f} | {final:.4f} | {delivered:.4f} | "
-            "{recall_max:.4f} | {latency:.2f}s | {p95:.2f}s | {qwen:.2f}s | "
+            "{recall_max:.4f} | {latency:.2f}s | {p95:.2f}s | {expansion:.2f}s | "
             "{rerank:.2f}s |".format(
                 name=name,
                 recall=metrics["recall"][f"NDCG@{ranking_cutoff}"],
@@ -692,7 +692,7 @@ def _dataset_markdown(dataset: dict[str, Any]) -> list[str]:
                 recall_max=metrics["recall"][f"Recall@{recall_cutoff}"],
                 latency=variant["latency"]["mean_seconds"],
                 p95=variant["latency"]["p95_seconds"],
-                qwen=timing.get("semantic_expansion", {}).get("mean_seconds", 0.0),
+                expansion=timing.get("semantic_expansion", {}).get("mean_seconds", 0.0),
                 rerank=timing.get("rerank", {}).get("mean_seconds", 0.0),
             )
         )
@@ -724,9 +724,9 @@ def _dataset_markdown(dataset: dict[str, Any]) -> list[str]:
                 "### Frozen Lexical-Overlap Strata",
                 "",
                 (
-                    f"| Stratum | Queries | Qwen recall nDCG@{ranking_cutoff}, "
-                    "no reranker | Qwen final nDCG, no reranker | "
-                    "Qwen final nDCG, reranker on | Added latency, reranker on |"
+                    f"| Stratum | Queries | Term-graph recall nDCG@{ranking_cutoff}, "
+                    "no reranker | Term-graph final nDCG, no reranker | "
+                    "Term-graph final nDCG, reranker on | Added latency, reranker on |"
                 ),
                 "| --- | ---: | ---: | ---: | ---: | ---: |",
             ]

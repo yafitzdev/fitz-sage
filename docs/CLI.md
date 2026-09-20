@@ -196,10 +196,10 @@ synthesizer: null
 chat_base_url: http://127.0.0.1:8080/v1
 ```
 
-This is enough for `fitz retrieve` and `fitz_sage.evidence(...)`. Managed Qwen
-semantic query terms, the ONNX reranker, and the accepted Pyrrho default run
-locally on CPU. Background entity and hierarchy enrichment is independent of
-source-index readiness.
+This is enough for `fitz retrieve` and `fitz_sage.evidence(...)`. SQLite
+semantic query expansion, the ONNX reranker, and the accepted Pyrrho default
+run locally on CPU. Background entity and hierarchy enrichment requires a
+configured chat tier and is independent of source-index readiness.
 
 See [CONFIG.md](CONFIG.md) for every key and
 [CONFIG_EXAMPLES.md](CONFIG_EXAMPLES.md) for deployment examples.

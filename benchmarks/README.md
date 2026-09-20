@@ -1,6 +1,11 @@
 <!-- benchmarks/README.md -->
 # Retrieval Benchmark
 
+> Historical reports below that name Qwen measure the pre-term-graph query
+> expansion path. Current `expansion` ablations enable the collection-derived
+> SQLite term graph and should not be compared to those numbers as the same
+> component.
+
 This benchmark is evidence-first. It does not score answer prose. It runs the
 real folder-to-evidence path and validates returned evidence against
 deterministic expectations.
@@ -50,7 +55,7 @@ For a quick smoke run:
 python -m benchmarks.fitz_bench.runner --limit 2 --index-mode progressive
 ```
 
-Measure cold query-ready ingestion separately from optional Qwen enrichment:
+Measure cold query-ready ingestion separately from optional chat enrichment:
 
 ```bash
 python -m benchmarks.fitz_bench.ingestion_benchmark \

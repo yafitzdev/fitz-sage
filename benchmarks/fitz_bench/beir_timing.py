@@ -251,7 +251,7 @@ def _markdown(report: dict[str, Any]) -> str:
         "",
         "Warm timings exclude the explicit first-query cold probe.",
         "",
-        "| Dataset | Runs | Total p50 | Total p95 | Qwen mean | Rerank mean | Pyrrho mean |",
+        "| Dataset | Runs | Total p50 | Total p95 | Term-graph mean | Rerank mean | Pyrrho mean |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for result in report["datasets"]:
@@ -262,13 +262,13 @@ def _markdown(report: dict[str, Any]) -> str:
             "pyrrho_decision", {}
         ).get("mean_seconds", 0.0)
         lines.append(
-            "| {dataset} | {runs} | {p50:.2f}s | {p95:.2f}s | {qwen:.2f}s | "
+            "| {dataset} | {runs} | {p50:.2f}s | {p95:.2f}s | {expansion:.2f}s | "
             "{rerank:.2f}s | {pyrrho:.2f}s |".format(
                 dataset=result["dataset"]["name"],
                 runs=summary.get("runs", 0),
                 p50=total.get("p50_seconds", 0.0),
                 p95=total.get("p95_seconds", 0.0),
-                qwen=groups.get("semantic_expansion", {}).get("mean_seconds", 0.0),
+                expansion=groups.get("semantic_expansion", {}).get("mean_seconds", 0.0),
                 rerank=groups.get("rerank", {}).get("mean_seconds", 0.0),
                 pyrrho=pyrrho_mean,
             )
@@ -277,7 +277,7 @@ def _markdown(report: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "| Dataset | Cold total | Cold Qwen | Cold rerank | Cold Pyrrho |",
+            "| Dataset | Cold total | Cold term graph | Cold rerank | Cold Pyrrho |",
             "| --- | ---: | ---: | ---: | ---: |",
         ]
     )
@@ -285,10 +285,10 @@ def _markdown(report: dict[str, Any]) -> str:
         cold = result.get("cold_probe") or {}
         groups = cold.get("grouped_seconds", {})
         lines.append(
-            "| {dataset} | {total:.2f}s | {qwen:.2f}s | {rerank:.2f}s | {pyrrho:.2f}s |".format(
+            "| {dataset} | {total:.2f}s | {expansion:.2f}s | {rerank:.2f}s | {pyrrho:.2f}s |".format(
                 dataset=result["dataset"]["name"],
                 total=float(cold.get("total_seconds", 0.0)),
-                qwen=float(groups.get("semantic_expansion", 0.0)),
+                expansion=float(groups.get("semantic_expansion", 0.0)),
                 rerank=float(groups.get("rerank", 0.0)),
                 pyrrho=float(groups.get("pyrrho_planning", 0.0))
                 + float(groups.get("pyrrho_decision", 0.0)),

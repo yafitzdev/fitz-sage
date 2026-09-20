@@ -98,12 +98,12 @@ class TestFitzKragConfig:
             FitzKragConfig(collection="test", nonexistent_field=True)
 
     def test_enrichment_provider_fields_are_removed(self):
-        """Qwen enrichment is internal; removed provider knobs are invalid."""
+        """Removed enrichment-provider knobs remain invalid."""
         with pytest.raises(Exception):
-            FitzKragConfig(collection="test", enricher="onnx/qwen3.5-0.8b")
+            FitzKragConfig(collection="test", enricher="endpoint/example")
 
         with pytest.raises(Exception):
-            FitzKragConfig(collection="test", summarizer="onnx/qwen3.5-0.8b")
+            FitzKragConfig(collection="test", summarizer="endpoint/example")
 
     def test_no_chat_kwargs_field(self):
         """chat_kwargs, embedding_kwargs, rerank_kwargs, vision_kwargs are deleted."""

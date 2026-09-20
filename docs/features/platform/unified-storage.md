@@ -68,7 +68,7 @@ helper extracts word tokens, quotes them, and OR-joins them before `MATCH`.
 |---|---|
 | One SQLite writer | Ingestion is serialized per collection |
 | Local files | No transparent multi-node sharing |
-| Sparse indexes | Different vocabulary needs Qwen query terms, corpus evidence, or user preprocessing |
+| Sparse indexes | Different vocabulary needs corpus term-graph evidence or user preprocessing |
 | Concrete native rows | Very wide or malformed CSV/TSV inputs can exceed parser/SQLite limits |
 | No vector index | Semantic recall remains a lexical bridge rather than dense nearest-neighbor search |
 

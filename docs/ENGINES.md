@@ -68,7 +68,7 @@ queries to the right strategy.
 
 ```
 Query
- ├─► Query prep (deterministic signals, explicit clauses, managed Qwen keywords)
+ ├─► Query prep (deterministic signals, explicit clauses, corpus term graph)
  ├─► Optional query intelligence (rewrite / analyze / detect)
  ├─► Router (symbol search · section search · table metadata)
 │    └─► FTS5 + bm25() over per-collection .db
@@ -123,8 +123,8 @@ with provenance and score), skipping evidence packaging and optional synthesis.
 
 See [CONFIG.md](CONFIG.md) for every key. The minimum is `collection:`.
 Chat providers are optional and only needed for synthesized answers, optional
-query intelligence, or vision parsing. Managed Qwen query terms and optional
-background enrichment are internal.
+query intelligence, background enrichment, or vision parsing. Semantic query
+terms come from the collection database.
 
 ### Built-in features
 

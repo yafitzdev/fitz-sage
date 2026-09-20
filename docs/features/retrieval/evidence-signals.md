@@ -41,12 +41,12 @@ flowchart LR
 ## Retrieval Profile
 
 Before retrieval, Fitz builds a query profile from deterministic query analysis,
-managed Qwen query keywords, and optional query intelligence.
+the SQLite corpus term graph, and optional query intelligence.
 
 | Signal | Meaning | Retrieval effect |
 |---|---|---|
 | `analysis_type` | Primary surface such as general, code, documentation, data, or cross-surface. | Seeds strategy weights and entity targeting. |
-| `keywords` | Managed Qwen and deterministic semantic query terms. | Adds best-effort lexical candidates without embeddings. |
+| `keywords` | Corpus-derived and deterministic semantic query terms. | Adds evidence-backed lexical candidates without embeddings. |
 | `comparison_entities` | Entities or sides that must both appear for comparison questions. | Helps avoid one-sided evidence packs. |
 | `temporal_references` | Dates, versions, quarters, or recency markers found in the query. | Adds period-focused legs and content-grounded temporal ordering. |
 | `strategy_weights` | Code, section, and table retrieval weights. | Points recall at the likely evidence surface. |

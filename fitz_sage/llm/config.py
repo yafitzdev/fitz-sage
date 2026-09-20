@@ -2,12 +2,8 @@
 """
 Configuration parser for LLM providers.
 
-There are two chat paths in fitz-sage:
+The chat path in fitz-sage is optional:
 
-``OnnxChat``
-              the managed in-process Qwen3.5 0.8B Q4F16 ONNX enrichment runtime.
-              This is the default for ingestion enrichment and needs no
-              external inference server.
 ``OpenAICompatChat`` / ``OpenAICompatVision``
               the optional OpenAI HTTP protocol path for user-supplied
               synthesis, query intelligence, and vision endpoints
@@ -18,7 +14,6 @@ Provider names are configuration knobs over those implementations:
 
     endpoint  — bring your own URL + model. Default (and only) auth is
                 NoAuth; opt-in to ApiKeyAuth via ``auth.api_key_env``.
-    onnx      — managed local Qwen3.5 0.8B Q4F16 ONNX generation on CPU.
     openai    — preset for ``https://api.openai.com/v1`` + OPENAI_API_KEY,
                 with default models from OPENAI_CHAT_MODELS.
     azure_openai
@@ -331,8 +326,8 @@ def create_chat_provider(
     Create a chat provider from a spec string.
 
     Args:
-        spec: ``provider`` or ``provider/model`` (e.g. ``onnx/qwen3.5-0.8b``,
-            ``endpoint/qwen2.5-7b``, ``openai/gpt-4o``,
+        spec: ``provider`` or ``provider/model`` (e.g. ``endpoint/qwen2.5-7b``,
+            ``openai/gpt-4o``,
             ``azure_openai/my-deployment``).
         config: Optional config dict (auth, base_url, etc.).
         tier: Tier hint when no model is supplied.
@@ -341,12 +336,6 @@ def create_chat_provider(
         A ChatProvider instance.
     """
     provider, _ = parse_provider_string(spec)
-    if provider == "onnx":
-        from fitz_sage.llm.providers.onnx_chat import DEFAULT_QWEN_MODEL_ALIAS, OnnxChat
-
-        _, model = parse_provider_string(spec)
-        return OnnxChat(model_id=model or DEFAULT_QWEN_MODEL_ALIAS)
-
     if provider == "enterprise":
         from fitz_sage.llm.providers.enterprise import EnterpriseChat
 

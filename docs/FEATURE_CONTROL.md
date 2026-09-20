@@ -13,7 +13,7 @@ fitz-sage uses a **provider-presence pattern**:
 - **Provider presence determines IF** optional endpoint-backed features run.
 - **No `enabled: true / false` flags.** Setting a provider enables
   the feature; omitting it (or setting `null`) skips that step.
-- **Retrieval intelligence is baked in.** Managed Qwen semantic query terms,
+- **Retrieval intelligence is baked in.** SQLite corpus semantic terms,
   broad recall, ONNX reranking, and Pyrrho governance are standard. Optional
   background enrichment is independent of source-index readiness.
 
@@ -142,20 +142,16 @@ The bare value uses Pyrrho's accepted immutable default. Pyrrho owns v2
 query-planning heads and every authoritative prefix decision; Fitz/KRAG owns
 the mechanical `3, 5, 7, ...` delivery loop that consumes exact verdicts.
 
-## Managed Qwen
+## Corpus Term Graph
 
-Managed Qwen does not follow endpoint-provider presence. It supplies:
+Standard query-time semantic keywords come from evidence collected during
+source indexing. The collection database stores abbreviations, aliases,
+identifier forms, error/component relationships, repeated phrases, and
+co-occurrence clusters. Query expansion therefore requires no chat provider.
 
-- standard query-time semantic keywords;
-- optional background entity and temporal metadata;
-- optional hierarchy and demand summaries.
-
-Exact model/runtime details live in [Managed Models](MANAGED_MODELS.md).
-
-There is no `enrichment:` provider key. Source indexing does not load Qwen. A
-query-expansion failure is recorded and falls back to the literal plan; a
-background failure is reported through enrichment status without weakening the
-stored source index.
+Background entity, temporal, hierarchy, and demand-summary work is separate. It
+runs when a balanced chat tier is configured and is reported through enrichment
+status without weakening the stored source index.
 
 ---
 
@@ -181,12 +177,12 @@ three chat tiers). Do not add illustrative or dormant config keys.
 
 | Feature | Config key | Product default |
 |---------|------------|-----------------|
-| Managed Qwen semantic terms | internal | standard local CPU query step |
-| Background entity/hierarchy work | internal | optional after source indexing |
+| SQLite semantic terms | internal | standard local query step |
+| Background entity/hierarchy work | chat tier | optional after source indexing |
 | Pyrrho governance | `governance:` | accepted immutable default |
 | ONNX reranker | `rerank:` | `rerank: onnx` |
 | Answer synthesis | `synthesizer:` | `null`, enabled only by explicit provider |
-| Query intelligence | `query_intelligence:` | `null`, deterministic prep + Qwen keywords |
+| Query intelligence | `query_intelligence:` | `null`, deterministic prep + corpus terms |
 | VLM in parser | `parser:` + `vision:` | off unless `parser: docling_vision` + `vision:` |
 
 ---
@@ -194,7 +190,7 @@ three chat tiers). Do not add illustrative or dormant config keys.
 ## See Also
 
 - [Reranking](features/retrieval/reranking.md) — detailed reranker docs
-- [Enrichment](ENRICHMENT.md) — managed Qwen enrichment
+- [Enrichment](ENRICHMENT.md) — optional entity and hierarchy enrichment
 - [Retrieval Pipeline](RETRIEVAL_PIPELINE.md) — how retrieval stages fit together
 - [PLUGINS.md](PLUGINS.md) — supported extension points
 - [CONFIG.md](CONFIG.md) — full configuration reference

@@ -26,7 +26,7 @@ parse and store original sections
     +--> background build_corpus_hierarchy(): L2 corpus overview
 ```
 
-The managed local Qwen runtime writes L1 and L2 summaries. A model failure is
+A configured balanced chat tier writes L1 and L2 summaries. A model failure is
 recorded in enrichment status and leaves the original L0 index intact.
 
 Demand summaries are separate: after retrieval surfaces a document or table,
@@ -54,7 +54,7 @@ unchanged searchable source remains available throughout the process.
 
 There is no public hierarchy provider or enable flag. Source indexing always
 works without hierarchy. The in-process worker or CLI enrichment daemon runs
-the managed background stages when work is pending.
+background stages when a balanced chat tier is configured.
 
 Use `indexing_status()` to distinguish the two contracts:
 
@@ -77,7 +77,7 @@ print(status["enrichment"]["complete"])
 
 - Summaries can omit details or flatten disagreements.
 - L2 is representative context, not proof of exhaustive corpus coverage.
-- Background completion time depends on corpus size and local Qwen runtime.
+- Background completion time depends on corpus size and the configured chat tier.
 - Original source evidence remains authoritative; Pyrrho receives selected raw
   source units, not a hierarchy-only answer.
 

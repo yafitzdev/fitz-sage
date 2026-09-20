@@ -67,16 +67,16 @@ engine.wait_for_enrichment()   # wait for the current in-process worker
 engine.stop_background_enrichment()
 ```
 
-## Qwen Work
+## Optional Chat Work
 
-The managed local Qwen runtime is loaded only when an enrichment operation or a
-query-time semantic-keyword operation actually needs it. `point()` does not
-ensure, load, or call Qwen.
+Entity extraction and hierarchy summaries run only when a balanced chat tier is
+configured. Without one, `point()` marks background enrichment not applicable;
+the source and its collection-derived semantic term graph are already
+searchable.
 
-There is no ingestion-time keyword generation. This removes duplicated semantic
-work from every document and keeps the source-index latency proportional to
-parsing and SQLite writes. Query-time semantic expansion remains bounded to the
-queries users actually make.
+Semantic query expansion is independent of background enrichment. Foreground
+ingestion records deterministic term evidence in SQLite, and query-time graph
+lookup remains local and model-free.
 
 ## Demand Summaries
 

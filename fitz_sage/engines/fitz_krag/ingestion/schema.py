@@ -185,6 +185,92 @@ def _table_index_ddl() -> str:
     """
 
 
+def _semantic_index_ddl() -> str:
+    return f"""
+    CREATE TABLE IF NOT EXISTS {TABLE_PREFIX}semantic_metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS {TABLE_PREFIX}semantic_terms (
+        id INTEGER PRIMARY KEY,
+        canonical TEXT NOT NULL,
+        normalized TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        document_frequency INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(normalized, kind)
+    );
+
+    CREATE TABLE IF NOT EXISTS {TABLE_PREFIX}semantic_forms (
+        raw_file_id TEXT NOT NULL REFERENCES {TABLE_PREFIX}raw_files(id) ON DELETE CASCADE,
+        unit_key TEXT NOT NULL,
+        term_id INTEGER NOT NULL REFERENCES {TABLE_PREFIX}semantic_terms(id) ON DELETE CASCADE,
+        surface TEXT NOT NULL,
+        normalized_surface TEXT NOT NULL,
+        form_type TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        extractor TEXT NOT NULL,
+        PRIMARY KEY (
+            raw_file_id, unit_key, term_id, normalized_surface, form_type, extractor
+        )
+    );
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}semantic_forms_surface
+        ON {TABLE_PREFIX}semantic_forms(normalized_surface);
+
+    CREATE TABLE IF NOT EXISTS {TABLE_PREFIX}semantic_occurrences (
+        raw_file_id TEXT NOT NULL REFERENCES {TABLE_PREFIX}raw_files(id) ON DELETE CASCADE,
+        unit_key TEXT NOT NULL,
+        term_id INTEGER NOT NULL REFERENCES {TABLE_PREFIX}semantic_terms(id) ON DELETE CASCADE,
+        occurrence_count INTEGER NOT NULL DEFAULT 1,
+        PRIMARY KEY (raw_file_id, unit_key, term_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}semantic_occurrences_term
+        ON {TABLE_PREFIX}semantic_occurrences(term_id);
+
+    CREATE TABLE IF NOT EXISTS {TABLE_PREFIX}semantic_relation_observations (
+        raw_file_id TEXT NOT NULL REFERENCES {TABLE_PREFIX}raw_files(id) ON DELETE CASCADE,
+        unit_key TEXT NOT NULL,
+        source_term_id INTEGER NOT NULL REFERENCES {TABLE_PREFIX}semantic_terms(id) ON DELETE CASCADE,
+        target_term_id INTEGER NOT NULL REFERENCES {TABLE_PREFIX}semantic_terms(id) ON DELETE CASCADE,
+        relation_type TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        extractor TEXT NOT NULL,
+        PRIMARY KEY (
+            raw_file_id, unit_key, source_term_id, target_term_id,
+            relation_type, extractor
+        )
+    );
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}semantic_observations_source
+        ON {TABLE_PREFIX}semantic_relation_observations(source_term_id);
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}semantic_observations_target
+        ON {TABLE_PREFIX}semantic_relation_observations(target_term_id);
+
+    CREATE TABLE IF NOT EXISTS {TABLE_PREFIX}semantic_relations (
+        source_term_id INTEGER NOT NULL REFERENCES {TABLE_PREFIX}semantic_terms(id) ON DELETE CASCADE,
+        target_term_id INTEGER NOT NULL REFERENCES {TABLE_PREFIX}semantic_terms(id) ON DELETE CASCADE,
+        relation_type TEXT NOT NULL,
+        weight REAL NOT NULL,
+        supporting_documents INTEGER NOT NULL,
+        supporting_units INTEGER NOT NULL,
+        extractor TEXT NOT NULL,
+        PRIMARY KEY (source_term_id, target_term_id, relation_type)
+    );
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}semantic_relations_source
+        ON {TABLE_PREFIX}semantic_relations(source_term_id);
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}semantic_relations_target
+        ON {TABLE_PREFIX}semantic_relations(target_term_id);
+
+    CREATE TABLE IF NOT EXISTS {TABLE_PREFIX}semantic_clusters (
+        cluster_id INTEGER NOT NULL,
+        term_id INTEGER NOT NULL REFERENCES {TABLE_PREFIX}semantic_terms(id) ON DELETE CASCADE,
+        membership REAL NOT NULL,
+        PRIMARY KEY (cluster_id, term_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_{TABLE_PREFIX}semantic_clusters_term
+        ON {TABLE_PREFIX}semantic_clusters(term_id);
+    """
+
+
 def _exec_script(conn, script: str) -> None:
     """Run a DDL block (multiple statements separated by ;)."""
     conn.executescript(script)
@@ -205,6 +291,7 @@ def ensure_schema(
         _exec_script(conn, _import_graph_ddl())
         _exec_script(conn, _section_index_ddl())
         _exec_script(conn, _table_index_ddl())
+        _exec_script(conn, _semantic_index_ddl())
         conn.commit()
 
     logger.info(f"KRAG schema ensured for collection '{collection}'")

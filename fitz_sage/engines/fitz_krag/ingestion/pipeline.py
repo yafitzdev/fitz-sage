@@ -86,14 +86,11 @@ class KragIngestPipeline:
         entity_graph_store: Any = None,
         enricher_chat: "ChatProvider | None" = None,
         summarizer_chat: "ChatProvider | None" = None,
+        semantic_index: Any = None,
     ):
         self._config = config
         self._chat = chat
         standard_chat = enricher_chat or summarizer_chat or chat
-        if standard_chat is None:
-            from fitz_sage.llm.providers.onnx_chat import OnnxChat
-
-            standard_chat = OnnxChat()
         self._enricher_chat = enricher_chat or standard_chat
         self._summarizer_chat = summarizer_chat or standard_chat
         self._cm = connection_manager
@@ -108,13 +105,17 @@ class KragIngestPipeline:
         self._table_store = table_store or TableStore(connection_manager, collection)
         self._sqlite_table_store = sqlite_table_store
         self._entity_graph_store = entity_graph_store
+        if semantic_index is None:
+            from fitz_sage.engines.fitz_krag.semantic_index import SemanticIndex
+
+            semantic_index = SemanticIndex(connection_manager, collection)
+        self._semantic_index = semantic_index
 
         # Entity enricher
         from fitz_sage.engines.fitz_krag.ingestion.enricher import KragEnricher
 
-        self._enricher: Any = KragEnricher(
-            self._enricher_chat,
-            batch_size=1,
+        self._enricher: Any = (
+            KragEnricher(self._enricher_chat, batch_size=1) if self._enricher_chat else None
         )
 
         # Code strategies
@@ -385,6 +386,8 @@ class KragIngestPipeline:
                 ]
             )
 
+        self._semantic_index.index_file(file_id, content)
+
         return len(result.symbols)
 
     def _parse_doc_file(self, rel_path: str, abs_path: Path, file_id: str) -> int:
@@ -444,6 +447,7 @@ class KragIngestPipeline:
             )
         _resolve_section_parents(section_dicts, [file_id] * len(section_dicts))
         self._section_store.upsert_batch(section_dicts)
+        self._semantic_index.index_file(file_id, content)
 
         return len(section_dicts)
 
@@ -509,10 +513,12 @@ class KragIngestPipeline:
                 }
             ]
         )
+        self._semantic_index.index_file(file_id, content)
         return 1
 
     def _delete_file(self, file_id: str) -> None:
         """Cascade-delete a removed file's stored data."""
+        self._semantic_index.remove_file(file_id)
         for rec in self._table_store.get_by_file(file_id):
             if self._sqlite_table_store:
                 self._sqlite_table_store.delete(rec["table_id"])
@@ -628,8 +634,8 @@ class KragIngestPipeline:
         if self._enricher and self._enricher_chat:
             return
         raise ConfigurationError(
-            "Entity enrichment requires the managed local Qwen ONNX runtime, "
-            "but it was not initialized."
+            "Entity enrichment requires a configured balanced chat tier, "
+            "but no chat provider is available."
         )
 
     def _require_summarizer(self) -> None:
@@ -637,8 +643,8 @@ class KragIngestPipeline:
         if self._summarizer_chat:
             return
         raise ConfigurationError(
-            "Ingestion requires hierarchy summarization, but the managed "
-            "local Qwen ONNX runtime was not initialized."
+            "Hierarchy summarization requires a configured balanced chat tier, "
+            "but no chat provider is available."
         )
 
     def _link_code_entities_file(self, file_id: str) -> None:

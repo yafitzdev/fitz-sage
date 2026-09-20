@@ -116,8 +116,8 @@ class ManagedModelError(EngineError):
     """
     Local managed model download, validation, or runtime failure.
 
-    Covers model lifecycle errors for Fitz-owned local CPU models such as the
-    managed Qwen ONNX GenAI bundle.
+    Covers model lifecycle errors for Fitz-owned local CPU reranking and
+    governance models.
     """
 
     pass

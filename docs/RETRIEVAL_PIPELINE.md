@@ -82,7 +82,7 @@ flowchart TD
     C --> C2["Pyrrho PRE evidence obligations"]
 
     P --> P1["Deterministic terms, query type, intent detection"]
-    P --> P2["Managed Qwen semantic keywords"]
+    P --> P2["SQLite corpus term graph"]
     P --> P3["Optional query_intelligence rewrite / analysis / detection"]
 
     R --> R1["Section BM25 over FTS5"]
@@ -97,11 +97,11 @@ flowchart TD
 ### Stage 1: Broad Recall
 
 Broad recall is intentionally permissive. It uses literal query terms,
-managed Qwen semantic keywords, and intent fanout for
+collection-derived semantic terms, and intent fanout for
 comparison, temporal, aggregation, and freshness queries. False positives are
 acceptable because the reranker and evidence compilation handle precision.
 Query profiling combines deterministic query shape, Pyrrho's query-only PRE
-obligations, managed Qwen semantic keywords, and optional query-intelligence
+obligations, SQLite term-graph expansion, and optional query-intelligence
 providers.
 
 Primary stores:
@@ -206,7 +206,7 @@ the configured synthesizer. This is separate from the retrieval package default.
 | Strategy | Role |
 |----------|------|
 | Sparse BM25 / literal source terms | Broad recall backbone. |
-| Managed Qwen semantic query keywords | Broad recall expansion in the default no-endpoint path. |
+| SQLite semantic query terms | Evidence-backed, collection-specific recall expansion in the default no-endpoint path. |
 | Query rewriting | Optional `query_intelligence` enhancement for conversational context or ambiguous phrasing. |
 | Multi-query decomposition | Deterministic explicit-clause fanout; optional `query_intelligence` handles implicit or conversational compounds. |
 | Comparison / temporal / aggregation / freshness detection | Deterministic default signals, optionally improved by query intelligence. |
@@ -226,7 +226,7 @@ the query contract/profile calls for a representative corpus overview.
 
 | Model/runtime | Required? | Used for |
 |---------------|-----------|----------|
-| Managed Qwen3.5 0.8B Q4F16 ONNX | standard for query expansion; optional for background work | query semantic keywords, entities, and hierarchy |
+| SQLite corpus term graph | standard for query expansion | semantic keywords with relation and support evidence |
 | ONNX reranker | default | candidate precision after broad recall |
 | Reviewed local Pyrrho v2 model | required product governance | native evidence verdict, failure mode, retrieval intents, and evidence-kind metadata |
 | OpenAI-compatible endpoint | optional | answer synthesis, optional query intelligence, optional vision parser |

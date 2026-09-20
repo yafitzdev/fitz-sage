@@ -255,14 +255,13 @@ def _freeze_evidence(results: Any) -> tuple[FrozenEvidence, ...]:
 
 
 def _component_specs(config: Any) -> dict[str, str]:
-    from fitz_sage.llm.providers.onnx_chat import DEFAULT_QWEN_MODEL_ALIAS
     from fitz_sage.llm.providers.onnx_reranker import DEFAULT_MODEL_ID as DEFAULT_RERANKER_MODEL_ID
 
     reranker = str(getattr(config, "rerank", "unknown"))
     if reranker == "onnx":
         reranker = f"onnx/{DEFAULT_RERANKER_MODEL_ID}"
     output = {
-        "semantic_keywords": f"onnx/{DEFAULT_QWEN_MODEL_ALIAS}",
+        "semantic_keywords": "sqlite/corpus-term-graph",
         "reranker": reranker,
         "pyrrho": str(getattr(config, "governance", "unknown")),
     }

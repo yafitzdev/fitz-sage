@@ -56,9 +56,9 @@ later precision; BM25 does not decide whether evidence is sufficient.
 
 ## Boundaries
 
-- Lexically unrelated wording needs Qwen query terms, explicit corpus evidence,
-  or user preprocessing.
-- Private abbreviations and identifier aliases are not inferred.
+- Lexically unrelated wording needs term-graph evidence in the corpus or user
+  preprocessing.
+- Undocumented private abbreviations and identifier aliases are not inferred.
 - Very common terms can produce a noisy pool within finite candidate limits.
 - FTS5 is not a dense semantic index and is not exposed as an end-user query
   language.

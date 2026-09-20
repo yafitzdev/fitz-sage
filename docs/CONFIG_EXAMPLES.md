@@ -7,7 +7,7 @@ Working configs for the managed-ONNX / SQLite world. The schema rules:
   not a provider block).
 - **Provider presence** controls optional endpoint-backed features
   (`synthesizer: null` means no generated answer; `query_intelligence: null`
-  means deterministic query prep plus managed Qwen semantic keywords).
+  means deterministic query prep plus corpus-derived semantic keywords).
 - **Governance is mandatory** — bare `pyrrho` uses the accepted immutable
   default; advanced users can select a local or commit-pinned package.
 - **Sensible defaults** — `collection` is the only required field. Selected
@@ -102,7 +102,7 @@ chat_api_key_env: MISTRAL_API_KEY
 
 ## Mixed local + cloud
 
-Managed local Qwen query expansion, optional endpoint query intelligence, and
+Local SQLite query expansion, optional endpoint query intelligence, and
 a cloud model for optional synthesis:
 
 ```yaml
@@ -149,19 +149,18 @@ local Ollama `glm-ocr` model.
 
 ---
 
-## Managed Qwen work
+## Collection-derived semantic expansion
 
 ```yaml
 collection: my_docs
 summary_batch_size: 15
 ```
 
-The managed local Qwen runtime supplies standard semantic query terms and
-optional background entity, hierarchy, and demand-summary work. Fitz downloads
-it on first model-backed operation, not during `point()`. A query-expansion
-failure is traced and falls back to the literal plan; a background failure is
-reported in enrichment status without invalidating the source index. Exact
-model/runtime details live in [Managed Models](MANAGED_MODELS.md).
+`point()` stores abbreviation, alias, identifier, phrase, and co-occurrence
+evidence in the collection database. Standard semantic query terms come from
+that graph. Optional background entity, hierarchy, and demand-summary work runs
+only when a chat tier is configured; its failure does not invalidate the source
+index.
 
 ---
 
@@ -230,6 +229,6 @@ pack = engine.evidence(Query(text="What is quantum computing?"))
 print(pack.mode, [item.file_path for item in pack.items])
 ```
 
-Only `collection` is strictly required by the schema. `point()` completes the
-searchable source index; the managed local Qwen runtime is loaded later by a
-query or optional background enrichment.
+Only `collection` is strictly required by the schema. `point()` completes both
+the searchable source index and the evidence used for model-free semantic
+expansion.

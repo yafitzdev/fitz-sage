@@ -41,7 +41,7 @@ source form.
 The recall query may contain:
 
 - literal terms from the original query;
-- semantic keywords proposed by the managed local Qwen runtime;
+- semantic keywords derived from the collection's SQLite term graph;
 - no implicit alias or mapping terms.
 
 There is no public mapping-term API. Semantic terms are search suggestions.

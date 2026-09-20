@@ -165,8 +165,7 @@ class FitzKragEngine:
             if "ConnectError" in type(e).__name__ or "10061" in msg or "Connection refused" in msg:
                 raise ConfigurationError(
                     "Cannot connect to the configured endpoint chat provider.\n"
-                    "Optional enrichment uses Fitz's managed local Qwen ONNX runtime; "
-                    "check chat_base_url only for endpoint-backed features."
+                    "Check chat_base_url for optional endpoint-backed features."
                 ) from e
             raise ConfigurationError(f"Failed to initialize Fitz KRAG engine: {e}") from e
 
@@ -253,6 +252,13 @@ class FitzKragEngine:
         self._import_store = ImportGraphStore(self._connection_manager, self._config.collection)
         self._section_store = SectionStore(self._connection_manager, self._config.collection)
 
+        from fitz_sage.engines.fitz_krag.semantic_index import SemanticIndex
+
+        self._semantic_index = SemanticIndex(
+            self._connection_manager,
+            self._config.collection,
+        )
+
         # Table stores
         from fitz_sage.engines.fitz_krag.ingestion.table_store import TableStore
         from fitz_sage.tabular.store.sqlite import SqliteTableStore
@@ -324,7 +330,6 @@ class FitzKragEngine:
         from fitz_sage.engines.fitz_krag.context.assembler import ContextAssembler
         from fitz_sage.engines.fitz_krag.generation.synthesizer import CodeSynthesizer
         from fitz_sage.llm.client import get_chat
-        from fitz_sage.llm.providers.onnx_chat import OnnxChat
 
         self._assembler = ContextAssembler(self._config)
         self._synthesizer = None
@@ -339,7 +344,7 @@ class FitzKragEngine:
             synth_chat = get_chat(self._config.synthesizer, "smart", synth_config)
             self._synthesizer = CodeSynthesizer(synth_chat, self._config)
 
-        standard_chat = OnnxChat()
+        standard_chat = self._chat_factory("balanced") if self._chat_factory else None
         self._enricher_chat = standard_chat
         self._summarizer_chat = standard_chat
 
@@ -361,10 +366,7 @@ class FitzKragEngine:
         # Query prep defaults to the deterministic planner. If
         # query_intelligence is configured, the batcher uses that provider and
         # treats provider/model failures as query failures.
-        from fitz_sage.engines.fitz_krag.query_batcher import (
-            SEMANTIC_KEYWORD_MAX_TOKENS,
-            QueryBatcher,
-        )
+        from fitz_sage.engines.fitz_krag.query_batcher import QueryBatcher
         from fitz_sage.engines.fitz_krag.query_planner import DeterministicQueryPlanner
         from fitz_sage.retrieval.detection.modules import DEFAULT_MODULES
 
@@ -390,12 +392,6 @@ class FitzKragEngine:
             chat_factory=query_chat_factory,
             detection_modules=list(DEFAULT_MODULES),
         )
-        self._semantic_keyword_batcher = QueryBatcher(
-            chat_factory=lambda _tier: self._enricher_chat,
-            detection_modules=[],
-            max_tokens=SEMANTIC_KEYWORD_MAX_TOKENS,
-        )
-
         # Reranker — mandatory INT8 ONNX cross-encoder via get_reranker().
         # Default backbone: Alibaba-NLP/gte-reranker-modernbert-base.
         # Override with rerank: "onnx/<hf-model-id>".
@@ -1033,7 +1029,7 @@ class FitzKragEngine:
             config=self._config,
             query_planner=getattr(self, "_query_planner", None),
             query_batcher=self._query_batcher,
-            semantic_keyword_batcher=getattr(self, "_semantic_keyword_batcher", None),
+            semantic_index=self._semantic_index,
             pyrrho=self._pyrrho,
             retrieval_pass=self._retrieval_pass,
             expander=self._expander,
@@ -1239,9 +1235,22 @@ class FitzKragEngine:
 
             self._index_registered_files(manifest, source_dir, core, progress)
             core.resolve_imports()
+            from fitz_sage.engines.fitz_krag.progressive.manifest import EnrichmentState
+
+            if self._enricher_chat is None:
+                for rel_path, entry in manifest.entries().items():
+                    if entry.state.value == "indexed":
+                        manifest.update_enrichment_state(rel_path, EnrichmentState.NOT_APPLICABLE)
+            else:
+                for rel_path, entry in manifest.entries().items():
+                    if (
+                        entry.state.value == "indexed"
+                        and entry.enrichment_state == EnrichmentState.NOT_APPLICABLE
+                    ):
+                        manifest.update_enrichment_state(rel_path, EnrichmentState.PENDING)
             manifest.save()
 
-            if start_worker and self._enrichment_is_pending(manifest):
+            if self._enricher_chat and start_worker and self._enrichment_is_pending(manifest):
                 from fitz_sage.engines.fitz_krag.progressive.worker import (
                     BackgroundEnrichmentWorker,
                 )
@@ -1267,6 +1276,10 @@ class FitzKragEngine:
         """Complete persisted model-backed enrichment, then exit."""
         if not self._manifest or not self._source_dir:
             return
+        if self._enricher_chat is None:
+            raise ConfigurationError(
+                "Background enrichment requires an optional chat tier such as chat_balanced."
+            )
 
         from fitz_sage.engines.fitz_krag.progressive.worker import (
             BackgroundEnrichmentWorker,
@@ -1312,6 +1325,7 @@ class FitzKragEngine:
             entity_graph_store=self._entity_graph_store,
             enricher_chat=self._enricher_chat,
             summarizer_chat=self._summarizer_chat,
+            semantic_index=self._semantic_index,
         )
 
     def _index_registered_files(

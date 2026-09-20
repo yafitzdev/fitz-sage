@@ -73,9 +73,7 @@ dependencies = [
     #   pyrrho-v2-nano-g1 — pre-built ONNX v2 evidence governance classifier
     #   gte-reranker      — pre-built INT8 ONNX cross-encoder
     "transformers>=4.50",
-    "onnx>=1.18",
     "onnxruntime>=1.20",
-    "onnxruntime-genai>=0.14.1",
     "huggingface-hub>=0.20",
     "numpy>=1.26",
 ]

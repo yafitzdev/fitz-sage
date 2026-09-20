@@ -827,14 +827,14 @@ SCENARIOS: list[TestScenario] = [
         min_sources=1,
     ),
     # =========================================================================
-    # Managed-Qwen Semantic Keywords
+    # Corpus-Derived Semantic Keywords
     # =========================================================================
     TestScenario(
         id="E71",
         name="Semantic keywords: fetch and retrieve",
         feature=Feature.SEMANTIC_KEYWORDS,
         query="How do I fetch employee data?",
-        # Managed Qwen should add useful retrieval vocabulary.
+        # The corpus term graph should add useful retrieval vocabulary.
         must_contain_any=["employee", "data", "retrieve", "get", "query"],
         min_sources=1,
     ),
@@ -843,7 +843,7 @@ SCENARIOS: list[TestScenario] = [
         name="Semantic keywords: add and create",
         feature=Feature.SEMANTIC_KEYWORDS,
         query="How do I add a new user account?",
-        # Managed Qwen should bridge ordinary prose and corpus vocabulary.
+        # The corpus term graph should bridge ordinary prose and corpus vocabulary.
         must_contain_any=["register", "create", "user", "account"],
         min_sources=1,
     ),
@@ -861,7 +861,7 @@ SCENARIOS: list[TestScenario] = [
         name="Semantic keywords: failure and error",
         feature=Feature.SEMANTIC_KEYWORDS,
         query="What failures can occur in authentication?",
-        # Managed Qwen should propose related failure vocabulary.
+        # The corpus term graph should propose related failure vocabulary.
         must_contain_any=["error", "exception", "authentication", "fail"],
         min_sources=1,
     ),
@@ -1308,7 +1308,7 @@ SCENARIOS: list[TestScenario] = [
         min_sources=1,
     ),
     # =========================================================================
-    # Additional Managed-Qwen Semantic Keywords - Edge Cases
+    # Additional Corpus-Derived Semantic Keywords - Edge Cases
     # =========================================================================
     TestScenario(
         id="E118",
@@ -1362,7 +1362,7 @@ SCENARIOS: list[TestScenario] = [
         min_sources=1,
     ),
     # =========================================================================
-    # Conceptual Retrieval (managed-Qwen keywords + exact evidence)
+    # Conceptual Retrieval (corpus terms + exact evidence)
     # =========================================================================
     TestScenario(
         id="E150",

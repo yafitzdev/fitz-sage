@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
-from fitz_sage.core.exceptions import QueryError, QueryIntelligenceError
+from fitz_sage.core.exceptions import QueryError
 from fitz_sage.engines.fitz_krag.evidence_closure import (
     EvidenceClosureRequest,
     annotate_closure_result,
@@ -70,7 +70,7 @@ class QueryPipeline:
         config: "FitzKragConfig",
         query_planner: Any,
         query_batcher: Any,
-        semantic_keyword_batcher: Any,
+        semantic_index: Any,
         pyrrho: "OnnxPyrrho",
         retrieval_pass: Any,
         expander: Any,
@@ -83,7 +83,7 @@ class QueryPipeline:
         self._config = config
         self._query_planner = query_planner
         self._query_batcher = query_batcher
-        self._semantic_keyword_batcher = semantic_keyword_batcher
+        self._semantic_index = semantic_index
         self._pyrrho = pyrrho
         self._retrieval_pass = retrieval_pass
         self._expander = expander
@@ -120,8 +120,11 @@ class QueryPipeline:
 
         t0 = time.perf_counter()
         try:
-            plan = self._add_semantic_query_keywords(sanitized, prepared_plan)
-        except QueryIntelligenceError as exc:
+            plan, semantic_expansions = self._add_semantic_query_keywords(
+                sanitized,
+                prepared_plan,
+            )
+        except Exception as exc:
             logger.warning(
                 "Semantic query expansion failed; using prepared query plan: %s",
                 exc,
@@ -134,26 +137,24 @@ class QueryPipeline:
                 "added_keywords": 0,
                 "error_type": type(exc).__name__,
                 "error": str(exc),
+                "expansions": [],
             }
         else:
-            prepared_keywords = {keyword.casefold() for keyword in prepared_plan.keywords}
-            added_keywords = [
-                keyword for keyword in plan.keywords if keyword.casefold() not in prepared_keywords
-            ]
-            enabled = self._semantic_keyword_batcher is not None
+            enabled = self._semantic_index is not None
             if not enabled:
                 status = "disabled"
-            elif added_keywords:
+            elif semantic_expansions:
                 status = "expanded"
             else:
                 status = "no_keywords"
             semantic_expansion_trace = {
                 "enabled": enabled,
-                "used": bool(added_keywords),
+                "used": bool(semantic_expansions),
                 "status": status,
-                "added_keywords": len(added_keywords),
+                "added_keywords": len(semantic_expansions),
+                "expansions": [item.as_dict() for item in semantic_expansions],
             }
-        timings.append(("Qwen query keywords", time.perf_counter() - t0))
+        timings.append(("Semantic term graph", time.perf_counter() - t0))
         query_terms = _query_term_trace(
             sanitized,
             prepared_plan,
@@ -433,31 +434,31 @@ class QueryPipeline:
 
         return plan, keyword_origin
 
-    def _add_semantic_query_keywords(self, query: str, plan: QueryPlan) -> QueryPlan:
-        """Use local Qwen for keyword-only query expansion."""
-        batcher = self._semantic_keyword_batcher
-        if batcher is None:
-            return plan
+    def _add_semantic_query_keywords(
+        self, query: str, plan: QueryPlan
+    ) -> tuple[QueryPlan, list[Any]]:
+        """Expand a query from the collection's deterministic semantic graph."""
+        semantic_index = self._semantic_index
+        if semantic_index is None:
+            return plan, []
 
-        batch_result = batcher.batch_classify(
-            query,
-            include_analysis=False,
-            include_detection=False,
-            include_rewriting=False,
-            include_extended=False,
-            include_keywords=True,
-        )
+        expansions = semantic_index.expand(query)
+        if not expansions:
+            return plan, []
 
-        if not batch_result.keywords:
-            return plan
-
-        return QueryPlan(
-            retrieval_query=plan.retrieval_query,
-            analysis=plan.analysis,
-            detection=plan.detection,
-            rewrite_result=plan.rewrite_result,
-            extended_signals=plan.extended_signals,
-            keywords=_merge_query_keywords(plan.keywords, batch_result.keywords),
+        return (
+            QueryPlan(
+                retrieval_query=plan.retrieval_query,
+                analysis=plan.analysis,
+                detection=plan.detection,
+                rewrite_result=plan.rewrite_result,
+                extended_signals=plan.extended_signals,
+                keywords=_merge_query_keywords(
+                    plan.keywords,
+                    [expansion.term for expansion in expansions],
+                ),
+            ),
+            expansions,
         )
 
     def _plan_with_pyrrho(self, query: str) -> "PyrrhoQueryPlan":

@@ -68,7 +68,7 @@ The most important metadata blocks are:
 ### Query Profile
 
 `metadata.query_profile` records how Fitz searched before governance ran. It
-contains query-shape metadata, managed Qwen query keywords, strategy weights,
+contains query-shape metadata, evidence-backed corpus query terms, strategy weights,
 fetch limits, and intent flags.
 The `has_*_intent` fields describe Fitz's deterministic reading of the user's
 query. Exact Pyrrho PRE evidence obligations remain separate in

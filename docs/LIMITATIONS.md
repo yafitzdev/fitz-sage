@@ -10,7 +10,7 @@ reinterpret a user's domain data.
 |---|---|
 | Supported-file discovery and visible failures | Choosing and preparing the corpus |
 | Parsing into sections, symbols, and native tables | Raw-log compression or rewriting |
-| Literal and best-effort semantic query recall | Private acronym, synonym, and ID mappings |
+| Literal and evidence-backed semantic query recall | Undocumented acronym, synonym, and ID mappings |
 | General query shapes such as temporal, comparison, and aggregation | Deciding which identifier forms are equivalent |
 | Reranking, source reading, evidence compilation, and provenance | OCR/parser selection for image-only or complex inputs |
 | Exact transport of Pyrrho planning and governance output | Removing secrets and documents that must not be indexed |
@@ -37,25 +37,19 @@ put explicit alias evidence in the corpus. There is no public mapping hook.
 
 ## Semantic Query Terms
 
-Managed Qwen proposes words and short phrases that may occur in relevant
-source. These are best-effort recall suggestions, not a dictionary and not
-proof that two terms mean the same thing.
+The collection term graph proposes words and short phrases supported by indexed
+source. These are ranked recall suggestions, not proof that two terms mean the
+same thing.
 
 The original query remains a recall leg, but literal and expanded legs share a
 bounded pool. Candidate competition is intentional broad-recall behavior:
 alternate vocabulary needs room to enter, so a fixed-cutoff score may improve
 or decline on an individual query.
 
-If Qwen returns malformed output or fails during a query, the failure is traced
-and retrieval continues with the literal prepared plan. Background Qwen failure
-is reported separately and does not invalidate the source index.
-
-The frozen ArguAna/Quora holdout did not show a consistent low-overlap gain from
-the current managed expansion path. With reranking active, Qwen changed macro
-final nDCG@10 by `+0.0022` while adding `2.06s` per query; per-dataset effects
-were inconclusive. That is a measured limitation of the current model and
-prompt on those tasks, not evidence that lexical retrieval no longer needs a
-general-language bridge.
+Only relationships observed in the indexed corpus are available. An acronym or
+alias that is never defined cannot be recovered from general world knowledge.
+Weak co-occurrence may also introduce noisy expansions, so explicit alias and
+abbreviation evidence receives more weight and expansion is bounded.
 
 ## Temporal Scope And Authority
 

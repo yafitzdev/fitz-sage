@@ -49,13 +49,13 @@ change.
 Changes must preserve these decisions unless a proposal explicitly changes the
 product contract:
 
-- `point()` completes the searchable source index before returning and does not
-  load Qwen.
+- `point()` completes the searchable source and semantic term index before
+  returning without loading a generative model.
 - background entity and hierarchy work is optional and independently reported.
 - BM25 over typed source units is the central recall mechanism; no dense index
   exists.
-- broad competition between literal and Qwen candidates is intentional.
-- domain cleanup, private mappings, and identifier normalization are user-owned.
+- broad competition between literal and corpus-derived candidates is intentional.
+- domain cleanup and undocumented private mappings remain user-owned.
 - temporal/comparison/aggregation recognition is package-owned query shape.
 - Pyrrho owns governance; Fitz-Sage transports its PRE obligations and final
   decision without local verdict heuristics.

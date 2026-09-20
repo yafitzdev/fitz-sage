@@ -2,7 +2,6 @@
 """
 LLM provider implementations.
 
-``OnnxChat`` is the managed local Qwen3.5 0.8B Q4F16 ONNX enrichment runtime.
 ``OpenAICompatChat`` / ``OpenAICompatVision`` are optional OpenAI HTTP
 clients for user-supplied endpoints such as OpenAI itself, Azure OpenAI,
 vLLM, LM Studio, Together, Fireworks, Groq, OpenRouter, and any other
@@ -32,15 +31,6 @@ __all__ = [
     "RerankResponse",
     "RerankResult",
 ]
-
-# Managed ONNX chat provider for query expansion and optional enrichment.
-from fitz_sage.llm.providers.onnx_chat import (  # noqa: E402,F401
-    OnnxChat,
-    OnnxChatModelError,
-    OnnxChatModelInfo,
-)
-
-__all__.extend(["OnnxChat", "OnnxChatModelError", "OnnxChatModelInfo"])
 
 # OpenAI-compatible HTTP provider for optional endpoint/cloud chat paths.
 try:

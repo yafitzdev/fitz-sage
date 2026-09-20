@@ -11,8 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Set the managed query-expansion and enrichment model to the commit-pinned
-  Qwen3.5 0.8B Q4F16 ONNX export.
+- Replaced managed generative query expansion with an evidence-backed SQLite
+  term graph built from each collection. It records abbreviations, aliases,
+  identifier variants, error/component relationships, phrases, and
+  co-occurrence clusters, and retracts evidence when files change or disappear.
+- Background entity and hierarchy enrichment now runs only when a chat tier is
+  explicitly configured. Standard ingestion and retrieval require no
+  generative model.
 
 ## [0.16.0] - 2026-08-08
 

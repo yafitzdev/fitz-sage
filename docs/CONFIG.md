@@ -56,10 +56,10 @@ Role-specific provider fields bind LLM-backed stages:
 | `query_intelligence` | Optional query-prep enhancement                  |
 | `synthesizer`        | Optional answer generation                       |
 
-Default semantic query keywords use Fitz's managed local Qwen runtime.
-Optional background entity, hierarchy, and demand-summary work uses the same
-runtime after the source index is searchable. There is no config key for that
-internal model. Optional endpoint-backed roles take a provider/model spec. For
+Default semantic query keywords come from the collection's SQLite term graph.
+Optional background entity, hierarchy, and demand-summary work uses a
+configured balanced chat tier after the source index is searchable. Optional
+endpoint-backed roles take a provider/model spec. For
 `endpoint`, the model name is the part after the slash and `chat_base_url`
 supplies the OpenAI-compatible URL:
 
@@ -78,14 +78,12 @@ retrieval remains available without them.
 
 ## Chat provider model
 
-Managed Qwen query expansion and optional background work use Fitz's local
-runtime. See [Managed Models](MANAGED_MODELS.md) for the exact package and
-runtime. Optional synthesis, query intelligence, and vision can use
-**`endpoint`** or the cloud/enterprise presets:
+Semantic query expansion is model-free. Optional synthesis, query intelligence,
+background enrichment, and vision can use **`endpoint`** or the
+cloud/enterprise presets:
 
 | Spec form                       | Resolves to                                              |
 | ------------------------------- | -------------------------------------------------------- |
-| `onnx/qwen3.5-0.8b`           | managed local Qwen3.5 0.8B Q4F16 ONNX runtime                |
 | `endpoint/<model>` + `chat_base_url` | canonical custom endpoint form                       |
 | `openai/<model>`                | endpoint pointing at `https://api.openai.com/v1`         |
 | `azure_openai/<deployment>`     | endpoint with Azure deployment URL                       |
@@ -99,15 +97,15 @@ For local servers such as Ollama, use `endpoint` with the server's
 
 ## Feature control
 
-The retrieval backbone includes managed Qwen semantic query terms, the ONNX
-reranker, and Pyrrho governance. Source indexing is independent of Qwen.
+The retrieval backbone includes collection-derived semantic query terms, the
+ONNX reranker, and Pyrrho governance.
 Optional endpoint-backed features are switched on by **provider presence**,
 not boolean flags:
 
 | Feature            | Standard / enabled when                  | Disabled when                       |
 | ------------------ | ---------------------------------------- | ----------------------------------- |
-| Semantic query terms | managed local Qwen on each standard query | no public off switch in product config |
-| Background enrichment | starts after source indexing | may remain pending or fail without blocking retrieval |
+| Semantic query terms | SQLite term-graph lookup on each standard query | no public off switch in product config |
+| Background enrichment | starts after source indexing when a chat tier is configured | not applicable without a chat tier |
 | ONNX reranker      | `rerank: onnx` (default)                 | not disabled                        |
 | Governance         | `governance: pyrrho` uses the accepted pinned model; custom model optional | not disabled |
 | Query intelligence | `query_intelligence: <provider/model>`   | `query_intelligence: null`          |
@@ -170,7 +168,6 @@ chat_api_key_env: OPENAI_API_KEY
 | Together         | `TOGETHER_API_KEY`   |
 | Groq             | `GROQ_API_KEY`       |
 | Mistral La Plateforme | `MISTRAL_API_KEY` |
-| Managed local Qwen | (no key) |
 | Local endpoint server / LM Studio / Ollama | (no key) |
 
 For enterprise (M2M / mTLS) deployments see
@@ -189,7 +186,7 @@ governance: pyrrho
 rerank: onnx
 ```
 
-Query intelligence defaults to deterministic detection plus managed Qwen
+Query intelligence defaults to deterministic detection plus collection-derived
 semantic keywords. Set `query_intelligence:` only when you want an optional
 endpoint-backed rewrite/analyze/detect bus.
 

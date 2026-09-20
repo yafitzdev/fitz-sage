@@ -33,11 +33,11 @@ def test_config_fingerprint_changes_with_retrieval_behavior():
     assert _config_sha256(first) != _config_sha256(second)
 
 
-def test_default_component_specs_resolve_the_reranker_model():
+def test_default_component_specs_resolve_reranker_and_semantic_index():
     components = _component_specs(FitzKragConfig(collection="reports"))
 
     assert components["reranker"] == ("onnx/Alibaba-NLP/gte-reranker-modernbert-base")
-    assert components["semantic_keywords"].startswith("onnx/")
+    assert components["semantic_keywords"] == "sqlite/corpus-term-graph"
 
 
 def test_collection_fingerprint_tracks_manifest_and_indexing_state(tmp_path):

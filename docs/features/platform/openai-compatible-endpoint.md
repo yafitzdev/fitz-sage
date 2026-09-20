@@ -1,10 +1,10 @@
 <!-- docs/features/platform/openai-compatible-endpoint.md -->
 # OpenAI-Compatible Endpoint Architecture
 
-**Status:** the optional endpoint/cloud chat path. Managed local Qwen supplies
-standard semantic query terms and optional background work; endpoint chat is
-for optional synthesis, query intelligence, vision, and explicitly configured
-chat-tier enhancements.
+**Status:** the optional endpoint/cloud chat path. Standard semantic query
+terms come from the SQLite corpus graph; endpoint chat is for optional
+synthesis, query intelligence, background enrichment, vision, and explicitly
+configured chat-tier enhancements.
 
 ## TL;DR
 
@@ -64,8 +64,8 @@ collection: default
 ```
 
 Use role-specific provider fields (`query_intelligence`, `vision`, and
-`synthesizer`) to mix local and cloud models. Managed Qwen work is internal and
-does not need an endpoint.
+`synthesizer`) to mix local and cloud models. Chat tiers may also provide
+optional entity and hierarchy enrichment.
 
 ## Cloud quick reference
 

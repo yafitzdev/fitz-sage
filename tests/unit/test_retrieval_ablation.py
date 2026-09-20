@@ -38,42 +38,42 @@ def test_stable_top_k_selector_preserves_order_and_budget() -> None:
 
 
 def test_literal_ablation_disables_only_managed_components() -> None:
-    semantic_batcher = object()
+    semantic_index = object()
     canonical_reranker = object()
-    query_pipeline = SimpleNamespace(_semantic_keyword_batcher=semantic_batcher)
+    query_pipeline = SimpleNamespace(_semantic_index=semantic_index)
     retrieval_pass = SimpleNamespace(_reranker=canonical_reranker)
     engine = SimpleNamespace(
         _query_pipeline=query_pipeline,
         _retrieval_pass=retrieval_pass,
-        _semantic_keyword_batcher=semantic_batcher,
+        _semantic_index=semantic_index,
         _address_reranker=canonical_reranker,
         _config=SimpleNamespace(rerank_k=7),
     )
 
     apply_ablation(engine, get_ablation("literal"))
 
-    assert engine._semantic_keyword_batcher is None
-    assert query_pipeline._semantic_keyword_batcher is None
+    assert engine._semantic_index is None
+    assert query_pipeline._semantic_index is None
     assert isinstance(engine._address_reranker, StableTopKSelector)
     assert retrieval_pass._reranker is engine._address_reranker
     assert engine._address_reranker._k == 7
 
 
 def test_full_ablation_keeps_canonical_components() -> None:
-    semantic_batcher = object()
+    semantic_index = object()
     canonical_reranker = object()
-    query_pipeline = SimpleNamespace(_semantic_keyword_batcher=semantic_batcher)
+    query_pipeline = SimpleNamespace(_semantic_index=semantic_index)
     retrieval_pass = SimpleNamespace(_reranker=canonical_reranker)
     engine = SimpleNamespace(
         _query_pipeline=query_pipeline,
         _retrieval_pass=retrieval_pass,
-        _semantic_keyword_batcher=semantic_batcher,
+        _semantic_index=semantic_index,
         _address_reranker=canonical_reranker,
         _config=SimpleNamespace(rerank_k=10),
     )
 
     apply_ablation(engine, get_ablation("full"))
 
-    assert query_pipeline._semantic_keyword_batcher is semantic_batcher
+    assert query_pipeline._semantic_index is semantic_index
     assert retrieval_pass._reranker is canonical_reranker
     assert engine._address_reranker is canonical_reranker

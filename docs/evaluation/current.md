@@ -29,6 +29,10 @@ architecture.
 
 ## Completed External Measurements
 
+The expansion measurements below cover the removed generative expansion path.
+They remain useful historical baselines, but they do not measure the current
+SQLite corpus term graph.
+
 - The broad NFCorpus, FiQA, and SciFact ablation measures literal retrieval,
   managed Qwen expansion, and INT8 reranking over all 1,271 judged queries.
 - The frozen ArguAna/Quora semantic holdout measures 240 queries across low,
@@ -42,24 +46,25 @@ architecture.
 
 ## Gaps To Fill
 
-1. Set-aware coverage experiments after pointwise reranking, evaluated on the
+1. Evaluate the SQLite corpus term graph on abbreviation, alias, identifier,
+   error/component, and frozen external retrieval sets.
+2. Set-aware coverage experiments after pointwise reranking, evaluated on the
    frozen enterprise categories without tuning on the holdout.
-2. A full matched enterprise rerun after the closure modality and section-FTS
+3. A full matched enterprise rerun after the closure modality and section-FTS
    latency fixes; the current two warm probes are diagnostic only.
-3. A separate, application-shaped non-BEIR semantic-expansion development set
-   for model, prompt, and expansion-policy experiments. It must directly
+4. A separate, application-shaped non-BEIR semantic-expansion development set
+   for extraction, weighting, and expansion-policy experiments. It must directly
    exercise ordinary semantic-to-lexical bridges without relying on private
    aliases or identifier normalization. The frozen ArguAna/Quora holdout must
-   remain evaluation-only and should be rerun after the planned managed-model
-   replacement.
-4. Cross-modality integration cases that preserve the exact accepted Pyrrho
+   remain evaluation-only and should be rerun against the corpus term graph.
+5. Cross-modality integration cases that preserve the exact accepted Pyrrho
    output without treating it as Fitz retrieval quality. Pyrrho owns
    false-sufficient, class-recall, and calibration evaluation.
-5. Keep the query-ready ingestion benchmark representative across small files,
+6. Keep the query-ready ingestion benchmark representative across small files,
    long documents, code, tables, and explicitly selected rich parsers.
-6. Measure and improve unchanged `point()` behavior for collections containing
+7. Measure and improve unchanged `point()` behavior for collections containing
    hundreds of thousands of tiny files.
-7. Measure background Qwen completion throughput and very large individual
+8. Measure optional background-chat completion throughput and very large individual
    document behavior separately from query-ready source indexing.
 
 ## Related

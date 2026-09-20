@@ -171,8 +171,9 @@ f.replay_pyrrho(
 #### point()
 
 Register a source file or directory. This call synchronously parses changed
-supported files and completes the searchable source index. Optional Qwen
-entity and hierarchy work can continue in the background afterward.
+supported files, records corpus term relationships, and completes the
+searchable source index. Optional chat-backed entity and hierarchy work can
+continue in the background afterward.
 
 ```text
 f.point(source: str | Path) -> None

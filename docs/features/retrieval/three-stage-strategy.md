@@ -12,7 +12,7 @@ The query plan combines:
 - literal terms and exact identifiers from the user query;
 - deterministic temporal, comparison, aggregation, and modality shape;
 - Pyrrho query-only PRE obligations;
-- managed Qwen semantic query terms;
+- SQLite corpus semantic query terms;
 - optional endpoint-backed query intelligence;
 - explicit multi-clause and query-shape variations.
 

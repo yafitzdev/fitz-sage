@@ -63,13 +63,9 @@ class TestUnknownProvider:
         with pytest.raises(ValueError, match="Unknown chat provider"):
             get_chat("unknown_provider")
 
-    def test_onnx_chat_provider_builds(self) -> None:
-        """The managed ONNX Qwen provider is available through get_chat."""
-        from fitz_sage.llm.providers.onnx_chat import DEFAULT_QWEN_MODEL_ID, OnnxChat
-
-        chat = get_chat("onnx/qwen3.5-0.8b")
-        assert isinstance(chat, OnnxChat)
-        assert chat._snapshot.spec.repo_id == DEFAULT_QWEN_MODEL_ID
+    def test_onnx_is_not_a_chat_provider(self) -> None:
+        with pytest.raises(ValueError, match="Unknown chat provider: onnx"):
+            get_chat("onnx")
 
     def test_unknown_vision_provider_raises(self) -> None:
         with pytest.raises(ValueError, match="Unknown vision provider"):

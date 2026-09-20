@@ -133,7 +133,7 @@ class TestEnrichEntityGraphIntegration:
         core.link_entities_file("file-1", ".py")
 
     def test_link_doc_entities_uses_deterministic_derivation(self):
-        """Progressive doc entity linking should not run Qwen entity generation."""
+        """Progressive doc entity linking does not run model generation."""
         entity_store = MagicMock()
         core = _make_core(entity_graph_store=entity_store)
         sections = [

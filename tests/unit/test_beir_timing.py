@@ -11,7 +11,7 @@ from benchmarks.fitz_bench.timing import group_timings, summarize_timing_records
 def test_group_timings_ignores_overlapping_retrieval_totals() -> None:
     grouped, overlap = group_timings(
         {
-            "Qwen query keywords": 2.0,
+            "Semantic term graph": 2.0,
             "Recall": 0.5,
             "Rerank": 5.0,
             "Read": 0.25,
@@ -36,7 +36,7 @@ def test_group_timings_ignores_overlapping_retrieval_totals() -> None:
 
 def test_group_timings_reports_overlap_instead_of_negative_residual() -> None:
     grouped, overlap = group_timings(
-        {"Qwen query keywords": 2.0, "Pyrrho": 1.0},
+        {"Semantic term graph": 2.0, "Pyrrho": 1.0},
         total_seconds=2.5,
     )
 
@@ -64,7 +64,7 @@ def test_summarize_records_reports_exclusive_stage_share() -> None:
                 "unattributed": 3.0,
             },
             "stage_seconds": {
-                "Qwen query keywords": 2.0,
+                "Semantic term graph": 2.0,
                 "Rerank": 5.0,
             },
         },
@@ -76,7 +76,7 @@ def test_summarize_records_reports_exclusive_stage_share() -> None:
                 "unattributed": 6.0,
             },
             "stage_seconds": {
-                "Qwen query keywords": 4.0,
+                "Semantic term graph": 4.0,
                 "Rerank": 10.0,
             },
         },

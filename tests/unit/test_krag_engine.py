@@ -21,7 +21,6 @@ from fitz_sage.core import (
     Provenance,
     Query,
     QueryError,
-    QueryIntelligenceError,
 )
 from fitz_sage.core.answer_mode import AnswerMode
 from fitz_sage.engines.fitz_krag.config.schema import FitzKragConfig
@@ -31,6 +30,7 @@ from fitz_sage.engines.fitz_krag.progressive.write_lock import (
     CollectionWriteLock,
 )
 from fitz_sage.engines.fitz_krag.query_batcher import BatchResult
+from fitz_sage.engines.fitz_krag.semantic_index import SemanticExpansion
 from fitz_sage.engines.fitz_krag.retrieval.router import RetrievalRouterResponse
 from fitz_sage.engines.fitz_krag.types import Address, AddressKind, ReadResult
 from tests.unit.mock_engine import build_mock_engine
@@ -650,9 +650,10 @@ class TestEvidence:
     def test_evidence_adds_semantic_keywords_to_broad_recall_profile(self):
         """Evidence mode enriches broad recall keywords without full chat prep."""
         engine = _make_engine()
-        engine._semantic_keyword_batcher.batch_classify.return_value = BatchResult(
-            keywords=["payment retry", "timeout failure"]
-        )
+        engine._semantic_index.expand.return_value = [
+            SemanticExpansion("payment retry", 0.91, "cooccurs_with", "payment", 3),
+            SemanticExpansion("timeout failure", 0.84, "error_of", "timeout", 2),
+        ]
         address = Address(
             kind=AddressKind.SECTION,
             source_id="doc-1",
@@ -677,7 +678,7 @@ class TestEvidence:
         pack = engine.evidence(Query(text="Which test case failed in Sprint 47?"), top_k=1)
 
         engine._query_batcher.batch_classify.assert_not_called()
-        engine._semantic_keyword_batcher.batch_classify.assert_called_once()
+        engine._semantic_index.expand.assert_called_once()
         profile = engine._retrieval_router.retrieve.call_args_list[0].args[1]
         assert "payment retry" in profile.keywords
         assert "timeout failure" in profile.keywords
@@ -686,14 +687,28 @@ class TestEvidence:
             "used": True,
             "status": "expanded",
             "added_keywords": 2,
+            "expansions": [
+                {
+                    "term": "payment retry",
+                    "score": 0.91,
+                    "relation": "cooccurs_with",
+                    "source": "payment",
+                    "supporting_documents": 3,
+                },
+                {
+                    "term": "timeout failure",
+                    "score": 0.84,
+                    "relation": "error_of",
+                    "source": "timeout",
+                    "supporting_documents": 2,
+                },
+            ],
         }
 
     def test_evidence_falls_back_when_semantic_keyword_expansion_is_malformed(self):
         """Optional semantic expansion cannot make literal retrieval unavailable."""
         engine = _make_engine()
-        engine._semantic_keyword_batcher.batch_classify.side_effect = QueryIntelligenceError(
-            "batched query intelligence missing `keywords` array"
-        )
+        engine._semantic_index.expand.side_effect = RuntimeError("semantic graph is unavailable")
         address = Address(
             kind=AddressKind.SECTION,
             source_id="doc-1",
@@ -721,8 +736,9 @@ class TestEvidence:
             "used": False,
             "status": "failed",
             "added_keywords": 0,
-            "error_type": "QueryIntelligenceError",
-            "error": "batched query intelligence missing `keywords` array",
+            "error_type": "RuntimeError",
+            "error": "semantic graph is unavailable",
+            "expansions": [],
         }
 
     def test_evidence_uses_pyrrho_pre_profile_for_comparisons(self):
@@ -784,7 +800,7 @@ class TestEvidence:
         assert [item.file_path for item in pack.items] == ["docs/1.md", "docs/2.md"]
         for timing_name in (
             "Query prep",
-            "Qwen query keywords",
+            "Semantic term graph",
             "Recall",
             "Rerank",
             "Read",
@@ -979,9 +995,9 @@ class TestEvidence:
         addresses, results = _evidence_results(3)
         engine._retrieval_router.retrieve.return_value = RetrievalRouterResponse(addresses)
         engine._reader.read.return_value = results
-        engine._semantic_keyword_batcher.batch_classify.return_value = BatchResult(
-            keywords=["incident"]
-        )
+        engine._semantic_index.expand.return_value = [
+            SemanticExpansion("incident", 0.8, "cooccurs_with", "happened", 2)
+        ]
         monkeypatch.setattr(FitzPaths, "workspace", classmethod(lambda cls: tmp_path))
 
         run = engine.trace(Query(text="What happened?"), top_k=3)
@@ -1092,6 +1108,7 @@ class TestPoint:
         engine._table_store = MagicMock()
         engine._sqlite_table_store = MagicMock()
         engine._entity_graph_store = None
+        engine._semantic_index = MagicMock()
         engine._enricher_chat = None
         engine._summarizer_chat = None
 
@@ -1121,7 +1138,7 @@ class TestPoint:
         build_manifest_path = builder_cls.return_value.build.call_args.args[1]
         assert build_manifest_path == workspace / "collections" / "custom" / "manifest.json"
 
-    def test_point_indexes_registered_files_without_loading_qwen(self, tmp_path):
+    def test_point_indexes_registered_files_without_loading_a_chat_model(self, tmp_path):
         """Every supported changed file is searchable before point returns."""
         from fitz_sage.engines.fitz_krag.progressive.manifest import FileState
 
@@ -1136,6 +1153,7 @@ class TestPoint:
         engine._table_store = MagicMock()
         engine._sqlite_table_store = MagicMock()
         engine._entity_graph_store = None
+        engine._semantic_index = MagicMock()
         engine._enricher_chat = MagicMock()
         engine._summarizer_chat = MagicMock()
 
@@ -1190,6 +1208,7 @@ class TestPoint:
         engine._table_store = MagicMock()
         engine._sqlite_table_store = MagicMock()
         engine._entity_graph_store = None
+        engine._semantic_index = MagicMock()
         engine._enricher_chat = None
         engine._summarizer_chat = None
 
@@ -1222,6 +1241,7 @@ class TestPoint:
         engine._source_dir = tmp_path / "docs"
         engine._config = _make_config(collection="default")
         engine._build_ingest_core = MagicMock(return_value=MagicMock())
+        engine._enricher_chat = MagicMock()
 
         with patch(
             "fitz_sage.engines.fitz_krag.progressive.worker.BackgroundEnrichmentWorker"

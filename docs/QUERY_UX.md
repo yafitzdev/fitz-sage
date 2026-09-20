@@ -25,8 +25,8 @@ flowchart TD
 ```
 
 There is one foreground guarantee: when source registration returns, supported
-files are searchable or explicitly listed as failures. Qwen is not loaded on
-that critical path.
+files and their semantic term evidence are searchable or explicitly listed as
+failures. No generative model is loaded on that critical path.
 
 ## Repeat Query
 
@@ -59,5 +59,5 @@ enrichment state. Only changed files are reparsed.
 - source: current working directory
 - collection: derived from the source folder name
 - retrieval: broad recall, ONNX rerank, progressive evidence, Pyrrho
-- enrichment: managed local Qwen entities/hierarchy, optional for query readiness
+- enrichment: optional chat-backed entities/hierarchy, separate from query readiness
 - answer synthesis: not used

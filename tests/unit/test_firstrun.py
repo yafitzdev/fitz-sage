@@ -125,7 +125,7 @@ class TestRunFirstrunSetup:
         assert "synthesizer: openai/gpt-4o" in config
 
     def test_no_provider_writes_minimal_config(self, tmp_path, monkeypatch) -> None:
-        """No endpoint, no key -> minimal config; Qwen is internal."""
+        """No endpoint and no key produce a minimal local config."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         with (
             patch("fitz_sage.config.firstrun.detect_endpoint", return_value=None),
@@ -145,7 +145,7 @@ class TestRunFirstrunSetup:
         assert "summarizer:" not in config
 
     def test_endpoint_with_no_chat_models_writes_minimal_config(self, tmp_path) -> None:
-        """A reachable server with no models still writes internal-Qwen config."""
+        """A reachable server with no models still writes a minimal config."""
         endpoint = DetectedEndpoint(
             base_url="http://localhost:8080/v1",
             chat_models=[],
