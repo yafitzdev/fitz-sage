@@ -4,7 +4,7 @@ In-process ONNX GenAI provider for managed local Qwen work.
 
 This is deliberately narrow: Fitz owns one tiny local generation backend for
 semantic query terms and optional background enrichment, using a pre-built
-Qwen3 0.6B ONNX GenAI bundle from Hugging Face on CPU. No external server, no
+Qwen3.5 0.8B Q4F16 ONNX model from Hugging Face on CPU. No external server, no
 GGUF, no llama.cpp, no torch.
 """
 
@@ -23,18 +23,20 @@ from typing import Any, cast
 
 from fitz_sage.core.exceptions import ManagedModelError
 
-DEFAULT_QWEN_MODEL_ALIAS = "qwen3-0.6b"
-DEFAULT_QWEN_MODEL_ID = "onnx-community/Qwen3-0.6B-DQ-ONNX"
+DEFAULT_QWEN_MODEL_ALIAS = "qwen3.5-0.8b"
+DEFAULT_QWEN_MODEL_ID = "onnx-community/Qwen3.5-0.8B-Text-ONNX"
+DEFAULT_QWEN_MODEL_REVISION = "1e45daba048899e7f771657ada617ec49350aa91"
 DEFAULT_QWEN_ONNX_SUBFOLDER = "onnx"
 DEFAULT_QWEN_ONNX_FILE = "model_q4f16.onnx"
 DEFAULT_MAX_NEW_TOKENS = 512
 DEFAULT_MAX_CONTEXT_TOKENS = 8192
 
-_MODEL_ALIASES: dict[str, tuple[str, str, str]] = {
+_MODEL_ALIASES: dict[str, tuple[str, str, str, str | None]] = {
     DEFAULT_QWEN_MODEL_ALIAS: (
         DEFAULT_QWEN_MODEL_ID,
         DEFAULT_QWEN_ONNX_SUBFOLDER,
         DEFAULT_QWEN_ONNX_FILE,
+        DEFAULT_QWEN_MODEL_REVISION,
     )
 }
 
@@ -77,6 +79,7 @@ class ManagedQwenSpec:
     repo_id: str
     onnx_subfolder: str
     onnx_file: str
+    revision: str | None = None
 
 
 class ManagedQwenSnapshot:
@@ -103,7 +106,8 @@ class ManagedQwenSnapshot:
             ) from e
 
         logger.info(
-            "Ensuring managed Qwen3 0.6B ONNX GenAI is available from %s (%s/%s)",
+            "Ensuring managed Qwen %s is available from %s (%s/%s)",
+            self._spec.name,
             self._spec.repo_id,
             self._spec.onnx_subfolder,
             self._spec.onnx_file,
@@ -112,12 +116,13 @@ class ManagedQwenSnapshot:
             return Path(
                 snapshot_download(
                     repo_id=self._spec.repo_id,
+                    revision=self._spec.revision,
                     allow_patterns=self.allow_patterns(),
                 )
             )
         except Exception as e:
             raise OnnxChatModelError(
-                "Could not download Fitz's managed Qwen3 0.6B ONNX GenAI model "
+                f"Could not download Fitz's managed Qwen model `{self._spec.name}` "
                 f"from Hugging Face repo `{self._spec.repo_id}`. Check network "
                 "access or pre-populate the Hugging Face cache, then retry."
             ) from e
@@ -148,15 +153,15 @@ class ManagedQwenSnapshot:
         onnx_path = snapshot_dir / self._spec.onnx_subfolder / self._spec.onnx_file
         external_data_paths = sorted(onnx_path.parent.glob(f"{self._spec.onnx_file}_data*"))
         tokenizer_path = snapshot_dir / "tokenizer.json"
-        genai_config_path = snapshot_dir / "genai_config.json"
-        missing = [
-            str(path)
-            for path in (onnx_path, tokenizer_path, genai_config_path)
-            if not path.exists()
-        ]
+        required_paths = [onnx_path, tokenizer_path]
+        if self._spec.name == DEFAULT_QWEN_MODEL_ALIAS:
+            required_paths.append(snapshot_dir / "config.json")
+        else:
+            required_paths.append(snapshot_dir / "genai_config.json")
+        missing = [str(path) for path in required_paths if not path.exists()]
         if missing:
             raise OnnxChatModelError(
-                "Fitz's managed Qwen3 0.6B ONNX GenAI snapshot is incomplete. "
+                f"Fitz's managed Qwen snapshot is incomplete for `{self._spec.name}`. "
                 f"Missing required file(s): {', '.join(missing)}"
             )
 
@@ -222,10 +227,20 @@ class GenAiRuntimeBundle:
             if source.exists():
                 _link_or_copy(source, runtime_dir / name)
 
-        for source in (Path(info.onnx_path), *(Path(path) for path in info.external_data_paths)):
+        genai_config_path = snapshot_dir / "genai_config.json"
+        onnx_source = Path(info.onnx_path)
+        onnx_target = runtime_dir / self._spec.onnx_subfolder / onnx_source.name
+        if genai_config_path.exists():
+            _link_or_copy(onnx_source, onnx_target)
+        else:
+            self._prepare_qwen35_onnx(onnx_source, onnx_target)
+        for source in (Path(path) for path in info.external_data_paths):
             _link_or_copy(source, runtime_dir / self._spec.onnx_subfolder / source.name)
 
-        config = json.loads((snapshot_dir / "genai_config.json").read_text(encoding="utf-8"))
+        if genai_config_path.exists():
+            config = json.loads(genai_config_path.read_text(encoding="utf-8"))
+        else:
+            config = self._build_qwen35_genai_config(snapshot_dir)
         decoder = config.setdefault("model", {}).setdefault("decoder", {})
         decoder["filename"] = f"{self._spec.onnx_subfolder}/{self._spec.onnx_file}"
         decoder.setdefault("session_options", {})["provider_options"] = []
@@ -241,6 +256,124 @@ class GenAiRuntimeBundle:
             encoding="utf-8",
         )
         return runtime_dir
+
+    def _prepare_qwen35_onnx(self, source: Path, target: Path) -> None:
+        """Rename Transformers.js cache tensors to the ORT GenAI convention."""
+        if self._spec.name != DEFAULT_QWEN_MODEL_ALIAS:
+            raise OnnxChatModelError(
+                f"Custom managed Qwen model `{self._spec.name}` must provide genai_config.json."
+            )
+        try:
+            import onnx
+        except ImportError as e:
+            raise OnnxChatModelError(
+                "Managed Qwen3.5 enrichment requires `onnx` to prepare the "
+                "ONNX Community graph for ONNX Runtime GenAI."
+            ) from e
+
+        model = onnx.load(str(source), load_external_data=False)
+        renamed: dict[str, str] = {}
+        for value in (*model.graph.input, *model.graph.output):
+            new_name = _qwen35_genai_tensor_name(value.name)
+            if new_name != value.name:
+                renamed[value.name] = new_name
+                value.name = new_name
+        for node in model.graph.node:
+            for index, name in enumerate(node.input):
+                node.input[index] = renamed.get(name, name)
+            for index, name in enumerate(node.output):
+                node.output[index] = renamed.get(name, name)
+
+        # ORT GenAI supplies num_logits_to_keep as a one-element tensor. The
+        # Transformers.js export unsqueezes it once more, producing invalid
+        # two-dimensional Slice starts. Reshape accepts either representation
+        # and guarantees the one-dimensional input Slice requires.
+        logits_shape_name = "fitz_sage_num_logits_to_keep_shape"
+        model.graph.initializer.append(
+            onnx.helper.make_tensor(
+                logits_shape_name,
+                onnx.TensorProto.INT64,
+                dims=[1],
+                vals=[-1],
+            )
+        )
+        adapted_logits_input = False
+        for node in model.graph.node:
+            if node.name == "/lm_head/num_logits_to_keep/Unsqueeze":
+                node.op_type = "Reshape"
+                node.input[1] = logits_shape_name
+                del node.attribute[:]
+                adapted_logits_input = True
+                break
+        if not adapted_logits_input:
+            raise OnnxChatModelError(
+                "The managed Qwen3.5 ONNX graph does not match its pinned export contract."
+            )
+
+        if target.exists():
+            target.unlink()
+        onnx.save(model, str(target))
+
+    def _build_qwen35_genai_config(self, snapshot_dir: Path) -> dict[str, Any]:
+        """Build the ORT GenAI manifest omitted by the ONNX Community export."""
+        if self._spec.name != DEFAULT_QWEN_MODEL_ALIAS:
+            raise OnnxChatModelError(
+                f"Custom managed Qwen model `{self._spec.name}` must provide genai_config.json."
+            )
+
+        hf_config = json.loads((snapshot_dir / "config.json").read_text(encoding="utf-8"))
+        model_type = str(hf_config.get("model_type", ""))
+        if model_type != "qwen3_5_text":
+            raise OnnxChatModelError(
+                "The managed Qwen3.5 snapshot has an unexpected model type: "
+                f"`{model_type or 'missing'}`."
+            )
+
+        eos_token_id = int(hf_config["eos_token_id"])
+        return {
+            "model": {
+                "bos_token_id": 1,
+                "context_length": int(hf_config["max_position_embeddings"]),
+                "decoder": {
+                    "session_options": {
+                        "log_id": "onnxruntime-genai",
+                        "provider_options": [],
+                    },
+                    "filename": f"{self._spec.onnx_subfolder}/{self._spec.onnx_file}",
+                    "head_size": int(hf_config["head_dim"]),
+                    "hidden_size": int(hf_config["hidden_size"]),
+                    "inputs": {
+                        "input_ids": "input_ids",
+                        "attention_mask": "attention_mask",
+                        "past_key_names": "past_key_values.%d.key",
+                        "past_value_names": "past_key_values.%d.value",
+                    },
+                    "outputs": {
+                        "logits": "logits",
+                        "present_key_names": "present.%d.key",
+                        "present_value_names": "present.%d.value",
+                    },
+                    "num_attention_heads": int(hf_config["num_attention_heads"]),
+                    "num_hidden_layers": int(hf_config["num_hidden_layers"]),
+                    "num_key_value_heads": int(hf_config["num_key_value_heads"]),
+                },
+                "eos_token_id": [eos_token_id],
+                "pad_token_id": eos_token_id,
+                "type": model_type,
+                "vocab_size": int(hf_config["vocab_size"]),
+            },
+            "search": {
+                "do_sample": False,
+                "early_stopping": True,
+                "max_length": DEFAULT_MAX_CONTEXT_TOKENS,
+                "num_beams": 1,
+                "num_return_sequences": 1,
+                "past_present_share_buffer": True,
+                "temperature": 0,
+                "top_k": 50,
+                "top_p": 1.0,
+            },
+        }
 
 
 class OnnxGenAiGenerator:
@@ -337,7 +470,7 @@ class _LoadedOnnxChatRuntime:
     run_lock: threading.Lock
 
 
-_ONNX_CHAT_RUNTIME_CACHE: dict[tuple[str, str, str], _LoadedOnnxChatRuntime] = {}
+_ONNX_CHAT_RUNTIME_CACHE: dict[tuple[str, str | None, str, str], _LoadedOnnxChatRuntime] = {}
 _ONNX_CHAT_RUNTIME_CACHE_LOCK = threading.Lock()
 
 
@@ -380,6 +513,20 @@ def _token_text(value: Any) -> str | None:
     return None
 
 
+def _qwen35_genai_tensor_name(name: str) -> str:
+    """Map ONNX Community Qwen3.5 cache names to ORT GenAI templates."""
+    replacements = (
+        (r"past_conv\.(\d+)", r"past_key_values.\1.conv_state"),
+        (r"past_recurrent\.(\d+)", r"past_key_values.\1.recurrent_state"),
+        (r"present_conv\.(\d+)", r"present.\1.conv_state"),
+        (r"present_recurrent\.(\d+)", r"present.\1.recurrent_state"),
+    )
+    for pattern, replacement in replacements:
+        if re.fullmatch(pattern, name):
+            return re.sub(pattern, replacement, name)
+    return name
+
+
 def _bundle_sha256(paths: list[Path]) -> str:
     """Compute a SHA256 checksum over model files in stable order."""
     digest = sha256()
@@ -400,12 +547,13 @@ def _resolve_qwen_spec(
     """Resolve a public provider spec into a managed Qwen model spec."""
     resolved = _MODEL_ALIASES.get(model_id)
     if resolved:
-        repo_id, default_subfolder, default_file = resolved
+        repo_id, default_subfolder, default_file, revision = resolved
         name = model_id
     else:
         repo_id = model_id
         default_subfolder = DEFAULT_QWEN_ONNX_SUBFOLDER
         default_file = DEFAULT_QWEN_ONNX_FILE
+        revision = None
         name = model_id
 
     return ManagedQwenSpec(
@@ -413,11 +561,12 @@ def _resolve_qwen_spec(
         repo_id=repo_id,
         onnx_subfolder=onnx_subfolder if onnx_subfolder is not None else default_subfolder,
         onnx_file=onnx_file if onnx_file is not None else default_file,
+        revision=revision,
     )
 
 
 class OnnxChat:
-    """Greedy CPU generation over the Fitz-managed Qwen3 0.6B ONNX GenAI graph."""
+    """CPU generation over the Fitz-managed Qwen3.5 0.8B Q4F16 ONNX graph."""
 
     def __init__(
         self,
@@ -514,7 +663,7 @@ class OnnxChat:
         if self._loaded_runtime is not None:
             return
         spec = self._snapshot.spec
-        cache_key = (spec.repo_id, spec.onnx_subfolder, spec.onnx_file)
+        cache_key = (spec.repo_id, spec.revision, spec.onnx_subfolder, spec.onnx_file)
         with _ONNX_CHAT_RUNTIME_CACHE_LOCK:
             runtime = _ONNX_CHAT_RUNTIME_CACHE.get(cache_key)
             if runtime is not None:
@@ -534,7 +683,7 @@ class OnnxChat:
                 tokenizer = self._load_tokenizer(snapshot_dir)
             except Exception as e:
                 raise OnnxChatModelError(
-                    "Could not load the tokenizer for Fitz's managed Qwen3 0.6B "
+                    f"Could not load the tokenizer for Fitz's managed Qwen `{spec.name}` "
                     f"ONNX model from {snapshot_dir}."
                 ) from e
 
@@ -550,7 +699,7 @@ class OnnxChat:
             except Exception as e:
                 raise OnnxChatModelError(
                     "Could not initialize ONNX Runtime GenAI for Fitz's managed "
-                    f"Qwen3 0.6B model at {runtime_dir}."
+                    f"Qwen `{spec.name}` model at {runtime_dir}."
                 ) from e
             runtime = _LoadedOnnxChatRuntime(
                 generator=generator,
@@ -637,6 +786,7 @@ def _link_or_copy(source: Path, target: Path) -> None:
 __all__ = [
     "DEFAULT_QWEN_MODEL_ALIAS",
     "DEFAULT_QWEN_MODEL_ID",
+    "DEFAULT_QWEN_MODEL_REVISION",
     "DEFAULT_QWEN_ONNX_FILE",
     "GenAiRuntimeBundle",
     "ManagedQwenSnapshot",

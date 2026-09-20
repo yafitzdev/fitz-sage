@@ -144,7 +144,7 @@ optional background work, plus one canonical optional endpoint provider —
 
 | Spec                                   | Resolves to                                              |
 | -------------------------------------- | -------------------------------------------------------- |
-| `onnx/qwen3-0.6b`                     | managed Qwen3 0.6B ONNX GenAI generation on CPU          |
+| `onnx/qwen3.5-0.8b`                   | managed Qwen3.5 0.8B Q4F16 ONNX generation on CPU        |
 | `endpoint/<model>`                    | model plus `chat_base_url` and optional API-key env       |
 | `openai/<model>`                       | endpoint pointing at `https://api.openai.com/v1`         |
 | `azure_openai/<deployment>`            | endpoint with Azure deployment URL                       |

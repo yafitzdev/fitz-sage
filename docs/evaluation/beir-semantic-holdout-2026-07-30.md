@@ -22,7 +22,7 @@ value and cost depend strongly on query and document shape.
   `606baf0b2be00b78aecc737a9d2f550521254be5e2845232029a69b824b1df78`
 - Queries: 120 ArguAna and 120 Quora queries
 - Executions: 960 Fitz-Sage queries across four variants
-- Expansion model: `onnx-community/Qwen3-0.6B-DQ-ONNX`
+- Expansion model: release-default managed ONNX expansion model
 - Reranker: INT8 `Alibaba-NLP/gte-reranker-modernbert-base`
 - Resumed queries: 0
 - Runtime: 6,975 seconds, about 1 hour 56 minutes

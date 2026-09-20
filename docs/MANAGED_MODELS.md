@@ -8,7 +8,7 @@ The standard retrieval path uses local CPU models.
 
 | Job | Model | Runtime | Why it exists |
 |---|---|---|---|
-| Semantic query terms and background enrichment | `onnx-community/Qwen3-0.6B-DQ-ONNX` (`qwen3-0.6b`) | `onnxruntime-genai`, CPU | Standard query expansion plus optional entity/hierarchy metadata. |
+| Semantic query terms and background enrichment | `onnx-community/Qwen3.5-0.8B-Text-ONNX` at revision `1e45daba048899e7f771657ada617ec49350aa91` (`qwen3.5-0.8b`, Q4F16) | `onnxruntime-genai`, CPU | Standard query expansion plus optional entity/hierarchy metadata. |
 | Reranking | `Alibaba-NLP/gte-reranker-modernbert-base` | raw `onnxruntime`, CPU | Cross-encoder precision over broad recall candidates. |
 | Governance | `yafitzdev/pyrrho-v2-nano-g1` at revision `948f0500b74871cfaec7689a01d4eab0dd516e1b` | raw `onnxruntime`, CPU | Accepted immutable Pyrrho default; custom local or commit-pinned models are supported. |
 
@@ -23,7 +23,7 @@ cache.
 
 | Model | Trigger |
 |---|---|
-| Qwen3 0.6B ONNX GenAI | First background-enrichment or semantic-query-keyword operation. `point()` does not load it. |
+| Qwen3.5 0.8B Q4F16 ONNX | First background-enrichment or semantic-query-keyword operation. `point()` does not load it. |
 | ONNX reranker | First retrieval pass that has enough candidates to rerank. |
 | Pyrrho v2 | First query-plan or evidence-decision call. |
 

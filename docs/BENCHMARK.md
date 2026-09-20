@@ -281,7 +281,7 @@ Run date: 2026-07-30. Run ID: `1785447318-d0a05a18`. Git commit:
 - 120 ArguAna and 120 Quora queries, selected before retrieval scores existed.
 - 8,674 ArguAna documents and 522,931 Quora documents.
 - 960 Fitz-Sage executions across the same four paired variants.
-- Expansion model: `onnx-community/Qwen3-0.6B-DQ-ONNX`.
+- Expansion model: release-default managed ONNX expansion model.
 - Reranker: INT8 `Alibaba-NLP/gte-reranker-modernbert-base`.
 - No resumed queries; all operational and integrity gates passed.
 - Runtime: 6,975 seconds, about 1 hour 56 minutes.

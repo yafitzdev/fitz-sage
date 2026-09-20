@@ -26,7 +26,7 @@ cost.
 - Canonical split digest:
   `74c2d04b613430f89052fa8a8f5fb9853e6f310289d2c9faa9381d89aaeabba5`
 - Index mode: source-only; optional document enrichment was disabled
-- Expansion model: `onnx-community/Qwen3-0.6B-DQ-ONNX`
+- Expansion model: release-default managed ONNX expansion model
 - Reranker: INT8 `Alibaba-NLP/gte-reranker-modernbert-base`, batch size 1
 - Governance: Fitz-Sage's exact configured Pyrrho model, with no override
 - Holdout executions: 1,312 Fitz-Sage queries across four paired variants

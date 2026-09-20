@@ -5,7 +5,7 @@ Configuration parser for LLM providers.
 There are two chat paths in fitz-sage:
 
 ``OnnxChat``
-              the managed in-process Qwen3 0.6B ONNX GenAI enrichment runtime.
+              the managed in-process Qwen3.5 0.8B Q4F16 ONNX enrichment runtime.
               This is the default for ingestion enrichment and needs no
               external inference server.
 ``OpenAICompatChat`` / ``OpenAICompatVision``
@@ -18,7 +18,7 @@ Provider names are configuration knobs over those implementations:
 
     endpoint  — bring your own URL + model. Default (and only) auth is
                 NoAuth; opt-in to ApiKeyAuth via ``auth.api_key_env``.
-    onnx      — managed local Qwen3 0.6B ONNX GenAI generation on CPU.
+    onnx      — managed local Qwen3.5 0.8B Q4F16 ONNX generation on CPU.
     openai    — preset for ``https://api.openai.com/v1`` + OPENAI_API_KEY,
                 with default models from OPENAI_CHAT_MODELS.
     azure_openai
@@ -283,9 +283,7 @@ def _resolve_endpoint_kwargs(
         )
     if require_model and not kwargs.get("model"):
         raise ValueError(
-            f"endpoint provider requires a model in the spec.\n"
-            f"Example:\n"
-            f"  {role}: endpoint/<model>"
+            f"endpoint provider requires a model in the spec.\nExample:\n  {role}: endpoint/<model>"
         )
     return auth, kwargs
 
@@ -333,7 +331,7 @@ def create_chat_provider(
     Create a chat provider from a spec string.
 
     Args:
-        spec: ``provider`` or ``provider/model`` (e.g. ``onnx/qwen3-0.6b``,
+        spec: ``provider`` or ``provider/model`` (e.g. ``onnx/qwen3.5-0.8b``,
             ``endpoint/qwen2.5-7b``, ``openai/gpt-4o``,
             ``azure_openai/my-deployment``).
         config: Optional config dict (auth, base_url, etc.).
@@ -423,7 +421,7 @@ def create_rerank_provider(
         return OnnxReranker(model_id=model or DEFAULT_MODEL_ID)
 
     raise ValueError(
-        f"Unknown rerank provider: {provider}. " f"Supported: 'onnx' or 'onnx/<hf-model-id>'."
+        f"Unknown rerank provider: {provider}. Supported: 'onnx' or 'onnx/<hf-model-id>'."
     )
 
 
@@ -460,7 +458,7 @@ def create_vision_provider(
         return OpenAICompatVision(auth, **kwargs)
 
     raise ValueError(
-        f"Unknown vision provider: {provider}. " f"Supported: 'endpoint', 'openai', 'azure_openai'."
+        f"Unknown vision provider: {provider}. Supported: 'endpoint', 'openai', 'azure_openai'."
     )
 
 

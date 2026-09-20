@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Set the managed query-expansion and enrichment model to the commit-pinned
+  Qwen3.5 0.8B Q4F16 ONNX export.
+
 ## [0.16.0] - 2026-08-08
 
 ### 🎉 Highlights
@@ -189,7 +194,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Section BM25 now ranks lightweight FTS row IDs before materializing only the
   winning source rows, avoiding full-content joins across large match sets
   without changing result order.
-- Documentation now names the actually shipped managed model, Qwen3 0.6B ONNX,
+- Documentation now names the managed model that shipped with this release
   rather than the deferred Qwen3.5 0.8B target.
 
 ### 🗑 Removed
@@ -241,8 +246,8 @@ top-2, ... evidence prefix is enough to answer.
 model uses the new v2 heads: `evidence_verdict`, `failure_mode`,
 `retrieval_intents`, and `evidence_kinds`.
 
-**Managed Qwen enrichment is standard.** Qwen3 0.6B ONNX is the
-required local runtime for semantic query keywords and ingestion
+**Managed Qwen enrichment is standard.** The release-default Qwen ONNX model
+is the required local runtime for semantic query keywords and ingestion
 enrichment. It is downloaded when missing and is not exposed as an
 optional user flag.
 
@@ -845,7 +850,7 @@ governance mode-match.
 
 ### 🎉 Highlights
 
-**Flat Config** — Single config file (`.fitz/config.yaml`) with flat `provider/model` keys. No nested `chat_kwargs`, no engine-specific config directory. `chat_fast: ollama/qwen3.5:0.6b` is the entire config for a chat tier. Auto-created on first run.
+**Flat Config** — Single config file (`.fitz/config.yaml`) with flat `provider/model` keys. No nested `chat_kwargs`, no engine-specific config directory. `chat_fast: ollama/qwen2.5:3b` is the entire config for a chat tier. Auto-created on first run.
 
 **Zero-Friction First Run** — `pip install fitz-sage` then `fitz query "Q" --source ./docs` just works. Auto-detects Ollama models, classifies into tiers, writes config. If models are missing, prompts to pull them. Fallback chain: Ollama → LM Studio → API keys → clear instructions.
 

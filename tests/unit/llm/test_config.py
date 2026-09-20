@@ -148,7 +148,7 @@ class TestUnknownProvider:
         """`onnx` dispatches the managed Qwen ONNX chat provider."""
         from fitz_sage.llm.providers.onnx_chat import DEFAULT_QWEN_MODEL_ID, OnnxChat
 
-        chat = create_chat_provider("onnx/qwen3-0.6b")
+        chat = create_chat_provider("onnx/qwen3.5-0.8b")
         assert isinstance(chat, OnnxChat)
         assert chat._snapshot.spec.repo_id == DEFAULT_QWEN_MODEL_ID
 

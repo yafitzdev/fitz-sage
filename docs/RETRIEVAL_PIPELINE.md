@@ -226,7 +226,7 @@ the query contract/profile calls for a representative corpus overview.
 
 | Model/runtime | Required? | Used for |
 |---------------|-----------|----------|
-| Managed Qwen3 0.6B ONNX GenAI | standard for query expansion; optional for background work | query semantic keywords, entities, and hierarchy |
+| Managed Qwen3.5 0.8B Q4F16 ONNX | standard for query expansion; optional for background work | query semantic keywords, entities, and hierarchy |
 | ONNX reranker | default | candidate precision after broad recall |
 | Reviewed local Pyrrho v2 model | required product governance | native evidence verdict, failure mode, retrieval intents, and evidence-kind metadata |
 | OpenAI-compatible endpoint | optional | answer synthesis, optional query intelligence, optional vision parser |

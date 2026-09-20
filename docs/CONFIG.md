@@ -85,7 +85,7 @@ runtime. Optional synthesis, query intelligence, and vision can use
 
 | Spec form                       | Resolves to                                              |
 | ------------------------------- | -------------------------------------------------------- |
-| `onnx/qwen3-0.6b`             | managed local Qwen3 0.6B ONNX GenAI runtime                  |
+| `onnx/qwen3.5-0.8b`           | managed local Qwen3.5 0.8B Q4F16 ONNX runtime                |
 | `endpoint/<model>` + `chat_base_url` | canonical custom endpoint form                       |
 | `openai/<model>`                | endpoint pointing at `https://api.openai.com/v1`         |
 | `azure_openai/<deployment>`     | endpoint with Azure deployment URL                       |
