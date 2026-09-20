@@ -412,13 +412,14 @@ and case-level evidence are in [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 
 | Boundary | Current behavior | Responsibility |
 |----------|------------------|----------------|
+| Query rewriting | Conversational, ambiguous, or context-dependent questions must be rewritten before submission | `user` |
+| Private vocabulary | Corpus-stated aliases are learned; undocumented mappings are not inferred | `user` |
+| Raw logs and scans | Logs need compression; scans need an OCR/vision parser | `user` |
+| Long or unrelated requests | Query scope, retrieval budgets, and evidence sufficiency interact | `user` + `fitz-sage` + `pyrrho` |
+| Governance context | `pyrrho` currently accepts up to 2,048 tokens | `pyrrho` |
 | Identifier forms | Observed identifiers gain mechanical forms such as `AuthService` ↔ `Auth Service` | `fitz-sage` |
-| Private vocabulary | Corpus-stated aliases are learned; undocumented mappings are not inferred | User data preparation |
-| Raw logs and scans | Logs need compression; scans need an OCR/vision parser | User input pipeline |
-| Long or unrelated requests | Retrieval and evidence budgets are finite | Shared boundary |
 | Multi-document ranking | Weaker than single-document ranking on the enterprise holdout | `fitz-sage` |
 | Extreme file counts | Public re-pointing still walks and hashes every source file | `fitz-sage` |
-| Governance context | `pyrrho` currently accepts up to 2,048 tokens | `pyrrho` |
 
 </details>
 
