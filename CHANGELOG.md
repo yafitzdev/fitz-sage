@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-09-21
+
+### 🔄 Changed
+
+- Updated the current documentation to describe deterministic corpus-term
+  expansion, user-owned query rewriting, and the literal identifier boundary.
+- Added the latest production, ArguAna, and latency measurements to the README
+  and readiness documentation.
+
+### 🔧 Fixed
+
+- Corrected the README coverage badge to the measured 78% unit-test coverage.
+- Removed stale current documentation for the retired query-rewriting feature.
+
 ## [0.16.1] - 2026-09-20
 
 ### 🚀 Added
@@ -2691,7 +2705,8 @@ Initial release of Fitz RAG framework.
 
 ---
 
-[Unreleased]: https://github.com/yafitzdev/fitz-sage/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/yafitzdev/fitz-sage/compare/v0.16.2...HEAD
+[0.16.2]: https://github.com/yafitzdev/fitz-sage/compare/v0.16.1...v0.16.2
 [0.16.1]: https://github.com/yafitzdev/fitz-sage/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/yafitzdev/fitz-sage/compare/v0.14.1...v0.15.0
