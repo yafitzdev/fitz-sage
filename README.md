@@ -91,8 +91,8 @@ inspect, display, store, or pass to a synthesizer.
 as symbols, documents as sections, and tables as SQLite-backed data. Queries are routed across those
 typed surfaces with retrieval strategies that match the source structure.
 
-⭐ Governance is enforced by [`pyrrho`](https://huggingface.co/yafitzdev) in local CPU forward passes. `fitz-sage` starts with the
-first three ranked sources and adds two only while `pyrrho` returns `INSUFFICIENT`.
+⭐ Governance is enforced by [`pyrrho`](https://huggingface.co/yafitzdev/pyrrho-v2-nano-g1) in local CPU forward passes. `fitz-sage` starts with the
+first three ranked sources and iteratively adds two while `pyrrho` returns that evidence is `INSUFFICIENT`.
 
 Yan Fitzner — ([LinkedIn](https://www.linkedin.com/in/yan-fitzner/), [GitHub](https://github.com/yafitzdev), [HuggingFace](https://huggingface.co/yafitzdev)).
 
@@ -186,10 +186,6 @@ and retrieval.
 
 <br>
 
-The query-ready path is keyword-first: exact query terms, collection-derived
-semantic terms, and BM25. Enriched collections can additionally use hierarchy
-summaries, entity links, and broader context expansion.
-
 [Built-in intelligence](docs/features/retrieval) handles the edge cases that break simple search:
 
 <br>
@@ -214,10 +210,6 @@ summaries, entity links, and broader context expansion.
 > [!IMPORTANT]
 > Retrieval intelligence is baked in. Configuration declares providers; the engine decides which retrieval capabilities a
 > query needs.
-
-Fitz-Sage does not rewrite conversational or ambiguous queries. Rewrite those
-queries before submitting them when the question depends on context that is not
-present in the query itself. See [Limitations](docs/LIMITATIONS.md).
 
 ---
 
@@ -380,10 +372,6 @@ exact serialized decisions with the `EvidencePack`. Applications can answer,
 retry, show conflict, or request more source material.
 
 <br>
-
-> [!NOTE]
-> Governance is a source-evidence judgment. `pyrrho` is trained to decide whether retrieved evidence is sufficient,
-> disputed, or insufficient, and `fitz-sage` records that judgment in the returned metadata.
 
 <strong>The model adapter fails closed on known contract violations 🛡️</strong>
 > `fitz-sage`'s managed `pyrrho` adapter checks the model artifact, label order, ONNX
@@ -581,32 +569,32 @@ build on source evidence.
 <br>
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         fitz-sage                               │
-├─────────────────────────────────────────────────────────────────┤
-│  User Interfaces                                                │
-│  CLI: retrieve | explain | replay | answer | collections | serve│
-│  SDK: fitz_sage.evidence(source=...)                            │
-│  API: /answer | /evidence | /chat | /collections | /health      │
-├─────────────────────────────────────────────────────────────────┤
-│  Engine                                                         │
-│  FitzKRAG: typed retrieval over code, documents, and tables     │
-├─────────────────────────────────────────────────────────────────┤
-│  Evidence Contract                                              │
-│  EvidencePack: items | mode | reasons | timings | metadata      │
-├─────────────────────────────────────────────────────────────────┤
-│  Pyrrho                                                         │
-│  evidence verdict | failure mode | evidence metadata            │
-├─────────────────────────────────────────────────────────────────┤
-│  Local CPU Models                                               │
-│  ONNX reranker | SQLite semantic term graph | Pyrrho           │
-├─────────────────────────────────────────────────────────────────┤
-│  Storage                                                        │
-│  SQLite + FTS5, one .db per collection                          │
-├─────────────────────────────────────────────────────────────────┤
-│  Optional OpenAI-Compatible Endpoint                            │
-│  answer synthesis | background enrichment | vision              │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                         fitz-sage                                │
+├──────────────────────────────────────────────────────────────────┤
+│  User Interfaces                                                 │
+│  CLI: retrieve | explain | replay | answer | collections | serve │
+│  SDK: fitz_sage.evidence(source=...)                             │
+│  API: /answer | /evidence | /chat | /collections | /health       │
+├──────────────────────────────────────────────────────────────────┤
+│  Engine                                                          │
+│  FitzKRAG: typed retrieval over code, documents, and tables      │
+├──────────────────────────────────────────────────────────────────┤
+│  Evidence Contract                                               │
+│  EvidencePack: items | mode | reasons | timings | metadata       │
+├──────────────────────────────────────────────────────────────────┤
+│  Pyrrho                                                          │
+│  evidence verdict | failure mode | evidence metadata             │
+├──────────────────────────────────────────────────────────────────┤
+│  Local CPU Models                                                │
+│  ONNX reranker | SQLite semantic term graph | Pyrrho             │
+├──────────────────────────────────────────────────────────────────┤
+│  Storage                                                         │
+│  SQLite + FTS5, one .db per collection                           │
+├──────────────────────────────────────────────────────────────────┤
+│  Optional OpenAI-Compatible Endpoint                             │
+│  answer synthesis | background enrichment | vision               │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 </details>
